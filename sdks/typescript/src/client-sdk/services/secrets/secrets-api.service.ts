@@ -54,8 +54,16 @@ export class SecretsApiService {
     return projectId;
   }
 
-  private async request<T>(path: string, options?: RequestInit): Promise<T> {
-    const projectId = await this.projectId();
+  /** One operation's request; the caller resolves `projectId` once for URL, body and header. */
+  private async request<T>({
+    projectId,
+    path,
+    options,
+  }: {
+    projectId: string;
+    path: string;
+    options?: RequestInit;
+  }): Promise<T> {
     const response = await langwatchFetch(`${this.endpoint}${path}`, {
       ...options,
       headers: mergeHeaders(
@@ -98,36 +106,44 @@ export class SecretsApiService {
 
   async getAll(): Promise<SecretResponse[]> {
     const projectId = await this.projectId();
-    return this.request<SecretResponse[]>(
-      `/api/v1/secrets?projectId=${encodeURIComponent(projectId)}`,
-    );
+    return this.request<SecretResponse[]>({
+      projectId,
+      path: `/api/v1/secrets?projectId=${encodeURIComponent(projectId)}`,
+    });
   }
 
   async get(id: string): Promise<SecretResponse> {
     const projectId = await this.projectId();
-    return this.request<SecretResponse>(
-      `/api/v1/secrets/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
-    );
+    return this.request<SecretResponse>({
+      projectId,
+      path: `/api/v1/secrets/${encodeURIComponent(id)}?projectId=${encodeURIComponent(projectId)}`,
+    });
   }
 
   async create(body: { name: string; value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>("/api/v1/secrets", {
-      method: "POST",
-      body: JSON.stringify({ projectId: await this.projectId(), ...body }),
+    const projectId = await this.projectId();
+    return this.request<SecretResponse>({
+      projectId,
+      path: "/api/v1/secrets",
+      options: { method: "POST", body: JSON.stringify({ projectId, ...body }) },
     });
   }
 
   async update(id: string, body: { value: string }): Promise<SecretResponse> {
-    return this.request<SecretResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
-      method: "PUT",
-      body: JSON.stringify({ projectId: await this.projectId(), ...body }),
+    const projectId = await this.projectId();
+    return this.request<SecretResponse>({
+      projectId,
+      path: `/api/v1/secrets/${encodeURIComponent(id)}`,
+      options: { method: "PUT", body: JSON.stringify({ projectId, ...body }) },
     });
   }
 
   async delete(id: string): Promise<SecretDeleteResponse> {
-    return this.request<SecretDeleteResponse>(`/api/v1/secrets/${encodeURIComponent(id)}`, {
-      method: "DELETE",
-      body: JSON.stringify({ projectId: await this.projectId() }),
+    const projectId = await this.projectId();
+    return this.request<SecretDeleteResponse>({
+      projectId,
+      path: `/api/v1/secrets/${encodeURIComponent(id)}`,
+      options: { method: "DELETE", body: JSON.stringify({ projectId }) },
     });
   }
 }

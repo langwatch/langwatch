@@ -72,7 +72,9 @@ This is deliberate rather than a failure state, so an unlicensed deployment alwa
 - Email sign-up and sign-in stay available.
 - **Forgot password** stays available, so anyone whose account was originally created through an identity provider can recover through their inbox. It can only deliver if outbound email is configured; without it the screen says so rather than claiming a link was sent.
 
-Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. If `AUTH_PROVIDER` (or the older `NEXTAUTH_PROVIDER`) names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
+Once a license is present **and the configured identity provider actually starts**, the deployment flips to SSO and the email routes close, so no password account can be minted on a licensed install. `LOCAL_PASSWORDS_ENABLED=on` keeps the email routes open next to the identity provider.
+
+If `AUTH_PROVIDER` (or the older `NEXTAUTH_PROVIDER`) names a provider LangWatch does not recognise or one whose credentials are missing, the deployment stays in email mode with the email routes open even though it is licensed, so a typo in a provider name cannot lock everyone out.
 
 <Warning>
 **Upgrading a deployment that predates this gate, where everyone signs in through SSO.** Before the license gate existed, the SSO environment variables alone were enough, so an unlicensed deployment can have a whole team of identity-provider accounts on it.

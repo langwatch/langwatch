@@ -344,7 +344,7 @@
       ],
       "views": [
         {
-          "name": "analytics.traces",
+          "name": "traces",
           "description": "One row per trace, with its timing, token, cost and error rollups.",
           "grain": "one row per (TenantId, TraceId), latest version only",
           "joinKeys": [
@@ -616,10 +616,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceId, TraceName, OccurredAt\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceId, TraceName, OccurredAt\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.spans",
+          "name": "spans",
           "description": "One row per span, with its timing, status and attributes.",
           "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
           "joinKeys": [
@@ -793,10 +793,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceId, SpanId, ParentSpanId\nFROM spans\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.evaluations",
+          "name": "evaluations",
           "description": "One row per evaluation run, with its score and outcome.",
           "grain": "one row per (TenantId, EvaluationId), latest version only",
           "joinKeys": [
@@ -956,10 +956,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT EvaluationId, TraceId, EvaluatorId\nFROM analytics.evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\nORDER BY ScheduledAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT EvaluationId, TraceId, EvaluatorId\nFROM evaluations\nWHERE ScheduledAt >= subtractDays(now(), 7)\nORDER BY ScheduledAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.simulations",
+          "name": "simulations",
           "description": "One row per simulation run, with its verdict and criteria.",
           "grain": "one row per (TenantId, ScenarioRunId), latest version only",
           "joinKeys": [
@@ -1135,10 +1135,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScenarioRunId, ScenarioId, BatchRunId\nFROM analytics.simulations\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScenarioRunId, ScenarioId, BatchRunId\nFROM simulations\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.trace_metrics",
+          "name": "trace_metrics",
           "description": "One row per trace, time-sorted, carrying its metrics and the user, conversation, customer and origin dimensions. Count traces with uniqExact(TraceId).",
           "grain": "one row per (TenantId, OccurredAt, TraceId), latest version only; one row per trace wherever OccurredAt held still",
           "joinKeys": [
@@ -1369,10 +1369,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceId, OccurredAt, UpdatedAt\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.trace_metrics_by_minute",
+          "name": "trace_metrics_by_minute",
           "description": "Trace and span metrics summed per minute. Every measure is a sum: divide by TraceCount for a per-trace average.",
           "grain": "one row per (TenantId, BucketStart), every measure summed",
           "joinKeys": [
@@ -1493,10 +1493,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT BucketStart, SpanCount, TraceCount\nFROM analytics.trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT BucketStart, SpanCount, TraceCount\nFROM trace_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.model_usage_by_minute",
+          "name": "model_usage_by_minute",
           "description": "Span metrics summed per minute, per model and span type: span counts, costs and tokens.",
           "grain": "one merged row per (TenantId, BucketStart, Model, SpanType), every measure summed",
           "joinKeys": [
@@ -1611,10 +1611,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT BucketStart, Model, SpanType\nFROM analytics.model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT BucketStart, Model, SpanType\nFROM model_usage_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.evaluation_metrics",
+          "name": "evaluation_metrics",
           "description": "One row per evaluation, its latest state, time-sorted, carrying its outcome, cost and the trace dimensions it inherited.",
           "grain": "one row per (TenantId, EvaluationId), latest version only",
           "joinKeys": [
@@ -1799,10 +1799,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT EvaluationId, OccurredAt, UpdatedAt\nFROM analytics.evaluation_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT EvaluationId, OccurredAt, UpdatedAt\nFROM evaluation_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.evaluation_metrics_by_minute",
+          "name": "evaluation_metrics_by_minute",
           "description": "Evaluation outcomes summed per minute, per evaluator type and terminal status. Every measure is a sum: pass rate is PassCount over PassCount plus FailCount.",
           "grain": "one merged row per (TenantId, BucketStart, EvaluatorType, Status), every measure summed",
           "joinKeys": [
@@ -1933,10 +1933,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT BucketStart, EvaluatorType, Status\nFROM analytics.evaluation_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT BucketStart, EvaluatorType, Status\nFROM evaluation_metrics_by_minute\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.coding_sessions",
+          "name": "coding_sessions",
           "description": "One row per coding-agent session, with its shape, economics, git context and outcome. Deduplicated by session.",
           "grain": "one row per (TenantId, SessionId), latest version only",
           "joinKeys": [
@@ -2651,10 +2651,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SessionId, SessionKeySource, StartedAt\nFROM analytics.coding_sessions\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT SessionId, SessionKeySource, StartedAt\nFROM coding_sessions\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.coding_session_events",
+          "name": "coding_session_events",
           "description": "One row per coding-agent session event: model calls, compactions, rate limits, tool runs and more, in event order.",
           "grain": "one row per (TenantId, SessionId, TimeUnixMs, RecordId)",
           "joinKeys": [
@@ -3028,10 +3028,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SessionId, TimeUnixMs, RecordId\nFROM analytics.coding_session_events\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
+          "exampleSql": "SELECT SessionId, TimeUnixMs, RecordId\nFROM coding_session_events\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.coding_tool_results",
+          "name": "coding_tool_results",
           "description": "One row per coding-agent tool call, with the text it printed back to the agent.",
           "grain": "one row per (TenantId, TraceId, SpanId), latest version only",
           "joinKeys": [
@@ -3127,10 +3127,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceId, SpanId, StartTime\nFROM analytics.coding_tool_results\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceId, SpanId, StartTime\nFROM coding_tool_results\nWHERE StartTime >= subtractDays(now(), 7)\nORDER BY StartTime DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.judgments",
+          "name": "judgments",
           "description": "One row per Instant Eval run, trace and question, with the verdict the judge gave.",
           "grain": "one row per (TenantId, RunId, TraceId, SpanId, QuestionId), latest version only",
           "joinKeys": [
@@ -3269,10 +3269,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RunId, TraceId, QuestionId\nFROM analytics.judgments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT RunId, TraceId, QuestionId\nFROM judgments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.billing_events",
+          "name": "billing_events",
           "description": "Billing events for customer invoice generation",
           "grain": "one row per DeduplicationKeyHash",
           "joinKeys": [
@@ -3356,10 +3356,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT OrganizationId, EventId, EventType\nFROM analytics.billing_events\nWHERE EventTimestamp >= subtractDays(now(), 7)\nORDER BY EventTimestamp DESC\nLIMIT 100"
+          "exampleSql": "SELECT OrganizationId, EventId, EventType\nFROM billing_events\nWHERE EventTimestamp >= subtractDays(now(), 7)\nORDER BY EventTimestamp DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.coding_trace_sessions",
+          "name": "coding_trace_sessions",
           "description": "Correlates a trace to the coding-agent session it belongs to.",
           "grain": "one row per (TenantId, TraceId)",
           "joinKeys": [
@@ -3419,10 +3419,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceId, SessionId, OccurredAt\nFROM analytics.coding_trace_sessions\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceId, SessionId, OccurredAt\nFROM coding_trace_sessions\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.dspy_optimizer_steps",
+          "name": "dspy_optimizer_steps",
           "description": "DSPy optimizer steps with prompts, examples, and LLM call details",
           "grain": "one row per (ExperimentId, RunId, StepIndex)",
           "joinKeys": [
@@ -3616,10 +3616,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT Id, ExperimentId, RunId\nFROM analytics.dspy_optimizer_steps\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT Id, ExperimentId, RunId\nFROM dspy_optimizer_steps\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.experiment_items",
+          "name": "experiment_items",
           "description": "Individual item results within an experiment run with evaluations",
           "grain": "one row per (RunId, ProjectionId)",
           "joinKeys": [
@@ -3883,10 +3883,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_items\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM experiment_items\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.experiment_run_results",
+          "name": "experiment_run_results",
           "description": "Experiment run results: completion counts, cost, and aggregate scores",
           "grain": "one row per (RunId, ExperimentId)",
           "joinKeys": [
@@ -4145,10 +4145,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_budget_ledger",
+          "name": "gateway_budget_ledger",
           "description": "Budget ledger entries per request with token counts and spend",
           "grain": "one row per (BudgetId, GatewayRequestId)",
           "joinKeys": [
@@ -4344,10 +4344,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT BudgetId, Scope, ScopeId\nFROM analytics.gateway_budget_ledger\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT BudgetId, Scope, ScopeId\nFROM gateway_budget_ledger\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_budget_totals",
+          "name": "gateway_budget_totals",
           "description": "Per-scope budget totals, merged from the aggregating rollup: spend, token counts and request count per budget window.",
           "grain": "one row per (TenantId, Scope, ScopeId, Window, PeriodStart, BudgetId), latest version only",
           "joinKeys": [
@@ -4480,10 +4480,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT Scope, ScopeId, Window\nFROM analytics.gateway_budget_totals\nWHERE PeriodStart >= subtractDays(now(), 7)\nORDER BY PeriodStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT Scope, ScopeId, Window\nFROM gateway_budget_totals\nWHERE PeriodStart >= subtractDays(now(), 7)\nORDER BY PeriodStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_request_spend",
+          "name": "gateway_request_spend",
           "description": "Individual API request spend and reconciliation details",
           "grain": "one row per GatewayRequestId",
           "joinKeys": [
@@ -4832,10 +4832,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayRequestId, OrganizationId, VirtualKeyId\nFROM analytics.gateway_request_spend\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayRequestId, OrganizationId, VirtualKeyId\nFROM gateway_request_spend\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.governance_cost_restatements",
+          "name": "governance_cost_restatements",
           "description": "Index of cost-rollup restatements, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, RestatementKey)",
           "joinKeys": [
@@ -4947,10 +4947,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RestatementKey, Day, IngestionSourceId\nFROM analytics.governance_cost_restatements\nWHERE Day >= subtractDays(now(), 7)\nORDER BY Day DESC\nLIMIT 100"
+          "exampleSql": "SELECT RestatementKey, Day, IngestionSourceId\nFROM governance_cost_restatements\nWHERE Day >= subtractDays(now(), 7)\nORDER BY Day DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.governance_daily_cost_rollup",
+          "name": "governance_daily_cost_rollup",
           "description": "Daily cost rollups per tenant, provider and model, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, Day, CostSource, IngestionSourceId, Provider, Model, AgentId, CurrencyCode, RawActorId)",
           "joinKeys": [
@@ -5210,10 +5210,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT Day, IngestionSourceId, Provider\nFROM analytics.governance_daily_cost_rollup\nWHERE Day >= subtractDays(now(), 7)\nORDER BY Day DESC\nLIMIT 100"
+          "exampleSql": "SELECT Day, IngestionSourceId, Provider\nFROM governance_daily_cost_rollup\nWHERE Day >= subtractDays(now(), 7)\nORDER BY Day DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.governance_hourly_kpis",
+          "name": "governance_hourly_kpis",
           "description": "Hourly spend and token KPIs per source, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, SourceId, HourBucket, TraceId)",
           "joinKeys": [
@@ -5308,10 +5308,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SourceId, HourBucket, TraceId\nFROM analytics.governance_hourly_kpis\nWHERE HourBucket >= subtractDays(now(), 7)\nORDER BY HourBucket DESC\nLIMIT 100"
+          "exampleSql": "SELECT SourceId, HourBucket, TraceId\nFROM governance_hourly_kpis\nWHERE HourBucket >= subtractDays(now(), 7)\nORDER BY HourBucket DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.governance_security_events",
+          "name": "governance_security_events",
           "description": "Raw OCSF-shaped security events, keyed by the org's internal_governance project; visible only to a caller whose project set includes it.",
           "grain": "one row per (TenantId, EventId)",
           "joinKeys": [
@@ -5496,10 +5496,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT OcsfSchemaVersion, EventId, TraceId\nFROM analytics.governance_security_events\nWHERE EventTime >= subtractDays(now(), 7)\nORDER BY EventTime DESC\nLIMIT 100"
+          "exampleSql": "SELECT OcsfSchemaVersion, EventId, TraceId\nFROM governance_security_events\nWHERE EventTime >= subtractDays(now(), 7)\nORDER BY EventTime DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_conversation_messages",
+          "name": "langy_conversation_messages",
           "description": "Langy conversation turns, one row per message.",
           "grain": "one row per (TenantId, ConversationId, MessageId)",
           "joinKeys": [
@@ -5567,10 +5567,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ConversationId, MessageId, Role\nFROM analytics.langy_conversation_messages\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ConversationId, MessageId, Role\nFROM langy_conversation_messages\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_usage_events",
+          "name": "langy_usage_events",
           "description": "Langy usage telemetry: tool calls, outcomes and durations.",
           "grain": "one row per (TenantId, OccurredAt, EventId)",
           "joinKeys": [
@@ -5718,10 +5718,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT EventId, EventType, EventVersion\nFROM analytics.langy_usage_events\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT EventId, EventType, EventVersion\nFROM langy_usage_events\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.legacy_event_log",
+          "name": "legacy_event_log",
           "description": "Legacy append-only event log, superseded by the canonical fact tables",
           "grain": "one row per (AggregateType, AggregateId, IdempotencyKey)",
           "joinKeys": [
@@ -5849,10 +5849,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IdempotencyKey, AggregateType, AggregateId\nFROM analytics.legacy_event_log\nWHERE EventOccurredAt >= subtractDays(now(), 7)\nORDER BY EventOccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IdempotencyKey, AggregateType, AggregateId\nFROM legacy_event_log\nWHERE EventOccurredAt >= subtractDays(now(), 7)\nORDER BY EventOccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.legacy_log_records",
+          "name": "legacy_log_records",
           "description": "Pre-canonical OpenTelemetry log record storage, superseded by log_records; retained for rolling-deployment reads and draining under its own TTL.",
           "grain": "one row per (TraceId, SpanId, ProjectionId), latest version only",
           "joinKeys": [
@@ -5995,10 +5995,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectionId, TraceId, SpanId\nFROM analytics.legacy_log_records\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectionId, TraceId, SpanId\nFROM legacy_log_records\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.legacy_metric_records",
+          "name": "legacy_metric_records",
           "description": "Pre-canonical OpenTelemetry metric record storage, superseded by the metric_data_points family; retained for rolling-deployment reads and draining under its own TTL.",
           "grain": "one row per (TraceId, SpanId, MetricName, ProjectionId), latest version only",
           "joinKeys": [
@@ -6131,10 +6131,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectionId, TraceId, SpanId\nFROM analytics.legacy_metric_records\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectionId, TraceId, SpanId\nFROM legacy_metric_records\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.log_ingestion_usage",
+          "name": "log_ingestion_usage",
           "description": "Per-tenant log ingestion usage estimates.",
           "grain": "one row per (OrganizationId, RecordId), latest version only",
           "joinKeys": [
@@ -6218,10 +6218,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT OrganizationId, RecordId, ProviderKind\nFROM analytics.log_ingestion_usage\nWHERE AcceptedAt >= subtractDays(now(), 7)\nORDER BY AcceptedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT OrganizationId, RecordId, ProviderKind\nFROM log_ingestion_usage\nWHERE AcceptedAt >= subtractDays(now(), 7)\nORDER BY AcceptedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.logs",
+          "name": "logs",
           "description": "Canonical OpenTelemetry log records: requests, responses and provider events, correlated to their trace and span.",
           "grain": "one row per (TenantId, TraceId, TimeUnixMs, RecordId)",
           "joinKeys": [
@@ -6630,10 +6630,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RecordId, ResourceSchemaUrl, ResourceDroppedAttributesCount\nFROM analytics.logs\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
+          "exampleSql": "SELECT RecordId, ResourceSchemaUrl, ResourceDroppedAttributesCount\nFROM logs\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.metric_ingestion_usage",
+          "name": "metric_ingestion_usage",
           "description": "Per-tenant metric ingestion usage estimates",
           "grain": "one row per (OrganizationId, PointId), latest version only",
           "joinKeys": [
@@ -6726,10 +6726,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT OrganizationId, PointId, SeriesId\nFROM analytics.metric_ingestion_usage\nWHERE AcceptedAt >= subtractDays(now(), 7)\nORDER BY AcceptedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT OrganizationId, PointId, SeriesId\nFROM metric_ingestion_usage\nWHERE AcceptedAt >= subtractDays(now(), 7)\nORDER BY AcceptedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.metric_points",
+          "name": "metric_points",
           "description": "Individual metric data points with gauges, sums, histograms, and summaries",
           "grain": "one row per (SeriesId, TimeUnixMs, PointId)",
           "joinKeys": [
@@ -7136,10 +7136,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PointId, SeriesId, ResourceSchemaUrl\nFROM analytics.metric_points\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
+          "exampleSql": "SELECT PointId, SeriesId, ResourceSchemaUrl\nFROM metric_points\nWHERE TimeUnixMs >= subtractDays(now(), 7)\nORDER BY TimeUnixMs DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.metric_rollups",
+          "name": "metric_rollups",
           "description": "Time-bucketed rollups of a metric series: per-bucket min, max, sum, count and histogram buckets.",
           "grain": "one row per (SeriesId, BucketStart)",
           "joinKeys": [
@@ -7382,10 +7382,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SeriesId, MetricName, MetricUnit\nFROM analytics.metric_rollups\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT SeriesId, MetricName, MetricUnit\nFROM metric_rollups\nWHERE BucketStart >= subtractDays(now(), 7)\nORDER BY BucketStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.metric_series_definitions",
+          "name": "metric_series_definitions",
           "description": "Metric series definitions from OpenTelemetry: name, unit, attributes, kind",
           "grain": "one row per SeriesId",
           "joinKeys": [
@@ -7578,10 +7578,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SeriesId, ResourceSchemaUrl, ScopeSchemaUrl\nFROM analytics.metric_series_definitions\nWHERE LastSeenAt >= subtractDays(now(), 7)\nORDER BY LastSeenAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT SeriesId, ResourceSchemaUrl, ScopeSchemaUrl\nFROM metric_series_definitions\nWHERE LastSeenAt >= subtractDays(now(), 7)\nORDER BY LastSeenAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.objects",
+          "name": "objects",
           "description": "Stored file objects: what was captured, its size and hash.",
           "grain": "one row per id",
           "joinKeys": [
@@ -7679,10 +7679,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT id, purpose, owner_kind\nFROM analytics.objects\nWHERE created_at >= subtractDays(now(), 7)\nORDER BY created_at DESC\nLIMIT 100"
+          "exampleSql": "SELECT id, purpose, owner_kind\nFROM objects\nWHERE created_at >= subtractDays(now(), 7)\nORDER BY created_at DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.session_metrics",
+          "name": "session_metrics",
           "description": "Per-session time-series metrics with aggregate statistics",
           "grain": "one row per (SessionId, SeriesId)",
           "joinKeys": [
@@ -7790,10 +7790,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SessionId, SeriesId, MetricName\nFROM analytics.session_metrics\nWHERE AsOf >= subtractDays(now(), 7)\nORDER BY AsOf DESC\nLIMIT 100"
+          "exampleSql": "SELECT SessionId, SeriesId, MetricName\nFROM session_metrics\nWHERE AsOf >= subtractDays(now(), 7)\nORDER BY AsOf DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.simulation_metric_rollups",
+          "name": "simulation_metric_rollups",
           "description": "Per-trace simulation cost and latency, merged from the aggregating rollup: total cost and per-role cost and latency maps.",
           "grain": "one row per (TenantId, ScenarioRunId, TraceId), latest version only",
           "joinKeys": [
@@ -7875,10 +7875,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScenarioRunId, TraceId, RoleLatencies\nFROM analytics.simulation_metric_rollups\nWHERE PartitionMonth >= subtractDays(now(), 7)\nORDER BY PartitionMonth DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScenarioRunId, TraceId, RoleLatencies\nFROM simulation_metric_rollups\nWHERE PartitionMonth >= subtractDays(now(), 7)\nORDER BY PartitionMonth DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.simulation_trace_metrics",
+          "name": "simulation_trace_metrics",
           "description": "Cost and latency metrics per simulated trace",
           "grain": "one row per (ScenarioRunId, TraceId)",
           "joinKeys": [
@@ -7961,10 +7961,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScenarioRunId, TraceId, RoleLatencies\nFROM analytics.simulation_trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScenarioRunId, TraceId, RoleLatencies\nFROM simulation_trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.test_suite_runs",
+          "name": "test_suite_runs",
           "description": "Test suite execution results with completion and pass counts",
           "grain": "one row per (ScenarioSetId, BatchRunId)",
           "joinKeys": [
@@ -8159,10 +8159,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectionId, SuiteRunId, BatchRunId\nFROM analytics.test_suite_runs\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectionId, SuiteRunId, BatchRunId\nFROM test_suite_runs\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.agents",
+          "name": "agents",
           "description": "Rows of the Agent table, one row per AgentId.",
           "grain": "one row per AgentId",
           "joinKeys": [
@@ -8282,10 +8282,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AgentId, Name, Type\nFROM analytics.agents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AgentId, Name, Type\nFROM agents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.ai_tool_entries",
+          "name": "ai_tool_entries",
           "description": "Org-scoped catalog of AI tools surfaced on the personal home portal (/me) and managed by org admins at /governance/tool-catalog.",
           "grain": "one row per (TenantId, AiToolEntryId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -8431,10 +8431,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AiToolEntryId, Scope, ScopeId\nFROM analytics.ai_tool_entries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AiToolEntryId, Scope, ScopeId\nFROM ai_tool_entries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.ai_tool_entry_departments",
+          "name": "ai_tool_entry_departments",
           "description": "Per-department scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryDepartmentId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -8479,10 +8479,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AiToolEntryDepartmentId, EntryId, DepartmentId\nFROM analytics.ai_tool_entry_departments\nLIMIT 100"
+          "exampleSql": "SELECT AiToolEntryDepartmentId, EntryId, DepartmentId\nFROM ai_tool_entry_departments\nLIMIT 100"
         },
         {
-          "name": "analytics.ai_tool_entry_teams",
+          "name": "ai_tool_entry_teams",
           "description": "Per-team scope binding for AiToolEntry.",
           "grain": "one row per (TenantId, AiToolEntryTeamId); a team-scoped row appears once per project",
           "joinKeys": [
@@ -8518,10 +8518,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AiToolEntryTeamId, EntryId\nFROM analytics.ai_tool_entry_teams\nLIMIT 100"
+          "exampleSql": "SELECT AiToolEntryTeamId, EntryId\nFROM ai_tool_entry_teams\nLIMIT 100"
         },
         {
-          "name": "analytics.analytics",
+          "name": "analytics",
           "description": "Rows of the Analytics table, one row per AnalyticsId.",
           "grain": "one row per AnalyticsId",
           "joinKeys": [
@@ -8592,10 +8592,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnalyticsId, NumericValue, BoolValue\nFROM analytics.analytics\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnalyticsId, NumericValue, BoolValue\nFROM analytics\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.annotation_queue_items",
+          "name": "annotation_queue_items",
           "description": "Rows of the AnnotationQueueItem table, one row per AnnotationQueueItemId.",
           "grain": "one row per AnnotationQueueItemId",
           "joinKeys": [
@@ -8690,10 +8690,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationQueueItemId, AnnotationQueueId, UserId\nFROM analytics.annotation_queue_items\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationQueueItemId, AnnotationQueueId, UserId\nFROM annotation_queue_items\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.annotation_queue_scores",
+          "name": "annotation_queue_scores",
           "description": "Rows of the AnnotationQueueScores table, one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, AnnotationQueueId, AnnotationScoreId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -8729,10 +8729,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationQueueId, AnnotationScoreId\nFROM analytics.annotation_queue_scores\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationQueueId, AnnotationScoreId\nFROM annotation_queue_scores\nLIMIT 100"
         },
         {
-          "name": "analytics.annotation_queues",
+          "name": "annotation_queues",
           "description": "Rows of the AnnotationQueue table, one row per AnnotationQueueId.",
           "grain": "one row per AnnotationQueueId",
           "joinKeys": [
@@ -8801,10 +8801,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationQueueId, Name, Slug\nFROM analytics.annotation_queues\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationQueueId, Name, Slug\nFROM annotation_queues\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.annotation_scores",
+          "name": "annotation_scores",
           "description": "Rows of the AnnotationScore table, one row per AnnotationScoreId.",
           "grain": "one row per AnnotationScoreId",
           "joinKeys": [
@@ -8917,10 +8917,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationScoreId, Name, CreatedAt\nFROM analytics.annotation_scores\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationScoreId, Name, CreatedAt\nFROM annotation_scores\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.annotations",
+          "name": "annotations",
           "description": "One row per human annotation of a trace, with the reviewer's thumbs verdict.",
           "grain": "one row per AnnotationId",
           "joinKeys": [
@@ -9046,10 +9046,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnnotationId, TraceId, IsThumbsUp\nFROM analytics.annotations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnnotationId, TraceId, IsThumbsUp\nFROM annotations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.anomaly_alerts",
+          "name": "anomaly_alerts",
           "description": "Persisted anomaly detection.",
           "grain": "one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -9198,10 +9198,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnomalyAlertId, RuleId, RuleName\nFROM analytics.anomaly_alerts\nWHERE TriggerWindowStart >= subtractDays(now(), 7)\nORDER BY TriggerWindowStart DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnomalyAlertId, RuleId, RuleName\nFROM anomaly_alerts\nWHERE TriggerWindowStart >= subtractDays(now(), 7)\nORDER BY TriggerWindowStart DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.anomaly_rules",
+          "name": "anomaly_rules",
           "description": "Admin-defined anomaly detection rule.",
           "grain": "one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -9332,10 +9332,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT AnomalyRuleId, Scope, ScopeId\nFROM analytics.anomaly_rules\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT AnomalyRuleId, Scope, ScopeId\nFROM anomaly_rules\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.batch_evaluations",
+          "name": "batch_evaluations",
           "description": "One row per offline batch evaluation of a dataset row, with its score, outcome and cost.",
           "grain": "one row per BatchEvaluationId",
           "joinKeys": [
@@ -9478,10 +9478,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT BatchEvaluationId, ExperimentId, Status\nFROM analytics.batch_evaluations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT BatchEvaluationId, ExperimentId, Status\nFROM batch_evaluations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.costs",
+          "name": "costs",
           "description": "Rows of the Cost table, one row per CostId.",
           "grain": "one row per CostId",
           "joinKeys": [
@@ -9591,10 +9591,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT CostType, ReferenceType, ReferenceId\nFROM analytics.costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT CostType, ReferenceType, ReferenceId\nFROM costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.custom_graphs",
+          "name": "custom_graphs",
           "description": "Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets.",
           "grain": "one row per CustomGraphId",
           "joinKeys": [
@@ -9714,10 +9714,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT CustomGraphId, Name, Kind\nFROM analytics.custom_graphs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT CustomGraphId, Name, Kind\nFROM custom_graphs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.custom_llm_model_costs",
+          "name": "custom_llm_model_costs",
           "description": "Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId.",
           "grain": "one row per CustomLLMModelCostId",
           "joinKeys": [
@@ -9807,10 +9807,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT OrganizationId, ScopeType, ScopeId\nFROM analytics.custom_llm_model_costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT OrganizationId, ScopeType, ScopeId\nFROM custom_llm_model_costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.dashboard_widgets",
+          "name": "dashboard_widgets",
           "description": "One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable.",
           "grain": "one row per DashboardWidgetId",
           "joinKeys": [
@@ -9912,10 +9912,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DashboardWidgetId, DashboardId, Name\nFROM analytics.dashboard_widgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DashboardWidgetId, DashboardId, Name\nFROM dashboard_widgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.dashboards",
+          "name": "dashboards",
           "description": "One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2.",
           "grain": "one row per DashboardId",
           "joinKeys": [
@@ -9993,10 +9993,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DashboardId, Name, Order\nFROM analytics.dashboards\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DashboardId, Name, Order\nFROM dashboards\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.dashboards_v2",
+          "name": "dashboards_v2",
           "description": "One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable.",
           "grain": "one row per DashboardId",
           "joinKeys": [
@@ -10074,10 +10074,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DashboardId, Name, CreatedById\nFROM analytics.dashboards_v2\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DashboardId, Name, CreatedById\nFROM dashboards_v2\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.data_privacy_policies",
+          "name": "data_privacy_policies",
           "description": "Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10155,10 +10155,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DataPrivacyPolicyId, ScopeType, ScopeId\nFROM analytics.data_privacy_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DataPrivacyPolicyId, ScopeType, ScopeId\nFROM data_privacy_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.dataset_records",
+          "name": "dataset_records",
           "description": "Rows of the DatasetRecord table, one row per DatasetRecordId.",
           "grain": "one row per DatasetRecordId",
           "joinKeys": [
@@ -10220,10 +10220,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DatasetRecordId, DatasetId, CreatedAt\nFROM analytics.dataset_records\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DatasetRecordId, DatasetId, CreatedAt\nFROM dataset_records\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.datasets",
+          "name": "datasets",
           "description": "Rows of the Dataset table, one row per DatasetId.",
           "grain": "one row per DatasetId",
           "joinKeys": [
@@ -10407,10 +10407,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DatasetId, Name, Slug\nFROM analytics.datasets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DatasetId, Name, Slug\nFROM datasets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.department_membership_histories",
+          "name": "department_membership_histories",
           "description": "One dated person → department link.",
           "grain": "one row per (TenantId, DepartmentMembershipHistoryId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10479,10 +10479,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DepartmentMembershipHistoryId, UserId, DepartmentId\nFROM analytics.department_membership_histories\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DepartmentMembershipHistoryId, UserId, DepartmentId\nFROM department_membership_histories\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.departments",
+          "name": "departments",
           "description": "A department is a single-valued accounting dimension, separate from RBAC, for rolling up AI spend by org unit (Engineering, Marketing,...).",
           "grain": "one row per (TenantId, DepartmentId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10541,10 +10541,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DepartmentId, Name, CreatedAt\nFROM analytics.departments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DepartmentId, Name, CreatedAt\nFROM departments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.discovered_agents",
+          "name": "discovered_agents",
           "description": "A non-human actor (a bot, agent or automation) discovered from a connected source, with the provider-native metadata the source published.",
           "grain": "one row per (TenantId, DiscoveredAgentId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10640,10 +10640,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DiscoveredAgentId, Provider, RawAgentId\nFROM analytics.discovered_agents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DiscoveredAgentId, Provider, RawAgentId\nFROM discovered_agents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.discovered_persons",
+          "name": "discovered_persons",
           "description": "A name-text seen on a provider's cost or audit rows: \"the provider told us someone called m.silva exists\".",
           "grain": "one row per (TenantId, DiscoveredPersonId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10779,10 +10779,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT DiscoveredPersonId, Provider, Kind\nFROM analytics.discovered_persons\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT DiscoveredPersonId, Provider, Kind\nFROM discovered_persons\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.email_suppressions",
+          "name": "email_suppressions",
           "description": "Rows of the EmailSuppression table, one row per EmailSuppressionId.",
           "grain": "one row per EmailSuppressionId",
           "joinKeys": [
@@ -10836,10 +10836,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT EmailSuppressionId, TriggerId, CreatedAt\nFROM analytics.email_suppressions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT EmailSuppressionId, TriggerId, CreatedAt\nFROM email_suppressions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.erased_identifier_suppressions",
+          "name": "erased_identifier_suppressions",
           "description": "Hashes of erased identifiers - the do-not-reimport list.",
           "grain": "one row per (TenantId, ErasedIdentifierSuppressionId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -10882,10 +10882,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ErasedIdentifierSuppressionId, Provider, ErasedAt\nFROM analytics.erased_identifier_suppressions\nWHERE ErasedAt >= subtractDays(now(), 7)\nORDER BY ErasedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ErasedIdentifierSuppressionId, Provider, ErasedAt\nFROM erased_identifier_suppressions\nWHERE ErasedAt >= subtractDays(now(), 7)\nORDER BY ErasedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.evaluators",
+          "name": "evaluators",
           "description": "Rows of the Evaluator table, one row per EvaluatorId.",
           "grain": "one row per EvaluatorId",
           "joinKeys": [
@@ -10988,10 +10988,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT EvaluatorId, Name, Slug\nFROM analytics.evaluators\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT EvaluatorId, Name, Slug\nFROM evaluators\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.experiment_versions",
+          "name": "experiment_versions",
           "description": "Rows of the ExperimentVersion table, one row per ExperimentVersionId.",
           "grain": "one row per ExperimentVersionId",
           "joinKeys": [
@@ -11121,10 +11121,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ExperimentVersionId, ExperimentId, Version\nFROM analytics.experiment_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ExperimentVersionId, ExperimentId, Version\nFROM experiment_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.experiments",
+          "name": "experiments",
           "description": "One row per experiment, with its display name and kind.",
           "grain": "one row per ExperimentId",
           "joinKeys": [
@@ -11226,10 +11226,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ExperimentId, ExperimentName, ExperimentType\nFROM analytics.experiments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ExperimentId, ExperimentName, ExperimentType\nFROM experiments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_budget_bucket_boundaries",
+          "name": "gateway_budget_bucket_boundaries",
           "description": "Rows of the GatewayBudgetBucketBoundary table, one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayBudgetBucketBoundaryId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -11298,10 +11298,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayBudgetBucketBoundaryId, BudgetId, BucketScopeId\nFROM analytics.gateway_budget_bucket_boundaries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayBudgetBucketBoundaryId, BudgetId, BucketScopeId\nFROM gateway_budget_bucket_boundaries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_budget_ledgers",
+          "name": "gateway_budget_ledgers",
           "description": "Rows of the GatewayBudgetLedger table, one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, GatewayBudgetLedgerId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -11439,10 +11439,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayBudgetLedgerId, BudgetId, VirtualKeyId\nFROM analytics.gateway_budget_ledgers\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayBudgetLedgerId, BudgetId, VirtualKeyId\nFROM gateway_budget_ledgers\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_budgets",
+          "name": "gateway_budgets",
           "description": "Rows of the GatewayBudget table, one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayBudgetId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -11645,10 +11645,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayBudgetId, ScopeType, ScopeId\nFROM analytics.gateway_budgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayBudgetId, ScopeType, ScopeId\nFROM gateway_budgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_cache_rules",
+          "name": "gateway_cache_rules",
           "description": "Rows of the GatewayCacheRule table, one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, GatewayCacheRuleId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -11770,10 +11770,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayCacheRuleId, Name, Priority\nFROM analytics.gateway_cache_rules\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayCacheRuleId, Name, Priority\nFROM gateway_cache_rules\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_change_events",
+          "name": "gateway_change_events",
           "description": "Rows of the GatewayChangeEvent table, one row per Revision.",
           "grain": "one row per Revision",
           "joinKeys": [
@@ -11861,10 +11861,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT Revision, OrganizationId, Kind\nFROM analytics.gateway_change_events\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT Revision, OrganizationId, Kind\nFROM gateway_change_events\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_guardrails",
+          "name": "gateway_guardrails",
           "description": "Rows of the GatewayGuardrail table, one row per GatewayGuardrailId.",
           "grain": "one row per GatewayGuardrailId",
           "joinKeys": [
@@ -11976,10 +11976,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayGuardrailId, Name, EvaluatorId\nFROM analytics.gateway_guardrails\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayGuardrailId, Name, EvaluatorId\nFROM gateway_guardrails\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.gateway_realtime_sessions",
+          "name": "gateway_realtime_sessions",
           "description": "Rows of the GatewayRealtimeSession table, one row per GatewayRealtimeSessionId.",
           "grain": "one row per GatewayRealtimeSessionId",
           "joinKeys": [
@@ -12198,10 +12198,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GatewayRealtimeSessionId, OrganizationId, VirtualKeyId\nFROM analytics.gateway_realtime_sessions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GatewayRealtimeSessionId, OrganizationId, VirtualKeyId\nFROM gateway_realtime_sessions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.github_branch_pull_request_checks",
+          "name": "github_branch_pull_request_checks",
           "description": "The per-branch bookkeeping behind pull-request mapping: when a branch was last looked up on GitHub, how many pull requests it resolved to, and when it may be asked about again.",
           "grain": "one row per (TenantId, GithubBranchPullRequestCheckId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12318,10 +12318,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GithubBranchPullRequestCheckId, RepositoryHost, RepositoryFullName\nFROM analytics.github_branch_pull_request_checks\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GithubBranchPullRequestCheckId, RepositoryHost, RepositoryFullName\nFROM github_branch_pull_request_checks\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.github_installations",
+          "name": "github_installations",
           "description": "The organization's GitHub connection: a GitHub App installation mapped to a LangWatch organization.",
           "grain": "one row per (TenantId, GithubInstallationId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12421,10 +12421,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GithubInstallationId, InstallationId, AccountType\nFROM analytics.github_installations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GithubInstallationId, InstallationId, AccountType\nFROM github_installations\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.github_pull_requests",
+          "name": "github_pull_requests",
           "description": "A pull request discovered through the organization's GitHub connection and mapped to the branch it was opened from, so a coding-agent session that knows only its branch can name the pull request it produced.",
           "grain": "one row per (TenantId, GithubPullRequestId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12585,10 +12585,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GithubPullRequestId, RepositoryHost, RepositoryFullName\nFROM analytics.github_pull_requests\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GithubPullRequestId, RepositoryHost, RepositoryFullName\nFROM github_pull_requests\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.governance_tenant_histories",
+          "name": "governance_tenant_histories",
           "description": "Every tenant id this organization has ever written governance rows under, appended on first use and never pruned.",
           "grain": "one row per (TenantId, GovernanceTenantHistoryId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12631,10 +12631,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT GovernanceTenantHistoryId, FirstUsedAt, LastUsedAt\nFROM analytics.governance_tenant_histories\nWHERE FirstUsedAt >= subtractDays(now(), 7)\nORDER BY FirstUsedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT GovernanceTenantHistoryId, FirstUsedAt, LastUsedAt\nFROM governance_tenant_histories\nWHERE FirstUsedAt >= subtractDays(now(), 7)\nORDER BY FirstUsedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.identity_match_suggestions",
+          "name": "identity_match_suggestions",
           "description": "Match candidates a background job computed and a human has yet to confirm.",
           "grain": "one row per (TenantId, IdentityMatchSuggestionId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12695,10 +12695,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IdentityMatchSuggestionId, DiscoveredPersonId, UserId\nFROM analytics.identity_match_suggestions\nWHERE ComputedAt >= subtractDays(now(), 7)\nORDER BY ComputedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IdentityMatchSuggestionId, DiscoveredPersonId, UserId\nFROM identity_match_suggestions\nWHERE ComputedAt >= subtractDays(now(), 7)\nORDER BY ComputedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.identity_matches",
+          "name": "identity_matches",
           "description": "A dated link from an external account to a platform user, opened when the match holds and closed when it stops being true.",
           "grain": "one row per (TenantId, IdentityMatchId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -12775,10 +12775,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IdentityMatchId, DiscoveredPersonId, UserId\nFROM analytics.identity_matches\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IdentityMatchId, DiscoveredPersonId, UserId\nFROM identity_matches\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.ingestion_pull_run_projections",
+          "name": "ingestion_pull_run_projections",
           "description": "Rebuildable per-source pull checkpoint and operator-facing run status.",
           "grain": "one row per IngestionPullRunProjectionId",
           "joinKeys": [
@@ -13073,10 +13073,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IngestionPullRunProjectionId, SourceId, Enabled\nFROM analytics.ingestion_pull_run_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IngestionPullRunProjectionId, SourceId, Enabled\nFROM ingestion_pull_run_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.ingestion_sources",
+          "name": "ingestion_sources",
           "description": "Per-platform fleet configuration that connects a closed SaaS product's audit / OTel / S3 stream to LangWatch's Activity Monitor.",
           "grain": "one row per (TenantId, IngestionSourceId); a team-scoped row appears once per project",
           "joinKeys": [
@@ -13271,10 +13271,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IngestionSourceId, OrganizationId, SourceType\nFROM analytics.ingestion_sources\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IngestionSourceId, OrganizationId, SourceType\nFROM ingestion_sources\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.ingestion_templates",
+          "name": "ingestion_templates",
           "description": "Admin/platform-curated catalog row for upstream OTLP normalization.",
           "grain": "one row per (TenantId, IngestionTemplateId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -13413,10 +13413,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT IngestionTemplateId, Slug, SourceType\nFROM analytics.ingestion_templates\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT IngestionTemplateId, Slug, SourceType\nFROM ingestion_templates\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_active_turns",
+          "name": "langy_active_turns",
           "description": "Postgres-authoritative one-turn admission for a conversation. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyActiveTurnId",
           "joinKeys": [
@@ -13521,10 +13521,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT LangyActiveTurnId, ConversationId, TurnId\nFROM analytics.langy_active_turns\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT LangyActiveTurnId, ConversationId, TurnId\nFROM langy_active_turns\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_conversation_projections",
+          "name": "langy_conversation_projections",
           "description": "Rebuildable operational state folded from Langy's canonical event stream. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyConversationProjectionId",
           "joinKeys": [
@@ -13737,10 +13737,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT LangyConversationProjectionId, ConversationId, UserId\nFROM analytics.langy_conversation_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT LangyConversationProjectionId, ConversationId, UserId\nFROM langy_conversation_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_conversation_turn_projections",
+          "name": "langy_conversation_turn_projections",
           "description": "Rebuildable per-turn operational render document. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyConversationTurnProjectionId",
           "joinKeys": [
@@ -13908,10 +13908,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT LangyConversationTurnProjectionId, ConversationId, TurnId\nFROM analytics.langy_conversation_turn_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT LangyConversationTurnProjectionId, ConversationId, TurnId\nFROM langy_conversation_turn_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_message_projections",
+          "name": "langy_message_projections",
           "description": "Rebuildable operational message fact. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyMessageProjectionId",
           "joinKeys": [
@@ -14015,10 +14015,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT LangyMessageProjectionId, ConversationId, MessageId\nFROM analytics.langy_message_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT LangyMessageProjectionId, ConversationId, MessageId\nFROM langy_message_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.langy_turn_requests",
+          "name": "langy_turn_requests",
           "description": "Durable idempotency receipt for one logical Langy send. Shared Langy conversations only; a member's private conversations are not queryable.",
           "grain": "one row per LangyTurnRequestId",
           "joinKeys": [
@@ -14123,10 +14123,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT LangyTurnRequestId, UserId, RequestId\nFROM analytics.langy_turn_requests\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT LangyTurnRequestId, UserId, RequestId\nFROM langy_turn_requests\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.model_default_config_scopes",
+          "name": "model_default_config_scopes",
           "description": "Rows of the ModelDefaultConfigScope table, one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, ModelDefaultConfigScopeId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -14187,10 +14187,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ModelDefaultConfigScopeId, ConfigId, ScopeType\nFROM analytics.model_default_config_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ModelDefaultConfigScopeId, ConfigId, ScopeType\nFROM model_default_config_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.model_default_configs",
+          "name": "model_default_configs",
           "description": "Rows of the ModelDefaultConfig table, one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, ModelDefaultConfigId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -14252,10 +14252,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ModelDefaultConfigId, AuthorId, CreatedAt\nFROM analytics.model_default_configs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ModelDefaultConfigId, AuthorId, CreatedAt\nFROM model_default_configs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.model_provider_scopes",
+          "name": "model_provider_scopes",
           "description": "Rows of the ModelProviderScope table, one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, ModelProviderScopeId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -14316,10 +14316,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ModelProviderScopeId, ModelProviderId, ScopeType\nFROM analytics.model_provider_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ModelProviderScopeId, ModelProviderId, ScopeType\nFROM model_provider_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.model_providers",
+          "name": "model_providers",
           "description": "Rows of the ModelProvider table, one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, ModelProviderId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -14518,10 +14518,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ModelProviderId, Name, Provider\nFROM analytics.model_providers\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ModelProviderId, Name, Provider\nFROM model_providers\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.monitors",
+          "name": "monitors",
           "description": "Rows of the Monitor table, one row per MonitorId.",
           "grain": "one row per MonitorId",
           "joinKeys": [
@@ -14678,10 +14678,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT MonitorId, ExperimentId, EvaluatorId\nFROM analytics.monitors\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT MonitorId, ExperimentId, EvaluatorId\nFROM monitors\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.notifications",
+          "name": "notifications",
           "description": "Rows of the Notification table, one row per NotificationId.",
           "grain": "one row per NotificationId",
           "joinKeys": [
@@ -14751,10 +14751,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT NotificationId, OrganizationId, CreatedAt\nFROM analytics.notifications\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT NotificationId, OrganizationId, CreatedAt\nFROM notifications\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.pinned_traces",
+          "name": "pinned_traces",
           "description": "Rows of the PinnedTrace table, one row per PinnedTraceId.",
           "grain": "one row per PinnedTraceId",
           "joinKeys": [
@@ -14825,10 +14825,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PinnedTraceId, TraceId, UserId\nFROM analytics.pinned_traces\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT PinnedTraceId, TraceId, UserId\nFROM pinned_traces\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.process_manager_inboxes",
+          "name": "process_manager_inboxes",
           "description": "Idempotency marker for a source event consumed by a process definition.",
           "grain": "one row per ProcessManagerInboxId",
           "joinKeys": [
@@ -14880,10 +14880,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProcessManagerInboxId, ProcessName, SourceEventId\nFROM analytics.process_manager_inboxes\nWHERE ConsumedAt >= subtractDays(now(), 7)\nORDER BY ConsumedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProcessManagerInboxId, ProcessName, SourceEventId\nFROM process_manager_inboxes\nWHERE ConsumedAt >= subtractDays(now(), 7)\nORDER BY ConsumedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.process_manager_instances",
+          "name": "process_manager_instances",
           "description": "Durable state for a long-running event-sourced process.",
           "grain": "one row per ProcessManagerInstanceId",
           "joinKeys": [
@@ -14961,10 +14961,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProcessManagerInstanceId, ProcessName, UserId\nFROM analytics.process_manager_instances\nWHERE NextWakeAt >= subtractDays(now(), 7)\nORDER BY NextWakeAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProcessManagerInstanceId, ProcessName, UserId\nFROM process_manager_instances\nWHERE NextWakeAt >= subtractDays(now(), 7)\nORDER BY NextWakeAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.process_manager_outbox_attempts",
+          "name": "process_manager_outbox_attempts",
           "description": "One row per failed outbox delivery attempt, so the table grows with delivery trouble rather than with traffic.",
           "grain": "one row per ProcessManagerOutboxAttemptId",
           "joinKeys": [
@@ -15050,10 +15050,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProcessManagerOutboxAttemptId, OutboxId, Attempt\nFROM analytics.process_manager_outbox_attempts\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProcessManagerOutboxAttemptId, OutboxId, Attempt\nFROM process_manager_outbox_attempts\nWHERE OccurredAt >= subtractDays(now(), 7)\nORDER BY OccurredAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.process_manager_outboxes",
+          "name": "process_manager_outboxes",
           "description": "Transactional intents emitted by a durable process transition.",
           "grain": "one row per ProcessManagerOutboxId",
           "joinKeys": [
@@ -15190,10 +15190,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProcessManagerOutboxId, ProcessName, UserId\nFROM analytics.process_manager_outboxes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProcessManagerOutboxId, ProcessName, UserId\nFROM process_manager_outboxes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.projects",
+          "name": "projects",
           "description": "The caller's project, with its display name and slug.",
           "grain": "one row per TenantId",
           "joinKeys": [
@@ -15412,10 +15412,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ProjectName, ProjectSlug, TeamId\nFROM analytics.projects\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ProjectName, ProjectSlug, TeamId\nFROM projects\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.prompt_tag_assignments",
+          "name": "prompt_tag_assignments",
           "description": "Rows of the PromptTagAssignment table, one row per PromptTagAssignmentId.",
           "grain": "one row per PromptTagAssignmentId",
           "joinKeys": [
@@ -15503,10 +15503,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PromptTagAssignmentId, ConfigId, VersionId\nFROM analytics.prompt_tag_assignments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT PromptTagAssignmentId, ConfigId, VersionId\nFROM prompt_tag_assignments\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.prompt_tags",
+          "name": "prompt_tags",
           "description": "Rows of the PromptTag table, one row per (TenantId, PromptTagId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, PromptTagId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -15575,10 +15575,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PromptTagId, Name, CreatedAt\nFROM analytics.prompt_tags\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT PromptTagId, Name, CreatedAt\nFROM prompt_tags\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.prompt_versions",
+          "name": "prompt_versions",
           "description": "One row per version of a prompt, carrying the version number a trace records.",
           "grain": "one row per PromptVersionId",
           "joinKeys": [
@@ -15677,10 +15677,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PromptVersionId, VersionNumber, AuthorId\nFROM analytics.prompt_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT PromptVersionId, VersionNumber, AuthorId\nFROM prompt_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.prompts",
+          "name": "prompts",
           "description": "One row per prompt configuration, with the name its versions are known by.",
           "grain": "one row per PromptId",
           "joinKeys": [
@@ -15775,10 +15775,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT PromptId, PromptName, CreatedAt\nFROM analytics.prompts\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT PromptId, PromptName, CreatedAt\nFROM prompts\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.retention_policies",
+          "name": "retention_policies",
           "description": "Rows of the RetentionPolicy table, one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, RetentionPolicyId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -15856,10 +15856,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RetentionPolicyId, ScopeType, ScopeId\nFROM analytics.retention_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT RetentionPolicyId, ScopeType, ScopeId\nFROM retention_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.routing_policies",
+          "name": "routing_policies",
           "description": "Rows of the RoutingPolicy table, one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, RoutingPolicyId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -15982,10 +15982,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RoutingPolicyId, Name, ModelProviderIds\nFROM analytics.routing_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT RoutingPolicyId, Name, ModelProviderIds\nFROM routing_policies\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.routing_policy_scopes",
+          "name": "routing_policy_scopes",
           "description": "Rows of the RoutingPolicyScope table, one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, RoutingPolicyScopeId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -16046,10 +16046,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT RoutingPolicyScopeId, RoutingPolicyId, ScopeType\nFROM analytics.routing_policy_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT RoutingPolicyScopeId, RoutingPolicyId, ScopeType\nFROM routing_policy_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.saved_views",
+          "name": "saved_views",
           "description": "Rows of the SavedView table, one row per SavedViewId.",
           "grain": "one row per SavedViewId",
           "joinKeys": [
@@ -16155,10 +16155,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SavedViewId, UserId, Name\nFROM analytics.saved_views\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT SavedViewId, UserId, Name\nFROM saved_views\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.scenario_versions",
+          "name": "scenario_versions",
           "description": "Rows of the ScenarioVersion table, one row per ScenarioVersionId.",
           "grain": "one row per ScenarioVersionId",
           "joinKeys": [
@@ -16255,10 +16255,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScenarioVersionId, ScenarioId, Version\nFROM analytics.scenario_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScenarioVersionId, ScenarioId, Version\nFROM scenario_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.scenarios",
+          "name": "scenarios",
           "description": "Rows of the Scenario table, one row per ScenarioId.",
           "grain": "one row per ScenarioId",
           "joinKeys": [
@@ -16433,10 +16433,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScenarioId, Name, Labels\nFROM analytics.scenarios\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScenarioId, Name, Labels\nFROM scenarios\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.scheduled_jobs",
+          "name": "scheduled_jobs",
           "description": "Rows of the ScheduledJob table, one row per ScheduledJobId.",
           "grain": "one row per ScheduledJobId",
           "joinKeys": [
@@ -16566,10 +16566,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ScheduledJobId, TargetType, TargetId\nFROM analytics.scheduled_jobs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ScheduledJobId, TargetType, TargetId\nFROM scheduled_jobs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.share_links",
+          "name": "share_links",
           "description": "Rows of the ShareLink table, one row per ShareLinkId.",
           "grain": "one row per ShareLinkId",
           "joinKeys": [
@@ -16679,10 +16679,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT ShareLinkId, ResourceType, ResourceId\nFROM analytics.share_links\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT ShareLinkId, ResourceType, ResourceId\nFROM share_links\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.simulation_suites",
+          "name": "simulation_suites",
           "description": "Rows of the SimulationSuite table, one row per SimulationSuiteId.",
           "grain": "one row per SimulationSuiteId",
           "joinKeys": [
@@ -16847,10 +16847,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT SimulationSuiteId, Name, Slug\nFROM analytics.simulation_suites\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT SimulationSuiteId, Name, Slug\nFROM simulation_suites\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.topic_clustering_run_history_projections",
+          "name": "topic_clustering_run_history_projections",
           "description": "Per-project topic clustering run history (audit read model).",
           "grain": "one row per TopicClusteringRunHistoryProjectionId",
           "joinKeys": [
@@ -16936,10 +16936,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TopicClusteringRunHistoryProjectionId, CreatedAt, UpdatedAt\nFROM analytics.topic_clustering_run_history_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TopicClusteringRunHistoryProjectionId, CreatedAt, UpdatedAt\nFROM topic_clustering_run_history_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.topic_clustering_run_projections",
+          "name": "topic_clustering_run_projections",
           "description": "Per-project topic clustering run status: the rebuildable operational read model behind the settings page.",
           "grain": "one row per TopicClusteringRunProjectionId",
           "joinKeys": [
@@ -17162,10 +17162,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TopicClusteringRunProjectionId, LastRequestedAt, LastRunAt\nFROM analytics.topic_clustering_run_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TopicClusteringRunProjectionId, LastRequestedAt, LastRunAt\nFROM topic_clustering_run_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.topic_model_projections",
+          "name": "topic_model_projections",
           "description": "Cursor row for the topic-model projection.",
           "grain": "one row per TopicModelProjectionId",
           "joinKeys": [
@@ -17241,10 +17241,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TopicModelProjectionId, CreatedAt, UpdatedAt\nFROM analytics.topic_model_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TopicModelProjectionId, CreatedAt, UpdatedAt\nFROM topic_model_projections\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.topics",
+          "name": "topics",
           "description": "One row per topic, with the name a trace's TopicId resolves to.",
           "grain": "one row per TopicId",
           "joinKeys": [
@@ -17312,10 +17312,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TopicId, TopicName, ParentTopicId\nFROM analytics.topics\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TopicId, TopicName, ParentTopicId\nFROM topics\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.trace_edit_overlays",
+          "name": "trace_edit_overlays",
           "description": "Rows of the TraceEditOverlay table, one row per TraceEditOverlayId.",
           "grain": "one row per TraceEditOverlayId",
           "joinKeys": [
@@ -17395,10 +17395,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TraceEditOverlayId, TraceId, CreatedById\nFROM analytics.trace_edit_overlays\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TraceEditOverlayId, TraceId, CreatedById\nFROM trace_edit_overlays\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.trigger_sents",
+          "name": "trigger_sents",
           "description": "Rows of the TriggerSent table, one row per TriggerSentId.",
           "grain": "one row per TriggerSentId",
           "joinKeys": [
@@ -17476,10 +17476,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TriggerSentId, TriggerId, TraceId\nFROM analytics.trigger_sents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TriggerSentId, TriggerId, TraceId\nFROM trigger_sents\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.triggers",
+          "name": "triggers",
           "description": "Rows of the Trigger table, one row per TriggerId.",
           "grain": "one row per TriggerId",
           "joinKeys": [
@@ -17671,10 +17671,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT TriggerId, Name, Action\nFROM analytics.triggers\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT TriggerId, Name, Action\nFROM triggers\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.virtual_key_scopes",
+          "name": "virtual_key_scopes",
           "description": "Rows of the VirtualKeyScope table, one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project.",
           "grain": "one row per (TenantId, VirtualKeyScopeId); a row reached through its parent appears once per project",
           "joinKeys": [
@@ -17735,10 +17735,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT VirtualKeyScopeId, VirtualKeyId, ScopeType\nFROM analytics.virtual_key_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT VirtualKeyScopeId, VirtualKeyId, ScopeType\nFROM virtual_key_scopes\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.virtual_keys",
+          "name": "virtual_keys",
           "description": "Rows of the VirtualKey table, one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project.",
           "grain": "one row per (TenantId, VirtualKeyId); an organization-scoped row appears once per project",
           "joinKeys": [
@@ -17984,10 +17984,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT VirtualKeyId, Name, Status\nFROM analytics.virtual_keys\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT VirtualKeyId, Name, Status\nFROM virtual_keys\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.webhook_endpoint_deliveries",
+          "name": "webhook_endpoint_deliveries",
           "description": "The per-ATTEMPT delivery log for BOTH webhook channels: the endpoints platform's batches and the automations channel's trigger fires.",
           "grain": "one row per WebhookEndpointDeliveryId",
           "joinKeys": [
@@ -18134,10 +18134,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT WebhookEndpointDeliveryId, Channel, OrganizationId\nFROM analytics.webhook_endpoint_deliveries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT WebhookEndpointDeliveryId, Channel, OrganizationId\nFROM webhook_endpoint_deliveries\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.workflow_versions",
+          "name": "workflow_versions",
           "description": "Rows of the WorkflowVersion table, one row per WorkflowVersionId.",
           "grain": "one row per WorkflowVersionId",
           "joinKeys": [
@@ -18243,10 +18243,10 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT WorkflowVersionId, Version, AuthorId\nFROM analytics.workflow_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT WorkflowVersionId, Version, AuthorId\nFROM workflow_versions\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
-          "name": "analytics.workflows",
+          "name": "workflows",
           "description": "Rows of the Workflow table, one row per WorkflowId.",
           "grain": "one row per WorkflowId",
           "joinKeys": [
@@ -18386,7 +18386,7 @@
               "available": true
             }
           ],
-          "exampleSql": "SELECT WorkflowId, Name, CreatedAt\nFROM analytics.workflows\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+          "exampleSql": "SELECT WorkflowId, Name, CreatedAt\nFROM workflows\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         }
       ],
       "appFunctions": [
@@ -18404,7 +18404,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT ConversationId, conversation(ConversationId) AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, conversation(ConversationId) AS transcript\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "conversation_bounded",
@@ -18420,7 +18420,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "llm_readable_thread",
@@ -18436,7 +18436,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "thread_traces",
@@ -18449,7 +18449,7 @@
           "cap": 200,
           "gates": [],
           "available": true,
-          "exampleSql": "SELECT ConversationId, thread_traces(ConversationId) AS trace_ids\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, thread_traces(ConversationId) AS trace_ids\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "llm_readable_trace",
@@ -18465,7 +18465,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, llm_readable_trace(TraceId, 8000) AS text\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, llm_readable_trace(TraceId, 8000) AS text\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
         {
           "name": "llm_messages",
@@ -18481,7 +18481,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, llm_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, llm_messages(TraceId) AS messages\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
         {
           "name": "llm_input_messages",
@@ -18496,7 +18496,7 @@
             "input"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, llm_input_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, llm_input_messages(TraceId) AS messages\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
         {
           "name": "llm_output_messages",
@@ -18512,7 +18512,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, llm_output_messages(TraceId) AS messages\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, llm_output_messages(TraceId) AS messages\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
         {
           "name": "llm_messages_span",
@@ -18528,7 +18528,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, SpanId, llm_messages_span(TraceId, SpanId) AS messages\nFROM analytics.spans\nWHERE StartTime >= subtractDays(now(), 1)\nORDER BY StartTime DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, SpanId, llm_messages_span(TraceId, SpanId) AS messages\nFROM spans\nWHERE StartTime >= subtractDays(now(), 1)\nORDER BY StartTime DESC\nLIMIT 20"
         },
         {
           "name": "trace_json",
@@ -18544,7 +18544,7 @@
             "output"
           ],
           "available": true,
-          "exampleSql": "SELECT TraceId, trace_json(TraceId) AS trace\nFROM analytics.traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
+          "exampleSql": "SELECT TraceId, trace_json(TraceId) AS trace\nFROM traces\nWHERE OccurredAt >= subtractDays(now(), 1)\nORDER BY OccurredAt DESC\nLIMIT 20"
         },
         {
           "name": "eval",
@@ -18557,7 +18557,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed') AS annoyed\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_criteria",
@@ -18570,7 +18570,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_criteria(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_criteria(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_passed",
@@ -18583,7 +18583,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_passed(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_passed(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_score",
@@ -18596,7 +18596,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_score(llm_readable_thread(ConversationId, 8000), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_score(llm_readable_thread(ConversationId, 8000), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category",
@@ -18609,7 +18609,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category_probs",
@@ -18622,7 +18622,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category_probs(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category_probs(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         }
       ]
     },

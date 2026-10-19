@@ -1,6 +1,6 @@
 /**
- * `langwatch query "<sql>" -o json` through the REAL command tree (`buildProgram`), like
- * `whoami-json.unit.test.ts`, so the output port's resolution and serialization are exercised.
+ * `langwatch query` through the REAL command tree (`buildProgram`), so flag parsing, the output
+ * port's resolution and serialization are exercised. @see specs/analytics/lwql-cli-query.feature
  * @see specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -132,6 +132,29 @@ describe("given a QueryApiService that returns rows", () => {
     it("exits 0", async () => {
       await runQuery(["SELECT count(*) AS count", "-o", "json"]);
 
+      expect(exited).toEqual([]);
+    });
+  });
+
+  describe("when the user runs langwatch query -f json", () => {
+    const printed = async (argv: string[]): Promise<string> => {
+      const chunks: string[] = [];
+      const write = vi.spyOn(process.stdout, "write").mockImplementation((chunk: unknown) => {
+        chunks.push(String(chunk));
+        return true;
+      });
+      await runQuery(argv);
+      write.mockRestore();
+      return chunks.join("");
+    };
+
+    /** @scenario "The format flag has the same short spelling as every other command" */
+    it("prints the rows as JSON, the same as --format json", async () => {
+      const short = await printed(["SELECT count(*) AS count", "-f", "json"]);
+      const long = await printed(["SELECT count(*) AS count", "--format", "json"]);
+
+      expect(JSON.parse(short)).toEqual(RUN_RESULT.rows);
+      expect(short).toBe(long);
       expect(exited).toEqual([]);
     });
   });

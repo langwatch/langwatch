@@ -34,9 +34,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "text",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       lwqlThreadExample({
-        database,
         call: "conversation(ConversationId)",
         alias: "transcript",
       }),
@@ -65,9 +64,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "text",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       lwqlThreadExample({
-        database,
         call: `conversation_bounded(ConversationId, ${LWQL_DEFAULT_BUDGET_TOKENS}, '')`,
         alias: "transcript",
       }),
@@ -89,9 +87,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "text",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       lwqlThreadExample({
-        database,
         call: `llm_readable_thread(ConversationId, ${LWQL_DEFAULT_BUDGET_TOKENS})`,
         alias: "text",
       }),
@@ -105,9 +102,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Array(String)",
     encoding: "text",
     gates: [],
-    example: (database) =>
+    example: () =>
       lwqlThreadExample({
-        database,
         call: "thread_traces(ConversationId)",
         alias: "trace_ids",
       }),
@@ -129,9 +125,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "text",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       lwqlTraceExample({
-        database,
         call: `llm_readable_trace(TraceId, ${LWQL_DEFAULT_BUDGET_TOKENS})`,
         alias: "text",
       }),
@@ -145,8 +140,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "json",
     gates: ["input", "output"],
-    example: (database) =>
-      lwqlTraceExample({ database, call: "llm_messages(TraceId)", alias: "messages" }),
+    example: () => lwqlTraceExample({ call: "llm_messages(TraceId)", alias: "messages" }),
   },
   {
     name: "llm_input_messages",
@@ -157,9 +151,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "json",
     gates: ["input"],
-    example: (database) =>
+    example: () =>
       lwqlTraceExample({
-        database,
         call: "llm_input_messages(TraceId)",
         alias: "messages",
       }),
@@ -173,9 +166,8 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "json",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       lwqlTraceExample({
-        database,
         call: "llm_output_messages(TraceId)",
         alias: "messages",
       }),
@@ -197,9 +189,9 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "json",
     gates: ["input", "output"],
-    example: (database) =>
+    example: () =>
       `SELECT TraceId, SpanId, llm_messages_span(TraceId, SpanId) AS messages\n` +
-      `FROM ${database}.spans\n` +
+      `FROM spans\n` +
       `WHERE StartTime >= subtractDays(now(), 1)\n` +
       `ORDER BY StartTime DESC\n` +
       `LIMIT 20`,
@@ -213,8 +205,7 @@ const EXTRACTION_FUNCTIONS: readonly Omit<LangWatchQLAppFunctionDefinition, "kin
     returns: "Nullable(String)",
     encoding: "json",
     gates: ["input", "output"],
-    example: (database) =>
-      lwqlTraceExample({ database, call: "trace_json(TraceId)", alias: "trace" }),
+    example: () => lwqlTraceExample({ call: "trace_json(TraceId)", alias: "trace" }),
   },
 ];
 

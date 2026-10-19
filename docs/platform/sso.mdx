@@ -8,7 +8,8 @@ keywords: sso, single sign-on, identity provider, connectors, scim, provisioning
 <Note>
   Single sign-on and SCIM provisioning are Enterprise features, on LangWatch
   Cloud and on self-hosted deployments. A self-hosted deployment without an
-  Enterprise license signs people in with email and password, and passkeys, only: setting
+  Enterprise license signs people in with email and password only, plus passkeys
+  unless `PASSKEYS_ENABLED=off`: setting
   `AUTH_PROVIDER` and the identity provider variables is not enough, and the
   deployment stays in email mode (see [SSO requires a license](/self-hosting/licensing#sso-requires-a-license)).
 

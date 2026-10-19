@@ -1116,11 +1116,11 @@ function visitTableIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
     defaultDatabase: ctx.policy.defaultDatabase,
   });
   const isAllowedTable = ctx.policy.allowedTables.has(qualified);
-  const bare = qualifyTableName({
+  const qualifiedHere = qualifyTableName({
     table: reference.name,
     defaultDatabase: ctx.policy.defaultDatabase,
   });
-  if (!isAllowedTable && database !== undefined && ctx.policy.allowedTables.has(bare)) {
+  if (!isAllowedTable && database !== undefined && ctx.policy.allowedTables.has(qualifiedHere)) {
     report({
       ctx,
       frame,

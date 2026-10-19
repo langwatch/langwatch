@@ -104,3 +104,53 @@ describe("given LANGWATCH_API_KEY is a user-scoped key", () => {
     expect(langwatchFetchMock).not.toHaveBeenCalled();
   });
 });
+
+describe("given the key project lookup fails", () => {
+  describe("when the platform answers with an error status", () => {
+    it("warns with the status before falling back", async () => {
+      langwatchFetchMock.mockImplementation(async () => new Response(null, { status: 401 }));
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const charts = recordingClient();
+
+      await expect(
+        new ChartsApiService({ langwatchApiClient: charts.client }).list(),
+      ).rejects.toThrow(/No project is in scope/);
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("/api/v1/me/project (HTTP 401)"));
+      warn.mockRestore();
+    });
+  });
+
+  describe("when the request itself throws", () => {
+    it("warns with the error before falling back", async () => {
+      langwatchFetchMock.mockImplementation(async () => {
+        throw new Error("connect ECONNREFUSED");
+      });
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
+      const widgets = recordingClient();
+
+      await expect(
+        new DashboardWidgetsApiService({ langwatchApiClient: widgets.client }).list(),
+      ).rejects.toThrow(/No project is in scope/);
+
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining("connect ECONNREFUSED"));
+      warn.mockRestore();
+    });
+  });
+});
+
+describe("given a secret is created", () => {
+  it("names one project in the body and the credentials", async () => {
+    vi.stubEnv("LANGWATCH_API_KEY", `sk-lw-user_scoped${keyCounter}`);
+    vi.stubEnv("LANGWATCH_PROJECT_ID", "project_env");
+    langwatchFetchMock.mockImplementation(async () => Response.json({ id: "secret_1" }));
+
+    await new SecretsApiService().create({ name: "TOKEN", value: "v" });
+
+    const [, init] = langwatchFetchMock.mock.calls[0] as [string, RequestInit];
+    expect(JSON.parse(init.body as string)).toMatchObject({ projectId: "project_env" });
+    const authorization = new Headers(init.headers).get("authorization") ?? "";
+    const decoded = Buffer.from(authorization.replace(/^Basic /, ""), "base64").toString();
+    expect(decoded.startsWith("project_env:")).toBe(true);
+  });
+});

@@ -175,11 +175,11 @@ describe("given nesting the validator does not allow", () => {
     }
 
     /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
-    it("refuses ORDER BY the alias and names the two-step pattern over analytics.judgments", () => {
+    it("refuses ORDER BY the alias and names the two-step pattern over judgments", () => {
       const result = withTail("ORDER BY s DESC");
 
       expect(codesOf(result)).toContain("APP_FUNCTION_POSITION");
-      expect(messagesOf(result)).toContain("analytics.judgments");
+      expect(messagesOf(result)).toContain("second query over judgments");
     });
 
     /** @scenario "Sorting by an eval's alias is refused rather than sorting by the text it judges" */
