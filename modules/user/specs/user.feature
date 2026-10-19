@@ -28,6 +28,14 @@ Feature: Canonical user lifecycle
     Then one is deactivated and the other is refused
     And one active operator remains
 
+  # ops's platform-operator seed asks this before granting an unverified account (Rogerio, 2026-10-19).
+  @unit
+  Scenario: The install's oldest active account is answered by id
+    Given accounts created one after another, some since deactivated
+    When asked whether an account is the install's oldest active one
+    Then only the earliest-created account still active answers yes
+    And with every account deactivated none does
+
   # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
   # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit

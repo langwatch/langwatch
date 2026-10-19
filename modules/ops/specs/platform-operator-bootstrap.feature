@@ -56,7 +56,8 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
 
   @unit @operator-seed
   Scenario: A still-set ADMIN_EMAILS seeds its verified users once
-    Given no platform operator holds the grant
+    Given the installation has email configured
+    And no platform operator holds the grant
     And ADMIN_EMAILS names a verified active user and an unverified one
     When the seed runs
     Then only the verified user is granted, by the system, with source migration
@@ -76,6 +77,7 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
   Scenario: An install with no email configured seeds the named user unverified
     Given the installation has no email configured, so no account can verify its address
     And ADMIN_EMAILS names an active user whose address was never verified
+    And that user is the install's oldest active account, the first one created
     And the installation has exactly one organization whose administrator is somebody else
     When the seed runs
     Then the named user is decided and recorded, and the administrator is not
@@ -85,8 +87,18 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     And a mailer that is named but misconfigured counts as email configured, so the seed waits
 
   @unit @operator-seed
+  Scenario: With no email configured a named unverified account that signed up later waits
+    Given the installation has no email configured
+    And ADMIN_EMAILS names an unverified active account that is not the install's oldest active account
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded, since anyone could have registered that address
+    And the wait reason says the named account is not the install's oldest active account
+    And a verified user ADMIN_EMAILS also names is still seeded
+
+  @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names
-    Given no platform operator holds the grant
+    Given the installation has email configured
+    And no platform operator holds the grant
     And ADMIN_EMAILS names a verified active user and an unverified one
     When the ops:seed-platform-operators upgrade step runs
     Then only the verified user is granted, by the system, with source migration

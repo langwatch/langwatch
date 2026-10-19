@@ -1708,6 +1708,8 @@ composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's 
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
+2026-10-19: the read seat also answers one page of aggregate streams at once, for upgrade steps
+that walk many aggregates (user's standing facts); the producer-only rule still holds for writes.
 
 **A lookup by id reads through its table's id index** (Alex, 2026-10-11): each time-partitioned
 table looked up by id alone has an unpartitioned `<table>_id_index` (TenantId, id to its time range),
@@ -1800,7 +1802,9 @@ task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted ins
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
 Where no email is configured no address can be verified, so a named active user is seeded unverified;
-the account must already exist, the seed never creates one (Rogerio, 2026-10-18).
+the account must already exist, the seed never creates one (Rogerio, 2026-10-18). An unverified one is
+seeded only as the install's oldest active account, as the first user is, since anyone can register a
+named address first on an install that cannot verify it (Rogerio, 2026-10-19).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
 recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
 grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
