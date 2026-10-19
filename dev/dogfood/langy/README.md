@@ -164,21 +164,21 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
 - `e2e-chat-boundary` (3): `langy-boundary.scenario.test.ts` 31, 72, 109.
 - The original e2e `it(` blocks for these 49 were removed from `apps/ui/e2e/langy/`, except the 8 in `langy-dogfood.scenario.test.ts` (they carry `@scenario` bindings) and 1544.
 - Stay, wave 1b (23): they needed data the default world does not make; slice 1
-  below moves 18 runs, some of them from this set.
+  below moves 17 runs, some of them from this set.
 - Stay in code (53): red team, folder, CLI and code access, workbench, guided
   onboarding, navigate, PR, latency budget: they need the browser, a local
   agent or a code check the judge cannot do.
 
 ### Wave 1b, slice 1: create-then-check runs and two judge-only runs
 
-18 more runs from `apps/ui/e2e/langy/`, labelled `e2e-migrated` like wave 1a.
+17 more runs from `apps/ui/e2e/langy/`, labelled `e2e-migrated` like wave 1a.
 
 - `e2e-chat-judge-extra` (2, default world): `langy-quality.scenario.test.ts`
   246 (the label is `never-<prompt_handle>`, so no run ever sent it) and
   `langy.scenario.test.ts` 444 (updates the world's prompt `prompt_handle`).
-- `e2e-chat-create` (16, world `resources`): `langy.scenario.test.ts` 87, 123,
+- `e2e-chat-create` (15, world `resources`): `langy.scenario.test.ts` 87, 123,
   171, 209, 250, 293, 357, 480, 517, 561, 603; `langy-current-surfaces.scenario.test.ts`
-  29, 71, 163; `langy-dogfood.scenario.test.ts` 361; `langy-quality.scenario.test.ts` 107. The user names every item `<something>-<tag>` (171 too, which asked for
+  71, 163; `langy-dogfood.scenario.test.ts` 361; `langy-quality.scenario.test.ts` 107. The user names every item `<something>-<tag>` (171 too, which asked for
   no name); each REST assertion of the original is a "Code check:
   facts_now.new_<kind> ..." criterion.
 - Matching is by tag, never by an id diff, because the project is shared
@@ -195,6 +195,7 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
 - `E2E core 1544: asks to connect GitHub` stays in code. Langy sometimes answers
   with a question card ("on your machine or through GitHub?") before the connect
   prompt, and the REST connector cannot answer cards yet. It waits for question-card support in the connector.
+- `E2E surfaces 29: generates a RAG evaluation dataset` stays in code. It failed 3 of 3 live runs on the dev stack without a wrong answer: once an empty card-only reply (fix in https://github.com/langwatch/langwatch/pull/8838), twice the turn did not settle within 290 s. Its original e2e run stays.
 - `langy.scenario.test.ts` 698 (set up evaluations) and `langy-dogfood.scenario.test.ts`
   281 (make me an eval) stay in code: in a shared project they can leave untagged
   live monitors that cost money, and they may stall on a question card (gap 2).

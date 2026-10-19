@@ -1,6 +1,6 @@
 {
   "name": "Langy e2e chat: create and check",
-  "description": "Wave 1b: 16 create-then-assert runs moved from apps/ui/e2e/langy/, against the connected agent langy (dev/dogfood/langy) in the world resources: names hold a per-run tag, the facts list what holds it, and teardown deletes it.",
+  "description": "Wave 1b: 15 create-then-assert runs moved from apps/ui/e2e/langy/, against the connected agent langy (dev/dogfood/langy) in the world resources: names hold a per-run tag, the facts list what holds it, and teardown deletes it.",
   "agent": "langy",
   "repeatCount": 1
 }
