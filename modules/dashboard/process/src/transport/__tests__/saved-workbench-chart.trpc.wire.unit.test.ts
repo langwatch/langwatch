@@ -72,11 +72,7 @@ describe("the saved workbench chart tRPC namespace", () => {
       const repositories = MemoryDashboardRepositories.create();
       const app = createDashboardTestApp({ repositories });
       const creator = { userId: "creator" };
-      const board = await app.create({
-        projectId: PROJECT_ID,
-        name: "Theirs",
-        createdById: "creator",
-      });
+      const board = await app.create({ projectId: PROJECT_ID, name: "Theirs" });
       await repositories.dashboards.createSavedWorkbenchChart({
         id: "chart-placed",
         projectId: PROJECT_ID,

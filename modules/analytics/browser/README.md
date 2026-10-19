@@ -40,7 +40,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(analyticsApi)`, tRPC contracts: `analytics.*`, `analytics.lwql.*`, `savedViews.*`.
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/feature-flag-client`, `@langwatch/langy-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/langy-client`.
 - Lends: `SavedDashboardsToken`, `StarredDashboardsToken`, `DashboardPointerToken`, `LwqlReplayChartToken`, `FilterSidebarToken`, `CustomGraphToken`.
 - Host APIs it requires: `AnalyticsHostApi`.
 - Capabilities: `traceFilters`.

@@ -12,21 +12,34 @@ import {
   type AttachableEvaluator,
   evaluatorFitsPlanLevel,
 } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
+import type { InheritedSuite } from "../run-evaluators/run-evaluators.ts";
 import type { SetExtras } from "./use-edit-and-attach-extra";
 
-/** The evaluator ids a run plan cannot feed, hidden from the attach list. */
-export function hiddenEvaluatorIdsOf(
-  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>,
-): string[] {
-  return [...evaluatorsById.values()]
+/**
+ * The evaluator ids hidden from the attach list: those a run plan cannot feed,
+ * and those the suites in scope already attach.
+ */
+export function hiddenEvaluatorIdsOf({
+  evaluatorsById,
+  inherited,
+}: {
+  evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  inherited: readonly InheritedSuite[];
+}): string[] {
+  const unfit = [...evaluatorsById.values()]
     .filter((evaluator) => !evaluatorFitsPlanLevel(evaluator))
     .map((evaluator) => evaluator.id);
+  const attached = inherited.flatMap((suite) =>
+    suite.attachments.map((attachment) => attachment.evaluatorId),
+  );
+  return [...new Set([...unfit, ...attached])];
 }
 
-/** Opens the list, without the evaluators a run plan cannot feed, and the toggles around it. */
+/** Opens the list, without the ids `hiddenEvaluatorIdsOf` hides, and the toggles around it. */
 export function useAddExtraFlow({
   attach,
   evaluatorsById,
+  inherited,
   openDrawer,
   closeDrawer,
   utils,
@@ -36,6 +49,7 @@ export function useAddExtraFlow({
 }: {
   attach: (evaluator: AttachableEvaluator) => void;
   evaluatorsById: ReadonlyMap<string, AttachableEvaluator>;
+  inherited: readonly InheritedSuite[];
   openDrawer: ReturnType<typeof useDrawer>["openDrawer"];
   closeDrawer: ReturnType<typeof useDrawer>["closeDrawer"];
   utils: ReturnType<typeof api.useUtils>;
@@ -59,9 +73,9 @@ export function useAddExtraFlow({
       },
     });
     openDrawer("evaluatorList", {
-      hiddenEvaluatorIds: hiddenEvaluatorIdsOf(evaluatorsById),
+      hiddenEvaluatorIds: hiddenEvaluatorIdsOf({ evaluatorsById, inherited }),
     });
-  }, [attach, evaluatorsById, openDrawer, closeDrawer, utils, projectId]);
+  }, [attach, evaluatorsById, inherited, openDrawer, closeDrawer, utils, projectId]);
 
   const showEvaluatorsBlock = useCallback(() => {
     setShowExtras(true);
