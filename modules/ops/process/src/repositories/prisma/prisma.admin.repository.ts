@@ -1,0 +1,98 @@
+import { UserToImpersonateNotFoundError } from "@langwatch/ops-contract";
+import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate } from "@langwatch/time";
+
+import { ImpersonationRepository, type ImpersonationTarget } from "../impersonation.repository.ts";
+
+export type AdminDatabase = PrismaClient;
+
+export class PrismaImpersonationRepository extends ImpersonationRepository {
+  private constructor(private readonly database: AdminDatabase) {
+    super();
+  }
+
+  static create(database: AdminDatabase): PrismaImpersonationRepository {
+    return new PrismaImpersonationRepository(database);
+  }
+
+  /**
+   * Memberships ride along as a NESTED read on purpose: a top-level
+   * `organizationUser.findMany` carries no single-organization predicate,
+   * so the tenancy guard (ADR-021) refuses it outright.
+   */
+  async getTarget(userId: string): Promise<ImpersonationTarget> {
+    const row = await this.database.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        image: true,
+        deactivatedAt: true,
+        orgMemberships: {
+          where: { organization: { mfaRequired: true } },
+          select: { organization: { select: { slug: true } } },
+        },
+      },
+    });
+    if (!row) throw new UserToImpersonateNotFoundError(userId);
+
+    const { orgMemberships, deactivatedAt, ...target } = row;
+    return {
+      ...target,
+      deactivatedAt: deactivatedAt ? fromDate(deactivatedAt) : null,
+      mfaRequiredOrganizationSlugs: orgMemberships.map(
+        (membership) => membership.organization.slug,
+      ),
+    };
+  }
+
+  async hasSecondFactor(userId: string): Promise<boolean> {
+    const operator = await this.database.user.findUnique({
+      where: { id: userId },
+      select: { twoFactorEnabled: true },
+    });
+    return operator?.twoFactorEnabled === true;
+  }
+}
+
+export const ORGANIZATION_SAFE_SELECT = {
+  id: true,
+  name: true,
+  phoneNumber: true,
+  slug: true,
+  createdAt: true,
+  updatedAt: true,
+  usageSpendingMaxLimit: true,
+  datasetAttachmentMaxMb: true,
+  signupData: true,
+  signedDPA: true,
+  useCustomS3: true,
+  sentPlanLimitAlert: true,
+  ssoDomain: true,
+  ssoProvider: true,
+  promoCode: true,
+  stripeCustomerId: true,
+  currency: true,
+  pricingModel: true,
+  // `license` is omitted on purpose: a connected install derives its hosted
+  // services credential from the license key (ADR-156), so the key is
+  // credential material and, like the S3 fields, write-only over the wire.
+  // Its dates are licensing's to read, not this generic admin's.
+} as const satisfies Prisma.OrganizationSelect;
+
+export const PROJECT_SAFE_SELECT = {
+  id: true,
+  name: true,
+  slug: true,
+  teamId: true,
+  language: true,
+  framework: true,
+  firstMessage: true,
+  integrated: true,
+  createdAt: true,
+  updatedAt: true,
+  userLinkTemplate: true,
+  traceSharingEnabled: true,
+  archivedAt: true,
+} as const satisfies Prisma.ProjectSelect;

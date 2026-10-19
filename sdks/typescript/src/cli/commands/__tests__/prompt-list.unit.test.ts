@@ -1,9 +1,7 @@
 /**
- * `prompt list` under `--limit`, the paging flag every other list command takes.
- *
- * Without it the command answered "unknown option '--limit'", which is where a
- * caller that has used `experiment list` starts, and what sent one agent off to
- * write its own reader instead.
+ * `prompt list` under `--limit`, the paging flag every other list command
+ * takes. Without it the command answered "unknown option '--limit'", which
+ * sent one agent off to write its own reader instead.
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -103,9 +101,7 @@ describe("given a project with 44 prompts", () => {
           .mockImplementation((code?: string | number | null) => {
             throw new Error(`process.exit(${String(code)})`);
           });
-        const error = vi
-          .spyOn(console, "error")
-          .mockImplementation(() => undefined);
+        const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
 
         await expect(listCommand({ limit })).rejects.toThrow("process.exit(1)");
         expect(error.mock.calls[0]?.[0]).toContain("--limit takes");

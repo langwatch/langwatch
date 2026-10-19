@@ -4,7 +4,11 @@ description: Setup contract only, S3 bucket + cross-account role config captured
 sidebarTitle: OpenAI Enterprise Compliance
 ---
 
-<Info>**Pairs with:** [AI Gateway → OpenAI provider](/ai-gateway/providers/openai). Direct OpenAI API traffic flows through the gateway data plane; OpenAI Enterprise Compliance API exports are a separate bulk feed routed through this ingestion source.</Info>
+<Info>
+  **Pairs with:** [AI Gateway → OpenAI provider](/ai-gateway/providers/openai). Direct OpenAI API
+  traffic flows through the gateway data plane; OpenAI Enterprise Compliance API exports are a
+  separate bulk feed routed through this ingestion source.
+</Info>
 
 `openai_compliance` pulls compliance JSONL drops from an S3 bucket OpenAI writes to (Enterprise Compliance API). Today the source can be created and the AWS credentials/S3 config are persisted, but the puller worker hasn't shipped, events do not flow yet.
 
@@ -13,7 +17,7 @@ The configuration contract below lets admins pre-stage IAM trust policies and bu
 ## Currently implemented
 
 - **CRUD:** the source can be created via the admin composer at `/governance/ingestion-sources` and via `api.ingestionSources.create`. It appears in `langwatch ingest list` with status `awaiting_first_event`.
-- **Receiver:** none. There is no `/api/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
+- **Receiver:** none. There is no `/api/v1/ingest/openai-compliance/:id` endpoint and the OTLP, webhook receivers reject `openai_compliance` sources with `400 wrong_endpoint`.
 - **Puller:** none.
 - **Normaliser:** none.
 - **Status flip:** the source stays `awaiting_first_event` indefinitely until the puller ships.
@@ -22,12 +26,12 @@ The configuration contract below lets admins pre-stage IAM trust policies and bu
 
 The composer collects:
 
-| Field | Required | Stored | Used by |
-|---|---|---|---|
-| S3 bucket name | yes | `IngestionSource.payloadConfig.bucket` | (future puller) |
-| S3 key prefix | no | `payloadConfig.prefix` (default `compliance/`) | (future puller) |
-| Cross-account role ARN | yes | `payloadConfig.roleArn` | (future puller) |
-| Polling cadence (seconds) | no | `payloadConfig.pollEverySec` (default 60) | (future puller) |
+| Field                     | Required | Stored                                         | Used by         |
+| ------------------------- | -------- | ---------------------------------------------- | --------------- |
+| S3 bucket name            | yes      | `IngestionSource.payloadConfig.bucket`         | (future puller) |
+| S3 key prefix             | no       | `payloadConfig.prefix` (default `compliance/`) | (future puller) |
+| Cross-account role ARN    | yes      | `payloadConfig.roleArn`                        | (future puller) |
+| Polling cadence (seconds) | no       | `payloadConfig.pollEverySec` (default 60)      | (future puller) |
 
 In OpenAI's Enterprise Compliance setup:
 

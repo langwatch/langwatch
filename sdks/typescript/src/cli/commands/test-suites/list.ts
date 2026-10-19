@@ -1,9 +1,10 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { createCliTestSuitesService } from "./cli-test-suites-service";
 
 /**
@@ -21,9 +22,7 @@ export const listTestSuitesCommand = async (): Promise<CommandResult | void> => 
   try {
     const suites = await service.list();
 
-    spinner.succeed(
-      `Found ${suites.length} test suite${suites.length !== 1 ? "s" : ""}`,
-    );
+    spinner.succeed(`Found ${suites.length} test suite${suites.length !== 1 ? "s" : ""}`);
 
     return {
       data: suites,

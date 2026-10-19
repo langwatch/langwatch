@@ -7,7 +7,7 @@ metadata:
   category: recipe
 ---
 
-import CliSetup from '../../_shared/cli-setup.mdx'
+import CliSetup from "../../_shared/cli-setup.mdx";
 
 # Debug Your LangWatch Instrumentation
 
@@ -28,6 +28,7 @@ epoch milliseconds, and defaults to the last 24 hours. The epoch form above is
 used because `date -d '7 days ago'` is GNU-only and fails on macOS.)
 
 For each trace, ask:
+
 - How many traces are there?
 - Do they have inputs and outputs populated, or are they `<empty>`?
 - Are there labels and metadata (user_id, thread_id)?
@@ -62,6 +63,7 @@ langwatch docs integration/typescript/guide     # TypeScript (or your framework)
 ## Step 4: Apply Fixes
 
 For each issue found:
+
 1. Identify the root cause in the code
 2. Apply the fix following the framework-specific docs
 3. Run the application to generate new traces
@@ -70,21 +72,23 @@ For each issue found:
 ## Step 5: Verify Improvement
 
 After fixes, compare before/after:
+
 - Are inputs/outputs now populated?
 - Are spans properly nested?
 - Are labels and metadata present?
 
 You can also export a sample for diff:
+
 ```bash
 langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 ```
 
 ## Common Issues and Fixes
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| All traces show `<empty>` input/output | Missing autotrack or telemetry config | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
-| Spans not connected to traces | Missing `@langwatch.trace()` on entry function | Add trace decorator to the main function |
-| No labels on traces | Labels not set in trace metadata | Add `metadata={"labels": ["feature"]}` to trace update |
-| Missing user_id | User ID not passed to trace | Add `user_id` to trace metadata |
-| Traces from different calls merged | Missing `langwatch.setup()` or trace context not propagated | Ensure `langwatch.setup()` called at startup |
+| Issue                                  | Cause                                                       | Fix                                                                                   |
+| -------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| All traces show `<empty>` input/output | Missing autotrack or telemetry config                       | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
+| Spans not connected to traces          | Missing `@langwatch.trace()` on entry function              | Add trace decorator to the main function                                              |
+| No labels on traces                    | Labels not set in trace metadata                            | Add `metadata={"labels": ["feature"]}` to trace update                                |
+| Missing user_id                        | User ID not passed to trace                                 | Add `user_id` to trace metadata                                                       |
+| Traces from different calls merged     | Missing `langwatch.setup()` or trace context not propagated | Ensure `langwatch.setup()` called at startup                                          |

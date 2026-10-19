@@ -114,13 +114,14 @@ func blockKindForDelta(delta *bfanthropic.AnthropicStreamDelta) (bfanthropic.Ant
 }
 
 // ensureStarted emits message_start once, before anything else can reference
-// the message.
-func (f *anthropicStreamFramer) ensureStarted(out []*bfanthropic.AnthropicStreamEvent) []*bfanthropic.AnthropicStreamEvent {
+// the message. Every caller invokes it before appending anything, so it
+// creates the event slice rather than extending one.
+func (f *anthropicStreamFramer) ensureStarted() []*bfanthropic.AnthropicStreamEvent {
 	if f.started {
-		return out
+		return nil
 	}
 	f.started = true
-	return append(out, &bfanthropic.AnthropicStreamEvent{
+	return append([]*bfanthropic.AnthropicStreamEvent(nil), &bfanthropic.AnthropicStreamEvent{
 		Type: bfanthropic.AnthropicStreamEventTypeMessageStart,
 		Message: &bfanthropic.AnthropicMessageResponse{
 			ID:      f.messageID,
@@ -236,7 +237,7 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		return append(out, ev)
 
 	case bfanthropic.AnthropicStreamEventTypeContentBlockStart:
-		out = f.ensureStarted(out)
+		out = f.ensureStarted()
 		if ev.Index == nil {
 			ev.Index = bfschemas.Ptr(0)
 		}
@@ -259,7 +260,7 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		return append(out, ev)
 
 	case bfanthropic.AnthropicStreamEventTypeContentBlockDelta:
-		out = f.ensureStarted(out)
+		out = f.ensureStarted()
 		if ev.Index == nil {
 			ev.Index = bfschemas.Ptr(0)
 		}
@@ -280,7 +281,7 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		return append(out, ev)
 
 	case bfanthropic.AnthropicStreamEventTypeContentBlockStop:
-		out = f.ensureStarted(out)
+		out = f.ensureStarted()
 		if ev.Index == nil {
 			ev.Index = bfschemas.Ptr(0)
 		}
@@ -326,7 +327,7 @@ func (f *anthropicStreamFramer) push(ev *bfanthropic.AnthropicStreamEvent) []*bf
 		// Close open blocks before terminating. finish() short-circuits once
 		// terminated is set, so anything still open here would never be closed
 		// by any later path and the client would hold a half-built block.
-		out = f.ensureStarted(out)
+		out = f.ensureStarted()
 		out = f.closeAllBlocks(out)
 		f.terminated = true
 		return append(out, ev)
@@ -372,7 +373,7 @@ func (f *anthropicStreamFramer) finish() []*bfanthropic.AnthropicStreamEvent {
 	f.terminated = true
 
 	var out []*bfanthropic.AnthropicStreamEvent
-	out = f.ensureStarted(out)
+	out = f.ensureStarted()
 	out = f.closeAllBlocks(out)
 
 	if !f.sentDelta {

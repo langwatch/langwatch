@@ -1,0 +1,173 @@
+// Unmapped-cost suggestion: shows when span carries `costSuggestion`,
+// opens model costs page in new window.
+// @vitest-environment jsdom
+// Spec: specs/traces-v2/span-unmapped-cost-suggestion.feature
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { SpanDetail, SpanTreeNode } from "@langwatch/trace-contract";
+import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { MemoryRouterWrapper } from "../../../hooks/__tests__/memory-router-wrapper.tsx";
+import { SpanAccordions } from "../span-accordions.tsx";
+
+const { mockDetailState } = vi.hoisted(() => ({
+  mockDetailState: { current: null as SpanDetail | null },
+}));
+
+vi.mock("../../../../../../behavior/trace-host.ts", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useTraceHost: () => ({ hasPermission: () => true }),
+}));
+vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
+  useOrganizationTeamProject: () => ({
+    project: { id: "proj-1", slug: "test-project" },
+  }),
+}));
+
+vi.mock("../../../../../../features/span/behavior/use-span-detail.ts", () => ({
+  useSpanDetail: () => ({
+    data: mockDetailState.current,
+    isLoading: false,
+  }),
+  useSpanDetailCanonical: () => ({
+    data: mockDetailState.current,
+    isLoading: false,
+  }),
+}));
+
+// SpanAccordions marks the fields a stored correction changed; this test
+// renders without a tRPC provider and no correction is in play here.
+vi.mock("../../../../../../behavior/explorer/use-trace-edit-overlay.ts", () => ({
+  useTraceEditOverlay: () => ({ data: null }),
+  useAppliedTraceEditPatch: () => null,
+}));
+
+vi.mock("../../../hooks/use-trace-resources.ts", () => ({
+  useTraceResources: () => ({ bySpanId: {}, isLoading: false }),
+}));
+
+// SpanAccordions reads the trace's comments to count them on each section;
+// this test renders without a tRPC provider and no comment is in play here.
+vi.mock("../../../../../../features/annotation/behavior/use-anchored-annotations.ts", () => ({
+  useAnchoredAnnotations: () => ({
+    commentsAt: () => [],
+    all: [],
+    isLoading: false,
+  }),
+}));
+
+// SpanAccordions joins log content onto spans via a tRPC query; this test
+// renders without that provider, so stub the hook to the no-logs state.
+// Log enrichment is out of scope for the cost suggestion.
+vi.mock("../../../../../../features/span/behavior/use-span-logs.ts", () => ({
+  useSpanLogs: () => ({ logsBySpanId: new Map(), isLoading: false }),
+}));
+
+// RedactedField (wrapping the IO viewers) reads field-redaction status via a
+// tRPC query; this test renders without that provider, so stub the hook to the
+// not-redacted passthrough — redaction is out of scope for the cost suggestion.
+vi.mock("../../../../use-field-redaction.ts", () => ({
+  useFieldRedaction: () => ({
+    isRedacted: false,
+    isLoading: false,
+    visibleTo: null,
+  }),
+}));
+
+const span: SpanTreeNode = {
+  spanId: "span-1",
+  parentSpanId: null,
+  name: "chat completion",
+  type: "llm",
+  startTimeMs: 1_750_000_000_000,
+  endTimeMs: 1_750_000_000_500,
+  durationMs: 500,
+  status: "ok",
+  model: "vertex_ai/gemini-3-pro-preview",
+  cost: null,
+};
+
+function makeDetail(overrides: Partial<SpanDetail> = {}): SpanDetail {
+  return {
+    spanId: "span-1",
+    parentSpanId: null,
+    name: "chat completion",
+    type: "llm",
+    startTimeMs: 1_750_000_000_000,
+    endTimeMs: 1_750_000_000_500,
+    durationMs: 500,
+    status: "ok",
+    model: "vertex_ai/gemini-3-pro-preview",
+    metrics: {
+      promptTokens: 1200,
+      completionTokens: 80,
+      cost: null,
+    },
+    events: [],
+    costSuggestion: { model: "vertex_ai/gemini-3-pro-preview" },
+    ...overrides,
+  };
+}
+
+function renderSpanDetail() {
+  return renderWithDesignSystem(
+    <MemoryRouterWrapper>
+      <SpanAccordions traceId="trace-1" span={span} />
+    </MemoryRouterWrapper>,
+  );
+}
+
+describe("Feature: Unmapped model cost suggestion in span details", () => {
+  afterEach(cleanup);
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    vi.spyOn(window, "open").mockReturnValue(null);
+    mockDetailState.current = makeDetail();
+  });
+
+  describe("when the span has a model and tokens but no cost mapped", () => {
+    /** @scenario Span with model and tokens but no cost shows a cost mapping suggestion */
+    it("shows the suggestion inside the Attributes section with the model name and an add button", () => {
+      renderSpanDetail();
+
+      const suggestion = screen.getByTestId("unmapped-cost-suggestion");
+      expect(suggestion).toHaveTextContent("no cost mapped");
+      expect(suggestion).toHaveTextContent("vertex_ai/gemini-3-pro-preview");
+      // The banner lives inside the span's Attributes accordion section,
+      // above the attribute table and its filter input.
+      expect(suggestion.closest('[data-section="attributes"]')).not.toBeNull();
+      expect(suggestion.closest('[data-section="io"]')).toBeNull();
+      expect(screen.getByRole("button", { name: /add cost mapping/i })).toBeInTheDocument();
+    });
+
+    /** @scenario Suggestion opens the model costs page prefilled in a new window */
+    /** @scenario Generated regex escapes special characters */
+    it("opens the model costs page prefilled in a new window", () => {
+      renderSpanDetail();
+
+      fireEvent.click(screen.getByRole("button", { name: /add cost mapping/i }));
+
+      expect(window.open).toHaveBeenCalledTimes(1);
+      const [url, target] = vi.mocked(window.open).mock.calls[0]!;
+      const parsed = new URL(`http://localhost${url as string}`);
+      expect(parsed.pathname).toBe("/settings/model-costs");
+      expect(parsed.searchParams.get("drawer.open")).toBe("llmModelCost");
+      expect(parsed.searchParams.get("drawer.prefillModel")).toBe("vertex_ai/gemini-3-pro-preview");
+      expect(parsed.searchParams.get("drawer.prefillRegex")).toBe(
+        "^vertex_ai\\/gemini-3-pro-preview$",
+      );
+      expect(target).toBe("_blank");
+    });
+  });
+
+  describe("when no suggestion applies to the span", () => {
+    it("renders nothing when the span detail carries no costSuggestion", () => {
+      mockDetailState.current = makeDetail({ costSuggestion: null });
+
+      renderSpanDetail();
+
+      expect(screen.queryByTestId("unmapped-cost-suggestion")).not.toBeInTheDocument();
+    });
+  });
+});

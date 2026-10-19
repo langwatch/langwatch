@@ -1,0 +1,87 @@
+/**
+ * What a browser installs when it installs auth: the unauthenticated
+ * front-door screens, every one under the auth layout that mounts AuthHostApi.
+ */
+
+import {
+  authWebConfigSchema,
+  PasskeyCeremoniesToken,
+  SignInMethodLinkingToken,
+  SsoTestSignInToken,
+  TwoStepCeremoniesToken,
+} from "@langwatch/auth-contract";
+import { defineBrowserModule } from "@langwatch/browser";
+
+export const authWeb = defineBrowserModule("auth")
+  // The deployment fields auth's slice answers, named as the shell's deployment reads them.
+  .withConfig({ auth: authWebConfigSchema }, ({ auth }) => ({
+    ...(auth.publicUrl ? { publicUrl: auth.publicUrl } : {}),
+    ...(auth.authProvider ? { authProvider: auth.authProvider } : {}),
+    passkeysEnabled: auth.passkeys,
+    emailPasswordEnabled: auth.emailPasswordEnabled,
+    federatedProviders: auth.federatedProviders,
+    signUpMode: auth.signUpMode,
+  }))
+  .withScreens({
+    // Placed by the application's route table until a top-level anchor accepts
+    // declared routes; the loader is this module's either way.
+    "pages/auth/signin": {
+      path: "/auth/signin",
+      load: () => import("./ui/sections/signin-screen.tsx"),
+    },
+    "pages/auth/signup": {
+      path: "/auth/signup",
+      load: () => import("./ui/sections/signup-screen.tsx"),
+    },
+    "pages/auth/forgot-password": {
+      path: "/auth/forgot-password",
+      load: () => import("./ui/sections/forgot-password-screen.tsx"),
+    },
+    "pages/auth/reset-password": {
+      path: "/auth/reset-password",
+      load: () => import("./ui/sections/reset-password-screen.tsx"),
+    },
+    "pages/auth/verify-email": {
+      path: "/auth/verify-email",
+      load: () => import("./ui/sections/verify-email-screen.tsx"),
+    },
+    "pages/auth/error": {
+      path: "/auth/error",
+      load: () => import("./ui/sections/sign-in-error-screen.tsx"),
+    },
+    "pages/auth/join": {
+      path: "/auth/join",
+      load: () => import("./ui/sections/join-screen.tsx"),
+    },
+    // Lands sign-ins whose destination better-auth's callbackURL check refuses.
+    "pages/auth/resume": {
+      path: "/auth/resume",
+      load: () => import("./ui/sections/auth-resume-screen.tsx"),
+    },
+    "pages/auth/sso-test-complete": {
+      path: "/auth/sso-test-complete",
+      load: () => import("./ui/sections/sso-test-complete-screen.tsx"),
+    },
+    "pages/invite/accept": {
+      path: "/invite/accept",
+      load: () => import("./ui/sections/invite-accept-screen.tsx"),
+    },
+  })
+  .withCapabilities({
+    /** Who is here: the composition root awaits this before it renders. */
+    session: { load: () => import("./session.ts") },
+    /** The front door's theme config; the composition root adds it to the design system. */
+    frontDoorTheme: { load: () => import("./model/front-door-theme.ts") },
+    /** The front door's host port, which the shell's auth layout implements. */
+    host: { load: () => import("./model/auth-host.ts") },
+  })
+  /** SSO's "Test sign-in": a sign-in that names a connection. */
+  .lends(SsoTestSignInToken, { load: () => import("./behavior/sign-in-capability.ts") })
+  /** The reader's own passkeys, for the personal workspace's security screen. */
+  .lends(PasskeyCeremoniesToken, { load: () => import("./behavior/passkey-capability.ts") })
+  /** Setting two-step verification up, and fresh backup codes. */
+  .lends(TwoStepCeremoniesToken, { load: () => import("./behavior/two-step-capability.ts") })
+  /** Linking another sign-in method to the reader's own account. */
+  .lends(SignInMethodLinkingToken, {
+    load: () => import("./behavior/sign-in-method-linking-capability.ts"),
+  });

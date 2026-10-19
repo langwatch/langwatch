@@ -11,7 +11,7 @@ T = TypeVar("T", bound="PostApiExperimentsBySlugRunBodyParameters")
 
 @_attrs_define
 class PostApiExperimentsBySlugRunBodyParameters:
-    """Constant inputs applied to every row, overriding fields of the same name"""
+    """ """
 
     additional_properties: dict[str, bool | float | str] = _attrs_field(init=False, factory=dict)
 

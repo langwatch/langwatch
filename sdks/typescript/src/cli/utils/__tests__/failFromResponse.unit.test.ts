@@ -1,18 +1,14 @@
 /**
  * What survives from a failed `Response` to the document an agent parses.
- *
- * The pattern this helper replaces kept the sentence and dropped the rest, so a
- * 403 arrived as `network_error`, `terminal: false`, plus "check your network
- * connection" — three claims that are all wrong about a permission refusal, and
- * the one an agent acts on is `terminal`.
+ * The old pattern kept the sentence and dropped the rest, so a 403 read as
+ * `network_error`, `terminal: false` -- all wrong, and `terminal` is what an agent acts on.
  */
 import type { Ora } from "ora";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { failSpinnerFromResponse } from "../failFromResponse";
 
-const spinner = () =>
-  ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
+const spinner = () => ({ fail: vi.fn(), succeed: vi.fn(), stop: vi.fn() }) as unknown as Ora;
 
 const responseOf = (status: number, body: unknown, contentType = "application/json") =>
   new Response(typeof body === "string" ? body : JSON.stringify(body), {
@@ -94,11 +90,7 @@ describe("failSpinnerFromResponse", () => {
     it("keeps the sentence and does not invent a domain code", async () => {
       await failSpinnerFromResponse({
         spinner: spinner(),
-        response: responseOf(
-          502,
-          "<html><body>Bad Gateway</body></html>",
-          "text/html",
-        ),
+        response: responseOf(502, "<html><body>Bad Gateway</body></html>", "text/html"),
         action: "create trigger",
         format: "json",
       });

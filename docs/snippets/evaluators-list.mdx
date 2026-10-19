@@ -1,70 +1,76 @@
 ## Expected Answer
+
 For when you have the golden answer and want to measure how correct the LLM gets it
 
-| Evaluator | Description |
-| --------- | ----------- |
-| [Exact Match Evaluator](/api-reference/evaluators/exact-match-evaluator) | Passes when the output matches the expected output character for character. Case, whitespace and punctuation handling are settings. |
-| [LLM Answer Match](/api-reference/evaluators/llm-answer-match) | Uses an LLM to check if the generated output answers a question correctly the same way as the expected output, even if their style is different. |
-| [LLM Factual Match](/api-reference/evaluators/llm-factual-match) | Uses an LLM to check that the facts stated in the output match the expected output. |
-| [BLEU Score](/api-reference/evaluators/bleu-score) | String similarity between the output and the expected output, from 0 to 1. |
-| [ROUGE Score](/api-reference/evaluators/rouge-score) | Overlap between the output and the expected output, from 0 to 1. |
+| Evaluator                                                                | Description                                                                                                                                      |
+| ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| [Exact Match Evaluator](/api-reference/evaluators/exact-match-evaluator) | Passes when the output matches the expected output character for character. Case, whitespace and punctuation handling are settings.              |
+| [LLM Answer Match](/api-reference/evaluators/llm-answer-match)           | Uses an LLM to check if the generated output answers a question correctly the same way as the expected output, even if their style is different. |
+| [LLM Factual Match](/api-reference/evaluators/llm-factual-match)         | Uses an LLM to check that the facts stated in the output match the expected output.                                                              |
+| [BLEU Score](/api-reference/evaluators/bleu-score)                       | String similarity between the output and the expected output, from 0 to 1.                                                                       |
+| [ROUGE Score](/api-reference/evaluators/rouge-score)                     | Overlap between the output and the expected output, from 0 to 1.                                                                                 |
 
 ## LLM as Judge
+
 For when you don't have a golden answer, but have a set of rules for another LLM to evaluate quality
 
-| Evaluator | Description |
-| --------- | ----------- |
-| [LLM-as-a-Judge Boolean Evaluator](/api-reference/evaluators/llm-as-a-judge-boolean-evaluator) | Returns pass or fail against the criteria you write in the prompt. |
-| [LLM-as-a-Judge Score Evaluator](/api-reference/evaluators/llm-as-a-judge-score-evaluator) | Returns a number on the scale your prompt defines. |
-| [LLM-as-a-Judge Category Evaluator](/api-reference/evaluators/llm-as-a-judge-category-evaluator) | Returns one of the categories you define, each with a name and a description. |
-| [Rubrics Based Scoring](/api-reference/evaluators/rubrics-based-scoring) | Scores the output against a rubric with a description for each score, typically from 1 to 5. |
-| [Comparison](/evaluations/experiments/ui/pairwise-compare) | Shows a judge every candidate output for the same row and picks the best one, or a tie. Used in experiments with two or more prompt or agent columns. |
+| Evaluator                                                                                        | Description                                                                                                                                           |
+| ------------------------------------------------------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [LLM-as-a-Judge Boolean Evaluator](/api-reference/evaluators/llm-as-a-judge-boolean-evaluator)   | Returns pass or fail against the criteria you write in the prompt.                                                                                    |
+| [LLM-as-a-Judge Score Evaluator](/api-reference/evaluators/llm-as-a-judge-score-evaluator)       | Returns a number on the scale your prompt defines.                                                                                                    |
+| [LLM-as-a-Judge Category Evaluator](/api-reference/evaluators/llm-as-a-judge-category-evaluator) | Returns one of the categories you define, each with a name and a description.                                                                         |
+| [Rubrics Based Scoring](/api-reference/evaluators/rubrics-based-scoring)                         | Scores the output against a rubric with a description for each score, typically from 1 to 5.                                                          |
+| [Comparison](/evaluations/experiments/ui/pairwise-compare)                                       | Shows a judge every candidate output for the same row and picks the best one, or a tie. Used in experiments with two or more prompt or agent columns. |
 
 ## RAG Quality
+
 For measuring the quality of your RAG, check for hallucinations with faithfulness and precision/recall
 
-| Evaluator | Description |
-| --------- | ----------- |
-| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness) | Measures how consistent the output is with the retrieved contexts. Higher scores mean fewer hallucinations. |
-| [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy) | Measures how relevant the output is to the input. |
-| [Ragas Response Context Precision](/api-reference/evaluators/ragas-response-context-precision) | Measures how much of the retrieved context was needed for the output, using an LLM. |
-| [Ragas Response Context Recall](/api-reference/evaluators/ragas-response-context-recall) | Measures how much of the expected output the retrieved contexts cover, using an LLM. |
-| [Context F1](/api-reference/evaluators/context-f1) | Balances precision and recall of the retrieved contexts against the expected contexts, with string distance metrics. |
+| Evaluator                                                                                      | Description                                                                                                          |
+| ---------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| [Ragas Faithfulness](/api-reference/evaluators/ragas-faithfulness)                             | Measures how consistent the output is with the retrieved contexts. Higher scores mean fewer hallucinations.          |
+| [Ragas Response Relevancy](/api-reference/evaluators/ragas-response-relevancy)                 | Measures how relevant the output is to the input.                                                                    |
+| [Ragas Response Context Precision](/api-reference/evaluators/ragas-response-context-precision) | Measures how much of the retrieved context was needed for the output, using an LLM.                                  |
+| [Ragas Response Context Recall](/api-reference/evaluators/ragas-response-context-recall)       | Measures how much of the expected output the retrieved contexts cover, using an LLM.                                 |
+| [Context F1](/api-reference/evaluators/context-f1)                                             | Balances precision and recall of the retrieved contexts against the expected contexts, with string distance metrics. |
 
 ## Quality Aspects
+
 For when you want to check the language, structure, style and other general quality metrics
 
-| Evaluator | Description |
-| --------- | ----------- |
-| [Valid Format Evaluator](/api-reference/evaluators/valid-format-evaluator) | Checks that the output is valid JSON, Markdown, Python, SQL or another format you pick. Works as a guardrail. |
-| [Language Detection](/api-reference/evaluators/lingua-language-detection) | Detects the language of the input and the output, and passes when they match or when the output is in the language you expect. Works as a guardrail. |
-| Sentiment Evaluator | Scores the sentiment of the text from -1.0 (very negative) to 1.0 (very positive), with a matching label. |
-| [Query Resolution](/api-reference/evaluators/query-resolution) | Checks with an LLM that every question the user asked in the conversation was answered. |
-| [Summarization Score](/api-reference/evaluators/summarization-score) | Measures how well the summary in the output captures the important information from the retrieved contexts. |
-| [SQL Query Equivalence](/api-reference/evaluators/sql-query-equivalence) | Checks with an LLM that the SQL query in the output returns the same results as the reference query, given the table schemas. |
+| Evaluator                                                                  | Description                                                                                                                                          |
+| -------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [Valid Format Evaluator](/api-reference/evaluators/valid-format-evaluator) | Checks that the output is valid JSON, Markdown, Python, SQL or another format you pick. Works as a guardrail.                                        |
+| [Language Detection](/api-reference/evaluators/lingua-language-detection)  | Detects the language of the input and the output, and passes when they match or when the output is in the language you expect. Works as a guardrail. |
+| Sentiment Evaluator                                                        | Scores the sentiment of the text from -1.0 (very negative) to 1.0 (very positive), with a matching label.                                            |
+| [Query Resolution](/api-reference/evaluators/query-resolution)             | Checks with an LLM that every question the user asked in the conversation was answered.                                                              |
+| [Summarization Score](/api-reference/evaluators/summarization-score)       | Measures how well the summary in the output captures the important information from the retrieved contexts.                                          |
+| [SQL Query Equivalence](/api-reference/evaluators/sql-query-equivalence)   | Checks with an LLM that the SQL query in the output returns the same results as the reference query, given the table schemas.                        |
 
 ## Safety
+
 Check for PII, leaked secrets, prompt injection and harmful content, and keep the conversation on topic
 
-| Evaluator | Description |
-| --------- | ----------- |
-| [PII Detection](/api-reference/evaluators/presidio-pii-detection) | Detects personally identifiable information such as names, emails, phone numbers and credit card numbers, with Presidio. Works as a guardrail. |
-| API Keys & Secrets Detection | Flags leaked credentials in the input or the output: provider and cloud API keys, tokens, private keys and database connection strings. Works as a guardrail. |
-| [Prompt Injection Detection](/api-reference/evaluators/azure-prompt-shield) | Detects prompt injection attempts in the input, with Azure Prompt Shield. Works as a guardrail. |
-| [Jailbreak Detection](/api-reference/evaluators/azure-jailbreak-detection) | Detects jailbreak attempts in the input, with Azure Content Safety. Works as a guardrail. |
-| [Content Safety](/api-reference/evaluators/azure-content-safety) | Detects hate, self-harm, sexual and violent content, with Azure Content Safety. Works as a guardrail. |
-| [Moderation](/api-reference/evaluators/openai-moderation) | Flags harmful content with the OpenAI moderation API. Works as a guardrail. |
-| [Competitor Blocklist](/api-reference/evaluators/competitor-blocklist) | Fails when the output mentions a competitor from your list. Works as a guardrail. |
-| [Competitor Allowlist Check](/api-reference/evaluators/competitor-allowlist-check) | Uses an LLM to fail when the output mentions a company outside your allowlist. Works as a guardrail. |
-| [Competitor LLM Check](/api-reference/evaluators/competitor-llm-check) | Uses an LLM with function calling to detect competitor mentions. Works as a guardrail. |
-| [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator) | Uses an LLM to fail when the input is outside the topics you allow. Works as a guardrail. |
+| Evaluator                                                                          | Description                                                                                                                                                   |
+| ---------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [PII Detection](/api-reference/evaluators/presidio-pii-detection)                  | Detects personally identifiable information such as names, emails, phone numbers and credit card numbers, with Presidio. Works as a guardrail.                |
+| API Keys & Secrets Detection                                                       | Flags leaked credentials in the input or the output: provider and cloud API keys, tokens, private keys and database connection strings. Works as a guardrail. |
+| [Prompt Injection Detection](/api-reference/evaluators/azure-prompt-shield)        | Detects prompt injection attempts in the input, with Azure Prompt Shield. Works as a guardrail.                                                               |
+| [Jailbreak Detection](/api-reference/evaluators/azure-jailbreak-detection)         | Detects jailbreak attempts in the input, with Azure Content Safety. Works as a guardrail.                                                                     |
+| [Content Safety](/api-reference/evaluators/azure-content-safety)                   | Detects hate, self-harm, sexual and violent content, with Azure Content Safety. Works as a guardrail.                                                         |
+| [Moderation](/api-reference/evaluators/openai-moderation)                          | Flags harmful content with the OpenAI moderation API. Works as a guardrail.                                                                                   |
+| [Competitor Blocklist](/api-reference/evaluators/competitor-blocklist)             | Fails when the output mentions a competitor from your list. Works as a guardrail.                                                                             |
+| [Competitor Allowlist Check](/api-reference/evaluators/competitor-allowlist-check) | Uses an LLM to fail when the output mentions a company outside your allowlist. Works as a guardrail.                                                          |
+| [Competitor LLM Check](/api-reference/evaluators/competitor-llm-check)             | Uses an LLM with function calling to detect competitor mentions. Works as a guardrail.                                                                        |
+| [Off Topic Evaluator](/api-reference/evaluators/off-topic-evaluator)               | Uses an LLM to fail when the input is outside the topics you allow. Works as a guardrail.                                                                     |
 
 ## API only
+
 These evaluators run from the SDK and the REST API by their id and are not offered in the evaluator picker
 
-| Evaluator | Id |
-| --------- | -- |
-| [Custom Basic Evaluator](/api-reference/evaluators/custom-basic-evaluator) | `langevals/basic` |
-| [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | `langevals/similarity` |
-| [Context Precision](/api-reference/evaluators/context-precision) | `ragas/context_precision` |
-| [Context Recall](/api-reference/evaluators/context-recall) | `ragas/context_recall` |
+| Evaluator                                                                                | Id                        |
+| ---------------------------------------------------------------------------------------- | ------------------------- |
+| [Custom Basic Evaluator](/api-reference/evaluators/custom-basic-evaluator)               | `langevals/basic`         |
+| [Semantic Similarity Evaluator](/api-reference/evaluators/semantic-similarity-evaluator) | `langevals/similarity`    |
+| [Context Precision](/api-reference/evaluators/context-precision)                         | `ragas/context_precision` |
+| [Context Recall](/api-reference/evaluators/context-recall)                               | `ragas/context_recall`    |

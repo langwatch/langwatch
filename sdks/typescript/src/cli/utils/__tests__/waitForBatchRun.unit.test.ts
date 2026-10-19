@@ -1,13 +1,4 @@
-/**
- * The shared `--wait` poll.
- *
- * What matters here is the ANSWER the poll returns, because every run command
- * puts it into the one document a machine caller reads. A wait that ends the
- * process, or that only prints its verdict, leaves that caller with an empty
- * stdout.
- *
- * Spec: specs/features/run-plan-cli.feature
- */
+/** Wait poll must return the answer for the caller's stdout. */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("ora", () => ({
@@ -181,9 +172,7 @@ describe("waitForBatchRun()", () => {
   describe("when the status endpoint keeps failing", () => {
     /** @scenario "A dead status endpoint still emits the machine-readable document" */
     it("gives up after five reads in a row and answers with the poll failure outcome", async () => {
-      const fetchSpy = vi
-        .spyOn(globalThis, "fetch")
-        .mockRejectedValue(new Error("endpoint down"));
+      const fetchSpy = vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("endpoint down"));
 
       const answer = await wait({ advanceMs: 5 * 3000 });
 

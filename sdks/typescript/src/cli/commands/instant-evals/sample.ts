@@ -1,12 +1,6 @@
 /**
- * `langwatch instant-eval sample <id>`: a few rows with the text that was
- * judged beside the verdict it received.
- *
- * The loop this exists for: run a hundred rows, read five of them in full,
- * see what the judge saw, change the words, run again. Sampling judges nothing
- * and costs nothing, because the text is re-read through the statement's own
- * extraction functions.
- *
+ * `langwatch instant-eval sample <id>`: a few rows with the judged text beside the verdict, re-read
+ * through the statement's extraction functions, so it costs nothing.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -15,11 +9,8 @@ import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
+import { INSTANT_EVAL_SAMPLE_CEILING, readCountFlag } from "./countFlag";
 import { printSample } from "./render";
-import {
-  INSTANT_EVAL_SAMPLE_CEILING,
-  readCountFlag,
-} from "./countFlag";
 
 export const sampleInstantEvalCommand = async (
   id: string,
@@ -36,13 +27,9 @@ export const sampleInstantEvalCommand = async (
   const spinner = createSpinner(`Sampling run ${id}...`).start();
 
   try {
-    const sample = await service.sample(id, {
-      ...(n === undefined ? {} : { n }),
-    });
+    const sample = await service.sample(id, n === undefined ? {} : { n });
 
-    spinner.succeed(
-      `Read ${sample.rows.length} row${sample.rows.length === 1 ? "" : "s"}`,
-    );
+    spinner.succeed(`Read ${sample.rows.length} row${sample.rows.length === 1 ? "" : "s"}`);
 
     return {
       data: sample,

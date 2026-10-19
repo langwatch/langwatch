@@ -4,11 +4,16 @@ Feature: Shareable privacy rule drawer
   So that I can share a link that opens the exact rule, and the browser back
   button closes the drawer
 
-  # Like every other drawer in the app (see dev/docs/best_practices/drawers.md),
-  # the privacy rule drawer is URL-routed: opening it adds a drawer.open
-  # parameter plus the scope it targets, and closing it removes them. A pasted
-  # link reopens the same rule because the drawer reconstructs itself from the
-  # URL, fetching the policy snapshot rather than relying on in-memory state.
+  # The privacy rule drawer is URL-routed: opening it puts the rule it targets
+  # in the page address, and closing it takes it back out. A pasted link reopens
+  # the same rule because the drawer reconstructs itself from the address and
+  # the policy snapshot the page already read, never from in-memory state.
+  #
+  # WHICH parameter carries it is not the promise. It was the application's
+  # shared drawer address while the page lived in `[gone]`, and it is the
+  # page's own `?rule=` now that the page owns the overlay; both satisfy every
+  # scenario below, which is why they are written about the address rather than
+  # about a parameter name.
 
   Background:
     Given an organization "acme" with a team "platform" and a project "web-app"

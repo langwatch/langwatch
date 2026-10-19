@@ -19,7 +19,9 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/clog"
+	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
 
 // llmPrefix is the path segment separating the routing token from the
@@ -129,6 +131,13 @@ func (r *Relay) handleLLM(w http.ResponseWriter, req *http.Request) {
 			// "gpt-…"; restore the full provider-prefixed id on the wire and
 			// the gateway routes it to the codex credential. See provision.go.
 			rewriteCodexModelBody(pr.Out, entry.info.Model)
+			// The gateway tiers its mirror by the Langy key, which a chat turn
+			// and a read-only run share; this turn's own tier withholds it.
+			// The worker's value never travels.
+			pr.Out.Header.Del(customertracebridge.HeaderLangyMirror)
+			if domain.NormalizeMirrorTier(entry.info.MirrorTier) == domain.MirrorTierSkip {
+				pr.Out.Header.Set(customertracebridge.HeaderLangyMirror, customertracebridge.LangyMirrorWithheld)
+			}
 			// Stamp a traceparent so the gateway's customer-facing gen_ai span
 			// joins the turn's trace, nested where the call really happened.
 			// The worker's own traceparent is never continued verbatim: its

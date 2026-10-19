@@ -34,8 +34,8 @@ func TestClassifyPressureUsesCompressorAndSwap(t *testing.T) {
 		})
 	})
 
-	t.Run("given swap nearly full", func(t *testing.T) {
-		m := MemStat{TotalBytes: 18 * gib, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * gib}
+	t.Run("given swap nearly full under a busy compressor", func(t *testing.T) {
+		m := MemStat{TotalBytes: 18 * gib, CompressedBytes: 2 * gib, SwapUsedBytes: 3900 * (1 << 20), SwapTotalBytes: 4 * gib}
 
 		t.Run("when pressure is classified", func(t *testing.T) {
 			t.Run("reads red", func(t *testing.T) {
@@ -47,7 +47,7 @@ func TestClassifyPressureUsesCompressorAndSwap(t *testing.T) {
 	})
 }
 
-// @scenario "Either signal alone can raise the level"
+// @scenario "The compressor alone raises the level; swap alone does not"
 func TestEitherSignalAloneRaisesTheLevel(t *testing.T) {
 	t.Run("given a machine with swap disabled, so its swap term is permanently zero", func(t *testing.T) {
 		m := MemStat{TotalBytes: 18 * gib, CompressedBytes: 4 * gib, SwapUsedBytes: 0, SwapTotalBytes: 0}
@@ -65,9 +65,9 @@ func TestEitherSignalAloneRaisesTheLevel(t *testing.T) {
 		m := MemStat{TotalBytes: 18 * gib, CompressedBytes: 0, SwapUsedBytes: 3 * gib, SwapTotalBytes: 4 * gib}
 
 		t.Run("when swap alone crosses the threshold", func(t *testing.T) {
-			t.Run("the level still rises", func(t *testing.T) {
-				if got := ClassifyPressure(m); got == Green {
-					t.Fatal("swap alone should raise the level")
+			t.Run("the level stays green", func(t *testing.T) {
+				if got := ClassifyPressure(m); got != Green {
+					t.Fatalf("stale swap alone must not throttle stacks; got %s", got)
 				}
 			})
 		})

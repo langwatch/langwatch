@@ -98,6 +98,30 @@ Feature: An image or a file cell reaches the target as an attachment
     When the row runs
     Then the cell fails with the attachment too large error code
 
+  # The ceiling is the file limit of the project's organization: 20 MB unless
+  # it was raised. One run asks for it once and holds every read to it.
+
+  @unit
+  Scenario: A stored file above the organization's file limit fails the cell
+    Given an organization whose file limit is lower than a stored file's size
+    When a row that maps the file runs
+    Then the cell fails with the attachment too large error code
+    And the error names the organization's limit
+
+  @unit
+  Scenario: An organization with a raised file limit reads a file the default limit refuses
+    Given an organization whose file limit was raised above 20 MB
+    And an agent target with a file input holding a public address
+    And the address serves more than 20 MB and less than the raised limit
+    When the row runs
+    Then the target receives the file
+
+  @unit
+  Scenario: The cells of one run ask for the organization's file limit once
+    Given a run whose rows each hold a stored file
+    When several cells of the run read their files
+    Then the organization's file limit is resolved once
+
   @unit
   Scenario: A stored object of another purpose is not readable as an attachment
     Given a cell that names a stored object kept as trace media

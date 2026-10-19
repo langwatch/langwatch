@@ -5,20 +5,21 @@ const MAX_DOCUMENTATION_BYTES = 2 * 1024 * 1024;
 const DOCUMENTATION_TIMEOUT_MS = 30_000;
 const DOCUMENTATION_CONTENT_TYPES = new Set(["text/markdown", "text/plain"]);
 
-const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; namespace: string }> = {
-  langwatch: {
-    defaultPath: "/docs/llms.txt",
-    namespace: "/docs",
-  },
-  scenario: {
-    defaultPath: "/scenario/llms.txt",
-    namespace: "/scenario",
-  },
-};
+const DOCUMENTATION_CONFIG: Record<DocumentationKind, { defaultPath: string; namespace: string }> =
+  {
+    langwatch: {
+      defaultPath: "/docs/llms.txt",
+      namespace: "/docs",
+    },
+    scenario: {
+      defaultPath: "/scenario/llms.txt",
+      namespace: "/scenario",
+    },
+  };
 
 function documentationUrlError(namespace: string): Error {
   return new Error(
-    `Only a trusted LangWatch documentation URL under ${TRUSTED_DOCUMENTATION_ORIGIN}${namespace}/ may be fetched`
+    `Only a trusted LangWatch documentation URL under ${TRUSTED_DOCUMENTATION_ORIGIN}${namespace}/ may be fetched`,
   );
 }
 
@@ -45,14 +46,14 @@ export function resolveDocumentationUrl(kind: DocumentationKind, input?: string)
     throw documentationUrlError(namespace);
   }
 
-  if (
-    url.protocol !== "https:" ||
-    url.hostname !== "langwatch.ai" ||
-    url.port !== "" ||
-    url.username !== "" ||
-    url.password !== "" ||
-    !url.pathname.startsWith(`${namespace}/`)
-  ) {
+  const isTrustedDocumentationUrl =
+    url.protocol === "https:" &&
+    url.hostname === "langwatch.ai" &&
+    url.port === "" &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname.startsWith(`${namespace}/`);
+  if (!isTrustedDocumentationUrl) {
     throw documentationUrlError(namespace);
   }
 
@@ -67,7 +68,7 @@ export function resolveDocumentationUrl(kind: DocumentationKind, input?: string)
 export async function fetchDocumentation(
   kind: DocumentationKind,
   input?: string,
-  fetchImplementation: typeof fetch = fetch
+  fetchImplementation: typeof fetch = fetch,
 ): Promise<string> {
   const url = resolveDocumentationUrl(kind, input);
   const response = await fetchImplementation(url, {

@@ -1,6 +1,8 @@
 import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
+
 import chalk from "chalk";
+
 import { EvaluatorsApiService } from "@/client-sdk/services/evaluators";
 import type { EvaluatorAttachment } from "@/client-sdk/services/test-suites";
 import {
@@ -11,25 +13,10 @@ import {
   scenarioMappingPathIssue,
 } from "@/internal/generated/types/evaluator-attachments";
 import type { SuiteFieldDefinition } from "@/internal/generated/types/suite-fields";
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
 
-/**
- * The `--evaluator` family of flags: which saved evaluators to attach, and
- * whether each one gates the scenario.
- *
- * `--evaluator <id|slug>` repeats, one evaluator per occurrence, and the
- * mappings of each one are inferred from its inputs against the suite's
- * fields, the way the platform infers them when an evaluator is picked in
- * the suite editor. `--required` and `--not-required` apply to the
- * `--evaluator` written just before them. `--evaluators-json` carries the
- * full attachments instead, for a mapping the rules do not infer, such as a
- * tool call.
- *
- * @see specs/features/test-suite-cli.feature
- */
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
+
+// The --evaluator family of flags; --required/--not-required apply to prior evaluator.
 
 export const EVALUATOR_FLAG = "--evaluator";
 export const EVALUATORS_JSON_FLAG = "--evaluators-json";
@@ -45,12 +32,11 @@ const rejectFlag = (message: string): never => {
   process.exit(1);
 };
 
-const newAttachmentId = (): string =>
-  `att_${randomUUID().replace(/-/g, "").slice(0, 21)}`;
+const newAttachmentId = (): string => `att_${randomUUID().replace(/-/g, "").slice(0, 21)}`;
 
 /** The input specs of a saved evaluator, as the mapping rules read them. */
 const inputsOf = (evaluator: {
-  fields: Array<{ identifier: string; optional?: boolean }>;
+  fields: { identifier: string; optional?: boolean }[];
 }): EvaluatorInputSpec[] =>
   evaluator.fields.map((field) => ({
     id: field.identifier,
@@ -65,16 +51,7 @@ export interface ResolvedEvaluatorAttachment {
   missing: string[];
 }
 
-/**
- * Turns the `--evaluator` references into attachments.
- *
- * Every reference is read from the platform first, so a slug that names
- * nothing ends the command before anything is written. The gate defaults to
- * required for an evaluator that produces `passed`, and to reporting only for
- * a score-only one. A required input the rules cannot map is reported on
- * stderr rather than refused: the platform accepts the attachment and refuses
- * the run until the mapping is set.
- */
+// Convert --evaluator references to attachments after platform lookup.
 export async function resolveEvaluatorAttachments({
   refs,
   fields,
@@ -103,8 +80,7 @@ export async function resolveEvaluatorAttachments({
       id: newAttachmentId(),
       evaluatorId: evaluator.id,
       required:
-        ref.required ??
-        evaluator.outputFields.some((field) => field.identifier === "passed"),
+        ref.required ?? evaluator.outputFields.some((field) => field.identifier === "passed"),
       mappings: inferScenarioMappings({
         inputs,
         ctx: { fields, toolNames: [] },
@@ -114,18 +90,14 @@ export async function resolveEvaluatorAttachments({
     resolved.push({
       attachment,
       name: evaluator.name,
-      missing: attachmentMissingInputs({ attachment, inputs }).map(
-        (input) => input.id,
-      ),
+      missing: attachmentMissingInputs({ attachment, inputs }).map((input) => input.id),
     });
   }
   return resolved;
 }
 
 /** Says, on stderr, which inputs still need a mapping before a run. */
-export function warnMissingMappings(
-  resolved: ResolvedEvaluatorAttachment[],
-): void {
+export function warnMissingMappings(resolved: ResolvedEvaluatorAttachment[]): void {
   for (const { name, missing } of resolved) {
     if (missing.length === 0) continue;
     console.error(
@@ -137,10 +109,9 @@ export function warnMissingMappings(
 }
 
 /**
- * The attachment list the flags describe, or none when no evaluator flag was
- * written. `--evaluators-json` is the full list; `--evaluator` references are
- * resolved and their mappings inferred against the fields. Both may be
- * given, and the list is their concatenation.
+ * The attachment list the flags describe, or none if no evaluator flag was
+ * written. `--evaluators-json` is the full list; `--evaluator` references
+ * resolve against the fields. Both may be given; the list is their concatenation.
  */
 export async function readEvaluators({
   options,
@@ -168,18 +139,13 @@ export async function readEvaluators({
       : undefined;
   if (fromRefs) warnMissingMappings(fromRefs);
   if (fromJson === undefined && fromRefs === undefined) return undefined;
-  return [
-    ...(fromJson ?? []),
-    ...(fromRefs ?? []).map((resolved) => resolved.attachment),
-  ];
+  return [...(fromJson ?? []), ...(fromRefs ?? []).map((resolved) => resolved.attachment)];
 }
 
 /**
- * Reads `--evaluators-json`: a path to a JSON file, or the JSON itself. The
- * document is the full attachment list. An attachment may leave `id` and
- * `required` out; the id is generated and the gate defaults to required.
- * Every mapping path is checked against the suite's fields, so a field the
- * suite does not declare is refused here with the reason.
+ * Reads `--evaluators-json`: a path to a JSON file or the JSON itself, the
+ * full attachment list. `id`/`required` may be omitted (generated / defaults
+ * required). Every mapping path is checked against the suite's fields.
  */
 export function readEvaluatorsJson({
   value,
@@ -218,18 +184,30 @@ export function readEvaluatorsJson({
     );
   }
   for (const attachment of parsed.data) {
-    for (const [input, mapping] of Object.entries(attachment.mappings)) {
-      const issue = scenarioMappingPathIssue({
-        mapping,
-        ctx: { fields },
-        isPlanLevel,
-      });
-      if (issue) {
-        return rejectFlag(
-          `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${issue}`,
-        );
-      }
-    }
+    validateEvaluatorMappings({ attachment, fields, isPlanLevel });
   }
   return parsed.data;
+}
+
+function validateEvaluatorMappings({
+  attachment,
+  fields,
+  isPlanLevel,
+}: {
+  attachment: EvaluatorAttachment;
+  fields: SuiteFieldDefinition[];
+  isPlanLevel?: boolean;
+}): void {
+  for (const [input, mapping] of Object.entries(attachment.mappings)) {
+    const check = scenarioMappingPathIssue({
+      mapping,
+      ctx: { fields },
+      isPlanLevel,
+    });
+    if (check.kind === "unreadable") {
+      return rejectFlag(
+        `Invalid mapping for ${input} on evaluator ${attachment.evaluatorId}: ${check.reason}`,
+      );
+    }
+  }
 }

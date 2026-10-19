@@ -138,7 +138,7 @@ func fileDeclarations(fset *token.FileSet, file *ast.File, herrName string) ([]D
 						continue
 					}
 					unreadable(target, fmt.Sprintf(
-						"%s is declared as a herr code herrgen cannot read; write the code as a plain string literal, or mark the line `%s` if it relays a code that is not ours to enumerate",
+						"%s is declared as a herr code herrgen cannot read; write the code as a plain string literal, or mark the line %#q if it relays a code that is not ours to enumerate",
 						name.Name, herrgenExternalMarker,
 					))
 					continue
@@ -170,7 +170,7 @@ func fileDeclarations(fset *token.FileSet, file *ast.File, herrName string) ([]D
 						return true
 					}
 					unreadable(call.Args[0], fmt.Sprintf(
-						"herr.Code(...) is built from something herrgen cannot read; write the code as a plain string literal, or mark the line `%s` if it relays a code that is not ours to enumerate",
+						"herr.Code(...) is built from something herrgen cannot read; write the code as a plain string literal, or mark the line %#q if it relays a code that is not ours to enumerate",
 						herrgenExternalMarker,
 					))
 					return true

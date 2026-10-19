@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_status import (
     PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status,
@@ -12,6 +11,12 @@ from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_s
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
+    from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_error import (
+        PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error,
+    )
+    from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_nodes import (
+        PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes,
+    )
     from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_result_type_0 import (
         PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0,
     )
@@ -24,14 +29,22 @@ T = TypeVar("T", bound="PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200")
 class PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200:
     """
     Attributes:
-        status (PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status): Execution state the run finished in
-        result (None | PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0 | Unset): The workflow's output
-            fields, named as the workflow names them
+        status (PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status):
+        result (None | PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0 | Unset):
+        trace_id (str | Unset):
+        nodes (PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes | Unset):
+        total_cost (float | Unset):
+        duration_ms (float | Unset):
+        error (PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error | Unset):
     """
 
     status: PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status
     result: None | PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0 | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
+    trace_id: str | Unset = UNSET
+    nodes: PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes | Unset = UNSET
+    total_cost: float | Unset = UNSET
+    duration_ms: float | Unset = UNSET
+    error: PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error | Unset = UNSET
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_result_type_0 import (
@@ -48,8 +61,22 @@ class PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200:
         else:
             result = self.result
 
+        trace_id = self.trace_id
+
+        nodes: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.nodes, Unset):
+            nodes = self.nodes.to_dict()
+
+        total_cost = self.total_cost
+
+        duration_ms = self.duration_ms
+
+        error: dict[str, Any] | Unset = UNSET
+        if not isinstance(self.error, Unset):
+            error = self.error.to_dict()
+
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "status": status,
@@ -57,11 +84,27 @@ class PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200:
         )
         if result is not UNSET:
             field_dict["result"] = result
+        if trace_id is not UNSET:
+            field_dict["trace_id"] = trace_id
+        if nodes is not UNSET:
+            field_dict["nodes"] = nodes
+        if total_cost is not UNSET:
+            field_dict["total_cost"] = total_cost
+        if duration_ms is not UNSET:
+            field_dict["duration_ms"] = duration_ms
+        if error is not UNSET:
+            field_dict["error"] = error
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
+        from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_error import (
+            PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error,
+        )
+        from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_nodes import (
+            PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes,
+        )
         from ..models.post_api_workflows_by_workflow_id_by_version_id_run_response_200_result_type_0 import (
             PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0,
         )
@@ -88,26 +131,34 @@ class PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200:
 
         result = _parse_result(d.pop("result", UNSET))
 
+        trace_id = d.pop("trace_id", UNSET)
+
+        _nodes = d.pop("nodes", UNSET)
+        nodes: PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes | Unset
+        if isinstance(_nodes, Unset):
+            nodes = UNSET
+        else:
+            nodes = PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes.from_dict(_nodes)
+
+        total_cost = d.pop("total_cost", UNSET)
+
+        duration_ms = d.pop("duration_ms", UNSET)
+
+        _error = d.pop("error", UNSET)
+        error: PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error | Unset
+        if isinstance(_error, Unset):
+            error = UNSET
+        else:
+            error = PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error.from_dict(_error)
+
         post_api_workflows_by_workflow_id_by_version_id_run_response_200 = cls(
             status=status,
             result=result,
+            trace_id=trace_id,
+            nodes=nodes,
+            total_cost=total_cost,
+            duration_ms=duration_ms,
+            error=error,
         )
 
-        post_api_workflows_by_workflow_id_by_version_id_run_response_200.additional_properties = d
         return post_api_workflows_by_workflow_id_by_version_id_run_response_200
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

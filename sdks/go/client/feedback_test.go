@@ -48,7 +48,7 @@ func TestEventsTrack(t *testing.T) {
 
 			// Maps to the canonical track-event endpoint.
 			assert.Equal(t, http.MethodPost, gotMethod)
-			assert.Equal(t, "/api/events/track", gotPath)
+			assert.Equal(t, "/api/v1/events/track", gotPath)
 
 			// The body matches the server's track-event schema.
 			assert.Equal(t, "trace_xyz", gotBody["trace_id"])
@@ -161,7 +161,7 @@ func TestFeedbackThumbs(t *testing.T) {
 
 			// Thumbs feedback is a tracked event, not an annotation.
 			assert.Equal(t, http.MethodPost, gotMethod)
-			assert.Equal(t, "/api/events/track", gotPath)
+			assert.Equal(t, "/api/v1/events/track", gotPath)
 
 			// The predefined thumbs_up_down event: vote=+1 and the feedback detail.
 			assert.Equal(t, "trace_xyz", gotBody["trace_id"])

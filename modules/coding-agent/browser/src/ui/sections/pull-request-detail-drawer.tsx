@@ -1,0 +1,203 @@
+import { Card } from "@langwatch/design-system/card";
+import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { GitHubIcon } from "@langwatch/design-system/icons";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
+import numeral from "numeral";
+import type React from "react";
+
+import { codingAgentApi as api } from "../../behavior/coding-agent-api.ts";
+import { type DetailPayload } from "../../model/pull-request-detail.ts";
+import { derivePullRequestStatus } from "../../model/pull-request-status.ts";
+import { formatShortDate } from "../../model/short-date.ts";
+import { ContributorsSection } from "../blocks/contributors-section.tsx";
+import { SessionsSection } from "../blocks/pull-request-sessions-section.tsx";
+import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
+import { CostBreakdownTooltipContent } from "../elements/cost-breakdown-tooltip.tsx";
+import { ModelsSection } from "../elements/models-section.tsx";
+import { PullRequestStatusBadge } from "../elements/pull-request-status-badge.tsx";
+
+/** PR detail: cost, contributors, model breakdown, sessions; facts only, no content. */
+
+export interface PullRequestDetailDrawerProps {
+  projectId: string;
+  repositoryHost: string;
+  repositoryFullName: string;
+  /** From the address it arrives as text; either way it is read as a number. */
+  prNumber: number | string;
+  /**
+   * Takes the drawer back off. The caller owns the address the drawer opens
+   * from, so it also owns closing it — the drawer never reaches for a registry
+   * that would close every drawer on the stack.
+   */
+  onClose: () => void;
+}
+
+export function PullRequestDetailDrawer({
+  projectId,
+  repositoryHost,
+  repositoryFullName,
+  prNumber,
+  onClose,
+}: PullRequestDetailDrawerProps) {
+  // The drawer's own state lives in the URL, which carries every value as
+  // text, so the number the table opened it with arrives back as a string.
+  // The read takes a number and rejects anything else, so the coercion has to
+  // happen before the query rather than in the caller that opened the drawer.
+  const number = Number(prNumber);
+  const hasNumber = Number.isInteger(number) && number > 0;
+  const detailQuery = api.codingAgents.pullRequestDetail.useQuery(
+    { projectId, repositoryHost, repositoryFullName, prNumber: number },
+    { enabled: !!projectId && hasNumber, refetchOnWindowFocus: false },
+  );
+
+  const detail = detailQuery.data;
+
+  return (
+    <Drawer
+      onClose={onClose}
+      // Two five-column tables of facts: a narrower drawer cuts the money off
+      // the right of both of them.
+      size="xl"
+      title={detail?.pullRequest.title || repositoryFullName}
+      eyebrow={{ label: `#${number}` }}
+      subtitle={
+        <Text as="span" fontFamily="mono" textStyle="xs">
+          {repositoryFullName}
+        </Text>
+      }
+      badges={
+        detail ? (
+          <PullRequestStatusBadge
+            status={derivePullRequestStatus({
+              state: detail.pullRequest.state,
+              isDraft: detail.pullRequest.isDraft,
+              prMergedAtMs: detail.pullRequest.prMergedAtMs,
+            })}
+            source="payload"
+          />
+        ) : undefined
+      }
+      headerAction={
+        detail
+          ? {
+              label: "Open on GitHub",
+              icon: <GitHubIcon size={14} />,
+              href: detail.pullRequest.htmlUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+            }
+          : void 0
+      }
+      loading={detailQuery.isLoading}
+      error={
+        !detailQuery.isLoading && (detailQuery.isError || !detail)
+          ? {
+              title: "Couldn't load this pull request",
+              onRetry: () => void detailQuery.refetch(),
+            }
+          : void 0
+      }
+    >
+      {detail ? <PullRequestDetailBody detail={detail} projectId={projectId} /> : null}
+    </Drawer>
+  );
+}
+
+const PullRequestDetailBody: React.FC<{
+  detail: DetailPayload;
+  projectId: string;
+}> = ({ detail, projectId }) => (
+  <VStack align="stretch" gap={6}>
+    <SummaryRow detail={detail} />
+    <ContributorsSection contributors={detail.contributors} />
+    <ModelsSection models={detail.modelBreakdown} />
+    <SessionsSection projectId={projectId} sessions={detail.sessions} />
+  </VStack>
+);
+
+const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
+  <VStack align="start" gap={0} flex={1} minWidth="120px">
+    <Text fontSize="xs" color="fg.muted">
+      {label}
+    </Text>
+    {children}
+  </VStack>
+);
+
+const TokenCostValue: React.FC<{
+  totals: DetailPayload["totals"];
+  nonBilled: number;
+  isBundled: boolean;
+}> = ({ totals, nonBilled, isBundled }) => {
+  if (totals.costUsd === null) {
+    return (
+      <Text fontSize="lg" fontWeight="medium" color="fg.subtle">
+        {MISSING_VALUE}
+      </Text>
+    );
+  }
+  if (!isBundled) {
+    return (
+      <Text fontSize="lg" fontWeight="medium">
+        {formatCost(totals.costUsd)}
+      </Text>
+    );
+  }
+  // Bundled money is the same list price as any other, so it reads
+  // the same and explains itself on hover instead.
+  return (
+    <Tooltip
+      content={
+        <CostBreakdownTooltipContent
+          isBundled
+          billedCost={totals.billedCostUsd ?? 0}
+          nonBilledCost={nonBilled}
+          grandCost={totals.costUsd}
+        />
+      }
+    >
+      {/* The split lives only in the hover, so it gets a tab stop. */}
+      <Text fontSize="lg" fontWeight="medium" cursor="help" tabIndex={0}>
+        {formatCost(totals.costUsd)}
+      </Text>
+    </Tooltip>
+  );
+};
+
+const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
+  const totals = detail.totals;
+  const nonBilled = totals.nonBilledCostUsd ?? 0;
+  const isBundled = nonBilled > 0;
+
+  return (
+    <Card variant="nested">
+      <HStack align="start" gap={6} wrap="wrap">
+        <Stat label="Sessions">
+          <Text fontSize="lg" fontWeight="medium">
+            {numeral(totals.sessionsCount).format("0,0")}
+          </Text>
+        </Stat>
+        <Stat label="Tokens">
+          <Text fontSize="lg" fontWeight="medium">
+            <FormattedNumber value={totals.totalTokens} unit="tokens">
+              {formatTokens(totals.totalTokens)}
+            </FormattedNumber>
+          </Text>
+        </Stat>
+        <Stat label="Token cost">
+          <TokenCostValue totals={totals} nonBilled={nonBilled} isBundled={isBundled} />
+        </Stat>
+        <Stat label="Opened">
+          <Text fontSize="lg" fontWeight="medium">
+            {formatShortDate({
+              timestampMs: detail.pullRequest.prCreatedAtMs,
+            })}
+          </Text>
+        </Stat>
+      </HStack>
+    </Card>
+  );
+};

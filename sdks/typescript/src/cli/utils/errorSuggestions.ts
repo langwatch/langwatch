@@ -1,17 +1,5 @@
-/**
- * What to DO about a failure, keyed on the platform's error code.
- *
- * The backend will grow `suggestions`/`docUrl` on `HandledError` (backend
- * owners — see dev/docs/lw-cli-compat-matrix.md §6), and the moment a route
- * sends them they win. Until then the CLI would render a perfectly structured
- * error with no way forward in it, so this table fills the gap client-side for
- * the handful of codes a CLI user hits most — the same code-keyed pattern the
- * app already uses in `platform/app/src/features/langy/logic/langyErrorExplainer.ts`.
- *
- * Keys are EXACT codes, never prefix matches: an unknown code gets no invented
- * advice, and a new backend code lands nowhere rather than in the wrong bucket.
- */
-import type { CliHandledError } from "@langwatch/langy/cards/handled-error";
+/** Error suggestions by code, filling the gap until backend sends them. */
+import type { LangWatchHandledErrorShape } from "@langwatch/handled-error/langwatch-handled-error";
 
 /** The fallback advice for one code. */
 export interface ErrorExplanation {
@@ -42,9 +30,7 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
     docUrl: `${DOCS}/platform/api-keys`,
   },
   forbidden: {
-    suggestions: [
-      "Ask a workspace admin to grant you access to this project or resource",
-    ],
+    suggestions: ["Ask a workspace admin to grant you access to this project or resource"],
   },
   // The management APIs (organization, members, invites, roles, role bindings,
   // groups, SCIM tokens) answer 402 below an Enterprise plan. Nothing the
@@ -119,6 +105,22 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
     ],
     docUrl: `${DOCS}/agent-testing/connect-your-agent`,
   },
+  // A grant, or a custom-role edit, may reach only as far as the caller's own
+  // permissions; an API key is judged by its own, never its owner's.
+  grant_exceeds_caller_permissions: {
+    suggestions: [
+      "Grant a role that carries only permissions you hold yourself; the ones you lack are listed under missingPermissions above",
+      "Or ask someone who holds those permissions at that scope to make the grant",
+    ],
+    docUrl: `${DOCS}/platform/roles-and-access`,
+  },
+  role_exceeds_caller_permissions: {
+    suggestions: [
+      "Leave out the permissions listed under missingPermissions above; you cannot add a permission you do not hold",
+      "Or ask someone who holds them to change the role",
+    ],
+    docUrl: `${DOCS}/platform/roles-and-access`,
+  },
   network_error: {
     suggestions: [
       "Check your network connection",
@@ -135,29 +137,27 @@ const FALLBACK_BY_CODE: Record<string, ErrorExplanation> = {
 };
 
 /** The fallback advice for a code, or undefined when we have none to give. */
-export const fallbackSuggestionsFor = (
-  code: string,
-): ErrorExplanation | undefined => FALLBACK_BY_CODE[code];
+export const fallbackSuggestionsFor = (code: string): ErrorExplanation | undefined =>
+  FALLBACK_BY_CODE[code];
 
 /**
- * Fill `suggestions`/`docUrl` from the fallback table — ONLY when the platform
- * did not send them. Server-sent advice always wins: it is written next to the
- * code that raised the failure, so it can only be more specific than a table
- * shipped with the CLI.
+ * Fills `suggestions`/`docUrl` from the fallback table -- only when the
+ * platform didn't send them. Server-sent advice always wins: it's written
+ * next to the code that raised the failure, so it's only ever more specific.
  */
 export const withFallbackSuggestions = (
-  domain: CliHandledError,
-): CliHandledError => {
+  domain: LangWatchHandledErrorShape,
+): LangWatchHandledErrorShape => {
   if (domain.suggestions?.length && domain.docUrl) return domain;
 
   const fallback = fallbackSuggestionsFor(domain.code);
   if (!fallback) return domain;
 
+  const docUrlOverride = !domain.docUrl && fallback.docUrl ? { docUrl: fallback.docUrl } : {};
+
   return {
     ...domain,
-    ...(domain.suggestions?.length
-      ? {}
-      : { suggestions: fallback.suggestions }),
-    ...(domain.docUrl ? {} : fallback.docUrl ? { docUrl: fallback.docUrl } : {}),
+    ...(domain.suggestions?.length ? {} : { suggestions: fallback.suggestions }),
+    ...docUrlOverride,
   };
 };

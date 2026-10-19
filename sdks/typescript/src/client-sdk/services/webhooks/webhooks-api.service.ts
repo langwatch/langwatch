@@ -1,8 +1,9 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import {
   CURSOR_WALK_PAGE_SIZE,
   walkCursorPages,
 } from "@/client-sdk/services/_shared/collect-cursor-pages";
+import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
+import { mergeHeaders } from "@/client-sdk/services/_shared/merge-headers";
 import {
   idempotentCreateInit,
   mutationInit,
@@ -10,8 +11,9 @@ import {
   type MutationOptions,
   type ObservedRequestInit,
 } from "@/client-sdk/services/_shared/mutation-options";
-import { formatApiErrorForOperation } from "@/client-sdk/services/_shared/format-api-error";
 import { throwIfHandledError } from "@/client-sdk/services/_shared/throw-handled-error";
+import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { resolveEndpoint } from "@/internal/endpoint";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
 
@@ -86,20 +88,15 @@ interface CreateWebhookEndpointBase {
 }
 
 /**
- * The POST body, exactly as the wire takes it.
- *
- * A destination is one kind and one address, so the two are a union rather
- * than independent optional fields: the type refuses `{destination_kind:
- * "sqs"}` with no queue, and `{url, sqs}` together, which is what the server
- * refuses too. `destination_kind` is optional only on the http branch, where
- * absent has always meant http.
+ * The POST body, exactly as the wire takes it. A destination is one kind and
+ * one address, so the two are a union, matching what the server refuses too.
+ * `destination_kind` is optional only on the http branch (absent means http).
  */
 export type WebhookDestinationInput =
   | { destination_kind?: "http"; url: string; sqs?: never }
   | { destination_kind: "sqs"; sqs: WebhookSqsDestinationInput; url?: never };
 
-export type CreateWebhookEndpointInput = CreateWebhookEndpointBase &
-  WebhookDestinationInput;
+export type CreateWebhookEndpointInput = CreateWebhookEndpointBase & WebhookDestinationInput;
 
 /** The PATCH body, exactly as the wire takes it. Omitted fields are left alone. */
 export interface UpdateWebhookEndpointInput {
@@ -198,24 +195,9 @@ export class WebhooksApiError extends Error {
 }
 
 /**
- * Client for the org-anchored webhook platform surface (/api/webhooks/v1).
- * Authenticates with an ORGANIZATION API key (sk-lw-*); project keys are
- * rejected by the server. The surface is anchored on the organization alone,
- * so there is no project id to give this client.
- *
- * The key MUST be an organization API key (`sk-lw-{id}_{secret}`, from
- * Settings > API Keys). A project API key is refused with
- * `credential_class_mismatch` before any permission is consulted, and no
- * header makes it work. The same organization key also reaches the
- * project-scoped surfaces when given `X-Project-Id`, so one key covers both
- * families and a project key covers only one.
- *
- * The endpoint entity and the create/update bodies mirror the wire verbatim,
- * so their fields are lowercase snake_case: virtual keys and gateway budgets
- * already take the wire body as it is, and translating field by field here
- * only made the request bodies of the four billing surfaces disagree. Call
- * options this SDK invents (query filters, per-call behaviour, action
- * arguments) stay camelCase like the rest of the SDK.
+ * Client for the org-anchored webhook platform surface (/api/webhooks/v1) — an ORGANIZATION
+ * API key only; a project key is refused with `credential_class_mismatch`. Fields mirror the
+ * wire verbatim in snake_case, since translating field-by-field made billing surfaces disagree.
  */
 export class WebhooksApiService {
   private readonly endpoint: string;
@@ -235,11 +217,14 @@ export class WebhooksApiService {
       ...init,
       // A hung control plane must fail the command, not freeze it.
       signal: init?.signal ?? AbortSignal.timeout(30_000),
-      headers: {
-        Authorization: `Bearer ${this.apiKey}`,
-        "Content-Type": "application/json",
-        ...(init?.headers ?? {}),
-      },
+      headers: mergeHeaders(
+        {
+          ...buildSdkIdentityHeaders(),
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+        init?.headers,
+      ),
     });
     if (!response.ok) {
       let parsedBody: unknown;
@@ -316,14 +301,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * Retire an endpoint: the server soft-archives the row, stamping
-   * `archived_at` and dropping the status to disabled, so the delivery
-   * history stays readable for audit while nothing more is ever sent. The
-   * row is archived, not removed, and `gatewayBudgets.archive()` already
-   * names that operation, so the billing surfaces agree on the verb.
-   *
-   * Nothing comes back: the response body carries only an `archived: true`
-   * acknowledgement, and a non-2xx already raises.
+   * Retire an endpoint: the server soft-archives the row (stamping `archived_at`, disabling
+   * delivery) so history stays readable for audit. Archived, not removed — same verb as
+   * `gatewayBudgets.archive()`, so the billing surfaces agree.
    */
   async archive(id: string, options?: MutationOptions): Promise<void> {
     await this.request<unknown>(
@@ -333,10 +313,7 @@ export class WebhooksApiService {
     );
   }
 
-  async rollSecret(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<WebhookEndpointWithSecret> {
+  async rollSecret(id: string, options?: MutationOptions): Promise<WebhookEndpointWithSecret> {
     const res = await this.request<{ data: WebhookEndpointWithSecret }>(
       "roll webhook endpoint secret",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/roll-secret`,
@@ -345,10 +322,7 @@ export class WebhooksApiService {
     return res.data;
   }
 
-  async test(
-    id: string,
-    options?: MutationOptions,
-  ): Promise<WebhookTestResult> {
+  async test(id: string, options?: MutationOptions): Promise<WebhookTestResult> {
     const res = await this.request<{ data: WebhookTestResult }>(
       "test webhook endpoint",
       `/api/webhooks/v1/endpoints/${encodeURIComponent(id)}/test`,
@@ -358,12 +332,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * ONE page of the endpoint's delivery attempts, newest first.
-   *
-   * The cursor is why this is a page: the route has always served one, and
-   * dropping it truncated the delivery log at whatever the first page held,
-   * with nothing in the result to say the rest existed. Pass `next_cursor`
-   * back as `cursor`, or walk the whole log with `iterDeliveries()`.
+   * ONE page of the endpoint's delivery attempts, newest first. Pass
+   * `next_cursor` back as `cursor` for the next page, or walk the whole log
+   * with `iterDeliveries()`.
    */
   async deliveriesPage(
     id: string,
@@ -428,10 +399,8 @@ export class WebhooksApiService {
 
   /**
    * ONE page of the organization's emitted-events log, newest first.
-   *
-   * Webhooks are a push over this log, never the only copy of it: a consumer
-   * that missed a delivery reads the window back from here. Walk the whole
-   * window with `iterEvents()`.
+   * Webhooks are a push over this log, never the only copy: a consumer that
+   * missed a delivery reads the window back from here.
    */
   async eventsPage(options: {
     type?: string;
@@ -471,10 +440,7 @@ export class WebhooksApiService {
       startCursor: options.cursor,
       nextCursorOf: (page) => page.next_cursor,
       onEndlessWalk: (reason) =>
-        new WebhooksApiError(
-          `Failed to list emitted events: ${reason}.`,
-          "list emitted events",
-        ),
+        new WebhooksApiError(`Failed to list emitted events: ${reason}.`, "list emitted events"),
       fetchPage: (cursor) =>
         this.eventsPage({
           ...options,
@@ -488,10 +454,9 @@ export class WebhooksApiService {
   }
 
   /**
-   * One emitted event by id, the envelope exactly as it was delivered.
-   *
-   * A 404 covers every reason the log cannot answer: never emitted, past the
-   * retention horizon, or belonging to another organization.
+   * One emitted event by id, the envelope exactly as it was delivered. A 404
+   * covers every reason the log cannot answer: never emitted, past
+   * retention, or belonging to another organization.
    */
   async getEvent(id: string): Promise<EmittedEvent> {
     const res = await this.request<{ data: EmittedEvent }>(

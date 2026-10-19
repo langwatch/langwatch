@@ -1,17 +1,17 @@
 /**
  * How a `--project <idOrSlug>` value becomes a project id: what answers
- * without a round trip, which match wins when an id and a slug could both
- * apply, and which failure the user is told about.
- *
+ * without a round trip, and which match wins when an id and slug both apply.
  * Feature: specs/typescript-sdk/cli-cross-project-access.feature
  */
 import { describe, expect, it, vi } from "vitest";
+
 import type {
   PaginatedProjects,
   Project,
   ProjectsApiService,
 } from "@/client-sdk/services/projects/projects-api.service";
 import { ProjectsApiError } from "@/client-sdk/services/projects/projects-api.service";
+
 import { ProjectScopeError, resolveProjectSelector } from "../projectScope";
 
 const project = (over: Partial<Project> & Pick<Project, "id" | "slug">): Project => ({
@@ -48,12 +48,7 @@ const listing = (
 const failingListing = (status: number): ProjectsApiService =>
   ({
     list: vi.fn(async () => {
-      throw new ProjectsApiError(
-        "Failed to list projects",
-        "list projects",
-        undefined,
-        status,
-      );
+      throw new ProjectsApiError("Failed to list projects", "list projects", undefined, status);
     }),
   }) as unknown as ProjectsApiService;
 
@@ -84,8 +79,7 @@ describe("resolveProjectSelector()", () => {
       const resolved = await resolveProjectSelector({
         selector: "proj-b",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       });
 
       expect(resolved).toBe("proj-b");
@@ -95,8 +89,7 @@ describe("resolveProjectSelector()", () => {
       const resolved = await resolveProjectSelector({
         selector: "checkout-agent",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       });
 
       expect(resolved).toBe("proj-b");
@@ -136,14 +129,11 @@ describe("resolveProjectSelector()", () => {
       const failure = await resolveProjectSelector({
         selector: "someone-elses",
         cfg: personalConfig,
-        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]])
-          .service,
+        service: listing([[project({ id: "proj-b", slug: "checkout-agent" })]]).service,
       }).catch((err: unknown) => err);
 
       expect(failure).toBeInstanceOf(ProjectScopeError);
-      expect((failure as ProjectScopeError).code).toBe(
-        "project_not_accessible",
-      );
+      expect((failure as ProjectScopeError).code).toBe("project_not_accessible");
       expect((failure as ProjectScopeError).project).toBe("someone-elses");
       expect((failure as ProjectScopeError).message).toContain(
         'no accessible project matches "someone-elses"',
@@ -159,9 +149,7 @@ describe("resolveProjectSelector()", () => {
         service: failingListing(403),
       }).catch((err: unknown) => err);
 
-      expect((failure as ProjectScopeError).code).toBe(
-        "project_not_accessible",
-      );
+      expect((failure as ProjectScopeError).code).toBe("project_not_accessible");
       expect((failure as ProjectScopeError).message).toContain("proj-b");
     });
 

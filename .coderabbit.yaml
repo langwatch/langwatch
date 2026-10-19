@@ -7,8 +7,8 @@
 #
 # Issue #3754. The investigation produced four flips off the original ACs:
 #  (1) AC1 split — YAML alone is advisory; branch-protection lives in AC1b.
-#  (2) AC3 deterministic rules move to ast-grep / semgrep; path_instructions
-#      keeps only judgment rules.
+#  (2) AC3 deterministic rules move to the langwatch oxlint plugin (and two
+#      semgrep rules); path_instructions keeps only judgment rules.
 #  (3) AC5 leaves CodeRabbit entirely (path_instructions cannot see PR
 #      descriptions). It now lives in .github/workflows/deployment-impact-check.yml.
 #  (4) Phased rollout — mode:warning for sprint 1, per-rule promotion to error
@@ -61,13 +61,6 @@ reviews:
     semgrep:
       enabled: true
       config_file: dev/lint/semgrep/langwatch.yml
-    # Deterministic syntactic rules (AC3). The ruleset is NOT CodeRabbit-owned —
-    # it lives at dev/lint/ast-grep/ and runs as a plain linter in CI and via
-    # `make lint-rules`. CodeRabbit is one consumer of it, not the gate.
-    ast-grep:
-      essential_rules: true
-      rule_dirs:
-        - dev/lint/ast-grep/rules
 
   path_instructions:
     # ── AC4: structural ${...} guard ───────────────────────────────────────
@@ -86,7 +79,7 @@ reviews:
         not in scope here.
 
     # ── AC2: PII rules (judgment-level — patterns are in dev/lint/semgrep) ────────
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines in this PR. Do NOT flag
         pre-existing code unless it is part of the diff.
@@ -121,8 +114,8 @@ reviews:
         fields needed for debugging, redact the rest.
 
     # ── AC3: layering / convention rules (judgment, not syntax) ────────────
-    # Syntactic checks (no `any`, inline import(), form.watch() in child,
-    # export * from re-export shims) live in /dev/lint/ast-grep/rules/.
+    # Syntactic checks (inline import(), form.watch() in child, aliased
+    # re-exports) are langwatch oxlint rules (dev/docs/lint-rules.md).
     # ClickHouse fully-qualified table names live in dev/lint/semgrep/langwatch.yml.
     # path_instructions only carries the judgment calls.
     #
@@ -132,7 +125,7 @@ reviews:
     # focused blocks fire reliably.
 
     # tRPC Zod gating — every router/procedure path.
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -144,19 +137,19 @@ reviews:
     # import from UI. Smoke PR caught the violation as part of a generic
     # comment, not surfaced under this rule — narrowing the glob makes CR
     # consult this block only on those files, raising firing reliability.
-    - path: "platform/app/src/{server,services}/**/*.{ts,tsx}"
+    - path: "{apps/api,apps/worker,packages}/**/*.ts"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
-        FAIL when this file imports from `~/components`, `~/components/...`,
-        or any `platform/app/src/components/**` path. Server-layer code and
+        FAIL when this file imports a UI component — anything under a
+        `**/web/src/ui/**` or `**/components/**` path. Server-layer code and
         service-layer code must not depend on UI components. Allowed
         dependency direction is UI → services and UI → server; the reverse
         (server or service code importing UI) is never allowed.
 
     # Class component ban — restrict to component-bearing surface to keep
     # this from getting noisy on non-component files.
-    - path: "platform/app/src/**/*.tsx"
+    - path: "{apps/ui,packages}/**/*.tsx"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -164,10 +157,8 @@ reviews:
         (`class X extends React.Component`, `class X extends Component`).
         Use function components + hooks instead.
 
-    # Localhost-fallback judgment fallback (the ast-grep rule covers the
-    # syntactic shapes; this catches creative variations the syntactic
-    # rule misses).
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    # Localhost-fallback is a judgment rule only; no linter carries it.
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -177,18 +168,18 @@ reviews:
         Required env vars must be validated through the Zod env schema and
         consumed without fallbacks.
 
-    - path: "platform/app/package.json"
+    - path: "{apps,packages}/**/package.json"
       instructions: |
         FAIL when newly added dependencies include `jest`, `@types/jest`,
         `babel-jest`, `ts-jest`, or jest plugins. Use Vitest. Pre-existing
         jest dependencies are out of scope here — promotion of this rule
         depends on a separate jest → vitest migration.
 
-    - path: "platform/app/src/server/{repositories,services}/**/*.{ts,tsx}"
+    - path: "packages/**/src/{repositories,services}/**/*.ts"
       instructions: |
-        Repository methods (under `platform/app/src/server/repositories/**`)
+        Repository methods (under `**/src/repositories/**`)
         must be named `findAll` / `findById` / `findBy*` / `create` / `update`
-        / `delete`. Service methods (under `platform/app/src/server/services/**`)
+        / `delete`. Service methods (under `**/src/services/**`)
         must be named `getAll` / `getById` / `getBy*` / `create` / `update`
         / `delete`. FAIL when a NEW repository method uses a `get*` prefix
         or a NEW service method uses a `find*` prefix.
@@ -215,7 +206,7 @@ reviews:
     # react.md: hooks must not return JSX. Hooks return state + callbacks;
     # the consumer renders. JSX-returning hooks couple rendering to logic
     # and hide the component tree.
-    - path: "platform/app/src/**/hooks/**/*.{ts,tsx}"
+    - path: "{apps/ui,packages}/**/hooks/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -225,14 +216,14 @@ reviews:
 
     # react.md: hook files should be .ts, not .tsx. A .tsx hook file means
     # the hook returns JSX — same anti-pattern as above.
-    - path: "platform/app/src/**/hooks/**/use*.tsx"
+    - path: "{apps/ui,packages}/**/hooks/**/use*.tsx"
       instructions: |
         FAIL: hook files must be `.ts`, not `.tsx`. A `.tsx` hook file is
         a smell — the JSX belongs in the consumer component. Move the JSX
         out and rename to `.ts`. See `dev/docs/best_practices/react.md`.
 
     # typescript.md: exhaustive switches need a `never` check in default.
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -244,7 +235,7 @@ reviews:
         `dev/docs/best_practices/typescript.md` § Exhaustive switches.
 
     # typescript.md: named params for 2+ args on exported functions.
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -257,7 +248,7 @@ reviews:
         `dev/docs/best_practices/typescript.md` § Named parameters.
 
     # soft-delete-vs-archive.md: archivedAt, not deletedAt.
-    - path: "platform/app/{prisma/schema.prisma,src/server/**/*.{ts,tsx}}"
+    - path: "{packages/prisma-client/prisma/schema.prisma,packages/**/server/**/*.ts,apps/api/src/**/*.ts,apps/worker/src/**/*.ts}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -271,7 +262,7 @@ reviews:
         `dev/docs/best_practices/soft-delete-vs-archive.md`.
 
     # ksuids.md: user-facing IDs use KSUIDs at the service/repository layer.
-    - path: "platform/app/src/server/{repositories,services}/**/*.ts"
+    - path: "packages/**/src/{repositories,services}/**/*.ts"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -285,7 +276,7 @@ reviews:
         `dev/docs/best_practices/ksuids.md`.
 
     # clickhouse-queries.md anti-pattern 1: ORDER BY <version> DESC LIMIT 1.
-    - path: "platform/app/src/server/clickhouse/**/*.{ts,sql}"
+    - path: "packages/**/clickhouse/**/*.{ts,sql}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -304,7 +295,7 @@ reviews:
     # design/guidelines.md §6: form Save button disables only on isPending,
     # never on !form.formState.isValid. Pre-disabling is silent and
     # frustrating; validation errors must surface inline or via toast.
-    - path: "platform/app/src/**/*.tsx"
+    - path: "{apps/ui,packages}/**/*.tsx"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -318,10 +309,10 @@ reviews:
         `dev/docs/design/guidelines.md` § 6 and ADR-018.
 
     # design/guidelines.md §3: prefer Drawer wrapper, not raw Chakra Modal.
-    # Biome's noRestrictedImports already bans @chakra-ui/react Dialog/Drawer/
+    # oxlint's no-restricted-imports already bans @chakra-ui/react Dialog/Drawer/
     # Modal — this catches the path_instructions side (new code introducing
     # modal-style flows that should use Dialog wrapper).
-    - path: "platform/app/src/**/*.tsx"
+    - path: "{apps/ui,packages}/**/*.tsx"
       instructions: |
         Flag ONLY on newly added or modified lines.
 
@@ -415,7 +406,7 @@ reviews:
         evidence.
 
     # ── AC8: BDD/TDD + public-API docs ─────────────────────────────────────
-    - path: "platform/app/src/**/*.{ts,tsx}"
+    - path: "{apps,packages}/**/*.{ts,tsx}"
       instructions: |
         Flag ONLY on newly added or modified lines.
 

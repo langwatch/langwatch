@@ -21,7 +21,7 @@
 # tmux session inside the VM matches as claude-<branch-slug> / claude-issue<N>.
 # Preview VMs live at preview-<branch-slug> (no namespace prefix — team shared golden).
 #
-# See dev/docs/boxd-makefile.md for the full reference + threat model.
+# See dev/docs/runbooks/boxd-makefile.md for the full reference + threat model.
 
 .PHONY: boxd-help boxd-golden boxd-golden-reset \
         boxd-fork-pr boxd-fork-branch boxd-fork-issue \

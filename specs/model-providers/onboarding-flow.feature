@@ -275,7 +275,7 @@ Feature: Onboarding Flow
   # would complete the step before the credentials are stored, leaving Langy
   # calling a provider with no API key.
   #
-  # Bindings: platform/app/src/features/onboarding/components/sections/model-provider/__tests__/ModelProviderSetup.single-save.integration.test.tsx
+  # Bindings: modules/model-provider/browser/src/ui/sections/__tests__/model-provider-form.single-save.integration.test.tsx
 
   @integration
   Scenario: The first save stores the credentials that were entered

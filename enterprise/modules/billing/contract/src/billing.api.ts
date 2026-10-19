@@ -1,0 +1,99 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+
+import type { PlanInfo } from "@langwatch/enterprise-licensing-contract";
+import { moduleApi } from "@langwatch/module";
+
+import type {
+  BillingPricingModel,
+  ResourceLimitNotifierInput,
+  SubscriptionPlanInput,
+} from "./billing-types.ts";
+import type {
+  ConnectedAddCommitRequest,
+  ConnectedBillingAccountView,
+  ConnectedBillingOverview,
+  ConnectedCreditGrantView,
+  ConnectedOnboardRequest,
+  ConnectedRenewRequest,
+} from "./connected-billing.schemas.ts";
+import type { RenewalCompletion } from "./connected-billing.ts";
+import type { Currency } from "./pricing.ts";
+import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
+
+/**
+ * The staff member the platform door admitted for an admin console command: the
+ * impersonator where one is borrowing a customer's session.
+ */
+export type BillingStaff = Readonly<{ id: string; email?: string | null | undefined }>;
+
+/**
+ * What the billing module answers other modules: invoice billing for a
+ * connected self-hosted customer (ADR-156 section 7). Every operation refuses
+ * off LangWatch Cloud, and where no payment provider is configured. The
+ * admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
+ */
+export interface BillingApi {
+  /** The commercial state of one connected customer. */
+  getConnectedBillingOverview(
+    input: { organizationId: string },
+    staff: BillingStaff,
+  ): Promise<ConnectedBillingOverview>;
+  /** Onboards a customer, or completes an onboarding that stopped halfway. */
+  onboardConnectedCustomer(
+    input: ConnectedOnboardRequest,
+    staff: BillingStaff,
+  ): Promise<ConnectedBillingAccountView>;
+  /** Raises the commit mid-term: a second paid credit, and the budget with it. */
+  addConnectedCommit(
+    input: ConnectedAddCommitRequest,
+    staff: BillingStaff,
+  ): Promise<ConnectedCreditGrantView>;
+  renewConnectedTerm(
+    input: ConnectedRenewRequest,
+    staff: BillingStaff,
+  ): Promise<ConnectedBillingAccountView>;
+  completeConnectedRenewalIfDue(
+    input: { organizationId: string },
+    staff: BillingStaff,
+  ): Promise<RenewalCompletion>;
+  /** Finance received the money outside the payment provider. */
+  markConnectedInvoicePaidOutOfBand(
+    input: { stripeInvoiceId: string },
+    staff: BillingStaff,
+  ): Promise<void>;
+  /**
+   * One seat invoicing pass: decides every seat change licensing recorded that
+   * has no decision yet, then invoices every intended one. Cloud only.
+   */
+  invoicePendingSeatChanges(): Promise<void>;
+  /** The daily tick: monthly statements and due renewals. Cloud only. */
+  runConnectedBillingTick(): Promise<void>;
+  /**
+   * The plan an organization's active subscription grants on LangWatch Cloud, with the
+   * subscription's own limit overrides; the free plan where none is active or off Cloud.
+   */
+  getActiveSubscriptionPlan(input: SubscriptionPlanInput): Promise<PlanInfo>;
+  /**
+   * Main's `usageLimits.notifyResourceLimitReached`: the ops Slack alert for a reached seat limit,
+   * SaaS only, at most once a day per organization and limit. Never throws.
+   */
+  notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
+  /** The organization's pricing model column, which is empty for organizations never migrated. */
+  getPricingModel(input: {
+    organizationId: string;
+  }): Promise<{ pricingModel: BillingPricingModel | null }>;
+  /**
+   * Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEmail`. Answers
+   * the pending subscription organization holds the checkout's invitations against (C2 A).
+   */
+  createSeatCheckout(input: {
+    organizationId: string;
+    baseUrl: string;
+    membersToAdd: number;
+    currency?: Currency;
+    billingInterval?: SubscriptionBillingInterval;
+    customerEmail: string | null;
+  }): Promise<{ url: string | null; subscriptionId: string }>;
+}
+
+export const BillingApi = moduleApi<BillingApi>()("billing");

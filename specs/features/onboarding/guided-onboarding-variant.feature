@@ -256,3 +256,19 @@ Feature: Guided onboarding variant
   Scenario: the CLI boot graph does not change for the onboarding commands
     When the CLI starts
     Then the onboarding command modules are not loaded until the command runs
+
+  # ============================================================================
+  # Persisting the guided state
+  #
+  # The record lives in Organization.signupData, a column the organization
+  # module owns; onboarding reaches it only through
+  # OrganizationApi.readGuidedOnboardingState/writeGuidedOnboardingState, so
+  # its storage round-trip is organization's own test surface, not this one.
+  # ============================================================================
+
+  @unit
+  Scenario: an unknown path is refused before any organization call
+    Given a guided onboarding service over an organization capability that refuses every call
+    When a path named "billing" is completed, begun or recorded
+    Then the request fails with the code "guided_onboarding_path_unknown"
+    And the organization capability is never called

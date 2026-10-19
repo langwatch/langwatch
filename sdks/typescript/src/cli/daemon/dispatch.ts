@@ -1,17 +1,11 @@
 /**
- * The CLI's front door.
- *
- * Every `langwatch …` invocation lands here. It decides — from argv, env and
- * the shape of stdio, without loading commander or any command module — whether
- * a warm daemon can serve this call, and falls back to running the command
- * in-process otherwise.
- *
- * The fallback is not an error path. It is the DEFAULT path: with no daemon
- * running, this module connects to nothing, finds nothing, and hands over to
- * exactly the code that ran before daemon mode existed.
+ * The CLI's front door: every invocation lands here, deciding whether a warm
+ * daemon can serve the call. Falling back to in-process is the DEFAULT
+ * path, not an error path -- with no daemon it's exactly the pre-daemon code.
  */
 
-import { runWithCredentialHolder } from "@/internal/credentialContext";
+import { runWithCliCredentialHolder } from "@/internal/credentialContext";
+
 import { execViaDaemon, requestStop } from "./client";
 import {
   collectForwardedEnv,
@@ -21,11 +15,7 @@ import {
   resolveColorLevel,
   stdinCarriesData,
 } from "./eligibility";
-import {
-  isDaemonSocketPathUsable,
-  resolveBuildId,
-  resolveIdentity,
-} from "./identity";
+import { isDaemonSocketPathUsable, resolveBuildId, resolveIdentity } from "./identity";
 import { spawnDaemon } from "./spawn";
 import { recordMissAndDecideToSpawn } from "./spawn-hint";
 
@@ -37,7 +27,8 @@ declare const __CLI_VERSION__: string;
  * for a daemon must never learn that one exists because it failed.
  */
 function debugLog(message: string): void {
-  if (!process.env.DEBUG?.includes("langwatch")) return;
+  const debugFlag = process.env.DEBUG;
+  if (!debugFlag?.includes("langwatch")) return;
   process.stderr.write(`langwatch:daemon ${message}\n`);
 }
 
@@ -68,12 +59,9 @@ export async function runCli(argv: string[]): Promise<void> {
   }
 
   const identity = resolveIdentity(process.env);
-  // The budget a DAEMON needs, not just the one this client needs to dial: a
-  // daemon binds a pid-scoped staging name in the same directory and publishes
-  // it under the shared one, so a shared path that fits while the staging path
-  // does not is a path no daemon can ever be started on. Asking the narrower
-  // question here left the client spawning a daemon every two misses, each
-  // dying at `listen()`, forever.
+  // The budget a DAEMON needs, not just this client's dial: a daemon binds a
+  // longer pid-scoped staging name first, so a shared path that fits while
+  // staging doesn't is one no daemon can ever start on.
   if (!isDaemonSocketPathUsable(identity.socketPath)) {
     debugLog("in-process (socket path too long for this platform)");
     await runInProcess(argv);
@@ -118,37 +106,29 @@ export async function runCli(argv: string[]): Promise<void> {
     // correct one. We do not spawn a replacement here, because the old daemon
     // may still be unlinking its socket and the two would race for the bind.
     await requestStop(identity.socketPath);
-  } else if (
-    isAutoSpawnEnabled(process.env) &&
-    argv[1] &&
-    recordMissAndDecideToSpawn(identity)
-  ) {
-    spawnDaemon({ cliPath: argv[1], env, identity });
+  } else if (isAutoSpawnEnabled(process.env)) {
+    if (argv[1]) {
+      if (recordMissAndDecideToSpawn(identity)) {
+        spawnDaemon({ cliPath: argv[1], env, identity });
+      }
+    }
   }
 
   await runInProcess(argv);
 }
 
 /**
- * The pre-daemon code path, verbatim: build the commander tree and parse.
- *
- * Dynamically imported so that a daemon-served invocation never loads commander
- * or any command module — that module graph is ~80ms of the ~165ms cold start
- * this whole feature exists to remove, and a static import would make every
- * invocation pay it whether it needed it or not. (The CLI already loads every
- * command this way for the same reason.)
+ * The pre-daemon code path, verbatim: builds the commander tree and parses.
+ * Dynamically imported so a daemon-served invocation never pays commander's
+ * ~80ms of this feature's ~165ms cold start.
  */
 async function runInProcess(argv: string[]): Promise<void> {
   const { buildProgram } = await import("../program.js");
-  // parseAsync + await: a rejected action promise (e.g. an invalid --jq
-  // expression surfacing from printResult outside a command's try/catch)
-  // must become this call's rejection — a clean exit — not an unhandled
-  // rejection with a raw stack.
-  //
+  // parseAsync + await: a rejected action promise must become this call's
+  // rejection — a clean exit — not an unhandled rejection with a raw stack.
+
   // Wrapped in a credential holder so the resolved key lands in a
-  // request-scoped store rather than the global env, matching the daemon path
-  // (internal/credentialContext.ts). For a cold CLI this is the one command
-  // in the process, but keeping the wrapper here means both paths behave
-  // identically and the resolver never has to touch process.env for the key.
-  await runWithCredentialHolder(() => buildProgram().parseAsync(argv));
+  // request-scoped store rather than the global env, matching the daemon path;
+  // the "Cli" variant also marks it so requests carry the CLI surface header.
+  await runWithCliCredentialHolder({ fn: () => buildProgram().parseAsync(argv) });
 }

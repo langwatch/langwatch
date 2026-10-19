@@ -1,0 +1,59 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["src/**/*.ts"],
+  "references": [
+    {
+      "path": "../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/trace/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/task/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/metric/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/test-harness/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
+}

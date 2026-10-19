@@ -76,13 +76,12 @@ func TestStartupErrorHandler_PassesAuthErrorsAfterGraceWindowElapses(t *testing.
 // stack overflowed at 1 GiB and the process exited with code 2. With a
 // flapping OTLP collector this took the gateway down within seconds.
 //
-// The fix in New() uses a concrete slogErrorHandler{} as the fallback,
-// so the recursion is impossible by construction. This test asserts the
-// wiring intent — the registered filter's delegate must be a leaf
-// handler that does not call back into OTel globals. Asserting on the
-// concrete type is the right granularity because the bug was a
-// structural mistake at construction time, not a behavioral mistake in
-// the filter's Handle code.
+// The fix in New() uses a concrete leaf handler as the fallback, so the
+// recursion is impossible by construction. This test asserts the wiring
+// intent — the registered filter's delegate must be a leaf handler that
+// does not call back into OTel globals. Asserting on the concrete type is
+// the right granularity because the bug was a structural mistake at
+// construction time, not a behavioral mistake in the filter's Handle code.
 //
 /** @scenario dispatched OTel error invokes the registered handler exactly once */
 func TestNew_StartupErrorHandlerHasConcreteDelegate(t *testing.T) {
@@ -99,8 +98,8 @@ func TestNew_StartupErrorHandlerHasConcreteDelegate(t *testing.T) {
 	if !ok {
 		t.Fatalf("expected global handler to be *startupErrorHandler, got %T", otelapi.GetErrorHandler())
 	}
-	if _, ok := h.delegate.(slogErrorHandler); !ok {
-		t.Fatalf("startupErrorHandler.delegate must be the concrete slogErrorHandler{} to avoid the self-loop recursion bug, got %T", h.delegate)
+	if _, ok := h.delegate.(*collectorErrorReporter); !ok {
+		t.Fatalf("startupErrorHandler.delegate must be the concrete *collectorErrorReporter to avoid the self-loop recursion bug, got %T", h.delegate)
 	}
 }
 
@@ -124,12 +123,18 @@ func TestStartupErrorHandler_MarkHealthyFlipsFilterOff(t *testing.T) {
 	}
 }
 
-func TestHealthyExporterWrap_CallsOnHealthyOnFirstSuccessfulExport(t *testing.T) {
+// The callback fires on EVERY successful export, not only the first. The
+// startup filter latches on its own (see markHealthy), and the second thing
+// hanging off this callback — the unreachable-collector suppression — has to
+// be lifted each time the collector comes back, or a collector that answers
+// and then stops is never reported again.
+//
+/** @scenario "A collector that starts answering is reported on again if it stops" */
+func TestHealthyExporterWrap_CallsOnHealthyOnEverySuccessfulExport(t *testing.T) {
 	inner := &fakeExporter{}
 	var called atomic.Int32
 	wrap := healthyExporterWrap(inner, func() { called.Add(1) })
 
-	// First export returns success → onHealthy should be invoked once.
 	if err := wrap.ExportSpans(context.Background(), nil); err != nil {
 		t.Fatalf("unexpected export error: %v", err)
 	}
@@ -137,12 +142,11 @@ func TestHealthyExporterWrap_CallsOnHealthyOnFirstSuccessfulExport(t *testing.T)
 		t.Fatalf("expected onHealthy called once, got %d", got)
 	}
 
-	// Subsequent successful exports must NOT re-fire — sync.Once guards it.
 	if err := wrap.ExportSpans(context.Background(), nil); err != nil {
 		t.Fatalf("unexpected export error: %v", err)
 	}
-	if got := called.Load(); got != 1 {
-		t.Fatalf("expected onHealthy to remain at 1 after second success, got %d", got)
+	if got := called.Load(); got != 2 {
+		t.Fatalf("expected onHealthy to fire again on a second success, got %d", got)
 	}
 }
 

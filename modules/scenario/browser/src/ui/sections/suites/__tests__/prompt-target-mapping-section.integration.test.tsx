@@ -1,0 +1,68 @@
+/**
+ * A prompt is authored in the library and pointed at by a run plan, so the
+ * binding between a simulation and its declared inputs is configured here (#6590).
+ * @vitest-environment jsdom
+ */
+
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { SuiteTarget } from "@langwatch/suite-contract";
+import { cleanup, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
+
+import {
+  type MappablePrompt,
+  PromptTargetMappingSection,
+} from "../prompt-target-mapping-section.tsx";
+
+const prompts: MappablePrompt[] = [
+  {
+    id: "prompt_with_inputs",
+    handle: "support-agent",
+    inputs: [
+      { identifier: "question", type: "str" },
+      { identifier: "customer_tier", type: "str" },
+    ],
+  },
+  { id: "prompt_without_inputs", handle: "plain-prompt", inputs: [] },
+];
+
+function renderSection(selectedTargets: SuiteTarget[]) {
+  return renderWithDesignSystem(
+    <PromptTargetMappingSection
+      selectedTargets={selectedTargets}
+      prompts={prompts}
+      onMappingChange={vi.fn()}
+    />,
+  );
+}
+
+afterEach(() => cleanup());
+
+describe("PromptTargetMappingSection", () => {
+  describe("given a selected prompt target that declares inputs", () => {
+    it("renders a mapping block titled by the prompt's handle", () => {
+      renderSection([{ type: "prompt", referenceId: "prompt_with_inputs" }]);
+
+      expect(screen.getByText("support-agent")).toBeDefined();
+      // The mapping section rows are the scenario fields a prompt input can read.
+      expect(screen.getByText("input")).toBeDefined();
+      expect(screen.getByText("threadId")).toBeDefined();
+    });
+  });
+
+  describe("given only targets without declared inputs", () => {
+    it("renders nothing for a prompt with no inputs", () => {
+      const { container } = renderSection([
+        { type: "prompt", referenceId: "prompt_without_inputs" },
+      ]);
+
+      expect(container.innerHTML).toBe("");
+    });
+
+    it("renders nothing for non-prompt targets", () => {
+      const { container } = renderSection([{ type: "http", referenceId: "agent_http" }]);
+
+      expect(container.innerHTML).toBe("");
+    });
+  });
+});

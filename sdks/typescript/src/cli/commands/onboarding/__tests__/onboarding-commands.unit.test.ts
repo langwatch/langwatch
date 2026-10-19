@@ -67,9 +67,9 @@ describe("langwatch onboarding", () => {
       const result = await onboardingStateCommand();
 
       expect(resolveCredentials).toHaveBeenCalledTimes(1);
-      expect(
-        vi.mocked(resolveCredentials).mock.invocationCallOrder[0]!,
-      ).toBeLessThan(getGuidedState.mock.invocationCallOrder[0]!);
+      expect(vi.mocked(resolveCredentials).mock.invocationCallOrder[0]!).toBeLessThan(
+        getGuidedState.mock.invocationCallOrder[0]!,
+      );
       expect(result?.data).toEqual(CARD);
 
       result?.table();
@@ -114,11 +114,12 @@ describe("langwatch onboarding", () => {
         provider: "vertex_ai",
         providerModel: undefined,
       });
-      expect(((await onboardingStateCommand())?.data as { provider: string }).provider).toBe(
-        "Vertex AI",
-      );
+      const withProvider = (await onboardingStateCommand())?.data as { provider: string };
+      expect(withProvider.provider).toBe("Vertex AI");
+
       getGuidedState.mockResolvedValueOnce({ ...STATE, provider: undefined });
-      expect("provider" in ((await onboardingStateCommand())?.data as object)).toBe(false);
+      const withoutProvider = (await onboardingStateCommand())?.data as object;
+      expect("provider" in withoutProvider).toBe(false);
     });
 
     it("reads a skipped tour as Skipped and leaves the row out when there was no tour", async () => {
@@ -126,9 +127,9 @@ describe("langwatch onboarding", () => {
         ...STATE,
         tourSkippedAt: "2026-09-06T10:00:00.000Z",
       });
-      expect(((await onboardingStateCommand())?.data as { tour?: string }).tour).toBe(
-        "Skipped",
-      );
+      const skipped = (await onboardingStateCommand())?.data as { tour?: string };
+      expect(skipped.tour).toBe("Skipped");
+
       getGuidedState.mockResolvedValueOnce(STATE);
       const card = (await onboardingStateCommand())?.data as object;
       expect("tour" in card).toBe(false);
@@ -173,9 +174,7 @@ describe("langwatch onboarding", () => {
       completePath.mockRejectedValue(new Error("guided_path_unknown"));
       const log = vi.spyOn(console, "log").mockImplementation(noop);
 
-      await expect(onboardingCompletePathCommand("nope")).rejects.toThrow(
-        "guided_path_unknown",
-      );
+      await expect(onboardingCompletePathCommand("nope")).rejects.toThrow("guided_path_unknown");
       expect(log).not.toHaveBeenCalled();
     });
   });

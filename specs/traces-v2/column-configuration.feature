@@ -143,7 +143,7 @@ Rule: Column resize
   Scenario: Column width persists per (lens × rowKind) in localStorage
     When the user resizes the "Trace" column
     Then `columnSizingStore.setSizing(getColumnSizingKey(lensId, rowKind), …)` is called
-    And the new width is persisted under `langwatch:traces-v2:column-sizing:v1`
+    And the new width is persisted for the reader (slice `trace:column-sizing`)
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -333,7 +333,7 @@ Rule: Data gating for columns with missing data
   Scenario: Persisted column widths survive reload
     Given the user resized columns on a previous session
     When the page reloads
-    Then `columnSizingStore` reads `langwatch:traces-v2:column-sizing:v1` from localStorage
+    Then the `trace:column-sizing` slice reads the widths persisted for the reader
     And applies sizes for the active (lensId, rowKind) key
     And invalid/non-positive entries are dropped silently
 

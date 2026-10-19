@@ -1,32 +1,11 @@
+import { describeIngestionKey, extractLookupIdFromToken, isExpiredSession } from "./cli-api";
+import { type GovernanceConfig, isLoggedIn, loadConfig, saveConfig } from "./config";
 /**
- * Heal a personal ingest key the collector rejected.
- *
- * A personal ingest key lives and dies with the CLI session that minted it,
- * but it can still die under a running agent: a revoke from the API-keys
- * page, or a session that ended while the agent kept running, after a
- * re-login on this device or a logout of a session that shared the key. The
- * agent's own OTLP exporter fails silently on the 401, and until now so did
- * the session context hook. The hook is the one process that learns the key
- * is dead on every session, so it is where the repair belongs: re-mint under
- * the device's current session through the same resolver `langwatch
- * instrument` uses, persist the cache, rewrite the tool's wiring, and hand
- * back a target for the retry.
- *
- * Nothing here throws to the caller: the hook is never allowed to be why a
- * session broke, so every failure is a null and a debug line.
+ * Heals a personal ingest key the collector rejected: re-mints it under the device's current
+ * session and rewrites the tool's wiring. Never throws to the caller — every failure degrades
+ * to a null and a debug line, so a dead key can't be why a running agent's session breaks.
  */
 import { installTelemetryWiring } from "./instrument-wiring";
-import {
-  describeIngestionKey,
-  extractLookupIdFromToken,
-  isExpiredSession,
-} from "./cli-api";
-import {
-  type GovernanceConfig,
-  isLoggedIn,
-  loadConfig,
-  saveConfig,
-} from "./config";
 import { resolveLiveIngestionKey } from "./telemetry-refresh";
 
 /** The wiring target for one agent's OTLP logs, and what authenticates it. */
@@ -36,19 +15,9 @@ export interface HealedTarget {
 }
 
 /**
- * How a heal ended, and whether it cost anything.
- *
- * The split the caller cares about is `declined` against the other three. A
- * decline is decided from the config alone, before any network call: this
- * device is not the one that can repair this 401, and running again a second
- * later would decide the same thing just as cheaply. The other three went to
- * the platform. A `failed` heal may already have spent a mint, so it is the
- * one that must not be retried in a loop. A `withheld` heal found that a
- * person revoked the key on purpose: the device must not replace it, and the
- * person must be told to set the device up again. An `expired` heal found
- * that the device itself is signed out, which no mint can repair either.
- * Throttling a decline would spend a repair window on a rejection that never
- * cost anything, and delay the real repair.
+ * How a heal ended. `declined` costs nothing and is safe to retry; `failed` may have already
+ * spent a mint, so must not be retried in a loop; `withheld` means the device must be set up
+ * again rather than retried; `expired` means the device is signed out, which no retry can fix.
  */
 export type HealOutcome =
   | { status: "declined" }
@@ -60,10 +29,9 @@ export type HealOutcome =
 const DECLINED: HealOutcome = { status: "declined" };
 
 /**
- * Stands in for a key status the platform never gave, because it refused the
- * device's session instead of answering. Distinct from the `null` any other
- * describe failure produces, so the heal can end on the repair the person can
- * actually make rather than on a silent failure.
+ * Stands in for a key status the platform never gave, because it refused the device's
+ * session instead of answering. Distinct from a plain `null` so the heal can end on the
+ * expired-session repair rather than a silent failure.
  */
 const EXPIRED_SESSION = Symbol("expired-session");
 
@@ -89,25 +57,21 @@ const REAL_DEPS: HealDeps = {
 /**
  * How long the healer waits for the platform to say what became of the key.
  * The hook runs on the session's critical path and fetch has no timeout of
- * its own, so a connection that opens and never answers would hold the
- * session open. Matches the deadline the hook posts its own record with.
+ * its own.
  */
 const DESCRIBE_TIMEOUT_MS = 3_000;
 
 /**
- * The one revocation a device must not mint past: a person's. Every other
- * cause is the platform's own doing (a session that ended, a rotation, an
- * older server's cap) and the device repairs itself under its current
- * session. A revoke recorded with no cause may have been a person's, so it
- * counts as one.
+ * The one revocation a device must not mint past: a person's. Every other cause is the
+ * platform's own doing, and the device repairs itself under its current session. A revoke
+ * recorded with no cause may have been a person's, so it counts as one.
  */
 const USER_REVOCATION_CAUSE = "user";
 
 /**
- * The person lost their membership of the organization, so the session that
- * held this key was retired with them. A mint would be refused for the same
- * reason, so the heal ends here on the signed-out outcome rather than
- * spending a round trip to be told so.
+ * The person lost their membership of the organization, so the session that held this key
+ * was retired with them. A mint would be refused for the same reason, so the heal ends here
+ * on the signed-out outcome rather than spending a round trip to be told so.
  */
 const OFFBOARDED_REVOCATION_CAUSE = "offboarded";
 
@@ -119,28 +83,9 @@ const TOOL_BY_AGENT: Record<string, string> = {
 };
 
 /**
- * Re-mint the personal ingest key for `agent` and rewrite its wiring.
- *
- * Declines, without reaching the platform, when this device is not in a
- * position to repair the 401: no login to mint with, a tool pinned to a
- * project (that path is `langwatch instrument --project`), or a rejected
- * token that is not exactly the cached personal key (a pasted credential is
- * the user's, never overwritten, and a request that carried no bearer at all
- * was rejected for another reason).
- *
- * Withholds the repair when the platform says a person revoked the cached
- * key, or recorded no cause for the revoke. A revoke from the API-keys page
- * is a decision about this device, and a device that minted its way past it
- * would make that page a no-op. A key retired with its session, replaced by
- * a rotation or evicted by an older server's cap is re-minted; one retired
- * because its person was offboarded reads as a sign-out instead, since the
- * mint would be refused anyway.
- *
- * Reports a failure once it has gone to the platform and not come back with a
- * wired tool that this device can recognise again: a status call that did not
- * answer inside its deadline, a server that says the cached key is still
- * live, in which case the 401 means something else, or a key that minted but
- * could not be written into the cache or into the tool's wiring.
+ * Re-mints the personal ingest key for `agent` and rewrites its wiring, declining without a
+ * platform call when this device can't repair the 401. {@link revocationBlocksHeal} decides
+ * whether the platform withholds the repair instead of granting it.
  */
 export async function healRevokedIngestKey({
   agent,
@@ -179,19 +124,9 @@ export async function healRevokedIngestKey({
 }
 
 /**
- * The status check that stands between the 401 and the mint, as an outcome
- * when it ends the heal and `null` when the key may be replaced.
- *
- * A platform that does not answer is not a platform that said "re-mint". The
- * one revocation the device must not mint past is a person's, so a status
- * call that times out or errors ends the heal rather than falling through to
- * the mint; the next session asks again once the window is up.
- *
- * A platform that refused the session is the same wall for a different
- * reason: the mint after this check would be refused too, so the heal ends
- * on `expired`, which is the one outcome that names a repair the person can
- * make. A key retired because its person was offboarded is that same wall,
- * read from the key rather than from a refused call.
+ * The status check between the 401 and the mint: an outcome ends the heal, `null` means the
+ * key may still be replaced. A call that errors or times out also ends the heal — a platform
+ * that didn't answer never said "safe to re-mint" — and a refused session ends on `expired`.
  */
 async function revocationBlocksHeal({
   cfg,
@@ -207,16 +142,11 @@ async function revocationBlocksHeal({
 
   const described = await deps
     .describeIngestionKey(cfg, lookupId, { timeoutMs: DESCRIBE_TIMEOUT_MS })
-    .catch((error: unknown) =>
-      isExpiredSession(error) ? EXPIRED_SESSION : null,
-    );
+    .catch((error: unknown) => (isExpiredSession(error) ? EXPIRED_SESSION : null));
   if (!described) return { status: "failed" };
   if (described === EXPIRED_SESSION) return { status: "expired" };
   if (described.status === "revoked") {
-    if (
-      described.revocationCause === USER_REVOCATION_CAUSE ||
-      described.revocationCause === null
-    ) {
+    if (described.revocationCause === USER_REVOCATION_CAUSE || described.revocationCause === null) {
       return { status: "withheld" };
     }
     if (described.revocationCause === OFFBOARDED_REVOCATION_CAUSE) {
@@ -228,14 +158,8 @@ async function revocationBlocksHeal({
 
 /**
  * Put a freshly minted key into the cache and the tool's wiring, or leave
- * both naming the key that was there before.
- *
- * The cache and the wiring must never name different keys. The next 401 is
- * repaired only when the rejected bearer is the key the cache holds, so a
- * pair that disagrees declines a repair this device could have made. The
- * cache is written first and put back when the wiring lands no target, and a
- * cache that cannot be written at all is a failed heal rather than a healed
- * one whose key this device would not recognise next time.
+ * both naming the key that was there before — they must never disagree.
+ * The cache is written first and put back when the wiring lands no target.
  */
 function adoptMintedKey({
   agent,
@@ -252,7 +176,7 @@ function adoptMintedKey({
 }): HealOutcome {
   const cachedKeys = cfg.default_personal_ingest_keys;
   cfg.default_personal_ingest_keys = {
-    ...(cachedKeys ?? {}),
+    ...cachedKeys,
     [agent]: { secret: resolved.token, prefix: resolved.prefix },
   };
   try {
@@ -278,6 +202,7 @@ function adoptMintedKey({
     } catch {
       // The write that put the new key there succeeded a moment ago, so this
       // one failing costs the device the heal it would make on the next 401.
+      void 0;
     }
     return { status: "failed" };
   }

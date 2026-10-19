@@ -109,40 +109,40 @@ only rebuilt by replay.
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
+| Name                            | Value                                                     | Purpose                                                                                                                                                                       |
+| ------------------------------- | --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `PULLED_ACTOR_NAMING_STARTS_AT` | UTC date, set in the release PR; MUST be ≥ the merge date | The line of Decision 2. If set earlier than deploy, days in the gap get pulled coarse by old code then named by new code — the exact double-count this ADR exists to prevent. |
-| Legacy actor value | `""` | Blank means "provider didn't say", "bucket coarser than a person", or "pre-line"; never a guess. |
+| Legacy actor value              | `""`                                                      | Blank means "provider didn't say", "bucket coarser than a person", or "pre-line"; never a guess.                                                                              |
 
 ## Invariants
 
-| Invariant | Meaning | How satisfied / test anchor |
-|---|---|---|
+| Invariant                              | Meaning                                                                 | How satisfied / test anchor                                                                                    |
+| -------------------------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
 | Naming never moves money between cells | A restatement folds into the same rollup cell as the figure it corrects | Decisions 2+4; test: pre-line day re-read after the change emits byte-identical restatement keys and cell keys |
-| Totals are unchanged by naming | Sum over actors of a post-line day equals the day's lump | Fold test: pull coarse fixture vs per-actor fixture, same total |
-| Keys never change | No adapter's restatement key or dimension set changes for this ADR | Decision 4; adapter unit tests on fixture parity |
-| Blank is honest | `rawActorId: ""` only ever means unreported, unresolvable, or pre-line | Decision 5; adapter unit tests; no fallback chain anywhere |
-| Erased actors never reach a key | Pulled lane substitutes the pseudonym before the write | Decision 6; the gateway lane's existing test pattern, applied to pulled |
-| No key-derived people | No adapter maps an API-key id to a person | Anthropic stays paused; code-review gate |
-| History readable | Events without the field parse with `""` | Schema unit test on a legacy event fixture |
+| Totals are unchanged by naming         | Sum over actors of a post-line day equals the day's lump                | Fold test: pull coarse fixture vs per-actor fixture, same total                                                |
+| Keys never change                      | No adapter's restatement key or dimension set changes for this ADR      | Decision 4; adapter unit tests on fixture parity                                                               |
+| Blank is honest                        | `rawActorId: ""` only ever means unreported, unresolvable, or pre-line  | Decision 5; adapter unit tests; no fallback chain anywhere                                                     |
+| Erased actors never reach a key        | Pulled lane substitutes the pseudonym before the write                  | Decision 6; the gateway lane's existing test pattern, applied to pulled                                        |
+| No key-derived people                  | No adapter maps an API-key id to a person                               | Anthropic stays paused; code-review gate                                                                       |
+| History readable                       | Events without the field parse with `""`                                | Schema unit test on a legacy event fixture                                                                     |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| Provider user ids are stable over time | One person appears as several rows/lines on the cost screen (display problem, not a money problem) |
-| A provider's per-user buckets keep their user across restatements | A re-attributed bucket would strand the old figure under the old user (stale name, money still counted once) |
+| Assumption                                                            | What breaks if false                                                                                                                                      |
+| --------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Provider user ids are stable over time                                | One person appears as several rows/lines on the cost screen (display problem, not a money problem)                                                        |
+| A provider's per-user buckets keep their user across restatements     | A re-attributed bucket would strand the old figure under the old user (stale name, money still counted once)                                              |
 | The erasure suppression list keys on exactly the string adapters emit | An erased person's id would keep landing on new rows (verified: `openaiAdmin.puller.ts:841-844` — suppression and discovery read the same `actor` string) |
 
 ## Gates
 
-| Path | Reversible? | Blast radius | Gate |
-|---|---|---|---|
-| Event schema field (defaulted, additive) | Yes | Large (log contract) | Automated: legacy-fixture parse test |
-| Fold cell keying by actor | Yes (code), rows accrue | Large (money display) | Automated: invariant tests above; ships dark behind `release_pulled_usage_cost_enabled` (`registry.ts:165`, FALSE) |
-| Databricks warehouse-cost query change | Yes | Medium (customer warehouse, read-only) | Automated: adapter unit + key-parity test (Decision 4). The change adds a column to the `system.query.history` leg, not to the `system.billing.usage` aggregate |
-| `PULLED_ACTOR_NAMING_STARTS_AT` value | **No** (wrong value = double count in the gap) | Large | Human review in the release PR: constant ≥ merge date, checked by a named reviewer |
-| Rollup rebuild / migration | — | — | **None. Deliberately: nothing to gate — no migration ships.** |
+| Path                                     | Reversible?                                    | Blast radius                           | Gate                                                                                                                                                            |
+| ---------------------------------------- | ---------------------------------------------- | -------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Event schema field (defaulted, additive) | Yes                                            | Large (log contract)                   | Automated: legacy-fixture parse test                                                                                                                            |
+| Fold cell keying by actor                | Yes (code), rows accrue                        | Large (money display)                  | Automated: invariant tests above; ships dark behind `release_pulled_usage_cost_enabled` (`registry.ts:165`, FALSE)                                              |
+| Databricks warehouse-cost query change   | Yes                                            | Medium (customer warehouse, read-only) | Automated: adapter unit + key-parity test (Decision 4). The change adds a column to the `system.query.history` leg, not to the `system.billing.usage` aggregate |
+| `PULLED_ACTOR_NAMING_STARTS_AT` value    | **No** (wrong value = double count in the gap) | Large                                  | Human review in the release PR: constant ≥ merge date, checked by a named reviewer                                                                              |
+| Rollup rebuild / migration               | —                                              | —                                      | **None. Deliberately: nothing to gate — no migration ships.**                                                                                                   |
 
 ## Schema
 
@@ -158,10 +158,10 @@ Shared rule (shape, not final code):
 ```ts
 // Named-or-blank, decided once for every naming puller (Decision 2+3).
 function actorForPulledDay(opts: {
-  sourceCreatedAt: Date;      // IngestionSource.createdAt
-  dayUtc: string;             // the business day being priced
-  reportedActor: string;      // what the provider said; "" if it said nothing
-}): string
+  sourceCreatedAt: Date; // IngestionSource.createdAt
+  dayUtc: string; // the business day being priced
+  reportedActor: string; // what the provider said; "" if it said nothing
+}): string;
 ```
 
 ## Rejected alternatives

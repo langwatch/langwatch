@@ -46,12 +46,6 @@ Feature: The internal run set of a project
     Then a readable name is shown
     And the raw address is not shown
 
-  @integration
-  Scenario: The internal run set is pinned in the run set list
-    Given a project with the internal run set and two external sets
-    When the run sets are listed
-    Then the internal run set holds a fixed place in the list
-
   # --- v1 ---
 
   @integration

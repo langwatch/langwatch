@@ -49,3 +49,56 @@ Feature: An evaluation run accepts inline data, a dataset id, or parameters
   Scenario: Passing both inline data and a dataset id is rejected
     When a run request supplies both data and a dataset id
     Then the request is rejected before any execution
+
+  # A saved dataset is read page by page on the server. A run covers every row
+  # of it or is refused: it never reports success over fewer rows than the
+  # dataset has. The row limit a plan sets applies to rows sent in the request,
+  # a saved dataset answers the dataset row limit instead.
+
+  @unit
+  Scenario: A saved dataset larger than one inline response runs every row
+    Given a saved dataset of 40 rows of 200 KB each
+    When I run the evaluation passing that dataset id
+    Then all 40 rows are loaded for the run
+
+  @unit
+  Scenario: A saved dataset with more rows than the plan sends inline runs every row
+    Given a free plan, which sends at most 1,000 rows inline
+    And a saved dataset of 2,500 rows
+    When I run the evaluation against that saved dataset
+    Then all 2,500 rows are loaded for the run
+
+  @unit
+  Scenario: Inline rows above the plan's inline row limit are refused naming that limit
+    Given a free plan, which sends at most 1,000 rows inline
+    When I run the evaluation passing 1,001 inline data rows
+    Then the run is refused as "experiment_evaluation_too_many_rows"
+    And the refusal names the 1,000 row limit and saving the rows as a dataset
+
+  @unit
+  Scenario: A saved dataset above the dataset row limit is refused before its rows are read
+    Given a saved dataset with more rows than one run reads
+    When I run the evaluation against that saved dataset
+    Then the run is refused as "experiment_dataset_too_many_rows"
+    And no page of rows is read
+
+  @unit
+  Scenario: A saved dataset whose rows total more than a run holds is refused
+    Given a saved dataset whose rows total more bytes than the organization's whole-dataset limit
+    When I run the evaluation against that saved dataset
+    Then the run is refused as "experiment_dataset_too_large_to_run"
+    And the refusal names the limit and storing images as attachments
+
+  @unit
+  Scenario: An organization with a raised file limit runs a dataset the default limit refuses
+    Given an organization whose whole-dataset limit was raised
+    And a saved dataset larger than the default limit and smaller than the raised one
+    When I run the evaluation against that saved dataset
+    Then every row is loaded for the run
+
+  @unit
+  Scenario: A saved dataset that changes while the run reads it is refused instead of run short
+    Given a saved dataset that loses rows after the run starts reading it
+    When I run the evaluation against that saved dataset
+    Then the run is refused as "experiment_dataset_changed_during_read"
+

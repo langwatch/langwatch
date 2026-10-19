@@ -321,9 +321,8 @@ var bfMessageRules = []bfMessageRule{
 // whole paragraph of remediation advice) and so the test can assert the
 // pinned Bifrost still says what we think it says.
 const (
-	bfNetworkErrorMessage = "network error occurred while connecting to provider API"
-	bfDoRequestMessage    = "failed to execute HTTP request to provider API"
-	//nolint:misspell // Bifrost's own wording, matched verbatim against its output.
+	bfNetworkErrorMessage          = "network error occurred while connecting to provider API"
+	bfDoRequestMessage             = "failed to execute HTTP request to provider API"
 	bfRequestCancelledMessage      = "request cancelled by caller"
 	bfRequestMarshalMessage        = "failed to marshal request body to JSON"
 	bfRequestBodyConversionMessage = "failed to convert bifrost request to the expected provider request body"

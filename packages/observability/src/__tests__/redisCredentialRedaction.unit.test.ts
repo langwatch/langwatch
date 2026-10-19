@@ -1,13 +1,14 @@
 /**
- * ioredis attaches the failed command to a reply error, so a rejected AUTH
- * carries the Redis password in `command.args`. These tests read the emitted
- * line through the real serializer map and check the password never lands in
- * it, under every key the platform logs an error with.
+ * A rejected AUTH carries the Redis password in `command.args`. These tests
+ * read the emitted line through the real serializer map and check the password
+ * never lands in it, under every key the platform logs an error with.
  */
 
 import { Writable } from "node:stream";
+
 import pino from "pino";
 import { describe, expect, it } from "vitest";
+
 import { NODE_LOG_SERIALIZERS } from "../logger";
 
 function captureLines(run: (logger: pino.Logger) => void): string[] {
@@ -18,23 +19,17 @@ function captureLines(run: (logger: pino.Logger) => void): string[] {
       cb();
     },
   });
-  const logger = pino(
-    { level: "debug", serializers: NODE_LOG_SERIALIZERS },
-    sink,
-  );
+  const logger = pino({ level: "debug", serializers: NODE_LOG_SERIALIZERS }, sink);
   run(logger);
   return chunks.join("").split("\n").filter(Boolean);
 }
 
 /** The error ioredis emits when the server rejects the password. */
 function wrongPassError(): Error {
-  return Object.assign(
-    new Error("WRONGPASS invalid username-password pair or user is disabled."),
-    {
-      name: "ReplyError",
-      command: { name: "auth", args: ["s3cret-redis-password"] },
-    },
-  );
+  return Object.assign(new Error("WRONGPASS invalid username-password pair or user is disabled."), {
+    name: "ReplyError",
+    command: { name: "auth", args: ["s3cret-redis-password"] },
+  });
 }
 
 describe("Redis credentials in logged errors", () => {
@@ -59,10 +54,7 @@ describe("Redis credentials in logged errors", () => {
     /** @scenario "the Redis password never reaches the logs" */
     it("redacts it under the reason key too", () => {
       const [line] = captureLines((logger) =>
-        logger.fatal(
-          { reason: wrongPassError() },
-          "unhandled rejection detected",
-        ),
+        logger.fatal({ reason: wrongPassError() }, "unhandled rejection detected"),
       );
 
       expect(line).not.toContain("s3cret-redis-password");
@@ -73,19 +65,13 @@ describe("Redis credentials in logged errors", () => {
   describe("when the server renamed AUTH and echoes its arguments", () => {
     it("redacts the password from the message and the stack", () => {
       const error = Object.assign(
-        new Error(
-          "ERR unknown command 'AUTH', with args beginning with: 's3cret-redis-password' ",
-        ),
+        new Error("ERR unknown command 'AUTH', with args beginning with: 's3cret-redis-password' "),
         { command: { name: "auth", args: ["s3cret-redis-password"] } },
       );
-      const [line] = captureLines((logger) =>
-        logger.error({ error }, "redis error"),
-      );
+      const [line] = captureLines((logger) => logger.error({ error }, "redis error"));
 
       expect(line).not.toContain("s3cret-redis-password");
-      expect(JSON.parse(line ?? "{}").error.message).toContain(
-        "unknown command 'AUTH'",
-      );
+      expect(JSON.parse(line ?? "{}").error.message).toContain("unknown command 'AUTH'");
     });
   });
 
@@ -98,9 +84,7 @@ describe("Redis credentials in logged errors", () => {
         ),
         { command: { name: "auth", args: ["default", password] } },
       );
-      const [line] = captureLines((logger) =>
-        logger.error({ error }, "redis error"),
-      );
+      const [line] = captureLines((logger) => logger.error({ error }, "redis error"));
 
       expect(line).not.toContain("x".repeat(20));
       expect(JSON.parse(line ?? "{}").error.message).toBe(
@@ -111,17 +95,12 @@ describe("Redis credentials in logged errors", () => {
 
   describe("when the AUTH username is a common word", () => {
     it("masks only the password, not the username elsewhere in the text", () => {
-      const error = Object.assign(
-        new Error("WRONGPASS for the default user"),
-        { command: { name: "auth", args: ["default", "s3cret-redis-password"] } },
-      );
-      const [line] = captureLines((logger) =>
-        logger.error({ error }, "redis error"),
-      );
+      const error = Object.assign(new Error("WRONGPASS for the default user"), {
+        command: { name: "auth", args: ["default", "s3cret-redis-password"] },
+      });
+      const [line] = captureLines((logger) => logger.error({ error }, "redis error"));
 
-      expect(JSON.parse(line ?? "{}").error.message).toBe(
-        "WRONGPASS for the default user",
-      );
+      expect(JSON.parse(line ?? "{}").error.message).toBe("WRONGPASS for the default user");
     });
   });
 
@@ -130,9 +109,7 @@ describe("Redis credentials in logged errors", () => {
       const error = Object.assign(new Error("WRONGPASS"), {
         command: { name: "hello", args: [3, "AUTH", "default", "pw-in-hello"] },
       });
-      const [line] = captureLines((logger) =>
-        logger.error({ error }, "redis error"),
-      );
+      const [line] = captureLines((logger) => logger.error({ error }, "redis error"));
 
       expect(line).not.toContain("pw-in-hello");
     });
@@ -143,13 +120,9 @@ describe("Redis credentials in logged errors", () => {
       const error = Object.assign(new Error("WRONGTYPE"), {
         command: { name: "get", args: ["some-key"] },
       });
-      const [line] = captureLines((logger) =>
-        logger.error({ error }, "redis error"),
-      );
+      const [line] = captureLines((logger) => logger.error({ error }, "redis error"));
 
-      expect(JSON.parse(line ?? "{}").error.command.args).toEqual([
-        "some-key",
-      ]);
+      expect(JSON.parse(line ?? "{}").error.command.args).toEqual(["some-key"]);
     });
   });
 });

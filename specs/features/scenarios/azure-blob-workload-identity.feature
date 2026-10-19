@@ -279,7 +279,7 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then it resolves to Azure and a matching Azure driver is registered
     And no shared-key configuration is consulted
 
-  @unit
+  @integration
   Scenario: Reads of previously persisted azure-blob URIs succeed in a token-based mode
     Given objects were written under shared-key auth before the switch
     When they are read after the deployment moves to a token-based mode
@@ -341,10 +341,11 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     Then the bytes round-trip through Azure Blob
 
   @unit
-  Scenario: Out-of-band maintenance tasks authenticate the same way as the services
-    Given a migration or backfill task that writes bytes outside the request path
-    Then it obtains Azure credentials from the same shared resolver
-    And the deployment documentation states it must run with the same identity as the services
+  Scenario: The storage migration task builds its own Azure credentials and shares the services' token-transport guards
+    Given the storage migration task configured for a token auth mode
+    When its Azure endpoint is plaintext, or sovereign without an authority host
+    Then it refuses to build the migration, as the services do
+    And an https public-cloud endpoint is accepted
 
   # ---------------------------------------------------------------
   # Helm surface
@@ -479,6 +480,23 @@ Feature: Azure Blob stored-objects authenticate without a shared account key
     When bytes are written, read back, sized, and deleted through the driver
     Then every operation succeeds using bearer authentication
     And the same operations attempted with shared-key auth are rejected by the account
+
+  # ---------------------------------------------------------------
+  # Worker/App configuration parity
+  # ---------------------------------------------------------------
+
+  @unit
+  Scenario: Azure dataset normalization reads the same AZURE_BLOB_* block as the App
+    Given the AZURE_BLOB_* environment block the App composes its Azure Blob config from
+    When the worker resolves its own configuration
+    Then the worker's Azure Blob account settings match the App's
+
+  @unit
+  Scenario: The worker refuses the insecure token endpoint escape hatch in production, like the App does
+    Given AZURE_BLOB_ALLOW_INSECURE_TOKEN_ENDPOINT_FOR_TESTS is set
+    And NODE_ENV is "production"
+    When the worker resolves its own configuration
+    Then allowInsecureTokenEndpointForTests is false
 
   # ---------------------------------------------------------------
   # Documentation

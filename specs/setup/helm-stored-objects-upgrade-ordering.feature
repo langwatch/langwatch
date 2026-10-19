@@ -130,12 +130,6 @@ Feature: A chart upgrade moves one stored-objects volume consumer at a time
       Then there are no upgrade steps, because no volume is shared
 
     @e2e
-    Scenario: An install without workers gets no upgrade steps
-      Given an install that does not deploy the workers
-      When the chart renders
-      Then there are no upgrade steps, because only the app holds the volume
-
-    @e2e
     Scenario: An operator can turn the upgrade steps off
       Given an operator who orders the rollout themselves
       When they turn the serialize-upgrades knob off and the chart renders

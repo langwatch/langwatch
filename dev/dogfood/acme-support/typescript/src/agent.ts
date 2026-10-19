@@ -1,14 +1,12 @@
 /**
- * The ACME shop support agent: one LLM turn with two tools.
- *
- * `answerTurn` is the shop logic. `src/server.ts` serves it over HTTP and
- * connects it to LangWatch Agent Testing.
+ * The ACME shop support agent: one LLM turn with two tools. `server.ts`
+ * serves it over HTTP and connects it to LangWatch Agent Testing.
  */
 import { openai } from "@ai-sdk/openai";
 import { generateText, stepCountIs, tool, type ModelMessage } from "ai";
 import { z } from "zod";
 
-import { lookupOrder, refundOrder, REFUND_LIMIT_FREE } from "./accounts.js";
+import { lookupOrder, refundOrder, REFUND_LIMIT_FREE } from "./accounts.ts";
 
 /** The account the support agent works on. Every conversation uses this one. */
 export const ACCOUNT_ID = "acme-pro";

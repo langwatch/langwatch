@@ -13,8 +13,8 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     *,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
@@ -78,19 +78,20 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -117,19 +118,20 @@ def sync(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,19 +153,20 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> Response[ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403]:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -188,19 +191,20 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     filter_: str | Unset = UNSET,
-    start_index: int | Unset = 1,
-    count: int | Unset = 100,
+    start_index: int | Unset = UNSET,
+    count: int | Unset = UNSET,
 ) -> ScimListUsersResponse200 | ScimListUsersResponse401 | ScimListUsersResponse403 | None:
     r"""List provisioned users
 
-     The members of the organization the token belongs to, as SCIM users. One filter expression is
-    understood, `userName eq \"someone@example.com\"`, matched against the member's email without regard
-    to case.
+     The members of the organization the token belongs to, as SCIM users. Two filter expressions are
+    understood: `userName eq \"someone@example.com\"`, matched against the member's email without regard
+    to case, and `externalId eq \"...\"`, matched against the identifier the presented token's own
+    directory connection pushed. Any other filter is refused.
 
     Args:
         filter_ (str | Unset):
-        start_index (int | Unset):  Default: 1.
-        count (int | Unset):  Default: 100.
+        start_index (int | Unset):
+        count (int | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

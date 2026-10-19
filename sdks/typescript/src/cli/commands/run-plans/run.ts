@@ -1,24 +1,22 @@
 import type { RunPlanRunBody } from "@/client-sdk/services/run-plans";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import { parseRunParameterFlags } from "../../utils/keyValueFlags";
-import { parseRunNoteFlag } from "../../utils/runNote";
-import type { RawOutputFlags } from "../../utils/output";
-import { createCliRunPlansService } from "./cli-run-plans-service";
-import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service";
-import {
-  type EvaluatorFlagRef,
-  readEvaluators,
-} from "../test-suites/evaluatorFlags";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { parseRunParameterFlags } from "../../utils/keyValueFlags.ts";
+import type { RawOutputFlags } from "../../utils/output.ts";
+import { parseRunNoteFlag } from "../../utils/runNote.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
+import { createCliTestSuitesService } from "../test-suites/cli-test-suites-service.ts";
+import { type EvaluatorFlagRef, readEvaluators } from "../test-suites/evaluatorFlags.ts";
+import { createCliRunPlansService } from "./cli-run-plans-service.ts";
+import { emitRunResult } from "./reportRun.ts";
 import {
   buildScope,
   parseRepeat,
   parseWait,
   parseTargets,
   type ScopeOptions,
-} from "./scopeFlags";
-import { emitRunResult } from "./reportRun";
+} from "./scopeFlags.ts";
 
 export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
   target?: string[];
@@ -37,17 +35,11 @@ export interface RunPlanRunOptions extends ScopeOptions, RawOutputFlags {
 }
 
 /**
- * Runs a configuration under a name.
- *
- * The name is the plan's identity: an existing name takes this configuration
- * and the run joins that plan's history, a new name creates the plan, and no
- * name lets the platform derive one from the scope and the targets.
- *
+ * Runs a configuration under a name: an existing name joins that plan's
+ * history, a new name creates the plan, no name lets the platform derive one.
  * @see specs/features/run-plan-cli.feature
  */
-export const runRunPlanCommand = async (
-  options: RunPlanRunOptions,
-): Promise<void> => {
+export const runRunPlanCommand = async (options: RunPlanRunOptions): Promise<void> => {
   await resolveCredentials();
 
   // Everything the caller wrote is read before anything is scheduled, so a
@@ -57,17 +49,10 @@ export const runRunPlanCommand = async (
   const targets = parseTargets(options.target);
   const repeatCount = parseRepeat(options.repeat);
   const wait = parseWait(options.wait);
-  const { scope, scenarioIds } = await buildScope(
-    options,
-    createCliTestSuitesService(),
-  );
+  const { scope, scenarioIds } = await buildScope(options, createCliTestSuitesService());
   // A plan evaluator reads the conversation and the trace, never a scenario
   // field: the plan may cover scenarios from suites with different fields.
-  const evaluators = await readEvaluators({
-    options,
-    fields: [],
-    isPlanLevel: true,
-  });
+  const evaluators = await readEvaluators({ options, fields: [], isPlanLevel: true });
 
   const service = createCliRunPlansService();
   const spinner = createSpinner("Scheduling run...").start();
@@ -80,15 +65,11 @@ export const runRunPlanCommand = async (
         targets,
         ...(scenarioIds ? { scenarioIds } : {}),
         ...(repeatCount !== undefined ? { repeatCount } : {}),
-        ...(options.simulatorModel
-          ? { simulatorModel: options.simulatorModel }
-          : {}),
+        ...(options.simulatorModel ? { simulatorModel: options.simulatorModel } : {}),
         ...(options.judgeModel ? { judgeModel: options.judgeModel } : {}),
         ...(evaluators !== undefined ? { evaluators } : {}),
       },
-      ...(options.idempotencyKey
-        ? { idempotencyKey: options.idempotencyKey }
-        : {}),
+      ...(options.idempotencyKey ? { idempotencyKey: options.idempotencyKey } : {}),
       ...(parameters ? { parameters } : {}),
       ...(note ? { note } : {}),
     };

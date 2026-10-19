@@ -1,25 +1,12 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
-from ...models.get_api_experiments_by_slug_workbench_state_fields import GetApiExperimentsBySlugWorkbenchStateFields
-from ...models.get_api_experiments_by_slug_workbench_state_response_200_type_0 import (
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0,
-)
-from ...models.get_api_experiments_by_slug_workbench_state_response_200_type_1 import (
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type1,
-)
-from ...models.get_api_experiments_by_slug_workbench_state_response_400 import (
-    GetApiExperimentsBySlugWorkbenchStateResponse400,
-)
-from ...models.get_api_experiments_by_slug_workbench_state_response_401 import (
-    GetApiExperimentsBySlugWorkbenchStateResponse401,
-)
-from ...models.get_api_experiments_by_slug_workbench_state_response_404 import (
-    GetApiExperimentsBySlugWorkbenchStateResponse404,
+from ...models.get_api_experiments_by_slug_workbench_state_response_200 import (
+    GetApiExperimentsBySlugWorkbenchStateResponse200,
 )
 from ...types import UNSET, Response, Unset, safe_http_status
 
@@ -27,22 +14,18 @@ from ...types import UNSET, Response, Unset, safe_http_status
 def _get_kwargs(
     slug: str,
     *,
-    fields: GetApiExperimentsBySlugWorkbenchStateFields | Unset = UNSET,
+    fields: str | Unset = UNSET,
 ) -> dict[str, Any]:
 
     params: dict[str, Any] = {}
 
-    json_fields: str | Unset = UNSET
-    if not isinstance(fields, Unset):
-        json_fields = fields.value
-
-    params["fields"] = json_fields
+    params["fields"] = fields
 
     params = {k: v for k, v in params.items() if v is not UNSET and v is not None}
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/experiments/{slug}/workbench-state".format(
+        "url": "/api/v1/experiments/{slug}/workbench-state".format(
             slug=quote(str(slug), safe=""),
         ),
         "params": params,
@@ -53,53 +36,22 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-    | None
-):
+) -> Any | GetApiExperimentsBySlugWorkbenchStateResponse200 | None:
     if response.status_code == 200:
-
-        def _parse_response_200(
-            data: object,
-        ) -> (
-            GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-            | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-        ):
-            try:
-                if not isinstance(data, dict):
-                    raise TypeError()
-                response_200_type_0 = GetApiExperimentsBySlugWorkbenchStateResponse200Type0.from_dict(data)
-
-                return response_200_type_0
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            if not isinstance(data, dict):
-                raise TypeError()
-            response_200_type_1 = GetApiExperimentsBySlugWorkbenchStateResponse200Type1.from_dict(data)
-
-            return response_200_type_1
-
-        response_200 = _parse_response_200(response.json())
+        response_200 = GetApiExperimentsBySlugWorkbenchStateResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = GetApiExperimentsBySlugWorkbenchStateResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = GetApiExperimentsBySlugWorkbenchStateResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 404:
-        response_404 = GetApiExperimentsBySlugWorkbenchStateResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -110,13 +62,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-]:
+) -> Response[Any | GetApiExperimentsBySlugWorkbenchStateResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -132,14 +78,8 @@ def sync_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    fields: GetApiExperimentsBySlugWorkbenchStateFields | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-]:
+    fields: str | Unset = UNSET,
+) -> Response[Any | GetApiExperimentsBySlugWorkbenchStateResponse200]:
     """Read an experiment's setup
 
      The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask
@@ -147,14 +87,14 @@ def sync_detailed(
 
     Args:
         slug (str):
-        fields (GetApiExperimentsBySlugWorkbenchStateFields | Unset):
+        fields (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugWorkbenchStateResponse200Type0 | GetApiExperimentsBySlugWorkbenchStateResponse200Type1 | GetApiExperimentsBySlugWorkbenchStateResponse400 | GetApiExperimentsBySlugWorkbenchStateResponse401 | GetApiExperimentsBySlugWorkbenchStateResponse404]
+        Response[Any | GetApiExperimentsBySlugWorkbenchStateResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -173,15 +113,8 @@ def sync(
     slug: str,
     *,
     client: AuthenticatedClient,
-    fields: GetApiExperimentsBySlugWorkbenchStateFields | Unset = UNSET,
-) -> (
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-    | None
-):
+    fields: str | Unset = UNSET,
+) -> Any | GetApiExperimentsBySlugWorkbenchStateResponse200 | None:
     """Read an experiment's setup
 
      The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask
@@ -189,14 +122,14 @@ def sync(
 
     Args:
         slug (str):
-        fields (GetApiExperimentsBySlugWorkbenchStateFields | Unset):
+        fields (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugWorkbenchStateResponse200Type0 | GetApiExperimentsBySlugWorkbenchStateResponse200Type1 | GetApiExperimentsBySlugWorkbenchStateResponse400 | GetApiExperimentsBySlugWorkbenchStateResponse401 | GetApiExperimentsBySlugWorkbenchStateResponse404
+        Any | GetApiExperimentsBySlugWorkbenchStateResponse200
     """
 
     return sync_detailed(
@@ -210,14 +143,8 @@ async def asyncio_detailed(
     slug: str,
     *,
     client: AuthenticatedClient,
-    fields: GetApiExperimentsBySlugWorkbenchStateFields | Unset = UNSET,
-) -> Response[
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-]:
+    fields: str | Unset = UNSET,
+) -> Response[Any | GetApiExperimentsBySlugWorkbenchStateResponse200]:
     """Read an experiment's setup
 
      The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask
@@ -225,14 +152,14 @@ async def asyncio_detailed(
 
     Args:
         slug (str):
-        fields (GetApiExperimentsBySlugWorkbenchStateFields | Unset):
+        fields (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[GetApiExperimentsBySlugWorkbenchStateResponse200Type0 | GetApiExperimentsBySlugWorkbenchStateResponse200Type1 | GetApiExperimentsBySlugWorkbenchStateResponse400 | GetApiExperimentsBySlugWorkbenchStateResponse401 | GetApiExperimentsBySlugWorkbenchStateResponse404]
+        Response[Any | GetApiExperimentsBySlugWorkbenchStateResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -249,15 +176,8 @@ async def asyncio(
     slug: str,
     *,
     client: AuthenticatedClient,
-    fields: GetApiExperimentsBySlugWorkbenchStateFields | Unset = UNSET,
-) -> (
-    GetApiExperimentsBySlugWorkbenchStateResponse200Type0
-    | GetApiExperimentsBySlugWorkbenchStateResponse200Type1
-    | GetApiExperimentsBySlugWorkbenchStateResponse400
-    | GetApiExperimentsBySlugWorkbenchStateResponse401
-    | GetApiExperimentsBySlugWorkbenchStateResponse404
-    | None
-):
+    fields: str | Unset = UNSET,
+) -> Any | GetApiExperimentsBySlugWorkbenchStateResponse200 | None:
     """Read an experiment's setup
 
      The experiment's datasets, targets and evaluators, with the version to send back when you save. Ask
@@ -265,14 +185,14 @@ async def asyncio(
 
     Args:
         slug (str):
-        fields (GetApiExperimentsBySlugWorkbenchStateFields | Unset):
+        fields (str | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        GetApiExperimentsBySlugWorkbenchStateResponse200Type0 | GetApiExperimentsBySlugWorkbenchStateResponse200Type1 | GetApiExperimentsBySlugWorkbenchStateResponse400 | GetApiExperimentsBySlugWorkbenchStateResponse401 | GetApiExperimentsBySlugWorkbenchStateResponse404
+        Any | GetApiExperimentsBySlugWorkbenchStateResponse200
     """
 
     return (

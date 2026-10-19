@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
-import { analyticsGroups } from "../schemas/analytics-groups.js";
+
+import { analyticsGroups } from "../schemas/analytics-groups.ts";
+import { analyticsMetrics } from "../schemas/analytics-metrics.ts";
 
 describe("schemas", () => {
-  describe("analyticsMetrics", () => {
+  describe("when reading analyticsMetrics", () => {
     it("covers expected categories", () => {
       const categories = new Set(analyticsMetrics.map((m) => m.category));
       expect(categories).toContain("metadata");
@@ -36,7 +37,7 @@ describe("schemas", () => {
     });
   });
 
-  describe("analyticsGroups", () => {
+  describe("when reading analyticsGroups", () => {
     it("has at least 10 entries", () => {
       expect(analyticsGroups.length).toBeGreaterThanOrEqual(10);
     });

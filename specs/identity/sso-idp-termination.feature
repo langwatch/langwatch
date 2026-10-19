@@ -433,6 +433,45 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the replacement is registered beside the legacy connection for migration
     But an ordinary second connection and any further replacement are refused with "sso_connection_already_registered"
 
+  @unit
+  Scenario: A direct replacement counts the domain proof it inherited from the grandfathered connection
+    Given the organization's grandfathered connection proved its domain from the earlier configuration
+    When the direct replacement that names that connection inherits the proof
+    Then the replacement counts the domain as proved, as main does
+    But the same earlier-configuration proof on a connection replacing any other connection, or replacing nothing, proves nothing
+
+  @unit
+  Scenario: Only the grandfather step writes an earlier-configuration proof or a grandfathered connection
+    Given every product path that records a domain proof or registers a connection
+    When the sources are read for a legacy-configuration proof or a legacy-grandfathered source being written
+    Then only the grandfather tenant step writes either, so no customer-facing route or Api operation on cloud can mint one
+
+  # Ruling 2026-10-11: an organization with the legacy settings beside its own connection is
+  # not an upgrade issue. It finishes; the domain still to move shows in its settings instead.
+  @unit
+  Scenario: The grandfather step finishes an organization that already has another live connection
+    Given an organization with legacy single sign-on settings
+    And it already holds a connection that is not closed and is not its grandfathered connection
+    When the grandfather step runs for it
+    Then the organization finishes with a report naming its legacy domains, and is not held
+    And no grandfathered connection is written and nothing is merged, so its people keep signing in through the legacy settings, as on main
+
+  @unit
+  Scenario: The legacy domain beside an organization's own connection is the one still to move
+    Given an organization with legacy single sign-on settings for "acme.com" and no grandfathered connection
+    And it holds its own live connection that has not verified "acme.com"
+    When its single sign-on setup is read
+    Then "acme.com" is named as the domain still to move onto its connection
+    And once its connection verifies "acme.com", or it holds no live connection, nothing is named
+
+  @integration
+  Scenario: Administrators and LangWatch staff are told a legacy domain still has to move
+    Given an organization's legacy domain is still to move onto its own connection
+    When a member who manages single sign-on opens its identity provider settings
+    Then a notice says the domain still signs in through the earlier setup and has to be added to their connection
+    And a member who may only view single sign-on sees no notice
+    And on LangWatch cloud, staff opening the organization in Ops see the same notice with a link to its connection
+
   @integration @regression
   Scenario: Migration routing waits for the replacement to be active
     Given the replacement has completed a test sign-in but is not active
@@ -455,7 +494,7 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     Then the other organizations are found through the member, not by reading memberships outside the tenant
     And a membership read bounded only by "not this organization" is refused before it reaches the database
 
-  @unit @integration
+  @unimplemented
   Scenario: Finishing moves the previous connection's directory sync across
     Given the previous connection's directory sync was set up by LangWatch, so the customer never held its token
     When the update finishes
@@ -463,6 +502,13 @@ Feature: Terminating an organization's identity provider - OpenID Connect and SA
     And the people and external ids the previous connection provisioned are the new connection's, without duplicating anyone it provisioned itself
     And the new connection's sync history starts, and the previous connection's ends
     And before finishing, the update says the directory sync moves across when it finishes rather than asking anyone to repoint it
+
+  @unit @integration
+  Scenario: Finishing waits for directory sync on the new connection while nothing moves it across
+    Given the previous connection's directory sync is pushing and the new connection has none
+    When the administrator opens the update
+    Then directory sync reads as needing to be set up on the new connection, and finishing is refused until it is
+    And the update never says the sync moves across when it finishes
 
   @integration @regression
   Scenario: A person the previous connection's sync provisioned can sign in through the replacement before the update finishes

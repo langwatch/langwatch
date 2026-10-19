@@ -34,6 +34,7 @@ npm start
 ```
 
 This example:
+
 - Iterates over a Q&A dataset
 - Calls a simulated LLM for each question
 - Logs accuracy (pass/fail) and confidence score metrics
@@ -47,6 +48,7 @@ npm run start:with-evaluator
 ```
 
 This example:
+
 - Uses the `langevals/exact_match` evaluator
 - Combines built-in evaluators with custom metrics
 
@@ -59,6 +61,7 @@ npm run start:multi-target
 ```
 
 This example:
+
 - Uses `setupObservability()` to enable trace capture (required for trace links)
 - Uses `withTarget()` for target-scoped tracing
 - Each target gets its own unique trace ID (clickable in evaluation results)
@@ -112,7 +115,7 @@ await evaluation.run(
       passed: response === item.expected,
     });
   },
-  { concurrency: 4 } // Run 4 items in parallel
+  { concurrency: 4 }, // Run 4 items in parallel
 );
 ```
 
@@ -171,6 +174,7 @@ await evaluation.run(dataset, async ({ item, index }) => {
 ```
 
 Benefits of `withTarget()`:
+
 - **Automatic latency capture** - Duration stored in dataset entry per target (like Evaluations V3)
 - **Context inference** - `log()` calls inside automatically use the target
 - **Parallel execution** - Use `Promise.all` for concurrent target testing

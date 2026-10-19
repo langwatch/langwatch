@@ -11,11 +11,30 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/app"
 )
 
+// Options are the per-instance overrides a host applies on top of the
+// service's own configuration.
+//
+// Addr exists because two services sharing one process cannot both read
+// SERVER_ADDR: the combined Go development process (`service combined`) hands
+// each one the port it was allocated instead. Empty means "whatever the
+// service's own configuration resolved", which is what every deployment uses.
+type Options struct {
+	Addr string
+}
+
 // Root is the service entrypoint called by cmd/service.
 func Root(ctx context.Context, _ []string) error {
+	return Run(ctx, Options{})
+}
+
+// Run boots the AI Gateway with the host's overrides applied.
+func Run(ctx context.Context, overrides Options) error {
 	cfg, err := aigateway.LoadConfig(ctx)
 	if err != nil {
 		return err
+	}
+	if overrides.Addr != "" {
+		cfg.Server.Addr = overrides.Addr
 	}
 
 	info := contexts.MustGetServiceInfo(ctx)
@@ -49,6 +68,9 @@ func Root(ctx context.Context, _ []string) error {
 		// a session outlives the request that minted it, and its per-key cap
 		// has to be counted somewhere every replica sees.
 		app.WithRealtimeSessions(deps.ControlPlane),
+		// Brokered voice calls outlive the request that set them up, so the
+		// process supervises them and ends them on shutdown.
+		app.WithVoiceSupervisor(deps.Voice),
 		// Hosted services are implemented once, on the control plane. The
 		// gateway authenticates, applies the budget stop and carries the call.
 		app.WithHostedServices(deps.ControlPlane),

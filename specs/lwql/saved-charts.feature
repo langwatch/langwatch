@@ -270,7 +270,7 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
   Scenario: A path naming another project reaches nothing
     Given a key for one project and the id of another project that exists
     When the key is used against the other project's path
-    Then the request is refused with error code project_not_found
+    Then the request is refused with 403 and error code scope_input_mismatch
 
   @integration
   Scenario: A key that may read charts may not write them
@@ -331,6 +331,33 @@ Feature: Saved LangWatchQL workbench charts — the persistence model and its wr
     When the dashboards are listed with the workbench on and again with it off
     Then in each state the list's card count admits the same kinds the dashboard's grid read admits
     And with the workbench off the count sees only builder graphs, as it did before the feature existed
+
+  # Running a chart by its id. The dashboard widget above is one caller; the
+  # workbench and the REST surface are others, and the decision about what a
+  # step may be is the service's, not the caller's.
+
+  @unit
+  Scenario: Running a saved chart executes its stored statement with its saved values and the surface's window and step
+    Given a saved chart with stored SQL and saved parameter values
+    When a surface runs it by id with its own time window and step
+    Then the stored statement is executed with the saved values
+    And the surface's window and step are the ones bound
+    And a surface that asked to coarsen is told which step actually ran
+
+  @unit
+  Scenario: Running a saved chart refuses a step finer than the period's bucket budget
+    Given a saved chart declaring granularity
+    And a step and period whose quotient exceeds the bucket ceiling
+    When the chart is run by id without asking to coarsen
+    Then the run is refused as too fine for the period
+    And nothing is executed
+
+  @unit
+  Scenario: Another project's saved chart is not runnable
+    Given a chart saved in one project
+    When a run names it from another project
+    Then the run is refused as chart not found
+    And no statement is executed
 
   @integration
   Scenario: A workbench card is not offered an alert it cannot evaluate

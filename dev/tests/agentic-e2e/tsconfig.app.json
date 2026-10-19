@@ -1,0 +1,14 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["tests/**/*.ts", "playwright.config.ts"],
+  "references": [
+    {
+      "path": "../../../enterprise/modules/licensing/process/tsconfig.build.json"
+    }
+  ]
+}

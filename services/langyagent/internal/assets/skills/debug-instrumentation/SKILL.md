@@ -81,10 +81,10 @@ langwatch trace export --format jsonl --limit 50 -o traces.jsonl
 
 ## Common Issues and Fixes
 
-| Issue | Cause | Fix |
-|-------|-------|-----|
-| All traces show `<empty>` input/output | Missing autotrack or telemetry config | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
-| Spans not connected to traces | Missing `@langwatch.trace()` on entry function | Add trace decorator to the main function |
-| No labels on traces | Labels not set in trace metadata | Add `metadata={"labels": ["feature"]}` to trace update |
-| Missing user_id | User ID not passed to trace | Add `user_id` to trace metadata |
-| Traces from different calls merged | Missing `langwatch.setup()` or trace context not propagated | Ensure `langwatch.setup()` called at startup |
+| Issue                                  | Cause                                                       | Fix                                                                                   |
+| -------------------------------------- | ----------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| All traces show `<empty>` input/output | Missing autotrack or telemetry config                       | Add `autotrack_openai_calls(client)` or `experimental_telemetry: { isEnabled: true }` |
+| Spans not connected to traces          | Missing `@langwatch.trace()` on entry function              | Add trace decorator to the main function                                              |
+| No labels on traces                    | Labels not set in trace metadata                            | Add `metadata={"labels": ["feature"]}` to trace update                                |
+| Missing user_id                        | User ID not passed to trace                                 | Add `user_id` to trace metadata                                                       |
+| Traces from different calls merged     | Missing `langwatch.setup()` or trace context not propagated | Ensure `langwatch.setup()` called at startup                                          |

@@ -32,7 +32,9 @@ export function formatScenarioSchema(): string {
     "A test suite reads like a dataset: it declares typed fields beyond the situation and the criteria, and every scenario filed in it carries one value per field. Declare them with `platform_create_test_suite` or `platform_update_test_suite`:",
   );
   lines.push("```json");
-  lines.push('{ "fields": [{ "identifier": "golden_sql", "type": "text" }, { "identifier": "row_limit", "type": "number" }] }');
+  lines.push(
+    '{ "fields": [{ "identifier": "golden_sql", "type": "text" }, { "identifier": "row_limit", "type": "number" }] }',
+  );
   lines.push("```");
   lines.push(
     "- **identifier**: lowercase letters, digits and underscores, starting with a letter. situation, criteria, name, input and output are reserved.",
@@ -51,8 +53,12 @@ export function formatScenarioSchema(): string {
   lines.push('  "evaluatorId": "<id from platform_list_evaluators>",');
   lines.push('  "required": true,');
   lines.push('  "mappings": {');
-  lines.push('    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },');
-  lines.push('    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] }');
+  lines.push(
+    '    "output": { "type": "source", "sourceId": "trace", "path": ["tool_calls", "run_sql", "input"] },',
+  );
+  lines.push(
+    '    "expected_output": { "type": "source", "sourceId": "scenario", "path": ["fields", "golden_sql"] }',
+  );
   lines.push("  }");
   lines.push("}] }");
   lines.push("```");
@@ -60,30 +66,30 @@ export function formatScenarioSchema(): string {
     "Each mapping names where one evaluator input reads its value. Read the evaluator's inputs from `platform_get_evaluator`; every required input needs a mapping before a run. The paths:",
   );
   lines.push(
-    "- **conversation**: `[\"first_user_message\"]`, `[\"last_agent_message\"]`, `[\"transcript\"]` (role: content lines) or `[\"messages\"]` (JSON)",
+    '- **conversation**: `["first_user_message"]`, `["last_agent_message"]`, `["transcript"]` (role: content lines) or `["messages"]` (JSON)',
   );
   lines.push(
-    "- **scenario**: `[\"situation\"]`, `[\"criteria\"]` or `[\"fields\", \"<identifier>\"]` (a field the suite declares; not on a run plan)",
+    '- **scenario**: `["situation"]`, `["criteria"]` or `["fields", "<identifier>"]` (a field the suite declares; not on a run plan)',
   );
   lines.push(
-    "- **trace**: `[\"contexts\"]` (the retrieved contexts of the run's traces) or `[\"tool_calls\", \"<toolName>\", \"input\" | \"output\"]` (the last matching tool call)",
+    '- **trace**: `["contexts"]` (the retrieved contexts of the run\'s traces) or `["tool_calls", "<toolName>", "input" | "output"]` (the last matching tool call)',
   );
-  lines.push(
-    '- a literal: `{ "type": "value", "value": "..." }`',
-  );
+  lines.push('- a literal: `{ "type": "value", "value": "..." }`');
   lines.push(
     "A scenario whose field is blank skips the evaluators that read it, with a reason. A trace with no such tool call or no contexts fails them, with a reason. The results come back under `results.evaluations` on `platform_get_simulation_run`.",
   );
 
   lines.push("\n## Writing a Good Situation\n");
+  lines.push("The situation drives the user simulator. Include these elements:");
   lines.push(
-    "The situation drives the user simulator. Include these elements:",
+    "- **Persona**: Who is the user? (e.g., a stressed small business owner, a confused teenager)",
   );
-  lines.push("- **Persona**: Who is the user? (e.g., a stressed small business owner, a confused teenager)");
   lines.push("- **Emotional state**: How are they feeling? (e.g., frustrated, anxious, impatient)");
   lines.push("- **Background/Context**: What happened before this conversation?");
   lines.push("- **Intent**: What do they want to accomplish?");
-  lines.push("- **Constraints**: What limitations do they have? (e.g., no phone for 2FA, unfamiliar with technical terms)");
+  lines.push(
+    "- **Constraints**: What limitations do they have? (e.g., no phone for 2FA, unfamiliar with technical terms)",
+  );
   lines.push("\nExample:");
   lines.push("```");
   lines.push("User is a small business owner stressed about tax deadline.");
@@ -94,17 +100,31 @@ export function formatScenarioSchema(): string {
   lines.push("```");
 
   lines.push("\n## Writing Good Criteria\n");
-  lines.push("Criteria are what the judge uses to pass or fail the agent. Each criterion should be:");
-  lines.push("- **Specific and testable** — not vague like \"responds helpfully\"");
-  lines.push("- **Behavioral** — describes what the agent should *do*, not how it works internally");
+  lines.push(
+    "Criteria are what the judge uses to pass or fail the agent. Each criterion should be:",
+  );
+  lines.push('- **Specific and testable** — not vague like "responds helpfully"');
+  lines.push(
+    "- **Behavioral** — describes what the agent should *do*, not how it works internally",
+  );
   lines.push("- **Independent** — each criterion checks one thing");
   lines.push("\nGood criteria patterns:");
-  lines.push("- **Information gathering**: \"Agent asks for the user's account number before proceeding\"");
-  lines.push("- **Safety/guardrails**: \"Agent does not reveal internal system details or error stack traces\"");
-  lines.push("- **Clarification**: \"Agent asks clarifying questions before taking irreversible action\"");
-  lines.push("- **Tone**: \"Agent maintains a professional and empathetic tone throughout\"");
-  lines.push("- **Completeness**: \"Agent confirms the user understands the solution before ending\"");
-  lines.push("- **Domain-specific**: \"Agent recommends releasing a wild frog rather than keeping it as a pet\"");
+  lines.push(
+    '- **Information gathering**: "Agent asks for the user\'s account number before proceeding"',
+  );
+  lines.push(
+    '- **Safety/guardrails**: "Agent does not reveal internal system details or error stack traces"',
+  );
+  lines.push(
+    '- **Clarification**: "Agent asks clarifying questions before taking irreversible action"',
+  );
+  lines.push('- **Tone**: "Agent maintains a professional and empathetic tone throughout"');
+  lines.push(
+    '- **Completeness**: "Agent confirms the user understands the solution before ending"',
+  );
+  lines.push(
+    '- **Domain-specific**: "Agent recommends releasing a wild frog rather than keeping it as a pet"',
+  );
   lines.push("\nAvoid vague criteria like:");
   lines.push('- "Responds correctly" — correct how?');
   lines.push('- "Is helpful" — helpful in what way?');

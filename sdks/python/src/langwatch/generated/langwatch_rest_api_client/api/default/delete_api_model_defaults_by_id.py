@@ -18,7 +18,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/model-defaults/{id}".format(
+        "url": "/api/v1/model-defaults/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -36,6 +36,10 @@ def _parse_response(
     | DeleteApiModelDefaultsByIdResponse500
     | None
 ):
+    if response.status_code == 200:
+        response_200 = response.json()
+        return response_200
+
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204

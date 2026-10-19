@@ -15,7 +15,7 @@ import (
 // launcher killed by pid sends no signal. Observed: a foreground
 // `haven up --agent` still supervising a full stack two days after the agent
 // session that ran it was gone. So the foreground run watches the process
-// group it was launched into — the same semantics dev-supervisor.mjs uses —
+// group it was launched into — the stack-teardown semantics the old dev supervisor had —
 // and shuts down as if interrupted when that group loses its leader.
 //
 // An interactive job is its own process-group leader, and the detached child

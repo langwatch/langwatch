@@ -1,18 +1,11 @@
 /**
- * Handles the `run_query` MCP tool invocation.
- *
- * Runs one LangWatchQL statement and renders the result as a markdown table.
- * The row cap is what makes this a tool rather than a pipe: a statement that
- * forgot to aggregate can return ten thousand rows, and pasting those into a
- * conversation costs more context than the answer is worth. The cap is
- * announced rather than silent, so a reader can tell a capped result from a
- * complete one and aggregate further.
- *
+ * Handles the `run_query` MCP tool: one LangWatchQL statement rendered as a markdown table. Rows
+ * are capped, and the cap is announced, so an unaggregated query cannot flood the conversation.
  * @see specs/mcp-server/schema-discovery.feature
  */
 
-import { runQuery } from "../langwatch-api-query.js";
-import { markdownTable } from "../utils/markdown-table.js";
+import { runQuery } from "../langwatch-api-query.ts";
+import { markdownTable } from "../utils/markdown-table.ts";
 
 /** Rows the table prints. Beyond this, aggregate or export through the CLI. */
 export const RUN_QUERY_ROW_CAP = 50;

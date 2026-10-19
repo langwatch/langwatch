@@ -11,7 +11,7 @@ T = TypeVar("T", bound="PostApiDatasetEvaluateBodySettingsType0")
 
 @_attrs_define
 class PostApiDatasetEvaluateBodySettingsType0:
-    """Per-call overrides of the evaluator's settings"""
+    """ """
 
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 

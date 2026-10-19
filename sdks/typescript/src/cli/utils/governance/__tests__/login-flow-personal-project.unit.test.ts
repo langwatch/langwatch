@@ -1,17 +1,13 @@
 /**
- * Device login persists the personal project delivered by /exchange, so data
- * commands authenticate with zero env vars from the very first post-login
- * command, no lazy exchange needed. Older servers omit the field and the
- * config simply carries none.
- *
+ * Device login persists the personal project from /exchange, so data
+ * commands authenticate with zero env vars from the first post-login command.
  * Feature: specs/ai-governance/cli-onboarding/me-credentials.feature
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const pollUntilDone = vi.fn();
 vi.mock("../device-flow", async () => {
-  const actual =
-    await vi.importActual<typeof import("../device-flow")>("../device-flow");
+  const actual = await vi.importActual<typeof deviceFlowModule>("../device-flow");
   return {
     ...actual,
     startDeviceCode: vi.fn(async () => ({
@@ -65,6 +61,7 @@ vi.mock("../../identityNotice", () => ({
 }));
 
 import { loadConfig } from "../config";
+import type * as deviceFlowModule from "../device-flow";
 import { runUnifiedLoginFlow } from "../login-flow";
 import { refreshTelemetryWiringForLogin } from "../telemetry-refresh";
 
@@ -94,7 +91,9 @@ describe("runUnifiedLoginFlow (device session) personal-project persistence", ()
     pollUntilDone.mockResolvedValue(exchangeResult());
     const notice = "Restart `langwatch code` to apply the updated telemetry settings.";
     vi.mocked(refreshTelemetryWiringForLogin).mockResolvedValueOnce({
-      mintedAny: false, labels: ["code shell function (~/.zshrc)"], warnings: [notice],
+      mintedAny: false,
+      labels: ["code shell function (~/.zshrc)"],
+      warnings: [notice],
     });
     const warn = vi.spyOn(console, "warn").mockImplementation(() => undefined);
 

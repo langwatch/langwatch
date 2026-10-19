@@ -1,0 +1,243 @@
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import { generate } from "@langwatch/ksuid";
+import {
+  assertNotGovernanceProject,
+  ProjectNotFoundError,
+  ProjectS3SecretRequiredError,
+  setTraceSharingInputSchema,
+  type Project,
+  type SetTraceSharingInput,
+  type UpdateProjectInput,
+  type ProjectLegacyKeyStatus,
+  type AggregateRule,
+} from "@langwatch/project-contract";
+
+import type {
+  ProjectStorageSettings,
+  ProjectStorageSettingsRepository,
+} from "../repositories/project-storage-settings.repository.ts";
+import {
+  isLegacyKeyRevoked,
+  REVOKED_LEGACY_KEY_PREFIX,
+} from "../rules/legacy-project-key.rules.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
+import type { ProjectService } from "./project.service.ts";
+
+/** The four project operations these use cases orchestrate, and nothing else. */
+export type ProjectOperationsDirectory = Pick<
+  ProjectService,
+  "create" | "findWithTeam" | "update" | "archive" | "getById" | "rotateLegacyApiKey"
+>;
+
+type ProjectOperationsDependencies = Readonly<{
+  readonly projects: ProjectOperationsDirectory;
+  /** Writes the stored-object columns, sealed by the live tier. */
+  readonly storageSettings: ProjectStorageSettingsRepository;
+  readonly auditLog: AuditLogApi;
+  readonly lifecycle: Pick<
+    ProjectCreatedNoticeService,
+    "legacyKeyRevoked" | "presenceSettingChanged" | "traceSharingDisabled"
+  >;
+  /** Where a best-effort failure is reported when nothing can be done about it. */
+  readonly logger: Readonly<{
+    error(payload: Readonly<Record<string, unknown>>, message: string): void;
+  }>;
+}>;
+
+const REVOKED_KEY_KSUID_RESOURCE = "project";
+
+type ProjectCaller = Readonly<{ id: string }>;
+
+export class ProjectOperationsService {
+  private constructor(private readonly dependencies: ProjectOperationsDependencies) {}
+
+  static create(dependencies: ProjectOperationsDependencies): ProjectOperationsService {
+    return new ProjectOperationsService(dependencies);
+  }
+
+  create(
+    input: Readonly<{
+      organizationId: string;
+      teamId?: string | undefined;
+      newTeamName?: string | undefined;
+      name: string;
+      language: string;
+      framework: string;
+      kind?: "aggregate" | undefined;
+      aggregateRule?: AggregateRule | undefined;
+    }>,
+    by: ProjectCaller,
+  ): Promise<Project> {
+    return this.dependencies.projects.create({
+      kind: input.kind,
+      aggregateRule: input.aggregateRule,
+      organizationId: input.organizationId,
+      userId: by.id,
+      teamId: input.teamId,
+      newTeamName: input.newTeamName,
+      name: input.name,
+      language: input.language,
+      framework: input.framework,
+    });
+  }
+
+  async updateSettings(
+    input: Readonly<UpdateProjectInput & { projectId: string }>,
+    by: ProjectCaller,
+  ): Promise<Project> {
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
+    if (!project) {
+      throw new ProjectNotFoundError();
+    }
+    if (input.s3Endpoint && input.s3SecretAccessKey === undefined && !project.s3SecretAccessKey) {
+      throw new ProjectS3SecretRequiredError();
+    }
+
+    const data: UpdateProjectInput = {
+      ...(input.name !== undefined && { name: input.name }),
+      ...(input.language !== undefined && { language: input.language }),
+      ...(input.framework !== undefined && { framework: input.framework }),
+      ...(input.userLinkTemplate !== undefined && {
+        userLinkTemplate: input.userLinkTemplate,
+      }),
+      ...(input.teamId !== undefined && { teamId: input.teamId }),
+      presenceEnabled: input.presenceEnabled,
+    };
+    const settings: ProjectStorageSettings = {
+      s3Endpoint: input.s3Endpoint ?? null,
+      s3AccessKeyId: input.s3AccessKeyId ?? null,
+      ...(input.s3SecretAccessKey !== undefined && { s3SecretAccessKey: input.s3SecretAccessKey }),
+      s3Bucket: input.s3Bucket,
+    };
+    const organizationId = project.team.organizationId;
+    const written = await this.dependencies.projects.update({
+      id: input.projectId,
+      organizationId,
+      data,
+      by: { type: "user", id: by.id },
+    });
+    const stored = await this.dependencies.storageSettings.update({
+      projectId: input.projectId,
+      organizationId,
+      settings,
+    });
+    let updated: Project = { ...written, ...stored };
+
+    if (input.traceSharingEnabled !== undefined) {
+      await this.setTraceSharing({
+        projectId: input.projectId,
+        enabled: input.traceSharingEnabled,
+        revokeExistingLinks: true,
+        by,
+      });
+      updated = { ...updated, traceSharingEnabled: input.traceSharingEnabled };
+    }
+    if (input.presenceEnabled !== undefined && input.presenceEnabled !== project.presenceEnabled) {
+      await this.dependencies.lifecycle.presenceSettingChanged({
+        projectId: input.projectId,
+        organizationId: project.team.organizationId,
+        presenceEnabled: input.presenceEnabled,
+        changedByUserId: by.id,
+      });
+    }
+
+    return updated;
+  }
+
+  /** A no-op when the switch already reads `enabled`: a resubmitted form records nothing new. */
+  async setTraceSharing(input: SetTraceSharingInput): Promise<void> {
+    const { projectId, enabled, revokeExistingLinks, by } = setTraceSharingInputSchema.parse(input);
+    const project = await this.dependencies.projects.findWithTeam(projectId);
+    if (!project) throw new ProjectNotFoundError();
+    if (project.traceSharingEnabled === enabled) return;
+
+    const organizationId = project.team.organizationId;
+    await this.dependencies.projects.update({
+      id: projectId,
+      organizationId,
+      data: { traceSharingEnabled: enabled },
+      by: { type: "user", id: by.id },
+    });
+    if (!enabled) {
+      await this.dependencies.lifecycle.traceSharingDisabled({
+        projectId,
+        organizationId,
+        disabledByUserId: by.id,
+        revokeExistingLinks,
+      });
+    }
+  }
+
+  async archive(input: Readonly<{ projectId: string }>): Promise<{ alreadyArchived: boolean }> {
+    const target = await this.dependencies.projects.findWithTeam(input.projectId);
+    if (!target) {
+      return { alreadyArchived: true };
+    }
+
+    try {
+      await this.dependencies.projects.archive({
+        id: input.projectId,
+        organizationId: target.team.organizationId,
+      });
+
+      return { alreadyArchived: false };
+    } catch (error) {
+      if (error instanceof ProjectNotFoundError) {
+        return { alreadyArchived: true };
+      }
+
+      throw error;
+    }
+  }
+
+  async getLegacyKeyStatus(
+    input: Readonly<{ projectId: string }>,
+  ): Promise<ProjectLegacyKeyStatus> {
+    const project = await this.dependencies.projects.getById(input.projectId);
+
+    return { present: !isLegacyKeyRevoked(project.apiKey) };
+  }
+
+  /** Idempotent: a project with no legacy key is left with a fresh unusable one. */
+  async revokeLegacyProjectKey(
+    input: Readonly<{ projectId: string }>,
+    by: ProjectCaller,
+  ): Promise<void> {
+    const project = await this.dependencies.projects.findWithTeam(input.projectId);
+    if (!project) {
+      throw new ProjectNotFoundError();
+    }
+    assertNotGovernanceProject(project.kind);
+    const revoked = await this.dependencies.projects.rotateLegacyApiKey({
+      projectId: input.projectId,
+      token: `${REVOKED_LEGACY_KEY_PREFIX}${generate(REVOKED_KEY_KSUID_RESOURCE).toString()}`,
+    });
+    if (!revoked) {
+      throw new ProjectNotFoundError();
+    }
+    await this.recordApiKeyRevoked({ userId: by.id, projectId: input.projectId });
+    await this.dependencies.lifecycle.legacyKeyRevoked({
+      projectId: input.projectId,
+      organizationId: project.team.organizationId,
+      revokedByUserId: by.id,
+    });
+  }
+
+  /** Best effort: an audit failure must not undo a revocation that has happened. */
+  private async recordApiKeyRevoked(
+    entry: Readonly<{ userId: string; projectId: string }>,
+  ): Promise<void> {
+    try {
+      await this.dependencies.auditLog.record({
+        action: "project.apiKey.revoked",
+        userId: entry.userId,
+        projectId: entry.projectId,
+      });
+    } catch (error) {
+      this.dependencies.logger.error(
+        { error, projectId: entry.projectId },
+        "Recording the project API key revocation in the audit log failed.",
+      );
+    }
+  }
+}

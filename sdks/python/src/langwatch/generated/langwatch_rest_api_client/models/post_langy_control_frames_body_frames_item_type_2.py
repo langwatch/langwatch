@@ -1,16 +1,11 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
-from typing import TYPE_CHECKING, Any, TypeVar
+from typing import TYPE_CHECKING, Any, Literal, TypeVar, cast
 
 from attrs import define as _attrs_define
+from attrs import field as _attrs_field
 
-from ..models.post_langy_control_frames_body_frames_item_type_2_protocol import (
-    PostLangyControlFramesBodyFramesItemType2Protocol,
-)
-from ..models.post_langy_control_frames_body_frames_item_type_2_type import (
-    PostLangyControlFramesBodyFramesItemType2Type,
-)
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
@@ -29,8 +24,8 @@ T = TypeVar("T", bound="PostLangyControlFramesBodyFramesItemType2")
 class PostLangyControlFramesBodyFramesItemType2:
     """
     Attributes:
-        protocol (PostLangyControlFramesBodyFramesItemType2Protocol):
-        type_ (PostLangyControlFramesBodyFramesItemType2Type):
+        protocol (Literal[1]):
+        type_ (Literal['result']):
         call_id (str):
         ok (bool):
         text (str | Unset):
@@ -38,18 +33,19 @@ class PostLangyControlFramesBodyFramesItemType2:
         error (PostLangyControlFramesBodyFramesItemType2Error | Unset):
     """
 
-    protocol: PostLangyControlFramesBodyFramesItemType2Protocol
-    type_: PostLangyControlFramesBodyFramesItemType2Type
+    protocol: Literal[1]
+    type_: Literal["result"]
     call_id: str
     ok: bool
     text: str | Unset = UNSET
     output: PostLangyControlFramesBodyFramesItemType2Output | Unset = UNSET
     error: PostLangyControlFramesBodyFramesItemType2Error | Unset = UNSET
+    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        protocol = self.protocol.value
+        protocol = self.protocol
 
-        type_ = self.type_.value
+        type_ = self.type_
 
         call_id = self.call_id
 
@@ -66,7 +62,7 @@ class PostLangyControlFramesBodyFramesItemType2:
             error = self.error.to_dict()
 
         field_dict: dict[str, Any] = {}
-
+        field_dict.update(self.additional_properties)
         field_dict.update(
             {
                 "protocol": protocol,
@@ -94,9 +90,13 @@ class PostLangyControlFramesBodyFramesItemType2:
         )
 
         d = dict(src_dict)
-        protocol = PostLangyControlFramesBodyFramesItemType2Protocol(d.pop("protocol"))
+        protocol = cast(Literal[1], d.pop("protocol"))
+        if protocol != 1:
+            raise ValueError(f"protocol must match const 1, got '{protocol}'")
 
-        type_ = PostLangyControlFramesBodyFramesItemType2Type(d.pop("type"))
+        type_ = cast(Literal["result"], d.pop("type"))
+        if type_ != "result":
+            raise ValueError(f"type must match const 'result', got '{type_}'")
 
         call_id = d.pop("callId")
 
@@ -128,4 +128,21 @@ class PostLangyControlFramesBodyFramesItemType2:
             error=error,
         )
 
+        post_langy_control_frames_body_frames_item_type_2.additional_properties = d
         return post_langy_control_frames_body_frames_item_type_2
+
+    @property
+    def additional_keys(self) -> list[str]:
+        return list(self.additional_properties.keys())
+
+    def __getitem__(self, key: str) -> Any:
+        return self.additional_properties[key]
+
+    def __setitem__(self, key: str, value: Any) -> None:
+        self.additional_properties[key] = value
+
+    def __delitem__(self, key: str) -> None:
+        del self.additional_properties[key]
+
+    def __contains__(self, key: str) -> bool:
+        return key in self.additional_properties

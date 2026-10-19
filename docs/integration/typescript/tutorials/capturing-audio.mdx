@@ -87,13 +87,13 @@ await transcribe("What does the caller ask for?", "call.wav");
 
 Send any of these and the recording is captured.
 
-| Source | Shape |
-|---|---|
-| OpenAI | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }` |
-| Vercel AI SDK | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }` |
-| OpenAI | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }` |
-| Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }` |
-| AG-UI | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
+| Source                   | Shape                                                                              |
+| ------------------------ | ---------------------------------------------------------------------------------- |
+| OpenAI                   | `{ type: "input_audio", input_audio: { data: "<base64>", format: "wav" } }`        |
+| Vercel AI SDK            | `{ type: "file", mediaType: "audio/wav", data: "<base64>" }`                       |
+| OpenAI                   | `{ type: "file", file: { filename: "call.wav", file_data: "<base64>" } }`          |
+| Google Gemini and Vertex | `{ inlineData: { mimeType: "audio/wav", data: "..." } }`                           |
+| AG-UI                    | `{ type: "audio", source: { type: "data", value: "...", mimeType: "audio/wav" } }` |
 
 An OpenAI Realtime session sends its turns in the same `input_audio` shape.
 
@@ -103,7 +103,7 @@ When a message holds both a recording and text, LangWatch treats the text as the
 
 ## What happens to the bytes
 
-LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
+LangWatch moves the recording out of the span at ingestion. The bytes go into content-addressed object storage and the message part becomes a `/api/v1/files/<projectId>/<id>` reference, around 60 characters where the base64 was.
 
 Storage is addressed by SHA-256, so identical bytes are stored once. For example, a recording captured by a simulation and by the trace of the same call is one stored object, not two.
 

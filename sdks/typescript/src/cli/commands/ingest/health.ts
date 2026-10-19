@@ -1,15 +1,13 @@
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { getSourceHealth } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 
 /**
- * `langwatch ingest health <sourceId> [--json]`
- *
- * One-shot health snapshot for an IngestionSource: events received in
- * the last 24h / 7d / 30d, plus the timestamp of the most recent
- * successful event. Wraps `sourceHealthMetrics`, the same query the
- * per-source detail page's metric strip uses.
+ * `langwatch ingest health <sourceId> [--json]`: one-shot snapshot of events
+ * received in the last 24h/7d/30d plus the latest success timestamp. Wraps
+ * `sourceHealthMetrics`, the same query the per-source detail page uses.
  */
 export async function ingestHealthCommand(
   sourceId: string,
@@ -17,9 +15,7 @@ export async function ingestHealthCommand(
 ): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -37,9 +33,7 @@ export async function ingestHealthCommand(
   }
 
   const { source, health } = result;
-  console.log(
-    `${chalk.bold(source.name)}  ${chalk.gray("(" + source.id + ")")}`,
-  );
+  console.log(`${chalk.bold(source.name)}  ${chalk.gray("(" + source.id + ")")}`);
   console.log(`Status:        ${colorStatus(source.status)}`);
   console.log(`Events (24h):  ${health.events24h}`);
   console.log(`Events (7d):   ${health.events7d}`);

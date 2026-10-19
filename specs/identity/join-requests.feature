@@ -172,6 +172,15 @@ Feature: Join requests - asking to join the organization your colleagues already
     Then the attempt is refused with code join_request_throttled and status 429
     And the refusal says how long is left, from the answer it got
 
+  # The offer is read on every page, so the page must not spend the lookup
+  # limit: a person who only moves around is never throttled.
+  @unit
+  Scenario: Moving between pages does not ask for the offer again
+    Given the offer to join was read less than thirty seconds ago
+    When the person moves to another page or back to the window
+    Then the offer is answered from what was already read
+    And the lookup limit is not spent on navigation
+
   @unit
   Scenario: A rejected person cannot immediately ask again
     Given "ana" rejected "sam"'s request
@@ -206,6 +215,21 @@ Feature: Join requests - asking to join the organization your colleagues already
     When "sam" accepts the invitation
     Then the request is WITHDRAWN because the invitation was accepted
     And "sam" is a member exactly once
+
+  # Organization records the acceptance; identity withdraws from its own side
+  # (§9, R7), so the withdrawal is eventual and organization holds no identity peer.
+  @unit
+  Scenario: Identity withdraws the pending request from organization's acceptance fact
+    Given "sam" has a PENDING request to join "acme"
+    When organization records that "sam" accepted an invitation to "acme"
+    Then identity withdraws "sam"'s request to join "acme"
+
+  @unit
+  Scenario: A redelivered acceptance withdraws the pending request once
+    Given "sam" has a PENDING request to join "acme"
+    When organization's acceptance fact for that invitation is delivered twice
+    Then both deliveries share one deduplication id keyed by the invitation
+    And the request is withdrawn once
 
   @unit
   Scenario: A pending request never blocks an invitation

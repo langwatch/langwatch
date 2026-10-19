@@ -52,6 +52,13 @@ Feature: LangWatchQL app-side extraction functions — projection UDFs plus a po
     Then the column holds the conversation markdown, with the system prompt once and one section per turn
     And the column type is reported as the hydrated type rather than the key's type
 
+  @unit
+  Scenario: conversation reads like the chat view and llm_readable_thread holds the agent's steps
+    Given a thread whose turns called tools
+    When conversation(ConversationId) and llm_readable_thread(ConversationId, 8000) are hydrated
+    Then conversation is rendered in the conversation view, with no budget
+    And llm_readable_thread is rendered in the steps view under its own budget, over the whole thread
+
   @integration
   Scenario: Submitted SQL using an app function is still recorded verbatim
     Given a statement projecting llm_readable_trace(TraceId, 8000) AS text with a trailing comment

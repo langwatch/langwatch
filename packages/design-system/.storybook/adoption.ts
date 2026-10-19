@@ -1,0 +1,282 @@
+/**
+ * Adoption numbers for the workshop: who imports each entry point, the debt and the shape
+ * census. `--report <path>` writes the census; `--check --paths <globs...>` is the wave gate,
+ * with `--min-adopted <n>` and `--require-owned-closed` (specs/shape-census.feature).
+ */
+import { execFileSync } from "node:child_process";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
+import path from "node:path";
+
+import { PACKAGE_ROOT, publishedEntries, storyExists, storyFor } from "./catalogue.ts";
+import {
+  type Census,
+  collectCensus,
+  evaluateCheck,
+  exitCodeOf,
+  gateRefusal,
+  loadEscapes,
+  openOwners,
+  renderCensusMarkdown,
+  revisionOf,
+  targetApi,
+} from "./census.ts";
+import { collectRawColours } from "./raw-colours.ts";
+
+const ROOT = path.resolve(PACKAGE_ROOT, "../..");
+const CONSUMER_DIRS = ["apps", "modules", "enterprise", "packages"];
+const SOURCE_GLOBS = CONSUMER_DIRS.flatMap((dir) => [`${dir}/*.ts`, `${dir}/*.tsx`]);
+const NOT_CONSUMER = [
+  ":(exclude)packages/design-system",
+  ":(exclude)packages/design-system-internal",
+];
+const BROWSER_SOURCES = [
+  "apps/ui/src/*.tsx",
+  "apps/ui/src/*.ts",
+  "modules/*/browser/src/*.tsx",
+  "modules/*/browser/src/*.ts",
+  "enterprise/modules/*/browser/src/*.tsx",
+  "enterprise/modules/*/browser/src/*.ts",
+  ":(exclude)*.test.ts",
+  ":(exclude)*.test.tsx",
+  ":(exclude)*/__tests__/*",
+];
+
+export type Usage = { files: number; owners: Record<string, number> };
+export type Debt = { files: number; sites: number; worst: { file: string; sites: number }[] };
+export type Adoption = {
+  entries: Record<
+    string,
+    Usage & { story?: string; storyMissing: boolean; names: Record<string, number> }
+  >;
+  debt: {
+    directChakra: Debt;
+    rawColour: Debt;
+    paletteStep: Debt;
+    handRolledTable: Debt;
+    shapeDrift: Debt;
+    pixelSpacing: Debt;
+    literalFontSize: Debt;
+  };
+  census: Census;
+};
+
+/** `git grep` over the consumer tree; tracked and untracked files alike. */
+function grep({ pattern, paths }: { pattern: string; paths: string[] }): string[] {
+  try {
+    return execFileSync(
+      "git",
+      ["grep", "--untracked", "-I", "-n", "-o", "-E", pattern, "--", ...paths],
+      {
+        cwd: ROOT,
+        encoding: "utf8",
+        maxBuffer: 64 * 1024 * 1024,
+      },
+    )
+      .split("\n")
+      .filter(Boolean);
+  } catch (error) {
+    // git grep exits 1 when nothing matches; anything else is a real failure.
+    if ((error as { status?: number }).status === 1) return [];
+    throw error;
+  }
+}
+
+/** `modules/trace/browser/src/x.tsx` -> `modules/trace/browser`. */
+const OWNER_DEPTH: Record<string, number> = { enterprise: 4, modules: 3 };
+
+function ownerOf({ file }: { file: string }): string {
+  const parts = file.split("/");
+  return parts.slice(0, OWNER_DEPTH[parts[0] ?? ""] ?? 2).join("/");
+}
+
+const fileOf = (line: string) => line.slice(0, line.indexOf(":"));
+
+function debtFrom({ lines }: { lines: string[] }): Debt {
+  const perFile = new Map<string, number>();
+  for (const line of lines) {
+    const file = fileOf(line);
+    perFile.set(file, (perFile.get(file) ?? 0) + 1);
+  }
+  const worst = [...perFile]
+    .toSorted((a, b) => b[1] - a[1])
+    .slice(0, 8)
+    .map(([file, sites]) => ({ file, sites }));
+  return { files: perFile.size, sites: lines.length, worst };
+}
+
+const IMPORT_CLAUSE =
+  /import\s+(?:type\s+)?\{([^}]*)\}\s*from\s*["']@langwatch\/design-system(\/[\w.-]+)?["']/g;
+
+/** Which files import each entry point. */
+function importersBySubpath(): Map<string, Set<string>> {
+  const files = new Map<string, Set<string>>();
+  for (const line of grep({
+    pattern: "@langwatch/design-system(/[A-Za-z0-9._-]+)?[\"']",
+    paths: [...SOURCE_GLOBS, ...NOT_CONSUMER],
+  })) {
+    const [file = "", , match = ""] = line.split(":");
+    const subpath = `.${match.slice("@langwatch/design-system".length, -1)}`;
+    files.set(subpath, (files.get(subpath) ?? new Set()).add(file));
+  }
+  return files;
+}
+
+/** How many files import each name from each entry point. */
+function namesBySubpath({ files }: { files: Set<string> }): Map<string, Map<string, number>> {
+  const names = new Map<string, Map<string, number>>();
+  for (const file of files) {
+    const source = readFileSync(path.join(ROOT, file), "utf8");
+    for (const [, clause = "", sub = ""] of source.matchAll(IMPORT_CLAUSE)) {
+      const counts = names.get(`.${sub}`) ?? new Map<string, number>();
+      const imported = clause.split(",").map((raw) =>
+        raw
+          .replace(/^\s*type\s+/, "")
+          .split(/\s+as\s+/)[0]
+          ?.trim(),
+      );
+      for (const name of imported) if (name) counts.set(name, (counts.get(name) ?? 0) + 1);
+      names.set(`.${sub}`, counts);
+    }
+  }
+  return names;
+}
+
+export function collectAdoption(): Adoption {
+  const filesBySubpath = importersBySubpath();
+  const names = namesBySubpath({
+    files: new Set([...filesBySubpath.values()].flatMap((files) => [...files])),
+  });
+
+  const entries: Adoption["entries"] = {};
+  for (const { subpath, source } of publishedEntries()) {
+    const files = [...(filesBySubpath.get(subpath) ?? [])];
+    const owners: Record<string, number> = {};
+    for (const file of files) owners[ownerOf({ file })] = (owners[ownerOf({ file })] ?? 0) + 1;
+    const story = storyFor({ source });
+    entries[subpath] = {
+      files: files.length,
+      owners,
+      story,
+      storyMissing: story !== undefined && !storyExists({ story }),
+      names: Object.fromEntries([...(names.get(subpath) ?? [])].toSorted((a, b) => b[1] - a[1])),
+    };
+  }
+
+  const listTableFiles = new Set(filesBySubpath.get("./list-table") ?? []);
+  const { census, sites, literals } = collectCensus();
+  const drift = sites.filter(
+    (site) => site.disposition !== "adopted" && site.disposition !== "clean",
+  );
+  const literalLines = ({ kind }: { kind: string }) =>
+    literals.filter((literal) => literal.kind === kind).map(({ file, line }) => `${file}:${line}`);
+
+  return {
+    entries,
+    debt: {
+      directChakra: debtFrom({
+        lines: grep({
+          pattern: "from [\"']@(chakra-ui|emotion)/",
+          paths: [...SOURCE_GLOBS, ...NOT_CONSUMER],
+        }),
+      }),
+      rawColour: debtFrom({
+        lines: collectRawColours(),
+      }),
+      paletteStep: debtFrom({
+        lines: grep({
+          pattern:
+            "(color|bg|background|borderColor|fill|stroke)=[\"'{]+(gray|red|orange|yellow|green|teal|blue|cyan|purple|pink|zinc)\\.[0-9]{2,3}[\"']",
+          paths: BROWSER_SOURCES,
+        }),
+      }),
+      handRolledTable: debtFrom({
+        lines: grep({ pattern: "Table\\.Root", paths: BROWSER_SOURCES }).filter(
+          (line) => !listTableFiles.has(fileOf(line)),
+        ),
+      }),
+      shapeDrift: debtFrom({ lines: drift.map(({ file, line }) => `${file}:${line}`) }),
+      pixelSpacing: debtFrom({ lines: literalLines({ kind: "pixelSpacing" }) }),
+      literalFontSize: debtFrom({ lines: literalLines({ kind: "fontSize" }) }),
+    },
+    census,
+  };
+}
+
+/** The values after a flag, up to the next flag. */
+function valuesAfter({ flag }: { flag: string }): string[] {
+  const start = process.argv.indexOf(flag);
+  if (start === -1) return [];
+  const rest = process.argv.slice(start + 1);
+  const end = rest.findIndex((arg) => arg.startsWith("--"));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+function valueAfter({ flag }: { flag: string }): string | undefined {
+  return valuesAfter({ flag })[0];
+}
+
+/** The wave gate: 1 on an unsuppressed violation, 2 on an unclassified candidate or unknown. */
+function runCheck() {
+  const paths = valuesAfter({ flag: "--paths" });
+  if (!paths.length) {
+    process.stderr.write("--check needs --paths <globs...>\n");
+    process.exitCode = 3;
+    return;
+  }
+  const { sites, sources } = collectCensus({ paths });
+  const result = evaluateCheck({ sites, escapes: loadEscapes() });
+  const minimum = Number(valueAfter({ flag: "--min-adopted" }) ?? 0);
+  const refused = gateRefusal({
+    paths,
+    files: [...sources.keys()],
+    adopted: result.adoptedRoots.length,
+    minimum,
+  });
+  if (refused) {
+    process.stderr.write(`${refused}\n`);
+    process.exitCode = 3;
+    return;
+  }
+  const ownedOpen = openOwners({ result });
+  const requireClosed = process.argv.includes("--require-owned-closed");
+  const code = exitCodeOf({ result }) || (requireClosed && ownedOpen.length ? 1 : 0);
+  const report = {
+    revision: revisionOf({ sources }),
+    scope: paths,
+    violations: result.violations,
+    approvedEscapes: result.approvedEscapes,
+    unclassifiedCandidates: result.unclassifiedCandidates,
+    adoptedRoots: result.adoptedRoots,
+    unknown: result.unknown,
+    classifiedCandidates: result.classifiedCandidates,
+    counts: {
+      violationParts: result.violations.length,
+      violationRoots: new Set(result.violations.map((found) => found.root)).size,
+      approvedEscapes: result.approvedEscapes.length,
+      unclassifiedCandidates: result.unclassifiedCandidates.length,
+      unknown: result.unknown.length,
+      adoptedRoots: result.adoptedRoots.length,
+    },
+    ownedElsewhere: result.ownedElsewhere,
+    ownedElsewhereOpen: ownedOpen,
+    targetApi: targetApi(),
+  };
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stderr.write(
+    `census check: ${result.violations.length} violations, ${result.unclassifiedCandidates.length} unclassified candidates, ${result.unknown.length} unknown, ${result.adoptedRoots.length} adopted roots in ${sources.size} files; owned elsewhere still open: ${ownedOpen.join(", ") || "none"}\n`,
+  );
+  process.exitCode = code;
+}
+
+if (import.meta.main && process.argv.includes("--check")) {
+  runCheck();
+} else if (import.meta.main) {
+  const adoption = collectAdoption();
+  const report = process.argv.indexOf("--report");
+  const target = report === -1 ? undefined : process.argv[report + 1];
+  if (target) {
+    mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
+    writeFileSync(target, renderCensusMarkdown({ census: adoption.census }));
+  }
+  process.stdout.write(`${JSON.stringify(adoption, null, 2)}\n`);
+}

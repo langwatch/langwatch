@@ -12,6 +12,7 @@ import (
 
 	"github.com/langwatch/langwatch/pkg/clog"
 	"github.com/langwatch/langwatch/pkg/config"
+	"github.com/langwatch/langwatch/services/nlpgo/app"
 )
 
 // DefaultSandboxPython is the interpreter a code block runs on when nothing
@@ -37,6 +38,13 @@ type Config struct {
 	Server         config.Server `env:"SERVER"`
 	Log            clog.Config   `env:"LOG"`
 	OTel           config.OTel   `env:"OTEL"`
+
+	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
+	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
+	// SpanSync swaps the per-tenant batch processor for a synchronous one so
+	// integration tests can assert on persisted spans (nlpgo-eval-trace-id-roundtrip).
+	// Production leaves it off: batching keeps the hot path off collector RTT.
+	SpanSync bool `env:"NLPGO_SPAN_SYNC"`
 
 	// Engine knobs surfaced to operators.
 	Engine EngineConfig `env:"NLPGO_ENGINE"`
@@ -103,9 +111,12 @@ func defaultConfig() Config {
 	return Config{
 		Environment: "local",
 		Server: config.Server{
-			Addr:                ":5562",
-			GracefulSeconds:     10,
-			MaxRequestBodyBytes: config.DefaultMaxRequestBodyBytes,
+			Addr:            ":5562",
+			GracefulSeconds: 10,
+			// One dataset row with every attachment inline; see the
+			// derivation on app.DefaultMaxRequestBodyBytes. An operator
+			// overrides it with SERVER_MAX_REQUEST_BODY_BYTES.
+			MaxRequestBodyBytes: app.DefaultMaxRequestBodyBytes,
 		},
 		Engine: EngineConfig{
 			StreamHeartbeatSeconds: 15,
@@ -170,17 +181,5 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := config.Validate(ctx, cfg); err != nil {
 		return Config{}, err
 	}
-	if err := validateRequired(cfg); err != nil {
-		return Config{}, err
-	}
 	return cfg, nil
-}
-
-func validateRequired(_ Config) error {
-	// Soft requirements — nlpgo boots even when the gateway is
-	// unconfigured because the /go/proxy and LLM-block paths fail
-	// gracefully, and operators may run nlpgo before every project's
-	// model providers are set up. Any non-/go/* request gets a
-	// self-explaining 502 from goOnlyModeFallback (see httpapi).
-	return nil
 }

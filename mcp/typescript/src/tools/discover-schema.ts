@@ -1,38 +1,16 @@
-import { analyticsGroups } from "../schemas/analytics-groups.js";
-import { analyticsMetrics } from "../schemas/analytics-metrics.js";
-import {
-  getQueryReference,
-  type QueryReferenceResponse,
-} from "../langwatch-api-query.js";
-import { markdownTable } from "../utils/markdown-table.js";
+import { getQueryReference, type QueryReferenceResponse } from "../langwatch-api-query.ts";
+import { analyticsGroups } from "../schemas/analytics-groups.ts";
+import { analyticsMetrics } from "../schemas/analytics-metrics.ts";
+import { markdownTable } from "../utils/markdown-table.ts";
 
-export type Category =
-  | "filters"
-  | "lwql"
-  | "metrics"
-  | "aggregations"
-  | "groups"
-  | "all";
+export type Category = "filters" | "lwql" | "metrics" | "aggregations" | "groups" | "all";
 
 /**
- * Categories whose answer comes from the platform rather than from this
- * package.
- *
- * The distinction is why `formatSchema` is async: the filter fields and the
- * analytics SQL schema are the platform's own registries, read from
- * `GET /api/v1/query/reference`, and they need the API key. The metrics,
- * aggregations and group-by lists are still static tables in this package and
- * answer without one.
- *
- * The filter half used to be static too — a hand-copied list of 24 field names
- * in `schemas/filter-fields.ts` — and it drifted in both directions with
- * nothing able to notice. That file is gone.
+ * Categories the platform answers, not this package — which is why
+ * `formatSchema` is async: they are read from `GET /api/v1/query/reference`
+ * and need the API key.
  */
-const PLATFORM_BACKED: ReadonlySet<Category> = new Set([
-  "filters",
-  "lwql",
-  "all",
-]);
+const PLATFORM_BACKED: ReadonlySet<Category> = new Set(["filters", "lwql", "all"]);
 
 export function needsQueryReference(category: Category): boolean {
   return PLATFORM_BACKED.has(category);
@@ -40,9 +18,8 @@ export function needsQueryReference(category: Category): boolean {
 
 /**
  * Formats the LangWatch query schema into markdown an agent can act on.
- *
- * `reference` is required for the platform-backed categories and ignored by the
- * others, so a caller that already fetched it for one category can reuse it.
+ * `reference` is required for the platform-backed categories and ignored by
+ * the others, so a caller that fetched it once can reuse it.
  */
 export async function formatSchema(
   category: Category,
@@ -50,9 +27,7 @@ export async function formatSchema(
 ): Promise<string> {
   const sections: string[] = [];
   const resolved =
-    needsQueryReference(category) && !reference
-      ? await getQueryReference()
-      : reference;
+    needsQueryReference(category) && !reference ? await getQueryReference() : reference;
 
   if (category === "filters" || category === "all") {
     sections.push(formatFilters(resolved));
@@ -76,6 +51,12 @@ export async function formatSchema(
   return sections.join("\n\n");
 }
 
+/** What the field's values column says: the closed set, or where to read an open one. */
+const knownValuesCell = (field: { knownValues: readonly string[]; facetable: boolean }): string => {
+  if (field.knownValues.length > 0) return field.knownValues.join(", ");
+  return field.facetable ? "open set, read them from GET /api/v1/traces/facets" : "";
+};
+
 function formatFilters(reference?: QueryReferenceResponse): string {
   if (!reference) {
     return "## Trace Filter Fields\n\nUnavailable: the platform could not be reached.";
@@ -95,12 +76,7 @@ function formatFilters(reference?: QueryReferenceResponse): string {
         Field: field.name,
         Type: field.valueType,
         Group: field.group ?? "",
-        "Known values":
-          field.knownValues.length > 0
-            ? field.knownValues.join(", ")
-            : field.facetable
-              ? "open set, read them from GET /api/traces/facets"
-              : "",
+        "Known values": knownValuesCell(field),
       })),
     }),
   );
@@ -161,9 +137,7 @@ function formatLangWatchQL(reference?: QueryReferenceResponse): string {
         rows: view.columns.map((column) => ({
           Column: column.name,
           Type: column.type,
-          Available: column.available
-            ? "yes"
-            : `needs ${column.gates.join(", ")}`,
+          Available: column.available ? "yes" : `needs ${column.gates.join(", ")}`,
           Description: column.description,
         })),
       }),
@@ -171,17 +145,15 @@ function formatLangWatchQL(reference?: QueryReferenceResponse): string {
     lines.push("");
   }
   lines.push("### Worked statements", "");
-  for (const example of reference.examples.filter(
-    (candidate) => candidate.language === "lwql",
-  )) {
-    lines.push(`**${example.title}**${example.available ? "" : ` (needs ${example.requires.gates.join(", ")})`}`);
+  for (const example of reference.examples.filter((candidate) => candidate.language === "lwql")) {
+    lines.push(
+      `**${example.title}**${example.available ? "" : ` (needs ${example.requires.gates.join(", ")})`}`,
+    );
     lines.push("```sql");
     lines.push(example.text);
     lines.push("```");
     for (const parameter of example.parameters) {
-      lines.push(
-        `- \`{${parameter.name}:${parameter.type}}\` — ${parameter.description}`,
-      );
+      lines.push(`- \`{${parameter.name}:${parameter.type}}\` — ${parameter.description}`);
     }
     lines.push("");
   }
@@ -205,9 +177,7 @@ function formatDecisionTable(reference: QueryReferenceResponse): string {
 
 function formatMetrics(): string {
   const lines = ["## Available Metrics", ""];
-  lines.push(
-    "Use these in `get_analytics` as `metric` parameter in `category.name` format."
-  );
+  lines.push("Use these in `get_analytics` as `metric` parameter in `category.name` format.");
   lines.push("");
 
   const byCategory = new Map<string, typeof analyticsMetrics>();
@@ -249,9 +219,7 @@ function formatAggregations(): string {
 
 function formatGroups(): string {
   const lines = ["## Available Group-By Options", ""];
-  lines.push(
-    "Use these in the `groupBy` parameter of `get_analytics`."
-  );
+  lines.push("Use these in the `groupBy` parameter of `get_analytics`.");
   lines.push("");
   for (const g of analyticsGroups) {
     lines.push(`- **${g.name}** (${g.label}): ${g.description}`);

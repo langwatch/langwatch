@@ -86,6 +86,9 @@ type BifrostRouter struct {
 	// above, with the gateway-wide provider timeout because synthesis and
 	// transcription are real work rather than a mint.
 	elevenLabsClient *http.Client
+	// openAIBaseURL overrides OpenAI's host for the direct audio lanes
+	// (tests only), the same override the Bifrost account carries.
+	openAIBaseURL string
 }
 
 // BifrostOptions configures the bifrost router.
@@ -98,7 +101,7 @@ type BifrostOptions struct {
 	// CodexRefresher wires the control-plane token refresh for the codex
 	// provider (see adapters/providers/codex.go).
 	CodexRefresher domain.CodexTokenRefresher
-	// CodexBackendURL overrides the codex upstream (tests only).
+	// CodexBackendURL overrides the codex upstream (CODEX_API_BASE, and tests).
 	CodexBackendURL string
 	// OpenAIBackendURL overrides OpenAI's upstream (tests only). A credential
 	// base_url reroutes to the vLLM chat-compat provider (see mapProvider);
@@ -161,10 +164,11 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		codexClient:     newCodexClient(),
 		codexRefresher:  opts.CodexRefresher,
 		codexBackendURL: codexURL,
-		langWatchClient: newLangWatchClient(),
+		langWatchClient: newLangWatchClient(endpointPolicy),
 		realtimeClient:  newRealtimeClient(endpointPolicy),
 
 		elevenLabsClient: newElevenLabsAudioClient(endpointPolicy),
+		openAIBaseURL:    opts.OpenAIBackendURL,
 	}, nil
 }
 
@@ -232,7 +236,11 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		if req.Type == domain.RequestTypeTranscription {
 			return r.dispatchElevenLabsTranscription(ctx, req, cred)
 		}
-		return r.dispatchElevenLabsSpeech(ctx, req, cred)
+		iter, err := r.dispatchElevenLabsSpeechStream(ctx, req, cred)
+		if err != nil {
+			return nil, err
+		}
+		return drainAudioStream(ctx, iter)
 	}
 
 	model := req.Model
@@ -329,7 +337,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 	// public runtime host (see bedrockConverseEndpoint); any other Bedrock
 	// request without a runtime endpoint stays on bifrost.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model, r.endpointPolicy); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCE(ctx, req, provider, model, cred, endpoint)
@@ -384,7 +392,7 @@ func (r *BifrostRouter) Dispatch(ctx context.Context, req *domain.Request, cred 
 		}
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	// Translated-lane response contract: a 200 must carry at least one
 	// choice, and a policy drop must be visible on the envelope. Scoped to
 	// the translated lanes: an OpenAI-compatible target can legitimately
@@ -487,7 +495,7 @@ func (r *BifrostRouter) dispatchResponses(
 		}, nil
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -526,7 +534,7 @@ func (r *BifrostRouter) dispatchEmbeddings(
 		return nil, errFromBifrost(ctx, berr, bifrostResponseHeaders(bfCtx))
 	}
 
-	body, _ := sonic.Marshal(resp)
+	body := publicWireBody(resp)
 	return &domain.Response{
 		Body:       body,
 		StatusCode: http.StatusOK,
@@ -651,6 +659,24 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 		})
 	}
 
+	// ElevenLabs' own synthesis paths, relayed from the vendor as they arrive.
+	if elevenLabsNativeRoute(req) {
+		if req.Type != domain.RequestTypeSpeech {
+			return nil, herr.New(ctx, domain.ErrBadRequest, herr.M{
+				"message": "this ElevenLabs route does not stream",
+			})
+		}
+		return r.dispatchElevenLabsSpeechStream(ctx, req, cred)
+	}
+
+	// The OpenAI-wire audio routes. See audio_dispatch.go.
+	if req.Type == domain.RequestTypeSpeech {
+		return r.dispatchSpeechStream(ctx, audioCall{req: req, model: model, cred: cred})
+	}
+	if req.Type == domain.RequestTypeTranscription {
+		return r.dispatchTranscriptionStream(ctx, audioCall{req: req, model: model, cred: cred})
+	}
+
 	// Codex bypasses Bifrost entirely: a direct SSE proxy to OpenAI's codex
 	// backend with OAuth + one-shot token refresh. See codex.go. Its backend
 	// speaks the Responses dialect only, so /v1/messages goes through the
@@ -701,7 +727,7 @@ func (r *BifrostRouter) DispatchStream(ctx context.Context, req *domain.Request,
 	// with its own VPCE handling. OpenAI models on Bedrock stream through the
 	// same lane over the public runtime host.
 	if req.Type == domain.RequestTypeChat {
-		if endpoint, err := bedrockConverseEndpoint(cred, model); err != nil {
+		if endpoint, err := bedrockConverseEndpoint(cred, model, r.endpointPolicy); err != nil {
 			return nil, err
 		} else if endpoint != "" {
 			return r.dispatchBedrockVPCEStream(ctx, req, provider, model, cred, endpoint)
@@ -1574,6 +1600,12 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 	case domain.ProviderBedrock:
 		return bfschemas.Bedrock
 	case domain.ProviderVertex:
+		// A base-URL override (a local stand-in such as llmsim) leaves the
+		// stock Vertex provider, which pins its Google host, for the derived
+		// Gemini-type provider that speaks the same publishers path.
+		if credBaseURL(cred) != "" && credentialIsAgentPlatform(cred) {
+			return geminiCompatProviderKey(cred)
+		}
 		return bfschemas.Vertex
 	case domain.ProviderGemini:
 		// A credential carrying a project and region is an Agent Platform
@@ -1582,7 +1614,7 @@ func mapProvider(cred domain.Credential) bfschemas.ModelProvider {
 		// project and location, because the stock Gemini provider is
 		// pinned to generativelanguage.googleapis.com, where such a key
 		// is refused by its own restrictions.
-		if credentialIsAgentPlatform(cred) {
+		if credentialIsAgentPlatform(cred) || credBaseURL(cred) != "" {
 			return geminiCompatProviderKey(cred)
 		}
 		return bfschemas.Gemini
@@ -1846,16 +1878,36 @@ const geminiCompatPrefix = "gemini-url-"
 // location. See specs/model-providers/google-agent-platform.feature.
 func geminiAgentPlatformEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
 	endpoint := anthropicCompatEndpoint{
-		baseURL: fmt.Sprintf(
-			"https://aiplatform.googleapis.com/v1/projects/%s/locations/%s/publishers/google",
-			url.PathEscape(cred.Extra["project_id"]),
-			url.PathEscape(cred.Extra["region"]),
-		),
-		keyless:  false,
+		baseURL: geminiCompatBaseURL(cred),
+		// A Vertex credential's key slot holds service-account JSON, never an API key.
+		keyless:  cred.ProviderID == domain.ProviderVertex,
 		baseType: bfschemas.Gemini,
 	}
 	sum := sha256.Sum256([]byte(fmt.Sprintf("%s|keyless=%t", endpoint.baseURL, endpoint.keyless)))
 	return endpoint, bfschemas.ModelProvider(geminiCompatPrefix + hex.EncodeToString(sum[:8]))
+}
+
+// geminiCompatBaseURL is the derived Gemini provider's base: the Agent Platform
+// publishers path for a project and location, else the Gemini API root. A
+// base-URL override replaces Google's host, as it does for Anthropic.
+func geminiCompatBaseURL(cred domain.Credential) string {
+	host := strings.TrimRight(credBaseURL(cred), "/")
+	if !credentialIsAgentPlatform(cred) {
+		if strings.HasSuffix(host, "/v1beta") || strings.HasSuffix(host, "/v1") {
+			return host
+		}
+		return host + "/v1beta"
+	}
+	if host == "" {
+		host = "https://aiplatform.googleapis.com"
+	}
+	host = strings.TrimSuffix(strings.TrimSuffix(host, "/v1beta"), "/v1")
+	return fmt.Sprintf(
+		"%s/v1/projects/%s/locations/%s/publishers/google",
+		host,
+		url.PathEscape(cred.Extra["project_id"]),
+		url.PathEscape(cred.Extra["region"]),
+	)
 }
 
 // geminiCompatProviderKey derives the provider key for a Gemini credential
@@ -1905,7 +1957,7 @@ func credentialIsAgentPlatform(cred domain.Credential) bool {
 // registry stores both kinds of derived endpoint, and the credential's
 // provider says which one this is.
 func compatEndpointForCred(cred domain.Credential) (anthropicCompatEndpoint, bfschemas.ModelProvider) {
-	if cred.ProviderID == domain.ProviderGemini {
+	if cred.ProviderID == domain.ProviderGemini || cred.ProviderID == domain.ProviderVertex {
 		return geminiAgentPlatformEndpointForCred(cred)
 	}
 	return anthropicCompatEndpointForCred(cred)
@@ -2051,7 +2103,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 		}
 		if chunk.BifrostChatResponse != nil {
 			it.ensureLeadingRoleDelta(chunk.BifrostChatResponse)
-			data, _ := sonic.Marshal(chunk.BifrostChatResponse)
+			data := publicWireBody(chunk.BifrostChatResponse)
 			if chunk.BifrostChatResponse.Usage != nil {
 				it.usage = extractUsage(chunk.BifrostChatResponse)
 				// The usage-bearing final chunk carries the policy drop
@@ -2066,7 +2118,7 @@ func (it *bifrostStreamIterator) Next(ctx context.Context) bool {
 			// Marshal verbatim — clients using the OpenAI Responses SDK
 			// decode these by `type`. Final usage appears on the
 			// response.completed event's nested Response object.
-			data, _ := sonic.Marshal(chunk.BifrostResponsesStreamResponse)
+			data := publicWireBody(chunk.BifrostResponsesStreamResponse)
 			it.current = data
 			//nolint:staticcheck // explicit embedded-field reference matches the parallel branches above for readability.
 			if resp := chunk.BifrostResponsesStreamResponse.Response; resp != nil && resp.Usage != nil {

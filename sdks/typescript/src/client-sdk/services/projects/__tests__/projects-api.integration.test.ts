@@ -1,18 +1,10 @@
-import {
-  describe,
-  it,
-  expect,
-  beforeAll,
-  beforeEach,
-  afterAll,
-  afterEach,
-} from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
-import {
-  ProjectsApiService,
-} from "../projects-api.service";
+import { describe, it, expect, beforeAll, beforeEach, afterAll, afterEach } from "vitest";
+
 import { LangWatchHandledError } from "@/internal/api/errors";
+
+import { ProjectsApiService } from "../projects-api.service";
 
 const TEST_ENDPOINT = "http://localhost:5560";
 
@@ -56,7 +48,7 @@ describe("ProjectsApiService", () => {
     describe("when the API returns a paginated list", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects`, () => {
             return HttpResponse.json({
               data: [
                 projectFixture({ id: "p1", name: "Project 1" }),
@@ -81,7 +73,7 @@ describe("ProjectsApiService", () => {
       it("passes page and limit as query params", async () => {
         let capturedUrl = "";
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects`, ({ request }) => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects`, ({ request }) => {
             capturedUrl = request.url;
             return HttpResponse.json({
               data: [],
@@ -101,7 +93,7 @@ describe("ProjectsApiService", () => {
     describe("when the API returns an error", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects`, () => {
             return HttpResponse.json(
               { error: "Unauthorized", message: "Invalid API key" },
               { status: 401 },
@@ -120,7 +112,7 @@ describe("ProjectsApiService", () => {
     describe("when the project exists", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects/proj_abc123`, () => {
             return HttpResponse.json(projectFixture());
           }),
         );
@@ -138,7 +130,7 @@ describe("ProjectsApiService", () => {
     describe("when the project does not exist", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects/nonexistent`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects/nonexistent`, () => {
             return HttpResponse.json(
               { error: "Not Found", message: "Project not found" },
               { status: 404 },
@@ -157,27 +149,22 @@ describe("ProjectsApiService", () => {
     describe("when the credential may update the project", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123/api-key`, () => {
+          http.get(`${TEST_ENDPOINT}/api/v1/projects/proj_abc123/api-key`, () => {
             return HttpResponse.json({ apiKey: "sk-lw-project-key" });
           }),
         );
       });
 
       it("returns the project's key", async () => {
-        await expect(service.getApiKey("proj_abc123")).resolves.toBe(
-          "sk-lw-project-key",
-        );
+        await expect(service.getApiKey("proj_abc123")).resolves.toBe("sk-lw-project-key");
       });
     });
 
     describe("when the credential lacks the permission", () => {
       beforeEach(() => {
         server.use(
-          http.get(`${TEST_ENDPOINT}/api/projects/proj_abc123/api-key`, () => {
-            return HttpResponse.json(
-              { error: "Forbidden", message: "Forbidden" },
-              { status: 403 },
-            );
+          http.get(`${TEST_ENDPOINT}/api/v1/projects/proj_abc123/api-key`, () => {
+            return HttpResponse.json({ error: "Forbidden", message: "Forbidden" }, { status: 403 });
           }),
         );
       });
@@ -201,7 +188,7 @@ describe("ProjectsApiService", () => {
     describe("when valid input is provided", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/projects`, async ({ request }) => {
+          http.post(`${TEST_ENDPOINT}/api/v1/projects`, async ({ request }) => {
             const body = (await request.json()) as Record<string, unknown>;
             return HttpResponse.json(
               {
@@ -233,7 +220,7 @@ describe("ProjectsApiService", () => {
     describe("when a slug conflict occurs", () => {
       beforeEach(() => {
         server.use(
-          http.post(`${TEST_ENDPOINT}/api/projects`, () => {
+          http.post(`${TEST_ENDPOINT}/api/v1/projects`, () => {
             return HttpResponse.json(
               { error: "Conflict", message: "Project slug already exists" },
               { status: 409 },
@@ -259,10 +246,8 @@ describe("ProjectsApiService", () => {
     describe("when valid fields are provided", () => {
       beforeEach(() => {
         server.use(
-          http.patch(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
-            return HttpResponse.json(
-              projectFixture({ name: "Updated Name" }),
-            );
+          http.patch(`${TEST_ENDPOINT}/api/v1/projects/proj_abc123`, () => {
+            return HttpResponse.json(projectFixture({ name: "Updated Name" }));
           }),
         );
       });
@@ -279,7 +264,7 @@ describe("ProjectsApiService", () => {
     describe("when the project exists", () => {
       beforeEach(() => {
         server.use(
-          http.delete(`${TEST_ENDPOINT}/api/projects/proj_abc123`, () => {
+          http.delete(`${TEST_ENDPOINT}/api/v1/projects/proj_abc123`, () => {
             return HttpResponse.json({
               id: "proj_abc123",
               name: "Test Project",
@@ -298,11 +283,11 @@ describe("ProjectsApiService", () => {
     });
   });
 
-  describe("auth header", () => {
+  describe("when setting the auth header", () => {
     it("sends Authorization Bearer header", async () => {
       let capturedAuth = "";
       server.use(
-        http.get(`${TEST_ENDPOINT}/api/projects`, ({ request }) => {
+        http.get(`${TEST_ENDPOINT}/api/v1/projects`, ({ request }) => {
           capturedAuth = request.headers.get("authorization") ?? "";
           return HttpResponse.json({
             data: [],

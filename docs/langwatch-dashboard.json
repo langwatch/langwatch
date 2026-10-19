@@ -392,9 +392,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -544,9 +542,7 @@
         "justifyMode": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1032,9 +1028,7 @@
         "namePlacement": "auto",
         "orientation": "vertical",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1115,9 +1109,7 @@
         "namePlacement": "auto",
         "orientation": "vertical",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1270,9 +1262,7 @@
         "namePlacement": "auto",
         "orientation": "vertical",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1553,9 +1543,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1708,9 +1696,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -1828,9 +1814,7 @@
               "id": "byNames",
               "options": {
                 "mode": "exclude",
-                "names": [
-                  "aws-evaluator-lambda"
-                ],
+                "names": ["aws-evaluator-lambda"],
                 "prefix": "All except:",
                 "readOnly": true
               }
@@ -1972,9 +1956,7 @@
               "id": "byNames",
               "options": {
                 "mode": "exclude",
-                "names": [
-                  "aws-evaluator-lambda"
-                ],
+                "names": ["aws-evaluator-lambda"],
                 "prefix": "All except:",
                 "readOnly": true
               }
@@ -2194,9 +2176,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -2303,10 +2283,7 @@
       "id": 7,
       "maxPerRow": 12,
       "options": {
-        "displayLabels": [
-          "value",
-          "name"
-        ],
+        "displayLabels": ["value", "name"],
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
@@ -2314,9 +2291,7 @@
         },
         "pieType": "pie",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -2675,9 +2650,7 @@
             "namePlacement": "auto",
             "orientation": "vertical",
             "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
+              "calcs": ["lastNotNull"],
               "fields": "",
               "values": false
             },
@@ -2935,9 +2908,7 @@
             "namePlacement": "auto",
             "orientation": "vertical",
             "reduceOptions": {
-              "calcs": [
-                "lastNotNull"
-              ],
+              "calcs": ["lastNotNull"],
               "fields": "",
               "values": false
             },
@@ -3129,9 +3100,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },
@@ -3202,9 +3171,7 @@
         "namePlacement": "auto",
         "orientation": "auto",
         "reduceOptions": {
-          "calcs": [
-            "lastNotNull"
-          ],
+          "calcs": ["lastNotNull"],
           "fields": "",
           "values": false
         },

@@ -1,9 +1,9 @@
 # Trace tour — visibility and persistence
 #
 # Implementation:
-#   platform/app/src/features/traces-v2/components/Toolbar/Toolbar.tsx          ("Show me around" control)
-#   platform/app/src/features/traces-v2/onboarding/store/onboardingStore.ts     (seen flags + localStorage key)
-#   platform/app/src/features/traces-v2/hooks/useIsNewAccount.ts                 (account age)
+#   modules/trace/browser/src/ui/sections/explorer/toolbar/toolbar.tsx          ("Show me around" control)
+#   modules/trace/browser/src/behavior/explorer/onboarding/store/onboarding-store.ts     (seen flags + localStorage key)
+#   modules/trace/browser/src/ui/sections/explorer/hooks/use-is-new-account.ts                 (account age)
 #
 # Motivation: two tour papercuts.
 #   1. Tour dismissal must follow the authenticated user across projects,
@@ -79,6 +79,7 @@ Rule: "Show me around" collapses to an icon for established accounts
   Scenario: New account sees the text label
     Given the account was created less than 5 days ago
     Then the control shows the "Show me around" text label
+    And the label drops to the icon while the toolbar is too narrow
 
   Scenario: Established account sees the icon only
     Given the account was created 5 or more days ago

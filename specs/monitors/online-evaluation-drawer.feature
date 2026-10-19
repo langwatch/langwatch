@@ -34,6 +34,20 @@ Feature: Online Evaluation Drawer
     Given I am logged in to a project
     And I have at least one evaluator created
 
+  Rule: A link that names this drawer opens it
+
+    The monitors REST API answers every monitor with a `platformUrl` that names
+    this drawer and the monitor's id, and that URL leaves the product: it goes
+    into an alert email and into whatever a caller stored from an API response.
+    A name that does not resolve turns all of them into links that land on the
+    Online Evaluations list with nothing open — no error, nothing to report.
+
+    @integration
+    Scenario: A monitor's platform link opens the online evaluation it names
+      Given a monitor link that names the online evaluation drawer and a monitor's id
+      When the recipient follows that link into the application
+      Then the online evaluation drawer opens on that monitor
+
   @unimplemented
   Scenario: Open drawer from menu
     Given I am on the evaluations page
@@ -137,15 +151,18 @@ Feature: Online Evaluation Drawer
   Scenario: Cannot save without evaluator
     Given the online evaluation drawer is open
     And no evaluator is selected
-    Then the Save button should be disabled
-    And a message should indicate "Select an evaluator to continue"
+    When I press Save
+    Then a message should indicate "Select an evaluator."
+    And nothing is saved
 
   @unimplemented
   Scenario: Cannot save without name
     Given the online evaluation drawer is open
     And an evaluator is selected
     But the name field is empty
-    Then the Save button should be disabled
+    When I press Save
+    Then a message should indicate "Enter a name for this online evaluation."
+    And nothing is saved
 
   @unimplemented
   Scenario: Clear selected evaluator
@@ -153,4 +170,4 @@ Feature: Online Evaluation Drawer
     When I click the X button on the evaluator box
     Then the evaluator should be removed
     And the box should show "Select Evaluator"
-    And the Save button should be disabled
+    And pressing Save says "Select an evaluator."

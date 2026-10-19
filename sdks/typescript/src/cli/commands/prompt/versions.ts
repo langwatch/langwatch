@@ -1,18 +1,18 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { PromptsApiService } from "@/client-sdk/services/prompts";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 /**
  * Returns the versions rather than printing them: the output port renders them
  * in whatever format the caller asked for (utils/output.ts).
  */
-export const promptVersionsCommand = async (
-  handle: string,
-): Promise<CommandResult | void> => {
+export const promptVersionsCommand = async (handle: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = new PromptsApiService();
@@ -23,7 +23,7 @@ export const promptVersionsCommand = async (
     const versions = await service.getVersions(handle);
 
     spinner.succeed(
-      `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`
+      `Found ${versions.length} version${versions.length !== 1 ? "s" : ""} for "${handle}"`,
     );
 
     return {
@@ -41,9 +41,7 @@ export const promptVersionsCommand = async (
           Version: `v${v.version}`,
           ID: v.versionId,
           Tags:
-            v.tags && v.tags.length > 0
-              ? v.tags.map((t) => t.name).join(", ")
-              : chalk.gray("—"),
+            v.tags && v.tags.length > 0 ? v.tags.map((t) => t.name).join(", ") : chalk.gray("—"),
           Message: v.commitMessage ?? chalk.gray("—"),
           Created: new Date(v.createdAt).toLocaleString(),
         }));
@@ -61,8 +59,8 @@ export const promptVersionsCommand = async (
         console.log();
         console.log(
           chalk.gray(
-            `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`
-          )
+            `  Tip: Restore a version with: langwatch prompt restore ${handle} <versionId>`,
+          ),
         );
         console.log();
       },

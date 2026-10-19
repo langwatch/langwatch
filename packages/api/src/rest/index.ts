@@ -1,0 +1,342 @@
+// The addressing half: the version vocabulary a family serves at, the
+// `/api/v1` alias every `/api` family answers under, and the static generation
+// a hand-mounted transport negotiates.
+export {
+  API_VERSION_HEADER,
+  assertVersionLabel,
+  basePathOf,
+  canonicalV1Path,
+  isDateVersion,
+  MANAGEMENT_API_VERSION,
+  RestVersionSelector,
+  restVersionSelectorMiddleware,
+  undescribedStack,
+  V1_PREFIX,
+  VERSION_LATEST,
+  VERSION_PREVIEW,
+  type DateVersion,
+  type HttpMethod,
+  type MountableRestApp,
+  type RestAddressing,
+  type RestAddressingOptions,
+  type RestVersionSelection,
+  type RestVersionSelectorMiddlewareOptions,
+  type RestVersionSelectorOptions,
+  type RestVersionSource,
+  type VersionLabel,
+  type VersionStatus,
+} from "./addressing.ts";
+
+// The declaration half: one complete declaration per route, and the vocabulary
+// a route states its sources, its answers and its door with.
+export {
+  browserSessionContext,
+  defineRestRouter,
+  permissionOf,
+  projectRequestContext,
+  type FeatureApiWitness,
+  type RestDeprecation,
+  type RestDoorCredential,
+  type RestMethodName,
+  type RestPermissionPlatform,
+  type RestPermissionReach,
+  type RestPermissionTarget,
+  type RestRouteAnswers,
+  type RestTransportDeclaration,
+  type RestTransportRoute,
+} from "./declaration.ts";
+
+// The runtime half: the ports a process fills, and the mount that puts a
+// family's declaration behind the one execution path.
+export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
+export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";
+
+export {
+  createRestRuntime,
+  type RestDeprecationLog,
+  type RestMountOptions,
+  type RestRuntime,
+  type RestRuntimeMembers,
+} from "./runtime.ts";
+
+// The request half: the validator that fails the way the boundary fails, the
+// wire-size cap nine ingestion families apply, the tracer and request logger,
+// the declared middleware context, SSE, and `Idempotency-Key` with its ledger.
+// The `Idempotency-Key` half: the header and its bounds, the declared
+// parameter and replay marker, and the receipt ledger a create replays from.
+export {
+  finalizeClaim,
+  HEARTBEAT_INTERVAL_MS,
+  IDEMPOTENCY_KEY_HEADER,
+  IdempotencyConflictError,
+  IdempotencyLedger,
+  idempotencyKeyParameter,
+  IDEMPOTENT_REPLAY_HEADER,
+  idempotentJson,
+  idempotentReplayHeaders,
+  isClaimAbandoned,
+  MAX_KEY_LENGTH,
+  MIN_KEY_LENGTH,
+  readIdempotencyKey,
+  RECEIPT_TTL_MS,
+  serializeResponseBody,
+  TAKEOVER_AFTER_MS,
+  takeOverClaim,
+  withIdempotency,
+  type IdempotencyConflictReason,
+  type IdempotencyResponseCipher,
+  type IdempotentExecuted,
+  type IdempotentOutcome,
+  type IdempotentReplayed,
+  type IdempotentRunner,
+  type RestIdempotency,
+  type WithIdempotencyParams,
+} from "./idempotency.ts";
+export type {
+  IdempotencyReceiptCreateInput,
+  IdempotencyReceiptPersistence,
+  IdempotencyReceiptRecord,
+} from "./repositories/prisma/prisma.idempotency-receipt.ts";
+
+export {
+  bindMiddlewareContext,
+  bodyLimit,
+  createSSEResponse,
+  defineMiddlewareContext,
+  loggerMiddleware,
+  multipartMiddleware,
+  RequestValidationError,
+  requestValidationErrorFrom,
+  restCacheKey,
+  restRateLimitKey,
+  tracerMiddleware,
+  validator,
+  type BodyLimitOptions,
+  type FieldViolation,
+  type RestCachePolicy,
+  type RestMultipart,
+  type RestMultipartDeclared,
+  type RestMultipartFile,
+  type RestMultipartFiles,
+  type RestRateLimitPolicy,
+  type RestRawAnswer,
+  type RestRawAnswerDeclared,
+  type RestRawBody,
+  type RestRawBodyDeclared,
+  type RestRawBodyForm,
+  type RestMediaTypeMismatch,
+  type RestRawBodyOut,
+  type RestRawResponse,
+  type RestRawResult,
+  type MiddlewareContext,
+  type MiddlewareContextBinding,
+  type SSEHandler,
+  type TypedSSEStream,
+} from "./request.ts";
+
+// The credential half: the project and credential a door resolves, the
+// principal a second permission question is asked with, the scope a handler
+// reads back, and who is behind a personal-workspace key.
+export {
+  admittedOwnerlessProjectKeyFor,
+  type AppRestOrganizationVariables,
+  type AppRestProjectVariables,
+  browserCallerOfRequest,
+  browserSessionOfRequest,
+  credentialPrincipalOf,
+  credentialPrincipalOfToken,
+  keyCredentialOfRequest,
+  keyDoorPrincipalOfRequest,
+  organizationCredentialOfRequest,
+  organizationCredentialPrincipalOf,
+  organizationCredentialPrincipalOfToken,
+  organizationOf,
+  type OrganizationScopedContext,
+  OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
+  PersonalProjectKeyRequiredError,
+  PersonalUsageKeyMismatchError,
+  PersonalUsageServiceKeyUnsupportedError,
+  principalOfCredential,
+  projectCredentialOfRequest,
+  projectRequestContextOf,
+  projectOf,
+  type ProjectScopedContext,
+  recordBrowserCaller,
+  recordKeyCredential,
+  recordOrganizationCredential,
+  recordProjectCredential,
+  recordScimCredential,
+  resolvePersonalCaller,
+  type RestBrowserCaller,
+  type RestResolvedScimCredential,
+  scimCredentialOfRequest,
+} from "./credential.ts";
+
+// The response half: the context keys, the handler context, the status-carrying
+// error vocabulary, the two wire envelopes and their documented responses, the
+// stored-object hardening, the trace handles and the family error handlers.
+export {
+  API_ERROR_TYPE_BY_STATUS,
+  apiErrorBody,
+  apiErrorSchema,
+  apiErrorType,
+  BadRequestError,
+  badRequestSchema,
+  baseResponses,
+  buildStandardSuccessResponse,
+  canonicalBaseResponses,
+  canonicalErrorAnswer,
+  canonicalErrorFor,
+  canonicalErrorResponse,
+  canonicalConflictResponses,
+  canonicalNotFoundResponses,
+  canonicalUnprocessableResponses,
+  coerceToEpoch,
+  conflictResponses,
+  conflictSchema,
+  createCanonicalFamilyErrorHandler,
+  createFamilyErrorHandler,
+  DECLARED_ANSWER,
+  declined,
+  ENDPOINT_INPUT,
+  ENDPOINT_ROUTE,
+  errorSchema,
+  FALLBACK_API_ERROR_TYPE,
+  ForbiddenError,
+  HttpError,
+  InternalServerError,
+  isDeclined,
+  isFrameworkRefusal,
+  jsonResponse,
+  NotFoundError,
+  rateLimitedResponse,
+  REQUEST_FAMILY,
+  REQUEST_LOG_CLAIM,
+  requestTraceIds,
+  safeMediaType,
+  sanitizeFilenameSegment,
+  STORED_OBJECT_RESPONSE_BASE_HEADERS,
+  successSchema,
+  unauthorizedSchema,
+  UnauthorizedError,
+  UnprocessableEntityError,
+  type ApiErrorBody,
+  type ApiErrorReason,
+  type Declined,
+  type EndpointDocs,
+  type EndpointVariables,
+  type RequestActor,
+  type RouteResponse,
+  type ServiceContext,
+} from "./response.ts";
+
+// The answer kinds a route may declare when it does not answer with JSON, and
+// the producers that make them. A transport file names the type it returns and
+// nothing else here: the producer arrives in the handler's own arguments.
+export type {
+  RestAnswer,
+  RestBytesProducer,
+  RestEvent,
+  RestEventsProducer,
+  RestForwardedProducer,
+  RestNegotiatedProducer,
+  RestProducedFor,
+  RestProducerFor,
+  RestProtocolProducer,
+  RestProtocolRefusal,
+  RestRedirectProducer,
+  RestRefusalProducer,
+  RestResponseKind,
+} from "./response-kind.ts";
+
+// The document half. Spec generation must come from the same hono-openapi
+// package instance that attached the route metadata, so the generator and the
+// schema wrapper are re-exported here: a transport file never reaches for
+// hono-openapi itself, and a peer-resolved copy has a different metadata symbol.
+export {
+  CREDENTIAL_CLASS_BY_DOOR,
+  deprecatedAlias,
+  deprecationNotice,
+  documentedPathOf,
+  documentedResponses,
+  documentRoute,
+  handWrittenDocs,
+  isHttpMethod,
+  normalizeExclusiveBounds,
+  restRouteDocumentation,
+  securityForCredentialClass,
+  type DocumentedRouteResponse,
+  type PlatformUrlBuilder,
+  type RestTransportDocs,
+  type SecurityRequirement,
+} from "./openapi.ts";
+export { resolver } from "hono-openapi";
+
+// The security half: the ports one process fills for its own doors, the
+// cross-check that every mounted route declared a policy, the refusal
+// fingerprint, the shared-secret comparison and the management audit.
+export {
+  type ApiErrorEnvelope,
+  type AppRestManagementAudit,
+  type AppRestRbacVocabulary,
+  type AppRestSecurityMembers,
+  assertEveryRouteDeclared,
+  type AuthDiagnostics,
+  collectAuthDiagnostics,
+  emitManagementAudit,
+  familyFromBasePath,
+  managementActor,
+  type MountedRouteTable,
+  type RestAddress,
+  restAddressInventory,
+  type RestApiServiceMembers,
+  undeclaredRoutes,
+} from "./security.ts";
+
+export { BrowserSessionIdentity, BrowserOriginRefusedError } from "./browser-session.ts";
+
+export { bindRestCredential, type RestCredentialBinding, type RestDoor } from "./request.ts";
+export {
+  defineRestDoor,
+  type ApiOfToken,
+  type DoorContract,
+  type DoorCredential,
+  type DoorIdentified,
+  type DoorPresented,
+  type ErasedRestDoorDefinition,
+  type RestDoorDefinition,
+} from "./door.ts";
+
+export { BearerIdentity } from "./bearer-identity.ts";
+export {
+  CliTokenIdentity,
+  type CliTokenHolder,
+  type CliTokenPermissionQuestion,
+  type CliTokenPresented,
+} from "./cli-token-identity.ts";
+export {
+  assertKeyKind,
+  keyCredentialOf,
+  REST_KEY_KINDS,
+  type RestKeyCredential,
+  type RestKeyDoor,
+  type RestKeyKind,
+  type RestKeyKinds,
+} from "./key-credential.ts";
+
+export type { RestDeclaredResult, RestSharedPath } from "./declaration.ts";
+
+// Named by every declaration's inferred type, so a module's declaration emit can name them.
+export type {
+  ApiEntitlement,
+  EntitlementOptions,
+  PlatformPermissionDeclaration,
+  PlatformPermissionTarget,
+  RouteAccess,
+} from "../access/access.ts";
+export type {
+  ExactInputPermission,
+  InputPermission,
+  PermissionChoice,
+  PermissionMap,
+} from "../access/input-permission.ts";

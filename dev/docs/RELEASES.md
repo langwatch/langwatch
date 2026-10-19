@@ -6,17 +6,17 @@ current versions in `.github/.release-please-manifest.json`.
 
 This repo publishes nine independently versioned components:
 
-| component | path | shim |
-| --- | --- | --- |
-| `langwatch` (the product, charts and app) | `.` | `.release-please-shim` |
-| `typescript-sdk` | `sdks/typescript` | `sdks/typescript/.release-please-shim` |
-| `python-sdk` | `sdks/python` | `sdks/python/.release-please-shim` |
-| `sdk-go` | `sdks/go` | `sdks/go/.release-please-shim` |
-| `mcp-server` | `mcp/typescript` | `mcp/typescript/.release-please-shim` |
-| `langevals` | `services/langevals` | `services/langevals/.release-please-shim` |
-| `clickhouse-serverless` | `charts/clickhouse-serverless` | `charts/clickhouse-serverless/.release-please-shim` |
-| `skills` | `skills` | `skills/.release-please-shim` |
-| `agent-plugin` | `plugins/langwatch` | `plugins/langwatch/.release-please-shim` |
+| component                                 | path                           | shim                                                |
+| ----------------------------------------- | ------------------------------ | --------------------------------------------------- |
+| `langwatch` (the product, charts and app) | `.`                            | `.release-please-shim`                              |
+| `typescript-sdk`                          | `sdks/typescript`              | `sdks/typescript/.release-please-shim`              |
+| `python-sdk`                              | `sdks/python`                  | `sdks/python/.release-please-shim`                  |
+| `sdk-go`                                  | `sdks/go`                      | `sdks/go/.release-please-shim`                      |
+| `mcp-server`                              | `mcp/typescript`               | `mcp/typescript/.release-please-shim`               |
+| `langevals`                               | `services/langevals`           | `services/langevals/.release-please-shim`           |
+| `clickhouse-serverless`                   | `charts/clickhouse-serverless` | `charts/clickhouse-serverless/.release-please-shim` |
+| `skills`                                  | `skills`                       | `skills/.release-please-shim`                       |
+| `agent-plugin`                            | `plugins/langwatch`            | `plugins/langwatch/.release-please-shim`            |
 
 Each gets its own release PR, its own tag and its own changelog.
 
@@ -109,7 +109,7 @@ typescript SDK to 1.3.0, and #6918 pinned it back to 3.13.0 after #4998.
 ## Why not just configure it away
 
 `exclude-paths` cannot express this. release-please matches it by directory prefix
-only, with no globs, and drops a commit from a component only when *every* touched
+only, with no globs, and drops a commit from a component only when _every_ touched
 file of that component is excluded. Excluding "tests" or "internal CLI code" is not
 expressible, and would not have helped #6600 anyway: the file that dragged the SDK
 to a major was ordinary SDK source.

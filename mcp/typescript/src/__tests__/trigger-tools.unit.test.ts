@@ -2,14 +2,14 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("../langwatch-api.js", () => ({ makeRequest: vi.fn() }));
 
-import { makeRequest } from "../langwatch-api.js";
 import {
   createTrigger,
   getTrigger,
   listTriggerFires,
   testFireTrigger,
   updateTrigger,
-} from "../langwatch-api-triggers.js";
+} from "../langwatch-api-triggers.ts";
+import { makeRequest } from "../langwatch-api.ts";
 import {
   actionParamsSchema,
   reportSchema,
@@ -17,10 +17,10 @@ import {
   TRIGGER_FILTER_QUERY_DESCRIPTION,
   TRIGGER_FILTERS_DESCRIPTION,
   validateActionParamsForAction,
-} from "../schemas/triggers.js";
-import { handleCreateTrigger } from "../tools/create-trigger.js";
-import { handleListTriggerFires } from "../tools/list-trigger-fires.js";
-import { handleListTriggers } from "../tools/list-triggers.js";
+} from "../schemas/triggers.ts";
+import { handleCreateTrigger } from "../tools/create-trigger.ts";
+import { handleListTriggerFires } from "../tools/list-trigger-fires.ts";
+import { handleListTriggers } from "../tools/list-triggers.ts";
 
 const request = vi.mocked(makeRequest);
 
@@ -65,7 +65,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           action: "SEND_SLACK_MESSAGE",
           actionParams: {
@@ -94,7 +94,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           report: {
             source: { kind: "dashboard", dashboardId: "dashboard_1" },
@@ -112,9 +112,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       };
 
       expect(reportSchema.parse(report)).toMatchObject(report);
-      expect(
-        reportSchema.safeParse({ schedule: report.schedule }).success,
-      ).toBe(false);
+      expect(reportSchema.validate({ schedule: report.schedule })).toBe(false);
     });
   });
 
@@ -132,7 +130,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "PATCH",
-        "/api/triggers/trigger-1",
+        "/api/v1/triggers/trigger-1",
         expect.objectContaining({
           report: expect.objectContaining({
             schedule: { cron: "0 8 * * *", timezone: "UTC" },
@@ -160,8 +158,10 @@ describe("Feature: an agent configures an automation over MCP", () => {
         actionParams: {},
       });
 
-      expect(verdict.ok).toBe(false);
-      if (!verdict.ok) expect(verdict.message).toContain("SEND_WEBHOOK");
+      expect(verdict).toMatchObject({
+        ok: false,
+        message: expect.stringContaining("SEND_WEBHOOK"),
+      });
     });
 
     it("refuses email fields sent for a webhook channel", () => {
@@ -290,7 +290,12 @@ describe("Feature: an agent configures an automation over MCP", () => {
     });
 
     it("still reads one from a deployment that answers with less", async () => {
-      const { kind, filterQuery, platformUrl, ...older } = TRIGGER;
+      const {
+        kind: _kind,
+        filterQuery: _filterQuery,
+        platformUrl: _platformUrl,
+        ...older
+      } = TRIGGER;
       request.mockResolvedValue(older);
 
       expect(await getTrigger("trigger-1")).toMatchObject({ id: "trigger-1" });
@@ -308,7 +313,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "PATCH",
-        "/api/triggers/trigger-1",
+        "/api/v1/triggers/trigger-1",
         expect.objectContaining({
           actionParams: { slackWebhook: "[redacted]", slackChannelId: "C123" },
         }),
@@ -330,10 +335,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(await testFireTrigger("trigger-1")).toMatchObject({
         channel: "slack",
       });
-      expect(request).toHaveBeenCalledWith(
-        "POST",
-        "/api/triggers/trigger-1/test-fire",
-      );
+      expect(request).toHaveBeenCalledWith("POST", "/api/v1/triggers/trigger-1/test-fire");
     });
 
     it("reads its fires newest first", async () => {
@@ -347,13 +349,8 @@ describe("Feature: an agent configures an automation over MCP", () => {
         },
       ]);
 
-      expect(
-        (await listTriggerFires({ id: "trigger-1", limit: 5 })).fires,
-      ).toHaveLength(1);
-      expect(request).toHaveBeenCalledWith(
-        "GET",
-        "/api/triggers/trigger-1/fires?limit=5",
-      );
+      expect((await listTriggerFires({ id: "trigger-1", limit: 5 })).fires).toHaveLength(1);
+      expect(request).toHaveBeenCalledWith("GET", "/api/v1/triggers/trigger-1/fires?limit=5");
     });
   });
 
@@ -371,7 +368,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(isError).toBeUndefined();
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           actionParams: {},
           filters: { "traces.error": ["true"] },
@@ -390,7 +387,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           actionParams: { slackIntegrationId: "slack_1", slackChannelId: "C123" },
         }),
@@ -443,7 +440,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(content[0]?.text).toContain("Kind: ALERT");
       expect(request).toHaveBeenCalledWith(
         "POST",
-        "/api/triggers",
+        "/api/v1/triggers",
         expect.objectContaining({
           customGraphId: "graph_1",
           graphAlert: expect.objectContaining({ threshold: 2000 }),
@@ -457,9 +454,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
         '{"evaluations.passed":{"<monitorId>":["false"]}}',
       );
-      expect(TRIGGER_FILTERS_DESCRIPTION).toContain(
-        '{"metadata.value":{"<key>":["true"]}}',
-      );
+      expect(TRIGGER_FILTERS_DESCRIPTION).toContain('{"metadata.value":{"<key>":["true"]}}');
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain('{"traces.error":["true"]}');
       expect(TRIGGER_FILTERS_DESCRIPTION).toContain("not its evaluatorId");
       expect(TRIGGER_FILTER_QUERY_DESCRIPTION).toContain("evaluatorVerdict:fail");
@@ -525,7 +520,7 @@ describe("Feature: an agent configures an automation over MCP", () => {
 
       expect(request).toHaveBeenCalledWith(
         "GET",
-        "/api/triggers/trigger-1/fires?limit=1&cursor=cursor-2",
+        "/api/v1/triggers/trigger-1/fires?limit=1&cursor=cursor-2",
       );
       expect(JSON.parse(text)).toMatchObject({ nextCursor: "cursor-3" });
     });

@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 770" width="1280" height="770" font-family="Inter, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Security view: identity, keys, secrets and what is exposed">
+<title>Security view: identity, keys, secrets and what is exposed</title>
+<defs><marker id="head" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#7b8394"/></marker><marker id="head-out" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0 L10 5 L0 10 z" fill="#ff9d3b"/></marker><marker id="head-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#7b8394"/></marker><marker id="head-out-start" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0 L10 5 L0 10 z" fill="#ff9d3b"/></marker></defs>
+<rect width="1280" height="770" fill="#10101a"/>
+<text x="24" y="42" font-size="22" font-weight="700" fill="#f1f5f9" text-anchor="start">Security view: identity, keys, secrets and what is exposed</text>
+<rect x="16" y="62" width="1248" height="688" rx="14" fill="#15151e" stroke="#3a3a44" stroke-width="1.5"/>
+<text x="32" y="86" font-size="14.5" font-weight="600" fill="#b4bccb" text-anchor="start">Your cloud account or data centre</text>
+<rect x="40" y="110" width="200" height="96" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="140" y="145.5" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Your team</text>
+<text x="140" y="166" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">sign in through</text>
+<text x="140" y="184.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">your identity provider</text>
+<rect x="330" y="110" width="240" height="96" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="450" y="145.5" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Your identity provider</text>
+<text x="450" y="166" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">Entra ID, Okta, Auth0, Google</text>
+<text x="450" y="184.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">OpenID Connect or SAML, SCIM</text>
+<rect x="423.8" y="99" width="140.2" height="22" rx="11" fill="#3a2a17" stroke="#c8782a" stroke-width="1"/>
+<text x="493.9" y="114.5" font-size="11.5" font-weight="600" fill="#ffc78a" text-anchor="middle">Enterprise license</text>
+<rect x="660" y="110" width="220" height="96" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="770" y="145.5" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Your agents, SDKs, CI</text>
+<text x="770" y="166" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">authenticate with</text>
+<text x="770" y="184.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">LangWatch API keys</text>
+<rect x="1000" y="110" width="240" height="96" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="1120" y="145.5" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Your secret manager</text>
+<text x="1120" y="166" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">Vault, AWS Secrets Manager,</text>
+<text x="1120" y="184.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">Azure Key Vault</text>
+<path d="M243 140 L328 140" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)" marker-start="url(#head-start)"/>
+<rect x="252.975" y="113.5" width="62.050000000000004" height="21" rx="4" fill="#15151e"/>
+<text x="284" y="128.68" font-size="13" font-weight="500" fill="#b4bccb" text-anchor="middle">sign in</text>
+<rect x="40" y="262" width="880" height="62" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="480" y="289.75" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Your ingress or load balancer, with TLS</text>
+<text x="480" y="310.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">the App is the only service exposed; the AI Gateway only when you give it a hostname</text>
+<path d="M120 206 L120 260" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)"/>
+<path d="M450 206 L450 260" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)"/>
+<path d="M770 206 L770 260" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)"/>
+<rect x="139.95" y="223.5" width="112.10000000000001" height="21" rx="4" fill="#15151e"/>
+<text x="196" y="238.68" font-size="13" font-weight="500" fill="#b4bccb" text-anchor="middle">HTTPS, session</text>
+<rect x="471.525" y="223.5" width="104.95" height="21" rx="4" fill="#15151e"/>
+<text x="524" y="238.68" font-size="13" font-weight="500" fill="#b4bccb" text-anchor="middle">sign-in, SCIM</text>
+<rect x="800.975" y="223.5" width="62.050000000000004" height="21" rx="4" fill="#15151e"/>
+<text x="832" y="238.68" font-size="13" font-weight="500" fill="#b4bccb" text-anchor="middle">API key</text>
+<rect x="40" y="364" width="1200" height="362" rx="14" fill="#1a1a24" stroke="#565664" stroke-width="1.5"/>
+<text x="56" y="388" font-size="14.5" font-weight="600" fill="#b4bccb" text-anchor="start">Kubernetes cluster: internal only</text>
+<path d="M420 324 L420 400" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)"/>
+<rect x="64" y="402" width="472" height="150" rx="10" fill="#2a1c0d" stroke="#c8782a" stroke-width="1.5"/>
+<text x="300" y="446" font-size="16" font-weight="650" fill="#ffc78a" text-anchor="middle">App</text>
+<text x="300" y="466.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">checks every request against roles per organisation,</text>
+<text x="300" y="485" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">team and project (custom roles with a license)</text>
+<text x="300" y="503.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">API keys stored as a keyed hash, never in clear</text>
+<text x="300" y="522" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">audit log of who did what (Enterprise license)</text>
+<rect x="64" y="580" width="472" height="122" rx="10" fill="#2a1c0d" stroke="#c8782a" stroke-width="1.5"/>
+<text x="300" y="619.25" font-size="16" font-weight="650" fill="#ffc78a" text-anchor="middle">Workers, NLP, LangEvals, Langy</text>
+<text x="300" y="639.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">no external address, reached over cluster DNS</text>
+<text x="300" y="658.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">PII redaction runs here, before anything is stored</text>
+<text x="300" y="676.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">Langy has no internet access unless you allow it</text>
+<rect x="596" y="402" width="320" height="300" rx="10" fill="#111d33" stroke="#4a6fae" stroke-width="1.5"/>
+<text x="756" y="465.5" font-size="16" font-weight="650" fill="#a9c7f7" text-anchor="middle">Data stores</text>
+<text x="756" y="486" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">PostgreSQL, ClickHouse, Redis,</text>
+<text x="756" y="504.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">object storage</text>
+<text x="756" y="523" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle"></text>
+<text x="756" y="541.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">private subnets, TLS connections,</text>
+<text x="756" y="560" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">encrypted volumes</text>
+<text x="756" y="578.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle"></text>
+<text x="756" y="597" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">provider keys and SSO secrets</text>
+<text x="756" y="615.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">encrypted in PostgreSQL (AES-256-GCM)</text>
+<text x="756" y="634" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle"></text>
+<text x="756" y="652.5" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">every trace query filtered by tenant</text>
+<path d="M539 476 L594 476" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)" marker-start="url(#head-start)"/>
+<path d="M539 640 L594 640" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)" marker-start="url(#head-start)"/>
+<rect x="976" y="402" width="240" height="300" rx="10" fill="#20202a" stroke="#565664" stroke-width="1.5"/>
+<text x="1096" y="474.75" font-size="16" font-weight="650" fill="#f1f5f9" text-anchor="middle">Kubernetes Secrets</text>
+<text x="1096" y="495.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">synced from your</text>
+<text x="1096" y="513.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">secret manager</text>
+<text x="1096" y="532.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle"></text>
+<text x="1096" y="550.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">encryption key,</text>
+<text x="1096" y="569.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">session secret,</text>
+<text x="1096" y="587.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">database passwords,</text>
+<text x="1096" y="606.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">license key</text>
+<text x="1096" y="624.75" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle"></text>
+<text x="1096" y="643.25" font-size="13.5" font-weight="400" fill="#b4bccb" text-anchor="middle">read by the pods at start</text>
+<path d="M1120 206 L1120 400" fill="none" stroke="#7b8394" stroke-width="2" marker-end="url(#head)"/>
+<rect x="1031.775" y="289.5" width="176.45000000000002" height="21" rx="4" fill="#15151e"/>
+<text x="1120" y="304.68" font-size="13" font-weight="500" fill="#b4bccb" text-anchor="middle">synced by your operator</text>
+</svg>

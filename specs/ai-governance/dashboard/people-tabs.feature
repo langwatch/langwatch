@@ -157,6 +157,14 @@ Feature: The People page is two tabs, People and Departments
     When sam picks one of them from the department chip
     Then only that department's people are listed
 
+  @integration
+  Scenario: A department nobody belongs to offers a way back to every department
+    Given people in two departments
+    And the address names a department none of them is in
+    When sam presses "Show every department"
+    Then the department leaves the address and the people are listed again
+    And the sort stays in the address
+
   # ── Header actions ────────────────────────────────────────────────────────
 
   @integration

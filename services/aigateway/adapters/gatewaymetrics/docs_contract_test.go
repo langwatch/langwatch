@@ -110,6 +110,10 @@ var notMetrics = map[string]string{
 	"gateway_trace_project_unknown":       "REST error code",
 	"gateway_spend_group_by_unstable":     "REST error code",
 
+	// Check ids in the self-hosted checkup report, values of its `check`
+	// field rather than series.
+	"gateway_control_plane": "checkup check id",
+
 	// SDK facade names. The python SDK exposes each resource as a
 	// snake_case attribute, so a documented call reads as a
 	// `gateway_`-prefixed token without naming a series.
@@ -294,18 +298,18 @@ func contains(haystack []string, needle string) bool {
 	return false
 }
 
-// repoRoot walks up from the test's package directory to the module root,
+// repoRoot walks up from the test's package directory to the repository root,
 // so the scan does not depend on where the test was invoked from.
 func repoRoot(t *testing.T) string {
 	t.Helper()
 	dir, err := os.Getwd()
 	require.NoError(t, err)
 	for {
-		if _, err := os.Stat(filepath.Join(dir, "go.mod")); err == nil {
+		if _, err := os.Stat(filepath.Join(dir, "go.work")); err == nil {
 			return dir
 		}
 		parent := filepath.Dir(dir)
-		require.NotEqual(t, dir, parent, "walked past the filesystem root without finding go.mod")
+		require.NotEqual(t, dir, parent, "walked past the filesystem root without finding go.work")
 		dir = parent
 	}
 }

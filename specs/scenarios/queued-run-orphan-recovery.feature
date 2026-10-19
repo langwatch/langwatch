@@ -52,20 +52,8 @@ Feature: Queued scenario run orphan recovery
   # Layer 2: one-shot backfill for runs the process manager never saw
   # ---------------------------------------------------------------------------
 
-  @unit
-  Scenario: Historical runs with no terminal event are closed by the backfill task
-    Given simulation runs are stored without a terminal event from before the process manager existed
-    And each has been quiet for longer than the backfill staleness threshold
-    When the stalled-run backfill task runs
-    Then each run is finished with status ERROR and reason "stalled"
-    And a run whose terminal write fails does not stop the remaining runs from being closed
-
-  @unit
-  Scenario: The backfill dry run measures the population without writing
-    Given stalled historical runs exist
-    When the stalled-run backfill task runs in dry-run mode
-    Then it reports how many runs would be closed
-    And no terminal event is written
+  # Closing them is the scenario:close-stalled-runs upgrade step:
+  # modules/scenario/specs/close-stalled-runs-step.feature.
 
   @integration
   Scenario: The backfill only selects abandoned non-terminal runs

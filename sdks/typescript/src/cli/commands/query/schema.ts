@@ -1,18 +1,14 @@
 /**
- * `langwatch query schema` — the LangWatchQL views and columns.
- *
- * The same document `langwatch chart schema` prints, on the query family it
- * belongs to: a statement run through `langwatch query` has nothing to do with
- * a saved chart, and asking about charts to learn a column name is the kind of
- * indirection an agent gets wrong. `chart schema` stays where it is, because
- * the chart skill's routing test pins its wording.
- *
+ * `langwatch query schema` — the LangWatchQL views and columns, the document
+ * `langwatch chart schema` prints, on the family it belongs to: asking about
+ * charts to learn a column name is indirection an agent gets wrong.
  * @see specs/analytics/lwql-cli-query.feature
  */
 
 import chalk from "chalk";
 
 import { QueryApiService } from "@/client-sdk/services/query/query-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
 import { formatTable } from "../../utils/formatting";
 import type { CommandResult } from "../../utils/output";
@@ -39,9 +35,7 @@ export const queryLwqlSchemaCommand = async (options?: {
       table: () => {
         for (const view of schema.views) {
           console.log();
-          console.log(
-            `  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`,
-          );
+          console.log(`  ${chalk.cyan.bold(view.name)} ${chalk.gray(`— ${view.description}`)}`);
           console.log(
             `  ${chalk.gray("Grain:")} ${view.grain}  ${chalk.gray("Time column:")} ${view.timeColumn}`,
           );

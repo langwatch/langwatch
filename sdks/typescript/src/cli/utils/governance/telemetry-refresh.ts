@@ -1,42 +1,7 @@
 /**
- * Latest login wins (#6202).
- *
- * `langwatch <tool>` persists telemetry wiring so a plain `<tool>` keeps
- * capturing: claude's env block in `~/.claude/settings.json`, codex's
- * `[otel]` block in `~/.codex/config.toml`, scoped shell functions for
- * gemini / opencode. Those persisted blocks hard-code the endpoint and
- * the ingest key of the login that wrote them, and some of them are
- * applied ON TOP of the process environment (Claude Code layers the
- * settings.json `env` block over the child env), so after logging into
- * a DIFFERENT instance a stale block silently reroutes telemetry to the
- * previous one - the wrapper's own env can't win.
- *
- * This module enforces the rule that the LATEST login wins:
- *
- *   - On login, any langwatch-authored block that points at a different
- *     endpoint than the new login is refreshed in place to the new
- *     login's endpoint + a live ingest key
- *     (`refreshTelemetryWiringForLogin`).
- *   - On every ingestion-mode wrapper run, the tool's own persisted
- *     block is re-synced value-exactly (endpoint AND key) with what the
- *     run resolved (`refreshClaudeUserTelemetryEnv`,
- *     `refreshScopedShellFunctions`; codex re-writes its [otel] block
- *     unconditionally in wrapper-mode already).
- *   - For claude the wrapper additionally maintains a project-level pin
- *     at `$CWD/.claude/settings.local.json` - the documented settings
- *     layer that outranks user-level settings - so the wrapped run can
- *     never be rerouted by user-level config at all
- *     (`ensureClaudeProjectTelemetryPin` / gateway-mode removal via
- *     `removeClaudeProjectTelemetryPin`).
- *
- * Authorship rule: refresh and removal only ever touch wiring langwatch
- * wrote. Marker-bracketed regions (codex toml, shell rc) carry explicit
- * authorship; the claude settings env block has no markers, so on top
- * of the known key set (same detection as `langwatch logout`) the
- * refresh requires the persisted values to look langwatch-shaped - a
- * `Bearer ik-lw-*` / `Bearer sk-lw-*` header or a `/api/otel` endpoint
- * (`otelWiringLooksLangwatchAuthored`). A user's own OTLP wiring (e.g.
- * a third-party collector) never matches and is never modified.
+ * Latest login wins (#6202): persisted telemetry wiring hard-codes the prior
+ * login's endpoint and key, so a stale block can silently reroute telemetry
+ * after switching logins. This module refreshes only wiring langwatch authored.
  */
 
 import { spawnSync } from "node:child_process";
@@ -45,55 +10,48 @@ import * as path from "node:path";
 
 import { normalizeEndpoint } from "../../../internal/endpoint";
 import {
-	codexGatewayBlockBaseUrl,
-	codexHasGatewayBlock,
-	codexHasOtelBlock,
-	codexOtelBlockEndpoint,
-	codexTraceEndpoint,
-	defaultCodexConfigPath,
-	displayCodexConfigPath,
-	writeCodexGatewayBlock,
-	writeCodexOtelBlock,
+  codexGatewayBlockBaseUrl,
+  codexHasGatewayBlock,
+  codexHasOtelBlock,
+  codexOtelBlockEndpoint,
+  codexTraceEndpoint,
+  defaultCodexConfigPath,
+  displayCodexConfigPath,
+  writeCodexGatewayBlock,
+  writeCodexOtelBlock,
 } from "../codex-config-toml";
 import {
-	appEnvHasAllVars,
-	appEnvHasAnyVar,
-	appEnvValues,
-	appSettingsTargetFor,
-	claudeProjectSettingsTarget,
-	installAppEnv,
-	removeAppEnvVars,
+  appEnvHasAllVars,
+  appEnvHasAnyVar,
+  appEnvValues,
+  appSettingsTargetFor,
+  claudeProjectSettingsTarget,
+  installAppEnv,
+  removeAppEnvVars,
 } from "./app-settings";
 import { readClaudePluginState } from "./claude-plugin";
 import {
-	installSessionContextHooks,
-	removeSessionContextHooks,
-} from "./session-context-hooks";
-import {
-	extractLookupIdFromToken,
-	isExpiredSession,
-	listIngestionKeys,
-	mintIngestionKey,
+  extractLookupIdFromToken,
+  isExpiredSession,
+  listIngestionKeys,
+  mintIngestionKey,
 } from "./cli-api";
+import { assertCodexAgentGuidance } from "./codex-agents-md";
 import { isIsolatedConfig, type GovernanceConfig } from "./config";
-import {
-	buildOtelEnvBlock,
-	SOURCE_TYPE_BY_TOOL,
-	telemetryEnvVarNames,
-} from "./otel-env-block";
+import { buildOtelEnvBlock, SOURCE_TYPE_BY_TOOL, telemetryEnvVarNames } from "./otel-env-block";
 import { resolvePlatformToolPolicy } from "./platform-tool-policy";
 import { runningCodeRestartNotice } from "./running-code";
-import { assertCodexAgentGuidance } from "./codex-agents-md";
+import { installSessionContextHooks, removeSessionContextHooks } from "./session-context-hooks";
 import {
-	buildScopedToolFunction,
-	type DetectedShell,
-	assertCodexTurnHarvest,
-	persistBlockToRc,
-	rcHasLangwatchBlock,
-	rcLangwatchBlockUrls,
-	rcPath,
-	tildify,
-	toolMarkers,
+  buildScopedToolFunction,
+  type DetectedShell,
+  assertCodexTurnHarvest,
+  persistBlockToRc,
+  rcHasLangwatchBlock,
+  rcLangwatchBlockUrls,
+  rcPath,
+  tildify,
+  toolMarkers,
 } from "./shell-rc";
 
 /** All rc files a scoped shell function may have been persisted to. */
@@ -104,464 +62,383 @@ const LANGWATCH_OTLP_ENDPOINT_RE = /\/api\/otel\/?$/;
 
 /** The OTLP ingestion base endpoint a control plane serves. */
 export function otlpEndpointFor(controlPlaneUrl: string): string {
-	return `${normalizeEndpoint(controlPlaneUrl)}/api/otel`;
+  return `${normalizeEndpoint(controlPlaneUrl)}/api/otel`;
 }
 
 /**
- * Whether an unmarked env map (claude settings `env` block) carries
- * langwatch-shaped OTLP wiring, i.e. wiring this CLI could have
- * written: a langwatch ingest-key bearer (`ik-lw-*` / `sk-lw-*`) or a
- * `/api/otel` endpoint. An env with NEITHER identity-bearing key
- * present is refreshable (nothing to misattribute); an env whose
- * endpoint/headers point at some other system is not ours and must
- * never be modified.
+ * Whether an unmarked env map (claude settings `env` block) carries langwatch-shaped OTLP
+ * wiring this CLI could have written. An env pointing at another system is not ours and
+ * must never be modified.
  */
-export function otelWiringLooksLangwatchAuthored(
-	env: Record<string, string>,
-): boolean {
-	const endpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT;
-	const headers = env.OTEL_EXPORTER_OTLP_HEADERS;
-	if (!endpoint && !headers) return true;
-	if (headers && LANGWATCH_BEARER_RE.test(headers)) return true;
-	if (endpoint && LANGWATCH_OTLP_ENDPOINT_RE.test(endpoint)) return true;
-	return false;
+export function otelWiringLooksLangwatchAuthored(env: Record<string, string>): boolean {
+  const endpoint = env.OTEL_EXPORTER_OTLP_ENDPOINT;
+  const headers = env.OTEL_EXPORTER_OTLP_HEADERS;
+  if (!endpoint && !headers) return true;
+  if (headers && LANGWATCH_BEARER_RE.test(headers)) return true;
+  if (endpoint && LANGWATCH_OTLP_ENDPOINT_RE.test(endpoint)) return true;
+  return false;
 }
 
 export interface IngestionKeyResolution {
-	token: string;
-	prefix?: string;
-	/** OTLP base endpoint (`<control-plane>/api/otel`). */
-	endpoint: string;
-	/** True when a fresh key was minted (vs a cached one reused). */
-	minted: boolean;
-	/**
-	 * True when the platform rejected this device's session, so the cached
-	 * key was reused without anything confirming it is still live.
-	 *
-	 * A device that cannot authenticate can neither check its key nor mint a
-	 * replacement, and the key it holds may have been revoked weeks ago. The
-	 * resolution still carries that key, because wiring the tool with a key
-	 * that may work beats wiring it with nothing, but the caller must say so
-	 * instead of reporting a working setup.
-	 */
-	sessionExpired?: boolean;
+  token: string;
+  prefix?: string;
+  /** OTLP base endpoint (`<control-plane>/api/otel`). */
+  endpoint: string;
+  /** True when a fresh key was minted (vs a cached one reused). */
+  minted: boolean;
+  /**
+   * True when the platform rejected this device's session, so the cached key was reused
+   * without confirming it is still live — wiring with a maybe-working key beats wiring
+   * with nothing, but the caller must say so instead of reporting a working setup.
+   */
+  sessionExpired?: boolean;
 }
 
 /**
- * Resolve a live personal ingest key for `sourceType`: reuse the cached
- * key when the platform confirms it is still live, otherwise mint a
- * fresh one.
- *
- * Stale-cache check (#4755): before reusing a cached key, confirm it is
- * still live on the platform. Token format: `ik-lw-{16-char lookupId}_{secret}`.
- * If the server resolves and the lookupId is absent → the key was revoked
- * (hard-cut rotation also invalidates the cache) → mint fresh. If the
- * request rejects (offline / older server without this endpoint) →
- * offline-first fallback: reuse the cache so air-gapped / degraded
- * environments still work, UNLESS the caller opted out via
- * `allowOfflineFallback: false` (see the parameter doc below).
- *
- * Pure resolution - callers persist the minted key to the config cache
- * themselves.
+ * Resolve a live personal ingest key for `sourceType`: reuse the cached key only when the
+ * platform confirms it is live, otherwise mint a fresh one (#4755); a rejected confirmation
+ * falls back to the cache unless the caller opts out via `allowOfflineFallback: false`.
  */
 export async function resolveLiveIngestionKey({
-	cfg,
-	sourceType,
-	allowOfflineFallback = true,
+  cfg,
+  sourceType,
+  allowOfflineFallback = true,
 }: {
-	cfg: GovernanceConfig;
-	sourceType: string;
-	/**
-	 * Whether a `listIngestionKeys()` failure falls back to reusing the
-	 * cached secret. Defaults to true: the per-run wrapper path wants a
-	 * disconnected device to keep working against the instance it already
-	 * has a key for (the #4755 offline-first behavior).
-	 *
-	 * The login-time wiring refresh (`refreshTelemetryWiringForLogin`) sets
-	 * this to false. It only reaches this resolver because the persisted
-	 * wiring's endpoint already differs from the login that just
-	 * completed, so the cached secret is presumptively bound to a
-	 * DIFFERENT instance. Falling back to it on a network hiccup would
-	 * pair the NEW endpoint with a token that was never valid there,
-	 * corrupting working wiring instead of leaving it alone - minting
-	 * fresh is the only outcome that can't reintroduce the #6202 hijack.
-	 */
-	allowOfflineFallback?: boolean;
+  cfg: GovernanceConfig;
+  sourceType: string;
+  /**
+   * Whether a `listIngestionKeys()` failure falls back to the cached secret.
+   * Defaults true (#4755); the login-time refresh sets it false since the
+   * cached secret there may be bound to a different instance (#6202).
+   */
+  allowOfflineFallback?: boolean;
 }): Promise<IngestionKeyResolution> {
-	const cached = cfg.default_personal_ingest_keys?.[sourceType];
-	if (cached?.secret) {
-		const cachedLookupId = extractLookupIdFromToken(cached.secret);
-		if (cachedLookupId === undefined) {
-			// Not a personal `ik-lw-` token: the user placed this credential
-			// here by hand (a project `sk-lw-` key, a legacy shape). It cannot
-			// be matched against the personal key listing, so probing it would
-			// always read "revoked" and re-mint over the user's explicit
-			// choice. Pinned: use as-is, never probe, never overwrite.
-			return {
-				token: cached.secret,
-				prefix: cached.prefix,
-				endpoint: otlpEndpointFor(cfg.control_plane_url),
-				minted: false,
-			};
-		}
-		let cacheIsLive = true; // assume live; falsified when server confirms otherwise
-		let sessionExpired = false;
-		try {
-			const liveKeys = await listIngestionKeys(cfg);
-			// Server resolved - verify the cached lookupId is still present
-			// for this sourceType.
-			const liveEntry = liveKeys.find(
-				(k) => k.sourceType === sourceType && k.lookupId === cachedLookupId,
-			);
-			if (!liveEntry) {
-				// Key was revoked or rotated on the platform - treat as no cache.
-				cacheIsLive = false;
-			}
-		} catch (error) {
-			// Network error / older server without the endpoint: reuse cache
-			// as-is (offline-first fallback - a device that is merely offline
-			// keeps exporting with the key it has) - unless the caller
-			// disabled that fallback.
-			//
-			// A session the platform rejected is not that case. Nothing about
-			// the cached key was confirmed and nothing can replace it, so the
-			// fallback still hands the key back but marks the resolution: the
-			// key may have been dead for weeks and only the caller can say so.
-			sessionExpired = isExpiredSession(error);
-			cacheIsLive = allowOfflineFallback;
-		}
-		if (cacheIsLive) {
-			return {
-				token: cached.secret,
-				prefix: cached.prefix,
-				endpoint: otlpEndpointFor(cfg.control_plane_url),
-				minted: false,
-				...(sessionExpired ? { sessionExpired: true } : {}),
-			};
-		}
-	}
-	const r = await mintIngestionKey(cfg, sourceType);
-	return {
-		token: r.token,
-		prefix: r.prefix,
-		endpoint: r.endpoint,
-		minted: true,
-	};
+  const cached = cfg.default_personal_ingest_keys?.[sourceType];
+  if (cached?.secret) {
+    const cachedLookupId = extractLookupIdFromToken(cached.secret);
+    if (cachedLookupId === undefined) {
+      // Not a personal `ik-lw-` token: the user placed this credential
+      // here by hand (a project `sk-lw-` key, a legacy shape). It cannot
+      // be matched against the personal key listing, so probing it would
+      // always read "revoked" and re-mint over the user's explicit
+      // choice. Pinned: use as-is, never probe, never overwrite.
+      return {
+        token: cached.secret,
+        prefix: cached.prefix,
+        endpoint: otlpEndpointFor(cfg.control_plane_url),
+        minted: false,
+      };
+    }
+    let cacheIsLive = true; // assume live; falsified when server confirms otherwise
+    let sessionExpired = false;
+    try {
+      const liveKeys = await listIngestionKeys(cfg);
+      // Server resolved - verify the cached lookupId is still present
+      // for this sourceType.
+      const liveEntry = liveKeys.find(
+        (k) => k.sourceType === sourceType && k.lookupId === cachedLookupId,
+      );
+      if (!liveEntry) {
+        // Key was revoked or rotated on the platform - treat as no cache.
+        cacheIsLive = false;
+      }
+    } catch (error) {
+      // Network error / older server: offline-first fallback reuses the cache
+      // unless disabled. A rejected session confirms nothing about the key, so
+      // the fallback still hands it back but marks sessionExpired so the
+      // caller can say the key may be dead rather than reporting it live.
+      sessionExpired = isExpiredSession(error);
+      cacheIsLive = allowOfflineFallback;
+    }
+    if (cacheIsLive) {
+      return {
+        token: cached.secret,
+        prefix: cached.prefix,
+        endpoint: otlpEndpointFor(cfg.control_plane_url),
+        minted: false,
+        ...(sessionExpired ? { sessionExpired: true } : {}),
+      };
+    }
+  }
+  const r = await mintIngestionKey(cfg, sourceType);
+  return {
+    token: r.token,
+    prefix: r.prefix,
+    endpoint: r.endpoint,
+    minted: true,
+  };
 }
 
 export interface IngestionCredentialResolution extends IngestionKeyResolution {
-	/** Where the credential is scoped: the personal workspace or a pinned project. */
-	scope: "personal" | "project";
-	/** Slug (preferred) or id of the pinned project; unset for pasted keys. */
-	projectLabel?: string;
+  /** Where the credential is scoped: the personal workspace or a pinned project. */
+  scope: "personal" | "project";
+  /** Slug (preferred) or id of the pinned project; unset for pasted keys. */
+  projectLabel?: string;
 }
 
 /**
- * Resolve the ingest credential for a tool: the project pin when one
- * exists (`tool_project_keys[tool]`, written by `--project` / `instrument`),
- * else the personal path via `resolveLiveIngestionKey`.
- *
- * A pinned credential is used verbatim with no server round trip: it may
- * belong to a project the device session cannot list (or the device may
- * have no session at all), and revocation surfaces on the ingest side.
- * Re-running `langwatch instrument <tool> --project ...` replaces it.
+ * Resolve the ingest credential for a tool: the project pin when one exists
+ * (`tool_project_keys[tool]`), else the personal path via `resolveLiveIngestionKey`. A pin
+ * is used verbatim with no server round trip — it may belong to a project the device can't list.
  */
 export async function resolveIngestionCredential({
-	cfg,
-	tool,
-	sourceType,
-	allowOfflineFallback = true,
+  cfg,
+  tool,
+  sourceType,
+  allowOfflineFallback = true,
 }: {
-	cfg: GovernanceConfig;
-	tool: string;
-	sourceType: string;
-	allowOfflineFallback?: boolean;
+  cfg: GovernanceConfig;
+  tool: string;
+  sourceType: string;
+  allowOfflineFallback?: boolean;
 }): Promise<IngestionCredentialResolution> {
-	const pinned = cfg.tool_project_keys?.[tool];
-	if (pinned?.secret) {
-		return {
-			token: pinned.secret,
-			endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
-			minted: false,
-			scope: "project",
-			projectLabel: pinned.project_slug ?? pinned.project_id,
-		};
-	}
-	const personal = await resolveLiveIngestionKey({
-		cfg,
-		sourceType,
-		allowOfflineFallback,
-	});
-	return { ...personal, scope: "personal" };
+  const pinned = cfg.tool_project_keys?.[tool];
+  if (pinned?.secret) {
+    return {
+      token: pinned.secret,
+      endpoint: otlpEndpointFor(pinned.endpoint ?? cfg.control_plane_url),
+      minted: false,
+      scope: "project",
+      projectLabel: pinned.project_slug ?? pinned.project_id,
+    };
+  }
+  const personal = await resolveLiveIngestionKey({
+    cfg,
+    sourceType,
+    allowOfflineFallback,
+  });
+  return { ...personal, scope: "personal" };
 }
 
 /**
- * Re-sync the langwatch-authored env block in `~/.claude/settings.json`
- * with the current run's values. Only fires when a langwatch-shaped
- * block is already present (presence = the user opted into persistence
- * on some earlier run) and its values differ. Returns the refreshed
- * target's label, or null when nothing was touched.
- *
- * Every run also re-asserts the session context seam in the same file, not only
- * the runs that rewrite the env. It is part of the wiring the persisted block
- * stands for, and the block outlived the CLI version that started writing it, so
- * a device that persisted earlier has the env and none of the seam. The seam
- * names no endpoint, so asserting it refreshes nothing to point at this login
- * and the label stays null when it was the only change.
- *
- * A device carrying the LangWatch Claude Code plugin already has those hooks
- * from the plugin, so the entries here are removed rather than asserted: wiring
- * both runs the same two hooks twice per session. This path never installs the
- * plugin, because nobody is being asked anything on a refresh.
+ * Re-sync the langwatch-authored env block in `~/.claude/settings.json`, firing only when
+ * a langwatch-shaped block is already present. Also removes (never asserts) the
+ * session-context seam when the LangWatch plugin is present, since its hooks run twice otherwise.
  */
 export function refreshClaudeUserTelemetryEnv({
-	vars,
+  vars,
 }: {
-	vars: Record<string, string>;
+  vars: Record<string, string>;
 }): string | null {
-	const target = appSettingsTargetFor("claude");
-	if (!target) return null;
-	if (!appEnvHasAnyVar(target, Object.keys(vars))) return null;
-	const current = appEnvValues(target);
-	if (!otelWiringLooksLangwatchAuthored(current)) return null;
-	try {
-		if (readClaudePluginState().pluginInstalled) {
-			removeSessionContextHooks({ tool: "claude_code" });
-		} else {
-			installSessionContextHooks({ tool: "claude_code" });
-		}
-	} catch {
-		// The env is the refresh that matters; the seam is best-effort.
-	}
-	if (appEnvHasAllVars(target, vars)) return null;
-	installAppEnv(target, vars);
-	return `claude telemetry env (${target.displayPath})`;
+  const target = appSettingsTargetFor("claude");
+  if (!target) return null;
+  const varNames = Object.keys(vars);
+  if (!appEnvHasAnyVar(target, varNames)) return null;
+  const current = appEnvValues(target);
+  if (!otelWiringLooksLangwatchAuthored(current)) return null;
+  try {
+    if (readClaudePluginState().pluginInstalled) {
+      removeSessionContextHooks({ tool: "claude_code" });
+    } else {
+      installSessionContextHooks({ tool: "claude_code" });
+    }
+  } catch {
+    // The env is the refresh that matters; the seam is best-effort.
+    void 0;
+  }
+  if (appEnvHasAllVars(target, vars)) return null;
+  installAppEnv(target, vars);
+  return `claude telemetry env (${target.displayPath})`;
 }
 
 /**
- * Re-sync the scoped `<tool>()` shell functions (gemini / opencode)
- * across every supported rc file with the current run's values. A
- * marker pair is explicit langwatch authorship, so any present block
- * whose body doesn't carry the current endpoint + Authorization header
- * is rewritten in place. Returns one label per rc file refreshed.
+ * Re-sync the scoped `<tool>()` shell functions (gemini / opencode) across every supported
+ * rc file. A marker pair is explicit langwatch authorship, so a present block whose body
+ * doesn't carry the current endpoint + Authorization header is rewritten in place.
  */
 export function refreshScopedShellFunctions({
-	tool,
-	vars,
+  tool,
+  vars,
 }: {
-	tool: string;
-	vars: Record<string, string>;
+  tool: string;
+  vars: Record<string, string>;
 }): string[] {
-	const labels: string[] = [];
-	const markers = toolMarkers(tool);
-	const requiredKeys = [
-		vars.OTEL_EXPORTER_OTLP_ENDPOINT,
-		vars.OTEL_EXPORTER_OTLP_HEADERS,
-	].filter((v): v is string => Boolean(v));
-	for (const shell of REFRESH_SHELLS) {
-		if (!rcHasLangwatchBlock({ shell, markers })) continue;
-		if (rcHasLangwatchBlock({ shell, markers, requiredKeys })) continue;
-		persistBlockToRc(
-			shell,
-			buildScopedToolFunction(tool, vars, shell),
-			markers,
-		);
-		labels.push(`${tool} shell function (${tildify(rcPath(shell))})`);
-	}
-	return labels;
+  const labels: string[] = [];
+  const markers = toolMarkers(tool);
+  const requiredKeys = [vars.OTEL_EXPORTER_OTLP_ENDPOINT, vars.OTEL_EXPORTER_OTLP_HEADERS].filter(
+    (v): v is string => Boolean(v),
+  );
+  for (const shell of REFRESH_SHELLS) {
+    if (!rcHasLangwatchBlock({ shell, markers })) continue;
+    if (rcHasLangwatchBlock({ shell, markers, requiredKeys })) continue;
+    persistBlockToRc(shell, buildScopedToolFunction(tool, vars, shell), markers);
+    labels.push(`${tool} shell function (${tildify(rcPath(shell))})`);
+  }
+  return labels;
 }
 
 /**
- * Re-sync the langwatch `[otel]` marker block in the codex config.toml
- * with the given endpoint + token, preserving whether the Authorization
- * header was persisted. Only fires when the block is already present.
- * Returns the refreshed target's label, or null when nothing changed.
+ * Re-sync the langwatch `[otel]` marker block in codex's config.toml with the given
+ * endpoint + token, preserving whether the Authorization header was persisted. Only
+ * fires when the block is already present.
  */
 export function refreshCodexOtelBlockTo({
-	endpoint,
-	token,
-	environment,
+  endpoint,
+  token,
+  environment,
 }: {
-	endpoint: string;
-	token: string;
-	environment: string;
+  endpoint: string;
+  token: string;
+  environment: string;
 }): string | null {
-	if (!codexHasOtelBlock(defaultCodexConfigPath())) return null;
-	const result = writeCodexOtelBlock({
-		baseEndpoint: endpoint,
-		ingestionToken: token,
-		environment,
-	});
-	// The exporters carry no conversation; the harvest recovers it, so a
-	// refresh that keeps the exporters healthy heals the harvest wiring too
-	// (idempotent and quiet while the notify block is already in place).
-	assertCodexTurnHarvest();
-	assertCodexAgentGuidance();
-	if (result.action === "unchanged") return null;
-	return `codex [otel] block (${displayCodexConfigPath()})`;
+  const codexConfigPath = defaultCodexConfigPath();
+  if (!codexHasOtelBlock(codexConfigPath)) return null;
+  const result = writeCodexOtelBlock({
+    baseEndpoint: endpoint,
+    ingestionToken: token,
+    environment,
+  });
+  // The exporters carry no conversation; the harvest recovers it, so a
+  // refresh that keeps the exporters healthy heals the harvest wiring too
+  // (idempotent and quiet while the notify block is already in place).
+  assertCodexTurnHarvest();
+  assertCodexAgentGuidance();
+  if (result.action === "unchanged") return null;
+  return `codex [otel] block (${displayCodexConfigPath()})`;
 }
 
-export type ClaudeProjectPinAction =
-	| "created"
-	| "updated"
-	| "unchanged"
-	| "skipped";
+export type ClaudeProjectPinAction = "created" | "updated" | "unchanged" | "skipped";
 
 export interface ClaudeProjectPinResult {
-	action: ClaudeProjectPinAction;
-	path: string;
-	displayPath: string;
+  action: ClaudeProjectPinAction;
+  path: string;
+  displayPath: string;
 }
 
 /**
- * Write (or re-sync) the langwatch telemetry env into the working
- * directory's `.claude/settings.local.json`. Claude Code applies local
- * project settings ABOVE user-level `~/.claude/settings.json`, so this
- * pin guarantees a wrapped run emits to the login that spawned it even
- * when user-level config carries wiring we may not touch. `skipped`
- * means the project file already carries OTLP wiring that is not
- * langwatch-shaped - explicit project config the user owns wins.
- *
- * On first creation the file is also added to the repo's
- * `.git/info/exclude` (best-effort): it carries a write-only ingest key
- * and must not get committed.
+ * Write (or re-sync) telemetry env into `.claude/settings.local.json`, which Claude Code
+ * applies above user-level settings so a wrapped run always emits to the login that spawned
+ * it. `skipped` means the file already carries non-langwatch OTLP wiring the user owns.
  */
 export function ensureClaudeProjectTelemetryPin({
-	vars,
-	cwd,
+  vars,
+  cwd,
 }: {
-	vars: Record<string, string>;
-	cwd: string;
+  vars: Record<string, string>;
+  cwd: string;
 }): ClaudeProjectPinResult {
-	const target = claudeProjectSettingsTarget(cwd);
-	const base = { path: target.path, displayPath: target.displayPath };
-	if (appEnvHasAllVars(target, vars)) return { action: "unchanged", ...base };
-	const current = appEnvValues(target);
-	const hasOwnedKey = Object.keys(vars).some((k) => k in current);
-	if (hasOwnedKey && !otelWiringLooksLangwatchAuthored(current)) {
-		return { action: "skipped", ...base };
-	}
-	const existedBefore = fs.existsSync(target.path);
-	installAppEnv(target, vars);
-	if (!existedBefore) excludeClaudeLocalSettingsFromGit(cwd);
-	return { action: existedBefore ? "updated" : "created", ...base };
+  const target = claudeProjectSettingsTarget(cwd);
+  const base = { path: target.path, displayPath: target.displayPath };
+  if (appEnvHasAllVars(target, vars)) return { action: "unchanged", ...base };
+  const current = appEnvValues(target);
+  const hasOwnedKey = Object.keys(vars).some((k) => k in current);
+  if (hasOwnedKey && !otelWiringLooksLangwatchAuthored(current)) {
+    return { action: "skipped", ...base };
+  }
+  const existedBefore = fs.existsSync(target.path);
+  installAppEnv(target, vars);
+  if (!existedBefore) excludeClaudeLocalSettingsFromGit(cwd);
+  return { action: existedBefore ? "updated" : "created", ...base };
 }
 
 /**
- * Strip the langwatch telemetry env from the working directory's
- * `.claude/settings.local.json`, when present and langwatch-shaped.
- * Used by gateway-mode wrapper runs (gateway capture + a live OTel
- * exporter would double-trace) and by `langwatch logout` for the
- * current directory. Deletes the file (and an empty `.claude` dir)
- * when stripping leaves it empty. Returns true when something was
- * removed.
+ * Strip the langwatch telemetry env from `.claude/settings.local.json` when present and
+ * langwatch-shaped. Used by gateway-mode wrapper runs (capture + a live exporter would
+ * double-trace) and by `langwatch logout`. Deletes the file (and empty `.claude` dir) when empty.
  */
-export function removeClaudeProjectTelemetryPin({
-	cwd,
-}: {
-	cwd: string;
-}): boolean {
-	const target = claudeProjectSettingsTarget(cwd);
-	const keys = telemetryEnvVarNames("claude");
-	if (!appEnvHasAnyVar(target, keys)) return false;
-	if (!otelWiringLooksLangwatchAuthored(appEnvValues(target))) return false;
-	const changed = removeAppEnvVars(target, keys);
-	if (changed) removeSettingsFileIfEmpty(target.path);
-	return changed;
+export function removeClaudeProjectTelemetryPin({ cwd }: { cwd: string }): boolean {
+  const target = claudeProjectSettingsTarget(cwd);
+  const keys = telemetryEnvVarNames("claude");
+  if (!appEnvHasAnyVar(target, keys)) return false;
+  const envValues = appEnvValues(target);
+  if (!otelWiringLooksLangwatchAuthored(envValues)) return false;
+  const changed = removeAppEnvVars(target, keys);
+  if (changed) removeSettingsFileIfEmpty(target.path);
+  return changed;
 }
 
 function removeSettingsFileIfEmpty(filePath: string): void {
-	try {
-		const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
-		const isEmptyObject =
-			parsed !== null &&
-			typeof parsed === "object" &&
-			!Array.isArray(parsed) &&
-			Object.keys(parsed).length === 0;
-		if (!isEmptyObject) return;
-		fs.unlinkSync(filePath);
-		fs.rmdirSync(path.dirname(filePath)); // only succeeds when .claude is empty
-	} catch {
-		// A leftover `{}` file or a non-empty .claude dir is harmless.
-	}
+  try {
+    const parsed = JSON.parse(fs.readFileSync(filePath, "utf8")) as unknown;
+    const isEmptyObject =
+      parsed !== null &&
+      typeof parsed === "object" &&
+      !Array.isArray(parsed) &&
+      Object.keys(parsed).length === 0;
+    if (!isEmptyObject) return;
+    fs.unlinkSync(filePath);
+    fs.rmdirSync(path.dirname(filePath)); // only succeeds when .claude is empty
+  } catch {
+    // A leftover `{}` file or a non-empty .claude dir is harmless.
+    void 0;
+  }
 }
 
 /**
- * Best-effort: keep the pin (which carries an ingest key) out of the
- * repo's history via `.git/info/exclude` - local-only, never committed,
- * and the same mechanism Claude Code uses for this file. Resolves the
- * common git dir so worktrees share the exclusion. Silently does
- * nothing outside a git repo or without git on PATH.
+ * Best-effort: keep the pin (it carries an ingest key) out of history via
+ * `.git/info/exclude` — local-only, the same mechanism Claude Code uses for this file.
+ * Resolves the common git dir so worktrees share it; no-ops outside a repo or without git.
  */
 function excludeClaudeLocalSettingsFromGit(cwd: string): void {
-	try {
-		const probe = spawnSync("git", ["rev-parse", "--git-common-dir"], {
-			cwd,
-			encoding: "utf8",
-			timeout: 2000,
-		});
-		if (probe.status !== 0 || typeof probe.stdout !== "string") return;
-		const gitCommonDir = path.resolve(cwd, probe.stdout.trim());
-		const excludePath = path.join(gitCommonDir, "info", "exclude");
-		const line = "**/.claude/settings.local.json";
-		let existing = "";
-		try {
-			existing = fs.readFileSync(excludePath, "utf8");
-		} catch {
-			// ENOENT - created below.
-		}
-		if (existing.split("\n").some((l) => l.trim() === line)) return;
-		fs.mkdirSync(path.dirname(excludePath), { recursive: true });
-		const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
-		fs.writeFileSync(excludePath, `${existing}${sep}${line}\n`);
-	} catch {
-		// The pin still works untracked; excluding it is a courtesy.
-	}
+  try {
+    const probe = spawnSync("git", ["rev-parse", "--git-common-dir"], {
+      cwd,
+      encoding: "utf8",
+      timeout: 2000,
+    });
+    if (probe.status !== 0 || typeof probe.stdout !== "string") return;
+    const gitCommonDir = path.resolve(cwd, probe.stdout.trim());
+    const excludePath = path.join(gitCommonDir, "info", "exclude");
+    const line = "**/.claude/settings.local.json";
+    let existing = "";
+    try {
+      existing = fs.readFileSync(excludePath, "utf8");
+    } catch {
+      // ENOENT - created below.
+      void 0;
+    }
+    const existingLines = existing.split("\n");
+    for (const l of existingLines) {
+      if (l.trim() === line) return;
+    }
+    fs.mkdirSync(path.dirname(excludePath), { recursive: true });
+    const sep = existing.length === 0 || existing.endsWith("\n") ? "" : "\n";
+    fs.writeFileSync(excludePath, `${existing}${sep}${line}\n`);
+  } catch {
+    // The pin still works untracked; excluding it is a courtesy.
+    void 0;
+  }
 }
 
 function claudeUserWiringNeedsRefresh(expectedEndpoint: string): boolean {
-	const target = appSettingsTargetFor("claude");
-	if (!target) return false;
-	if (!appEnvHasAnyVar(target, telemetryEnvVarNames("claude"))) return false;
-	const current = appEnvValues(target);
-	if (!otelWiringLooksLangwatchAuthored(current)) return false;
-	return current.OTEL_EXPORTER_OTLP_ENDPOINT !== expectedEndpoint;
+  const target = appSettingsTargetFor("claude");
+  if (!target) return false;
+  const claudeVarNames = telemetryEnvVarNames("claude");
+  if (!appEnvHasAnyVar(target, claudeVarNames)) return false;
+  const current = appEnvValues(target);
+  if (!otelWiringLooksLangwatchAuthored(current)) return false;
+  return current.OTEL_EXPORTER_OTLP_ENDPOINT !== expectedEndpoint;
 }
 
 function codexOtelWiringNeedsRefresh(expectedEndpoint: string): boolean {
-	const configPath = defaultCodexConfigPath();
-	if (!codexHasOtelBlock(configPath)) return false;
-	return (
-		codexOtelBlockEndpoint(configPath) !== codexTraceEndpoint(expectedEndpoint)
-	);
+  const configPath = defaultCodexConfigPath();
+  if (!codexHasOtelBlock(configPath)) return false;
+  return codexOtelBlockEndpoint(configPath) !== codexTraceEndpoint(expectedEndpoint);
 }
 
-function scopedShellFunctionNeedsRefresh(
-	tool: string,
-	expectedEndpoint: string,
-): boolean {
-	const markers = toolMarkers(tool);
-	return REFRESH_SHELLS.some(
-		(shell) =>
-			rcHasLangwatchBlock({ shell, markers }) &&
-			!rcHasLangwatchBlock({
-				shell,
-				markers,
-				requiredKeys: [expectedEndpoint],
-			}),
-	);
+function scopedShellFunctionNeedsRefresh(tool: string, expectedEndpoint: string): boolean {
+  const markers = toolMarkers(tool);
+  return REFRESH_SHELLS.some(
+    (shell) =>
+      rcHasLangwatchBlock({ shell, markers }) &&
+      !rcHasLangwatchBlock({
+        shell,
+        markers,
+        requiredKeys: [expectedEndpoint],
+      }),
+  );
 }
 
 const LOOPBACK_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "[::1]"]);
 
 /** True for an endpoint served from this machine. Unparseable reads as not. */
 export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
-	if (!endpoint) return false;
-	try {
-		return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
-	} catch {
-		return false;
-	}
+  if (!endpoint) return false;
+  try {
+    return LOOPBACK_HOSTS.has(new URL(endpoint).hostname.toLowerCase());
+  } catch {
+    return false;
+  }
 }
 
 /**
@@ -570,226 +447,267 @@ export function isLoopbackEndpoint(endpoint: string | undefined): boolean {
  * its block is parsed and judged by its host.
  */
 function toolWiringPointsAtLoopback(tool: string): boolean {
-	if (tool === "claude") {
-		const target = appSettingsTargetFor("claude");
-		if (!target) return false;
-		return isLoopbackEndpoint(
-			appEnvValues(target).OTEL_EXPORTER_OTLP_ENDPOINT,
-		);
-	}
-	if (tool === "codex") {
-		return isLoopbackEndpoint(
-			codexOtelBlockEndpoint(defaultCodexConfigPath()) ?? undefined,
-		);
-	}
-	const markers = toolMarkers(tool);
-	return REFRESH_SHELLS.some((shell) =>
-		rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
-	);
+  if (tool === "claude") {
+    const target = appSettingsTargetFor("claude");
+    if (!target) return false;
+    return isLoopbackEndpoint(appEnvValues(target).OTEL_EXPORTER_OTLP_ENDPOINT);
+  }
+  if (tool === "codex") {
+    return isLoopbackEndpoint(codexOtelBlockEndpoint(defaultCodexConfigPath()) ?? undefined);
+  }
+  const markers = toolMarkers(tool);
+  return REFRESH_SHELLS.some((shell) =>
+    rcLangwatchBlockUrls({ shell, markers }).some(isLoopbackEndpoint),
+  );
 }
 
-function toolWiringNeedsLoginRefresh(
-	tool: string,
-	expectedEndpoint: string,
-): boolean {
-	if (tool === "claude") return claudeUserWiringNeedsRefresh(expectedEndpoint);
-	if (tool === "codex") return codexOtelWiringNeedsRefresh(expectedEndpoint);
-	return scopedShellFunctionNeedsRefresh(tool, expectedEndpoint);
+/** A tool whose wiring reports to another deployment, which a local login keeps. */
+function keepsWiringForLoopback(tool: string, expectedEndpoint: string): boolean {
+  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
+  return !toolWiringPointsAtLoopback(tool);
+}
+
+function toolWiringNeedsLoginRefresh(tool: string, expectedEndpoint: string): boolean {
+  if (tool === "claude") return claudeUserWiringNeedsRefresh(expectedEndpoint);
+  if (tool === "codex") return codexOtelWiringNeedsRefresh(expectedEndpoint);
+  return scopedShellFunctionNeedsRefresh(tool, expectedEndpoint);
 }
 
 export interface LoginTelemetryRefreshResult {
-	/** One human-readable label per persisted target that was refreshed. */
-	labels: string[];
-	/**
-	 * True when a fresh ingest key was minted (and stored on
-	 * cfg.default_personal_ingest_keys) - the caller should saveConfig.
-	 */
-	mintedAny: boolean;
-	/** Restart advice when a live launcher predates successfully changed wiring. */
-	warnings?: string[];
-	/**
-	 * Tools whose wiring points at another instance and was left alone, with
-	 * the reason: this login lives in a config of its own, or it is a login on
-	 * this machine and the wiring reports to a deployment elsewhere.
-	 */
-	kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
+  /** One human-readable label per persisted target that was refreshed. */
+  labels: string[];
+  /**
+   * True when a fresh ingest key was minted (and stored on
+   * cfg.default_personal_ingest_keys) - the caller should saveConfig.
+   */
+  mintedAny: boolean;
+  /** Restart advice when a live launcher predates successfully changed wiring. */
+  warnings?: string[];
+  /**
+   * Tools whose wiring points at another instance and was left alone, with
+   * the reason: this login lives in a config of its own, or it is a login on
+   * this machine and the wiring reports to a deployment elsewhere.
+   */
+  kept?: { tools: string[]; reason: "isolated_config" | "loopback_login" };
+}
+
+function ensureCodexHooks(): void {
+  if (!codexHasOtelBlock(defaultCodexConfigPath())) return;
+  assertCodexTurnHarvest();
+  assertCodexAgentGuidance();
+}
+
+function rewriteToolWiring({
+  cfg,
+  tool,
+  key,
+  labels,
+  warnings,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  key: Awaited<ReturnType<typeof resolveLiveIngestionKey>>;
+  labels: string[];
+  warnings: string[];
+}): void {
+  const vars = buildOtelEnvBlock(tool, key.endpoint, key.token);
+  if (tool === "claude") {
+    const label = refreshClaudeUserTelemetryEnv({ vars });
+    if (label) labels.push(label);
+  } else if (tool === "codex") {
+    const label = refreshCodexOtelBlockTo({
+      endpoint: key.endpoint,
+      token: key.token,
+      environment: cfg.organization?.slug ?? "langwatch",
+    });
+    if (label) labels.push(label);
+  } else {
+    const refreshed = refreshScopedShellFunctions({ tool, vars });
+    labels.push(...refreshed);
+    if (tool === "code" && refreshed.length > 0) {
+      const notice = runningCodeRestartNotice();
+      if (notice) warnings.push(notice);
+    }
+  }
+}
+
+/** Refreshes one tool's stale wiring for the new login; true when it minted a key. */
+async function refreshToolForLogin({
+  cfg,
+  tool,
+  sourceType,
+  expectedEndpoint,
+  loopbackLogin,
+  keptForLoopback,
+  labels,
+  warnings,
+}: {
+  cfg: GovernanceConfig;
+  tool: string;
+  sourceType: string;
+  expectedEndpoint: string;
+  loopbackLogin: boolean;
+  keptForLoopback: string[];
+  labels: string[];
+  warnings: string[];
+}): Promise<boolean> {
+  if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
+    // The new org forbids direct OTLP for this tool; the wrapper
+    // surfaces that on the next run rather than login guessing.
+    return false;
+  }
+  // A login on this machine leaves a tool that reports elsewhere wholly
+  // alone: the hook names this CLI's own path, which is no business of a
+  // config file this login does not take over.
+  if (loopbackLogin && keepsWiringForLoopback(tool, expectedEndpoint)) {
+    keptForLoopback.push(tool);
+    return false;
+  }
+  // codex's notify hook recovers the conversation, and its guidance tells a session to
+  // declare the checkout it moved to. Neither names an endpoint or a key, so both stand
+  // ahead of the pin check — a pinned codex needs them exactly as a personal one does.
+  // A config already pointing at this login skips the refresh below, so a device whose
+  // [otel] block predates either would never be given one; both calls are idempotent.
+  if (tool === "codex") ensureCodexHooks();
+  if (cfg.tool_project_keys?.[tool]?.secret) {
+    // Project-pinned wiring is deliberate scope, not stale personal
+    // wiring; a new login never re-points it at the personal path.
+    return false;
+  }
+  if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) return false;
+  // allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
+  // This caller only gets here because the persisted endpoint
+  // already differs from the new login, so a network hiccup must
+  // mint fresh rather than reuse a secret bound to the old instance.
+  const key = await resolveLiveIngestionKey({
+    cfg,
+    sourceType,
+    allowOfflineFallback: false,
+  });
+  if (key.minted) {
+    cfg.default_personal_ingest_keys = {
+      ...cfg.default_personal_ingest_keys,
+      [sourceType]: { secret: key.token, prefix: key.prefix },
+    };
+  }
+  try {
+    rewriteToolWiring({ cfg, tool, key, labels, warnings });
+  } catch {
+    // Best-effort per tool: the key minted above stays cached.
+    void 0;
+  }
+  return key.minted;
 }
 
 /**
- * Login-time half of latest-login-wins: walk every tool's persisted
- * wiring and refresh any langwatch-authored block whose ENDPOINT
- * differs from the login's control plane, minting (or reusing) a live
- * ingest key on the new instance for each. A block already pointing at
- * this instance is left alone here - key-level drift is re-synced
- * value-exactly by the next wrapper run, which resolves a key anyway.
- *
- * Two logins never take the wiring over, and both are reported in `kept`:
- *
- *   - a login in a config of its own (`isIsolatedConfig`). The wiring under
- *     the home belongs to the home's default config, so nothing under the
- *     home is read for rewriting, minted for, or written.
- *   - a login on this machine (localhost) while the wiring reports to a
- *     deployment elsewhere. A local stack comes and goes, and taking the
- *     wiring silently would drop the telemetry of every plain tool run once
- *     it stops. Running `langwatch <tool>` on that login is the explicit way
- *     to move a tool over. Wiring that already reports to this machine is
- *     refreshed as usual, which is what a self-hosted install on localhost
- *     needs when its port changes.
- *
- * Wholly best-effort: per-tool failures (no personal workspace yet,
- * network) skip that tool; the login itself never fails on refresh.
- * Mutates `cfg.default_personal_ingest_keys` for minted keys; the
- * caller persists.
+ * Path A: the codex gateway provider block pins the gateway URL of the login
+ * that wrote it. Re-sync it with this login's gateway URL when present.
+ */
+function resyncCodexGatewayBlock({
+  cfg,
+  loopbackLogin,
+  keptForLoopback,
+  labels,
+}: {
+  cfg: GovernanceConfig;
+  loopbackLogin: boolean;
+  keptForLoopback: string[];
+  labels: string[];
+}): void {
+  try {
+    const codexConfigPath = defaultCodexConfigPath();
+    const keepsGatewayBlock =
+      loopbackLogin && !isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined);
+    if (!codexHasGatewayBlock(codexConfigPath)) {
+      // Nothing to re-sync.
+    } else if (keepsGatewayBlock) {
+      if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
+    } else {
+      const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
+      if (result.action !== "unchanged") {
+        labels.push(`codex gateway block (${displayCodexConfigPath()})`);
+      }
+    }
+  } catch {
+    // Best-effort, same as the per-tool refresh.
+    void 0;
+  }
+}
+
+/**
+ * Login-time half of latest-login-wins: refresh any langwatch-authored block whose endpoint
+ * differs from the new control plane; a block already pointing here is left for the next
+ * wrapper run to re-sync. Best-effort — per-tool failures skip that tool, never the login.
  */
 export async function refreshTelemetryWiringForLogin(
-	cfg: GovernanceConfig,
+  cfg: GovernanceConfig,
 ): Promise<LoginTelemetryRefreshResult> {
-	const labels: string[] = [];
-	let mintedAny = false;
-	const warnings: string[] = [];
-	const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
+  const labels: string[] = [];
+  let mintedAny = false;
+  const warnings: string[] = [];
+  const expectedEndpoint = otlpEndpointFor(cfg.control_plane_url);
 
-	if (isIsolatedConfig()) {
-		const tools = Object.keys(SOURCE_TYPE_BY_TOOL).filter((tool) => {
-			try {
-				return toolWiringNeedsLoginRefresh(tool, expectedEndpoint);
-			} catch {
-				return false;
-			}
-		});
-		return {
-			labels,
-			mintedAny,
-			...(tools.length > 0
-				? { kept: { tools, reason: "isolated_config" as const } }
-				: {}),
-		};
-	}
+  if (isIsolatedConfig()) {
+    const tools = Object.keys(SOURCE_TYPE_BY_TOOL).filter((tool) => {
+      try {
+        return toolWiringNeedsLoginRefresh(tool, expectedEndpoint);
+      } catch {
+        return false;
+      }
+    });
+    return {
+      labels,
+      mintedAny,
+      ...(tools.length > 0 ? { kept: { tools, reason: "isolated_config" as const } } : {}),
+    };
+  }
 
-	const loopbackLogin = isLoopbackEndpoint(expectedEndpoint);
-	const keptForLoopback: string[] = [];
+  const loopbackLogin = isLoopbackEndpoint(expectedEndpoint);
+  const keptForLoopback: string[] = [];
 
-	for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
-		try {
-			if (!resolvePlatformToolPolicy(tool, cfg.tool_policies).allowOtelDirect) {
-				// The new org forbids direct OTLP for this tool; the wrapper
-				// surfaces that on the next run rather than login guessing.
-				continue;
-			}
-			// A login on this machine leaves a tool that reports elsewhere
-			// wholly alone, the codex hook and guidance below included: the
-			// hook names this CLI's own path, which is no business of a config
-			// file this login does not take over.
-			if (
-				loopbackLogin &&
-				toolWiringNeedsLoginRefresh(tool, expectedEndpoint) &&
-				!toolWiringPointsAtLoopback(tool)
-			) {
-				keptForLoopback.push(tool);
-				continue;
-			}
-			// codex's notify hook is what recovers the conversation, and the
-			// guidance beside it is what tells a session to declare the checkout
-			// it moved to. Neither names an endpoint or a key, so both stand
-			// ahead of the pin check: a pinned codex needs them exactly as a
-			// personal one does, and only the mint and the rewiring below are a
-			// pin's to refuse. A config already pointing at this login skips the
-			// refresh below, so a device whose [otel] block predates either would
-			// never be given one. Idempotent and quiet when they are in place.
-			if (tool === "codex" && codexHasOtelBlock(defaultCodexConfigPath())) {
-				assertCodexTurnHarvest();
-				assertCodexAgentGuidance();
-			}
-			if (cfg.tool_project_keys?.[tool]?.secret) {
-				// Project-pinned wiring is deliberate scope, not stale personal
-				// wiring; a new login never re-points it at the personal path.
-				continue;
-			}
-			if (!toolWiringNeedsLoginRefresh(tool, expectedEndpoint)) continue;
-			// allowOfflineFallback: false - see resolveLiveIngestionKey's doc.
-			// This caller only gets here because the persisted endpoint
-			// already differs from the new login, so a network hiccup must
-			// mint fresh rather than reuse a secret bound to the old instance.
-			const key = await resolveLiveIngestionKey({
-				cfg,
-				sourceType,
-				allowOfflineFallback: false,
-			});
-			if (key.minted) {
-				cfg.default_personal_ingest_keys = {
-					...(cfg.default_personal_ingest_keys ?? {}),
-					[sourceType]: { secret: key.token, prefix: key.prefix },
-				};
-				mintedAny = true;
-			}
-			const vars = buildOtelEnvBlock(tool, key.endpoint, key.token);
-			if (tool === "claude") {
-				const label = refreshClaudeUserTelemetryEnv({ vars });
-				if (label) labels.push(label);
-			} else if (tool === "codex") {
-				const label = refreshCodexOtelBlockTo({
-					endpoint: key.endpoint,
-					token: key.token,
-					environment: cfg.organization?.slug ?? "langwatch",
-				});
-				if (label) labels.push(label);
-			} else {
-				const refreshed = refreshScopedShellFunctions({ tool, vars });
-				labels.push(...refreshed);
-				if (tool === "code" && refreshed.length > 0) {
-					const notice = runningCodeRestartNotice();
-					if (notice) warnings.push(notice);
-				}
-			}
-		} catch {
-			// Best-effort per tool: one failed mint must not block the login
-			// or the other tools' refreshes.
-		}
-	}
+  for (const [tool, sourceType] of Object.entries(SOURCE_TYPE_BY_TOOL)) {
+    try {
+      const minted = await refreshToolForLogin({
+        cfg,
+        tool,
+        sourceType,
+        expectedEndpoint,
+        loopbackLogin,
+        keptForLoopback,
+        labels,
+        warnings,
+      });
+      if (minted) mintedAny = true;
+    } catch {
+      // Best-effort per tool: one failed mint must not block the login
+      // or the other tools' refreshes.
+      void 0;
+    }
+  }
 
-	// Path A: the codex gateway provider block pins the gateway URL of
-	// the login that wrote it. Re-sync it with this login's gateway URL
-	// when present - no ingest key involved.
-	try {
-		if (
-			loopbackLogin &&
-			codexHasGatewayBlock(defaultCodexConfigPath()) &&
-			!isLoopbackEndpoint(codexGatewayBlockBaseUrl() ?? undefined)
-		) {
-			if (!keptForLoopback.includes("codex")) keptForLoopback.push("codex");
-		} else if (codexHasGatewayBlock(defaultCodexConfigPath())) {
-			const result = writeCodexGatewayBlock({ gatewayUrl: cfg.gateway_url });
-			if (result.action !== "unchanged") {
-				labels.push(`codex gateway block (${displayCodexConfigPath()})`);
-			}
-		}
-	} catch {
-		// Best-effort, same as above.
-	}
+  resyncCodexGatewayBlock({ cfg, loopbackLogin, keptForLoopback, labels });
 
-	return {
-		labels,
-		mintedAny,
-		...(warnings.length > 0 ? { warnings } : {}),
-		...(keptForLoopback.length > 0
-			? { kept: { tools: keptForLoopback, reason: "loopback_login" as const } }
-			: {}),
-	};
+  return {
+    labels,
+    mintedAny,
+    ...(warnings.length > 0 ? { warnings } : {}),
+    ...(keptForLoopback.length > 0
+      ? { kept: { tools: keptForLoopback, reason: "loopback_login" as const } }
+      : {}),
+  };
 }
 
 /** The lines the login prints for wiring it left alone. Exported for tests. */
-export function keptWiringLines(
-	kept: NonNullable<LoginTelemetryRefreshResult["kept"]>,
-): string[] {
-	const tools = kept.tools.join(", ");
-	if (kept.reason === "isolated_config") {
-		return [
-			`Left the wiring of ${tools} as it is: this login lives in its own config file (LANGWATCH_CLI_CONFIG), so it is not this machine's login.`,
-		];
-	}
-	const example = kept.tools[0] ?? "claude";
-	return [
-		`Left the wiring of ${tools} as it is: it reports to another LangWatch, and a login on this machine does not take it over.`,
-		`To report to this one instead, run the tool through it once: langwatch ${example}`,
-	];
+export function keptWiringLines(kept: NonNullable<LoginTelemetryRefreshResult["kept"]>): string[] {
+  const tools = kept.tools.join(", ");
+  if (kept.reason === "isolated_config") {
+    return [
+      `Left the wiring of ${tools} as it is: this login lives in its own config file (LANGWATCH_CLI_CONFIG), so it is not this machine's login.`,
+    ];
+  }
+  const example = kept.tools[0] ?? "claude";
+  return [
+    `Left the wiring of ${tools} as it is: it reports to another LangWatch, and a login on this machine does not take it over.`,
+    `To report to this one instead, run the tool through it once: langwatch ${example}`,
+  ];
 }

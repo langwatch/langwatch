@@ -170,6 +170,10 @@ const (
 	// Either the token leaked, or the install was rebuilt and an operator has
 	// to reset the binding.
 	ErrConnectWrongInstance = herr.Code("connect_wrong_instance")
+	// ErrConnectCredentialPending means the license authenticated but its
+	// managed key is still being provisioned. It is not a refusal: a retry a
+	// few seconds later succeeds, so the gateway never remembers it.
+	ErrConnectCredentialPending = herr.Code("connect_credential_pending")
 	// ErrConnectServiceNotEntitled means the license authenticated but does
 	// not include the hosted service the call needs. Distinct from every
 	// refusal above: the license is live and its other services keep working,

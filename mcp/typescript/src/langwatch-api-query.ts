@@ -1,18 +1,11 @@
 /**
- * The query family: the analytics SQL door and the reference that describes
- * both query languages.
- *
- * The reference is what replaced `schemas/filter-fields.ts`, a hand-copied list
- * of 24 filter field names that lived in this package and drifted: it named
- * fields the platform had renamed and missed the ones the Trace Explorer had
- * gained, and nothing could catch that because there was nothing to compare it
- * against. Fetching it means this server cannot describe a field the platform
- * does not have.
- *
+ * The query family: the analytics SQL door and the reference describing both query languages.
+ * Fetched, replacing a hand-copied field list that drifted, so this server cannot describe a
+ * missing field.
  * @see specs/mcp-server/schema-discovery.feature
  */
 
-import { makeRequest } from "./langwatch-api.js";
+import { makeRequest } from "./langwatch-api.ts";
 
 /** One column of a query result. */
 export interface QueryResultColumn {
@@ -117,8 +110,5 @@ export async function runQuery(params: {
 
 /** Reads the query reference: both languages, their fields and worked examples. */
 export async function getQueryReference(): Promise<QueryReferenceResponse> {
-  return makeRequest(
-    "GET",
-    "/api/v1/query/reference",
-  ) as Promise<QueryReferenceResponse>;
+  return makeRequest("GET", "/api/v1/query/reference") as Promise<QueryReferenceResponse>;
 }

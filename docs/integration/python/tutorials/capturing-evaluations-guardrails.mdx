@@ -47,7 +47,7 @@ def process_request(user_query: str):
         label="Good",
         details="Reviewed by Jane Doe. Response is clear and relevant."
     )
-    
+
     # Example 3: A client-side guardrail check
     is_safe = not ("unsafe_word" in response_text)
     langwatch.get_current_span().add_evaluation(
@@ -116,7 +116,7 @@ def handle_rag_query(user_query: str):
     eval_data = BasicEvaluateData(
         input=user_query,
         output=llm_output,
-        contexts=retrieved_contexts_str 
+        contexts=retrieved_contexts_str
     )
 
     # Trigger a server-side "faithfulness" evaluation
@@ -127,7 +127,7 @@ def handle_rag_query(user_query: str):
             name="Faithfulness Check (Server)",
             data=eval_data,
         )
-        
+
         print(f"Faithfulness Evaluation Result: {faithfulness_result}")
         # faithfulness_result is an EvaluationResultModel(status, passed, score, details, etc.)
 
@@ -212,15 +212,18 @@ if is_too_long:
     # Take action: truncate response, ask for shorter output, etc.
     return llm_response[:1000] + "..."
 ```
+
 For client-side guardrails added with `add_evaluation`, your code is fully responsible for interpreting the `passed` status and handling any errors during the local check.
 
 ## How Evaluations and Guardrails Appear in LangWatch
 
 Both client-side and server-side evaluations (including those marked as guardrails) are logged as spans in LangWatch.
+
 - `add_evaluation`: Creates a child span of type `evaluation` (or `guardrail` if `is_guardrail=True`).
 - `evaluate`/`async_evaluate`: Also create a child span of type `evaluation` (or `guardrail` if `as_guardrail=True`).
 
 These spans will contain the evaluation's name, result (score, passed, label), details, cost, and any associated metadata, typically within their `output` attribute. This allows you to:
+
 - See a history of all evaluation outcomes.
 - Filter traces by evaluation results.
 - Analyze the performance of different evaluators or guardrails.
@@ -229,13 +232,13 @@ These spans will contain the evaluation's name, result (score, passed, label), d
 ## Use Cases
 
 - **Quality Assurance**:
-    - **Client-Side**: Log scores from a custom heuristic checking for politeness in responses.
-    - **Server-Side**: Trigger a managed ["Toxicity" evaluator](/evaluations/evaluators/list) on LLM outputs, or use more open-ended approaches like an [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge) for tasks without predefined correct answers.
+  - **Client-Side**: Log scores from a custom heuristic checking for politeness in responses.
+  - **Server-Side**: Trigger a managed ["Toxicity" evaluator](/evaluations/evaluators/list) on LLM outputs, or use more open-ended approaches like an [LLM-as-a-judge](/evaluations/experiments/ui/llm-as-a-judge) for tasks without predefined correct answers.
 - **Compliance & Safety**:
-    - **Client-Side Guardrail**: Perform a regex check for forbidden words and log it with `is_guardrail=True`.
-    - **Server-Side Guardrail**: Use a managed ["PII Detection" evaluator](/evaluations/evaluators/list) with `as_guardrail=True` to decide if a response can be shown.
+  - **Client-Side Guardrail**: Perform a regex check for forbidden words and log it with `is_guardrail=True`.
+  - **Server-Side Guardrail**: Use a managed ["PII Detection" evaluator](/evaluations/evaluators/list) with `as_guardrail=True` to decide if a response can be shown.
 - **Performance Monitoring**:
-    - **Client-Side**: Log human feedback scores (`add_evaluation`) for helpfulness.
-    - **Server-Side**: Evaluate RAG system outputs for ["Context Relevancy" and "Faithfulness"](/evaluations/evaluators/list) using managed evaluators.
+  - **Client-Side**: Log human feedback scores (`add_evaluation`) for helpfulness.
+  - **Server-Side**: Evaluate RAG system outputs for ["Context Relevancy" and "Faithfulness"](/evaluations/evaluators/list) using managed evaluators.
 - **A/B Testing**: Log custom metrics or trigger standard evaluations for different model versions or prompts to compare their performance.
 - **Feedback Integration**: `add_evaluation` can be used to pipe scores from an external human review platform directly into the relevant trace.

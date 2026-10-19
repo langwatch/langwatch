@@ -1,0 +1,112 @@
+import type { AggregateSearchResult } from "@langwatch/ops-contract";
+
+import {
+  EventExplorerRepository,
+  type AggregateDiscoveryRow,
+  type RawEventRow,
+} from "../event-explorer.repository.ts";
+import type { MemoryEventRow, MemoryOpsStore } from "./memory.ops.store.ts";
+
+/**
+ * The event-log explorer over the in-memory log: the same grouping, the same
+ * contains-match on an aggregate id and the same newest-first event page the
+ * stored rows answer with.
+ */
+export class MemoryEventExplorerRepository extends EventExplorerRepository {
+  static create({ store }: { store: MemoryOpsStore }): MemoryEventExplorerRepository {
+    return new MemoryEventExplorerRepository(store);
+  }
+
+  private constructor(private readonly store: MemoryOpsStore) {
+    super();
+  }
+
+  // Arrow instance properties, not prototype methods: EventExplorerRepository
+  // declares these as properties (a test mock can assert on them without an
+  // unbound extraction), and a subclass must match that shape.
+  findAggregates = async ({
+    aggregateTypes,
+    sinceMs,
+    tenantIds,
+  }: {
+    aggregateTypes: string[];
+    sinceMs: number;
+    tenantIds?: string[];
+  }): Promise<AggregateDiscoveryRow[]> => {
+    const counted = new Map<string, { row: MemoryEventRow; ids: Set<string> }>();
+
+    for (const row of this.#within({ sinceMs, tenantIds })) {
+      if (aggregateTypes.length > 0 && !aggregateTypes.includes(row.aggregateType)) continue;
+      const key = `${row.aggregateType}\0${row.tenantId}`;
+      const group = counted.get(key) ?? { row, ids: new Set<string>() };
+      group.ids.add(row.aggregateId);
+      counted.set(key, group);
+    }
+
+    return [...counted.values()].map(({ row, ids }) => ({
+      aggregateType: row.aggregateType,
+      tenantId: row.tenantId,
+      aggregateCount: ids.size,
+    }));
+  };
+
+  searchAggregates = async ({
+    query,
+    tenantIds,
+    sinceMs,
+  }: {
+    query: string;
+    tenantIds?: string[];
+    sinceMs?: number;
+  }): Promise<AggregateSearchResult[]> => {
+    const term = query.trim().toLowerCase();
+    const matched = new Map<string, AggregateSearchResult>();
+
+    for (const row of this.#within({ sinceMs: sinceMs ?? 0, tenantIds })) {
+      if (term !== "" && !row.aggregateId.toLowerCase().includes(term)) continue;
+      const seen = matched.get(row.aggregateId);
+      matched.set(row.aggregateId, {
+        aggregateId: row.aggregateId,
+        aggregateType: row.aggregateType,
+        tenantId: row.tenantId,
+        eventCount: (seen?.eventCount ?? 0) + 1,
+        lastEventTime:
+          seen === undefined || seen.lastEventTime < row.eventTimestamp
+            ? row.eventTimestamp
+            : seen.lastEventTime,
+      });
+    }
+
+    return [...matched.values()];
+  };
+
+  findEventsByAggregate = async ({
+    aggregateId,
+    tenantId,
+    limit,
+  }: {
+    aggregateId: string;
+    tenantId: string;
+    limit: number;
+  }): Promise<RawEventRow[]> => {
+    return this.store.events
+      .filter((row) => row.aggregateId === aggregateId && row.tenantId === tenantId)
+      .toSorted((left, right) => right.occurredAtMs - left.occurredAtMs)
+      .slice(0, limit)
+      .map(({ eventId, eventType, eventTimestamp, payload }) => ({
+        eventId,
+        eventType,
+        eventTimestamp,
+        payload,
+      }));
+  };
+
+  /** Every stored event inside the window and the tenants asked for. */
+  #within({ sinceMs, tenantIds }: { sinceMs: number; tenantIds?: string[] }): MemoryEventRow[] {
+    return this.store.events.filter(
+      (row) =>
+        row.occurredAtMs >= sinceMs &&
+        (tenantIds === undefined || tenantIds.length === 0 || tenantIds.includes(row.tenantId)),
+    );
+  }
+}

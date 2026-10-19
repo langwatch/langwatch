@@ -85,17 +85,33 @@ You can ask up to ten questions per run, all of the same text. Put each `--crite
 
 ```json
 [
-  { "id": "annoyed", "kind": "boolean", "instructions": "the customer sounds annoyed",
-    "criteria": ["sarcasm, repetition or a raised voice count", "a calm complaint does not count"] },
-  { "id": "apologised", "kind": "boolean", "instructions": "the agent apologised", "threshold": 0.8 },
-  { "id": "satisfaction", "kind": "score",
+  {
+    "id": "annoyed",
+    "kind": "boolean",
+    "instructions": "the customer sounds annoyed",
+    "criteria": ["sarcasm, repetition or a raised voice count", "a calm complaint does not count"]
+  },
+  {
+    "id": "apologised",
+    "kind": "boolean",
+    "instructions": "the agent apologised",
+    "threshold": 0.8
+  },
+  {
+    "id": "satisfaction",
+    "kind": "score",
     "instructions": "How satisfied is the customer, from 1 for angry to 5 for delighted",
-    "range": { "min": 1, "max": 5 } },
-  { "id": "intent", "kind": "category", "instructions": "what is the customer asking for",
+    "range": { "min": 1, "max": 5 }
+  },
+  {
+    "id": "intent",
+    "kind": "category",
+    "instructions": "what is the customer asking for",
     "options": [
       { "name": "refund", "description": "wants money back" },
       { "name": "bug", "description": "reports something broken" }
-    ] }
+    ]
+  }
 ]
 ```
 

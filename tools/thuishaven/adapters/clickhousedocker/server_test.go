@@ -12,7 +12,7 @@ import (
 func TestWriteConfig(t *testing.T) {
 	newServer := func(t *testing.T) *Server {
 		t.Helper()
-		return &Server{home: t.TempDir(), limits: domain.DefaultClickHouseLimits()}
+		return &Server{home: t.TempDir(), limits: domain.DefaultClickHouseLimits(0)}
 	}
 
 	t.Run("given no config on disk", func(t *testing.T) {
@@ -37,6 +37,16 @@ func TestWriteConfig(t *testing.T) {
 				}
 				if string(b) != domain.RenderClickHouseConfig(s.limits) {
 					t.Error("on-disk config differs from the rendered one")
+				}
+			})
+
+			t.Run("persists the users.d override LangWatchQL provisioning needs", func(t *testing.T) {
+				b, err := os.ReadFile(s.usersConfigPath())
+				if err != nil {
+					t.Fatal(err)
+				}
+				if string(b) != domain.ClickHouseUsersConfig {
+					t.Error("on-disk users config differs from domain.ClickHouseUsersConfig")
 				}
 			})
 		})

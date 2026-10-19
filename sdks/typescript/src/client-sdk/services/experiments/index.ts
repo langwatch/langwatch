@@ -1,34 +1,12 @@
 /**
- * Experiments API
- *
- * Run batch experiments over datasets with automatic tracing,
- * parallel execution, and built-in evaluator support.
- *
- * @example SDK-defined experiment
- * ```typescript
- * const langwatch = new LangWatch({ apiKey: process.env.LANGWATCH_API_KEY });
- * const experiment = await langwatch.experiments.init('my-experiment');
- *
- * await experiment.run(dataset, async ({ item, index, span }) => {
- *   const response = await myAgent(item.question);
- *   experiment.log('accuracy', { index, score: 0.95 });
- * });
- * ```
- *
- * @example Platform-configured experiment (Experiments Workbench)
- * ```typescript
- * const langwatch = new LangWatch();
- * const result = await langwatch.experiments.run("my-experiment-slug");
- * result.printSummary();
- * ```
+ * Experiments API: batch experiments over datasets with tracing, parallel
+ * execution, and evaluators. SDK-defined: `experiments.init(name)` then
+ * `experiment.run(dataset, fn)`. Platform: `experiments.run("slug")`.
  */
 
 export { Experiment } from "./experiment";
 export { ExperimentsFacade } from "./experiments.facade";
-export {
-  ExperimentsApiService,
-  ExperimentsApiServiceError,
-} from "./experiments-api.service";
+export { ExperimentsApiService, ExperimentsApiServiceError } from "./experiments-api.service";
 export type {
   ExperimentRunStartResponse,
   ExperimentRunStartRequest,
@@ -48,11 +26,11 @@ export { mapRunResultsToRows } from "./mapResults";
 
 // SDK-defined experiment types
 export type {
-  EvaluationStatus,
+  ExperimentEvaluationStatus,
   TargetType,
   TargetMetadata,
   TargetInfo,
-  EvaluationResult,
+  ExperimentEvaluationResult,
   BatchEntry,
   Batch,
   ComparisonMetric,
@@ -61,7 +39,7 @@ export type {
   ComparisonVerdict,
   ExperimentInitOptions,
   LogOptions,
-  EvaluateOptions,
+  ExperimentEvaluateOptions,
   RunOptions,
   RunCallback,
   RunContext,
@@ -91,11 +69,7 @@ export type {
 } from "./platformTypes";
 
 // Run polling
-export {
-  pollExperimentRun,
-  DEFAULT_POLL_INTERVAL,
-  DEFAULT_POLL_TIMEOUT,
-} from "./run-status";
+export { pollExperimentRun, DEFAULT_POLL_INTERVAL, DEFAULT_POLL_TIMEOUT } from "./run-status";
 export type { PollRunStatus, PollExperimentRunResult } from "./run-status";
 
 export {

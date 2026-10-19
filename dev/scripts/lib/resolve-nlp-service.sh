@@ -6,10 +6,10 @@
 # names the variable and the label for the engine. See that file for why the
 # launcher has to read the env files at all.
 #
-# Usage from platform/app/scripts/start.sh:
+# Usage from dev/scripts/dev-stack.sh:
 #
-#   . "$(dirname "$0")/../../../dev/scripts/lib/resolve-nlp-service.sh"
-#   resolve_nlp_service "$(dirname "$0")/.."
+#   . "$(dirname "$0")/lib/resolve-nlp-service.sh"
+#   resolve_nlp_service "$REPO_ROOT"
 
 . "$(dirname "${BASH_SOURCE[0]}")/resolve-service-address.sh"
 

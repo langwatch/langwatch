@@ -1,11 +1,11 @@
 /**
- * What a row reports when the judge call fails or the judge itself reports a
- * failure, and how that stays distinct from a judge that reached no verdict.
- *
+ * What a row reports when the judge call fails or the judge itself reports
+ * a failure, distinct from a judge that reached no verdict.
  * Spec: specs/experiments/comparison-sdk.feature
  */
 
 import { describe, it, expect } from "vitest";
+
 import {
   type ComparisonHarness,
   comparisonEvaluations,
@@ -74,9 +74,7 @@ describe("Experiment.compare", () => {
 
         expect(error).toBeUndefined();
         expect(verdict?.status).toBe("error");
-        expect(verdict?.reasoning).toBe(
-          "The judge model is not configured for this project."
-        );
+        expect(verdict?.reasoning).toBe("The judge model is not configured for this project.");
         expect(comparisonEvaluations(harness)[0]!.status).toBe("error");
       });
     });

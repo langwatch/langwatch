@@ -1,13 +1,11 @@
-import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenarios.js";
+import { archiveScenario as apiArchiveScenario } from "../langwatch-api-scenarios.ts";
 
 /**
  * Handles the platform_archive_scenario MCP tool invocation.
  *
  * Archives (soft-deletes) a scenario and returns confirmation.
  */
-export async function handleArchiveScenario(params: {
-  scenarioId: string;
-}): Promise<string> {
+export async function handleArchiveScenario(params: { scenarioId: string }): Promise<string> {
   const result = await apiArchiveScenario(params.scenarioId);
 
   const lines: string[] = [];

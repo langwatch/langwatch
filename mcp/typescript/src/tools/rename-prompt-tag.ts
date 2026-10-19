@@ -1,4 +1,4 @@
-import { renamePromptTag as apiRenamePromptTag } from "../langwatch-api.js";
+import { renamePromptTag as apiRenamePromptTag } from "../langwatch-api.ts";
 
 export async function handleRenamePromptTag(params: {
   tag: string;

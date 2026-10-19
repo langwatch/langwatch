@@ -1,22 +1,17 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import {
-  context,
-  trace,
-  INVALID_SPAN_CONTEXT,
-  type ContextManager,
-} from "@opentelemetry/api";
+import { context, trace, INVALID_SPAN_CONTEXT, type ContextManager } from "@opentelemetry/api";
 import { AsyncLocalStorageContextManager } from "@opentelemetry/context-async-hooks";
+import { describe, it, expect, beforeAll, afterAll } from "vitest";
+
 import { MockSpan, MockTracerProvider } from "../../__tests__/test-utils";
+import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../../semconv/attributes";
 import { createLangWatchSpan } from "../../span";
 import { getLangWatchTracerFromProvider } from "../../tracer";
-import { ATTR_LANGWATCH_EVALUATION_CUSTOM } from "../../semconv/attributes";
 import { emitEvaluationEvent } from "../index";
 
 /**
  * The complete set of keys the emitted payload must contain, matching the
- * Python `Evaluation` TypedDict (`python-sdk/.../domain/__init__.py`) exactly.
- * Notably there is NO `cost` key: Python routes cost into span metrics, not the
- * evaluation event payload.
+ * Python `Evaluation` TypedDict exactly. Notably there is NO `cost` key --
+ * Python routes cost into span metrics, not the evaluation event payload.
  */
 const EXPECTED_PAYLOAD_KEYS = [
   "evaluation_id",
@@ -55,7 +50,7 @@ describe("addEvaluation", () => {
     expect(ATTR_LANGWATCH_EVALUATION_CUSTOM).toBe(EVENT_NAME);
   });
 
-  describe("span.addEvaluation", () => {
+  describe("when calling span.addEvaluation", () => {
     it("emits a langwatch.evaluation.custom event with the snake_case payload", () => {
       const mockSpan = new MockSpan("evaluation-target");
       const span = createLangWatchSpan(mockSpan);
@@ -105,19 +100,17 @@ describe("addEvaluation", () => {
 
       // The payload keys must be EXACTLY the Python `Evaluation` TypedDict set
       // (12 keys, no `cost`) — cost lives in span metrics on the Python side.
-      expect(Object.keys(payload).sort()).toEqual(
-        [...EXPECTED_PAYLOAD_KEYS].sort(),
-      );
+      expect(Object.keys(payload).toSorted()).toEqual([...EXPECTED_PAYLOAD_KEYS].toSorted());
     });
 
     it("emits span_id as null for an invalid / non-recording span context", () => {
-      // An invalid span context carries the all-zero span id that OTel JS hands
-      // back outside an active trace. Python guards this via `is_valid` and
-      // emits null; we must match by guarding on `isSpanContextValid`.
-      //
-      // Use a MockSpan (which records events so we can read the payload back)
-      // but override its context to the OTel-canonical INVALID_SPAN_CONTEXT so
-      // the real `isSpanContextValid` path is exercised.
+      // An invalid span context carries the all-zero span id OTel JS hands
+      // back outside an active trace. Python guards via `is_valid`; we match
+      // by guarding on `isSpanContextValid`.
+
+      // Uses a MockSpan (records events so we can read the payload back) but
+      // overrides its context to INVALID_SPAN_CONTEXT so the real
+      // `isSpanContextValid` path is exercised.
       const mockSpan = new MockSpan("invalid-ctx-target");
       mockSpan.spanContext = () => INVALID_SPAN_CONTEXT;
 
@@ -128,9 +121,7 @@ describe("addEvaluation", () => {
 
       const event = mockSpan.getEvent(EVENT_NAME);
       expect(event).toBeDefined();
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.name).toBe("invalid_ctx_eval");
       // The guard converts the all-zero id to null.
@@ -149,9 +140,7 @@ describe("addEvaluation", () => {
       });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.evaluation_id).toBe("eval_custom_123");
       expect(payload.status).toBe("skipped");
@@ -166,9 +155,7 @@ describe("addEvaluation", () => {
 
       const event = mockSpan.getEvent(EVENT_NAME);
       expect(event).toBeDefined();
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
       expect(payload.name).toBe("alias_eval");
       expect(payload.passed).toBe(false);
     });
@@ -180,9 +167,7 @@ describe("addEvaluation", () => {
       span.addEvaluation({ name: "no_error_eval", error: null });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.error).toBeNull();
     });
@@ -194,9 +179,7 @@ describe("addEvaluation", () => {
       span.addEvaluation({ name: "error_eval", error: new Error("boom") });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(typeof payload.error.message).toBe("string");
       expect(payload.error.message.length).toBeGreaterThan(0);
@@ -211,9 +194,7 @@ describe("addEvaluation", () => {
       span.addEvaluation({ name: "string_error_eval", error: "plain failure" });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.error.message).toBe("plain failure");
       expect(payload.error.stacktrace).toEqual([]);
@@ -229,9 +210,7 @@ describe("addEvaluation", () => {
       });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.timestamps.started_at).toBe(1000);
       expect(payload.timestamps.finished_at).toBe(2000);
@@ -247,9 +226,7 @@ describe("addEvaluation", () => {
       });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.timestamps.started_at).toBe(5);
       expect(payload.timestamps.finished_at).toBe(6);
@@ -262,21 +239,16 @@ describe("addEvaluation", () => {
       span.addEvaluation({ name: "zero_score_eval", score: 0 });
 
       const event = mockSpan.getEvent(EVENT_NAME);
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
 
       expect(payload.score).toBe(0);
     });
   });
 
-  describe("tracer.addEvaluation (trace-level)", () => {
+  describe("when calling tracer.addEvaluation (trace-level)", () => {
     it("emits the evaluation event onto the currently active span", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = getLangWatchTracerFromProvider(
-        mockProvider,
-        "evaluation-test-tracer",
-      );
+      const tracer = getLangWatchTracerFromProvider(mockProvider, "evaluation-test-tracer");
 
       const mockSpan = new MockSpan("root-span");
 
@@ -296,9 +268,7 @@ describe("addEvaluation", () => {
       expect(event).toBeDefined();
       expect(event?.name).toBe(ATTR_LANGWATCH_EVALUATION_CUSTOM);
 
-      const payload = JSON.parse(
-        event?.attributes?.json_encoded_event as string,
-      );
+      const payload = JSON.parse(event?.attributes?.json_encoded_event as string);
       expect(payload.name).toBe("response_quality");
       expect(payload.passed).toBe(true);
       expect(payload.score).toBe(0.95);
@@ -307,15 +277,10 @@ describe("addEvaluation", () => {
 
     it("is a no-op when there is no active span", () => {
       const mockProvider = new MockTracerProvider();
-      const tracer = getLangWatchTracerFromProvider(
-        mockProvider,
-        "evaluation-test-tracer-noop",
-      );
+      const tracer = getLangWatchTracerFromProvider(mockProvider, "evaluation-test-tracer-noop");
 
       // No active span in context -> must not throw.
-      expect(() =>
-        tracer.addEvaluation({ name: "orphan_eval", passed: true }),
-      ).not.toThrow();
+      expect(() => tracer.addEvaluation({ name: "orphan_eval", passed: true })).not.toThrow();
     });
   });
 });

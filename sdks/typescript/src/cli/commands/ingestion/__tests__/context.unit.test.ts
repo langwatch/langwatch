@@ -1,9 +1,6 @@
 /**
- * `langwatch ingest context`: the agent declares the repository and branch it
- * is working on, itself. Which session it declares for, what it posts, what
- * it says back, and how it shares the fingerprint state with the hooks.
- *
- * Feature: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Agent declares repo/branch. Tests session resolution, declaration sharing,
+ * fingerprint state. Feature: session-context-declare.feature.
  */
 
 import * as fs from "node:fs";
@@ -49,8 +46,7 @@ let previousTmpdir: string | undefined;
 const posted: PostedRequest[] = [];
 const lines: string[] = [];
 
-const collector =
-  (status = 200): typeof fetch =>
+const collector = (status = 200): typeof fetch =>
   ((url: string, init: { headers: Record<string, string>; body: string }) => {
     posted.push({
       url,
@@ -84,10 +80,7 @@ function writeRollout({
 }: { sessionId?: string; agoMs?: number } = {}): void {
   const dir = path.join(sessionsRoot, "2026", "08", "22");
   fs.mkdirSync(dir, { recursive: true });
-  const file = path.join(
-    dir,
-    `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`,
-  );
+  const file = path.join(dir, `rollout-2026-08-22T10-00-00-${sessionId}.jsonl`);
   fs.writeFileSync(
     file,
     [
@@ -125,9 +118,7 @@ const ancestorHolding = (sessionId: string): AncestorProbe => ({
       : [],
 });
 
-const runContext = (
-  options: Partial<Parameters<typeof contextCommand>[0]> = {},
-) =>
+const runContext = (options: Partial<Parameters<typeof contextCommand>[0]> = {}) =>
   contextCommand({
     env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT, ...CLAUDE_ENV },
     cwd: "/repo/worktrees/review",
@@ -199,7 +190,7 @@ describe("the declare command's session resolution", () => {
     expect(lines[0]).toContain("--agent");
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the session whose process this runs under", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5 * 60_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 1_000 });
@@ -217,7 +208,7 @@ describe("the declare command's session resolution", () => {
     });
   });
 
-  /** @scenario "The invoking codex session is resolved from the ancestor process that holds the rollout open" */
+  /** @scenario "Codex session resolved from ancestor holding rollout" */
   it("declares for the ancestor session while a second session is mid-turn", async () => {
     writeRollout({ sessionId: CODEX_SESSION, agoMs: 5_000 });
     writeRollout({ sessionId: OTHER_CODEX_SESSION, agoMs: 2_000 });
@@ -341,7 +332,8 @@ describe("what the declaration posts", () => {
       "vcs.worktree.name": "review",
     });
     expect(lines).toEqual([
-      `Declared github.com/langwatch/langwatch@feat/session-context for claude_code session ${SESSION_ID}`,
+      `Declared github.com/langwatch/langwatch@feat/session-context for ` +
+        `claude_code session ${SESSION_ID}`,
     ]);
   });
 
@@ -387,9 +379,7 @@ describe("what the declaration posts", () => {
       },
     });
 
-    expect(recordOf(posted[0]!).traceId).toBe(
-      "16872e6253edb3e8748023ff172703c4",
-    );
+    expect(recordOf(posted[0]!).traceId).toBe("16872e6253edb3e8748023ff172703c4");
     expect(recordOf(posted[0]!).spanId).toBe("be7ce7c6bf1173f5");
   });
 });
@@ -448,9 +438,7 @@ describe("the declare command's refusals", () => {
       }),
     });
 
-    expect(
-      readSpooledDeclarations({ stateDir, now: () => NOW }),
-    ).toHaveLength(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
   });
 });
 
@@ -499,9 +487,7 @@ describe("the declaration and the hooks share one fingerprint", () => {
     });
 
     expect(posted).toHaveLength(2);
-    expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe(
-      "fix/regression",
-    );
+    expect(attributesOf(posted[1]!)["vcs.ref.head.name"]).toBe("fix/regression");
   });
 });
 
@@ -514,10 +500,7 @@ describe("a queued declaration and the next session report", () => {
     hookCommand({
       tool: "claude-code",
       env: { OTEL_EXPORTER_OTLP_ENDPOINT: ENDPOINT },
-      readInput: () =>
-        Promise.resolve(
-          JSON.stringify({ session_id: SESSION_ID, cwd }),
-        ),
+      readInput: () => Promise.resolve(JSON.stringify({ session_id: SESSION_ID, cwd })),
       runGit: gitRunner({
         ...WORKTREE_GIT,
         "branch --show-current": "main",
@@ -537,9 +520,7 @@ describe("a queued declaration and the next session report", () => {
 
     await runHookSeam();
 
-    const branches = posted.map(
-      (request) => attributesOf(request)["vcs.ref.head.name"],
-    );
+    const branches = posted.map((request) => attributesOf(request)["vcs.ref.head.name"]);
     expect(branches).toContain("feat/session-context");
     expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toEqual([]);
   });
@@ -554,9 +535,9 @@ describe("a queued declaration and the next session report", () => {
     // The declaration has to land last or the session keeps the hook branch.
     expect(posted.length).toBeGreaterThanOrEqual(2);
     expect(attributesOf(posted[0]!)["vcs.ref.head.name"]).toBe("main");
-    expect(
-      attributesOf(posted[posted.length - 1]!)["vcs.ref.head.name"],
-    ).toBe("feat/session-context");
+    expect(attributesOf(posted[posted.length - 1]!)["vcs.ref.head.name"]).toBe(
+      "feat/session-context",
+    );
   });
 
   /** @scenario "The next session report sends the queued declaration" */
@@ -580,18 +561,13 @@ describe("a queued declaration and the next session report", () => {
       agent: "claude_code",
       sessionId: SESSION_ID,
     });
-    const stale = JSON.parse(fs.readFileSync(entry, "utf8")) as Record<
-      string,
-      unknown
-    >;
+    const stale = JSON.parse(fs.readFileSync(entry, "utf8")) as Record<string, unknown>;
     stale.queued_at_ms = NOW - 61 * 60_000;
     fs.writeFileSync(entry, JSON.stringify(stale));
 
     await runHookSeam();
 
-    const branches = posted.map(
-      (request) => attributesOf(request)["vcs.ref.head.name"],
-    );
+    const branches = posted.map((request) => attributesOf(request)["vcs.ref.head.name"]);
     expect(branches).not.toContain("feat/session-context");
     expect(fs.existsSync(entry)).toBe(false);
   });
@@ -602,8 +578,6 @@ describe("a queued declaration and the next session report", () => {
 
     await runHookSeam({ fetchImpl: unreachableCollector });
 
-    expect(
-      readSpooledDeclarations({ stateDir, now: () => NOW }),
-    ).toHaveLength(1);
+    expect(readSpooledDeclarations({ stateDir, now: () => NOW })).toHaveLength(1);
   });
 });

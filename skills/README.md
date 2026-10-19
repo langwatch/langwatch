@@ -11,19 +11,19 @@ content. Read "The pipeline" below before editing anything.
 
 ## What lives where
 
-| Path | What it is |
-|---|---|
-| `<skill>/SKILL.mdx` (e.g. `tracing/`, `github/`) | Canonical source for a **feature skill**. Public skills are curated in `FEATURE_SKILLS`; Langy-only skills are curated in `NATIVE_ONLY_SKILLS`. |
-| `recipes/<name>/SKILL.mdx` | **Recipe** skills (use-case cookbooks). Auto-discovered: every `recipes/*/SKILL.mdx` is published, no registration needed. |
-| `_shared/*.mdx` | Partials (`<CliSetup />`, `<PlanLimits />`, …) imported by skills and inlined at compile time. Published output never references `_shared/`. |
-| `_lib/` | Shared tooling: `feature-skills.ts` (the ONE definition of "our published skill set"), `mdx-inline.ts` (partial inliner), `frontmatter.ts`. |
-| `_compiler/` | Generators: `compile.ts` (copy-paste prompts) and `native.ts` (opencode `SKILL.md` files for Langy). |
-| `_compiled/*.txt` | **Gitignored** copy-paste prompts consumed by the docs pipeline. |
-| `_compiled/native/` | **Committed** opencode skills consumed by the Langy agent image. |
-| `_publish/sync.ts` | Publisher: wipes and re-fills a checkout of the public [langwatch/skills](https://github.com/langwatch/skills) repo. |
-| `_tests/` | Dogfood scenario tests (drive a real sub-agent against each skill; local-only, cost money) plus fast structural tests (`native-skills.test.ts`, `publish-sync.test.ts`) that run with plain `vitest`. |
-| `initial-prompt.md` | Historical: the original kickoff brief this workspace was built from. Context only — nothing consumes it. |
-| `version.txt`, `CHANGELOG.md` | Version stamp copied into the public repo on publish, and its log. |
+| Path                                             | What it is                                                                                                                                                                                            |
+| ------------------------------------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `<skill>/SKILL.mdx` (e.g. `tracing/`, `github/`) | Canonical source for a **feature skill**. Public skills are curated in `FEATURE_SKILLS`; Langy-only skills are curated in `NATIVE_ONLY_SKILLS`.                                                       |
+| `recipes/<name>/SKILL.mdx`                       | **Recipe** skills (use-case cookbooks). Auto-discovered: every `recipes/*/SKILL.mdx` is published, no registration needed.                                                                            |
+| `_shared/*.mdx`                                  | Partials (`<CliSetup />`, `<PlanLimits />`, …) imported by skills and inlined at compile time. Published output never references `_shared/`.                                                          |
+| `_lib/`                                          | Shared tooling: `feature-skills.ts` (the ONE definition of "our published skill set"), `mdx-inline.ts` (partial inliner), `frontmatter.ts`.                                                           |
+| `_compiler/`                                     | Generators: `compile.ts` (copy-paste prompts) and `native.ts` (opencode `SKILL.md` files for Langy).                                                                                                  |
+| `_compiled/*.txt`                                | **Gitignored** copy-paste prompts consumed by the docs pipeline.                                                                                                                                      |
+| `_compiled/native/`                              | **Committed** opencode skills consumed by the Langy agent image.                                                                                                                                      |
+| `_publish/sync.ts`                               | Publisher: wipes and re-fills a checkout of the public [langwatch/skills](https://github.com/langwatch/skills) repo.                                                                                  |
+| `_tests/`                                        | Dogfood scenario tests (drive a real sub-agent against each skill; local-only, cost money) plus fast structural tests (`native-skills.test.ts`, `publish-sync.test.ts`) that run with plain `vitest`. |
+| `initial-prompt.md`                              | Historical: the original kickoff brief this workspace was built from. Context only — nothing consumes it.                                                                                             |
+| `version.txt`, `CHANGELOG.md`                    | Version stamp copied into the public repo on publish, and its log.                                                                                                                                    |
 
 ## The pipeline: one source, three consumers
 
@@ -60,7 +60,9 @@ Langy's native selection is a strict superset of the public selection, so what
 we publish always ships in Langy. The `github/` skill is Langy-only because it
 depends on provisioned `GH_TOKEN` and bot-authored PR behavior; its canonical
 source still lives here, while `listPublishedSkills()` keeps it out of the
-public repository. The copy under the Go embed directory supports local builds,
+public repository. A Langy-only skill that only a module's own brief names, such
+as `daily-insights`, also says `internal: true` in its front matter: the worker
+installs it and the composer's skill palette never offers it. The copy under the Go embed directory supports local builds,
 and `_tests/native-skills.test.ts` pins it to the root-compiled output.
 
 ## Adding or changing a skill

@@ -68,24 +68,19 @@ git checkout -qf main
 git rev-parse -q --verify "${EXPECTED_SHA}^{commit}" > /dev/null
 git reset -q --hard "$EXPECTED_SHA"
 
-# app package location: platform/app since the repo restructure, langwatch/ before
-if [ -d platform/app ]; then APP_DIR=platform/app; else APP_DIR=langwatch; fi
-
-# carry the machine's .env across the restructure (it is not in the image repo)
-if [ ! -f "$APP_DIR/.env" ] && [ -f langwatch/.env ]; then
-  cp langwatch/.env "$APP_DIR/.env"
+# One pnpm workspace: install, migrate and dev all run from the repo root.
+# Carry the machine's .env across older layouts (it is not in the image repo).
+if [ ! -f .env ]; then
+  for old in platform/app/.env langwatch/.env; do
+    if [ -f "$old" ]; then cp "$old" .env; break; fi
+  done
 fi
 
-cd "$APP_DIR"
 pnpm install
-if grep -q '"prisma:migrate"' package.json; then
-  pnpm run prisma:migrate
-else
-  pnpm prisma migrate deploy
-fi
+pnpm run prisma:migrate
 
 # Stop the previous dev stack by process group. Name patterns are not enough:
-# the API server runs as `tsx src/server.mts`, which matches none of the
+# the API server runs as `node ... src/main.ts`, which matches none of the
 # patterns below, so pattern-only kills left an old server alive holding the
 # app port. A stale server answering the health and collector gates would make
 # a refresh look verified while serving the previous commit — the gates check
@@ -125,7 +120,6 @@ pkill -9 -f "dev-superviso[r]" 2>/dev/null || true
 pkill -9 -f "bin/pnpm de[v]" 2>/dev/null || true
 pkill -9 -f "concurrentl[y]" 2>/dev/null || true
 pkill -9 -f "start:ap[p]" 2>/dev/null || true
-pkill -9 -f "tsx/dist/cli.mjs src/server.mt[s]" 2>/dev/null || true
 pkill -9 -f "loader.mjs src/server.mt[s]" 2>/dev/null || true
 # The Go services outlive their parents and hold ports of their own — an
 # nlpgo binary from an earlier stack was found still holding 5561 a day later.

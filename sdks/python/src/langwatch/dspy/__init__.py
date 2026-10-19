@@ -5,7 +5,7 @@ import time
 import warnings
 import dspy
 from typing import Callable, List, Optional, Any, Type, Union
-from langwatch.utils.auth import build_auth_headers
+from langwatch.utils.auth import build_request_headers
 from langwatch.utils.exceptions import better_raise_for_status
 from langwatch.utils.transformation import SerializableWithStringFallback, truncate_object_recursively
 from langwatch.utils.utils import safe_get
@@ -199,8 +199,8 @@ class LangWatchDSPy:
         try:
             with create_client(timeout=60) as client:
                 response = client.post(
-                    f"{langwatch.get_endpoint()}/api/experiment/init",
-                    headers=build_auth_headers(langwatch.get_api_key() or ""),
+                    f"{langwatch.get_endpoint()}/api/v1/experiment/init",
+                    headers=build_request_headers(langwatch.get_api_key() or ""),
                     json={
                         "experiment_slug": slug or experiment,
                         "experiment_type": "DSPY",
@@ -307,14 +307,11 @@ class LangWatchDSPy:
                     response["prompt"] = entry["prompt"]
                 if "messages" in entry:
                     response["messages"] = entry["messages"]
-                if "model" in lm_response:
-                    response["model"] = lm_response["model"]
-                if "choices" in lm_response:
-                    response["choices"] = lm_response["choices"]
-                if (
-                    not "_hidden_params" in lm_response
-                    or "additional_headers" not in lm_response["_hidden_params"]
-                ):
+                if safe_get(lm_response, "model") is not None:
+                    response["model"] = safe_get(lm_response, "model")
+                if safe_get(lm_response, "choices") is not None:
+                    response["choices"] = safe_get(lm_response, "choices")
+                if safe_get(lm_response, "_hidden_params", "additional_headers") is None:
                     response["cached"] = True
                 llm_call["response"] = response
 
@@ -409,9 +406,9 @@ class LangWatchDSPy:
         ]
         with create_client(timeout=60) as client:
             response = client.post(
-                f"{langwatch.get_endpoint()}/api/dspy/log_steps",
+                f"{langwatch.get_endpoint()}/api/v1/dspy/log_steps",
                 headers={
-                    **build_auth_headers(langwatch.get_api_key() or ""),
+                    **build_request_headers(langwatch.get_api_key() or ""),
                     "Content-Type": "application/json",
                 },
                 content=json.dumps(data),

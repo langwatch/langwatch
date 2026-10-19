@@ -1,18 +1,12 @@
 /**
- * A scenario reference is an id or a name; both are read the same way by
- * every scenario command.
- *
+ * A scenario reference is an id or a name, read the same way by every command.
  * Spec: specs/features/scenario-cli.feature
  */
 import { describe, it, expect, vi } from "vitest";
-import type {
-  ScenarioResponse,
-  ScenariosApiService,
-} from "@/client-sdk/services/scenarios";
-import {
-  resolveScenarioReference,
-  ScenarioReferenceError,
-} from "../resolveScenario";
+
+import type { ScenarioResponse, ScenariosApiService } from "@/client-sdk/services/scenarios";
+
+import { resolveScenarioReference, ScenarioReferenceError } from "../resolveScenario";
 
 const scenario = (
   overrides: Partial<ScenarioResponse> & Pick<ScenarioResponse, "id" | "name">,
@@ -32,10 +26,8 @@ const scenario = (
   }) as ScenarioResponse;
 
 /**
- * The platform's two reads, as spies: `get` answers for an id the project
- * holds and refuses anything else, `getAll` returns the whole list. Returned
- * beside the service so a test can assert on a spy without reading the method
- * back off the service object.
+ * The platform's two reads as spies: `get` answers only for a held id,
+ * `getAll` returns the whole list; returned beside the service for asserting.
  */
 const spiedService = (scenarios: ScenarioResponse[]) => {
   const getAll = vi.fn(async () => scenarios);
@@ -96,9 +88,7 @@ describe("resolveScenarioReference()", () => {
 
     describe("when the reference is an id the project holds", () => {
       it("fetches that scenario without listing the project", async () => {
-        const one = spiedService([
-          scenario({ id: "scenario_1", name: "Login Flow" }),
-        ]);
+        const one = spiedService([scenario({ id: "scenario_1", name: "Login Flow" })]);
         await resolveScenarioReference({
           reference: "scenario_1",
           service: one.service,
@@ -110,9 +100,7 @@ describe("resolveScenarioReference()", () => {
 
     describe("when the reference is an id the project does not hold", () => {
       it("falls back to the listing and refuses with the list command", async () => {
-        const one = spiedService([
-          scenario({ id: "scenario_1", name: "Login Flow" }),
-        ]);
+        const one = spiedService([scenario({ id: "scenario_1", name: "Login Flow" })]);
         await expect(
           resolveScenarioReference({
             reference: "scenario_9",
@@ -126,12 +114,12 @@ describe("resolveScenarioReference()", () => {
     describe("when the reference names nothing", () => {
       /** @scenario "A reference that names no scenario is not found" */
       it("refuses and points at the list command", async () => {
-        await expect(
-          resolveScenarioReference({ reference: "Checkout", service }),
-        ).rejects.toThrow(ScenarioReferenceError);
-        await expect(
-          resolveScenarioReference({ reference: "Checkout", service }),
-        ).rejects.toThrow("langwatch scenario list");
+        await expect(resolveScenarioReference({ reference: "Checkout", service })).rejects.toThrow(
+          ScenarioReferenceError,
+        );
+        await expect(resolveScenarioReference({ reference: "Checkout", service })).rejects.toThrow(
+          "langwatch scenario list",
+        );
       });
     });
   });

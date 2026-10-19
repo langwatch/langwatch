@@ -1,4 +1,6 @@
-import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-http";
+import { OTLPLogExporter } from "@opentelemetry/exporter-logs-otlp-proto";
+import { type CompressionAlgorithm } from "@opentelemetry/otlp-exporter-base";
+
 import {
   DEFAULT_ENDPOINT,
   LANGWATCH_SDK_LANGUAGE,
@@ -7,51 +9,21 @@ import {
   LANGWATCH_SDK_VERSION,
   LOGS_PATH,
 } from "../../internal/constants";
+import { resolveOtlpCompression } from "../../internal/otlp-compression";
 
 export interface LangWatchLogsExporterOptions {
   endpoint?: string;
   apiKey?: string;
+  /** Request compression: gzip unless an OTEL_EXPORTER_OTLP_*COMPRESSION env var is set. */
+  compression?: CompressionAlgorithm;
 }
 
-/**
- * LangWatchLogsExporter extends the OpenTelemetry OTLP HTTP logs exporter
- * to send logs to LangWatch with proper authentication and metadata headers.
- *
- * This exporter automatically configures:
- * - Authorization headers using the provided API key or environment variables/fallback
- * - SDK version and language identification headers
- * - Proper endpoint configuration for LangWatch ingestion using provided URL or environment variables/fallback
- *
- * @example
- * ```typescript
- * import { LangWatchLogsExporter } from '@langwatch/observability';
- *
- * // Using environment variables/fallback configuration
- * const exporter = new LangWatchLogsExporter();
- *
- * // Using custom options
- * const exporter = new LangWatchLogsExporter({
- *   apiKey: 'your-api-key',
- *   endpoint: 'https://custom.langwatch.com'
- * });
- * ```
- */
+/** Extends OpenTelemetry OTLP HTTP logs exporter to send logs to LangWatch with authentication. */
 export class LangWatchLogsExporter extends OTLPLogExporter {
-  /**
-   * Creates a new LangWatchLogsExporter instance.
-   *
-   * @param opts - Optional configuration options for the exporter.
-   * @param opts.apiKey - Optional API key for LangWatch authentication. If not provided,
-   *                     will use environment variables or fallback configuration.
-   * @param opts.endpoint - Optional custom endpoint URL for LangWatch ingestion.
-   *                       If not provided, will use environment variables or fallback configuration.
-   */
+  /** Configures auth headers and endpoint; reads defaults from environment if needed. */
   constructor(opts?: LangWatchLogsExporterOptions) {
     const apiKey = opts?.apiKey ?? process.env.LANGWATCH_API_KEY ?? "";
-    const endpoint =
-      opts?.endpoint ??
-      process.env.LANGWATCH_ENDPOINT ??
-      DEFAULT_ENDPOINT;
+    const endpoint = opts?.endpoint ?? process.env.LANGWATCH_ENDPOINT ?? DEFAULT_ENDPOINT;
 
     const url = new URL(LOGS_PATH, endpoint);
     const otelEndpoint = url.toString();
@@ -65,6 +37,7 @@ export class LangWatchLogsExporter extends OTLPLogExporter {
         ...(apiKey ? { authorization: `Bearer ${apiKey}` } : {}),
       },
       url: otelEndpoint.toString(),
+      compression: resolveOtlpCompression({ compression: opts?.compression, signal: "LOGS" }),
     });
   }
 }

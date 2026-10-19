@@ -8,8 +8,5 @@ export interface TenantSource {
    * Tenant ids after `cursor` in a stable order, at most `limit` of them.
    * An empty array ends the pass.
    */
-  findTenantIdsAfter(args: {
-    cursor: string | null;
-    limit: number;
-  }): Promise<string[]>;
+  findTenantIdsAfter(args: { cursor: string | null; limit: number }): Promise<string[]>;
 }

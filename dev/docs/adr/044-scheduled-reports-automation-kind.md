@@ -18,9 +18,9 @@ the distinction out loud:
   scheduled `graphAlertSweep` process manager for absence and recovery
   (ADR-034 Ph 5; the K8s `/api/cron/triggers` sweep was removed).
 
-Customers keep asking for a **third** shape neither covers: *"every Monday 09:00,
-post my evals dashboard to #quality"*, *"daily 07:00, the top-5 error traces from
-last night as a table"*, *"this week's pass-rate vs last week's, as a chart."*
+Customers keep asking for a **third** shape neither covers: _"every Monday 09:00,
+post my evals dashboard to #quality"_, _"daily 07:00, the top-5 error traces from
+last night as a table"_, _"this week's pass-rate vs last week's, as a chart."_
 This is a **periodic, informational report** — a digest on a calendar. It fires
 because the clock said so, not because something broke.
 
@@ -34,7 +34,7 @@ Two capabilities are missing entirely:
 1. **A per-trigger calendar schedule.** Nothing carries a cron expression +
    day-of-week + time-of-day + timezone at the trigger level. `Trigger` has
    `lastRunAt Float`, `notificationCadence` (`immediate | 5min_digest |
-   15min_digest | hourly_digest`), and `traceDebounceMs` — all *relative* windows
+15min_digest | hourly_digest`), and `traceDebounceMs` — all _relative_ windows
    anchored to an event, never an absolute wall-clock instant
    (`src/automations/cadences.ts:9-31`; `computeScheduledFor` snaps to the next
    epoch-aligned UTC boundary, `triggerActionDispatch.ts:60-79`). The only
@@ -56,13 +56,13 @@ As with ADR-040, most of the framework exists: the provider registry
 (ADR-036), the Block Kit allowlist and proposed native chart/table blocks
 (ADR-041), the ADR-052 process-manager substrate, the fire-history surface
 (`TriggerSent` + `ViewAutomationDrawer.tsx`), and the analytics service
-(`AnalyticsService.getTimeseries`). This ADR's job is to *compose* them into a
+(`AnalyticsService.getTimeseries`). This ADR's job is to _compose_ them into a
 schedule-triggered kind, and to design the one primitive that does not yet exist —
 the calendar scheduler.
 
 ## Decision
 
-Introduce **Report**, a third automation *kind* triggered by a calendar schedule.
+Introduce **Report**, a third automation _kind_ triggered by a calendar schedule.
 A report renders a content source (a dashboard, a single custom graph, or a trace
 query) into the existing notify channels (Slack / email / webhook) on a
 cron-expression + IANA-timezone schedule, driven by a new **in-process scheduler
@@ -76,11 +76,11 @@ infrastructure, sleeping until the next job is due (see §4). Ship it dark behin
 
 Make the split first-class and mutually exclusive **by trigger**:
 
-| Kind | Fires when | Semantics | Today |
-|------|-----------|-----------|-------|
-| **Automation** | an event occurs — a trace lands matching `filters` | reactive, per-match (or digested) | `customGraphId == null` |
-| **Alert** | a condition holds — a metric crosses a threshold | incident: opens on breach, resolves on recovery (`TriggerSent.resolvedAt`) | `customGraphId != null` |
-| **Report** | the clock reaches a scheduled instant | periodic, informational; no breach, no incident | **new** |
+| Kind           | Fires when                                         | Semantics                                                                  | Today                   |
+| -------------- | -------------------------------------------------- | -------------------------------------------------------------------------- | ----------------------- |
+| **Automation** | an event occurs — a trace lands matching `filters` | reactive, per-match (or digested)                                          | `customGraphId == null` |
+| **Alert**      | a condition holds — a metric crosses a threshold   | incident: opens on breach, resolves on recovery (`TriggerSent.resolvedAt`) | `customGraphId != null` |
+| **Report**     | the clock reaches a scheduled instant              | periodic, informational; no breach, no incident                            | **new**                 |
 
 The three are disjoint — an automation is not scheduled, a report has no
 threshold, an alert has no calendar.
@@ -92,21 +92,21 @@ page and surface the three kinds as first-class cards in the type picker
 (Automation · Alert · Report), each with its own copy and empty state.** The three
 are the same "when X, notify Y" shape sharing one drawer, one fire-history, one
 channel set — three nav items would triple the surface for no gain, and the picker
-already exists (`TypePicker.tsx`). *Rejected:* retitling the page "Alerts,
+already exists (`TypePicker.tsx`). _Rejected:_ retitling the page "Alerts,
 automations & reports" — more discoverable but verbose, and it fronts "alerts"
 when the default kind is a trace automation. If discoverability testing later
 demands the nouns in the nav, expose them as picker cards and let deep-links target
 `?kind=report`, not three routes.
 
 **Discriminator — make the kind explicit.** Today the trace-vs-alert split is the
-*implicit* `customGraphId != null` heuristic, hard-branched in ~a dozen places
+_implicit_ `customGraphId != null` heuristic, hard-branched in ~a dozen places
 (`trigger.service.ts:33-51`, the upsert router `automations.ts:587-632`,
 `draftReducer.ts` `SET_SOURCE`, `TypePicker.tsx`, both dispatch helpers). A third
 kind does not compose onto that. **Add a `triggerKind` enum column** (`AUTOMATION
 | ALERT | REPORT`, default `AUTOMATION`), backfilled (`customGraphId != null →
 ALERT`, else `AUTOMATION`), as the single source of truth; `customGraphId`- and
-schedule-presence become *consequences* of the kind, not the discriminator.
-*Rejected:* a second implicit heuristic (`schedule != null → report`) — it would
+schedule-presence become _consequences_ of the kind, not the discriminator.
+_Rejected:_ a second implicit heuristic (`schedule != null → report`) — it would
 leave three overlapping presence-rules a future reader must reconstruct, exactly
 the fragility the current code suffers.
 
@@ -161,7 +161,7 @@ comparison:  "none" | "previousPeriod"          // §3 this-vs-last framing
 
 We deliberately do **not** reuse the top-level `Trigger.customGraphId` FK for a
 single-graph report: it is `@unique` (`schema.prisma:784`) — one row per graph —
-and it is the *alert* slot, so a report over an alerted-on graph would collide.
+and it is the _alert_ slot, so a report over an alerted-on graph would collide.
 Keeping the source in `actionParams` (the ADR-040 precedent for webhook config)
 avoids the collision and keeps `customGraphId` meaning exactly "the graph this
 alert watches." The upsert router validates `dashboardId` / `customGraphId` belong
@@ -174,15 +174,15 @@ reuses the four ADR-036 template columns and a new default family (§3), and ign
 
 ### 3. Content source is orthogonal to the trigger
 
-A report is **not** graph-only. Its trigger is a schedule; its *content* is one of
+A report is **not** graph-only. Its trigger is a schedule; its _content_ is one of
 three sources. Single-graph is the degenerate 1-element dashboard; a trace top-N
 table is a first-class citizen.
 
-| `reportSource.kind` | Data primitive | Block Kit render (ADR-041) | Fallback |
-|---------------------|----------------|----------------------------|----------|
-| `dashboard` | enumerate `dashboard.graphs` (ordered), one `getTimeseries` per graph | one `data_visualization` chart per graph | sparkline / mrkdwn lines; email full render |
-| `customGraph` | one `getTimeseries` (= 1-element dashboard) | one `data_visualization` chart | sparkline |
-| `traceQuery` | the trace list / analytics surface (`api.traces.getAllForProject`, `AnalyticsService`) | one `table` block (Time · Score · Input · Link) | section-list |
+| `reportSource.kind` | Data primitive                                                                         | Block Kit render (ADR-041)                      | Fallback                                    |
+| ------------------- | -------------------------------------------------------------------------------------- | ----------------------------------------------- | ------------------------------------------- |
+| `dashboard`         | enumerate `dashboard.graphs` (ordered), one `getTimeseries` per graph                  | one `data_visualization` chart per graph        | sparkline / mrkdwn lines; email full render |
+| `customGraph`       | one `getTimeseries` (= 1-element dashboard)                                            | one `data_visualization` chart                  | sparkline                                   |
+| `traceQuery`        | the trace list / analytics surface (`api.traces.getAllForProject`, `AnalyticsService`) | one `table` block (Time · Score · Input · Link) | section-list                                |
 
 **Dashboard enumeration** is a relational fetch: a `Dashboard` has-many
 `CustomGraph` (`schema.prisma:644,652`); enumerate via `DashboardService.getById` →
@@ -210,15 +210,28 @@ preview (mirroring `buildGraphAlertTemplateContext:285-381` /
 interface ReportTemplateContext {
   trigger: { id; name; editUrl };
   project: { name; slug; url };
-  report:  { title; source: "dashboard"|"customGraph"|"traceQuery";
-             period: { start; end; label };
-             comparison: { previousStart; previousEnd } | null };
-  dashboard: { id; name; url } | null;      // graph sources
-  graphs: Array<{ id; name; url; chartType;
-                  series: Array<{ name; points: {label;value}[];
-                                  previousPoints?: {label;value}[] }>;
-                  current: number; previous: number | null; delta: number | null }>;
-  table: { columns: string[]; rows: string[][] } | null;   // traceQuery source
+  report: {
+    title;
+    source: "dashboard" | "customGraph" | "traceQuery";
+    period: { start; end; label };
+    comparison: { previousStart; previousEnd } | null;
+  };
+  dashboard: { id; name; url } | null; // graph sources
+  graphs: Array<{
+    id;
+    name;
+    url;
+    chartType;
+    series: Array<{
+      name;
+      points: { label; value }[];
+      previousPoints?: { label; value }[];
+    }>;
+    current: number;
+    previous: number | null;
+    delta: number | null;
+  }>;
+  table: { columns: string[]; rows: string[][] } | null; // traceQuery source
   occurredAt: string;
 }
 ```
@@ -237,15 +250,15 @@ today — there is no `MAX_BLOCKS` constant, `filterBlockKit` does not paginate,
 Slack rejects the whole payload. By channel:
 
 - **Slack = curated top-N + link (default).** Render the first N graphs (N so total
-  blocks ≤ ~45, leaving headroom; ≈ 10 charts), then append a url-only *"View full
-  dashboard →"* button (ADR-041 `actions`) to `dashboard.url`. Introduce a
+  blocks ≤ ~45, leaving headroom; ≈ 10 charts), then append a url-only _"View full
+  dashboard →"_ button (ADR-041 `actions`) to `dashboard.url`. Introduce a
   `REPORT_SLACK_GRAPH_CAP` constant (net-new). Report the omitted count ("Showing
   10 of 24 graphs").
 - **Email = full render.** Email (Liquid → Markdown → HTML) has no 50-block
   ceiling; the full dashboard renders naturally. Steer "whole dashboard" users to
   email, Slack to the highlights.
 - **Threaded chunking (deferred).** Splitting across threaded messages needs a
-  bot-token `chat.postMessage` channel — the *same* Slack-app OAuth lift ADR-041
+  bot-token `chat.postMessage` channel — the _same_ Slack-app OAuth lift ADR-041
   defers for `data_visualization`/`table`. Not in v1.
 
 Because `data_visualization` and `table` are **"unverified — probe first"** on
@@ -262,29 +275,29 @@ full-fidelity path from day one.
 The calendar scheduler does not exist and it is the load-bearing new piece. It
 should **not** be built report-specific. Add a small, general-purpose
 **durable scheduler** — a persisted set of cron entries and a cross-pod worker
-loop that conditionally leases due entries — and make the report its *first
-consumer*. (If it grows, promote it to its own ADR.) The scheduler knows nothing
+loop that conditionally leases due entries — and make the report its _first
+consumer_. (If it grows, promote it to its own ADR.) The scheduler knows nothing
 about reports, dashboards, or graphs: it owns cron entries and firing; report
 logic lives in the registered handler.
 
 **Two ways to build it — poll a durable table, or park a delayed "wait" in the
-queue.** A tempting alternative skips the periodic scan: enqueue each job *now*
+queue.** A tempting alternative skips the periodic scan: enqueue each job _now_
 with a far-in-advance delay (a week-long "wait") and let the queue deliver it when
 the delay elapses. Clean mental model, and the right instinct on payload — you park
 only a **tiny trigger, never data** (a discipline we adopt unconditionally below).
-But we recommend **against** the queue-as-schedule *storage* model, for three
+But we recommend **against** the queue-as-schedule _storage_ model, for three
 reasons:
 
 1. **Durability.** A week-long delayed message lives in Redis; the GroupQueue is
    Redis-backed (the in-house GroupQueue, not BullMQ). A flush,
    eviction, failover, or migration silently drops every parked schedule — whereas
-   a Postgres `ScheduledJob` row survives all of that. The *schedule* must not live
+   a Postgres `ScheduledJob` row survives all of that. The _schedule_ must not live
    only in a volatile queue.
 2. **Recurring safety.** A delayed job fires once; "every Monday" means the handler
    re-enqueues the next wait when it fires — a self-perpetuating chain. If one fire
    is lost (a crash between pop and re-enqueue, a Redis blip), the chain breaks
-   *silently and permanently*. A durable row cannot break the chain: the row still
-   sits there and the next scan catches up. (ADR-023/025 is the cautionary tale of
+   _silently and permanently_. A durable row cannot break the chain: the row still
+   sits there and the next scan catches up. (ADR-025 is the cautionary tale of
    such a chain that had to be removed.)
 3. **Edit / cancel / DST-recompute.** With parked waits, changing a schedule means
    finding and removing the queued job by id and re-adding; with a row it is one
@@ -324,15 +337,15 @@ model ScheduledJob {
 
 `targetType`/`targetId` keep it agnostic — a report writes `("reportTrigger",
 trigger.id)`; a future weekly-rollup or retention-report writes its own type. So
-the report's schedule lives *here*, not on `Trigger` (§2's `schedule` column
+the report's schedule lives _here_, not on `Trigger` (§2's `schedule` column
 collapses to "keep the `ScheduledJob` in sync on upsert").
 
 **An in-process scheduler loop — no cron, no fixed tick.** Explicit decision
 (supersedes a fixed-interval heartbeat framing): a long-lived **in-process loop**
-on the worker that sleeps *until the next job is due*, not a cron entry or fixed 60
+on the worker that sleeps _until the next job is due_, not a cron entry or fixed 60
 s poll. Redis only accelerates wake-up. The loop:
 
-1. Reads `MIN(nextRunAt) WHERE active` — the soonest due instant across *all*
+1. Reads `MIN(nextRunAt) WHERE active` — the soonest due instant across _all_
    target types — and **sleeps until exactly that instant**, capped by a
    `SCHEDULER_MAX_SLEEP_MS` backstop (~60 s) as a safety net, not the primary
    cadence.
@@ -341,7 +354,7 @@ s poll. Redis only accelerates wake-up. The loop:
    minutes" job doesn't wait out the backstop.
 3. On wake: `SELECT ... WHERE active AND nextRunAt <= now` (indexed due-scan), then
    conditionally lease each due row, invoke its registered handler with `{
-   targetType, targetId, slot }`, and advance `nextRunAt` after successful
+targetType, targetId, slot }`, and advance `nextRunAt` after successful
    settlement. Failures keep the slot and retry with bounded backoff.
 
 **Cross-pod safety = Postgres conditional leases.** Every worker-capable pod may
@@ -355,7 +368,7 @@ invokes it under the fenced lease. A second scheduled feature later is one row
 type + one handler — no new tick, lock, or cron parser.
 
 **Representation & `nextRunAt` computation.** Cron + IANA timezone, not a relative
-window — "09:00 *their* Monday" is a UTC instant that moves across DST. Compute
+window — "09:00 _their_ Monday" is a UTC instant that moves across DST. Compute
 `nextRunAt` in the entry's zone with a tz-aware cron evaluator (`cron-parser` is
 present transitively via BullMQ and takes a `tz` option; `croner` is a tz-native
 alternative) and persist it, so the tick is an indexed comparison, not a per-entry
@@ -372,18 +385,18 @@ message but before settlement can still re-run the handler, so channel delivery
 also uses a stable identity keyed on `(targetType, targetId, slot)`, the calendar
 analog of the alert's `@@unique([triggerId, traceId])` incident claim. The report
 also records its fire in
-`TriggerSent`/`ReportSent` for the operator surface (§7), but the *at-most-once
-guarantee lives in the scheduler*, so every future consumer inherits it.
+`TriggerSent`/`ReportSent` for the operator surface (§7), but the _at-most-once
+guarantee lives in the scheduler_, so every future consumer inherits it.
 
 **Missed-run / catch-up policy** (`ScheduledJob.catchUp`, framework-level):
 
-- **`skip`** — on recovery, fast-forward `nextRunAt` to the next *future* instant;
+- **`skip`** — on recovery, fast-forward `nextRunAt` to the next _future_ instant;
   drop everything missed. (A Monday digest sent Wednesday is noise.)
-- **`runLatest` (recommended default)** — fire exactly one catch-up for the *most
-  recent* missed slot, then fast-forward. A short outage doesn't silently swallow a
+- **`runLatest` (recommended default)** — fire exactly one catch-up for the _most
+  recent_ missed slot, then fast-forward. A short outage doesn't silently swallow a
   daily report; a week of downtime doesn't spew seven backfilled reports.
 - The scheduler **never** replays every missed slot — the per-slot claim makes it
-  *possible*, but a stampede of stale fires is worse than a gap.
+  _possible_, but a stampede of stale fires is worse than a gap.
 
 Why not the K8s `/api/cron/triggers` sweep: it was project-blind, coarse
 (3-minute), and has since been removed (ADR-034 Ph 5 — the graph-alert cron is
@@ -395,11 +408,12 @@ gone). 60 s granularity is ample for calendar reports.
 
 A weekly report over a large dashboard is **N heavy ClickHouse `getTimeseries`
 queries fired at once, on a cold cache** (the 30 s `getTimeseries` TTL,
-`analytics.service.ts:52`, helps concurrent dashboard *views*, not a once-a-week
+`analytics.service.ts:52`, helps concurrent dashboard _views_, not a once-a-week
 batch). One graph = one bucketed CH GROUP-BY (two when the tripwire runs the routed
-+ legacy query in parallel, `analytics.service.ts:138`); N graphs fan out to N
-independent queries with no batching. A synchronous 20-query loop inside one
-dispatch would blow the render budget and hammer CH.
+
+- legacy query in parallel, `analytics.service.ts:138`); N graphs fan out to N
+  independent queries with no batching. A synchronous 20-query loop inside one
+  dispatch would blow the render budget and hammer CH.
 
 **Fan each graph's query out through process-manager intents / GroupQueue rather than a
 synchronous loop.** A report "assemble" job enqueues N per-graph "compute" jobs
@@ -424,21 +438,21 @@ Extend the automations drawer with the Report kind, mirroring the kind-aware
 patterns PR #5015 built for alerts (`draftReducer.ts` `SET_SOURCE`,
 `TypePicker.tsx` gating, `AutomationDrawer.tsx` `isGraphAlert` branches):
 
-- **Type picker** gains a third card — *Report* — alongside Automation and Alert;
+- **Type picker** gains a third card — _Report_ — alongside Automation and Alert;
   selecting it sets `triggerKind = REPORT` and swaps the drawer body.
-- **Content source** picker: *Dashboard* · *Single graph* · *Trace query* (filters
-  + top-N). The trace-query builder reuses the existing trace filter UI; the
-  dashboard/graph pickers reuse `api.dashboards.getAll` / `api.graphs.getAll`.
+- **Content source** picker: _Dashboard_ · _Single graph_ · _Trace query_ (filters
+  - top-N). The trace-query builder reuses the existing trace filter UI; the
+    dashboard/graph pickers reuse `api.dashboards.getAll` / `api.graphs.getAll`.
 - **Schedule** field: a constrained frequency/day/time/timezone picker compiling to
   the cron string, with an advanced escape hatch (extend `PullScheduleField` with a
   timezone select). Show the computed "next run".
-- **Comparison** toggle: *none* vs *vs previous period* (drives `includePrevious` /
+- **Comparison** toggle: _none_ vs _vs previous period_ (drives `includePrevious` /
   the `previousPeriod` series).
 - **Channel + template + preview**: unchanged notify pipeline — pick
   email/Slack/webhook, pick or customize the template, preview against real recent
   data via the ADR-037 pane.
-- **Copywriting** (per `copywriting.md`): the card says *what it does* ("A scheduled
-  summary of a dashboard, posted on a calendar you choose"), never *how*.
+- **Copywriting** (per `copywriting.md`): the card says _what it does_ ("A scheduled
+  summary of a dashboard, posted on a calendar you choose"), never _how_.
 
 ---
 
@@ -459,7 +473,7 @@ for the other kinds.
 
 - **Feature flag.** Add `release_scheduled_reports` to `FEATURE_FLAGS`
   (`src/server/featureFlag/registry.ts`), `scope: "PRODUCT"`, `defaultValue: false`,
-  mirroring `release_webhook_automations`. Gate the picker card (client) *and* the
+  mirroring `release_webhook_automations`. Gate the picker card (client) _and_ the
   upsert route + scheduler dispatch (server); staff/dev unhide via
   `FEATURE_FLAG_FORCE_ENABLE=release_scheduled_reports`.
 - **Migrations.** All schema changes ship as a **single consolidated migration**,
@@ -474,7 +488,7 @@ for the other kinds.
     `ScheduledJob` table, the `SchedulerService` (due-scan + per-slot
     at-most-once claim + catch-up), the `SchedulerRegistry`, the `triggerKind`
     column, and a **single-graph** or **trace-query** report as the first
-    `targetType` — rendered with *today's* allowlist-clean blocks (section-list /
+    `targetType` — rendered with _today's_ allowlist-clean blocks (section-list /
     sparkline) on Slack and the **full render on email**. Proves scheduling
     correctness (no double-fire across deploys/DST/catch-up) without any ADR-041
     probe; the trace-query report is a natural first consumer since email renders it
@@ -490,7 +504,7 @@ for the other kinds.
   across competing replicas, redeploys, lease expiry, and DST; the
   per-slot at-most-once claim + the durable `ScheduledJob.nextRunAt` (source of
   truth, not a parked queue message) + `runLatest` catch-up are the mitigations, and
-  each must be covered by a test that *executes* the path (a simulated redeploy
+  each must be covered by a test that _executes_ the path (a simulated redeploy
   across a slot, a spring-forward instant, a dropped fire re-caught by the next
   scan), not a string assertion. (2) **Slack's 50-block ceiling** — the
   `REPORT_SLACK_GRAPH_CAP` + top-N-plus-link strategy is the guard, and the
@@ -501,7 +515,7 @@ for the other kinds.
 - **Why a kind, not a new model or action.** The report shares the notify channels,
   template engine, fire-history ledger, drawer, and leased delivery with the other
   kinds.
-  Reusing them makes the calendar schedule and the multi-graph render the *only*
+  Reusing them makes the calendar schedule and the multi-graph render the _only_
   genuinely new pieces; a new model or bespoke `TriggerAction` would fork three
   subsystems to add one trigger shape.
 - **Why an explicit `triggerKind` over the implicit heuristic.** The codebase
@@ -516,7 +530,7 @@ for the other kinds.
   wall-clock instant; a relative window cannot express it, and a UTC-only cron (the
   `pullSchedule` precedent) sends the digest an hour off half the year.
 - **Why a durable-row poll, not a parked delayed "wait"** (§4): a week-long delayed
-  message stores the *schedule* in volatile Redis (lost on flush/failover), makes a
+  message stores the _schedule_ in volatile Redis (lost on flush/failover), makes a
   recurring report a fragile self-perpetuating chain that dies silently if one fire
   is dropped, and turns an edit into a find-and-replace of queued jobs. A Postgres
   `ScheduledJob` row served by an intelligent loop with a 60 s polling backstop is
@@ -540,7 +554,7 @@ for the other kinds.
   representation, a framework-level per-slot at-most-once claim, and a catch-up
   policy — enters the platform alongside ADR-052's process managers.
   It is the first per-entity, timezone-aware calendar schedule and it is
-  *report-agnostic*: future scheduled work (weekly rollups, retention reports)
+  _report-agnostic_: future scheduled work (weekly rollups, retention reports)
   registers a `targetType` + handler and inherits cross-pod leasing, durability, and
   exactly-once firing for free. If it accretes, promote it to its own ADR.
 - **A third render context (`ReportTemplateContext`) and default family**
@@ -568,10 +582,10 @@ for the other kinds.
   the two render contexts the report's third context joins; fall-back-to-default and
   test-fire discipline the report reuses.
 - [ADR-037](./037-automation-operator-surfaces.md) — authoring drawer + live preview
-  + fire-history the report configuration and delivery surface extend.
+  - fire-history the report configuration and delivery surface extend.
 - [ADR-052](./052-automations-on-process-manager-substrate.md) — the durable wake,
   leased intent, and GroupQueue substrate used by automation reactions.
-- [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating reactor
+- [ADR-025](./025-remove-orphan-sweep.md) — the removed self-perpetuating cleanup chain
   chain; the cautionary tale for why a "re-enqueue the next wait" queue-chain is
   rejected in favour of a durable-row poll.
 - [ADR-040](./040-webhook-http-request-automation-channel.md) — the webhook notify
@@ -583,7 +597,7 @@ for the other kinds.
 - [ADR-034](./034-event-sourced-analytics-materialization.md) — the slim/rollup
   analytics tables `getTimeseries` reads; report queries prefer the rollup.
 - PR #5015 (`feat(automations): graph alerts in automations drawer + Liquid template
-  wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
+wiring`) — the kind-aware drawer, `graphAlert` sub-shape, and
   `graph-trigger-evaluation.service.ts` this report generalizes.
 - `src/server/app-layer/automations/graph-trigger-evaluation.service.ts` — the
   server-side "stored graph → `getTimeseries`" evaluator the report render extends

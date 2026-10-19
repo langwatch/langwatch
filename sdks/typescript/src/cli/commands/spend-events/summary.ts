@@ -1,15 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import {
   SpendEventsApiService,
   type SpendGroupBy,
   type SpendSummaryRow,
 } from "@/client-sdk/services/spend-events/spend-events-api.service";
+
 import { checkOrgApiKey } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
-import type { CommandResult } from "../../utils/output";
 import { parseInstantOrNull } from "../../utils/instant";
 import { parseKeyValueFlags } from "../../utils/keyValueFlags";
+import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 
 const parseInstant = (value: string, flag: string): number => {
   const parsed = parseInstantOrNull(value);
@@ -43,9 +45,8 @@ const BUCKET_VALUES = ["none", "hour", "day"] as const;
 
 /**
  * Everything that tells one row from another. A rollup can be grouped two
- * ways and bucketed by time, so `key` alone is now ambiguous: two rows sharing
- * a model but not an end user, or a day, would print under the same label and
- * read as duplicates of each other.
+ * ways and bucketed by time, so `key` alone is ambiguous -- two rows sharing
+ * a model but not a user or day would print under the same label.
  */
 function rowLabel(row: SpendSummaryRow): string {
   const dimensions = Object.values(row.group)
@@ -66,15 +67,7 @@ const GROUP_LABELS: Record<string, string> = {
   request_type: "request types",
 };
 
-/**
- * What the row count after the walk is a count OF.
- *
- * A dimension's own noun is only true when the walk has one dimension and no
- * time bucket. Add a second dimension or an hour column and each row is a
- * combination, so calling twelve model-by-hour rows "12 models" states
- * something the data does not say, on a surface whose whole job is being
- * exactly right about counts.
- */
+// Determine correct noun for row count; single dimension yields its own noun.
 export function summaryCountNoun({
   groupBy,
   bucket,
@@ -82,8 +75,7 @@ export function summaryCountNoun({
   groupBy: string[];
   bucket?: string;
 }): string {
-  const countsOneDimension =
-    groupBy.length === 1 && (bucket === undefined || bucket === "none");
+  const countsOneDimension = groupBy.length === 1 && (bucket === undefined || bucket === "none");
   if (!countsOneDimension) return "rows";
   return GROUP_LABELS[groupBy[0] ?? "virtual_key"] ?? "groups";
 }
@@ -104,15 +96,12 @@ function oneOf<T extends string>({
 }): T {
   if (!allowed.includes(value as T)) {
     console.error(
-      chalk.red(
-        `Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`,
-      ),
+      chalk.red(`Invalid ${flag} value: ${value} (expected one of ${allowed.join(", ")})`),
     );
     process.exit(1);
   }
   return value as T;
 }
-
 
 export const spendSummaryCommand = async (options: {
   groupBy?: string;
@@ -147,11 +136,8 @@ export const spendSummaryCommand = async (options: {
         });
   const now = Date.now();
   const fromMs =
-    options.from !== undefined
-      ? parseInstant(options.from, "--from")
-      : now - 24 * 60 * 60 * 1000;
-  const toMs =
-    options.to !== undefined ? parseInstant(options.to, "--to") : now;
+    options.from !== undefined ? parseInstant(options.from, "--from") : now - 24 * 60 * 60 * 1000;
+  const toMs = options.to !== undefined ? parseInstant(options.to, "--to") : now;
   const service = new SpendEventsApiService({ apiKey });
   const spinner = createSpinner("Reading spend summaries...").start();
   try {
@@ -176,10 +162,7 @@ export const spendSummaryCommand = async (options: {
         pairs: options.metadata,
         flag: "--metadata",
       }),
-      limit:
-        options.limit !== undefined
-          ? parsePositiveInt(options.limit, "--limit")
-          : undefined,
+      limit: options.limit !== undefined ? parsePositiveInt(options.limit, "--limit") : undefined,
     })) {
       data.push(row);
     }
@@ -190,30 +173,29 @@ export const spendSummaryCommand = async (options: {
     );
     return {
       data,
-      table: () => {
-        console.log();
-        for (const row of data) {
-          const imageTokens =
-            row.usage.input_image_tokens + row.usage.output_image_tokens;
-          // Only on rows that have image spend: the text buckets read as the
-          // whole story otherwise, and image tokens are not part of them.
-          const imageNote =
-            imageTokens > 0 || row.usage.image_count > 0
-              ? `  img ${row.usage.input_image_tokens} / ${row.usage.output_image_tokens} tok, ${row.usage.image_count} image${row.usage.image_count !== 1 ? "s" : ""}`
-              : "";
-          const settledNote =
-            row.settled_count > 0
-              ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`)
-              : "";
-          console.log(
-            `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}${imageNote}`,
-          );
-        }
-        console.log();
-      },
+      table: () => printSummaryRows(data),
     };
   } catch (error) {
     failSpinner({ spinner, error, action: "read spend summaries" });
     process.exit(1);
   }
 };
+
+function printSummaryRows(data: readonly SpendSummaryRow[]): void {
+  console.log();
+  for (const row of data) {
+    const imageTokens = row.usage.input_image_tokens + row.usage.output_image_tokens;
+    // Only on rows that have image spend: the text buckets read as the
+    // whole story otherwise, and image tokens are not part of them.
+    const imageNote =
+      imageTokens > 0 || row.usage.image_count > 0
+        ? `  img ${row.usage.input_image_tokens} / ${row.usage.output_image_tokens} tok, ${row.usage.image_count} image${row.usage.image_count !== 1 ? "s" : ""}`
+        : "";
+    const settledNote =
+      row.settled_count > 0 ? chalk.yellow(` (+${row.settled_count} settled, unpriced)`) : "";
+    console.log(
+      `${chalk.cyan(rowLabel(row))}  $${Number(row.cost.total_usd).toFixed(6)}  ${row.event_count} events${settledNote}  in ${row.usage.input_tokens} / out ${row.usage.output_tokens}${imageNote}`,
+    );
+  }
+  console.log();
+}

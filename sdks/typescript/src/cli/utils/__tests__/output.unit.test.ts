@@ -1,28 +1,25 @@
 /**
- * The output contract's RESULT rendering, pinned: `printResult` for every
- * format, and the tiny built-in jq subset behind `--jq`. Flag normalisation
- * lives in output-context.unit.test.ts; Commander registration in
- * output-registration.unit.test.ts.
+ * The output contract's RESULT rendering: `printResult` per format, and the
+ * built-in jq subset behind `--jq`. Flag normalisation lives in
+ * output-context.unit.test.ts; Commander registration in output-registration.unit.test.ts.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import {
-  AGENT_MODE_ENV_VARS,
-  applyJq,
-  printResult,
-} from "../output";
+
+import { AGENT_MODE_ENV_VARS, applyJq, printResult } from "../output";
 
 const DATA = [
   { name: "alpha", id: "1", nested: { score: 0.9 } },
   { name: "beta", id: "2", nested: { score: 0.1 } },
 ];
 
-/** Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must not leak into tests. */
+/**
+ * Agent-mode env vars from the host (e.g. CLAUDECODE under Claude Code) must
+ * not leak into tests.
+ */
 let savedAgentEnv: Record<string, string | undefined> = {};
 
 beforeEach(() => {
-  savedAgentEnv = Object.fromEntries(
-    AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]),
-  );
+  savedAgentEnv = Object.fromEntries(AGENT_MODE_ENV_VARS.map((name) => [name, process.env[name]]));
   for (const name of AGENT_MODE_ENV_VARS) delete process.env[name];
   vi.spyOn(console, "log").mockImplementation(() => undefined);
 });
@@ -37,7 +34,12 @@ afterEach(() => {
 });
 
 const printedJson = (): unknown =>
-  JSON.parse(vi.mocked(console.log).mock.calls.map((call) => String(call[0])).join("\n"));
+  JSON.parse(
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n"),
+  );
 
 describe("printResult", () => {
   describe("given no output flags", () => {
@@ -124,15 +126,15 @@ describe("printResult", () => {
     });
 
     it("throws on an expression that does not start with a dot", async () => {
-      await expect(
-        printResult(DATA, { jq: "items[]", table: vi.fn() }),
-      ).rejects.toThrow(/must start with/);
+      await expect(printResult(DATA, { jq: "items[]", table: vi.fn() })).rejects.toThrow(
+        /must start with/,
+      );
     });
 
     it("throws when iterating a non-array", async () => {
-      await expect(
-        printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() }),
-      ).rejects.toThrow(/non-array/);
+      await expect(printResult({ items: 42 }, { jq: ".items[]", table: vi.fn() })).rejects.toThrow(
+        /non-array/,
+      );
     });
   });
 });
@@ -152,18 +154,16 @@ describe("applyJq", () => {
     expect(applyJq(". | length", { a: 1, b: 2 })).toBe(2);
     // Iteration collects first (`.items[].tags` → array of tag arrays), then
     // `| length` sizes the collected result — the subset's documented reading.
-    expect(applyJq(".items[].tags | length", {
-      items: [{ tags: ["a", "b"] }, { tags: [] }],
-    })).toBe(2);
+    expect(
+      applyJq(".items[].tags | length", {
+        items: [{ tags: ["a", "b"] }, { tags: [] }],
+      }),
+    ).toBe(2);
   });
 
   it("throws on unsupported pipes instead of silently printing null", () => {
-    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(
-      /after a pipe/,
-    );
-    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(
-      /after a pipe/,
-    );
+    expect(() => applyJq(".items | map(.name)", { items: [] })).toThrow(/after a pipe/);
+    expect(() => applyJq(".items | length | length", { items: [] })).toThrow(/after a pipe/);
     expect(() => applyJq(".items | length", { items: 42 })).toThrow(/no size/);
   });
 
@@ -179,17 +179,13 @@ describe("applyJq", () => {
 
   /** @scenario "A pipe into a path on a single value reads that value" */
   it("pipes into a path on a single value, with no iteration to spread over", () => {
-    expect(applyJq(".meta | .name", { meta: { name: "langwatch" } })).toBe(
-      "langwatch",
-    );
+    expect(applyJq(".meta | .name", { meta: { name: "langwatch" } })).toBe("langwatch");
   });
 
-  // The two pipe readings are not the same, and both follow the subset's own
-  // convention that an iteration collects into an array. `| .path` distributes
-  // over that array, because an array has no `.slug` and the result has to
-  // equal the inline `.data[].slug` spelling. `| length` sizes the collected
-  // array itself, which is the reading already pinned above for
-  // `.items[].tags | length`.
+  // The two pipe readings are not the same, and both follow the subset's own convention that an
+  // iteration collects into an array. `| .path` distributes over that array, because an array has
+  // no `.slug` and the result has to equal the inline `.data[].slug` spelling. `| length` sizes the
+  // collected array itself, which is the reading already pinned above for `.items[].tags | length`.
   it("distributes a piped path over an iteration, then sizes each result", () => {
     expect(
       applyJq(".data[] | .slug | length", {

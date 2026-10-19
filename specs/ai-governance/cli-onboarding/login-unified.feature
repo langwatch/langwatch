@@ -205,17 +205,6 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     # switch projects non-interactively (field report).
 
   @bdd @cli @login @project @slug @integration
-  Scenario: `langwatch login --project <slug>` resolves the key through the device session, no browser
-    Given the user has a valid device session in ~/.langwatch/config.json
-    And a shared project with the given slug exists in the session's organization
-    And the user has write access to that project
-    When the user runs `langwatch login --project <slug>` (TTY or not)
-    Then the CLI calls POST /api/auth/cli/project-key with the slug and its bearer token
-    And the server returns that project's existing API key (nothing new is minted)
-    And the CLI writes LANGWATCH_API_KEY to $CWD/.env
-    And no browser opens and no prompt fires
-
-  @bdd @cli @login @project @slug @integration
   Scenario: `--project <slug>` without a device session fails with actionable guidance
     Given no device session exists in ~/.langwatch/config.json
     When the user runs `langwatch login --project some-slug`
@@ -223,23 +212,30 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     And stderr says a device login is needed first (`langwatch login` in a browser-able
       terminal) or to use `--api-key <key>` instead
 
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses a project the caller cannot manage
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names a project the user cannot write to
-    Then the server responds 403 and no key is returned
+  # The key `--project` writes does project work beyond tracing: versioning prompts,
+  # reading datasets, running evaluations and simulations (founder, 2026-10-02).
+  @bdd @cli @login @project @slug @unit
+  Scenario: `langwatch login --project <slug>` writes a full-access key
+    Given a device session and a project the person manages
+    When the user runs `langwatch login --project <slug>`
+    Then the CLI forks a session bound to that project and mints the person's own key
+      with every permission there, through `POST /api/v1/api-keys/full-access`
+    And it ends the forked session and writes the key to `$CWD/.env`
+    And it prints "API key for project <name> saved to .env"
 
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint returns the caller's own personal project key
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names the caller's own personal project slug
-    Then the server returns the personal project's API key
+  @bdd @cli @login @project @slug @unit
+  Scenario: A person who cannot manage the project gets an ingestion key and is told so
+    Given a device session and a project the person can send traces to but not manage
+    When the user runs `langwatch login --project <slug>`
+    Then the full key is refused and the CLI mints the ingestion key with the same session
+    And it prints that the key only sends traces, and how to get one that does more
 
-  @bdd @cli @login @project @slug @integration
-  Scenario: the project-key endpoint refuses another user's personal project
-    Given a device-session bearer token
-    When POST /api/auth/cli/project-key names another user's personal project slug
-    Then the server responds 400 personal_project_not_allowed
+  @bdd @cli @login @project @unit
+  Scenario: The browser project pick writes the same full-access key
+    Given the user picked a project on the /cli/auth page in an interactive project login
+    When the CLI receives the project-bound session
+    Then it mints the full-access key with it, or the ingestion key for a person who
+      cannot manage the project, and ends the session
 
   @bdd @cli @login @agent-aware @fake-tty
   Scenario: agent-hint banner is shown EVEN when stdin reports as TTY (fake-TTY agents)
@@ -418,6 +414,66 @@ Feature: Unified `langwatch login` UX — endpoint + auth-mode + storage discipl
     Then `~/.langwatch/config.json` is removed (or access_token cleared)
     And `$CWD/.env`'s `LANGWATCH_API_KEY` is NOT touched
 
+  # ─────────────────────────────────────────────────────────────────────
+  # The authorize screen's own states, written down when the page moved
+  # out of `[gone]`. The wire underneath them — the three routes and
+  # their bodies — is unchanged, because the published CLI polls the other
+  # side of it.
+  # ─────────────────────────────────────────────────────────────────────
+
+  @bdd @cli @login @integration
+  Scenario: an unauthenticated reader is bounced through sign-in with their code
+    Given a browser opened by `langwatch login` with no session
+    When the authorize page loads
+    Then it sends the reader to sign-in with the device code in the callback URL
+    And it looks up nothing until they are signed in
+
+  @bdd @cli @login @integration
+  Scenario: a reader whose session is still arriving is not bounced
+    Given the session answer has not arrived yet
+    When the authorize page renders
+    Then it waits rather than redirecting
+    And a signed-in reader never round-trips through sign-in for a frame
+
+  @bdd @cli @login @integration
+  Scenario: a reader who signed up mid-login round-trips through onboarding
+    Given a reader who has just signed up and belongs to no organization
+    When the authorize page loads
+    Then it sends them to onboarding with a return address carrying their code
+    So the CLI's poll can still succeed when they come back
+
+  @bdd @cli @login @integration
+  Scenario: an unrecognised code explains itself
+    Given a device code nothing recognises
+    When the authorize page looks it up
+    Then it names the code and says it may have expired or already been used
+
+  @bdd @cli @login @integration
+  Scenario: an expired code sends the reader back to their terminal
+    Given a device code past its deadline
+    When the authorize page looks it up
+    Then it says the code expired and to run `langwatch login` again
+    And it does not read as a generic failure
+
+  @bdd @cli @login @integration
+  Scenario: a refused approval says why
+    Given an approval the endpoint refuses
+    When the refusal arrives
+    Then the page shows the message the endpoint sent
+
+  @bdd @cli @login @integration
+  Scenario: denying the code rejects the CLI session
+    Given a pending device code
+    When the reader denies it
+    Then the CLI session is rejected
+    And the reader is told so even when the call could not be made
+
+  @bdd @cli @login @integration
+  Scenario: the CLI stamps itself as the acquisition source
+    Given a browser opened by `langwatch login`
+    When the authorize page loads
+    Then the CLI is recorded as the lead source
+    And a reader who originally arrived through a campaign keeps their real source
   # A login overwrites the session on this machine in place. Logging in as a
   # second account left every command answering from the first account's
   # organization with nothing on screen saying the account had changed, and a

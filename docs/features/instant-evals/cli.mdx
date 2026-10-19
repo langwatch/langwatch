@@ -7,15 +7,15 @@ description: Every langwatch instant-eval subcommand and flag, what each prints,
 
 ## Subcommands
 
-| Command | What it does |
-|---|---|
-| `run [question]` | Starts a run, waits for it and prints the matches |
-| `estimate [question]` | Counts the rows and reports the cost without judging any |
-| `status <id>` | Reads one run: where it is, what it matched, what it cost |
-| `list` | Lists the project's runs, newest first |
-| `results <id>` | Reads a page of the run's verdicts |
-| `sample <id>` | Reads a few rows with the judged text beside the verdict |
-| `cancel <id>` | Asks a run to stop before its next page |
+| Command               | What it does                                              |
+| --------------------- | --------------------------------------------------------- |
+| `run [question]`      | Starts a run, waits for it and prints the matches         |
+| `estimate [question]` | Counts the rows and reports the cost without judging any  |
+| `status <id>`         | Reads one run: where it is, what it matched, what it cost |
+| `list`                | Lists the project's runs, newest first                    |
+| `results <id>`        | Reads a page of the run's verdicts                        |
+| `sample <id>`         | Reads a few rows with the judged text beside the verdict  |
+| `cancel <id>`         | Asks a run to stop before its next page                   |
 
 The CLI uses the project of your `langwatch login`, or the key in `LANGWATCH_API_KEY`. Reading runs needs `analytics:view`; starting or cancelling one needs `analytics:manage`.
 
@@ -27,27 +27,27 @@ langwatch instant-eval run "the customer sounds annoyed" --target threads --last
 
 The question goes first, or as `--ask` when you want several. `estimate` takes the same flags, less `--name`, `--estimate`, `--detach` and `--show`.
 
-| Flag | What it does |
-|---|---|
-| `[question]` | The question, as the first argument |
-| `--ask <question>` | The same, as a flag. Repeat it to ask several questions of the same text |
-| `--criteria <text>` | For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the `--ask` it describes |
-| `--threshold <probability>` | For a yes or no question: the probability at or above which the answer counts as yes (default 0.5). A question takes criteria or a threshold, not both |
-| `--score <min..max>` | Ask for a rating on that whole-numbered scale instead of a yes or no, for example `1..5` |
-| `--category <name=meaning>` | Ask which option fits. Repeat it for each option, after the `--ask` it describes |
-| `--id <name>` | What to call the question before it, which becomes its column (default `q1`, `q2` and so on) |
-| `--questions-file <path>` | Read the questions from a JSON or YAML file instead of flags |
-| `--target <target>` | What one row is: `traces`, `threads` or `llm-spans` (default `traces`) |
-| `--filter <filter>` | Narrow the rows with a trace filter, for example `"service:checkout AND cost:>0.01"` |
-| `--last <window>` | How far back to look: `30m`, `24h`, `7d`, `2w` (default `7d`) |
-| `--start <instant>`, `--end <instant>` | The window, exactly, as ISO 8601 or epoch milliseconds |
-| `--sql <statement>`, `--sql-file <path>` | Run a LangWatchQL statement of your own instead of a target |
-| `--param <key=value>` | Bind one of your statement's parameters. Repeat it for each |
-| `--limit <n>` | Rows the run may judge (default 1,000; up to 10,000 on every plan and 100,000 on a paid plan) |
-| `--name <name>` | What to call the run |
-| `--estimate` | Report the cost and exit without starting the run |
-| `--detach` | Create the run, print its id and return instead of waiting |
-| `--show <n>` | Rows to print when the run finishes (default 20, at most 25) |
+| Flag                                     | What it does                                                                                                                                           |
+| ---------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `[question]`                             | The question, as the first argument                                                                                                                    |
+| `--ask <question>`                       | The same, as a flag. Repeat it to ask several questions of the same text                                                                               |
+| `--criteria <text>`                      | For a yes or no question: what counts as yes, then what counts as no. Write it twice, after the `--ask` it describes                                   |
+| `--threshold <probability>`              | For a yes or no question: the probability at or above which the answer counts as yes (default 0.5). A question takes criteria or a threshold, not both |
+| `--score <min..max>`                     | Ask for a rating on that whole-numbered scale instead of a yes or no, for example `1..5`                                                               |
+| `--category <name=meaning>`              | Ask which option fits. Repeat it for each option, after the `--ask` it describes                                                                       |
+| `--id <name>`                            | What to call the question before it, which becomes its column (default `q1`, `q2` and so on)                                                           |
+| `--questions-file <path>`                | Read the questions from a JSON or YAML file instead of flags                                                                                           |
+| `--target <target>`                      | What one row is: `traces`, `threads` or `llm-spans` (default `traces`)                                                                                 |
+| `--filter <filter>`                      | Narrow the rows with a trace filter, for example `"service:checkout AND cost:>0.01"`                                                                   |
+| `--last <window>`                        | How far back to look: `30m`, `24h`, `7d`, `2w` (default `7d`)                                                                                          |
+| `--start <instant>`, `--end <instant>`   | The window, exactly, as ISO 8601 or epoch milliseconds                                                                                                 |
+| `--sql <statement>`, `--sql-file <path>` | Run a LangWatchQL statement of your own instead of a target                                                                                            |
+| `--param <key=value>`                    | Bind one of your statement's parameters. Repeat it for each                                                                                            |
+| `--limit <n>`                            | Rows the run may judge (default 1,000; up to 10,000 on every plan and 100,000 on a paid plan)                                                          |
+| `--name <name>`                          | What to call the run                                                                                                                                   |
+| `--estimate`                             | Report the cost and exit without starting the run                                                                                                      |
+| `--detach`                               | Create the run, print its id and return instead of waiting                                                                                             |
+| `--show <n>`                             | Rows to print when the run finishes (default 20, at most 25)                                                                                           |
 
 ### What run prints
 
@@ -103,11 +103,11 @@ langwatch instant-eval list
 langwatch instant-eval list --limit 100 --before 2026-09-18T00:00:00Z --before-id <id>
 ```
 
-| Flag | What it does |
-|---|---|
-| `--limit <n>` | Runs to list, at most 100 (default 20) |
-| `--before <instant>` | Runs created before this instant, ISO 8601 |
-| `--before-id <id>` | The id of the last run on the previous page, with `--before`, so a page starts after it |
+| Flag                 | What it does                                                                            |
+| -------------------- | --------------------------------------------------------------------------------------- |
+| `--limit <n>`        | Runs to list, at most 100 (default 20)                                                  |
+| `--before <instant>` | Runs created before this instant, ISO 8601                                              |
+| `--before-id <id>`   | The id of the last run on the previous page, with `--before`, so a page starts after it |
 
 ## results
 
@@ -116,13 +116,13 @@ langwatch instant-eval results <id> --question annoyed --matched --limit 200
 langwatch instant-eval results <id> --cursor <cursor>
 ```
 
-| Flag | What it does |
-|---|---|
-| `--question <id>` | Only that question's verdicts |
+| Flag                       | What it does                                                            |
+| -------------------------- | ----------------------------------------------------------------------- |
+| `--question <id>`          | Only that question's verdicts                                           |
 | `--matched`, `--unmatched` | Only the yes or no verdicts that matched, or only the ones that did not |
-| `--status <status>` | Only `judged`, `skipped` or `failed` verdicts |
-| `--limit <n>` | Verdicts per page, at most 1,000 (default 100) |
-| `--cursor <cursor>` | The cursor the previous page printed on its last line |
+| `--status <status>`        | Only `judged`, `skipped` or `failed` verdicts                           |
+| `--limit <n>`              | Verdicts per page, at most 1,000 (default 100)                          |
+| `--cursor <cursor>`        | The cursor the previous page printed on its last line                   |
 
 Each verdict prints as the trace, the question, the status, the answer with its probability, and the conversation. See [Results](/features/instant-evals/results) for the JSON shape.
 

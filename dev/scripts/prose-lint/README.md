@@ -28,18 +28,18 @@ node dev/scripts/prose-lint/lint.mjs page.mdx --rules both --json
 node dev/scripts/prose-lint/lint.mjs page.mdx --rules both --section-level 3 --threshold 0.8
 ```
 
-| Flag | Default | What it does |
-|---|---|---|
-| `--rules docs\|writing\|both` | `docs` | Which rule file(s) to load. `both` runs the docs rules and the writing rules on every section |
-| `--rules landing` | | `rules/landing.json`, the landing-page-writing rules, plus the writing rules, since every writing rule binds on a landing page |
-| `--context` | | Give the judge every section above the one it reads as `above`. Rules marked `"context": true` (landing rule 2, understandable from the page above; rule 9, product name defined) only run with it, and are skipped with a note without it. Write the page copy as one file, one `##` per block, in page order |
-| `--section-level N` | `2` | Split the file at headings of level N and above. Frontmatter is stripped, MDX components stay in the text |
-| `--threshold P` | `0.7` | Exit code 1 when any rule fires at or above P |
-| `--min P` | `0.5` | Only report rules at or above P |
-| `--locate P` | `0.6` | Ask Jev which sentence for judge rules at or above P; `--no-locate` skips that request |
-| `--only a,b` / `--skip a,b` | | Run or skip rule ids |
-| `--json` | | Machine output: sections, findings, usage |
-| `--concurrency N` | `4` | Sections judged in parallel |
+| Flag                          | Default | What it does                                                                                                                                                                                                                                                                                                   |
+| ----------------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--rules docs\|writing\|both` | `docs`  | Which rule file(s) to load. `both` runs the docs rules and the writing rules on every section                                                                                                                                                                                                                  |
+| `--rules landing`             |         | `rules/landing.json`, the landing-page-writing rules, plus the writing rules, since every writing rule binds on a landing page                                                                                                                                                                                 |
+| `--context`                   |         | Give the judge every section above the one it reads as `above`. Rules marked `"context": true` (landing rule 2, understandable from the page above; rule 9, product name defined) only run with it, and are skipped with a note without it. Write the page copy as one file, one `##` per block, in page order |
+| `--section-level N`           | `2`     | Split the file at headings of level N and above. Frontmatter is stripped, MDX components stay in the text                                                                                                                                                                                                      |
+| `--threshold P`               | `0.7`   | Exit code 1 when any rule fires at or above P                                                                                                                                                                                                                                                                  |
+| `--min P`                     | `0.5`   | Only report rules at or above P                                                                                                                                                                                                                                                                                |
+| `--locate P`                  | `0.6`   | Ask Jev which sentence for judge rules at or above P; `--no-locate` skips that request                                                                                                                                                                                                                         |
+| `--only a,b` / `--skip a,b`   |         | Run or skip rule ids                                                                                                                                                                                                                                                                                           |
+| `--json`                      |         | Machine output: sections, findings, usage                                                                                                                                                                                                                                                                      |
+| `--concurrency N`             | `4`     | Sections judged in parallel                                                                                                                                                                                                                                                                                    |
 
 ## The key
 
@@ -102,12 +102,12 @@ Label what is not prose so the judge reads the page the way a visitor sees it: `
 
 Jev charges 0.042 USD per million input tokens and nothing for output. Every judge question costs roughly 100 tokens of question text on top of the section text, and the sentence locator sends the section again with the fired rules as choice questions.
 
-| Page | Rules | Sections | Requests | Input tokens | USD |
-|---|---|---|---|---|---|
-| `langy/overview.mdx` | docs | 2 | 4 | 10,024 | 0.0004 |
-| `coding-agents/overview.mdx` | docs | 5 | 8 | 21,063 | 0.0009 |
-| a 7-section page | both | 7 | 13 | 59,244 | 0.0025 |
-| a 10-section page | both | 10 | 16 | 86,023 | 0.0036 |
+| Page                         | Rules | Sections | Requests | Input tokens | USD    |
+| ---------------------------- | ----- | -------- | -------- | ------------ | ------ |
+| `langy/overview.mdx`         | docs  | 2        | 4        | 10,024       | 0.0004 |
+| `coding-agents/overview.mdx` | docs  | 5        | 8        | 21,063       | 0.0009 |
+| a 7-section page             | both  | 7        | 13       | 59,244       | 0.0025 |
+| a 10-section page            | both  | 10       | 16       | 86,023       | 0.0036 |
 
 So a docs page costs a tenth of a cent with the docs rules and a quarter to a third of a cent with both rule sets. The full calibration run over 15 fixtures is 0.006 USD. The request cap is 32k tokens for text and questions together; the tool keeps a 30k budget and splits the questions across requests when a section is long. It never splits the text: a section over the budget is reported as an error, and `--section-level 3` is the way to make sections smaller.
 

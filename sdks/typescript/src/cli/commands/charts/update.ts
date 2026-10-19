@@ -1,20 +1,17 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import {
-  ChartInputError,
-  type DefinitionFlags,
-  resolveDefinitionInput,
-} from "./definitionInput";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { ChartInputError, type DefinitionFlags, resolveDefinitionInput } from "./definitionInput";
 
 /**
- * Returns the updated chart rather than printing it: the output port renders
- * it in whatever format the caller asked for (utils/output.ts). A call
- * touching nothing is refused locally, matching the API's own refusal of an
- * empty update.
+ * Returns the updated chart rather than printing it (output port renders
+ * per-format). A call touching nothing is refused locally, matching the
+ * API's own refusal of an empty update.
  */
 export const updateChartCommand = async (
   id: string,
@@ -35,9 +32,7 @@ export const updateChartCommand = async (
 
   if (options.name === undefined && definition === undefined) {
     console.error(
-      chalk.red(
-        "Error: nothing to update — pass --name, or a definition via --sql / --sql-file",
-      ),
+      chalk.red("Error: nothing to update — pass --name, or a definition via --sql / --sql-file"),
     );
     process.exit(1);
   }

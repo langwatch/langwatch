@@ -2,19 +2,16 @@
   "name": "mastra",
   "version": "1.0.0",
   "description": "",
+  "keywords": [],
+  "license": "ISC",
+  "author": "",
+  "type": "module",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "mastra dev",
     "build": "mastra build",
     "start": "mastra start"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "module",
-  "engines": {
-    "node": ">=22.13.0"
   },
   "dependencies": {
     "@mastra/core": "^1.8.0",
@@ -45,5 +42,8 @@
     "protobufjs": ">=7.5.6 <8.0.0 || >=8.6.6",
     "shell-quote": ">=1.9.0 <2",
     "uuid": ">=11.1.1 <12"
+  },
+  "engines": {
+    "node": ">=22.13.0"
   }
 }

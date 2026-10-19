@@ -76,14 +76,14 @@ Feature: Recent Items UI
     Then items should be grouped by their type
 
   # Error handling
-  @unimplemented
+  @integration
   Scenario: Handles API error gracefully
     Given the recent items API returns an error
     When I view the recent items section
     Then I should see an error message
     And I should see a retry button
 
-  @unimplemented
+  @integration
   Scenario: Retry button refetches data
     Given the recent items API returned an error
     When I click the retry button

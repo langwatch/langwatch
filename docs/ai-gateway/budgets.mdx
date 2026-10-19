@@ -14,21 +14,24 @@ Spend is counted after the provider answers, from the token counts the provider 
 
 Open **AI Gateway > Budgets** and click **New budget**. The drawer has these fields:
 
-| Field | Values |
-|---|---|
-| **Name**, **Description** | The name is required. |
-| **Applies to** | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself. |
-| **Provider** | **All providers**, or one provider credential. Only requests served by that credential count. |
-| **Window** | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
-| **Limit (USD)** | The cap. |
-| **Start cycle on** | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles). |
-| **On breach** | **Block: reject requests at limit** or **Warn: tag responses, keep serving**. |
+| Field                     | Values                                                                                                                                  |
+| ------------------------- | --------------------------------------------------------------------------------------------------------------------------------------- |
+| **Name**, **Description** | The name is required.                                                                                                                   |
+| **Applies to**            | **Organization**, **Group**, **Team**, **Project**, **Member** or **Virtual key**, then the target itself.                              |
+| **Provider**              | **All providers**, or one provider credential. Only requests served by that credential count.                                           |
+| **Window**                | **Per minute**, **Per hour**, **Per day**, **Per week**, **Per calendar month**, **Total (no reset)** or **Manual (reset on request)**. |
+| **Limit (USD)**           | The cap.                                                                                                                                |
+| **Start cycle on**        | Optional, on the cycling windows only. The date and time the periods roll from. See [Cycles](#windows-and-cycles).                      |
+| **On breach**             | **Block: reject requests at limit** or **Warn: tag responses, keep serving**.                                                           |
 
 <Frame caption="The New budget drawer: Applies to with the six scope types, the provider filter, the window, the limit, the cycle anchor and On breach.">
-  <img src="/images/ai-gateway/budget-create-drawer.png" alt="The New budget drawer with Project selected under Applies to, Per calendar month, a 500 dollar limit and Block on breach" />
+  <img
+    src="/images/ai-gateway/budget-create-drawer.png"
+    alt="The New budget drawer with Project selected under Applies to, Per calendar month, a 500 dollar limit and Block on breach"
+  />
 </Frame>
 
-The budget is in force at once: the next request counts against it. The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+The budget is in force at once: the next request counts against it. See [How far past a limit spend can go](#how-far-past-a-limit-spend-can-go).
 
 For a team, project or group target with no active key that can reach it, the drawer refuses the budget with `gateway_budget_scope_unreachable` and offers **Create it anyway**. Use it when you provision the budget before the keys.
 
@@ -36,15 +39,15 @@ Per-end-user budgets are created over the API. See [Per end user](#per-end-user)
 
 ## Scopes
 
-| Scope | Counts |
-|---|---|
-| `organization` | Every request in the organization. |
-| `team` | Every request whose trace project belongs to the team. |
-| `project` | Every request whose traces land in the project. |
-| `virtual_key` | Every request on this key. |
-| `principal` | Every request by this person, on any key with them as principal. **Member** in the drawer. |
-| `group` | Each member of the group, individually. One budget, one allowance per member. Needs the ClickHouse spend ledger. |
-| `attributed_user` | Each end user of your product, individually, on one key or one project. Needs the ClickHouse spend ledger. |
+| Scope             | Counts                                                                                                           |
+| ----------------- | ---------------------------------------------------------------------------------------------------------------- |
+| `organization`    | Every request in the organization.                                                                               |
+| `team`            | Every request whose trace project belongs to the team.                                                           |
+| `project`         | Every request whose traces land in the project.                                                                  |
+| `virtual_key`     | Every request on this key.                                                                                       |
+| `principal`       | Every request by this person, on any key with them as principal. **Member** in the drawer.                       |
+| `group`           | Each member of the group, individually. One budget, one allowance per member. Needs the ClickHouse spend ledger. |
+| `attributed_user` | Each end user of your product, individually, on one key or one project. Needs the ClickHouse spend ledger.       |
 
 One request is checked against all of them. For example, a request on key `acme-support-agent` in project `support` of team `platform` counts against the key's, the project's, the team's and the organization's budgets, and against the principal and group budgets when the key has a principal.
 
@@ -67,16 +70,16 @@ curl -sS https://app.langwatch.ai/api/gateway/v1/budgets \
   }'
 ```
 
-The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
+The end user comes from the request: the `X-LangWatch-End-User-Id` header, then the `X-Litellm-End-User-Id` header, then the OpenAI `user` body field. A voice session keeps the end user of the request that created it, and every usage report of that session counts against that end user. While such a budget is active on the key, a request with no end-user id is rejected with HTTP 400 `end_user_required`.
 
 Read one user's spend and caps with `GET /api/gateway/v1/end-users/:id/spend`. See [Billing and spend events](/ai-gateway/billing-events#read-events-over-rest).
 
 ## Block and warn
 
-| `on_breach` | At the limit | From 80 percent |
-|---|---|---|
-| `block` | HTTP 402 `budget_exceeded` | `X-LangWatch-Budget-Warning` header |
-| `warn` | Request served, header set | `X-LangWatch-Budget-Warning` header |
+| `on_breach` | At the limit               | From 80 percent                     |
+| ----------- | -------------------------- | ----------------------------------- |
+| `block`     | HTTP 402 `budget_exceeded` | `X-LangWatch-Budget-Warning` header |
+| `warn`      | Request served, header set | `X-LangWatch-Budget-Warning` header |
 
 The 402 body is an OpenAI-shaped error with the budget in `error.meta`:
 
@@ -103,6 +106,28 @@ A `block` budget with a **Provider** filter removes that provider from the reque
 
 Two webhook events fire once per period: `gateway.budget.threshold_crossed` at 80 percent and `gateway.budget.breached` at the limit, on `warn` budgets too. See [Webhooks](/features/webhooks).
 
+## How far past a limit spend can go
+
+A budget is checked before a request and debited after it, so spend can pass the limit by a bounded amount:
+
+- **One request.** A request admitted under the limit is served in full, whatever it costs.
+- **Requests in flight.** Requests admitted at the same moment are each checked against the spend recorded so far.
+- **The refresh.** The gateway reads budget spend from a configuration bundle refreshed every 60 seconds, so a key can serve for up to one minute after it crosses the limit.
+
+### Voice and realtime sessions
+
+A voice call is one admission that bills for as long as it runs. It is checked when the session is created and debited while it runs: each usage report is its own debit, so budgets see a call in progress.
+
+| Session | Created on | At the limit | Overshoot bound |
+| ------- | ---------- | ------------ | --------------- |
+| Metered by the gateway | `/v1/live/sessions`, `/v1/realtime/calls` | The gateway ends the call. It checks on every usage report and every 30 seconds. | About one minute of the call. |
+| Metered by the client | `/v1/realtime/client_secrets`, `/v1/single-use-token/{token_type}` | The usage answer carries `budget.exceeded: true`. The client closes the socket. The gateway cannot. | The rest of the call, at most the vendor's session length. |
+| Never reported | Either client-metered route | LangWatch charges an estimate when the open window passes. | The estimate. See [Sessions that never report](/ai-gateway/api/realtime#sessions-that-never-report). |
+
+The next session create on a key past its limit answers HTTP 402 in all three cases.
+
+Two settings keep a client-metered session small: a short credential lifetime on the mint (`expires_after.seconds` for OpenAI; an ElevenLabs token lasts 15 minutes and opens one socket) and **max open sessions** on the key, which caps how many calls it holds at once. See [Realtime voice](/ai-gateway/api/realtime#limiting-how-many-calls-a-key-runs-at-once).
+
 ## Windows and cycles
 
 The cycling windows (`minute`, `hour`, `day`, `week`, `month`) roll on the calendar in UTC: a day resets at 00:00, a week on Monday 00:00, a month on the first.
@@ -123,13 +148,19 @@ A reset moves the period boundary to now. Recorded spend and emitted spend event
 **AI Gateway > Budgets** lists every budget with its spent amount against its limit, its window, its breach mode and its next reset.
 
 <Frame caption="AI Gateway > Budgets: spent against limit per budget, the window, the breach mode and the next reset. The block budget is at 100 percent, the warn budget at 85.">
-  <img src="/images/ai-gateway/budgets-page.png" alt="The Budgets list with an organization budget at 0 percent, a block budget at 100 percent and a warn budget at 85 percent" />
+  <img
+    src="/images/ai-gateway/budgets-page.png"
+    alt="The Budgets list with an organization budget at 0 percent, a block budget at 100 percent and a warn budget at 85 percent"
+  />
 </Frame>
 
 Click a budget for its 20 most recent debits, with the time, the virtual key, the model, the amount and the status.
 
 <Frame caption="A breached block budget opened: $0.05822 spent of a $0.05 daily limit, 100 percent used, the next reset, and under Recent activity the requests that spent it.">
-  <img src="/images/ai-gateway/budget-breached-detail.png" alt="The budget detail page for acme-block-budget with the utilization bar full and red, Window day, On breach block, the Identity block and the Recent activity table" />
+  <img
+    src="/images/ai-gateway/budget-breached-detail.png"
+    alt="The budget detail page for acme-block-budget with the utilization bar full and red, Window day, On breach block, the Identity block and the Recent activity table"
+  />
 </Frame>
 
 **AI Gateway > Usage** shows total spend, requests, cost per request, top virtual keys and top models over a period, with a CSV export.
@@ -152,13 +183,13 @@ langwatch gateway-budgets archive <budget_id>
 
 ## Manage budgets over REST
 
-| Method and path | Permission |
-|---|---|
-| `GET /api/gateway/v1/budgets` | `gatewayBudgets:view` |
-| `POST /api/gateway/v1/budgets` | `gatewayBudgets:create` |
-| `GET /api/gateway/v1/budgets/:id` | `gatewayBudgets:view` |
-| `PATCH /api/gateway/v1/budgets/:id` | `gatewayBudgets:update` |
-| `POST /api/gateway/v1/budgets/:id/reset` | `gatewayBudgets:update` |
+| Method and path                                | Permission              |
+| ---------------------------------------------- | ----------------------- |
+| `GET /api/gateway/v1/budgets`                  | `gatewayBudgets:view`   |
+| `POST /api/gateway/v1/budgets`                 | `gatewayBudgets:create` |
+| `GET /api/gateway/v1/budgets/:id`              | `gatewayBudgets:view`   |
+| `PATCH /api/gateway/v1/budgets/:id`            | `gatewayBudgets:update` |
+| `POST /api/gateway/v1/budgets/:id/reset`       | `gatewayBudgets:update` |
 | `DELETE /api/gateway/v1/budgets/:id` (archive) | `gatewayBudgets:delete` |
 
 Field by field: [Budgets API reference](/api-reference/gateway-budgets/overview). A virtual key's own budget can also be set inline on the key: see [Virtual keys](/ai-gateway/virtual-keys#manage-keys-over-rest).

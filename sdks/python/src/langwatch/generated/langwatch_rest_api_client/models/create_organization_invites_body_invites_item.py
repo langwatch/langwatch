@@ -7,6 +7,7 @@ from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
 from ..models.create_organization_invites_body_invites_item_role import CreateOrganizationInvitesBodyInvitesItemRole
+from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.create_organization_invites_body_invites_item_teams_item import (
@@ -23,12 +24,12 @@ class CreateOrganizationInvitesBodyInvitesItem:
     Attributes:
         email (str):
         role (CreateOrganizationInvitesBodyInvitesItemRole):
-        teams (list[CreateOrganizationInvitesBodyInvitesItemTeamsItem]):
+        teams (list[CreateOrganizationInvitesBodyInvitesItemTeamsItem] | Unset):
     """
 
     email: str
     role: CreateOrganizationInvitesBodyInvitesItemRole
-    teams: list[CreateOrganizationInvitesBodyInvitesItemTeamsItem]
+    teams: list[CreateOrganizationInvitesBodyInvitesItemTeamsItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -36,10 +37,12 @@ class CreateOrganizationInvitesBodyInvitesItem:
 
         role = self.role.value
 
-        teams = []
-        for teams_item_data in self.teams:
-            teams_item = teams_item_data.to_dict()
-            teams.append(teams_item)
+        teams: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.teams, Unset):
+            teams = []
+            for teams_item_data in self.teams:
+                teams_item = teams_item_data.to_dict()
+                teams.append(teams_item)
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
@@ -47,9 +50,10 @@ class CreateOrganizationInvitesBodyInvitesItem:
             {
                 "email": email,
                 "role": role,
-                "teams": teams,
             }
         )
+        if teams is not UNSET:
+            field_dict["teams"] = teams
 
         return field_dict
 
@@ -64,12 +68,14 @@ class CreateOrganizationInvitesBodyInvitesItem:
 
         role = CreateOrganizationInvitesBodyInvitesItemRole(d.pop("role"))
 
-        teams = []
-        _teams = d.pop("teams")
-        for teams_item_data in _teams:
-            teams_item = CreateOrganizationInvitesBodyInvitesItemTeamsItem.from_dict(teams_item_data)
+        _teams = d.pop("teams", UNSET)
+        teams: list[CreateOrganizationInvitesBodyInvitesItemTeamsItem] | Unset = UNSET
+        if _teams is not UNSET:
+            teams = []
+            for teams_item_data in _teams:
+                teams_item = CreateOrganizationInvitesBodyInvitesItemTeamsItem.from_dict(teams_item_data)
 
-            teams.append(teams_item)
+                teams.append(teams_item)
 
         create_organization_invites_body_invites_item = cls(
             email=email,

@@ -9,7 +9,18 @@ from attrs import field as _attrs_field
 from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
-    from ..models.post_api_scenario_events_body_type_2_messages_item import PostApiScenarioEventsBodyType2MessagesItem
+    from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
+        PostApiScenarioEventsBodyType2MessagesItemType0,
+    )
+    from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
+        PostApiScenarioEventsBodyType2MessagesItemType1,
+    )
+    from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
+        PostApiScenarioEventsBodyType2MessagesItemType2,
+    )
+    from ..models.post_api_scenario_events_body_type_2_messages_item_type_3 import (
+        PostApiScenarioEventsBodyType2MessagesItemType3,
+    )
 
 
 T = TypeVar("T", bound="PostApiScenarioEventsBodyType2")
@@ -21,39 +32,64 @@ class PostApiScenarioEventsBodyType2:
     Attributes:
         type_ (Literal['SCENARIO_MESSAGE_SNAPSHOT']):
         timestamp (float):
-        messages (list[PostApiScenarioEventsBodyType2MessagesItem]):
         batch_run_id (str):
         scenario_id (str):
         scenario_run_id (str):
+        messages (list[PostApiScenarioEventsBodyType2MessagesItemType0 | PostApiScenarioEventsBodyType2MessagesItemType1
+            | PostApiScenarioEventsBodyType2MessagesItemType2 | PostApiScenarioEventsBodyType2MessagesItemType3]):
         raw_event (Any | Unset):
         scenario_set_id (str | Unset):  Default: 'default'.
     """
 
     type_: Literal["SCENARIO_MESSAGE_SNAPSHOT"]
     timestamp: float
-    messages: list[PostApiScenarioEventsBodyType2MessagesItem]
     batch_run_id: str
     scenario_id: str
     scenario_run_id: str
+    messages: list[
+        PostApiScenarioEventsBodyType2MessagesItemType0
+        | PostApiScenarioEventsBodyType2MessagesItemType1
+        | PostApiScenarioEventsBodyType2MessagesItemType2
+        | PostApiScenarioEventsBodyType2MessagesItemType3
+    ]
     raw_event: Any | Unset = UNSET
     scenario_set_id: str | Unset = "default"
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
+            PostApiScenarioEventsBodyType2MessagesItemType0,
+        )
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
+            PostApiScenarioEventsBodyType2MessagesItemType1,
+        )
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
+            PostApiScenarioEventsBodyType2MessagesItemType2,
+        )
+
         type_ = self.type_
 
         timestamp = self.timestamp
-
-        messages = []
-        for messages_item_data in self.messages:
-            messages_item = messages_item_data.to_dict()
-            messages.append(messages_item)
 
         batch_run_id = self.batch_run_id
 
         scenario_id = self.scenario_id
 
         scenario_run_id = self.scenario_run_id
+
+        messages = []
+        for messages_item_data in self.messages:
+            messages_item: dict[str, Any]
+            if isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType0):
+                messages_item = messages_item_data.to_dict()
+            elif isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType1):
+                messages_item = messages_item_data.to_dict()
+            elif isinstance(messages_item_data, PostApiScenarioEventsBodyType2MessagesItemType2):
+                messages_item = messages_item_data.to_dict()
+            else:
+                messages_item = messages_item_data.to_dict()
+
+            messages.append(messages_item)
 
         raw_event = self.raw_event
 
@@ -65,10 +101,10 @@ class PostApiScenarioEventsBodyType2:
             {
                 "type": type_,
                 "timestamp": timestamp,
-                "messages": messages,
                 "batchRunId": batch_run_id,
                 "scenarioId": scenario_id,
                 "scenarioRunId": scenario_run_id,
+                "messages": messages,
             }
         )
         if raw_event is not UNSET:
@@ -80,8 +116,17 @@ class PostApiScenarioEventsBodyType2:
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
-        from ..models.post_api_scenario_events_body_type_2_messages_item import (
-            PostApiScenarioEventsBodyType2MessagesItem,
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_0 import (
+            PostApiScenarioEventsBodyType2MessagesItemType0,
+        )
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_1 import (
+            PostApiScenarioEventsBodyType2MessagesItemType1,
+        )
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_2 import (
+            PostApiScenarioEventsBodyType2MessagesItemType2,
+        )
+        from ..models.post_api_scenario_events_body_type_2_messages_item_type_3 import (
+            PostApiScenarioEventsBodyType2MessagesItemType3,
         )
 
         d = dict(src_dict)
@@ -91,18 +136,57 @@ class PostApiScenarioEventsBodyType2:
 
         timestamp = d.pop("timestamp")
 
-        messages = []
-        _messages = d.pop("messages")
-        for messages_item_data in _messages:
-            messages_item = PostApiScenarioEventsBodyType2MessagesItem.from_dict(messages_item_data)
-
-            messages.append(messages_item)
-
         batch_run_id = d.pop("batchRunId")
 
         scenario_id = d.pop("scenarioId")
 
         scenario_run_id = d.pop("scenarioRunId")
+
+        messages = []
+        _messages = d.pop("messages")
+        for messages_item_data in _messages:
+
+            def _parse_messages_item(
+                data: object,
+            ) -> (
+                PostApiScenarioEventsBodyType2MessagesItemType0
+                | PostApiScenarioEventsBodyType2MessagesItemType1
+                | PostApiScenarioEventsBodyType2MessagesItemType2
+                | PostApiScenarioEventsBodyType2MessagesItemType3
+            ):
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    messages_item_type_0 = PostApiScenarioEventsBodyType2MessagesItemType0.from_dict(data)
+
+                    return messages_item_type_0
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    messages_item_type_1 = PostApiScenarioEventsBodyType2MessagesItemType1.from_dict(data)
+
+                    return messages_item_type_1
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                try:
+                    if not isinstance(data, dict):
+                        raise TypeError()
+                    messages_item_type_2 = PostApiScenarioEventsBodyType2MessagesItemType2.from_dict(data)
+
+                    return messages_item_type_2
+                except (TypeError, ValueError, AttributeError, KeyError):
+                    pass
+                if not isinstance(data, dict):
+                    raise TypeError()
+                messages_item_type_3 = PostApiScenarioEventsBodyType2MessagesItemType3.from_dict(data)
+
+                return messages_item_type_3
+
+            messages_item = _parse_messages_item(messages_item_data)
+
+            messages.append(messages_item)
 
         raw_event = d.pop("rawEvent", UNSET)
 
@@ -111,10 +195,10 @@ class PostApiScenarioEventsBodyType2:
         post_api_scenario_events_body_type_2 = cls(
             type_=type_,
             timestamp=timestamp,
-            messages=messages,
             batch_run_id=batch_run_id,
             scenario_id=scenario_id,
             scenario_run_id=scenario_run_id,
+            messages=messages,
             raw_event=raw_event,
             scenario_set_id=scenario_set_id,
         )

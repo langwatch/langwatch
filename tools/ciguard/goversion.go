@@ -40,7 +40,8 @@ var GoDockerfileRoots = []string{"infra", "services", "platform", "tools"}
 // consumer who meets the SDK's directive cannot build a sibling module that
 // quietly asks for more.
 var ModuleFamilies = map[string]string{
-	"sdks/go/": "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build the tree standalone with GOWORK=off precisely so that stays true, and examples/ and e2e/ sit outside the workspace so they compile against the SDK at the floor it really publishes.",
+	"sdks/go/":                          "published SDK: its go directive is the floor consumers must meet, and raising it drops support for anyone below. sdk-go-ci and sdk-go-cd build the tree standalone with GOWORK=off precisely so that stays true, and examples/ and e2e/ sit outside the workspace so they compile against the SDK at the floor it really publishes.",
+	"services/third_party/scenario-go/": "vendored third-party module: it keeps the go directive its upstream publishes (Go 1.25), and we do not raise it with the repo.",
 }
 
 var (
@@ -60,28 +61,20 @@ func goDirective(text string) string {
 	return ""
 }
 
-// GoVersion reports every place that disagrees with the root go.mod.
+// GoVersion reports every place that disagrees with go.work, the version
+// every workspace module shares (there is no module at the repository root).
 func GoVersion(repoRoot string) ([]string, error) {
-	rootModule, err := os.ReadFile(filepath.Join(repoRoot, "go.mod"))
-	if err != nil {
-		return nil, fmt.Errorf("read go.mod: %w", err)
-	}
-
-	want := goDirective(string(rootModule))
-	if want == "" {
-		return []string{"go.mod has no parseable `go` directive"}, nil
-	}
-
-	var problems []string
-
 	work, err := os.ReadFile(filepath.Join(repoRoot, "go.work"))
 	if err != nil {
 		return nil, fmt.Errorf("read go.work: %w", err)
 	}
-	if got := goDirective(string(work)); got != want {
-		problems = append(problems, fmt.Sprintf(
-			"go.work says %s, go.mod says %s — the workspace and the root module must agree", got, want))
+
+	want := goDirective(string(work))
+	if want == "" {
+		return []string{"go.work has no parseable `go` directive"}, nil
 	}
+
+	var problems []string
 
 	modules, err := goChildModules(repoRoot, want)
 	if err != nil {
@@ -103,8 +96,8 @@ func GoVersion(repoRoot string) ([]string, error) {
 	return append(problems, images...), nil
 }
 
-// goChildModules compares every non-root go.mod against the version it is
-// supposed to track — the root module's, or its family's floor.
+// goChildModules compares every go.mod against the version it is supposed to
+// track — go.work's, or its family's floor.
 //
 // Without this the guard read the root module and nothing else, so
 // infra/clickhouse-serverless/go.mod could drift straight back to 1.26.1
@@ -153,7 +146,7 @@ type expectation struct {
 func expectationFor(repoRoot, path, rootVersion string) (expectation, bool, error) {
 	family, isInFamily := moduleFamily(path)
 	if !isInFamily {
-		return expectation{version: rootVersion, authority: "go.mod"}, true, nil
+		return expectation{version: rootVersion, authority: "go.work"}, true, nil
 	}
 
 	authority := family + "go.mod"
@@ -215,7 +208,7 @@ func childModulePaths(repoRoot string) ([]string, error) {
 			return fs.SkipDir
 		case err != nil:
 			return err
-		case entry.IsDir() && isSkippedDir(entry.Name()):
+		case entry.IsDir() && path != repoRoot && isSkippedDir(path, entry.Name()):
 			return fs.SkipDir
 		case entry.IsDir() || entry.Name() != "go.mod":
 			return nil
@@ -225,9 +218,7 @@ func childModulePaths(repoRoot string) ([]string, error) {
 		if relErr != nil {
 			return relErr
 		}
-		if rel != "go.mod" {
-			paths = append(paths, filepath.ToSlash(rel))
-		}
+		paths = append(paths, filepath.ToSlash(rel))
 
 		return nil
 	})
@@ -310,8 +301,15 @@ func goDockerfileImages(repoRoot, want string) ([]string, error) {
 	return problems, nil
 }
 
-func isSkippedDir(name string) bool {
-	return name == "node_modules" || name == ".git" || name == "dist"
+// isSkippedDir also skips scratch trees and linked worktrees (a .git file).
+func isSkippedDir(path, name string) bool {
+	switch name {
+	case "node_modules", ".git", "dist", ".fuzz", ".worktrees", ".claude", ".bin":
+		return true
+	}
+	info, err := os.Lstat(filepath.Join(path, ".git"))
+
+	return err == nil && !info.IsDir()
 }
 
 func isDockerfile(name string) bool {
@@ -330,7 +328,7 @@ func dockerfilePaths(repoRoot string) ([]string, error) {
 			return fs.SkipDir
 		case err != nil:
 			return err
-		case entry.IsDir() && isSkippedDir(entry.Name()):
+		case entry.IsDir() && path != repoRoot && isSkippedDir(path, entry.Name()):
 			return fs.SkipDir
 		case entry.IsDir() || !isDockerfile(entry.Name()):
 			return nil
@@ -363,11 +361,11 @@ func checkGolangImage(path, tag, want string) []string {
 		// the image quietly stops matching the module without any file
 		// changing.
 		return []string{fmt.Sprintf(
-			"%s uses golang:%s, a floating tag — pin the patch so the image is built with the toolchain go.mod asks for", path, tag)}
+			"%s uses golang:%s, a floating tag — pin the patch so the image is built with the toolchain go.work asks for", path, tag)}
 	}
 
 	if version != want {
-		return []string{fmt.Sprintf("%s builds with Go %s, go.mod says %s", path, version, want)}
+		return []string{fmt.Sprintf("%s builds with Go %s, go.work says %s", path, version, want)}
 	}
 
 	return nil

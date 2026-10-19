@@ -1,0 +1,164 @@
+import { FEATURE_PREFIX, stripFeaturePrefix } from "../../grammar/feature-layout-policy.mjs";
+import { defineRule } from "../define-rule.mjs";
+
+// Only `repositories/<store>/**` names a store client, and a registry hands the
+// clients in (ARCHITECTURE.md §3.2, §7). One row per store; Prisma alone is
+// refused even as a type, and a Redis channel speaks to its own client.
+
+const STORES = [
+  {
+    folder: "prisma",
+    packages: /^(?:@langwatch\/prisma-client|@prisma\/client)(?:\/|$)/,
+    registryValues: new Set(["PrismaRepository", "prismaRepositories", "prismaTables"]),
+    store: "Prisma",
+    typesTravel: false,
+  },
+  {
+    folder: "clickhouse",
+    packages: /^(?:@langwatch\/clickhouse-client|@clickhouse\/client)(?:\/|$)/,
+    registryValues: new Set(),
+    store: "ClickHouse",
+    typesTravel: true,
+  },
+  {
+    channelTier: "redis",
+    folder: "redis",
+    packages: /^(?:@langwatch\/redis-client|ioredis)(?:\/|$)/,
+    registryValues: new Set(),
+    store: "Redis",
+    typesTravel: true,
+  },
+];
+
+const MODULE_ROLES = new Set(["contract", "process", "browser", "library", "client"]);
+
+// Named exceptions: the file, the stores it may name, and why (Alex, 2026-10-06, Q212).
+// A third-party library takes the raw client itself; each moves with its code.
+const NAMED_EXCEPTIONS = [
+  {
+    path: /^modules\/auth\/process\/src\/app\/auth-composition\.build\.ts$/,
+    stores: new Set(["Prisma", "Redis"]),
+    reason:
+      "Better Auth's storage adapter takes the raw Prisma client and a Redis secondary storage",
+  },
+  {
+    path: /^modules\/ops\/process\/src\/repositories\/live\/live\.replay-runtime\.repository\.ts$/,
+    stores: new Set(["ClickHouse", "Redis"]),
+    reason: "ops' event replay reads the event log over ClickHouse and locks on a duplicated Redis",
+  },
+];
+
+function isNamedException({ file, row }) {
+  return NAMED_EXCEPTIONS.some(
+    (exception) => exception.path.test(file.workspacePath) && exception.stores.has(row.store),
+  );
+}
+const REPOSITORY_REGISTRY = new RegExp(`^${FEATURE_PREFIX}repositories/[^/]+\\.registry\\.ts$`);
+
+function isGoverned(file) {
+  if (file.isTest) return false;
+
+  return MODULE_ROLES.has(file.role) || file.kind === "application";
+}
+
+function sourceOf(node) {
+  const value = node.source?.value;
+
+  return typeof value === "string" ? value : undefined;
+}
+
+function bindingsOf(node) {
+  return node.specifiers ?? [];
+}
+
+function isTypeBinding(node, binding) {
+  if (node.importKind === "type" || node.exportKind === "type") return true;
+
+  return binding.importKind === "type" || binding.exportKind === "type";
+}
+
+/** The names a node brings in as values; a side-effect or dynamic import is one unnamed value. */
+function valueNamesOf(node) {
+  if (node.importKind === "type" || node.exportKind === "type") return [];
+  if (node.type === "ImportExpression" || node.type === "ExportAllDeclaration") return ["*"];
+  const bindings = bindingsOf(node);
+  if (bindings.length === 0) return ["*"];
+
+  return bindings
+    .filter((binding) => !isTypeBinding(node, binding))
+    .map((binding) => binding.imported?.name ?? binding.local?.name ?? "*");
+}
+
+function isSeam({ row, sourcePath }) {
+  const layerPath = stripFeaturePrefix(sourcePath);
+  if (layerPath.startsWith(`repositories/${row.folder}/`)) return true;
+
+  return Boolean(row.channelTier) && layerPath.startsWith(`channels/${row.channelTier}/`);
+}
+
+function isProcessSeam({ file, row, values }) {
+  if (file.role !== "process" || !file.sourcePath) return false;
+  if (isSeam({ row, sourcePath: file.sourcePath })) return true;
+
+  return (
+    REPOSITORY_REGISTRY.test(file.sourcePath) &&
+    values.every((name) => row.registryValues.has(name))
+  );
+}
+
+function isAllowed({ file, node, row }) {
+  const values = valueNamesOf(node);
+  if (isProcessSeam({ file, row, values }) || isNamedException({ file, row })) return true;
+
+  return row.typesTravel && values.length === 0;
+}
+
+function messageFor({ file, row }) {
+  if (file.kind === "application") return "storeInApplication";
+
+  return row.typesTravel ? "storeClientValue" : "storeNamed";
+}
+
+export const storeContainmentRule = defineRule({
+  name: "store-containment",
+  kind: "problem",
+  applies: isGoverned,
+  messages: {
+    storeClientValue: {
+      what: "`{{specifier}}` is the {{store}} client, value-imported outside `repositories/{{folder}}/`.",
+      why: "A service holding its own client has a second, unswappable path to the module's data.",
+      fix: "Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; a file that only needs a type writes `import type`. Read the `process-module` skill.",
+    },
+    storeNamed: {
+      what: "`{{specifier}}` names {{store}} outside `repositories/{{folder}}/`.",
+      why: "A repository owns its store, so every query against it sits behind the one interface the module tests.",
+      fix: "Move the query into `repositories/{{folder}}/{{folder}}.<subject>.repository.ts` behind the `repositories/<subject>.repository.ts` interface and call that from the service; only that folder names {{store}}, even as a type.",
+    },
+    storeInApplication: {
+      what: "`{{specifier}}` is a {{store}} client named in an application.",
+      why: "The `Server` chain opens and closes every store; a client in an app escapes its lifecycle and tiers.",
+      fix: "Delete the import: the `Server` chain opens every store, and only a module's repositories and channels hold a client.",
+    },
+  },
+  create(context, file) {
+    const check = (node) => {
+      const specifier = sourceOf(node);
+      if (!specifier) return;
+      const row = STORES.find((candidate) => candidate.packages.test(specifier));
+      if (!row || isAllowed({ file, node, row })) return;
+
+      context.report({
+        node,
+        messageId: messageFor({ file, row }),
+        data: { folder: row.folder, specifier, store: row.store },
+      });
+    };
+
+    return {
+      ExportAllDeclaration: check,
+      ExportNamedDeclaration: check,
+      ImportDeclaration: check,
+      ImportExpression: check,
+    };
+  },
+});

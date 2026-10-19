@@ -155,6 +155,12 @@ Feature: Roles and access assignments in one settings surface
       And a role that grants nothing cannot be saved, and says why
 
     @integration
+    Scenario: A role is saved only with a name that fits
+      When "ana" saves a role with no name, or with a name over 50 characters
+      Then the role is not saved
+      And she is asked to give it a name, or to keep the name under 50 characters
+
+    @integration
     Scenario: The preview says which permissions do nothing at that scope
       Given a role that grants something only the organization can grant
       When "ana" previews it assigned on a team

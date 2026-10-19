@@ -53,14 +53,14 @@ langwatch claude
 
 The first run issues your personal key, prints `issued your personal virtual key for the gateway path`, and starts Claude Code with the gateway as its endpoint. Later runs reuse the key. The tool itself is unchanged: flags, terminal handling and exit codes pass through.
 
-| Wrapper | Tool | Variables the wrapper sets |
-|---|---|---|
-| `langwatch claude` | Claude Code | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
-| `langwatch codex` | Codex | `OPENAI_BASE_URL`, `OPENAI_API_KEY` |
-| `langwatch cursor` | Cursor | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN` |
-| `langwatch gemini` | Gemini CLI | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY` |
-| `langwatch copilot` | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY` |
-| `langwatch opencode` | OpenCode | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` |
+| Wrapper              | Tool               | Variables the wrapper sets                                                                             |
+| -------------------- | ------------------ | ------------------------------------------------------------------------------------------------------ |
+| `langwatch claude`   | Claude Code        | `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`                                                           |
+| `langwatch codex`    | Codex              | `OPENAI_BASE_URL`, `OPENAI_API_KEY`                                                                    |
+| `langwatch cursor`   | Cursor             | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`                      |
+| `langwatch gemini`   | Gemini CLI         | `GOOGLE_GEMINI_BASE_URL`, `GEMINI_API_KEY`, `GOOGLE_API_KEY`                                           |
+| `langwatch copilot`  | GitHub Copilot CLI | `COPILOT_PROVIDER_TYPE`, `COPILOT_PROVIDER_BASE_URL`, `COPILOT_PROVIDER_API_KEY`                       |
+| `langwatch opencode` | OpenCode           | `OPENAI_BASE_URL`, `OPENAI_API_KEY`, `ANTHROPIC_BASE_URL`, `ANTHROPIC_AUTH_TOKEN`, `ANTHROPIC_API_KEY` |
 
 **Also check:** [Coding Agents](/coding-agents/overview) for the setup pages per tool.
 

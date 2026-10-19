@@ -7,11 +7,14 @@ package domain
 // relative to a worktree root.
 var ReclaimablePaths = []string{
 	"node_modules",
-	"platform/app/node_modules",
+	"apps/api/node_modules",
+	"apps/ui/node_modules",
+	"apps/worker/node_modules",
 	"mcp/typescript/node_modules",
 	"sdks/typescript/node_modules",
-	"platform/app/dist",
-	"platform/app/.vite",
-	"platform/app/coverage",
-	"platform/app/server.log",
+	"apps/ui/dist",
+	"apps/ui/node_modules/.vite",
+	"apps/api/dist",
+	"coverage",
+	"server.log",
 }

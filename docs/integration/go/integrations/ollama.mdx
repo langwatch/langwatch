@@ -78,7 +78,8 @@ If you'd rather build the `*http.Client` yourself, use `ollama.NewTransport()` (
 </Note>
 
 <Warning>
-The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost when your application exits.
+  The `defer tp.Shutdown(ctx)` call is essential. Without it, traces buffered in memory will be lost
+  when your application exits.
 </Warning>
 
 ## Related

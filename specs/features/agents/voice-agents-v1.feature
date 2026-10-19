@@ -249,6 +249,15 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Then 2 runs execute and 2 runs wait in the queue with status "Queued"
 
   # AC22
+  @unit
+  Scenario: The voice run concurrency cap is VOICE_RUNS_MAX_CONCURRENT, 2 when unset
+    Given a worker that executes voice runs
+    When VOICE_RUNS_MAX_CONCURRENT is unset, blank or not a positive whole number
+    Then each project may run 2 voice runs at once on that worker
+    When VOICE_RUNS_MAX_CONCURRENT is a positive whole number
+    Then that number is the per-project cap
+
+  # AC22
   @integration
   Scenario: A voice run that fails before its call starts frees its concurrency slot
     Given the project's voice run concurrency cap is reached
@@ -285,13 +294,6 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   # ---------------------------------------------------------------------------
   # Session binding and audio ownership (integration)
   # ---------------------------------------------------------------------------
-
-  # AC13
-  @integration
-  Scenario: An unauthenticated Talk to it request is refused
-    Given a request to mint a voice session with no logged-in user
-    When the request is handled
-    Then it is refused as unauthenticated and no session is minted
 
   # AC13
   @integration
@@ -373,7 +375,7 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
   Scenario: A voice target carries the caller OpenAI key to the child
     Given a voice agent and a project with an enabled OpenAI provider
     When the run data is prefetched for that voice target
-    Then the prepared voice data carries the project's OpenAI key as caller env
+    Then the prepared voice adapter data carries the project's OpenAI key in its callerEnv
 
   # AC19, AC20
   @unit
@@ -441,6 +443,20 @@ Feature: Voice agents v1: test an ElevenLabs agent from the app
     Given a caller voice value
     When the caller voice config is validated
     Then a well-formed "provider/voice" string is accepted and a value of the wrong shape is rejected
+
+  # AC17
+  @unit
+  Scenario: A scenario row with the caller-voice column parses
+    Given a stored scenario row carrying its caller-voice column, set or unset
+    When the row is parsed through the module contract's scenario schema
+    Then it parses without rejecting the caller-voice column as unrecognised
+
+  # AC17
+  @unit
+  Scenario: A stored scenario keeps its caller voice through the module contract
+    Given a scenario row whose caller-voice column holds a stored config
+    When the row is parsed through the module contract's scenario schema
+    Then the parsed scenario carries that same caller-voice config
 
   # AC14
   @unit

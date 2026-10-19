@@ -49,3 +49,10 @@ Feature: Deployment-impact check skips manifest-only dependency bumps
     Given at least one changed file is not a lockfile or dependency manifest
     And the PR description has no deployment-impact writeup
     Then the check still requires one, regardless of what else changed
+
+  @unit
+  Scenario: Every trigger path still names deployment surface in the tree
+    Given the paths that trigger the deployment-impact workflow
+    When each is matched against the tracked files
+    Then each matches at least one tracked file
+    Except a path the module layout reserves, which is listed as reserved in the guard's test

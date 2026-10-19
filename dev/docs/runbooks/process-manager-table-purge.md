@@ -51,10 +51,10 @@ overlaps with a sweep that is working through the same rows more slowly.
 
 ## What gets deleted, and why it is safe
 
-| Table | Predicate | Why safe |
-|---|---|---|
-| `ProcessManagerOutbox` | `status='dispatched' AND "dispatchedAt" < now() - 7 days` | A dispatched row is completed work. Its only remaining value is forensic, and seven days is well past any window in which anyone reads it. Pending and dead rows are never touched: pending rows are work still owed, dead rows are the operator's failure record. |
-| `ProcessManagerInbox` | `"consumedAt" < now() - 7 days` | An inbox row is an idempotency marker. It only has to outlive the window in which the same source event could be redelivered. That horizon is about 25 hours: origin guards reject events older than 1 hour and traces older than 24 hours, and the longest debounce bucket is 600 seconds. Seven days is a wide margin on top, and `TriggerSent` claims are a second layer against a double side effect even if a marker were dropped too early. |
+| Table                  | Predicate                                                 | Why safe                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ProcessManagerOutbox` | `status='dispatched' AND "dispatchedAt" < now() - 7 days` | A dispatched row is completed work. Its only remaining value is forensic, and seven days is well past any window in which anyone reads it. Pending and dead rows are never touched: pending rows are work still owed, dead rows are the operator's failure record.                                                                                                                                                                                |
+| `ProcessManagerInbox`  | `"consumedAt" < now() - 7 days`                           | An inbox row is an idempotency marker. It only has to outlive the window in which the same source event could be redelivered. That horizon is about 25 hours: origin guards reject events older than 1 hour and traces older than 24 hours, and the longest debounce bucket is 600 seconds. Seven days is a wide margin on top, and `TriggerSent` claims are a second layer against a double side effect even if a marker were dropped too early. |
 
 `ProcessManagerInstance` is deliberately **not** purged. It is bounded by entity
 population rather than by traffic (16 MB against 2.1 GB of inbox), and deleting
@@ -63,9 +63,12 @@ rather than a cleanup.
 
 ## Access path
 
-No psql bastion is needed. `platform/app/scripts/ops/purge-process-manager-tables.mjs`
-runs inside an app pod, which already has the Prisma client and the database
-credentials. Nothing here needs a new credential or a new network route.
+No psql bastion is needed. The purge runs inside an app pod, which already has
+the Prisma client and the database credentials, so nothing here needs a new
+credential or a new network route. The monolith's
+`scripts/ops/purge-process-manager-tables.mjs` did not survive the platform
+split — run the statements below directly against the pod's Prisma client until
+an equivalent task lands on `apps/api` or `apps/worker`.
 
 ## Procedure
 
@@ -126,7 +129,7 @@ leaves the rest of the backlog for the next run or for the sweep.
 
 The delete it issues is `ctid`-batched, which is what makes this work without an
 index: the subquery picks physical row locations off a sequential scan, so there
-is no dependency on the indexes, which do not exist until step 5 builds them.
+is no dependency on the indexes, which may not exist yet (step 5).
 
 ```sql
 WITH batch AS (
@@ -176,22 +179,25 @@ WHERE relname IN ('ProcessManagerOutbox', 'ProcessManagerInbox');
 
 `n_dead_tup` should be near zero after the vacuum.
 
-### 5. Build the sweep's indexes
+### 5. Pre-build the sweep's indexes
 
 The sweep reaps by age across every process name, which neither table's
-existing indexes can answer: the outbox indexes lead on `status` or
+other indexes can answer: the outbox indexes lead on `status` or
 `processName`, and 99.98% of outbox rows are `dispatched`, so an age predicate
-without these indexes falls back to scanning. The sweep still works without
-them, just with sequential scans over tables it keeps bounded, so these builds
-are an optimisation, not a prerequisite.
+without these indexes reads the whole table on every batch.
 
-They are deliberately **not** in a Prisma migration. `prisma migrate deploy`
-runs a plain `CREATE INDEX`, which holds a `SHARE` lock that blocks every
-`INSERT` on these tables for the whole build, and these are the two
-highest-volume insert paths in the system. A timeout only caps the damage; it
-does not remove it. `CREATE INDEX CONCURRENTLY` builds without blocking
-writes, but cannot run inside the transaction Prisma applies migrations in,
-so it is an operator step:
+These indexes were once only an operator step here. Production never ran it,
+and on 2026-10-14 the hourly sweep's reads hit the database volume's IOPS
+ceiling. Migration `20261014150000_process_manager_sweep_age_indexes` now
+builds both, so `pnpm task upgrade` creates them on every install.
+
+That migration runs a plain `CREATE INDEX`, which holds a `SHARE` lock that
+blocks every `INSERT` on its table for the whole build, and these are the two
+highest-volume insert paths in the system. The sweep keeps both tables small,
+so the block is short, but on an install with real traffic build them first
+with `CREATE INDEX CONCURRENTLY`, which does not block writes. Then the
+migration's `IF NOT EXISTS` finds them and does nothing. Run this before the
+deploy that carries the migration:
 
 ```sql
 CREATE INDEX CONCURRENTLY IF NOT EXISTS "ProcessManagerOutbox_dispatchedAt_idx"
@@ -235,6 +241,27 @@ DROP INDEX CONCURRENTLY IF EXISTS "<name>";
 ```
 
 Run it outside an explicit transaction, then run the build again.
+
+`pnpm task upgrade` makes a similar check before it applies the migration. An
+invalid index under either name, or one on other columns, stops the run with a
+message naming it (`packages/upgrade/src/stepping/prebuilt-indexes.ts`). It
+checks only that the outbox index has a `WHERE` clause, not what the clause
+says. So a pre-built outbox index with the wrong predicate passes, and the
+sweep cannot use it. After a pre-build, confirm the predicate:
+
+```sql
+SELECT indexdef FROM pg_indexes
+WHERE indexname = 'ProcessManagerOutbox_dispatchedAt_idx';
+-- expect: ... WHERE (status = 'dispatched'::"ProcessManagerOutboxStatus")
+```
+
+To roll the indexes back, drop them the same way. The sweep keeps working
+without them; it reads the whole table again on every batch:
+
+```sql
+DROP INDEX CONCURRENTLY IF EXISTS "ProcessManagerOutbox_dispatchedAt_idx";
+DROP INDEX CONCURRENTLY IF EXISTS "ProcessManagerInbox_consumedAt_idx";
+```
 
 ## After the deploy
 

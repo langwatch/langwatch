@@ -1,27 +1,21 @@
 import { setTimeout as wait } from "node:timers/promises";
+
 import chalk from "chalk";
-import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
-import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+
 import { reportCommandError } from "@/cli/utils/errorOutput";
+import { listIngestionSources } from "@/cli/utils/governance/cli-api";
+import { loadConfig, isLoggedIn } from "@/cli/utils/governance/config";
 import { normalizeEndpoint } from "@/internal/endpoint";
 
 /**
- * `langwatch ingest list [--all] [--json]`
- *
- * Read-only enumeration of the org's IngestionSources, mirroring the
- * `/governance/ingestion-sources` list page for ops folks
- * who live in terminal. Same multi-tenant guard as the web UI
- * (org-scoped via the device-flow Bearer token).
+ * `langwatch ingest list [--all] [--json]`: read-only enumeration of the
+ * org's IngestionSources, mirroring the `/governance/ingestion-sources`
+ * page. Same multi-tenant guard as the web UI (device-flow Bearer token).
  */
-export async function ingestListCommand(options: {
-  all?: boolean;
-  json?: boolean;
-}): Promise<void> {
+export async function ingestListCommand(options: { all?: boolean; json?: boolean }): Promise<void> {
   const cfg = loadConfig();
   if (!isLoggedIn(cfg)) {
-    process.stderr.write(
-      "Not logged in. Run `langwatch login --device` first.\n",
-    );
+    process.stderr.write("Not logged in. Run `langwatch login --device` first.\n");
     process.exit(1);
   }
 
@@ -50,26 +44,14 @@ export async function ingestListCommand(options: {
   }
 
   // Stable formatted table. No external table dep — keep deps tight.
-  const cols: Array<keyof (typeof sources)[number]> = [
-    "name",
-    "sourceType",
-    "status",
-    "lastEventAt",
-  ];
+
   const headerRow = ["NAME", "TYPE", "STATUS", "LAST EVENT"];
   const rows: string[][] = [headerRow];
   for (const s of sources) {
     const lastEvent =
-      s.lastEventAt === null
-        ? chalk.gray("—")
-        : humanRelative(new Date(s.lastEventAt));
+      s.lastEventAt === null ? chalk.gray("—") : humanRelative(new Date(s.lastEventAt));
     const archivedTag = s.archivedAt ? chalk.gray(" [archived]") : "";
-    rows.push([
-      s.name + archivedTag,
-      s.sourceType,
-      colorStatus(s.status),
-      lastEvent,
-    ]);
+    rows.push([s.name + archivedTag, s.sourceType, colorStatus(s.status), lastEvent]);
   }
   printTable(rows);
 
@@ -91,10 +73,9 @@ function colorStatus(status: string): string {
 }
 
 /**
- * Render a relative timestamp like "5m ago" / "2h ago" / "3d ago"
- * for the table's LAST EVENT column. Falls back to the ISO string
- * for future timestamps (clock drift) since "in 5 minutes" would be
- * confusing in a "last event" context. Exported for unit testing.
+ * Renders a relative timestamp like "5m ago" for the LAST EVENT column,
+ * falling back to the ISO string for future timestamps (clock drift), since
+ * "in 5 minutes" would confuse a "last event" context.
  */
 export function humanRelative(d: Date, now: number = Date.now()): string {
   const ms = now - d.getTime();
@@ -110,14 +91,8 @@ export function humanRelative(d: Date, now: number = Date.now()): string {
 }
 
 /**
- * Build a fixed-width table from rows including a leading header row.
- * Returns the formatted string (one row per \n-separated line) instead
- * of console.log-ing directly, so callers control output and tests can
- * assert column alignment without spying on stdout.
- *
- * Each cell's visible width is computed by stripping ANSI escape codes
- * (chalk wraps colors as `\x1b[Nm...\x1b[0m`); without this, coloured
- * cells appear longer than they actually are and break alignment.
+ * Build fixed-width table, stripping ANSI codes for accurate column widths.
+ * Returns formatted string, not stdout (testable, controlled output).
  */
 export function buildTable(rows: string[][]): string {
   if (rows.length === 0) return "";
@@ -140,7 +115,10 @@ function printTable(rows: string[][]): void {
   if (out) console.log(out);
 }
 
+/** The SGR introducer, built from a char code so no control character sits in a regex literal. */
+const ANSI_SGR = new RegExp(`${String.fromCharCode(27)}\\[[0-9;]*m`, "g");
+
 function stripAnsi(s: string): string {
-  // eslint-disable-next-line no-control-regex -- intentional: stripping ANSI escape codes from chalk output for column-width math
-  return s.replace(/\x1b\[[0-9;]*m/g, "");
+  // Strip ANSI codes from chalk output for column-width math
+  return s.replace(ANSI_SGR, "");
 }

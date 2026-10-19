@@ -275,3 +275,10 @@ Rule: An injected notification reads as a note, not as the user's words
     Given a user message that opens with the system notification marker
     When the message is classified
     Then the whole message is one notice and nothing is left as the prompt
+
+  @unit
+  Scenario: The Terminal replay's log read passes the tenant guard
+    Given a coding-agent session whose transcript is read from its stored logs
+    When the Terminal view asks for the session's transcript
+    Then the log read names its time window with parameters the tenant guard does not mistake for a FROM clause
+    And the transcript request answers instead of failing with a tenant-scope refusal

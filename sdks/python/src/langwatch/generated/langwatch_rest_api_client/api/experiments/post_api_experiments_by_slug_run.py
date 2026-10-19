@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, cast
 from urllib.parse import quote
 
 import httpx
@@ -7,9 +7,6 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.post_api_experiments_by_slug_run_body import PostApiExperimentsBySlugRunBody
 from ...models.post_api_experiments_by_slug_run_response_200 import PostApiExperimentsBySlugRunResponse200
-from ...models.post_api_experiments_by_slug_run_response_400 import PostApiExperimentsBySlugRunResponse400
-from ...models.post_api_experiments_by_slug_run_response_401 import PostApiExperimentsBySlugRunResponse401
-from ...models.post_api_experiments_by_slug_run_response_404 import PostApiExperimentsBySlugRunResponse404
 from ...types import UNSET, Response, Unset, safe_http_status
 
 
@@ -22,7 +19,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/experiments/{slug}/run".format(
+        "url": "/api/v1/experiments/{slug}/run".format(
             slug=quote(str(slug), safe=""),
         ),
     }
@@ -38,31 +35,22 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> (
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-    | None
-):
+) -> Any | PostApiExperimentsBySlugRunResponse200 | None:
     if response.status_code == 200:
         response_200 = PostApiExperimentsBySlugRunResponse200.from_dict(response.json())
 
         return response_200
 
     if response.status_code == 400:
-        response_400 = PostApiExperimentsBySlugRunResponse400.from_dict(response.json())
-
+        response_400 = cast(Any, None)
         return response_400
 
     if response.status_code == 401:
-        response_401 = PostApiExperimentsBySlugRunResponse401.from_dict(response.json())
-
+        response_401 = cast(Any, None)
         return response_401
 
     if response.status_code == 404:
-        response_404 = PostApiExperimentsBySlugRunResponse404.from_dict(response.json())
-
+        response_404 = cast(Any, None)
         return response_404
 
     if client.raise_on_unexpected_status:
@@ -73,12 +61,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-]:
+) -> Response[Any | PostApiExperimentsBySlugRunResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -95,12 +78,7 @@ def sync_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiExperimentsBySlugRunBody | Unset = UNSET,
-) -> Response[
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-]:
+) -> Response[Any | PostApiExperimentsBySlugRunResponse200]:
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
@@ -115,7 +93,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiExperimentsBySlugRunResponse200 | PostApiExperimentsBySlugRunResponse400 | PostApiExperimentsBySlugRunResponse401 | PostApiExperimentsBySlugRunResponse404]
+        Response[Any | PostApiExperimentsBySlugRunResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -135,13 +113,7 @@ def sync(
     *,
     client: AuthenticatedClient,
     body: PostApiExperimentsBySlugRunBody | Unset = UNSET,
-) -> (
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-    | None
-):
+) -> Any | PostApiExperimentsBySlugRunResponse200 | None:
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
@@ -156,7 +128,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiExperimentsBySlugRunResponse200 | PostApiExperimentsBySlugRunResponse400 | PostApiExperimentsBySlugRunResponse401 | PostApiExperimentsBySlugRunResponse404
+        Any | PostApiExperimentsBySlugRunResponse200
     """
 
     return sync_detailed(
@@ -171,12 +143,7 @@ async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
     body: PostApiExperimentsBySlugRunBody | Unset = UNSET,
-) -> Response[
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-]:
+) -> Response[Any | PostApiExperimentsBySlugRunResponse200]:
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
@@ -191,7 +158,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[PostApiExperimentsBySlugRunResponse200 | PostApiExperimentsBySlugRunResponse400 | PostApiExperimentsBySlugRunResponse401 | PostApiExperimentsBySlugRunResponse404]
+        Response[Any | PostApiExperimentsBySlugRunResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -209,13 +176,7 @@ async def asyncio(
     *,
     client: AuthenticatedClient,
     body: PostApiExperimentsBySlugRunBody | Unset = UNSET,
-) -> (
-    PostApiExperimentsBySlugRunResponse200
-    | PostApiExperimentsBySlugRunResponse400
-    | PostApiExperimentsBySlugRunResponse401
-    | PostApiExperimentsBySlugRunResponse404
-    | None
-):
+) -> Any | PostApiExperimentsBySlugRunResponse200 | None:
     """Run an experiment
 
      Start a run of a saved experiment, addressed by slug. Returns a runId to poll straight away. Send
@@ -230,7 +191,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        PostApiExperimentsBySlugRunResponse200 | PostApiExperimentsBySlugRunResponse400 | PostApiExperimentsBySlugRunResponse401 | PostApiExperimentsBySlugRunResponse404
+        Any | PostApiExperimentsBySlugRunResponse200
     """
 
     return (

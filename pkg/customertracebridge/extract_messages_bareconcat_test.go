@@ -25,7 +25,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	"github.com/langwatch/langwatch/services/aigateway/domain"
+	"github.com/langwatch/langwatch/pkg/aitrace"
 )
 
 func TestExtractOutputMessages_RequestTypeResponses_bareConcatenatedObjects_realCapture(t *testing.T) {
@@ -34,7 +34,7 @@ func TestExtractOutputMessages_RequestTypeResponses_bareConcatenatedObjects_real
 	require.False(t, looksLikeSSE(body),
 		"the accumulator buffer for codex responses is bare JSON objects, not SSE-framed")
 
-	got := extractOutputMessages(body, domain.RequestTypeResponses)
+	got := extractOutputMessages(body, aitrace.RequestTypeResponses)
 	require.NotEmpty(t, got,
 		"assistant output must be lifted from the bare-object stream (regression: was empty)")
 	assert.Contains(t, got, "PURPLE-ELEPHANT-SEVENTEEN",
@@ -58,7 +58,7 @@ func TestExtractOutputMessages_RequestTypeResponses_bareConcatenated_minimal(t *
 			`]}}`,
 	)
 	require.False(t, looksLikeSSE(body))
-	got := extractOutputMessages(body, domain.RequestTypeResponses)
+	got := extractOutputMessages(body, aitrace.RequestTypeResponses)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 
@@ -73,7 +73,7 @@ func TestExtractOutputMessages_RequestTypeChat_bareConcatenated(t *testing.T) {
 			`{"choices":[{"delta":{},"finish_reason":"stop"}]}`,
 	)
 	require.False(t, looksLikeSSE(body))
-	got := extractOutputMessages(body, domain.RequestTypeChat)
+	got := extractOutputMessages(body, aitrace.RequestTypeChat)
 	assert.JSONEq(t, `[{"role":"assistant","content":"PONG"}]`, got)
 }
 

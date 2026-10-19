@@ -78,24 +78,9 @@ func mutableActions(view *View, downed, destroyed *[]string) Actions {
 
 func stacksView(rows ...Row) View { return View{Stacks: rows} }
 
-// @scenario "Jumping into a stack's git view from the hub"
 // @scenario "Destruction requires typing the name"
 func TestHubModel(t *testing.T) {
 	t.Run("given two stacks", func(t *testing.T) {
-		t.Run("when enter is pressed on the second row, it opens that worktree's git view", func(t *testing.T) {
-			var downed, destroyed []string
-			m := newModel(context.Background(), testActions(&downed, &destroyed))
-			m = press(t, m, "j")
-			next, cmd := m.Update(key("enter"))
-			m = next.(model)
-			if m.outcome.OpenGitDir != "/wt/beta" {
-				t.Errorf("OpenGitDir = %q, want /wt/beta", m.outcome.OpenGitDir)
-			}
-			if cmd == nil {
-				t.Fatal("enter should quit the hub so the git view can take the terminal")
-			}
-		})
-
 		t.Run("when d is confirmed with y, the selected stack is downed", func(t *testing.T) {
 			var downed, destroyed []string
 			m := newModel(context.Background(), testActions(&downed, &destroyed))
@@ -175,8 +160,8 @@ func TestHubModel(t *testing.T) {
 			for _, k := range []string{"enter", "g", "d", "x", "j", "k"} {
 				m = press(t, m, k)
 			}
-			if m.outcome.OpenGitDir != "" {
-				t.Errorf("OpenGitDir = %q, want empty", m.outcome.OpenGitDir)
+			if m.outcome != (Outcome{}) {
+				t.Errorf("outcome = %+v, want empty", m.outcome)
 			}
 		})
 	})
@@ -525,4 +510,29 @@ func TestHubTickRefresh(t *testing.T) {
 			_ = m.View() // must not panic with the shrunk row set
 		})
 	})
+}
+
+// @scenario "The hub opens a selected stack's project viewer"
+func TestHubProjectViewerAndStableSelection(t *testing.T) {
+	rows := []Row{{Slug: "alpha", Dir: "/alpha"}, {Slug: "beta", Dir: "/beta"}}
+	m := newModel(context.Background(), Actions{Refresh: func() View { return View{Stacks: rows} }, HasViewer: true})
+	m.cursor = 1
+	rows = []Row{{Slug: "new", Dir: "/new"}, {Slug: "alpha", Dir: "/alpha"}, {Slug: "beta", Dir: "/beta"}}
+	m.refresh()
+	if it, ok := m.selected(); !ok || it.name() != "beta" {
+		t.Fatal("selection changed during refresh")
+	}
+	updated, cmd := m.Update(tea.KeyMsg{Type: tea.KeyRunes, Runes: []rune{'l'}})
+	if updated.(model).outcome.OpenStack != "beta" || cmd == nil {
+		t.Fatal("did not request the selected project's viewer")
+	}
+}
+
+// @scenario "The hub opens a selected stack's project viewer"
+func TestEnterInspects(t *testing.T) {
+	m := newModel(context.Background(), Actions{Refresh: func() View { return View{Stacks: []Row{{Slug: "alpha", Dir: "/alpha"}}} }, HasViewer: true})
+	inspected := press(t, m, "enter")
+	if inspected.outcome.OpenStack != "alpha" {
+		t.Fatal(inspected.outcome)
+	}
 }

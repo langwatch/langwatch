@@ -464,7 +464,30 @@
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "UnpricedSpanCount",
+              "type": "UInt32",
+              "description": "Spans whose model has no price, so their cost is unknown rather than zero. 0 on traces stored before this was recorded.",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "UnpricedModels",
+              "type": "Array(LowCardinality(String))",
+              "description": "The models of those unpriced spans, sorted. Empty on traces stored before this was recorded.",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -717,7 +740,8 @@
               "description": "Billed cost attributed to the span, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -727,7 +751,8 @@
               "description": "Cost attributed to the span that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1233,7 +1258,8 @@
               "description": "Billed cost of the trace, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1243,7 +1269,30 @@
               "description": "Cost of the trace that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "UnpricedSpanCount",
+              "type": "UInt32",
+              "description": "Spans whose model has no price, so their cost is unknown rather than zero. 0 on traces stored before this was recorded.",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "UnpricedModels",
+              "type": "Array(LowCardinality(String))",
+              "description": "The models of those unpriced spans, sorted. Empty on traces stored before this was recorded.",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1379,7 +1428,8 @@
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1389,7 +1439,8 @@
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1503,7 +1554,8 @@
               "description": "Total cost of the bucket's spans, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1513,7 +1565,8 @@
               "description": "Cost of the bucket's spans that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1721,7 +1774,8 @@
               "description": "Billed cost of running the evaluator, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1731,7 +1785,8 @@
               "description": "Cost of running the evaluator that is not billed, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1861,7 +1916,8 @@
               "description": "Total cost of the bucket's evaluations, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -1871,7 +1927,8 @@
               "description": "Cost of the bucket's evaluations that is not billed, in USD. Billed cost is the difference from CostSum.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -2225,7 +2282,8 @@
               "description": "Computed cost of the session, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -2235,7 +2293,8 @@
               "description": "Cost the agent reported for itself, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -2763,7 +2822,8 @@
               "description": "Cost of a model call, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3510,7 +3570,8 @@
               "description": "LlmCallsTotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3653,7 +3714,8 @@
               "description": "TargetCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3757,7 +3819,8 @@
               "description": "EvaluationCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -3922,7 +3985,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4063,6 +4127,22 @@
               "unit": null,
               "gates": [],
               "available": true
+            },
+            {
+              "name": "ExpectedTargetResults",
+              "type": "Nullable(UInt32)",
+              "description": "ExpectedTargetResults",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ExpectedEvaluatorResults",
+              "type": "Nullable(UInt32)",
+              "description": "ExpectedEvaluatorResults",
+              "unit": null,
+              "gates": [],
+              "available": true
             }
           ],
           "exampleSql": "SELECT ProjectionId, RunId, ExperimentId\nFROM analytics.experiment_run_results\nWHERE StartedAt >= subtractDays(now(), 7)\nORDER BY StartedAt DESC\nLIMIT 100"
@@ -4151,7 +4231,8 @@
               "description": "AmountUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4257,7 +4338,8 @@
               "description": "AmountNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -4333,7 +4415,8 @@
               "description": "SpendUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4391,7 +4474,8 @@
               "description": "SpendNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             }
@@ -4578,7 +4662,8 @@
               "description": "CostNanoUSD",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4792,7 +4877,8 @@
               "description": "CostSource",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4899,7 +4985,8 @@
               "description": "CostSource",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4973,7 +5060,8 @@
               "description": "AmountNanoUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -4983,7 +5071,8 @@
               "description": "AmountNanoMinor",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -5041,7 +5130,8 @@
               "description": "PreviousAmountNanoUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -5180,7 +5270,8 @@
               "description": "SpendUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7743,7 +7834,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7753,7 +7845,8 @@
               "description": "RoleCosts",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7827,7 +7920,8 @@
               "description": "TotalCost",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -7837,7 +7931,8 @@
               "description": "RoleCosts",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -8110,16 +8205,6 @@
               "description": "Type",
               "unit": null,
               "gates": [],
-              "available": true
-            },
-            {
-              "name": "Config",
-              "type": "String",
-              "description": "Config",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
               "available": true
             },
             {
@@ -9047,7 +9132,8 @@
               "description": "Numeric trigger context.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9206,16 +9292,6 @@
               "available": true
             },
             {
-              "name": "DestinationConfig",
-              "type": "String",
-              "description": "Alert routing per destination.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "Status",
               "type": "String",
               "description": "'active' (default - evaluator picks it up) | 'disabled' (admin paused; rule rows kept for audit). 'archived' uses archivedAt timestamp instead so we can filter `archivedAt IS NULL` cheaply.",
@@ -9354,7 +9430,8 @@
               "description": "Billed cost of running the evaluation, in USD.",
               "unit": "USD",
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9429,7 +9506,8 @@
               "description": "CostId",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9447,7 +9525,8 @@
               "description": "CostName",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9516,7 +9595,7 @@
         },
         {
           "name": "analytics.custom_graphs",
-          "description": "Rows of the CustomGraph table, one row per CustomGraphId.",
+          "description": "Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets.",
           "grain": "one row per CustomGraphId",
           "joinKeys": [
             "TenantId",
@@ -9573,7 +9652,7 @@
             {
               "name": "Kind",
               "type": "String",
-              "description": "Discriminator for the two chart shapes that share this table: - \"builder\" (default) - the chart builder's own `graph` payload - \"workbench_sql\" - a saved LangWatchQL workbench chart, whose `graph` holds the versioned definition Each reader filters by its own kind, so neither sees the other's rows and a builder chart can never be interpreted as a workbench definition.",
+              "description": "Discriminator for the chart shapes that share this table: - \"builder\" (default) - the chart builder's own `graph` payload - \"workbench_sql\" - a saved LangWatchQL workbench chart, whose `graph` holds the versioned definition - \"dashboard_srcdoc\" - frozen legacy copies of Dashboards v2 widgets, which now live in DashboardWidget; nothing new writes this kind Each reader filters by its own kind, so neither sees the other's rows and a builder chart can never be interpreted as a workbench definition.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9664,7 +9743,8 @@
               "description": "CustomLLMModelCostId",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -9730,12 +9810,118 @@
           "exampleSql": "SELECT OrganizationId, ScopeType, ScopeId\nFROM analytics.custom_llm_model_costs\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
+          "name": "analytics.dashboard_widgets",
+          "description": "One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable.",
+          "grain": "one row per DashboardWidgetId",
+          "joinKeys": [
+            "TenantId",
+            "DashboardWidgetId",
+            "DashboardId"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the row belongs to. Join key to every other view.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardWidgetId",
+              "type": "String",
+              "description": "Widget identifier.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardId",
+              "type": "Nullable(String)",
+              "description": "The board the widget sits on. Matches `dashboards_v2.DashboardId`; null while unplaced.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "description": "The widget's name.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Definition",
+              "type": "String",
+              "description": "The widget's definition: its React source, its named queries, description and prompt.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "GridColumn",
+              "type": "Int32",
+              "description": "The widget's left column on the board's grid.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "GridRow",
+              "type": "Int32",
+              "description": "The widget's top row on the board's grid.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ColSpan",
+              "type": "Int32",
+              "description": "How many grid columns the widget spans.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "RowSpan",
+              "type": "Int32",
+              "description": "How many grid rows the widget spans.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "CreatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "UpdatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT DashboardWidgetId, DashboardId, Name\nFROM analytics.dashboard_widgets\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
           "name": "analytics.dashboards",
-          "description": "Rows of the Dashboard table, one row per DashboardId.",
+          "description": "One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2.",
           "grain": "one row per DashboardId",
           "joinKeys": [
             "TenantId",
-            "DashboardId"
+            "DashboardId",
+            "CreatedById"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -9767,7 +9953,25 @@
             {
               "name": "Order",
               "type": "Int32",
-              "description": "Order",
+              "description": "Legacy board sort position.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Description",
+              "type": "Nullable(String)",
+              "description": "Free text under the board's name; null until a member writes one.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "The member who created it; null for boards that predate the column.",
               "unit": null,
               "gates": [],
               "available": true
@@ -9790,6 +9994,87 @@
             }
           ],
           "exampleSql": "SELECT DashboardId, Name, Order\nFROM analytics.dashboards\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
+        },
+        {
+          "name": "analytics.dashboards_v2",
+          "description": "One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable.",
+          "grain": "one row per DashboardId",
+          "joinKeys": [
+            "TenantId",
+            "DashboardId",
+            "CreatedById"
+          ],
+          "timeColumn": "CreatedAt",
+          "freshness": "live — read from PostgreSQL at query time",
+          "columns": [
+            {
+              "name": "TenantId",
+              "type": "String",
+              "description": "Project the row belongs to. Join key to every other view.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "DashboardId",
+              "type": "String",
+              "description": "Board identifier. Matches `dashboard_widgets.DashboardId`.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Name",
+              "type": "String",
+              "description": "The board's name.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Description",
+              "type": "Nullable(String)",
+              "description": "Free text under the board's name; null until a member writes one.",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "CreatedById",
+              "type": "Nullable(String)",
+              "description": "The member who made the board; null when no member is known.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Scope",
+              "type": "String",
+              "description": "Who sees the board: PROJECT, the project's members, or ORGANIZATION, every project of its organization.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "CreatedAt",
+              "type": "DateTime64(3)",
+              "description": "CreatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "UpdatedAt",
+              "type": "DateTime64(3)",
+              "description": "UpdatedAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            }
+          ],
+          "exampleSql": "SELECT DashboardId, Name, CreatedById\nFROM analytics.dashboards_v2\nWHERE CreatedAt >= subtractDays(now(), 7)\nORDER BY CreatedAt DESC\nLIMIT 100"
         },
         {
           "name": "analytics.data_privacy_policies",
@@ -9943,7 +10228,8 @@
           "grain": "one row per DatasetId",
           "joinKeys": [
             "TenantId",
-            "DatasetId"
+            "DatasetId",
+            "SourceStoredObjectId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -10066,6 +10352,14 @@
               "gates": [
                 "output"
               ],
+              "available": true
+            },
+            {
+              "name": "SourceStoredObjectId",
+              "type": "Nullable(String)",
+              "description": "SourceStoredObjectId",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {
@@ -10431,7 +10725,8 @@
               "description": "Set alongside `erasedAt` and cleared once the daily cost rows have been removed and their rebuild requested.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -10451,7 +10746,8 @@
               "description": "conflict rule: automatic linking has stopped for this identity because evidence pointed at two candidates, or contradicted an existing link.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -10461,7 +10757,8 @@
               "description": "What tripped the suspension, for the human who reviews it.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11072,7 +11369,8 @@
               "description": "AmountUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11222,7 +11520,8 @@
               "description": "LimitUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11268,7 +11567,8 @@
               "description": "SpentUsd",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -11825,8 +12125,60 @@
               "description": "VendorCostRaw",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
+              "available": true
+            },
+            {
+              "name": "Kind",
+              "type": "Nullable(String)",
+              "description": "Kind",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Metering",
+              "type": "Nullable(String)",
+              "description": "Metering",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "TranscriptionModel",
+              "type": "Nullable(String)",
+              "description": "TranscriptionModel",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LastReportAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "LastReportAt",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ReportedCostNanoUsd",
+              "type": "Int64",
+              "description": "ReportedCostNanoUsd",
+              "unit": null,
+              "gates": [
+                "costs",
+                "cost:view"
+              ],
+              "available": true
+            },
+            {
+              "name": "ReportCount",
+              "type": "Int32",
+              "description": "ReportCount",
+              "unit": null,
+              "gates": [],
               "available": true
             },
             {
@@ -12006,16 +12358,6 @@
               "available": true
             },
             {
-              "name": "AccountLogin",
-              "type": "String",
-              "description": "The GitHub account the App is installed on.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "AccountType",
               "type": "String",
               "description": "\"Organization\" or \"User\".",
@@ -12057,7 +12399,8 @@
               "description": "Set when GitHub suspends the installation; cleared on unsuspend.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -12879,7 +13222,8 @@
               "description": "- the window this source read while pulled cost recording was off for the organization, so its spend was dropped rather than priced.",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -12889,7 +13233,8 @@
               "description": "UnpricedUsageThrough",
               "unit": null,
               "gates": [
-                "costs"
+                "costs",
+                "cost:view"
               ],
               "available": true
             },
@@ -13315,6 +13660,14 @@
               "name": "LastModel",
               "type": "Nullable(String)",
               "description": "The model the latest accepted turn ran on; reopening seeds the picker from it.",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "Origin",
+              "type": "String",
+              "description": "Who started the conversation: `interactive` for the person in the panel, `run` for a module acting for them with nobody at the keyboard.",
               "unit": null,
               "gates": [],
               "available": true
@@ -14910,16 +15263,6 @@
               "description": "Project kind: - \"application\": user-facing workspace where developers send their own app traces.",
               "unit": null,
               "gates": [],
-              "available": true
-            },
-            {
-              "name": "AggregateRule",
-              "type": "Nullable(String)",
-              "description": "The scope rule an aggregate project materialises into grants.",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
               "available": true
             },
             {
@@ -17188,16 +17531,6 @@
               "available": true
             },
             {
-              "name": "ActionParams",
-              "type": "String",
-              "description": "ActionParams",
-              "unit": null,
-              "gates": [
-                "output"
-              ],
-              "available": true
-            },
-            {
               "name": "Filters",
               "type": "String",
               "description": "Filters",
@@ -17416,7 +17749,8 @@
             "TraceProjectId",
             "RevokedById",
             "CreatedById",
-            "RoutingPolicyId"
+            "RoutingPolicyId",
+            "LicenseInstanceId"
           ],
           "timeColumn": "CreatedAt",
           "freshness": "live — read from PostgreSQL at query time",
@@ -17619,6 +17953,32 @@
               "name": "RoutingMode",
               "type": "String",
               "description": "RoutingMode",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "ConnectServices",
+              "type": "Array(String)",
+              "description": "ConnectServices",
+              "unit": null,
+              "gates": [
+                "output"
+              ],
+              "available": true
+            },
+            {
+              "name": "LicenseInstanceId",
+              "type": "Nullable(String)",
+              "description": "LicenseInstanceId",
+              "unit": null,
+              "gates": [],
+              "available": true
+            },
+            {
+              "name": "LicenseExpiresAt",
+              "type": "Nullable(DateTime64(3))",
+              "description": "LicenseExpiresAt",
               "unit": null,
               "gates": [],
               "available": true
@@ -18034,7 +18394,7 @@
           "name": "conversation",
           "kind": "extraction",
           "signature": "conversation(thread_key)",
-          "description": "The whole thread as one markdown transcript, the way the trace drawer renders it: the system prompt once, then one section per turn, with a marker where content was redacted.",
+          "description": "The whole thread as one markdown transcript that reads like the chat view: the system prompt once, then each turn's user message and reply, with one line naming the tools the turn used. For questions about what was said; `llm_readable_thread` holds what the agent did.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18050,7 +18410,7 @@
           "name": "conversation_bounded",
           "kind": "extraction",
           "signature": "conversation_bounded(thread_key, max_tokens, until_trace_id)",
-          "description": "The same transcript under a token budget: the opening and closing turns are kept and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
+          "description": "The same transcript under a token budget: every turn is shortened before one is dropped, and a marker names how many turns were dropped from the middle. Pass an empty string for `until_trace_id` to read the whole thread.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "thread",
@@ -18061,6 +18421,22 @@
           ],
           "available": true,
           "exampleSql": "SELECT ConversationId, conversation_bounded(ConversationId, 8000, '') AS transcript\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+        },
+        {
+          "name": "llm_readable_thread",
+          "kind": "extraction",
+          "signature": "llm_readable_thread(thread_key, max_tokens)",
+          "description": "The thread as the thread evaluators read it: each turn once, with the agent's work between the user message and the reply (model calls with token counts, tool calls with their arguments and results, retrievals), under a token budget. For questions about what the agent did; `conversation` holds what was said.",
+          "returns": "Nullable(String)",
+          "encoding": "text",
+          "keyKind": "thread",
+          "cap": 200,
+          "gates": [
+            "input",
+            "output"
+          ],
+          "available": true,
+          "exampleSql": "SELECT ConversationId, llm_readable_thread(ConversationId, 8000) AS text\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "thread_traces",
@@ -18079,7 +18455,7 @@
           "name": "llm_readable_trace",
           "kind": "extraction",
           "signature": "llm_readable_trace(trace_id, max_tokens)",
-          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the model calls, then the slowest.",
+          "description": "The trace as the online evaluators and the scenario judge read it: a span digest, cut to the token budget by keeping the structure and expanding the spans that failed, then the tool calls, then the model calls, then the slowest.",
           "returns": "Nullable(String)",
           "encoding": "text",
           "keyKind": "trace",
@@ -18181,7 +18557,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed') AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_criteria",
@@ -18194,7 +18570,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_criteria(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_criteria(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', ['sarcasm, repetition or a raised voice count', 'a calm complaint does not count']) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_passed",
@@ -18207,7 +18583,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_passed(conversation_bounded(ConversationId, 8000, ''), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_passed(llm_readable_thread(ConversationId, 8000), 'The customer sounds annoyed', 0.7) AS annoyed\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_score",
@@ -18220,7 +18596,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_score(conversation_bounded(ConversationId, 8000, ''), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_score(llm_readable_thread(ConversationId, 8000), 'How satisfied is the customer, from 1 for angry to 5 for delighted', 1, 5) AS satisfaction\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category",
@@ -18233,7 +18609,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         },
         {
           "name": "eval_category_probs",
@@ -18246,7 +18622,7 @@
           "cap": 1000,
           "gates": [],
           "available": false,
-          "exampleSql": "SELECT ConversationId, eval_category_probs(conversation_bounded(ConversationId, 8000, ''), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
+          "exampleSql": "SELECT ConversationId, eval_category_probs(llm_readable_thread(ConversationId, 8000), 'What is the customer asking for', ['refund: wants money back', 'bug: reports something broken', 'question: wants information', 'other: anything else']) AS intent_probabilities\nFROM analytics.trace_metrics\nWHERE OccurredAt >= subtractDays(now(), 7) AND ConversationId != ''\nGROUP BY ConversationId\nORDER BY ConversationId\nLIMIT 20"
         }
       ]
     },
@@ -18913,7 +19289,8 @@
       "parameters": [],
       "requires": {
         "gates": [
-          "costs"
+          "costs",
+          "cost:view"
         ],
         "functions": []
       },

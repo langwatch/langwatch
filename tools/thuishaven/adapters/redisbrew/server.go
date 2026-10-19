@@ -112,6 +112,16 @@ func (s *Server) ping(ctx context.Context) bool {
 	return err == nil && len(out) >= 4 && string(out[:4]) == "PONG"
 }
 
+// FlushDB empties one logical database with FLUSHDB; other databases are untouched.
+func (s *Server) FlushDB(ctx context.Context, db int) error {
+	out, err := exec.CommandContext(ctx, "redis-cli", "-h", "127.0.0.1", "-p", fmt.Sprint(s.port),
+		"-n", fmt.Sprint(db), "flushdb").CombinedOutput()
+	if reply := strings.TrimSpace(string(out)); err != nil || !strings.HasPrefix(reply, "OK") {
+		return fmt.Errorf("redis flushdb on db %d: %v: %s", db, err, reply)
+	}
+	return nil
+}
+
 // Port returns the configured port.
 func (s *Server) Port() int { return s.port }
 

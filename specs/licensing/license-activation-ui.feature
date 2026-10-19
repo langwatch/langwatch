@@ -2,7 +2,7 @@ Feature: License Activation UI
 
   # Page-level UX of the License activation flow. The @integration scenarios
   # under "Either form in any field" are bound by
-  # src/components/license/__tests__/NoLicenseCard.integration.test.tsx, which
+  # enterprise/modules/licensing/browser/src/ui/sections/__tests__/license-input-forms.integration.test.tsx, which
   # renders the page with the license API mocked. The @unimplemented ones
   # still need a page-level harness or a Playwright E2E.
 

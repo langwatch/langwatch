@@ -60,7 +60,7 @@ from langwatch.utils.initialization import ensure_setup
 
 if TYPE_CHECKING:
     from .tracing import LangWatchTrace
-    from langwatch.evaluations import BasicEvaluateData
+    from langwatch.evaluation import BasicEvaluateData
 
 
 __all__ = ["span", "LangWatchSpan"]
@@ -467,9 +467,9 @@ class LangWatchSpan:
         timestamps: Optional[EvaluationTimestamps] = None,
     ):
 
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        return evaluations._add_evaluation(  # type: ignore
+        return evaluation._add_evaluation(
             span=self,
             evaluation_id=evaluation_id,
             name=name,
@@ -498,20 +498,21 @@ class LangWatchSpan:
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        return evaluations.evaluate(
-            span=self,
+        return evaluation.evaluate(
             slug=slug,
+            data=evaluation._merge_keyword_data(
+                data,
+                input=input,
+                output=output,
+                expected_output=expected_output,
+                contexts=contexts,
+                conversation=conversation,
+            ),
             name=name,
-            input=input,
-            output=output,
-            expected_output=expected_output,
-            contexts=contexts,
-            conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
-            data=data,
         )
 
     async def async_evaluate(
@@ -527,20 +528,21 @@ class LangWatchSpan:
         as_guardrail: bool = False,
         data: Optional[Union["BasicEvaluateData", Dict[str, Any]]] = None,
     ):
-        from langwatch import evaluations
+        from langwatch import evaluation
 
-        return await evaluations.async_evaluate(
-            span=self,
+        return await evaluation.async_evaluate(
             slug=slug,
+            data=evaluation._merge_keyword_data(
+                data,
+                input=input,
+                output=output,
+                expected_output=expected_output,
+                contexts=contexts,
+                conversation=conversation,
+            ),
             name=name,
-            input=input,
-            output=output,
-            expected_output=expected_output,
-            contexts=contexts,
-            conversation=conversation,
             settings=settings,
             as_guardrail=as_guardrail,
-            data=data,
         )
 
     def end(

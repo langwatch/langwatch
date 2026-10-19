@@ -111,3 +111,10 @@ Feature: Langy minimised peek
     Then the panel is hidden outright, as it always was
     And the corner launcher orb is what opens it again
     And exactly one minimised affordance is ever on screen
+
+  @unit
+  Scenario: The launcher sits beside an open drawer, never on the sidebar
+    Given the corner launcher orb is showing
+    When a drawer opens on the right edge
+    Then the launcher sits just left of the drawer
+    But where that would put it on the sidebar or off the page, it stays in the corner

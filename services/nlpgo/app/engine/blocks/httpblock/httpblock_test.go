@@ -97,6 +97,24 @@ func TestExtractJSONPath_NumericIndex(t *testing.T) {
 	assert.InDelta(t, 2.0, got, 1e-9)
 }
 
+func TestExtractJSONPath_NegativeSliceAndIndex(t *testing.T) {
+	data := map[string]any{"messages": []any{
+		map[string]any{"content": "first"},
+		map[string]any{"content": "last"},
+	}}
+	got, err := httpblock.ExtractJSONPath(data, "$.messages[-1:].content")
+	require.NoError(t, err)
+	assert.Equal(t, "last", got)
+
+	got, err = httpblock.ExtractJSONPath(data, "$.messages[-1].content")
+	require.NoError(t, err)
+	assert.Equal(t, "last", got)
+
+	got, err = httpblock.ExtractJSONPath(data, "$.messages[:5].content")
+	require.NoError(t, err)
+	assert.Equal(t, []any{"first", "last"}, got)
+}
+
 func TestSSRF_BlocksLoopback(t *testing.T) {
 	for _, u := range []string{
 		"http://127.0.0.1/x",

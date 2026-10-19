@@ -152,7 +152,7 @@ Rule: Drawer-level keyboard shortcuts
 
   Scenario: "?" toggles the drawer's keyboard-shortcut help dialog
     When the user presses "?"
-    Then `drawerStore.shortcutsOpen` toggles
+    Then the keyboard-shortcut help dialog toggles open or closed
 
   Scenario: "[" and "]" navigate between spans in the current trace
     Given the trace has a non-empty span tree
@@ -174,16 +174,16 @@ Rule: Drawer-level keyboard shortcuts
 
   Scenario: O returns to the Trace Summary accordion tab
     When the user presses "o" or "O"
-    Then `drawerStore.activeTab` is set to "summary"
+    Then the summary tab becomes active
 
   Scenario: T switches the drawer to Trace mode
     When the user presses "t" or "T"
-    Then `drawerStore.viewMode` is set to "trace"
+    Then the drawer shows trace mode
 
   Scenario: C switches to Conversation mode when the trace has a conversation
     Given the trace has a `conversationId`
     When the user presses "c" or "C"
-    Then `drawerStore.viewMode` is set to "conversation"
+    Then the drawer shows conversation mode
 
   Scenario: C is a no-op when the trace has no conversation
     Given the trace has no `conversationId`
@@ -201,7 +201,7 @@ Rule: Drawer-level keyboard shortcuts
 
   Scenario: M toggles the maximised drawer state
     When the user presses "m" or "M"
-    Then `drawerStore.maximized` toggles
+    Then the drawer toggles between maximised and its previous size
 
   Scenario: R refreshes the active trace
     When the user presses "r" or "R"

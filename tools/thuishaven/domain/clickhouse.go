@@ -26,6 +26,10 @@ func DatabaseForSlug(slug string) string {
 // second worktree finds this one and reuses it rather than standing up a rival.
 const ClickHouseContainer = "langwatch-clickhouse"
 
+// ClickHouseDataVolume holds the server's data on the VM's own disk: a host
+// bind mount is virtiofs, where every part write costs tens of milliseconds.
+const ClickHouseDataVolume = "langwatch-clickhouse-data"
+
 // ClickHouseImage is Altinity's Stable Build: a well-managed, LTS-backported
 // ClickHouse image (as opposed to upstream's own release cadence). Chosen over
 // running clickhouse-server as a native host binary so every contributor's setup
@@ -49,7 +53,7 @@ const (
 	// the shared container's config, and the number every stack's app is told
 	// about (CLICKHOUSE_SERVER_MAX_CONCURRENT_QUERIES) so it sizes its pool for
 	// this server rather than for the 300-query one it assumes by default.
-	ClickHouseMaxConcurrentQueries = 32
+	ClickHouseMaxConcurrentQueries = 100
 )
 
 // ClickHouseLimits bound what the managed server may take from the host. Proven
@@ -83,12 +87,10 @@ func (l ClickHouseLimits) EffectiveSystemLogTTLDays() int {
 	return l.SystemLogTTLDays
 }
 
-// NoisySystemLogs are the system tables LightweightLogsEnabled turns off: pure volume
-// with no local-debugging value. text_log duplicates what the container already
-// writes to stdout; the metric logs are sampled telemetry nobody reads on a dev
-// box (asynchronous_metric_log alone reached 70M rows in the measurement above);
-// trace_log and the profile logs only matter during deliberate profiling, which
-// is what HAVEN_CLICKHOUSE_FULL_LOGS=1 is for.
+// NoisySystemLogs are the system tables LightweightLogsEnabled turns off: volume
+// with no local-debugging value (text_log duplicates stdout; the metric, trace and
+// profile logs matter only when profiling, which HAVEN_CLICKHOUSE_FULL_LOGS=1 is
+// for; part_log logs every part written, doubling the server's own file churn).
 var NoisySystemLogs = []string{
 	"text_log",
 	"trace_log",
@@ -96,15 +98,15 @@ var NoisySystemLogs = []string{
 	"asynchronous_metric_log",
 	"processors_profile_log",
 	"query_metric_log",
+	"part_log",
 }
 
 // KeptSystemLogs are the system tables LightweightLogsEnabled keeps, capped at
-// SystemLogTTLDays. These are the ones actually worth reaching for locally:
-// query_log answers "why was that slow", part_log explains merge behaviour, and
-// error_log/crash_log are tiny and matter exactly when something broke.
+// SystemLogTTLDays and flushed every SystemLogFlushMillis. query_log answers "why
+// was that slow" (tests read it after SYSTEM FLUSH LOGS), and error_log/crash_log
+// are tiny and matter exactly when something broke.
 var KeptSystemLogs = []string{
 	"query_log",
-	"part_log",
 	"error_log",
 	"crash_log",
 }
@@ -114,13 +116,14 @@ var KeptSystemLogs = []string{
 // room before the container's hard limit bites), a modest 64MiB mark cache, and
 // — set directly in the config template, not here — uncompressed/mmap/compiled-
 // expression caches all zeroed, since none of them pull their weight at this
-// scale and idle RSS is the whole point.
-func DefaultClickHouseLimits() ClickHouseLimits {
-	const containerMB = 1536 // 1.5 GiB
+// scale and idle RSS is the whole point. The container gets 3/64 of the
+// machine's RAM (3 GiB on 64 GiB), between 1.5 and 4 GiB.
+func DefaultClickHouseLimits(totalRAMBytes uint64) ClickHouseLimits {
+	containerMB := clampInt(int(totalRAMBytes>>20)*3/64, 1536, 4096)
 	return ClickHouseLimits{
 		ContainerMemoryMB:      containerMB,
-		MaxServerMemory:        int64(containerMB) * 9 / 10 * (1 << 20), // 1.35 GiB
-		MarkCacheSize:          64 << 20,                                // 64 MiB
+		MaxServerMemory:        int64(containerMB) * 9 / 10 * (1 << 20),
+		MarkCacheSize:          64 << 20, // 64 MiB
 		LightweightLogsEnabled: true,
 		SystemLogTTLDays:       DefaultSystemLogTTLDays,
 	}
@@ -130,9 +133,43 @@ func DefaultClickHouseLimits() ClickHouseLimits {
 // "it was slow last Thursday" without letting query_log grow without bound.
 const DefaultSystemLogTTLDays = 7
 
+// SystemLogFlushMillis is how often a kept system log writes a new part. The stock
+// 7.5s wrote hundreds of small files a minute on an idle dev box; readers that need
+// fresh rows run SYSTEM FLUSH LOGS first.
+const SystemLogFlushMillis = 60000
+
 // ClickHouseConfigFile is the config.d override haven mounts read-only into the
 // container — additive to the image's own config.d, never replacing it.
 const ClickHouseConfigFile = "zzz-thuis.xml"
+
+// ClickHouseUsersConfigFile is the users.d override haven mounts beside the
+// image's default-user.xml; the zz- prefix sorts it after that file, so it wins.
+const ClickHouseUsersConfigFile = "zz-lwql-access-management.xml"
+
+// ClickHouseUsersConfig lets the default user provision LangWatchQL's access
+// model (users, profiles, row policies, the lwql_postgres named collection), as
+// the product's own LangWatchQLServerConfigService.accessManagementConfigXml does.
+const ClickHouseUsersConfig = `<!-- generated by haven (thuishaven) — do not edit -->
+<clickhouse>
+    <users>
+        <default>
+            <access_management>1</access_management>
+            <named_collection_control>1</named_collection_control>
+            <show_named_collections>1</show_named_collections>
+        </default>
+    </users>
+    <!-- async inserts as production (a seeding burst lands as a few batched parts),
+         but ClickHouse's own adaptive flush (50-200 ms), not production's 1 s:
+         a sequential seed waits for each flush -->
+    <profiles>
+        <default>
+            <async_insert>1</async_insert>
+            <wait_for_async_insert>1</wait_for_async_insert>
+            <max_threads>2</max_threads>
+        </default>
+    </profiles>
+</clickhouse>
+`
 
 // LegacyClickHouseConfigFiles are earlier names of ClickHouseConfigFile, removed
 // from haven's home on write. The mount is a single named file, so a stale one
@@ -168,7 +205,7 @@ func renderLogConfig(l ClickHouseLimits) string {
 		fmt.Fprintf(&b, "    <%s remove=\"1\"/>\n", name)
 	}
 	for _, name := range KeptSystemLogs {
-		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl></%s>\n", name, l.EffectiveSystemLogTTLDays(), name)
+		fmt.Fprintf(&b, "    <%s><ttl>event_date + INTERVAL %d DAY</ttl><flush_interval_milliseconds>%d</flush_interval_milliseconds></%s>\n", name, l.EffectiveSystemLogTTLDays(), SystemLogFlushMillis, name)
 	}
 	return b.String()
 }
@@ -205,10 +242,11 @@ const clickHouseConfigTemplate = `<!-- generated by haven (thuishaven) — do no
          the stock pools (16 merge threads, a 512-thread schedule pool) assume
          cores to spare, and on a few-core VM serving a dozen small stack
          databases they only contend with the queries they exist to serve.
-         The merge_tree free-entries thresholds must shrink with the merge
-         pool, or large merges and mutations are never scheduled at all. -->
+         The merge_tree free-entries thresholds must stay below pool*ratio (2),
+         or large merges and mutations are never scheduled at all. -->
     <max_concurrent_queries>%d</max_concurrent_queries>
-    <background_pool_size>8</background_pool_size>
+    <background_pool_size>2</background_pool_size>
+    <background_merges_mutations_concurrency_ratio>1</background_merges_mutations_concurrency_ratio>
     <background_common_pool_size>4</background_common_pool_size>
     <background_schedule_pool_size>64</background_schedule_pool_size>
     <background_buffer_flush_schedule_pool_size>4</background_buffer_flush_schedule_pool_size>
@@ -217,11 +255,20 @@ const clickHouseConfigTemplate = `<!-- generated by haven (thuishaven) — do no
     <background_message_broker_schedule_pool_size>2</background_message_broker_schedule_pool_size>
     <background_distributed_schedule_pool_size>2</background_distributed_schedule_pool_size>
     <merge_tree>
-        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>4</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
-        <number_of_free_entries_in_pool_to_execute_mutation>4</number_of_free_entries_in_pool_to_execute_mutation>
-        <!-- stock 25 exceeds the shrunk pool*ratio capacity (16), and the server
+        <number_of_free_entries_in_pool_to_lower_max_size_of_merge>1</number_of_free_entries_in_pool_to_lower_max_size_of_merge>
+        <number_of_free_entries_in_pool_to_execute_mutation>1</number_of_free_entries_in_pool_to_execute_mutation>
+        <!-- stock 25 exceeds the shrunk pool*ratio capacity (2), and the server
              REFUSES TO BOOT on that sanity check rather than warning -->
-        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>4</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
+        <number_of_free_entries_in_pool_to_execute_optimize_entire_partition>1</number_of_free_entries_in_pool_to_execute_optimize_entire_partition>
     </merge_tree>
+    <!-- CPU workload scheduling (clickhouse_workload.go): time-sliced slots,
+         merges and mutations in their own capped workload, and an unknown
+         workload name runs unscheduled rather than failing the query -->
+    <cpu_slot_preemption>true</cpu_slot_preemption>
+    <merge_workload>merges</merge_workload>
+    <mutation_workload>merges</mutation_workload>
+    <throw_on_unknown_workload>false</throw_on_unknown_workload>
+    <!-- custom_: the setting LangWatchQL's restricted user carries its tenant in -->
+    <custom_settings_prefixes>SQL_,custom_</custom_settings_prefixes>
 %s</clickhouse>
 `

@@ -132,7 +132,7 @@ address is confirmed and the provider sends `email_verified: true`.
 
 ## Upgrading an existing installation
 
-Identity and access migrations run automatically as the app starts, one
+Identity and access migrations run automatically after each upgrade, one
 organization at a time. Each organization switches over as soon as it migrates
 cleanly. When an organization's historical data needs attention, it stays on
 its existing sign-in path and the deployment starts anyway. See the

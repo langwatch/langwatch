@@ -2,6 +2,7 @@
 
 Date: 2026-08-13
 Status: Proposed
+
 > One-line: add nullable **maxTurns** and **minTurns** columns to the **Scenario** Prisma model, thread them through **ScenarioConfigSchema** → **ChildProcessJobData** → **ScenarioRunner.run()**, and expose them in a collapsible **Advanced** section in the scenario editor drawer.
 
 ## Context
@@ -13,10 +14,12 @@ Customer request: let users configure turn limits per scenario from the platform
 Forcing function: SDK v1.2.0 ships `minTurns` (PR langwatch/scenario#900, ADR-005), and the platform must re-vendor anyway. Adding both fields in the same PR avoids a second migration.
 
 Prior art:
+
 - ADR-005 (Obsidian vault) — locked the `minTurns` SDK design; deferred "whether the platform UI ever surfaces minTurns" as a non-blocking open question. This ADR resolves that.
 - `simulatorModel`/`judgeModel` on the `Scenario` model (`schema.prisma:2129-2130`) follow the same nullable-optional pattern, but they thread outside `ScenarioConfigSchema` because they need cascade resolution (suite > scenario > project default). `maxTurns`/`minTurns` don't need that cascade — they go directly on `ScenarioConfigSchema`.
 
 Constraints (locked in Phase 1):
+
 - Scenario-level, not suite-level (suite override is a follow-up).
 - SDK default applies when unset (platform doesn't embed the default value).
 - Same threading pattern as `simulatorModel`/`judgeModel` through Prisma → TRPC → prefetcher → child process.
@@ -31,7 +34,7 @@ Constraints (locked in Phase 1):
 3. **Thread through two manual wiring sites.** Both `fetchScenario()` (`data-prefetcher.ts:479-484`) and `ScenarioRunner.run()` (`scenario-child-process.ts:173-189`) cherry-pick fields explicitly — they do NOT spread the `scenario` object. Adding to `ScenarioConfigSchema` alone does nothing. Implementation must update both sites:
    - `fetchScenario()`: add `maxTurns` and `minTurns` to the config object returned
    - `scenario-child-process.ts`: add both to the first arg of `ScenarioRunner.run()`
-   
+
    Note: unlike `situation` → SDK `description` rename at `scenario-child-process.ts:176`, `maxTurns`/`minTurns` pass through as-is (names match the SDK interface). Rejects: a separate config channel (adds fields to ChildProcessJobData outside the scenario object).
 
 4. **Minimal platform validation: type and bounds.** `maxTurns`: positive integer (≥ 1, ≤ 100). `minTurns`: non-negative integer (≥ 0, ≤ 100). No cross-validation of `minTurns ≤ maxTurns` — the SDK validates at startup and returns a clear error. Rejects: duplicating SDK cross-validation on the platform (the SDK is the authority; platform validation would drift).
@@ -44,36 +47,36 @@ Constraints (locked in Phase 1):
 
 ## Constants
 
-| Name | Value | Purpose |
-|---|---|---|
-| `maxTurns` column | `Int?`, default `NULL` | `NULL` → SDK default (currently 10) |
-| `minTurns` column | `Int?`, default `NULL` | `NULL` → SDK default (unset = no floor) |
-| Vendored SDK | `langwatch-scenario-1.2.0.tgz` | Includes minTurns support (PR #900) |
+| Name              | Value                          | Purpose                                 |
+| ----------------- | ------------------------------ | --------------------------------------- |
+| `maxTurns` column | `Int?`, default `NULL`         | `NULL` → SDK default (currently 10)     |
+| `minTurns` column | `Int?`, default `NULL`         | `NULL` → SDK default (unset = no floor) |
+| Vendored SDK      | `langwatch-scenario-1.2.0.tgz` | Includes minTurns support (PR #900)     |
 
 ## Invariants
 
-| Invariant | Meaning | Test anchor |
-|---|---|---|
-| NULL → SDK default | Unset fields produce identical behaviour to pre-change runs | Existing scenario tests stay green without modification |
-| Optional parsing | `ChildProcessJobData` without maxTurns/minTurns still parses | Zod schema uses `.optional()` — in-flight jobs from before the deploy parse correctly |
-| Form → DB → SDK | A value set in the form reaches `ScenarioRunner.run()` | Integration: save scenario with maxTurns=3, run, assert SDK receives maxTurns=3 |
+| Invariant          | Meaning                                                      | Test anchor                                                                           |
+| ------------------ | ------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| NULL → SDK default | Unset fields produce identical behaviour to pre-change runs  | Existing scenario tests stay green without modification                               |
+| Optional parsing   | `ChildProcessJobData` without maxTurns/minTurns still parses | Zod schema uses `.optional()` — in-flight jobs from before the deploy parse correctly |
+| Form → DB → SDK    | A value set in the form reaches `ScenarioRunner.run()`       | Integration: save scenario with maxTurns=3, run, assert SDK receives maxTurns=3       |
 
 ## Assumptions
 
-| Assumption | What breaks if false |
-|---|---|
-| SDK `ScenarioRunner.run()` config shape won't change | Child process wiring breaks if SDK renames/moves `maxTurns`/`minTurns` |
-| No suite-level override needed now | If suite-level is needed soon, maxTurns on ScenarioConfigSchema can't cascade — would need a separate field like simulatorModel |
-| SDK validates `minTurns ≤ maxTurns` reliably | If SDK validation has bugs, users see a runtime error with no platform-side guard |
+| Assumption                                           | What breaks if false                                                                                                            |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------- |
+| SDK `ScenarioRunner.run()` config shape won't change | Child process wiring breaks if SDK renames/moves `maxTurns`/`minTurns`                                                          |
+| No suite-level override needed now                   | If suite-level is needed soon, maxTurns on ScenarioConfigSchema can't cascade — would need a separate field like simulatorModel |
+| SDK validates `minTurns ≤ maxTurns` reliably         | If SDK validation has bugs, users see a runtime error with no platform-side guard                                               |
 
 ## Gates
 
-| Path | Reversible? | Blast radius | Gate |
-|---|---|---|---|
-| Prisma migration (add nullable columns) | Yes (drop columns) | Low — additive only, no data touched | Human review (this ADR + PR review) |
-| ScenarioConfigSchema change | Yes (revert) | Medium — affects ChildProcessJobData parsing for new jobs | Automated: zod `.optional()` ensures backward compat |
-| SDK re-vendor 1.1.0 → 1.2.0 | Yes (revert tarball) | Medium — new SDK behavior for all runs | Existing test suites + smoke tests |
-| UI Advanced section | Yes (revert) | Low — no existing UI contract | Manual QA |
+| Path                                    | Reversible?          | Blast radius                                              | Gate                                                 |
+| --------------------------------------- | -------------------- | --------------------------------------------------------- | ---------------------------------------------------- |
+| Prisma migration (add nullable columns) | Yes (drop columns)   | Low — additive only, no data touched                      | Human review (this ADR + PR review)                  |
+| ScenarioConfigSchema change             | Yes (revert)         | Medium — affects ChildProcessJobData parsing for new jobs | Automated: zod `.optional()` ensures backward compat |
+| SDK re-vendor 1.1.0 → 1.2.0             | Yes (revert tarball) | Medium — new SDK behavior for all runs                    | Existing test suites + smoke tests                   |
+| UI Advanced section                     | Yes (revert)         | Low — no existing UI contract                             | Manual QA                                            |
 
 ## Schema
 

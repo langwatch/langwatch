@@ -384,6 +384,11 @@ type ConfigFetchResult struct {
 	// read as "this key never expires": a refresh against an older control
 	// plane would then lift the cap off a key whose own token says it expires.
 	VirtualKeyExpiryKnown bool
+
+	// KeyInactive is set when the response says the key is revoked or
+	// disabled. The request path learns that from the key resolution; a
+	// holder that only re-reads config by id learns it here.
+	KeyInactive bool
 }
 
 // Routing modes carried on the bundle wire (contract §4.2 routing_mode).

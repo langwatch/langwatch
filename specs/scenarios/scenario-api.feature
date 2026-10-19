@@ -48,6 +48,17 @@ Feature: Scenario API
     When I PATCH the scenario with a new name
     Then the response is 200 and carries the new name
 
+  # A legacy project key names no person. The update is recorded the way main
+  # recorded it: no user is named, rather than the key's id, which is no
+  # User row and was refused by the last-updated-by foreign key.
+  @integration
+  Scenario: A legacy project key updates a scenario without naming a user
+    Given I am authenticated with a legacy project key
+    And a scenario exists
+    When I PATCH the scenario with a new name
+    Then the response is 200 and carries the new name
+    And the scenario names no user as its last editor
+
   @integration
   Scenario: REST rejects a model override with no provider prefix
     Given I am authenticated with a project API key
@@ -93,3 +104,31 @@ Feature: Scenario API
     When I call scenarios.getRunState with the runId
     Then I receive the current run state
     And the state includes conversation events
+
+  # ============================================================================
+  # Platform links (`platformUrl`)
+  # ============================================================================
+
+  # A scenario resource's `platformUrl` builds under the deployment's own
+  # public origin, sourced through the scenario module's config slice (not a
+  # process member) exactly like suite, dataset and evaluator already do -
+  # see apps/api/src/app/api-production.composition.ts's `apiModuleConfig`.
+
+  @unit
+  Scenario: A scenario's platform link answers when a public base URL is configured
+    Given a deployment that configured a public base URL for the scenario module
+    When a scenario resource asks for its platform link
+    Then it answers a URL built under that public base URL
+
+  @unit
+  Scenario: A scenario's platform link refuses by name without a public base URL
+    Given a deployment that named no public base URL for the scenario module
+    When a scenario resource asks for its platform link
+    Then it refuses by name instead of crashing
+
+  @unit
+  Scenario: A browser-tab offer with no open tab answers undelivered with the run's link
+    Given the scenario module composed the way production composes it
+    And no browser tab is open on the project's simulations
+    When a batch run is offered to a browser tab
+    Then it answers undelivered with the batch run's link

@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.create_instant_eval_run_body import CreateInstantEvalRunBody
 from ...models.create_instant_eval_run_response_202 import CreateInstantEvalRunResponse202
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: CreateInstantEvalRunBody,
+    body: CreateInstantEvalRunBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,7 +20,8 @@ def _get_kwargs(
         "url": "/api/v1/instant-evals",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -59,7 +60,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateInstantEvalRunBody,
+    body: CreateInstantEvalRunBody | Unset = UNSET,
 ) -> Response[CreateInstantEvalRunResponse202]:
     """Start a run. The statement is accepted, its questions are derived from the eval functions it
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
@@ -69,7 +70,7 @@ def sync_detailed(
     statement is written for you and handed back on the run; sending both is refused.
 
     Args:
-        body (CreateInstantEvalRunBody):
+        body (CreateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -93,7 +94,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: CreateInstantEvalRunBody,
+    body: CreateInstantEvalRunBody | Unset = UNSET,
 ) -> CreateInstantEvalRunResponse202 | None:
     """Start a run. The statement is accepted, its questions are derived from the eval functions it
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
@@ -103,7 +104,7 @@ def sync(
     statement is written for you and handed back on the run; sending both is refused.
 
     Args:
-        body (CreateInstantEvalRunBody):
+        body (CreateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -122,7 +123,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: CreateInstantEvalRunBody,
+    body: CreateInstantEvalRunBody | Unset = UNSET,
 ) -> Response[CreateInstantEvalRunResponse202]:
     """Start a run. The statement is accepted, its questions are derived from the eval functions it
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
@@ -132,7 +133,7 @@ async def asyncio_detailed(
     statement is written for you and handed back on the run; sending both is refused.
 
     Args:
-        body (CreateInstantEvalRunBody):
+        body (CreateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -154,7 +155,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: CreateInstantEvalRunBody,
+    body: CreateInstantEvalRunBody | Unset = UNSET,
 ) -> CreateInstantEvalRunResponse202 | None:
     """Start a run. The statement is accepted, its questions are derived from the eval functions it
     projects, and the judging happens on the queue: the answer is the queued run, and its progress is
@@ -164,7 +165,7 @@ async def asyncio(
     statement is written for you and handed back on the run; sending both is refused.
 
     Args:
-        body (CreateInstantEvalRunBody):
+        body (CreateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

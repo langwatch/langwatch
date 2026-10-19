@@ -1,58 +1,79 @@
 /**
- * The composition core: one class that owns its policies and runs them in a
- * fixed, stated order.
- *
- * This replaces a middleware `compose()`. The behaviours are the same and so is
- * their order; what changed is that the order is now written out as nesting in
- * one method instead of being implied by a list's index. A reader asking "does
- * a retry keep its concurrency slot?" reads {@link ClickHouseQueryClient.query}
- * and sees the answer, rather than inferring it from the position of two
- * entries in an array.
- *
- * The order is load-bearing, and each step is here for a recorded reason:
- *
- *  1. **Tenant guard** — outermost, so a statement that cannot name its tenant
- *     is refused before it costs a span, a slot, or a socket.
- *  2. **Tracing** — outside the limiter, so queue time is inside the span. Time
- *     spent waiting for a slot is latency the caller experienced; a span that
- *     started after the wait would report a fast query on a slow request.
- *  3. **Concurrency limit** — outside retry, NOT inside. A slot is held across
- *     retries. Inside, a retrying statement would release its slot, rejoin the
- *     back of the queue and compete with fresh work, which is how a queue turns
- *     a small overload into a persistent one.
- *  4. **Retry** — innermost, wrapping the driver, so it retries the statement
- *     and nothing else.
- *
- * Every collaborator is injected and every one is optional. A client with no
- * policies is a thin pass-through to the driver, which is what makes the class
- * usable in a test without standing up four dependencies to assert on one.
+ * The composition core: one class running policies in a fixed, load-bearing
+ * order (tenant guard, tracing, concurrency limit, reporting, retry). Concurrency
+ * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import type { ConcurrencyLimiter } from "./rateLimit";
-import type { QueryDriver, QueryRequest, QueryResult } from "./query";
-import type { RetryPolicy } from "./retry";
-import type { QueryTracer } from "./tracing";
-import type { TenantGuard } from "./tenantGuard";
+import type {
+  ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
+} from "./managed-client.ts";
+import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
+import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
+import type { RetryPolicy } from "./retry.ts";
+import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
+import { extractQueryType, extractTableName } from "./statementShape.ts";
+import type { PrivateRouteVariable } from "./tenancy.ts";
+import type { TenantGuard } from "./tenantGuard.ts";
+import type { QueryTracer } from "./tracing.ts";
 
 export interface ClickHouseQueryClientOptions {
   /** The only collaborator that talks to a server. */
   driver: QueryDriver;
-  /** Refuses statements with no tenant predicate. Omit to allow everything. */
-  tenantGuard?: TenantGuard | undefined;
+  /** Refuses statements with no tenant predicate unless they set `SKIP_TENANT_CHECK`. */
+  tenantGuard: TenantGuard;
   /** Records a span per statement. Omit to record none. */
   tracer?: QueryTracer | undefined;
-  /** Bounds statements in flight and sheds when the wait queue is full. */
-  limiter?: ConcurrencyLimiter | undefined;
+  /** Bounds statements in flight; refuses as overloaded on a full queue or an outlasted wait. */
+  limiter?: ClickHouseStatementAdmission | undefined;
   /** Retries transient failures. Omit to try exactly once. */
   retries?: RetryPolicy | undefined;
+  /** Logs and counts each read and write once its retries settle, cold scans included. */
+  reporter?: StatementReporter | undefined;
+  /** The routing table's private routes, organization id to endpoint; none by default. */
+  privateRoutes?: ReadonlyMap<string, string> | undefined;
+  /** Every private route variable this process parsed, usable or not; none by default. */
+  privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
+  /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
+  unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
+  /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
+  overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
 }
+
+/** The handled refusal for a read whose server did not answer once retries ran out. */
+export abstract class ClickHouseUnavailableErrorFactory {
+  abstract create(input: { cause: Error }): unknown;
+}
+
+/** A connection that failed or dropped (`socket hang up` is ECONNRESET), never a server error. */
+function isConnectionFailure(error: unknown): error is Error {
+  const code = (error as { code?: unknown } | null)?.code;
+  return error instanceof Error && typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code);
+}
+
+/** ClickHouse's own overload refusal: TOO_MANY_SIMULTANEOUS_QUERIES (202). */
+const SERVER_OVERLOAD_CODES: ReadonlySet<string> = new Set(["202"]);
+
+function isServerOverload(error: unknown): error is Error {
+  const code = (error as { code?: unknown } | null)?.code;
+  return error instanceof Error && typeof code === "string" && SERVER_OVERLOAD_CODES.has(code);
+}
+
+const now = (): number => globalThis.performance.now();
 
 export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
-  private readonly tenantGuard: TenantGuard | undefined;
+  private readonly tenantGuard: TenantGuard;
   private readonly tracer: QueryTracer | undefined;
-  private readonly limiter: ConcurrencyLimiter | undefined;
+  private readonly limiter: ClickHouseStatementAdmission | undefined;
   private readonly retries: RetryPolicy | undefined;
+  private readonly reporter: StatementReporter | undefined;
+  private readonly routes: ReadonlyMap<string, string>;
+  private readonly routeVariables: readonly PrivateRouteVariable[];
+  private readonly columnLists = new Map<string, ClickHouseColumns>();
+  private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
+  private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
 
   constructor({
     driver,
@@ -60,23 +81,68 @@ export class ClickHouseQueryClient {
     tracer,
     limiter,
     retries,
+    reporter,
+    privateRoutes,
+    privateRouteVariables,
+    unavailableErrorFactory,
+    overloadErrorFactory,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
     this.tracer = tracer;
     this.limiter = limiter;
     this.retries = retries;
+    this.reporter = reporter;
+    this.routes = privateRoutes ?? new Map();
+    this.routeVariables = privateRouteVariables ?? [];
+    this.unavailable = unavailableErrorFactory;
+    this.overloaded = overloadErrorFactory;
   }
 
   /**
-   * Run one statement under every policy this client was given.
-   *
-   * Reads top to bottom as the order described on the class. Each step is a
-   * plain call rather than a wrap, so an absent policy is a skipped line and
-   * not a hole in a chain.
+   * The organizations this client routes to a private endpoint, parsed once at boot. A
+   * deployment fact a peer reads (cohort exclusion) without declaring the env family again.
+   */
+  privateRoutes(): ReadonlyMap<string, string> {
+    return this.routes;
+  }
+
+  /** Each private route variable by name and label, and whether it parsed; never its value. */
+  privateRouteVariables(): readonly PrivateRouteVariable[] {
+    return this.routeVariables;
+  }
+
+  /**
+   * The column list of the target `tenantId` routes to, for a read naming a column a pending
+   * ClickHouse step adds (NO-HOLDS, ARCHITECTURE.md section 7). Kept per tenant, since only the
+   * driver knows a tenant's target; each list refreshes on the helper's own interval.
+   */
+  columns({ tenantId }: { tenantId: string }): ClickHouseColumns {
+    const known = this.columnLists.get(tenantId);
+    if (known !== undefined) return known;
+    const columns = ClickHouseColumns.over({
+      read: async () =>
+        (
+          await this.query<{ table: string; name: string }>({
+            tenantId,
+            sql: CLICKHOUSE_COLUMNS_QUERY,
+            table: "system.columns",
+            // The schema's column list describes the server, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
+          })
+        ).rows,
+    });
+    this.columnLists.set(tenantId, columns);
+    return columns;
+  }
+
+  /**
+   * Runs one statement under every policy this client was given, top to
+   * bottom per the class order. Each step is a plain call rather than a
+   * wrap, so an absent policy is a skipped line, not a hole in a chain.
    */
   async query<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
-    this.tenantGuard?.assert(request);
+    this.tenantGuard.assert(request);
 
     const runOnce = () => this.driver.execute<Row>(request);
     const withRetries = () =>
@@ -84,14 +150,124 @@ export class ClickHouseQueryClient {
         ? runOnce()
         : this.retries.run(runOnce, { signal: request.signal, request });
 
+    const withReport = () =>
+      this.reported({
+        operation: "query",
+        params: {
+          query: request.sql,
+          query_params: request.params,
+          table: request.table,
+          SKIP_COLD_SCAN_CHECK: request.SKIP_COLD_SCAN_CHECK,
+        },
+        task: withRetries,
+      });
+
     // The slot wraps the retries, so it is held for the whole statement.
     const withSlot = () =>
       this.limiter === undefined
-        ? withRetries()
-        : this.limiter.run({ task: withRetries, signal: request.signal });
+        ? withReport()
+        : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
 
-    return this.tracer === undefined
-      ? withSlot()
-      : this.tracer.trace({ request, task: withSlot });
+    try {
+      return await (this.tracer === undefined
+        ? withSlot()
+        : this.tracer.trace({ request, task: withSlot }));
+    } catch (error) {
+      if (this.overloaded !== undefined && isServerOverload(error)) {
+        throw this.overloaded.create({ cause: error });
+      }
+      if (this.unavailable === undefined || !isConnectionFailure(error)) throw error;
+      throw this.unavailable.create({ cause: error });
+    }
+  }
+
+  /**
+   * Streams one read batch by batch (replay's event reads). The tenant guard applies; the slot and
+   * retries do not, since the reader sets how long it runs and a retried stream would repeat rows.
+   * A driver that cannot stream answers the whole result, under every policy, as one batch.
+   */
+  async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
+    this.tenantGuard.assert(request);
+    if (this.driver.stream === undefined) {
+      yield (await this.query<Row>(request)).rows;
+      return;
+    }
+    yield* this.driver.stream<Row>(request);
+  }
+
+  /**
+   * Run a statement that answers no rows, under every policy this client was
+   * given. Same order, same reasons as {@link query}.
+   */
+  async command(request: QueryRequest): Promise<void> {
+    this.tenantGuard.assert(request);
+
+    const runOnce = () => this.driver.command(request);
+    const withRetries = () =>
+      this.retries === undefined
+        ? runOnce()
+        : this.retries.run(runOnce, { signal: request.signal, request });
+
+    if (this.limiter === undefined) return withRetries();
+    await this.limiter.run({ operation: "command", task: withRetries, signal: request.signal });
+  }
+
+  /**
+   * Writes one batch under every policy this client was given, same order as
+   * {@link query}: the guard refuses a multi-tenant batch before it costs a
+   * slot or socket, and a retrying insert keeps its slot.
+   */
+  async insert(request: InsertRequest): Promise<void> {
+    this.tenantGuard.assertInsert(request);
+    if (request.rows.length === 0) return;
+
+    const runOnce = () => this.driver.insert(request);
+    const withRetries = () =>
+      this.retries === undefined
+        ? runOnce()
+        : this.retries.run(runOnce, {
+            signal: request.signal,
+            request: {
+              tenantId: request.tenantId,
+              sql: `INSERT INTO ${request.table}`,
+              table: request.table,
+              kind: "write",
+            },
+          });
+    const withReport = () =>
+      this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
+
+    if (this.limiter === undefined) return withReport();
+    await this.limiter.run({ operation: "insert", task: withReport, signal: request.signal });
+  }
+
+  /** One statement's outcome, reported the way the vendor client policy reports it. */
+  private async reported<T>({
+    operation,
+    params,
+    task,
+  }: {
+    operation: StatementOperation;
+    params: Record<string, unknown>;
+    task: () => Promise<T>;
+  }): Promise<T> {
+    const reporter = this.reporter;
+    if (reporter === undefined) return task();
+
+    const queryType = operation === "insert" ? "INSERT" : extractQueryType(params);
+    const table = extractTableName(params);
+    const start = now();
+    try {
+      const result = await task();
+      const durationMs = now() - start;
+      reporter.success({ operation, durationMs, params });
+      reporter.outcome({ queryType, table, durationMs, outcome: "success" });
+      return result;
+    } catch (error) {
+      const durationMs = now() - start;
+      reporter.failure({ operation, error, durationMs, params });
+      reporter.outcome({ queryType, table, durationMs, outcome: "error" });
+      throw error;
+    }
   }
 }

@@ -39,6 +39,88 @@ Feature: Private ClickHouse Routing
     Then the private ClickHouse map is empty
 
   # ---------------------------------------------------------------------------
+  # The family is a secret (ruled 2026-09-28, ARCHITECTURE §7)
+  #
+  # Main's `CLICKHOUSE_URL__<label>__<orgId>` family stays as it is, so no
+  # deployment changes. Each URL carries a password, so the stores declare the
+  # family as one `Secret.family("CLICKHOUSE_URL__")` handle (ADR-132), resolve it
+  # through the chain once at boot, and hand the routing table to the clickhouse
+  # member; nothing else reads the environment, and no route URL is ever printed.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: The stores parse the route family into the clickhouse member at boot
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server and CLICKHOUSE_URL is unset
+    When the process opens its stores
+    Then the clickhouse member exists and answers org_1 among its private routes
+
+  @unit
+  Scenario: A route entry naming no organization is skipped
+    Given CLICKHOUSE_URL__acme__ is set beside a shared CLICKHOUSE_URL
+    When the process opens its stores
+    Then the clickhouse member answers no private route, and the warning names the variable only
+
+  @unit
+  Scenario: The migration runner reads the clickhouse member's routes
+    Given CLICKHOUSE_URL__acme__org_1 names an organization's own server
+    When ops' migration pass resolves an organization's dataplane
+    Then org_1 answers as private and every other organization as shared
+
+  # ---------------------------------------------------------------------------
+  # Recorded private organizations (Alex, 2026-10-11; upgrade trial T7-F2, T7-F3)
+  #
+  # The env family was the only thing saying an organization is private, so a
+  # missing variable quietly routed it to the shared server: empty reads, ingest
+  # answered 200, nothing logged. Now the organization module records, in
+  # Postgres, the label of each private route the first time it sees it. A
+  # recorded organization whose route is later missing, or whose variable is
+  # malformed, is refused with private_dataplane_unavailable (503) naming the
+  # variable in its meta, never its value, and never served from shared.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A recorded private organization with its route present routes to its own server
+    Given org "org123" is recorded as private with label "acme"
+    And CLICKHOUSE_URL__acme__org123 is set
+    When a statement is routed for one of its projects
+    Then it goes to the private ClickHouse
+
+  @unit
+  Scenario: A recorded private organization whose route is missing is refused, naming the variable
+    Given org "org123" is recorded as private with label "acme"
+    And CLICKHOUSE_URL__acme__org123 is not set
+    When a statement is routed for one of its projects
+    Then it is refused with private_dataplane_unavailable naming CLICKHOUSE_URL__acme__org123 as missing
+    And the shared ClickHouse is not used
+
+  @unit
+  Scenario: An organization whose route variable is malformed is refused, naming the variable
+    Given CLICKHOUSE_URL__acme__org123 is set to a value that is no URL
+    When a statement is routed for one of its projects
+    Then it is refused with private_dataplane_unavailable naming CLICKHOUSE_URL__acme__org123 as malformed
+    And the shared ClickHouse is not used
+
+  @unit
+  Scenario: An organization never recorded as private and with no route stays on the shared server
+    Given org "org456" is not recorded as private and has no CLICKHOUSE_URL__ variable
+    When a statement is routed for one of its projects
+    Then it goes to the shared ClickHouse
+
+  @unit
+  Scenario: The organization module records a private route the first time it sees it, once
+    Given CLICKHOUSE_URL__acme__org123 and DATAPLANE_S3__acme__org123 are set
+    When the organization module's scheduled job runs twice
+    Then org "org123" is recorded with ClickHouse label "acme" and S3 label "acme"
+    And the second run changes nothing, and a later label does not replace the first
+
+  @unit
+  Scenario: A refused private organization is logged once per process, organization and kind
+    Given a recorded private organization whose route is missing
+    When many of its requests are refused
+    Then one error line names the organization, the kind and the variable
+    And each request answers 503 private_dataplane_unavailable with the variable in its meta
+
+  # ---------------------------------------------------------------------------
   # Organization-level routing
   # ---------------------------------------------------------------------------
 
@@ -96,6 +178,15 @@ Feature: Private ClickHouse Routing
     Then the returned client connects to the private ClickHouse
     And no project needs to exist for that id
 
+  @unit
+  Scenario: One directory places tenants for every process
+    Given the directory the API process and the worker process each compose
+    When it is asked for a project, for an organization and for a user
+    Then it answers the project's organization, the organization itself, and the shared instance
+    # One implementation, not one per process: the API resolved a tenant through
+    # the project table alone, so an organization- or user-tenanted read that the
+    # worker routed correctly was refused in the API.
+
   @integration
   Scenario: A tenant that names no project, organization or user is refused
     Given an id that matches no project, no organization and no user
@@ -103,21 +194,31 @@ Feature: Private ClickHouse Routing
     Then resolution fails with an error naming the tenant
     And the shared client is not returned
 
+  @unit
+  Scenario: An organization created after a process booted resolves on its next lookup
+    Given a long-lived worker that looked up an organization before it was created
+    When the organization is created and the worker looks it up again
+    Then the lookup reads Postgres again and answers that organization
+    # T0-F11: a refusal is never remembered, so a new tenant is never stuck unroutable.
+
   # ---------------------------------------------------------------------------
   # Access discipline
   # ---------------------------------------------------------------------------
   # Routing is only safe while there is one road to a client. The composition
-  # root builds the resolvers once; everything else receives them through the
-  # app or an injected repository, so no module can quietly reach the wrong
-  # instance by importing its own way in.
+  # root builds the connection once and everything else receives a client from
+  # it, so a repository cannot reach an instance of its own choosing. What that
+  # is worth is only ever visible at the servers: a repository handed the
+  # routed connection writes where its tenant routes, and the other instance
+  # holds nothing of it.
   # ---------------------------------------------------------------------------
 
-  @unit
-  Scenario: The application reaches ClickHouse through the composition root alone
-    Given the composition root builds the tenant and organization resolvers once
-    When any other module needs a ClickHouse client
-    Then it receives one through the app or an injected repository
-    And no module outside the sanctioned boot paths imports the client module's functions directly
+  @integration
+  Scenario: A repository handed the routed connection cannot reach the other instance
+    Given the composition root builds one routed connection over both instances
+    And a repository that resolves its client from that connection
+    When it writes for a tenant routed to the private instance
+    Then the row is on the private instance
+    And the shared instance holds nothing of it
 
   # ---------------------------------------------------------------------------
   # Admin / migration operations
@@ -181,3 +282,32 @@ Feature: Private ClickHouse Routing
     When the routed client is resolved for that user as the tenant
     Then it answers the shared ClickHouse
     And their organization's private instance is not consulted
+
+  @integration
+  Scenario: A scheduled singleton is a tenant in its own right
+    Given the pseudo-tenant a scheduled process manager's single instance runs under
+    When the routed client is resolved for that tenant
+    Then it answers the shared ClickHouse
+    And no project, organization or user is looked up to get there
+
+  @unit
+  Scenario: A read whose ClickHouse stops answering is refused as clickhouse_unavailable
+    Given the private ClickHouse for "org123" drops every connection
+    When a read for one of its projects runs out of retries on "read ECONNRESET"
+    Then the read fails with the handled 503 "clickhouse_unavailable"
+    And the dropped connection is kept as its reason
+    But a ClickHouse server error is passed through unchanged
+
+  @unit
+  Scenario: A ClickHouse that comes back answers again with no restart
+    Given a read refused as clickhouse_unavailable because its ClickHouse refused or dropped the connection
+    When the ClickHouse answers again
+    Then the next read on the same process succeeds on the same vendor client
+    And no client, socket or route is kept in a failed state
+
+  @unit
+  Scenario: A read the ClickHouse server refuses as too many simultaneous queries is refused as clickhouse_overloaded
+    Given the ClickHouse server refuses every read with code 202 "Too many simultaneous queries"
+    When a read runs out of retries on that refusal
+    Then the read fails with the handled 503 "clickhouse_overloaded"
+    And the server's refusal is kept as its reason

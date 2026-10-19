@@ -24,7 +24,7 @@ The identity platform is, on paper, already the house shape. Under
 16 services with constructor-injected ports, 5 event-ledger writers and some
 25 adapter classes; `runtime.ts` composes them and the routers call what it
 hands out. The packages behind it (`@langwatch/identity`,
-`@langwatch/identity-server`) declare the ports and ship the services and
+`@langwatch/identity-process`) declare the ports and ship the services and
 read neither Prisma nor the environment, and a test proves it.
 
 The layer ABOVE that is not the house shape, and it is where the bugs of the
@@ -127,7 +127,7 @@ named one disappears without its allowlist being tightened.
 2. **Prisma moves into the repository tier.** In
    `app-layer/identity/` and `better-auth/`, a query (`prisma.<model>.`,
    `prisma.$transaction`) appears only in `repositories/**`, `*.repository.ts`,
-   `*.adapter.ts` and `*-adapters.ts`. `runtime.ts` may *hold* the client to
+   `*.adapter.ts` and `*-adapters.ts`. `runtime.ts` may _hold_ the client to
    construct repositories; it may not query with it. The auth routers and the
    auth route touch no `account`, `session`, `passkey`, `verification`,
    `ssoProvider` or `ssoConnection` row directly.

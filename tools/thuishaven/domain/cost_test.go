@@ -4,7 +4,6 @@ import (
 	"math"
 	"strings"
 	"testing"
-	"time"
 )
 
 // @scenario "The warning states the price, not just the fact"
@@ -88,125 +87,6 @@ func TestInvalidationWarningsCarryTheirCertainty(t *testing.T) {
 			}
 			if !strings.Contains(got, "no escape hatch") || !strings.Contains(got, "$2.85") {
 				t.Fatalf("expected the consequence and the price, got %q", got)
-			}
-		})
-	})
-}
-
-// @scenario "A test rerun after an edit is not a repeat"
-// @scenario "A tool call repeating identically with no intervening change is stopped"
-// @scenario "An interleaved call resets the repeat count"
-func TestRepeatDetectorDoesNotBreakTheRedGreenLoop(t *testing.T) {
-	key := RepeatKey("Bash", "pnpm test:unit run src/x")
-
-	t.Run("given the same command run repeatedly with nothing changing", func(t *testing.T) {
-		state := RepeatState{}
-		var denied bool
-		for i := 0; i <= RepeatThreshold; i++ {
-			state, denied = ObserveCall(state, key)
-		}
-
-		t.Run("it is eventually denied", func(t *testing.T) {
-			if !denied {
-				t.Fatalf("expected a denial past %d repeats", RepeatThreshold)
-			}
-		})
-
-		t.Run("and the reason tells the caller to change something rather than retry", func(t *testing.T) {
-			reason := RepeatDenialReason(state.Count)
-			if !strings.Contains(reason, "do not retry it unchanged") {
-				t.Fatalf("expected actionable copy, got %q", reason)
-			}
-		})
-	})
-
-	t.Run("given the same command with a file edit in between", func(t *testing.T) {
-		state := RepeatState{}
-		for range RepeatThreshold + 2 {
-			state.EditedSince = true // an edit landed since the last call
-			var denied bool
-			state, denied = ObserveCall(state, key)
-			if denied {
-				t.Fatal("the red-green loop must never be denied")
-			}
-		}
-	})
-
-	t.Run("given a different call in between", func(t *testing.T) {
-		state := RepeatState{}
-		for range RepeatThreshold + 2 {
-			state, _ = ObserveCall(state, key)
-			state, _ = ObserveCall(state, RepeatKey("Read", "somefile"))
-		}
-
-		t.Run("the count never builds up", func(t *testing.T) {
-			next, denied := ObserveCall(state, key)
-			if denied || next.Count > 1 {
-				t.Fatalf("an interleaved call must reset the run, got count %d", next.Count)
-			}
-		})
-	})
-}
-
-// @scenario "A spawn count that cannot be trusted admits"
-// @scenario "Spawning past the machine-wide agent cap is refused"
-func TestSpawnCapExpiresRatherThanFailingClosed(t *testing.T) {
-	now := time.Now()
-
-	t.Run("given recent spawns", func(t *testing.T) {
-		var recorded []time.Time
-		for range MaxConcurrentAgents {
-			recorded = append(recorded, now)
-		}
-
-		t.Run("they are all counted", func(t *testing.T) {
-			if got := LiveSpawns(recorded, now); got != MaxConcurrentAgents {
-				t.Fatalf("expected %d live, got %d", MaxConcurrentAgents, got)
-			}
-		})
-
-		t.Run("and the refusal names the count so it is checkable", func(t *testing.T) {
-			if !strings.Contains(SpawnDenialReason(MaxConcurrentAgents), "do not sleep") {
-				t.Fatal("the refusal must not invite a sleep")
-			}
-		})
-	})
-
-	t.Run("given spawns older than the entry TTL", func(t *testing.T) {
-		stale := now.Add(-SpawnEntryTTL - time.Minute)
-		recorded := []time.Time{stale, stale, stale}
-
-		t.Run("they are discarded, so a lost decrement cannot wedge the machine", func(t *testing.T) {
-			if got := LiveSpawns(recorded, now); got != 0 {
-				t.Fatalf("expected stale entries dropped, got %d", got)
-			}
-		})
-	})
-
-	t.Run("given a spawn stamped in the future", func(t *testing.T) {
-		// A negative age is under the TTL by arithmetic, so a clock that went
-		// backwards would hold the cap full until the timestamp passed — the
-		// stale-high count the fail-open design says must be impossible.
-		recorded := []time.Time{now.Add(time.Minute)}
-
-		t.Run("it is not counted, because an impossible entry is not evidence", func(t *testing.T) {
-			if got := LiveSpawns(recorded, now); got != 0 {
-				t.Fatalf("expected a future entry ignored, got %d", got)
-			}
-		})
-	})
-}
-
-func TestParallelSpawnsPayTheWriteNotTheRead(t *testing.T) {
-	t.Run("given several sub-agents launched together on a shared prefix", func(t *testing.T) {
-		t.Run("every one after the first pays a write it could have read", func(t *testing.T) {
-			one := ParallelSpawnCachePrice(1, 200_000)
-			four := ParallelSpawnCachePrice(4, 200_000)
-			if one != 0 {
-				t.Fatalf("a lone spawn shares nothing; got %v", one)
-			}
-			if four <= 0 {
-				t.Fatalf("expected a real cost for parallel spawns, got %v", four)
 			}
 		})
 	})

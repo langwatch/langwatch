@@ -6,6 +6,7 @@ import (
 	"errors"
 	"net"
 	"net/http"
+	"time"
 )
 
 // Service is a managed component with a start/stop lifecycle.
@@ -20,6 +21,13 @@ type Service interface {
 // asynchronously after Start (e.g. an HTTP server whose accept loop dies).
 type fatalReporter interface {
 	Fatal() <-chan error
+}
+
+// stopBudgeter is optionally implemented by a service whose Stop needs a
+// deadline of its own instead of the group's graceful budget, such as one
+// that drains work far longer lived than a request.
+type stopBudgeter interface {
+	StopBudget() time.Duration
 }
 
 // --- Adapters ---

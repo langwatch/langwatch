@@ -1,4 +1,5 @@
 import { describe, it, expect, vi } from "vitest";
+
 import { checkBudget, renderBudgetExceeded } from "../budget";
 import type { GovernanceConfig } from "../config";
 
@@ -124,7 +125,7 @@ describe("renderBudgetExceeded", () => {
     expect(out).not.toContain("Admin:");
   });
 
-  describe("period rendering — gateway emits lowercased GatewayBudgetWindow root form", () => {
+  describe("when the gateway emits a lowercased GatewayBudgetWindow root form", () => {
     it.each([
       ["month", "monthly budget"],
       ["week", "weekly budget"],
@@ -153,7 +154,6 @@ describe("renderBudgetExceeded", () => {
 
   it("contains no ANSI escape sequences (pipe-safe)", () => {
     const out = renderBudgetExceeded(baseEvent);
-    // eslint-disable-next-line no-control-regex
-    expect(out).not.toMatch(/\[/);
+    expect(out).not.toContain("\u001b[");
   });
 });

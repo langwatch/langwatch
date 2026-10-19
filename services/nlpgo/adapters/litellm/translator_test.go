@@ -105,6 +105,8 @@ func TestIsReasoningModel(t *testing.T) {
 		"openai/co3-thing",     // `co3` would substring-match o3 in the full id
 		"vertex_ai/pro1-model", // `pro1` would substring-match o1 in the full id
 		"custom/super-gpt-5x",  // gpt-5 anywhere but the start would substring-match
+		"openai/gpt-6x",        // a generation must end at the id's end, a `.` or a `-`
+		"openai/o1x-model",
 	}
 	for _, m := range yes {
 		if !IsReasoningModel(m) {
@@ -511,5 +513,21 @@ func TestInlineCredentials_RequiresProvider(t *testing.T) {
 	ic := InlineCredentials{Provider: ""}
 	if _, err := ic.Encode(); err == nil {
 		t.Errorf("expected error when provider is empty")
+	}
+}
+
+// @scenario "A Gemini or Vertex provider with a base URL reaches that host instead of Google's"
+func TestFromLiteLLMParams_GeminiVertexAndBedrockCarryTheBaseURL(t *testing.T) {
+	gemini, err := FromLiteLLMParams("gemini", map[string]any{"api_key": "k", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || gemini.Gemini["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("gemini api_base lost: %v %v", gemini.Gemini, err)
+	}
+	vertex, err := FromLiteLLMParams("vertex_ai", map[string]any{"vertex_project": "p", "vertex_location": "l", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || vertex.VertexAI["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("vertex api_base lost: %v %v", vertex.VertexAI, err)
+	}
+	bedrock, err := FromLiteLLMParams("bedrock", map[string]any{"aws_region_name": "us-east-1", "api_base": "http://127.0.0.1:21651"})
+	if err != nil || bedrock.Bedrock["api_base"] != "http://127.0.0.1:21651" {
+		t.Fatalf("bedrock api_base lost: %v %v", bedrock.Bedrock, err)
 	}
 }

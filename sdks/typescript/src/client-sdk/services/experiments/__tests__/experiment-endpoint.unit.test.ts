@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+
 import { LangWatch } from "@/client-sdk";
 
 const mockFetch = vi.fn();
@@ -6,7 +7,10 @@ vi.stubGlobal("fetch", mockFetch);
 
 const initResponse = (): Response =>
   new Response(
-    JSON.stringify({ slug: "trailing-slash-eval", path: "/acme/experiments/trailing-slash-eval" }),
+    JSON.stringify({
+      slug: "trailing-slash-eval",
+      path: "/acme/experiments/trailing-slash-eval",
+    }),
     { status: 200, headers: { "content-type": "application/json" } },
   );
 
@@ -16,10 +20,8 @@ const fetchedUrl = (): string => {
 };
 
 /**
- * A trailing slash on the endpoint used to append onto paths that already carry
- * their own leading slash, producing `//api/experiment/init`. The router does
- * not match that, so the SDK surfaced the server's opaque `{"error":"Not
- * Found"}` with nothing pointing at the endpoint as the cause.
+ * A trailing slash on the endpoint used to append onto paths that already carry their own
+ * leading slash, producing `//api/v1/experiment/init`.
  */
 describe("Experiment.init endpoint handling", () => {
   const previousApiKey = process.env.LANGWATCH_API_KEY;
@@ -51,8 +53,8 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
-        expect(new URL(fetchedUrl()).pathname).toBe("/api/experiment/init");
+        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/v1/experiment/init");
+        expect(new URL(fetchedUrl()).pathname).toBe("/api/v1/experiment/init");
       });
     });
   });
@@ -68,7 +70,7 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("http://localhost:5560/api/experiment/init");
+        expect(fetchedUrl()).toBe("http://localhost:5560/api/v1/experiment/init");
       });
     });
   });
@@ -83,7 +85,7 @@ describe("Experiment.init endpoint handling", () => {
 
         await langwatch.experiments.init("trailing-slash-eval");
 
-        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/experiment/init");
+        expect(fetchedUrl()).toBe("https://app.langwatch.ai/api/v1/experiment/init");
       });
     });
   });

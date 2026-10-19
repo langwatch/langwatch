@@ -85,13 +85,18 @@ type langWatchCall struct {
 
 // newLangWatchClient builds the LangWatch-to-LangWatch HTTP client. No overall
 // Timeout, because a streamed completion can run for minutes; cancellation
-// rides the request context.
-func newLangWatchClient() *http.Client {
+// rides the request context. Like the mint client, it re-checks every dialed
+// address against the endpoint policy and never follows a redirect.
+func newLangWatchClient(policy customerEndpointPolicy) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
+			DialContext:         policyDialer(policy, 30*time.Second).DialContext,
 			MaxIdleConnsPerHost: 20,
 			IdleConnTimeout:     90 * time.Second,
 			ForceAttemptHTTP2:   true,
+		},
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return http.ErrUseLastResponse
 		},
 	}
 }

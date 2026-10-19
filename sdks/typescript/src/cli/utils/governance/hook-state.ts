@@ -1,19 +1,7 @@
 /**
- * What the session-context seams remember between invocations: one small file
- * per session holding the last context it managed to post. The command hooks
- * (`langwatch ingest hook <tool>`) and the codex rollout harvest share this
- * state, so a device carrying both seams posts a session's context once.
- *
- * That file is the whole reason a Stop hook on a quiet session costs nothing,
- * and the reason a branch switch mid-session is reported. It lives beside the
- * CLI's own config rather than in the repository, because it describes a
- * session on this machine and nothing a checkout should carry.
- *
- * Reads report "nothing recorded" for every failure, so an unreadable file
- * costs one duplicate record rather than silence. Writes throw, and the caller
- * decides what a lost fingerprint is worth.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
+ * What the session-context seams remember between invocations: one small
+ * file per session, shared by command hooks and the rollout harvest. Reads
+ * report "nothing recorded" on failure; writes throw.
  */
 
 import * as fs from "node:fs";
@@ -29,10 +17,9 @@ export function defaultStateDir(): string {
 }
 
 /**
- * Where one session's fingerprint lives. The agent is part of the key because
- * session ids are only unique within one agent, and two agents sharing a
- * fingerprint would leave the second silent. Whatever the agent and session id
- * turn out to contain, the result is one path segment.
+ * Where one session's fingerprint lives. The agent is part of the key
+ * because session ids are only unique within one agent -- two agents
+ * sharing a fingerprint would leave the second silent.
  */
 export function stateFilePath({
   stateDir,
@@ -86,26 +73,23 @@ export function writeFingerprint({
  * the directory is small, this runs on a hook that is already doing IO, and
  * every failure is beneath mentioning.
  */
-export function pruneStaleState({
-  stateDir,
-  now,
-}: {
-  stateDir: string;
-  now: () => number;
-}): void {
+export function pruneStaleState({ stateDir, now }: { stateDir: string; now: () => number }): void {
   try {
     for (const entry of fs.readdirSync(stateDir)) {
       if (!entry.endsWith(".json")) continue;
       const file = path.join(stateDir, entry);
       try {
-        if (now() - fs.statSync(file).mtimeMs > STATE_MAX_AGE_MS) {
+        const age = now() - fs.statSync(file).mtimeMs;
+        if (age > STATE_MAX_AGE_MS) {
           fs.unlinkSync(file);
         }
       } catch {
         // Raced with another hook, or unreadable. Either way, leave it.
+        void 0;
       }
     }
   } catch {
     // No state directory yet.
+    void 0;
   }
 }

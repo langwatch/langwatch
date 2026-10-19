@@ -1,0 +1,193 @@
+/**
+ * The write gates the settings page is bounded by: who may write a scope, what a plan may
+ * persist, and who may switch retention off entirely.
+ */
+import { describe, expect, it } from "vitest";
+
+import { createDataRetentionTestAuthz } from "../../app/__tests__/data-retention.fixture.ts";
+import {
+  type DataRetentionDirectoryReader,
+  type RetentionOrganizationDirectory,
+  type RetentionProjectLineage,
+} from "../../app/data-retention.app.ts";
+import { DataRetentionPolicyService } from "../data-retention-policy.service.ts";
+import { RetentionPermissionsService } from "../retention-permissions.service.ts";
+import type { DataRetentionPlan, RetentionPlanService } from "../retention-plan.service.ts";
+
+const ACTOR = { userId: "user_alice", email: "alice@example.com" };
+
+class StubDirectory implements DataRetentionDirectoryReader {
+  constructor(private readonly organizationId: string | null) {}
+  async findProjectLineage(): Promise<RetentionProjectLineage | null> {
+    return {
+      projectId: "proj_a",
+      name: "A",
+      teamId: "team_1",
+      organizationId: this.organizationId,
+      organizationName: "Acme",
+    };
+  }
+  async findOrganizationDirectory(): Promise<RetentionOrganizationDirectory> {
+    return { teams: [], projects: [] };
+  }
+  async findScopeProjects(): Promise<readonly { id: string; teamId: string }[]> {
+    return [];
+  }
+}
+
+class StubPlans implements Pick<RetentionPlanService, "getPlan"> {
+  constructor(private readonly plan: DataRetentionPlan) {}
+  async getPlan(): Promise<DataRetentionPlan> {
+    return this.plan;
+  }
+}
+
+function policy(options: {
+  organizationId?: string | null;
+  allow?: boolean;
+  plan?: DataRetentionPlan;
+  admin?: boolean;
+}) {
+  return DataRetentionPolicyService.create({
+    directory: new StubDirectory(
+      "organizationId" in options ? (options.organizationId ?? null) : "org_1",
+    ),
+    permissions: RetentionPermissionsService.create({
+      authz: createDataRetentionTestAuthz(options.allow ?? true, options.admin ?? false),
+    }),
+    plans: new StubPlans(options.plan ?? { free: false, uncapped: false }),
+  });
+}
+
+/** The refusal a synchronous gate threw, so the case can assert on its code. */
+function refusalOf(run: () => void): { code?: unknown; httpStatus?: unknown } {
+  try {
+    run();
+  } catch (error) {
+    return error as { code?: unknown; httpStatus?: unknown };
+  }
+
+  throw new Error("expected the gate to refuse, but it returned");
+}
+
+describe("given a plan-gated write", () => {
+  describe("when the organization is on a free plan", () => {
+    /** @scenario "A retention rule saved on a free plan is refused by name" */
+    it("refuses by name", async () => {
+      await expect(
+        policy({ plan: { free: true, uncapped: false } }).assertPlanForProject({
+          actor: ACTOR,
+          projectId: "proj_a",
+        }),
+      ).rejects.toMatchObject({ code: "data_retention_not_on_plan", httpStatus: 403 });
+    });
+  });
+
+  describe("when the project no longer sits in an organization", () => {
+    /** @scenario "A retention rule saved from a project with no organization is refused by name" */
+    it("refuses by name rather than gating on a plan it cannot resolve", async () => {
+      await expect(
+        policy({ organizationId: null }).assertPlanForProject({
+          actor: ACTOR,
+          projectId: "proj_a",
+        }),
+      ).rejects.toMatchObject({ code: "project_not_found", httpStatus: 404 });
+    });
+  });
+});
+
+describe("given a value a plan may or may not persist", () => {
+  /**
+   * @scenario "A retention length the plan does not offer is refused by name"
+   * @scenario "A paid organization cannot save an off-menu retention value"
+   */
+  it("allows only the fixed presets on a capped plan", () => {
+    const capped = { free: false, uncapped: false };
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 35),
+    ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 63),
+    ).not.toThrow();
+    expect(
+      refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(capped, 98)),
+    ).toMatchObject({ code: "data_retention_length_not_on_plan", httpStatus: 403 });
+  });
+
+  /**
+   * @scenario "A retention length under the plan's floor is told the floor"
+   * @scenario "An enterprise organization gets the full menu and a custom value"
+   */
+  it("allows any whole-week value at or above the floor on an uncapped plan", () => {
+    const uncapped = { free: false, uncapped: true };
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 49),
+    ).not.toThrow();
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 700),
+    ).not.toThrow();
+    // The paid short presets stay the sole exceptions below the floor.
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 35),
+    ).not.toThrow();
+    expect(
+      refusalOf(() => DataRetentionPolicyService.assertPlanAllowsRetentionValue(uncapped, 42)),
+    ).toMatchObject({
+      code: "data_retention_length_below_plan_minimum",
+      meta: { minimumDays: 49 },
+    });
+  });
+
+  it("leaves the indefinite sentinel to the platform-administrator gate", () => {
+    expect(() =>
+      DataRetentionPolicyService.assertPlanAllowsRetentionValue(
+        { free: false, uncapped: false },
+        0,
+      ),
+    ).not.toThrow();
+  });
+});
+
+describe("given a request to disable retention entirely", () => {
+  describe("when the caller is not a platform administrator", () => {
+    /**
+     * @scenario "A request to keep data forever is refused by name"
+     * @scenario "Keep-forever stays a platform-admin capability on every plan"
+     * @scenario "An organization admin who is not a platform admin cannot disable retention"
+     */
+    it("refuses by name", async () => {
+      await expect(
+        policy({ admin: false }).assertCanDisableRetention({ actor: ACTOR }),
+      ).rejects.toMatchObject({ code: "data_retention_disable_forbidden" });
+    });
+  });
+
+  describe("when the caller is one", () => {
+    /** @scenario "A platform admin can disable retention for a scope" */
+    it("allows it", async () => {
+      await expect(
+        policy({ admin: true }).assertCanDisableRetention({ actor: ACTOR }),
+      ).resolves.toBeUndefined();
+    });
+  });
+});
+
+describe("given the read side's configurable flag", () => {
+  it("reports false for a project with no organization", async () => {
+    await expect(
+      policy({}).canConfigureRetention({ organizationId: null, actor: ACTOR }),
+    ).resolves.toBe(false);
+  });
+
+  it("reports false on a free plan and true otherwise", async () => {
+    await expect(
+      policy({ plan: { free: true, uncapped: false } }).canConfigureRetention({
+        organizationId: "org_1",
+        actor: ACTOR,
+      }),
+    ).resolves.toBe(false);
+    await expect(
+      policy({}).canConfigureRetention({ organizationId: "org_1", actor: ACTOR }),
+    ).resolves.toBe(true);
+  });
+});

@@ -90,7 +90,7 @@ class ModelProvidersFacade:
         Returns:
             Dictionary with model provider data.
         """
-        response = self._http().get("/api/model-providers")
+        response = self._http().get("/api/v1/model-providers")
         _raise_for_status(response, operation="list")
         return response.json()
 
@@ -112,7 +112,7 @@ class ModelProvidersFacade:
         """
         body = params or {}
         response = self._http().put(
-            f"/api/model-providers/{_quote(provider)}", json=body
+            f"/api/v1/model-providers/{_quote(provider)}", json=body
         )
         _raise_for_status(response, operation="set")
         return response.json()

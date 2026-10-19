@@ -1,20 +1,15 @@
-import { updateTestSuite as apiUpdateTestSuite } from "../langwatch-api-test-suites.js";
+import { updateTestSuite as apiUpdateTestSuite } from "../langwatch-api-test-suites.ts";
 import {
   type EvaluatorAttachmentInput,
   type SuiteField,
   toWireAttachments,
-} from "../schemas/suite-fields.js";
-import {
-  formatEvaluatorAttachments,
-  formatSuiteFields,
-} from "./format-suite-details.js";
+} from "../schemas/suite-fields.ts";
+import { formatEvaluatorAttachments, formatSuiteFields } from "./format-suite-details.ts";
 
 /**
- * Handles the platform_update_test_suite MCP tool invocation.
- *
- * Any of the name, the fields and the evaluators. A field list or an
- * evaluator list replaces the one the suite holds; a key left out keeps
- * what the suite has.
+ * Handles the platform_update_test_suite MCP tool: updates any of name,
+ * fields and evaluators. A field or evaluator list replaces what the
+ * suite holds; a key left out keeps its current value.
  */
 export async function handleUpdateTestSuite(params: {
   id: string;

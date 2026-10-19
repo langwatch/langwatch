@@ -160,8 +160,84 @@ test_the_default_grace_period_covers_the_default_drain() {
   fi
 }
 
+# @scenario "the voice call drain reaches the pod and fits its grace period"
+test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period() {
+  local voice err
+  voice=$(configmap_value_of "" "LW_GATEWAY_VOICE_DRAIN_SECONDS")
+  if [ "$voice" != "40" ]; then
+    fail "voice drain" "LW_GATEWAY_VOICE_DRAIN_SECONDS is '${voice:-<absent>}', expected the shutdown.voiceDrainSeconds default of 40"
+  else
+    echo "ok   [voice drain] LW_GATEWAY_VOICE_DRAIN_SECONDS=$voice"
+  fi
+
+  # 570 + 30 + 5 needs 605 against the default 75: the kubelet would kill
+  # the pod with calls still open and their final reports unsent.
+  err=$(render_error "--set shutdown.voiceDrainSeconds=570")
+  case "$err" in
+    *"terminationGracePeriodSeconds"*"shutdown.voiceDrainSeconds"*605*)
+      echo "ok   [voice drain override] render refused, naming the 605s it needs"
+      ;;
+    "")
+      fail "voice drain override" "shutdown.voiceDrainSeconds=570 rendered against a 75s grace period"
+      ;;
+    *)
+      fail "voice drain override" "render failed without naming the required grace period: $err"
+      ;;
+  esac
+
+  voice=$(configmap_value_of "--set shutdown.voiceDrainSeconds=570 --set terminationGracePeriodSeconds=605" "LW_GATEWAY_VOICE_DRAIN_SECONDS")
+  if [ "$voice" != "570" ]; then
+    fail "voice drain matched override" "LW_GATEWAY_VOICE_DRAIN_SECONDS is '${voice:-<absent>}' after raising both values"
+  else
+    echo "ok   [voice drain matched override] LW_GATEWAY_VOICE_DRAIN_SECONDS=$voice"
+  fi
+}
+
+# @scenario "the allowed browser origins an operator sets reach the pod"
+test_cors_allowed_origins_reach_the_configmap() {
+  local origins
+  origins=$(configmap_value_of "" "LW_GATEWAY_CORS_ALLOWED_ORIGINS")
+  if [ -n "$origins" ]; then
+    fail "cors default" "LW_GATEWAY_CORS_ALLOWED_ORIGINS is '$origins', expected empty so CORS stays off"
+  else
+    echo "ok   [cors default] LW_GATEWAY_CORS_ALLOWED_ORIGINS is empty"
+  fi
+
+  origins=$(configmap_value_of "--set security.corsAllowedOrigins={https://app.example.com,http://localhost:5173}" "LW_GATEWAY_CORS_ALLOWED_ORIGINS")
+  if [ "$origins" != "https://app.example.com,http://localhost:5173" ]; then
+    fail "cors override" "LW_GATEWAY_CORS_ALLOWED_ORIGINS is '${origins:-<absent>}', expected the two origins comma-joined"
+  else
+    echo "ok   [cors override] LW_GATEWAY_CORS_ALLOWED_ORIGINS=$origins"
+  fi
+}
+
+# The metrics listener is opt-in: off renders no key, on renders the switch, the port and the secret.
+test_the_metrics_listener_is_opt_in() {
+  local exporter port rendered
+  exporter=$(configmap_value_of "" "OTEL_METRICS_EXPORTER")
+  if [ -n "$exporter" ]; then
+    fail "metrics default" "OTEL_METRICS_EXPORTER is '$exporter', expected absent"
+  else
+    echo "ok   [metrics default] OTEL_METRICS_EXPORTER is absent"
+  fi
+
+  exporter=$(configmap_value_of "--set metrics.enabled=true" "OTEL_METRICS_EXPORTER")
+  port=$(configmap_value_of "--set metrics.enabled=true --set metrics.port=9470" "OTEL_EXPORTER_PROMETHEUS_PORT")
+  rendered=$(render "--set metrics.enabled=true")
+  if [ "$exporter" != "otlp,prometheus" ] || [ "$port" != "9470" ]; then
+    fail "metrics enabled" "OTEL_METRICS_EXPORTER='${exporter:-<absent>}', OTEL_EXPORTER_PROMETHEUS_PORT='${port:-<absent>}'"
+  elif ! grep -q 'name: METRICS_API_KEY' <<<"$rendered"; then
+    fail "metrics enabled" "METRICS_API_KEY is not injected from the Secret"
+  else
+    echo "ok   [metrics enabled] exporter=$exporter port=$port, METRICS_API_KEY injected"
+  fi
+}
+
 test_drain_timing_reaches_the_configmap
+test_the_metrics_listener_is_opt_in
+test_cors_allowed_origins_reach_the_configmap
 test_the_duration_string_keys_are_refused
+test_the_voice_drain_reaches_the_pod_and_fits_the_grace_period
 test_an_unsurvivable_drain_budget_is_refused
 test_the_default_grace_period_covers_the_default_drain
 

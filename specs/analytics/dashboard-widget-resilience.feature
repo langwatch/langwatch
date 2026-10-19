@@ -64,3 +64,53 @@ Feature: Dashboard widgets recover from failures and stay current
     And comes back to the dashboard later
     Then auto-refresh is still every 5 minutes
     And choosing off stops scheduled refreshes
+
+  # ---------------------------------------------------------------------------
+  # Every LangWatchQL query runs under one restricted database identity that
+  # may run a fixed number of statements at once. A dashboard asked for all of
+  # its widgets' queries in the same instant, on load and on every refresh, so
+  # some were refused. The refusal had no code, reached the page as an unknown
+  # error, and the widget's data hook dropped the chart it was already showing.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A busy query service is a named, retryable refusal
+    Given the LangWatchQL identity is already running as many statements as it may
+    When another query arrives and the database refuses it
+    Then the caller receives "lwql_busy", a platform fault marked retryable
+    And it is not reported as an unknown error
+
+  @integration
+  Scenario: The frame is told when a failed query is worth retrying
+    Given a widget's query is refused with a retryable error
+    When the page answers the frame
+    Then the error the frame receives is marked retryable
+    And an error that is not retryable carries no such mark
+
+  @unit
+  Scenario: A failed refresh keeps the chart that was on screen
+    Given a widget's query has loaded rows
+    When a later refetch of it fails
+    Then the widget still holds the same rows and is not in an error state
+    And the failure is reported apart, as a refetch error
+
+  @unit
+  Scenario: A retryable failure is retried with backoff before it counts
+    Given a widget's query is refused with a retryable error
+    When the data hook handles the refusal
+    Then it tries again up to three times, waiting longer each time, with jitter
+    And a retry that succeeds leaves no error behind
+    And a failure that is not marked retryable is not retried
+
+  @unit
+  Scenario: An error state is only for a query that never had data
+    Given a widget's query has never loaded rows
+    When it fails and its retries are spent
+    Then the widget is in an error state carrying that failure
+
+  @unit
+  Scenario: A dashboard does not send every widget query at once
+    Given the widgets on a page ask for more queries than the page runs at a time
+    When they all ask in the same instant
+    Then at most four run at once and the rest start as earlier ones finish
+    And a query whose frame is torn down while it waits never starts

@@ -1,26 +1,15 @@
 // @vitest-environment node
 // @vitest-config ./vitest.e2e.config.mts
 
-import {
-  describe,
-  expect,
-  it,
-  afterEach,
-  beforeEach,
-  afterAll,
-  beforeAll,
-} from "vitest";
+import { randomUUID } from "crypto";
 import * as fs from "fs";
 import * as path from "path";
 
 import { config } from "dotenv";
-import {
-  expectations,
-  CliRunner,
-  PROMPT_NAME_PREFIX,
-  PromptFileManager,
-} from "./helpers";
+import { describe, expect, it, afterEach, beforeEach, afterAll, beforeAll } from "vitest";
+
 import { LangWatch } from "../../../dist";
+import { expectations, CliRunner, PromptFileManager } from "./helpers";
 import { ApiHelpers } from "./helpers/api-helpers";
 
 config({ path: ".env.test", override: true });
@@ -32,8 +21,15 @@ interface Tag {
   name: string;
 }
 
+// Not the shared PROMPT_NAME_PREFIX: sibling files and concurrent CI runs sweep that
+// prefix in their afterAll, deleting this file's prompts mid-test (#3129, #3240).
+const TAG_PROMPT_PREFIX = "cli-tag-e2e-test-prompt-";
+const createdHandles = new Set<string>();
+
 const createUniquePromptName = () => {
-  return `${PROMPT_NAME_PREFIX}-${Date.now()}`;
+  const handle = `${TAG_PROMPT_PREFIX}${randomUUID()}`;
+  createdHandles.add(handle);
+  return handle;
 };
 
 const createdTagNames = new Set<string>();
@@ -74,7 +70,7 @@ describe("CLI E2E", () => {
 
   afterAll(async () => {
     const apiHelpers = new ApiHelpers(langwatch);
-    await apiHelpers.cleanUpTestPrompts();
+    await apiHelpers.cleanUpTestPrompts(Array.from(createdHandles));
     // Only delete tags created by this test run to avoid interference with parallel runs
     await Promise.all(
       [...createdTagNames].map((name) =>
@@ -83,8 +79,8 @@ describe("CLI E2E", () => {
     );
   });
 
-  describe("tag", () => {
-    describe("tag create", () => {
+  describe("when running tag", () => {
+    describe("when running tag create", () => {
       describe("when creating a valid tag", () => {
         it("creates the tag and confirms", async () => {
           const tagName = createUniqueTagName();
@@ -112,7 +108,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag list", () => {
+    describe("when running tag list", () => {
       describe("when tags exist", () => {
         it("displays tags in a table", async () => {
           const tagName = createUniqueTagName();
@@ -128,7 +124,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag rename", () => {
+    describe("when running tag rename", () => {
       describe("when renaming an existing tag", () => {
         it("renames the tag", async () => {
           const oldName = createUniqueTagName();
@@ -149,7 +145,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag assign", () => {
+    describe("when running tag assign", () => {
       describe("when assigning a tag to a prompt version", () => {
         it("assigns the tag to the latest version", async () => {
           const handle = createUniquePromptName();
@@ -179,8 +175,7 @@ describe("CLI E2E", () => {
       });
 
       describe("when assigning a tag to a specific version", () => {
-        // Skip: flaky when two sdk-javascript-ci runs share the same e2e backend — see #3129
-        it.skip("assigns the tag to that version", async () => {
+        it("assigns the tag to that version", async () => {
           const handle = createUniquePromptName();
           const tagName = createUniqueTagName();
 
@@ -195,9 +190,7 @@ describe("CLI E2E", () => {
           await langwatch.prompts.tags.create({ name: tagName });
 
           try {
-            const result = cli.run(
-              `prompt tag assign ${handle} ${tagName} --version 1`,
-            );
+            const result = cli.run(`prompt tag assign ${handle} ${tagName} --version 1`);
 
             expectCliResultSuccess(result);
 
@@ -213,7 +206,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("tag delete", () => {
+    describe("when running tag delete", () => {
       describe("when deleting with --force", () => {
         it("deletes the tag without confirmation", async () => {
           const tagName = createUniqueTagName();
@@ -270,7 +263,7 @@ describe("CLI E2E", () => {
       });
     });
 
-    describe("pull --tag", () => {
+    describe("when running pull --tag", () => {
       describe("when pulling by tag", () => {
         it("fetches the tagged version instead of latest", async () => {
           const handle = createUniquePromptName();
@@ -307,8 +300,7 @@ describe("CLI E2E", () => {
               cwd: testDir,
               materializedDir: true,
             });
-            const content =
-              materializedPromptFileManagement.getPromptFileContent(handle);
+            const content = materializedPromptFileManagement.getPromptFileContent(handle);
             expect(content).toContain("Version 1");
             expect(content).not.toContain("Version 2");
           } finally {

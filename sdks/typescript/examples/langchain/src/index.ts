@@ -1,10 +1,11 @@
-import { setupObservability } from "langwatch/observability/node";
-import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
-import { getLangWatchTracer } from "langwatch";
-import { ChatOpenAI } from "@langchain/openai";
-import { HumanMessage, SystemMessage } from "@langchain/core/messages";
 import * as readline from "readline";
+
+import { HumanMessage, SystemMessage } from "@langchain/core/messages";
+import { ChatOpenAI } from "@langchain/openai";
 import cliMarkdown from "cli-markdown";
+import { getLangWatchTracer } from "langwatch";
+import { LangWatchCallbackHandler } from "langwatch/observability/instrumentation/langchain";
+import { setupObservability } from "langwatch/observability/node";
 
 setupObservability();
 
@@ -32,7 +33,7 @@ async function main() {
     callbacks: [langWatchCallback],
   });
 
-  const conversationHistory: Array<HumanMessage | SystemMessage> = [
+  const conversationHistory: (HumanMessage | SystemMessage)[] = [
     new SystemMessage(
       "You are a helpful assistant that can answer questions and help with tasks. You may use markdown to format your responses.",
     ),
@@ -57,10 +58,7 @@ async function main() {
           });
 
           // Check for exit command
-          if (
-            userInput.toLowerCase() === "quit" ||
-            userInput.toLowerCase() === "exit"
-          ) {
+          if (userInput.toLowerCase() === "quit" || userInput.toLowerCase() === "exit") {
             console.log("👋 Goodbye!");
             finish = true;
             return;

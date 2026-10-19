@@ -1,0 +1,228 @@
+import { timingSafeEqual } from "node:crypto";
+
+import type { AuthzPermission } from "@langwatch/authorization";
+
+/**
+ * The access decision for a single HTTP route. Every route mounted through the secured app builder
+ * must declare exactly one of these — that is the whole point: the access decision is a mandatory,
+ * reviewable property of the route, not a positional middleware a developer can forget.
+ */
+export type AccessPolicy =
+  | { readonly kind: "permission"; readonly permission: AuthzPermission }
+  | { readonly kind: "apiKeyPermission"; readonly permission: AuthzPermission }
+  | {
+      readonly kind: "projectPermission";
+      readonly permission: AuthzPermission;
+      /** Route param naming the project. Defaults to `id`. */
+      readonly param: string;
+    }
+  | {
+      readonly kind: "teamPermission";
+      readonly permission: AuthzPermission;
+      /** Route param naming the team. Defaults to `id`. */
+      readonly param: string;
+    }
+  | { readonly kind: "anyAuthenticated" }
+  | { readonly kind: "public"; readonly reason: string }
+  | { readonly kind: "internal"; readonly reason: string }
+  | {
+      readonly kind: "handlerManaged";
+      readonly reason: string;
+      /**
+       * The RBAC permissions the handler enforces for itself; `[]` when it
+       * gates on something that is not an RBAC permission. Mandatory — see
+       * `handlerManagedAuth` for why the optional version was a defect.
+       */
+      readonly permissions: readonly AuthzPermission[];
+      /**
+       * What kind of credential reaches this route:
+       */
+      readonly credential: HandlerCredential;
+    };
+
+/** @see the `credential` field on the handler-managed policy. */
+export type HandlerCredential = "apiKey" | "session" | "both" | "internal";
+
+/**
+ * Which credential an API consumer presents to reach a route.
+ */
+export type CredentialClass =
+  | "project_api_key"
+  | "organization_api_key"
+  /** The self-hosted key used to create the first organization. */
+  | "instance_admin_api_key"
+  /** SCIM bearer token for provisioning endpoints. */
+  | "scim_token"
+  /** A CLI device-session bearer, minted by `langwatch login`. */
+  | "cli_access_token"
+  /** Deployment-wide secret presented by an external monitor. */
+  | "internal_secret"
+  | "session"
+  | "internal"
+  | "none";
+
+/**
+ * The credential class a route reaches by, from the app it is mounted on and
+ * the policy it declares.
+ */
+export function credentialClassFor({
+  scope,
+  policy,
+}: {
+  scope: AppScope;
+  policy: AccessPolicy;
+}): CredentialClass {
+  if (policy.kind === "public") return "none";
+
+  if (policy.kind === "internal") return "internal";
+
+  if (policy.kind === "handlerManaged") {
+    return handlerManagedCredentialClass({
+      scope,
+      credential: policy.credential,
+    });
+  }
+
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/** The app families a route can be mounted on. */
+type AppScope = "project" | "organization" | "service" | "session";
+
+/** What each app answers for a route that does not opt out of its family. */
+const CLASS_BY_APP_SCOPE = {
+  project: "project_api_key",
+  organization: "organization_api_key",
+  service: "internal",
+  session: "session",
+} as const satisfies Record<AppScope, CredentialClass>;
+
+/** @see credentialClassFor, which is where the reasoning lives. */
+function handlerManagedCredentialClass({
+  scope,
+  credential,
+}: {
+  scope: AppScope;
+  credential: HandlerCredential;
+}): CredentialClass {
+  if (credential === "internal") return "internal";
+
+  if (credential === "session") return "session";
+
+  // apiKey / both, on an app whose scope names no key family of its own.
+  if (scope === "service" || scope === "session") return "project_api_key";
+
+  return CLASS_BY_APP_SCOPE[scope];
+}
+
+/**
+ * Any valid credential for the app's scope is accepted; no specific permission
+ * is checked. Reserve for routes whose handler performs no privileged action
+ * beyond what authentication already proves (e.g. "whoami").
+ */
+export function anyAuthenticated(): { readonly kind: "anyAuthenticated" } {
+  return { kind: "anyAuthenticated" };
+}
+
+/**
+ * Intentionally unauthenticated. `reason` is mandatory and must be non-empty —
+ * it is the reviewable justification that this route is safe to expose without
+ * credentials.
+ */
+export function publicEndpoint(reason: string): {
+  readonly kind: "public";
+  readonly reason: string;
+} {
+  assertReason(reason, "publicEndpoint");
+
+  return { kind: "public", reason };
+}
+
+/**
+ * Service-to-service route authenticated by a shared secret or signature, not
+ * an RBAC credential. `reason` is mandatory.
+ */
+export function internalSecret(reason: string): {
+  readonly kind: "internal";
+  readonly reason: string;
+} {
+  assertReason(reason, "internalSecret");
+
+  return { kind: "internal", reason };
+}
+
+/** Declares legacy in-handler authorization and its reviewable `reason`. */
+export function handlerManagedAuth({
+  reason,
+  permissions,
+  credential,
+}: {
+  reason: string;
+  /** Which credential reaches this route. @see the policy type. */
+  credential: HandlerCredential;
+  /**
+   * The RBAC permissions this handler enforces for itself — `[]` when it gates
+   * on something that is not an RBAC permission (an internal secret, a raw
+   * session check, a signature).
+   */
+  permissions: readonly AuthzPermission[];
+}): Extract<AccessPolicy, { kind: "handlerManaged" }> {
+  assertReason(reason, "handlerManagedAuth");
+
+  return { kind: "handlerManaged", reason, permissions, credential };
+}
+
+/**
+ * Every RBAC permission a route requires, whichever way it declares it — middleware policy
+ * or self-enforcing handler. The single place any audit should ask "what does this route
+ * actually demand?", so a new policy kind cannot quietly drop out of the answer.
+ */
+export function policyPermissions(policy: AccessPolicy): readonly AuthzPermission[] {
+  switch (policy.kind) {
+    case "permission":
+    case "apiKeyPermission":
+    case "projectPermission":
+    case "teamPermission":
+      return [policy.permission];
+    case "handlerManaged":
+      return policy.permissions;
+    case "anyAuthenticated":
+    case "public":
+    case "internal":
+      return [];
+  }
+}
+
+function assertReason(reason: string, fn: string): void {
+  if (typeof reason !== "string" || reason.trim().length === 0) {
+    throw new Error(
+      `${fn}() requires a non-empty reason describing why the route needs no RBAC credential`,
+    );
+  }
+}
+
+/**
+ * Fails CLOSED, because `header === secret` read `undefined === undefined` as
+ * true and let anyone trigger destructive jobs.
+ */
+export function isInternalSecretValid({
+  authorizationHeader,
+  expected,
+}: {
+  authorizationHeader: string | undefined;
+  expected: string | undefined;
+}): boolean {
+  if (!expected) return false;
+
+  const presented = authorizationHeader?.startsWith("Bearer ")
+    ? authorizationHeader.slice("Bearer ".length)
+    : authorizationHeader;
+
+  if (!presented) return false;
+
+  const presentedBytes = Buffer.from(presented);
+  const expectedBytes = Buffer.from(expected);
+  if (presentedBytes.length !== expectedBytes.length) return false;
+
+  return timingSafeEqual(presentedBytes, expectedBytes);
+}

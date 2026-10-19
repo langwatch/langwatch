@@ -1,0 +1,189 @@
+import type { AuthzPermission } from "@langwatch/authorization";
+import type { FrontendFeatureFlag } from "@langwatch/feature-flag-contract";
+import {
+  Boxes,
+  Building2,
+  Crown,
+  LayoutDashboard,
+  type LucideIcon,
+  UserRound,
+  Waypoints,
+} from "lucide-react";
+
+/** Product registry; Settings excluded (no switcher, no memory, own shell) */
+export type ProductId = "me" | "llm-ops" | "dashboards" | "gateway" | "governance";
+
+export type ProductScopeKind = "personal" | "project" | "organization";
+
+export interface ProductAccessGate {
+  flag?: FrontendFeatureFlag;
+  permission?: AuthzPermission;
+  /** The flag off closes the product's pages too (a 404), not only its menu entry. */
+  closesPages?: boolean;
+}
+
+export interface ProductDefinition {
+  id: ProductId;
+  label: string;
+  /** One line advertising the functionality, shown in the product switcher. */
+  pitch: string;
+  icon: LucideIcon;
+  scopeKind: ProductScopeKind;
+  /**
+   * The address the product opens on. Null when the product needs context
+   * it does not have yet (LLM Ops without a project); the landing resolver
+   * falls through to the next candidate.
+   */
+  homeHref: (context: { projectSlug?: string | null }) => string | null;
+  /** Every gate must pass for the product to be reachable. */
+  gates: ProductAccessGate[];
+}
+
+// The switcher lists products in this order. Dashboards leads: it is the overview every
+// other product feeds, so it is the first place to look.
+export const PRODUCTS: readonly ProductDefinition[] = [
+  {
+    id: "dashboards",
+    label: "Dashboards",
+    pitch: "Your saved dashboards, in one place",
+    icon: LayoutDashboard,
+    scopeKind: "project",
+    homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}/dashboards` : null),
+    gates: [{ flag: "release_dashboards", closesPages: true }, { permission: "analytics:view" }],
+  },
+  {
+    id: "me",
+    label: "Me",
+    pitch: "Track your coding assistants",
+    icon: UserRound,
+    scopeKind: "personal",
+    homeHref: () => "/me",
+    gates: [{ flag: "release_ui_ai_governance_enabled", closesPages: true }],
+  },
+  {
+    id: "llm-ops",
+    label: "LLM Ops",
+    pitch: "Observe, evaluate and test your agents",
+    icon: Boxes,
+    scopeKind: "project",
+    homeHref: ({ projectSlug }) => (projectSlug ? `/${projectSlug}` : null),
+    gates: [],
+  },
+  {
+    id: "gateway",
+    label: "Gateway",
+    pitch: "Route, meter and bill LLM usage",
+    icon: Waypoints,
+    scopeKind: "organization",
+    homeHref: () => "/gateway/virtual-keys",
+    gates: [{ flag: "release_ui_ai_gateway_menu_enabled" }, { permission: "virtualKeys:view" }],
+  },
+  {
+    id: "governance",
+    label: "Governance",
+    pitch: "Every AI tool, license, agent and dollar",
+    icon: Building2,
+    scopeKind: "organization",
+    homeHref: () => "/governance",
+    gates: [
+      { flag: "release_ui_ai_governance_enabled", closesPages: true },
+      { permission: "governance:view" },
+    ],
+  },
+];
+
+/**
+ * Whether a seat may open a product at all, before any flag or permission is asked.
+ * A Developer (ADR-171) owns a personal project and nothing shared, so no
+ * organization-wide product is open to them, whatever the permissions say.
+ */
+export function seatReachesProduct({
+  product,
+  organizationRole,
+}: {
+  product: Pick<ProductDefinition, "scopeKind">;
+  organizationRole: string | null | undefined;
+}): boolean {
+  if (organizationRole !== "DEVELOPER") return true;
+  return product.scopeKind !== "organization";
+}
+
+export function productById(id: ProductId): ProductDefinition {
+  const product = PRODUCTS.find((candidate) => candidate.id === id);
+  if (!product) throw new Error(`Unknown product id "${id}"`);
+  return product;
+}
+
+/** Whether a product works inside one project, so the top bar offers the project picker. */
+export function isProjectScopedProduct(id: ProductId | null): boolean {
+  if (!id) return false;
+  return PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind === "project";
+}
+
+/** Checks if product is org-scoped; registry owns scope so fifth product means one edit */
+export function isOrganizationScopedProduct(id: ProductId | null): boolean {
+  if (!id) return false;
+  return PRODUCTS.find((candidate) => candidate.id === id)?.scopeKind === "organization";
+}
+
+/**
+ * Whether an address is a top-level base or sits under it, matched on the
+ * segment boundary — a plain `startsWith` would read a project slug like
+ * "metadata" as the Me product, since slugs aren't reserved names.
+ */
+export function isPathUnder({ pathname, base }: { pathname: string; base: string }): boolean {
+  return pathname === base || pathname.startsWith(`${base}/`);
+}
+
+/**
+ * Which product a browser address belongs to, or null for a non-product
+ * page (settings, ops, auth, onboarding, root). Landing memory writes
+ * through this, so a null keeps the previous product remembered.
+ */
+export function productFromPathname(pathname: string): ProductId | null {
+  if (isPathUnder({ pathname, base: "/me" })) return "me";
+  if (isPathUnder({ pathname, base: "/gateway" })) return "gateway";
+  if (isPathUnder({ pathname, base: "/governance" })) return "governance";
+  const nonProductPrefixes = [
+    "/settings",
+    "/ops",
+    "/admin",
+    "/auth",
+    "/authorize",
+    "/onboarding",
+    "/invite",
+    "/share",
+    "/unsubscribe",
+    "/cli",
+    "/mcp",
+    "/@project",
+  ];
+  const isNonProductPath =
+    pathname === "/" ||
+    nonProductPrefixes.some((prefix) => isPathUnder({ pathname, base: prefix }));
+  if (isNonProductPath) {
+    return null;
+  }
+  // Everything else is a /:project page (including the next-router
+  // "/[project]/*" pattern spelling); its Dashboards area is its own product.
+  const [, , area] = pathname.split("/");
+  return area === "dashboards" ? "dashboards" : "llm-ops";
+}
+
+/** The operator console: not a product, so it sits apart in the switcher and its own sidebar. */
+export const OPERATIONS_CONSOLE = {
+  label: "Operations",
+  pitch: "With LangWatch's great features, come great responsibility",
+  icon: Crown,
+  href: "/ops",
+} as const;
+
+/** The operator console (/ops): inside the settings detour, but with its own Admin sidebar. */
+export function isAdminShellRoute(pathname: string): boolean {
+  return isPathUnder({ pathname, base: "/ops" });
+}
+
+/** Settings detour: settings and ops pages; both org-scoped, render the detour's sidebar */
+export function isSettingsShellRoute(pathname: string): boolean {
+  return isPathUnder({ pathname, base: "/settings" }) || isPathUnder({ pathname, base: "/ops" });
+}

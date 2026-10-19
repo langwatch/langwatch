@@ -4,7 +4,6 @@ from typing import Optional
 import dspy
 
 from langevals_core.base_evaluator import (
-    MAX_TOKENS_HARD_LIMIT,
     BaseEvaluator,
     EvaluatorEntry,
     EvaluationResult,
@@ -14,6 +13,15 @@ from langevals_core.base_evaluator import (
     Money,
 )
 from litellm.cost_calculator import cost_per_token
+from langevals_core.token_budget import fit_judge_content
+
+# DSPy's own framing around the three fields and the two answers, counted
+# against the budget with the prompt.
+ANSWER_MATCH_SIGNATURE_TEXT = (
+    "Your input fields are: question, gold_answer (correct answer for question), "
+    "predicted_answer. Your output fields are: reasoning, is_correct (True or False). "
+    "All interactions will be structured with each field in its own section."
+)
 
 
 class LLMAnswerMatchEntry(EvaluatorEntry):
@@ -64,17 +72,16 @@ class LLMAnswerMatchEvaluator(
     is_guardrail = False
 
     def evaluate(self, entry: LLMAnswerMatchEntry) -> SingleEvaluationResult:
-        total_tokens = len(
-            litellm.encode(  # type: ignore
-                model=self.settings.model,
-                text=f"{entry.input} {entry.output} {entry.expected_output}",
-            )
+        fitted = fit_judge_content(
+            model=self.settings.model,
+            max_tokens=self.settings.max_tokens,
+            reserved_texts=[self.settings.prompt, ANSWER_MATCH_SIGNATURE_TEXT],
+            input=entry.input,
+            output=entry.output,
+            expected_output=entry.expected_output,
         )
-        max_tokens = min(self.settings.max_tokens, MAX_TOKENS_HARD_LIMIT)
-        if total_tokens > max_tokens:
-            return EvaluationResultSkipped(
-                details=f"Total tokens exceed the maximum of {max_tokens}: {total_tokens}"
-            )
+        if isinstance(fitted, EvaluationResultSkipped):
+            return fitted
 
         lm = model_to_dspy_lm(self.settings.model)
 
@@ -84,9 +91,9 @@ class LLMAnswerMatchEvaluator(
         answer_match.set_lm(lm)
 
         result = answer_match(
-            question=entry.input,
-            gold_answer=entry.expected_output,
-            predicted_answer=entry.output,
+            question=fitted.input,
+            gold_answer=fitted.expected_output,
+            predicted_answer=fitted.output,
         )
 
         last_response = lm.history[-1]
@@ -114,7 +121,7 @@ class LLMAnswerMatchEvaluator(
         return LLMAnswerMatchResult(
             passed=passed,
             score=1 if passed else 0,
-            details=result.reasoning,
+            details=fitted.with_note(result.reasoning),
             cost=Money(amount=cost, currency="USD") if cost is not None else None,
         )
 

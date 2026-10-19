@@ -1,15 +1,4 @@
-/**
- * `--required` and `--not-required` apply to the `--evaluator` written just
- * before them. A boolean flag keeps only its last value in commander, so
- * program.ts records the three flags in the order they are read and hands the
- * command an ordered list.
- *
- * This drives the real program rather than the command function: the pairing
- * is only worth anything if the wiring hands it over, and a test of the
- * function alone cannot see that.
- *
- * Spec: specs/features/test-suite-cli.feature
- */
+// Test --evaluator flag wiring in the real program; function tests alone miss pairing.
 import { describe, expect, it, vi } from "vitest";
 
 const createSpy = vi.hoisted(() => vi.fn(async () => undefined));
@@ -91,9 +80,7 @@ describe("test-suite create, given the evaluator gate flags", () => {
   /** @scenario "A gate flag written before any evaluator is refused" */
   it("refuses a gate flag written before any evaluator", async () => {
     const reported = silence();
-    const exit = vi.spyOn(process, "exit").mockImplementation(((
-      code: number,
-    ) => {
+    const exit = vi.spyOn(process, "exit").mockImplementation(((code: number) => {
       throw new Error(`process.exit(${code})`);
     }) as never);
 
@@ -111,7 +98,7 @@ describe("test-suite create, given the evaluator gate flags", () => {
         "--evaluator",
         "judge",
       ]),
-    ).rejects.toThrow();
+    ).rejects.toThrow("process.exit(1)");
 
     expect(exit).toHaveBeenCalledWith(1);
     expect(reported.join("\n")).toContain("must follow the --evaluator");

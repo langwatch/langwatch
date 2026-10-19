@@ -6,12 +6,12 @@ from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.estimate_instant_eval_run_body import EstimateInstantEvalRunBody
 from ...models.estimate_instant_eval_run_response_200 import EstimateInstantEvalRunResponse200
-from ...types import Response, safe_http_status
+from ...types import UNSET, Response, Unset, safe_http_status
 
 
 def _get_kwargs(
     *,
-    body: EstimateInstantEvalRunBody,
+    body: EstimateInstantEvalRunBody | Unset = UNSET,
 ) -> dict[str, Any]:
     headers: dict[str, Any] = {}
 
@@ -20,7 +20,8 @@ def _get_kwargs(
         "url": "/api/v1/instant-evals/estimate",
     }
 
-    _kwargs["json"] = body.to_dict()
+    if not isinstance(body, Unset):
+        _kwargs["json"] = body.to_dict()
 
     headers["Content-Type"] = "application/json"
 
@@ -59,7 +60,7 @@ def _build_response(
 def sync_detailed(
     *,
     client: AuthenticatedClient,
-    body: EstimateInstantEvalRunBody,
+    body: EstimateInstantEvalRunBody | Unset = UNSET,
 ) -> Response[EstimateInstantEvalRunResponse200]:
     """Estimate a run
 
@@ -68,7 +69,7 @@ def sync_detailed(
     does, a statement or a target with questions.
 
     Args:
-        body (EstimateInstantEvalRunBody):
+        body (EstimateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -92,7 +93,7 @@ def sync_detailed(
 def sync(
     *,
     client: AuthenticatedClient,
-    body: EstimateInstantEvalRunBody,
+    body: EstimateInstantEvalRunBody | Unset = UNSET,
 ) -> EstimateInstantEvalRunResponse200 | None:
     """Estimate a run
 
@@ -101,7 +102,7 @@ def sync(
     does, a statement or a target with questions.
 
     Args:
-        body (EstimateInstantEvalRunBody):
+        body (EstimateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -120,7 +121,7 @@ def sync(
 async def asyncio_detailed(
     *,
     client: AuthenticatedClient,
-    body: EstimateInstantEvalRunBody,
+    body: EstimateInstantEvalRunBody | Unset = UNSET,
 ) -> Response[EstimateInstantEvalRunResponse200]:
     """Estimate a run
 
@@ -129,7 +130,7 @@ async def asyncio_detailed(
     does, a statement or a target with questions.
 
     Args:
-        body (EstimateInstantEvalRunBody):
+        body (EstimateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -151,7 +152,7 @@ async def asyncio_detailed(
 async def asyncio(
     *,
     client: AuthenticatedClient,
-    body: EstimateInstantEvalRunBody,
+    body: EstimateInstantEvalRunBody | Unset = UNSET,
 ) -> EstimateInstantEvalRunResponse200 | None:
     """Estimate a run
 
@@ -160,7 +161,7 @@ async def asyncio(
     does, a statement or a target with questions.
 
     Args:
-        body (EstimateInstantEvalRunBody):
+        body (EstimateInstantEvalRunBody | Unset):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.

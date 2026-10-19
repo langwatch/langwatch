@@ -17,7 +17,8 @@ LLM traffic never uses this path; it goes to the in-cluster [LangWatch AI Gatewa
 The one boundary to understand before you rely on this in a regulated environment: once `networkPolicy.allowExternalHttps` is `true`, the L7 adapter is **cooperative by default**. A prompt-injected worker can dial an external IP directly on `:443` and bypass it, and that bypass is monitored, not blocked, in the stock pod. Mandatory enforcement is opt-in and needs the Cilium CNI. The details are below and in [The sandbox](/langy/security/sandbox).
 
 <Info>
-**Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
+  **Also check:** [Self-hosting overview](/self-hosting/langy/overview), [Environment
+  variables](/self-hosting/langy/environment-variables), [The sandbox](/langy/security/sandbox).
 </Info>
 
 ## Why egress is L7, not iptables
@@ -30,12 +31,12 @@ That is why per-worker egress control lives at L7, in a per-worker CONNECT proxy
 
 ## What the agent needs to reach
 
-| Destination | Why | Path |
-|---|---|---|
-| In-cluster LangWatch AI Gateway | All LLM traffic (traced, budgeted, policed) | Always, in-cluster |
-| In-cluster LangWatch app | The `langwatch` CLI (per-session key) | Always, in-cluster |
-| `github.com`, `api.github.com`, `codeload.github.com` | Clone and push for pull requests | Only when egress is on |
-| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane |
+| Destination                                                                                          | Why                                                                                              | Path                   |
+| ---------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------ | ---------------------- |
+| In-cluster LangWatch AI Gateway                                                                      | All LLM traffic (traced, budgeted, policed)                                                      | Always, in-cluster     |
+| In-cluster LangWatch app                                                                             | The `langwatch` CLI (per-session key)                                                            | Always, in-cluster     |
+| `github.com`, `api.github.com`, `codeload.github.com`                                                | Clone and push for pull requests                                                                 | Only when egress is on |
+| `api.github.com`, or `GITHUB_LANGY_HOST` when one is set (from the control plane, not the agent pod) | Mint 1-hour installation tokens, read installation metadata, and list pull requests for a branch | Control plane          |
 
 Private ranges (RFC 1918), CGNAT (`100.64.0.0/10`), and the cloud metadata service are blocked at L3/L4 regardless of the egress toggle, which is the SSRF and IMDS protection.
 
@@ -43,7 +44,7 @@ With `GITHUB_LANGY_HOST` set to a GitHub Enterprise Server hostname, the control
 
 ## Inbound
 
-Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/github/webhook`.
+Everything above is outbound. The one inbound path GitHub uses is the webhook, delivered to `<BASE_URL>/api/v1/github/webhook`.
 
 It is optional. An instance GitHub cannot reach still connects and works, and reconciles late instead. For what changes, see [Restricted networks](/self-hosting/langy/github-app#restricted-networks).
 
@@ -60,6 +61,21 @@ It is optional. An instance GitHub cannot reach still connects and works, and re
 An ingress that does not pass WebSocket upgrades still works: the CLI falls back to long-polling on its own. Each poll holds for up to 20 seconds, so keep the ingress read timeout at 30 seconds or more. The same timeout already applies to [connected agents](/agent-testing/connect-your-agent).
 
 The developer authenticates with their device session to approve a request, and the CLI then holds a Langy session key scoped to one conversation. The key stops working when the CLI disconnects or the conversation's workspace is disconnected from the chat.
+
+## Push notifications
+
+Langy's browser notifications are Web Push messages. The LangWatch app and workers send them over HTTPS (`:443`) straight to the push service of each subscribed browser. The agent pod is not involved, and push needs no configuration: the install generates its own VAPID key pair on first use and stores it encrypted in the database.
+
+| Browser | Push service host |
+|---|---|
+| Chrome, Edge on Android, Opera, Samsung Internet and other Chromium browsers | `fcm.googleapis.com` |
+| Firefox | `updates.push.services.mozilla.com` |
+| Safari on macOS and iOS | `web.push.apple.com` (Apple documents `*.push.apple.com`) |
+| Edge on Windows and macOS | `*.notify.windows.com` |
+
+The app refuses a subscription whose endpoint is on any other host. Allow the hosts for the browsers your team uses. When the app cannot reach a push service, the send is retried with backoff for about ten minutes, and then dropped.
+
+A browser that cannot subscribe at all, because it has no Push API or subscribing failed, gets its notifications from the open LangWatch tab instead. A browser that did subscribe never falls back to the tab, so blocking these hosts after people subscribed means their notifications stop.
 
 ## Enable outbound egress
 
@@ -79,12 +95,12 @@ Make sure `langyagent.networkPolicy.privateExcept` and `privateExceptV6` include
 
 When egress is on, each worker's outbound traffic is forced through a per-worker CONNECT proxy (ADR-076) that applies, in order:
 
-| Control | Env var | Default | Effect |
-|---|---|---|---|
-| Require TLS | `LANGY_EGRESS_REQUIRE_TLS` | `true` | Refuse cleartext and non-`:443` forwards. |
-| FQDN floor | `LANGY_EGRESS_FQDN_FLOOR` | `github.com,api.github.com,codeload.github.com` | Operator always-allowed FQDNs, on top of a project's own allow-list. |
-| Enforce floor | `LANGY_EGRESS_ENFORCE_FLOOR` | `false` | When on, the floor becomes a hard ceiling for projects that have no allow-list of their own. Default is monitor-only. |
-| SNI cross-check | `LANGY_EGRESS_SNI_CROSSCHECK` | `true` | Cross-check the TLS SNI against the CONNECT authority to block domain-fronting. |
+| Control         | Env var                       | Default                                         | Effect                                                                                                                |
+| --------------- | ----------------------------- | ----------------------------------------------- | --------------------------------------------------------------------------------------------------------------------- |
+| Require TLS     | `LANGY_EGRESS_REQUIRE_TLS`    | `true`                                          | Refuse cleartext and non-`:443` forwards.                                                                             |
+| FQDN floor      | `LANGY_EGRESS_FQDN_FLOOR`     | `github.com,api.github.com,codeload.github.com` | Operator always-allowed FQDNs, on top of a project's own allow-list.                                                  |
+| Enforce floor   | `LANGY_EGRESS_ENFORCE_FLOOR`  | `false`                                         | When on, the floor becomes a hard ceiling for projects that have no allow-list of their own. Default is monitor-only. |
+| SNI cross-check | `LANGY_EGRESS_SNI_CROSSCHECK` | `true`                                          | Cross-check the TLS SNI against the CONNECT authority to block domain-fronting.                                       |
 
 See [Environment variables](/self-hosting/langy/environment-variables#egress) for the full table.
 

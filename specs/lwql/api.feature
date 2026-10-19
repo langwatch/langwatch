@@ -463,6 +463,13 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And every view statement the provisioner emits creates a view under that prefix
     And a view named outside it would be created without a grant, and so read as empty rather than fail
 
+  @unit
+  Scenario: The operator opt-out skips LangWatchQL provisioning in the boot chain
+    Given the deploy sets SKIP_LWQL_PROVISION to true
+    When the boot chain runs the lwql-provision task
+    Then the task provisions nothing and reads no project rows
+    And the boot chain continues to the process it was going to start
+
   @integration
   Scenario: PG connection credentials are not exposed to the restricted identity
     Given a PG-resident table is mapped into ClickHouse through the server-side named collection
@@ -514,6 +521,27 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And the response names the column the server could not resolve
     And the fault is the caller's, and the remediation tells them to check the name against the view's columns
     And no part of the server's own refusal text reaches the caller, because it echoes the submitted query
+
+  @unit
+  Scenario: A query the database rejects as written is refused as the caller's fault
+    Given a query the static validator accepts, such as an aggregate function inside WHERE
+    When the server refuses it as malformed or mis-typed, such as ILLEGAL_AGGREGATION or SYNTAX_ERROR
+    Then the query is refused with error code lwql_invalid_query at HTTP 400, never a 500
+    And the fault is the caller's
+    And the server's own refusal text does not reach the caller, because it echoes the submitted query
+
+  @unit
+  Scenario: A refusal that describes the deployment is not reported as an invalid query
+    Given a query the server refuses because an object is missing or a grant is incomplete
+    When the executor maps the refusal
+    Then the code is the deployment's, not lwql_invalid_query
+
+  @unit
+  Scenario: A parameter value that does not fit its declared type is refused with the parameter named
+    Given a query declaring {start:DateTime64(3)}
+    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
+    And the refusal names the parameter and nothing else from the server's message
 
   @unit
   Scenario: A missing column passed to a function is named in the refusal
@@ -850,7 +878,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     And provisioning against a database name that differs from the connection URL's is refused
 
   # P1 (#6635): every app pod runs the convergence at boot, and it is
-  # destructive (CREATE USER OR REPLACE, drop/recreate the PostgreSQL-engine
+  # destructive (CREATE USER OR REPLACE, replace the PostgreSQL-engine
   # tables, grants, row policies). Two pods running it at once race — one
   # recreating the restricted identity while another queries through it
   # mid-drop. A single global Postgres advisory lock gates entry so the
@@ -925,6 +953,32 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the run aborts rather than skipping the row policy
     And the same read-only error is skipped only when the inventoried policy is on the very table the statement targets
 
+  # Named collections are server-global. Two stacks on one ClickHouse (haven) each
+  # drop and recreate theirs at boot, so a shared name let the last booter repoint
+  # every other stack's engine tables at its own PostgreSQL database.
+  @unit
+  Scenario: Each ClickHouse database provisions its own named collection
+    Given two LangWatchQL databases on the same ClickHouse server
+    When the self-provisioning statements are rendered for each
+    Then each creates a named collection whose name carries its own database
+    And each database's PostgreSQL-engine tables read only through its own collection
+
+  # A 669 outside a NAMED COLLECTION statement means the collection is absent: the
+  # engine table was never created, and every view over it would fail later as
+  # UNKNOWN_TABLE, naming neither the table nor the collection.
+  @unit
+  Scenario: A missing named collection fails provisioning at the engine table that needs it
+    Given a PostgreSQL-engine table statement rejected because the named collection does not exist
+    When the config-store-tolerant runner executes the list
+    Then the run aborts at that statement rather than skipping it
+    And the failure is logged with the table it was creating and the collection it could not find
+
+  @unit
+  Scenario: A provisioning failure over a missing table names both objects
+    Given a view statement rejected because the table it reads does not exist
+    When the config-store-tolerant runner executes the list
+    Then the failure is logged with the view it was creating and the missing table
+
   # Issue #8258: the app owns the LangWatchQL access model on every distribution,
   # so the chart-managed ClickHouse renderer must render none of it — no
   # identity, profile, row policy or named collection — while still granting the
@@ -941,35 +995,164 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # config-store-owned (495). Moments later the pod rolls to the new chart, which
   # renders no access model — the XML identity is gone and, without this, nothing
   # re-provisions until the next app boot. The deploy task is a short-lived
-  # process, so the long-running app server watches instead: it polls a stateless
-  # ownership probe on a backoff and decides from each snapshot alone, never
-  # inferring from history. The probe reports which store owns the model right
-  # now — the config store (the old pod still rendering it), the SQL store (the
-  # app-owned model is already live), or neither. Config store → keep waiting;
-  # SQL store → nothing to do; neither → re-provision the app-owned model once.
-  # A probe that throws (ClickHouse mid-roll) is treated as still-waiting and
-  # never re-provisions on the failure alone, so a transient error can never fire
-  # a re-provision against a healthy install. The first poll fires within seconds
-  # so a pod that rolled before the server listened is still caught, and a config
-  # store that never releases gives up at a ~30-minute budget with a warning.
+  # process, so the worker checks instead: a stateless ownership probe decides
+  # from each snapshot alone, never inferring from history. The probe reports
+  # which store owns the model right now — the config store (the old pod still
+  # rendering it), the SQL store (the app-owned model is already live), or
+  # neither. Config store → keep waiting; SQL store → nothing to do; neither →
+  # re-provision the app-owned model. A probe that throws (ClickHouse mid-roll) is
+  # treated as still-waiting and never re-provisions on the failure alone.
   @unit
   Scenario: The app re-provisions once the ClickHouse config store releases the LangWatchQL access model
-    Given the running app server polls a stateless LangWatchQL ownership probe after a chart upgrade
+    Given the worker's reconvergence check probes a stateless LangWatchQL ownership probe after a chart upgrade
     When a probe finds the model is owned by neither the config store nor the SQL store
-    Then the app re-provisions the app-owned access model exactly once and stops watching
-    And while the config store still owns the model the watch keeps polling on a backoff
-    And when the SQL store already owns the model the watch stops without re-provisioning
-    And a probe error alone never re-provisions — the watch keeps polling until a snapshot is authoritative
-    And a config store that never releases the model gives up at the budget with a warning
+    Then the app re-provisions the app-owned access model, and later probes find the SQL store and do nothing
+    And while the config store still owns the model each later check probes again
+    And when the SQL store already owns the model the probe does nothing
+    And a probe error alone never re-provisions — the next check probes again
 
-  # AC4 shutdown race: stop() may fire while an ownership probe is already in
-  # flight. A probe that resolves "none" after shutdown was requested must never
-  # re-provision — the app is tearing down the very App a converge would touch.
+  # Shutdown: the check is a worker-hosted process manager, and the worker drains
+  # its outbox before it closes the app, so a re-provision is never left running
+  # against a torn-down app — the intent awaits the whole convergence.
   @unit
-  Scenario: A probe that resolves after shutdown never re-provisions
-    Given the reconvergence watch has a probe in flight when the app requests shutdown
-    When that probe resolves "none" after stop was requested
-    Then the watch discards the snapshot and never calls converge
+  Scenario: A re-provision in flight finishes before the worker lets the app close
+    Given the reconvergence intent has started a re-provision
+    When the worker begins draining for shutdown
+    Then the intent resolves only once the re-provision has finished
+
+  # Issue #8726: a deploy's converge can fail while ClickHouse pods are still
+  # re-mounting the access config (named collection missing, a replica terminating),
+  # and ClickHouse can keep rolling for hours. The upgrade gate does not run the
+  # converge again, so the worker checks, level-triggered and with no end: every
+  # 5 minutes one check across the fleet reads the system tables (and the
+  # PostgreSQL catalog) for the app-owned objects the catalog expects, and
+  # repairs only the objects that are absent. A column change is a deploy's to
+  # converge, never the check's. Rendered mode never touches the config-store-owned
+  # entities; sql mode keeps the owner probe above. An operator who will not wait
+  # for the next check uses Ops > Upgrades Retry.
+  @unit
+  Scenario: The reconvergence check runs every 5 minutes with no end and no per-worker state
+    Given the worker's scheduled reconvergence process
+    When its wake fires, slot after slot, on whichever worker holds the schedule
+    Then each slot asks for exactly one check, keyed by the slot so a repeat dedupes
+    And no budget ends the checks
+    And a check run by any worker decides from what the databases hold, never from what an earlier check did
+
+  @unit
+  Scenario: The reconvergence check converges nothing while every app-owned LangWatchQL object is in place
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And the key map, the PostgreSQL engine tables, the views and the app functions exist
+    And the reader role may select every approved PostgreSQL view
+    When the reconvergence check runs
+    Then it runs catalog reads only and no DDL
+
+  @unit
+  Scenario: The reconvergence check converges the app-owned LangWatchQL objects it finds missing
+    Given LWQL_ACCESS_MODEL_MODE is unset or "rendered"
+    And an app-owned object is missing
+    When the reconvergence check runs
+    Then it creates only the missing objects, and the views over an engine table it replaces
+    And it creates the key map or an app function only when that one is missing
+    And in PostgreSQL it creates only the missing approved views, then grants the reader SELECT on each missing or ungranted one
+    And it leaves the user, settings profile, row policies and named collection to the config store
+    And a ClickHouse that cannot be read converges nothing, and the next check reads again
+    And a PostgreSQL that cannot be read is unknown: a warning, no converge, and its last alert left as it was
+
+  # During a rollout old and new workers run the check side by side. The check
+  # never compares columns, so a newer deploy that added a column or removed one
+  # looks healthy to an older worker, which leaves the newer view alone. Its
+  # grants are additive and never revoke, so a view only the newer catalog has
+  # keeps its SELECT. Column changes converge on a deploy only.
+  @unit
+  Scenario: An older worker never rewrites a newer view
+    Given a newer deploy has converged views and approved views that added or removed columns this worker's catalog declares
+    When this worker's reconvergence check runs
+    Then it finds no drift and runs no DDL
+    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
+    And a deploy's converge still revokes and grants the reader role's whole set
+
+  @unit
+  Scenario: The reconvergence check skips the PostgreSQL half when the reader role and approved views are in place
+    Given the reader role may select every approved view
+    When the reconvergence check converges a ClickHouse drift
+    Then it runs no PostgreSQL statement
+    And a drift in PostgreSQL alone runs no ClickHouse DDL
+
+  @unit
+  Scenario: A PostgreSQL failure does not stop the ClickHouse objects converging
+    Given PostgreSQL refuses the reader role, as a managed server without CREATEROLE does
+    When a converge runs
+    Then the refusal is logged with its own message, its SQLSTATE and no secret
+    And the ClickHouse objects still converge
+    And the run then fails, so the upgrade names it
+
+  @unit
+  Scenario: The PostgreSQL reader's grants change in one transaction
+    Given the reader role's grants are converged
+    When the revokes and the grants run
+    Then they run as one statement, revokes first, so a live read never sees the role without its grants
+
+  # The alert keeps the deploy runner's messages, "lwql provisioning failed creating
+  # ClickHouse objects" and "lwql provisioning failed creating PostgreSQL objects", one per
+  # store, with a stable error_signature field (the PostgreSQL one carries its SQLSTATE).
+  # Each worker logs it at error on the first failure, when the failure changes and hourly
+  # while it holds, and at warn in between. The alert matches level=error and the message.
+  @unit
+  Scenario: A failed converge is retried by the next check and alerts once per change of failure
+    Given the reconvergence check's converge of the app-owned objects failed
+    When later checks fail the same way
+    Then each logs a warning that the check retries, without crashing the worker
+    And the error-level alert is logged on the first failure, when the failure changes, and when the last one is over an hour old
+    And a check that finds that store converged clears it, so its next failure alerts again
+    And a PostgreSQL failure alerts with its own message, its code and SQLSTATE, and ClickHouse still converges
+    And the alert line carries the failure's error_signature
+    And a check that cannot read PostgreSQL leaves its last alert as it was
+    And the converge's own statement failure is logged at warn in other words on the check's path, and at error with the alert's message on a deploy's
+
+  @integration
+  Scenario: A failed converge never removes a working engine table
+    Given a rendered install whose PostgreSQL engine tables exist and answer
+    When the named collection disappears and a converge runs and fails
+    Then every engine table still exists and still answers
+    And each engine table is replaced in one statement, never dropped first
+
+  @integration
+  Scenario: A converge over present views and engine tables succeeds again and the views still answer
+    Given a rendered install whose engine tables and the views over them exist and answer
+    When a full converge runs again, and then a check's converge of one engine table
+    Then both succeed, each engine table replaced under the views that read it
+    And every view still answers
+
+  @e2e
+  Scenario: A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage
+    Given a three-replica rendered-mode install whose PostgreSQL engine tables are missing
+    And the app boots while every ClickHouse replica is down, so its converge fails
+    When ClickHouse comes back and no further deploy runs
+    Then within one check interval every engine table exists on every replica
+    And the restricted identity reads the PostgreSQL-backed views
+
+  @e2e
+  Scenario: A single-node upgrade that restarts ClickHouse reconverges LangWatchQL
+    Given a single-node rendered-mode install whose PostgreSQL engine tables are missing
+    When an upgrade restarts the only ClickHouse replica and no further deploy runs
+    Then within one check interval every engine table exists
+    And the restricted identity reads the PostgreSQL-backed views
+
+  @integration
+  Scenario: A rendered install whose named collection appears late converges on a later check
+    Given a rendered-mode ClickHouse whose config store has not mounted the named collection yet
+    When checks run and their converges fail at the PostgreSQL engine tables, the PostgreSQL half converging regardless
+    And the named collection then appears
+    Then the next check, on any worker and with no boot, creates every engine table and view
+    And a later check converges nothing
+
+  @unit
+  Scenario: A failed provisioning statement logs the ClickHouse error code and name
+    Given a provisioning statement fails on the ClickHouse server
+    When the runner logs the failure
+    Then the log carries the numeric ClickHouse code and its name, such as 669 and NAMED_COLLECTION_DOESNT_EXIST
+    And a failure that never reached the server, such as a timeout, logs no code
+    And the log never carries the statement text or a secret
 
   # The re-provision gate is only as trustworthy as the probe behind it, so the
   # ownership classification is split from its I/O and unit-tested directly: a
@@ -978,7 +1161,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # wins whenever it still renders an entity; else the app-owned SQL-store user
   # if present; else neither. Connectivity is proven first, so an unreachable
   # ClickHouse makes the probe throw rather than report a spurious "neither" the
-  # watch would re-provision against. The SQL-store count excludes the config
+  # check would re-provision against. The SQL-store count excludes the config
   # store's `users_xml` rather than pinning one storage kind.
   @unit
   Scenario: The ownership probe classifies who owns the LangWatchQL access model
@@ -1362,6 +1545,37 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
       When the query door resolves the caller's content protections
       Then a content category is offered only when every readable project grants it
       And an empty readable set offers no content
+
+    # Explicit narrowing (the CLI's --project): the body names one project and the
+    # run reads that project alone. Without it the run keeps the whole readable set.
+    @unit
+    Scenario: A run naming no project keeps the key's whole readable scope
+      Given an organization key that reads several projects
+      When it runs a statement whose body names no projectId
+      Then the run spans every project the key holds analytics:view on
+      And it is redacted by the strictest protection across them
+
+    @unit
+    Scenario: A run naming a project reads only that project, under its own protections
+      Given an organization key that reads several projects with differing content protections
+      When it runs a statement whose body names one of them as projectId
+      Then the run reads that project's rows alone
+      And it is redacted by that project's own protections, never another project's
+
+    @unit
+    Scenario: A run naming a project the key cannot read is refused as not found
+      Given a key and a projectId it holds no analytics:view on, outside its organization, or that does not exist
+      When it runs a statement naming that projectId
+      Then the run is refused with project_not_found before the statement reaches the engine
+      And the refusal is the same whichever of those it was, so it reveals nothing about the project
+      And a legacy project key naming any project but its own is refused the same way
+
+    @unit
+    Scenario: The run door publishes projectId as the way to narrow a run to one project
+      Given the generated OpenAPI document for POST /api/v1/query
+      When its request body and description are read
+      Then the body accepts an optional projectId
+      And the description says a run without it spans every readable project and names the project_not_found refusal
 
   Rule: Discover what I can ask
 

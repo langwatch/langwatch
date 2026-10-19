@@ -1,21 +1,8 @@
-/**
- * Drift guard between the MCP tools this server registers and the names
- * `feature-map.json` tells agents to call.
- *
- * The feature map is the canonical information architecture: it is embedded
- * into the CLI at codegen time and shipped inside the npx server package, so a
- * name in it is a name an agent will try. Two entries pointed at
- * `platform_run_evaluation` and `platform_evaluation_status`, which have never
- * existed — the tools are `platform_run_experiment` and
- * `platform_experiment_status`. An agent following the map for the experiments
- * feature called two tools that were not there.
- *
- * Nothing compared the two lists, which is why it went unnoticed. This does.
- *
- * @see .claude/skills/feature-map/SKILL.md
- */
+// Drift guard: the feature-map.json names must match actual MCP tool names or agents will call
+// non-existent tools. See .claude/skills/feature-map/SKILL.md
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 const REPO_ROOT = join(__dirname, "../../../..");
@@ -25,9 +12,7 @@ const REPO_ROOT = join(__dirname, "../../../..");
  * arrays hang off surfaces nested several levels into the tree.
  */
 function toolNamesInFeatureMap(): Set<string> {
-  const map: unknown = JSON.parse(
-    readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8")
-  );
+  const map: unknown = JSON.parse(readFileSync(join(REPO_ROOT, "feature-map.json"), "utf-8"));
   const names = new Set<string>();
 
   const walk = (node: unknown): void => {
@@ -51,17 +36,12 @@ function toolNamesInFeatureMap(): Set<string> {
 }
 
 /**
- * Every name passed as the first argument of a `server.tool(` registration.
- *
- * Read from the source rather than by constructing a server: building one
- * needs config and credentials this test has no business holding, and the
- * registration is a string literal in every case.
+ * Every name passed as the first argument of a `server.tool(`
+ * registration, read from source: building a server needs config
+ * and credentials this test has no business holding.
  */
 function registeredToolNames(): Set<string> {
-  const source = readFileSync(
-    join(__dirname, "../create-mcp-server.ts"),
-    "utf-8"
-  );
+  const source = readFileSync(join(__dirname, "../create-mcp-server.ts"), "utf-8");
   const names = new Set<string>();
   for (const match of source.matchAll(/server\.tool\(\s*"([^"]+)"/g)) {
     names.add(match[1]!);
@@ -75,7 +55,7 @@ describe("feature map MCP tool names", () => {
       const registered = registeredToolNames();
       const missing = [...toolNamesInFeatureMap()]
         .filter((name) => !registered.has(name))
-        .sort();
+        .toSorted();
 
       // Listed, not registered: an agent following the map calls a tool that
       // is not there. Either rename the entry, or register the tool.

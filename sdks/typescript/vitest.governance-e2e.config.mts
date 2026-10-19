@@ -1,18 +1,11 @@
-import { defineConfig } from "vitest/config";
 import { resolve } from "path";
 
+import { defineConfig } from "vitest/config";
+
 /**
- * Standalone vitest config for the governance CLI wrapper e2e suite.
- * NO globalSetup, NO DB, NO LangWatch endpoint required — the tests
- * spin up their own fake control-plane + fake gateway in-process and
- * spawn the compiled CLI as a child process. Lets a developer run the
- * suite in isolation without standing up the full LangWatch stack.
- *
- * (The suite also runs under the main `vitest.e2e.config.mts` in CI
- * via the broader `**\/*.e2e.test.ts` include — the standalone config
- * is purely a dev-loop convenience.)
- *
- * testTimeout bumped to 30s for cold-start + child-spawn overhead.
+ * Standalone vitest config for the governance CLI wrapper e2e suite: no
+ * globalSetup/DB/endpoint, spins up a fake control-plane + gateway and
+ * spawns the compiled CLI so a developer can run it in isolation.
  */
 export default defineConfig({
   test: {
@@ -20,14 +13,13 @@ export default defineConfig({
     hookTimeout: 30_000,
     environment: "node",
     // Each test spawns child processes (the compiled CLI). Forks pool
-    // gives us isolated child_process workers; the default threads
-    // pool blocks spawnSync indefinitely.
+    // gives us isolated child_process workers; a threads pool blocks
+    // spawnSync indefinitely.
     pool: "forks",
-    poolOptions: {
-      forks: {
-        singleFork: true,
-      },
-    },
+    // Was `poolOptions.forks.singleFork`, removed by vitest 4's pool rework
+    // in favour of a top-level worker count.
+    // https://v4.vitest.dev/guide/migration#pool-rework
+    maxWorkers: 1,
     include: ["__tests__/e2e/cli/governance-wrapper.e2e.test.ts"],
     passWithNoTests: false,
   },

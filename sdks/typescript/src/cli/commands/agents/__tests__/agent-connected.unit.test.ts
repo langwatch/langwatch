@@ -1,18 +1,16 @@
 /**
- * The agent commands with a connected agent: the columns the list shows, the
- * parameters and instances the detail shows, and the relay a run goes
- * through.
- *
+ * The agent commands with a connected agent: the columns the list shows,
+ * the parameters/instances the detail shows, and the relay a run goes through.
  * @see specs/typescript-sdk/cli-agents.feature
  */
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+
 import chalk from "chalk";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     AgentsApiService: vi.fn(),
@@ -20,7 +18,11 @@ vi.mock("@/client-sdk/services/agents/agents-api.service", async (importOriginal
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -35,8 +37,15 @@ import {
   AgentsApiService,
   type AgentResponse,
 } from "@/client-sdk/services/agents/agents-api.service";
+
 import { describeParameter, getAgentCommand } from "../get";
-import { agentLastSeenLabel, agentOwnerLabel, agentStatusColor, agentStatusLabel, listAgentsCommand } from "../list";
+import {
+  agentLastSeenLabel,
+  agentOwnerLabel,
+  agentStatusColor,
+  agentStatusLabel,
+  listAgentsCommand,
+} from "../list";
 import { buildRelayBody, runAgentCommand } from "../run";
 import { testAgentCommand } from "../test";
 
@@ -66,7 +75,13 @@ const connectedAgent = (overrides: Partial<AgentResponse> = {}): AgentResponse =
   owner: null,
   hostLabel: null,
   parameters: [
-    { name: "model", type: "string", options: ["gpt-5", "gpt-5-mini"], default: "gpt-5-mini", required: false },
+    {
+      name: "model",
+      type: "string",
+      options: ["gpt-5", "gpt-5-mini"],
+      default: "gpt-5-mini",
+      required: false,
+    },
     { name: "plan", type: "string", required: true, description: "Customer plan" },
   ],
   ...overrides,
@@ -116,7 +131,16 @@ describe("listAgentsCommand()", () => {
       result?.table?.();
 
       const output = printed();
-      for (const header of ["Name", "Environment", "Status", "Last seen", "Type", "ID", "Owner", "Updated"]) {
+      for (const header of [
+        "Name",
+        "Environment",
+        "Status",
+        "Last seen",
+        "Type",
+        "ID",
+        "Owner",
+        "Updated",
+      ]) {
         expect(output).toContain(header);
       }
       expect(output).toContain("production");
@@ -129,8 +153,12 @@ describe("listAgentsCommand()", () => {
     it("reads now while online, how long ago otherwise, and nothing for an HTTP agent", () => {
       const twoDaysAgo = new Date(Date.now() - 2 * 24 * 60 * 60 * 1000).toISOString();
 
-      expect(agentLastSeenLabel(connectedAgent({ status: "online", lastSeenAt: twoDaysAgo }))).toBe("now");
-      expect(agentLastSeenLabel(connectedAgent({ status: "offline", lastSeenAt: twoDaysAgo }))).toBe("2d ago");
+      expect(agentLastSeenLabel(connectedAgent({ status: "online", lastSeenAt: twoDaysAgo }))).toBe(
+        "now",
+      );
+      expect(
+        agentLastSeenLabel(connectedAgent({ status: "offline", lastSeenAt: twoDaysAgo })),
+      ).toBe("2d ago");
       expect(agentLastSeenLabel(connectedAgent({ status: "offline", lastSeenAt: null }))).toBe("");
       expect(agentLastSeenLabel(httpAgent())).toBe("");
     });
@@ -166,9 +194,7 @@ describe("listAgentsCommand()", () => {
           }),
         ),
       ).toBe("Ada (owner only)");
-      expect(agentOwnerLabel(connectedAgent({ selectable: false }))).toBe(
-        "owner only",
-      );
+      expect(agentOwnerLabel(connectedAgent({ selectable: false }))).toBe("owner only");
     });
   });
 });
@@ -176,9 +202,24 @@ describe("listAgentsCommand()", () => {
 describe("listAgentsCommand() with stale sibling rows", () => {
   const hoursAgo = (hours: number) => new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
   const siblings = () => [
-    connectedAgent({ id: "agent_live", environment: "development", status: "online", lastSeenAt: hoursAgo(0) }),
-    connectedAgent({ id: "agent_old", environment: "development", status: "offline", lastSeenAt: hoursAgo(72) }),
-    connectedAgent({ id: "agent_recent", environment: "development", status: "offline", lastSeenAt: hoursAgo(1) }),
+    connectedAgent({
+      id: "agent_live",
+      environment: "development",
+      status: "online",
+      lastSeenAt: hoursAgo(0),
+    }),
+    connectedAgent({
+      id: "agent_old",
+      environment: "development",
+      status: "offline",
+      lastSeenAt: hoursAgo(72),
+    }),
+    connectedAgent({
+      id: "agent_recent",
+      environment: "development",
+      status: "offline",
+      lastSeenAt: hoursAgo(1),
+    }),
   ];
 
   describe("when one name and environment has an online row, a recent offline row and a stale one", () => {
@@ -192,7 +233,9 @@ describe("listAgentsCommand() with stale sibling rows", () => {
       const result = await listAgentsCommand();
       result?.table?.();
 
-      const listed = (result?.data as { data: AgentResponse[] }).data.map((agent) => agent.id);
+      const listed = (result?.data as { data: AgentResponse[] } | undefined)?.data.map(
+        (agent) => agent.id,
+      );
       expect(listed).toEqual(["agent_live", "agent_recent"]);
       const output = printed();
       expect(output).toContain("agent_live");
@@ -229,7 +272,9 @@ describe("listAgentsCommand() with stale sibling rows", () => {
       const result = await listAgentsCommand({ all: true });
       result?.table?.();
 
-      const listed = (result?.data as { data: AgentResponse[] }).data.map((agent) => agent.id);
+      const listed = (result?.data as { data: AgentResponse[] } | undefined)?.data.map(
+        (agent) => agent.id,
+      );
       expect(listed).toEqual(["agent_live", "agent_old", "agent_recent"]);
       expect(printed()).not.toContain("stale row");
     });
@@ -281,7 +326,9 @@ describe("getAgentCommand()", () => {
     });
 
     it("describes one parameter on one line", () => {
-      expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe("n: number, default 5");
+      expect(describeParameter({ name: "n", type: "number", default: 5 })).toBe(
+        "n: number, default 5",
+      );
     });
   });
 
@@ -332,7 +379,11 @@ describe("runAgentCommand()", () => {
     /** @scenario "An input body with messages is sent as the relay body" */
     it("sends an input with messages, thread id and session as the body", async () => {
       service.get.mockResolvedValue(connectedAgent());
-      service.call.mockResolvedValue({ output: "ok", instance: { hostname: "pod-a" }, durationMs: 1 });
+      service.call.mockResolvedValue({
+        output: "ok",
+        instance: { hostname: "pod-a" },
+        durationMs: 1,
+      });
       const input = JSON.stringify({
         messages: [{ role: "user", content: "again" }],
         threadId: "t1",
@@ -354,7 +405,9 @@ describe("runAgentCommand()", () => {
     it("refuses an input with no messages and no message", async () => {
       service.get.mockResolvedValue(connectedAgent());
 
-      await expect(runAgentCommand("agent_conn", { input: '{"question":"hi"}' })).rejects.toThrow(ProcessExitError);
+      await expect(runAgentCommand("agent_conn", { input: '{"question":"hi"}' })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(service.call).not.toHaveBeenCalled();
       const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
@@ -382,7 +435,9 @@ describe("runAgentCommand()", () => {
     it("says the agent is offline and names connectAgent", async () => {
       service.get.mockResolvedValue(connectedAgent({ status: "offline", instances: [] }));
 
-      await expect(runAgentCommand("agent_conn", { message: "hi" })).rejects.toThrow(ProcessExitError);
+      await expect(runAgentCommand("agent_conn", { message: "hi" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(service.call).not.toHaveBeenCalled();
       const errors = vi.mocked(console.error).mock.calls.flat().join("\n");
@@ -398,7 +453,10 @@ describe("runAgentCommand()", () => {
       vi.stubGlobal("fetch", fetchMock);
       try {
         const result = await runAgentCommand("agent_http", { input: '{"question":"hi"}' });
-        expect(fetchMock).toHaveBeenCalledWith("https://api.example.com/agent", expect.objectContaining({ method: "POST" }));
+        expect(fetchMock).toHaveBeenCalledWith(
+          "https://api.example.com/agent",
+          expect.objectContaining({ method: "POST" }),
+        );
         expect(service.call).not.toHaveBeenCalled();
         expect(result?.data).toEqual({ answer: "hi" });
       } finally {
@@ -423,12 +481,17 @@ describe("the agent command help", () => {
 
   /** @scenario "The target help names the connected forms" */
   it("names connected:<name> first, then connected:<name>@<environment> and connected:<id>, in the target help", () => {
-    const targetHelp = program.slice(program.indexOf("const TARGET_FLAG_HELP"), program.indexOf("const RUN_NAME_FLAG_HELP"));
+    const targetHelp = program.slice(
+      program.indexOf("const TARGET_FLAG_HELP"),
+      program.indexOf("const RUN_NAME_FLAG_HELP"),
+    );
     expect(targetHelp).toContain("connected:support-agent.");
     expect(targetHelp).toContain("connected:<name> runs the agent in development");
     expect(targetHelp).toContain("connected:<name>@<environment>");
     expect(targetHelp).toContain("connected:<id>");
-    expect(targetHelp.indexOf("connected:<name>")).toBeLessThan(targetHelp.indexOf("connected:<id>"));
+    expect(targetHelp.indexOf("connected:<name>")).toBeLessThan(
+      targetHelp.indexOf("connected:<id>"),
+    );
   });
 });
 

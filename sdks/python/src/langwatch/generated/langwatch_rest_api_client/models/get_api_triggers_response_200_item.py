@@ -4,16 +4,9 @@ from collections.abc import Mapping
 from typing import TYPE_CHECKING, Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.get_api_triggers_response_200_item_action import GetApiTriggersResponse200ItemAction
-from ..models.get_api_triggers_response_200_item_alert_type_type_1 import GetApiTriggersResponse200ItemAlertTypeType1
-from ..models.get_api_triggers_response_200_item_alert_type_type_2_type_1 import (
-    GetApiTriggersResponse200ItemAlertTypeType2Type1,
-)
-from ..models.get_api_triggers_response_200_item_alert_type_type_3_type_1 import (
-    GetApiTriggersResponse200ItemAlertTypeType3Type1,
-)
+from ..models.get_api_triggers_response_200_item_alert_type_type_0 import GetApiTriggersResponse200ItemAlertTypeType0
 from ..models.get_api_triggers_response_200_item_kind import GetApiTriggersResponse200ItemKind
 
 if TYPE_CHECKING:
@@ -40,7 +33,7 @@ class GetApiTriggersResponse200Item:
             value replaced by the `[redacted]` placeholder. Which channel is configured, which destination is set and which
             header names are in play all survive; the values never leave; a Slack automation names its connection by
             `slackIntegrationId` and carries no secret. Sending the placeholder back on an update keeps the stored value.
-            The rule this automation fires by is not here — it is stated in `graphAlert` or `report`, and sending it in this
+            The rule this automation fires by is not here: it is stated in `graphAlert` or `report`, and sending it in this
             field is refused.
         graph_alert (GetApiTriggersResponse200ItemGraphAlertType0 | None): The rule an alert fires by. Null for anything
             that is not one.
@@ -57,8 +50,7 @@ class GetApiTriggersResponse200Item:
             from. Absent fields render the LangWatch default for the channel.
         active (bool):
         message (None | str):
-        alert_type (GetApiTriggersResponse200ItemAlertTypeType1 | GetApiTriggersResponse200ItemAlertTypeType2Type1 |
-            GetApiTriggersResponse200ItemAlertTypeType3Type1 | None):
+        alert_type (GetApiTriggersResponse200ItemAlertTypeType0 | None):
         created_at (str):
         updated_at (str):
         platform_url (str):
@@ -79,16 +71,10 @@ class GetApiTriggersResponse200Item:
     templates: GetApiTriggersResponse200ItemTemplates
     active: bool
     message: None | str
-    alert_type: (
-        GetApiTriggersResponse200ItemAlertTypeType1
-        | GetApiTriggersResponse200ItemAlertTypeType2Type1
-        | GetApiTriggersResponse200ItemAlertTypeType3Type1
-        | None
-    )
+    alert_type: GetApiTriggersResponse200ItemAlertTypeType0 | None
     created_at: str
     updated_at: str
     platform_url: str
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         from ..models.get_api_triggers_response_200_item_graph_alert_type_0 import (
@@ -140,11 +126,7 @@ class GetApiTriggersResponse200Item:
         message = self.message
 
         alert_type: None | str
-        if isinstance(self.alert_type, GetApiTriggersResponse200ItemAlertTypeType1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, GetApiTriggersResponse200ItemAlertTypeType2Type1):
-            alert_type = self.alert_type.value
-        elif isinstance(self.alert_type, GetApiTriggersResponse200ItemAlertTypeType3Type1):
+        if isinstance(self.alert_type, GetApiTriggersResponse200ItemAlertTypeType0):
             alert_type = self.alert_type.value
         else:
             alert_type = self.alert_type
@@ -156,7 +138,7 @@ class GetApiTriggersResponse200Item:
         platform_url = self.platform_url
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "id": id,
@@ -275,47 +257,18 @@ class GetApiTriggersResponse200Item:
 
         message = _parse_message(d.pop("message"))
 
-        def _parse_alert_type(
-            data: object,
-        ) -> (
-            GetApiTriggersResponse200ItemAlertTypeType1
-            | GetApiTriggersResponse200ItemAlertTypeType2Type1
-            | GetApiTriggersResponse200ItemAlertTypeType3Type1
-            | None
-        ):
+        def _parse_alert_type(data: object) -> GetApiTriggersResponse200ItemAlertTypeType0 | None:
             if data is None:
                 return data
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                alert_type_type_1 = GetApiTriggersResponse200ItemAlertTypeType1(data)
+                alert_type_type_0 = GetApiTriggersResponse200ItemAlertTypeType0(data)
 
-                return alert_type_type_1
+                return alert_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_2_type_1 = GetApiTriggersResponse200ItemAlertTypeType2Type1(data)
-
-                return alert_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                alert_type_type_3_type_1 = GetApiTriggersResponse200ItemAlertTypeType3Type1(data)
-
-                return alert_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                GetApiTriggersResponse200ItemAlertTypeType1
-                | GetApiTriggersResponse200ItemAlertTypeType2Type1
-                | GetApiTriggersResponse200ItemAlertTypeType3Type1
-                | None,
-                data,
-            )
+            return cast(GetApiTriggersResponse200ItemAlertTypeType0 | None, data)
 
         alert_type = _parse_alert_type(d.pop("alertType"))
 
@@ -347,21 +300,4 @@ class GetApiTriggersResponse200Item:
             platform_url=platform_url,
         )
 
-        get_api_triggers_response_200_item.additional_properties = d
         return get_api_triggers_response_200_item
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

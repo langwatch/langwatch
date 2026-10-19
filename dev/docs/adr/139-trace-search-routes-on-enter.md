@@ -60,4 +60,4 @@ Facets on `stored_spans` and `evaluation_runs` count spans and evaluation runs, 
 - Related ADRs: ADR-045 (handled errors), ADR-137 (Instant Eval runs), ADR-138 (the query reference)
 - Spec: `specs/traces-v2/search.feature`, rule "Enter routes a sentence"
 - Spec: `specs/traces-v2/instant-eval-search.feature`, the `eval` chip, the cost rule, the progress and the refusals
-- Spec: `specs/instant-evals/instant-eval-shorthand.feature`, the selection fallback
+- Spec: `modules/instant-eval/specs/instant-eval-shorthand.feature`, the selection fallback

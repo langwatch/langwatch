@@ -1,0 +1,304 @@
+import { sealAuthorization } from "@langwatch/authorization";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { ModelProviderServerConfig } from "@langwatch/model-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { ResourceScope } from "@langwatch/process";
+import { projectWithTeamSchema, type ProjectApi } from "@langwatch/project-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { TraceApi } from "@langwatch/trace-contract";
+import { describe, expect, it } from "vitest";
+
+/**
+ * Tests that ModelProviderModule.create builds collaborators from its registry, peers and config,
+ * not from hand-composed infrastructure. Regression: before regaining build step, calls
+ * crashed on undefined errors (defaultFeatures, systemProviders, exists).
+ */
+import { MemoryModelProviderChannels } from "../../channels/memory/memory.model-provider.channels.ts";
+import { MemoryModelProviderRepositories } from "../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../repositories/model-provider.repositories.ts";
+import { ModelProviderModule } from "../model-provider.app.ts";
+import {
+  createModelProviderTestDataPrivacy,
+  createModelProviderTestManagedProviders,
+  createModelProviderTestSecrets,
+  createModelProviderTestTraces,
+} from "./model-provider.fixture.ts";
+
+function testProject(id: string) {
+  return projectWithTeamSchema.parse({
+    id,
+    name: "Test Project",
+    slug: "test-project",
+    apiKey: "test-api-key",
+    lwqlKey: "test-lwql-key",
+    teamId: "team-1",
+    language: "typescript",
+    framework: "langchain",
+    kind: "application",
+    firstMessage: false,
+    integrated: true,
+    createdAt: new Date("2026-01-01T00:00:00.000Z"),
+    updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+    userLinkTemplate: null,
+    traceSharingEnabled: false,
+    presenceEnabled: false,
+    s3Endpoint: null,
+    s3AccessKeyId: null,
+    s3SecretAccessKey: null,
+    s3Bucket: null,
+    archivedAt: null,
+    isPersonal: false,
+    ownerUserId: null,
+    personalFeatures: {},
+    departmentId: null,
+    langyEgressAllowlist: null,
+    lastCodingAgentSessionAt: null,
+    lastCodingAgentPullRequestAt: null,
+    team: {
+      id: "team-1",
+      name: "Test Team",
+      slug: "test-team",
+      organizationId: "organization-1",
+      createdAt: new Date("2026-01-01T00:00:00.000Z"),
+      updatedAt: new Date("2026-01-01T00:00:00.000Z"),
+      archivedAt: null,
+      isPersonal: false,
+      ownerUserId: null,
+      departmentId: null,
+    },
+  });
+}
+
+/** A project read fuller than the shared fixture's: this suite also drives the scope derivation. */
+function createFullModelProviderTestProjects(): ProjectApi {
+  return createApiFixture<ProjectApi>({
+    getWithTeam: async (id: string) => testProject(id),
+    findWithTeam: async (id: string) => testProject(id),
+    findOrganizationId: async () => "organization-1",
+    listIdsByOrganization: async () => [],
+    findLiveNonGovernanceIdsByOrganization: async () => [],
+    listNamesByIds: async () => [],
+  });
+}
+
+/** An organization read fuller than the shared fixture's, for the same reason. */
+function createFullModelProviderTestOrganizations(): OrganizationApi {
+  return createApiFixture<OrganizationApi>({
+    getBillingProfile: async ({ organizationId }: { organizationId: string }) => ({
+      id: organizationId,
+      name: "Test Organization",
+      billingCustomerId: null,
+    }),
+    listTeams: async () => ({
+      data: [],
+      pagination: { total: 0, page: 1, limit: 1_000 },
+    }),
+  });
+}
+
+/**
+ * Builds the app exactly the way boot does: through `create`, not test-only
+ * `createForTesting`.
+ */
+const NO_PROVIDER_FALLBACKS: ModelProviderServerConfig["providerFallbacks"] = {
+  OPENAI_BASE_URL: undefined,
+  ANTHROPIC_BASE_URL: undefined,
+  AZURE_OPENAI_ENDPOINT: undefined,
+  CUSTOM_BASE_URL: undefined,
+  VERTEXAI_PROJECT: undefined,
+  VERTEXAI_LOCATION: undefined,
+  AWS_REGION_NAME: undefined,
+};
+
+function createRealModelProviderApp(
+  repositories: ModelProviderRepositories = MemoryModelProviderRepositories.create(),
+  traces: TraceApi = createModelProviderTestTraces(),
+  deployment: {
+    providerFallbacks?: Partial<ModelProviderServerConfig["providerFallbacks"]>;
+    environment?: Record<string, string>;
+  } = {},
+): Promise<ModelProviderModule> {
+  return ModelProviderModule.create({
+    repositories,
+    channels: MemoryModelProviderChannels.create({ bound: { traces } }),
+    dependencies: {
+      projects: createFullModelProviderTestProjects(),
+      organizations: createFullModelProviderTestOrganizations(),
+      permissions: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
+      dataPrivacy: createModelProviderTestDataPrivacy(),
+      managed: createModelProviderTestManagedProviders(),
+      secrets: createModelProviderTestSecrets(),
+    },
+    config: {
+      blockLocalHttpCalls: true,
+      allowedProxyHosts: [],
+      defaultModel: undefined,
+      nlpServiceUrl: undefined,
+      gatewayInternalUrl: undefined,
+      gatewayPublicUrl: undefined,
+      gatewayLegacyUrl: undefined,
+      probeBaseUrls: {
+        gemini: undefined,
+        deepseek: undefined,
+        xai: undefined,
+        cerebras: undefined,
+        groq: undefined,
+        elevenlabs: undefined,
+      },
+      providerFallbacks: { ...NO_PROVIDER_FALLBACKS, ...deployment.providerFallbacks },
+      codexOAuthIssuer: undefined,
+    },
+    resources: new ResourceScope(),
+    secrets: SecretsResolver.over(
+      SecretsChain.start({ environment: deployment.environment ?? {} }).withEnv(),
+    ).scopeTo("model-provider", Object.values(ModelProviderModule.secrets)),
+  });
+}
+
+describe("ModelProviderModule.create", () => {
+  describe("given the memory registry, peers and an empty secrets chain", () => {
+    it("answers the default-models feature catalogue instead of crashing on undefined defaultFeatures", async () => {
+      const app = await createRealModelProviderApp();
+
+      await expect(
+        app.getDefaultSnapshotUnattributed({ projectId: "project-1" }),
+      ).resolves.toBeDefined();
+    });
+
+    it("answers the provider list instead of crashing on undefined systemProviders", async () => {
+      const app = await createRealModelProviderApp();
+
+      await expect(app.listForProject({ projectId: "project-1" })).resolves.toEqual([]);
+    });
+
+    it("recognizes a known provider instead of crashing on undefined exists", async () => {
+      const app = await createRealModelProviderApp();
+
+      await expect(
+        app.upsertUnattributed({
+          projectId: "project-1",
+          provider: "openai",
+          enabled: true,
+          customKeys: { OPENAI_API_KEY: "sk-test" },
+        }),
+      ).resolves.toBeDefined();
+    });
+  });
+
+  describe("given install-wide provider settings and a row that leaves them empty", () => {
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("executes OpenAI against the deployment's base URL", async () => {
+      const app = await createRealModelProviderApp(undefined, undefined, {
+        providerFallbacks: { OPENAI_BASE_URL: "https://proxy.example.com/v1" },
+      });
+      await app.upsertUnattributed({
+        projectId: "project-1",
+        provider: "openai",
+        enabled: true,
+        customKeys: { OPENAI_API_KEY: "sk-test" },
+      });
+
+      await expect(
+        app.prepareExecution({ model: "openai/gpt-5", projectId: "project-1" }),
+      ).resolves.toMatchObject({ api_base: "https://proxy.example.com/v1" });
+    });
+
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("executes Bedrock with the deployment's region and never an environment secret", async () => {
+      const app = await createRealModelProviderApp(undefined, undefined, {
+        providerFallbacks: { AWS_REGION_NAME: "eu-west-1" },
+        environment: { AWS_SECRET_ACCESS_KEY: "deployment-secret" },
+      });
+      await app.upsertUnattributed({
+        projectId: "project-1",
+        provider: "bedrock",
+        enabled: true,
+        customKeys: { AWS_ACCESS_KEY_ID: "AKIATEST" },
+      });
+
+      await expect(
+        app.prepareExecution({ model: "bedrock/anthropic.claude-v2", projectId: "project-1" }),
+      ).resolves.toMatchObject({
+        aws_access_key_id: "AKIATEST",
+        aws_secret_access_key: "invalid",
+        aws_region_name: "eu-west-1",
+      });
+    });
+  });
+
+  describe("given the trace module bound to the channel tier", () => {
+    describe("when the cost-rule preview is asked what a pattern matches", () => {
+      it("reads trace's models instead of refusing as service_unavailable", async () => {
+        const traces = createApiFixture<TraceApi>({
+          readModelUsageStats: async () => [{ model: "gpt-5", spanCount: 2, lastSeenMs: 1 }],
+          readRecentSpansByModels: async () => [],
+        });
+        const app = await createRealModelProviderApp(undefined, traces);
+        const authorization = sealAuthorization({
+          actor: { type: "user", id: "user-1" },
+          principal: { type: "user", id: "user-1" },
+          scope: { organizationId: "organization-1" },
+          grants: [{ projectId: "project-1", permissions: ["traces:view"], via: [], kind: "own" }],
+          expiresAt: Date.now() + 60_000,
+          purpose: { kind: "route", route: "test" },
+        });
+
+        await expect(
+          app.previewCostRuleMatchingSpans(
+            { projectId: "project-1", regex: "gpt-5" },
+            { authorization },
+          ),
+        ).resolves.toMatchObject({ matchedModels: [{ model: "gpt-5", spanCount: 2 }] });
+      });
+    });
+  });
+
+  describe("given a deployment that blocks local destinations", () => {
+    describe.each([
+      ["a metadata address", "http://169.254.169.254/latest"],
+      ["a loopback address", "http://127.0.0.1:8080/v1"],
+    ])("when a custom provider is saved with %s as its base URL", (_name, baseUrl) => {
+      it("refuses the save with model_provider_invalid", async () => {
+        const app = await createRealModelProviderApp();
+
+        await expect(
+          app.upsertUnattributed({
+            projectId: "project-1",
+            provider: "custom",
+            enabled: true,
+            customKeys: { CUSTOM_API_KEY: "sk-test", CUSTOM_BASE_URL: baseUrl },
+          }),
+        ).rejects.toMatchObject({ code: "model_provider_invalid" });
+      });
+    });
+  });
+
+  describe("given default-model configs on the organization and on a sibling project", () => {
+    describe("when a credential that names no person reads the snapshot", () => {
+      it("lists no configs, as main's null-session read does, and still resolves the cascade", async () => {
+        const repositories = MemoryModelProviderRepositories.create();
+        await repositories.defaults.save({
+          id: "config-organization",
+          organizationId: "organization-1",
+          config: { DEFAULT: "openai/gpt-5-mini" },
+          scopes: [{ scopeType: "ORGANIZATION", scopeId: "organization-1" }],
+          authorId: null,
+        });
+        await repositories.defaults.save({
+          id: "config-sibling",
+          organizationId: "organization-1",
+          config: { DEFAULT: "openai/gpt-5" },
+          scopes: [{ scopeType: "PROJECT", scopeId: "project-2" }],
+          authorId: null,
+        });
+        const app = await createRealModelProviderApp(repositories);
+
+        const snapshot = await app.getDefaultSnapshotUnattributed({ projectId: "project-1" });
+
+        expect(snapshot.configs).toEqual([]);
+        expect(snapshot.effective.DEFAULT).toMatchObject({ scope: "organization" });
+      });
+    });
+  });
+});

@@ -14,7 +14,6 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
 	aigateway "github.com/langwatch/langwatch/services/aigateway/cmd"
-	idpsim "github.com/langwatch/langwatch/services/idpsim/cmd"
 	langyagent "github.com/langwatch/langwatch/services/langyagent/cmd"
 	nlpgo "github.com/langwatch/langwatch/services/nlpgo/cmd"
 )
@@ -44,11 +43,15 @@ func serviceTelemetryName(cmd string) string {
 // ServiceBoot is the entrypoint signature each service must implement.
 type ServiceBoot func(ctx context.Context, args []string) error
 
+// The simulators register only in a dev build: combined_dev.go.
 var services = map[string]ServiceBoot{
 	"aigateway":  aigateway.Root,
-	"idpsim":     idpsim.Root,
 	"langyagent": langyagent.Root,
 	"nlpgo":      nlpgo.Root,
+	// The development topology (ADR-004, 2026-09-07): the Go data-plane
+	// services in one process. Never a deployment — each service is still its
+	// own container in production.
+	combinedCommand: combinedRoot,
 }
 
 func main() {

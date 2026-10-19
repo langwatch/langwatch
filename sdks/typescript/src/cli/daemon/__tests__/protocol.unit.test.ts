@@ -1,11 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import {
-  type ClientFrame,
-  encodeFrame,
-  FrameDecoder,
-  type ServerFrame,
-} from "../protocol";
+import { type ClientFrame, encodeFrame, FrameDecoder, type ServerFrame } from "../protocol";
 
 describe("FrameDecoder", () => {
   describe("given a frame split across several socket reads", () => {
@@ -43,9 +38,7 @@ describe("FrameDecoder", () => {
       const raw = Buffer.from([0x00, 0xff, 0x80, 0x41, 0xf0, 0x9f, 0x92, 0xa9]);
       const decoder = new FrameDecoder<ServerFrame>();
 
-      const [frame] = decoder.push(
-        encodeFrame({ t: "out", d: raw.toString("base64") }),
-      );
+      const [frame] = decoder.push(encodeFrame({ t: "out", d: raw.toString("base64") }));
 
       expect(frame).toBeDefined();
       const decoded = Buffer.from((frame as { d: string }).d, "base64");
@@ -58,14 +51,12 @@ describe("FrameDecoder", () => {
       const payload = Buffer.from("line one\nline two\n");
       const decoder = new FrameDecoder<ServerFrame>();
 
-      const frames = decoder.push(
-        encodeFrame({ t: "out", d: payload.toString("base64") }),
-      );
+      const frames = decoder.push(encodeFrame({ t: "out", d: payload.toString("base64") }));
 
       expect(frames).toHaveLength(1);
-      expect(
-        Buffer.from((frames[0] as { d: string }).d, "base64").toString(),
-      ).toBe("line one\nline two\n");
+      expect(Buffer.from((frames[0] as { d: string }).d, "base64").toString()).toBe(
+        "line one\nline two\n",
+      );
     });
   });
 
@@ -79,12 +70,9 @@ describe("FrameDecoder", () => {
 
   describe("given a multi-byte character split across two socket reads", () => {
     it("decodes it whole instead of resolving each half to U+FFFD", () => {
-      // A socket splits wherever it likes. Decoding each chunk independently
-      // turned a straddling UTF-8 sequence into two replacement characters —
-      // and because the surrounding JSON stayed well-formed, the frame parsed
-      // fine and shipped corrupted argv. `out`/`err` are base64 so they were
-      // safe; the `exec` frame carries raw strings, so `dataset records add
-      // --json '<non-ASCII>'` uploaded mangled records at exit 0.
+      // A socket splits wherever it likes; decoding each chunk independently
+      // corrupted a straddling UTF-8 sequence while the JSON stayed
+      // well-formed, so `exec` frames (raw strings) shipped mangled argv silently.
       const decoder = new FrameDecoder<ClientFrame>();
       const payload = "漢字とカタカナ";
       const frame = Buffer.from(

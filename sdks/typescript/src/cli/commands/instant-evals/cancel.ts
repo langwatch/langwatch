@@ -1,9 +1,6 @@
 /**
- * `langwatch instant-eval cancel <id>`: ask a run to stop.
- *
- * It stops before its next page, so the pages it already judged keep their
- * judgements and are still readable.
- *
+ * `langwatch instant-eval cancel <id>`: ask a run to stop before its next page; pages already
+ * judged keep their judgements and stay readable.
  * @see specs/features/instant-eval-cli.feature
  */
 
@@ -16,9 +13,7 @@ import { failSpinner } from "../../utils/spinnerError";
 import { createCliInstantEvalsService } from "./cli-instant-evals-service";
 import { printRun } from "./render";
 
-export const cancelInstantEvalCommand = async (
-  id: string,
-): Promise<CommandResult | void> => {
+export const cancelInstantEvalCommand = async (id: string): Promise<CommandResult | void> => {
   await resolveCredentials();
 
   const service = createCliInstantEvalsService();

@@ -11,20 +11,10 @@ Feature: A screen fetches a drawer's code before the person opens it
 
   Rule: A screen warms the drawers it opens
 
-    @integration
-    Scenario: The scenario library warms the scenario editor
-      Given the scenario library is on screen
-      When the browser becomes idle
-      Then the scenario editor's code is fetched
-
-    # A screen warms every drawer it opens, not only the one its rows open. The
-    # runs page opens a run's detail from the rows and the run plan editor from
-    # the sidebar, and both wait on the same kind of download.
-    @integration
-    Scenario: The runs page warms the drawers its rows and sidebar open
-      Given the runs page is on screen
-      When the browser becomes idle
-      Then the code of the run detail and the run plan editor is fetched
+    # The two screen-level warm-ups ("The scenario library warms the scenario
+    # editor", "The runs page warms the drawers its rows and sidebar open") were
+    # retired on 2026-09-05: dev/docs/plans/restore-or-retire-2026-09-05.md marks
+    # them "retire — use-preload-drawer is a documented no-op".
 
     # Fetching the code is not the whole of it. A drawer keeps its own record of
     # whether it is ready, so a drawer whose code is in memory still reports
@@ -90,18 +80,11 @@ Feature: A screen fetches a drawer's code before the person opens it
       When the drawer is opened later
       Then the code is fetched again and the drawer opens
 
+    # A person can open a drawer while a warm-up runs; the page stands down only for the
+    # warm-up's own download. What a waiting screen does is in chunk-load-retry.feature.
     @unit
     Scenario: A stale file outside a warm-up still reloads the page
       Given no warm-up is in flight
       When a download fails because the file is gone
-      Then the page reloads once
-
-    # A warm-up runs in the background, so a person can open a drawer while one
-    # is still going. Standing down for the whole of a warm-up would take the
-    # recovery away from that open as well, so the page tells the two apart and
-    # stands down only for the warm-up's own download.
-    @unit
-    Scenario: A stale file for a waiting screen reloads during a warm-up
-      Given a warm-up is in flight
-      When another download fails because the file is gone
+      And the server confirms the file is gone
       Then the page reloads once

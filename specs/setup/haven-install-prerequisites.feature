@@ -1,0 +1,264 @@
+@unit
+Feature: haven self install checks the machine's prerequisites
+  `make haven install` used to do two things: go install the binary and offer
+  to put the Go bin dir on PATH. It said nothing about whether the machine had
+  the tools haven then drives — portless, a Node toolchain, the brew formulae
+  behind the managed Postgres and Redis, a container runtime. Every one of
+  those was discovered later, as a failed `haven up`, one at a time.
+
+  `haven self install` is that check: it probes each prerequisite, shows what is
+  missing, and offers to install it. Nothing is installed without being
+  chosen, and anything declined with "never" is remembered machine-wide so the
+  same question is not asked on every checkout.
+
+  # Behaviour lives in tools/thuishaven: domain/prereq.go (the catalogue and
+  # the planning), app/install.go (probing, ordering, persistence),
+  # adapters/prereqs (the real probes and installers), adapters/installtui
+  # (the picker), cmd/install.go (the command).
+
+  Rule: Requirement level decides what a silent run does
+
+    Scenario: A required prerequisite that is missing fails the check
+      Given portless is not installed
+      When the developer runs "haven self install --list"
+      Then portless is reported missing and marked required
+      And the report names the command that would install it
+
+    Scenario: An optional prerequisite that is missing is reported, not demanded
+      Given the ClickHouse client is not installed
+      And every required prerequisite is present
+      When the developer runs "haven self install --list"
+      Then the ClickHouse client is reported missing and marked optional
+      And the machine is still reported ready
+
+    Scenario: A tool only the agent instructions suggest is offered, never assumed
+      Given rtk is not installed
+      And every required prerequisite is present
+      When the developer runs "haven self install --list"
+      Then rtk is reported missing and marked optional
+      And the machine is still reported ready
+
+    Scenario: Bun is offered so a fresh machine can run Langy
+      Given bun is not installed
+      And every required prerequisite is present
+      When the developer runs "haven self install --list"
+      Then bun is reported missing and marked recommended
+      And the report names "brew install bun"
+      And "haven self install --yes" installs it
+
+    Scenario: A Langy that cannot build for want of bun says how to fix it
+      Given bun is not installed
+      When the developer runs "haven up +langy"
+      Then the langy-worker build is not attempted
+      And the line says "bun is missing: run `haven self install`"
+      And the rest of the stack comes up without Langy
+
+    Scenario: Everything present reports ready and installs nothing
+      Given every prerequisite is present
+      When the developer runs "haven self install"
+      Then it reports the machine is ready
+      And no installer is run
+
+  Rule: A choice is offered once, not as two separate demands
+
+    Scenario: Either container runtime satisfies the group
+      Given colima and the docker CLI are installed
+      When the prerequisites are planned
+      Then the container runtime is satisfied
+      And Docker Desktop is not also offered
+
+    Scenario: A missing runtime offers the alternatives as one pick
+      Given neither colima nor Docker Desktop is installed
+      When the prerequisites are planned
+      Then one container-runtime entry is offered
+      And it carries both candidates so the developer picks one
+
+  Rule: Order follows dependency, so an install never runs before its installer
+
+    Scenario: Homebrew installs before anything it installs
+      Given brew, redis and postgres are all missing
+      When the chosen prerequisites are ordered
+      Then brew comes before redis and postgres
+
+    Scenario: Node installs before the npm globals
+      Given node and portless are both missing
+      When the chosen prerequisites are ordered
+      Then node comes before portless
+
+  Rule: "Never ask again" is remembered for the machine, not the checkout
+
+    Scenario: Declining with never is persisted
+      Given the ClickHouse client is missing
+      When the developer answers "never ask again" for it
+      Then it is recorded as skipped for this machine
+      And a later run reports it as skipped instead of offering it
+
+    Scenario: A skipped prerequisite is still installed when named
+      Given the ClickHouse client is recorded as skipped
+      When the developer runs "haven self install clickhouse-client"
+      Then it is installed
+      And it is no longer recorded as skipped
+
+    Scenario: The skips can be cleared
+      Given two prerequisites are recorded as skipped
+      When the developer runs "haven self install --reset-skips"
+      Then nothing is recorded as skipped any more
+      And the next run offers both again
+
+  Rule: Reporting never installs, and installing always reports
+
+    Scenario: The report-only flag refuses to be given something to install
+      Given the ClickHouse client is missing
+      When the developer runs "haven self install --list clickhouse-client"
+      Then it fails saying the two cannot be combined
+      And nothing is installed
+
+    Scenario: A machine with nothing to do still says so
+      Given every prerequisite is present
+      And the developer is at a terminal
+      When the developer runs "haven self install"
+      Then the full report is printed with the ready verdict
+      And no picker is shown
+
+    Scenario: A prerequisite present at the wrong version is not called missing
+      Given portless is installed at a version haven does not pin
+      When the prerequisites are planned
+      Then the verdict says the machine is ready
+      And it notes that portless is not the pinned version
+
+  Rule: A prerequisite is probed the way haven will use it
+
+    Scenario: A brew-managed server is judged by the formula, not the binary
+      Given redis-server is on PATH but no redis formula is installed
+      When the prerequisites are planned
+      Then Redis is reported missing
+      # haven starts it with `brew services`, which has nothing to start
+
+    Scenario: A keg-only formula counts even with no binary on PATH
+      Given postgresql@15 is installed but psql is not on PATH
+      When the prerequisites are planned
+      Then PostgreSQL is reported installed
+
+    Scenario: A wrong-version linter is reported outdated, not installed
+      Given golangci-lint is on PATH at a version the repo's Makefile does not pin
+      When the prerequisites are planned
+      Then golangci-lint is reported outdated
+      And it names the version found and the version the Makefile pins
+      # a v1.64.8 binary satisfied nothing and refused the repo's v2 config,
+      # so the report has to say so rather than reading as installed
+
+    Scenario: A small macOS accept queue is reported and haven self install sets it
+      Given the machine is macOS and kern.ipc.somaxconn is 128
+      When the prerequisites are planned
+      Then the accept queue is reported missing
+      And installing it runs `sudo sysctl -w kern.ipc.somaxconn=1024` in the developer's terminal
+      And it writes the setting to /etc/sysctl.conf so it survives a reboot
+      # vite cold loads through the proxy can 502 under bursts
+
+    Scenario: The accept queue is not checked off macOS
+      Given the machine is not macOS
+      When the prerequisites are planned
+      Then the accept queue is reported not applicable
+
+  Rule: Only commands that can run on this platform are offered
+
+    Scenario: A brew command is not offered where there is no brew
+      Given the machine is not macOS
+      And node is missing
+      When the prerequisites are planned
+      Then node is reported with words, not a `brew install` command
+      And a silent run does not attempt it
+
+  Rule: An agent and a pipe are never asked a question
+
+    Scenario: Agent mode reports instead of prompting
+      Given haven is running in agent mode
+      And prerequisites are missing
+      When the developer runs "haven self install"
+      Then the missing prerequisites are printed with the commands that fix them
+      And no picker is shown and nothing is installed
+
+    Scenario: A non-interactive run with --yes installs what is needed
+      Given stdin is a pipe
+      And node and portless are missing
+      When the developer runs "haven self install --yes"
+      Then node and portless are installed
+      And optional prerequisites are left alone
+
+    Scenario: A prerequisite haven cannot install itself is explained, not attempted
+      Given brew is missing
+      When the developer runs "haven self install --yes"
+      Then brew is reported as install-it-yourself with its official command
+      And no installer is run for it
+      And the run stops there rather than failing on the formulae below it
+
+  Rule: The picker asks the question and nothing else
+
+    Scenario: The picker lists what needs deciding, not the whole inventory
+      Given seven prerequisites are installed and two are missing
+      When the picker opens
+      Then it lists the two that are missing
+      And it names the seven on one line underneath
+      # Nine rows to ask one question buries the question in the answers.
+
+    Scenario: Every column lines up, including the highlighted row
+      Given the cursor is on a row
+      When the list is rendered
+      Then that row's columns start where every other row's columns start
+
+  Rule: The picker chooses; the installing happens after it closes
+
+    Scenario: Installs run with the terminal to themselves
+      Given a terminal and missing prerequisites
+      When the developer ticks two of them and confirms
+      Then the picker closes first
+      And each install runs in order with its own output visible
+
+    Scenario: Quitting the picker installs nothing
+      Given a terminal and missing prerequisites
+      When the developer quits the picker
+      Then nothing is installed and nothing is recorded as skipped
+
+    Scenario: One failed install does not silently skip the rest
+      Given three prerequisites were chosen
+      When the second one, a required one, fails to install
+      Then the failure is reported naming the prerequisite
+      And the run stops rather than reporting a success it did not get
+
+    Scenario: A failed recommended install does not stop the run
+      Given a recommended prerequisite and a later one were chosen
+      When the recommended one fails to install
+      Then the failure is logged naming the prerequisite
+      And the later one is still installed
+      And the summary lists the failure and the run does not fail
+
+  Rule: On macOS the install brings the native tier, and a container runtime is optional
+
+    Scenario: macOS install fetches the native tier and colima stays optional
+      Given a Mac with Homebrew and no observability tools or pinned binaries
+      When the developer runs "haven self install --yes"
+      Then grafana, prometheus and loki are installed through Homebrew
+      And the pinned ClickHouse, Tempo and Alloy releases are downloaded and their sha256 verified
+      And the container runtime is reported optional, never required
+
+    Scenario: A second install run fetches nothing
+      Given the pinned ClickHouse, Tempo and Alloy binaries are already on disk
+      When the developer runs "haven self install" again
+      Then nothing is downloaded and the row reads as installed with every version
+
+    Scenario: Haven fetches a pinned, checksummed Alloy instead of building it
+      Given a Mac whose Command Line Tools are too old to build Alloy from source
+      When the developer runs "haven self install"
+      Then haven downloads the pinned Alloy darwin zip for its architecture into its home
+      And unpacks the alloy binary only when the zip matches its pinned sha256
+
+    Scenario: Linux install keeps today's catalogue
+      Given a Linux machine
+      When the developer runs "haven self install"
+      Then the observability tools and the pinned binaries are reported not applicable
+
+    Scenario: Two concurrent installs of a pinned binary download it once
+      Given a pinned artifact that is not yet in haven's home
+      When two haven runs ensure it at the same time
+      Then one downloads it and the other waits for the lock
+      And the waiting run finds the binary in place and downloads nothing

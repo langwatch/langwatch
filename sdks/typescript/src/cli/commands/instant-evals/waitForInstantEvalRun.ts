@@ -1,27 +1,12 @@
 /**
- * The `--wait` poll for a run, modelled on `utils/waitForBatchRun.ts`.
- *
- * Same three decisions as the batch wait, for the same reasons: the progress
- * prose is for a person and stays on the spinner (stderr), the verdict is
- * RETURNED so the command puts the same numbers into the one document a
- * machine caller reads, and a run that failed or a wait that timed out sets a
- * failing exit code rather than exiting zero on a red run.
- *
- * What differs is what progress means. A batch counts runs; a run counts rows
- * judged and, of those, how many matched, which is the number the caller
- * actually asked a question to learn:
- *
- * ```
- * Judging... 3,200/10,000 (412 matched)
- * ```
- *
+ * The `--wait` poll for a run, modelled on `utils/waitForBatchRun.ts`: progress on the spinner
+ * (stderr), the verdict returned, failure sets the exit code. Progress is rows judged and matched.
  * @see specs/features/instant-eval-cli.feature
  */
 
 import chalk from "chalk";
 
-import type { InstantEvalRun } from "@/client-sdk/services/instant-evals";
-import type { InstantEvalsApiService } from "@/client-sdk/services/instant-evals";
+import type { InstantEvalRun, InstantEvalsApiService } from "@/client-sdk/services/instant-evals";
 
 import { createSpinner } from "../../utils/spinner";
 
@@ -50,15 +35,11 @@ export interface InstantEvalWaitResult {
 }
 
 /** `--wait` with no value means the default; `--wait 5` means five minutes. */
-export function readWaitMinutes(
-  raw: boolean | string | undefined,
-): number | undefined {
+export function readWaitMinutes(raw: boolean | string | undefined): number | undefined {
   if (raw === undefined || raw === false) return undefined;
   if (raw === true) return DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
   const minutes = Number(raw);
-  return Number.isFinite(minutes) && minutes > 0
-    ? minutes
-    : DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
+  return Number.isFinite(minutes) && minutes > 0 ? minutes : DEFAULT_INSTANT_EVAL_WAIT_MINUTES;
 }
 
 /** Whether a run has stopped moving. */
@@ -71,8 +52,7 @@ const grouped = (value: number): string => value.toLocaleString("en-US");
 /** `Judging... 3,200/10,000 (412 matched)`. */
 export function instantEvalProgressLine(run: InstantEvalRun): string {
   const total = run.total ?? run.limit;
-  const matched =
-    run.matched === null ? "" : ` (${grouped(run.matched)} matched)`;
+  const matched = run.matched === null ? "" : ` (${grouped(run.matched)} matched)`;
   return `Judging... ${grouped(run.progress)}/${grouped(total)}${matched}`;
 }
 
@@ -108,18 +88,7 @@ export async function waitForInstantEvalRun({
 
   for (;;) {
     if (Date.now() - startedAt > timeoutMs) {
-      process.exitCode = 1;
-      const minutes = timeoutMs / 60_000;
-      spinner.fail(
-        chalk.red(
-          `Stopped waiting after ${minutes} minute${minutes === 1 ? "" : "s"}. The run is still going.`,
-        ),
-      );
-      if (!machine) {
-        console.log(
-          chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`),
-        );
-      }
+      reportTimedOut({ spinner, timeoutMs, machine, runId });
       return {
         outcome: "timeout",
         run: last ?? (await lastResort(service, runId, known)),
@@ -156,33 +125,14 @@ export async function waitForInstantEvalRun({
 
     if (!isOver(run.status)) continue;
 
-    if (run.status === "finished") {
-      spinner.succeed(
-        `Judged ${grouped(run.progress)} row${run.progress === 1 ? "" : "s"}` +
-          (run.matched === null
-            ? ""
-            : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
-      );
-      return { outcome: "finished", run };
-    }
-    if (run.status === "cancelled") {
-      spinner.warn(
-        `The run was cancelled after judging ${grouped(run.progress)} rows.`,
-      );
-      return { outcome: "cancelled", run };
-    }
-    process.exitCode = 1;
-    spinner.fail(chalk.red(`The run failed: ${run.error ?? "unknown"}`));
-    return { outcome: "failed", run };
+    return reportOverRun({ run, spinner });
   }
 }
 
 /**
- * The run, read once more for the document a machine caller reads.
- *
- * Only reached when the wait ended before any poll succeeded, and a failure
- * here is the caller's own: they asked to wait on a run the platform will not
- * answer for.
+ * The run, read once more for the document a machine caller reads. Only reached when the wait ended
+ * before any poll succeeded, and a failure here is the caller's own: they asked to wait on a run
+ * the platform will not answer for.
  */
 async function lastResort(
   service: Pick<InstantEvalsApiService, "get">,
@@ -194,4 +144,53 @@ async function lastResort(
   } catch {
     return known;
   }
+}
+
+type WaitSpinner = ReturnType<typeof createSpinner>;
+
+function reportTimedOut({
+  spinner,
+  timeoutMs,
+  machine,
+  runId,
+}: {
+  spinner: WaitSpinner;
+  timeoutMs: number;
+  machine: boolean;
+  runId: string;
+}): void {
+  process.exitCode = 1;
+  const minutes = timeoutMs / 60_000;
+  spinner.fail(
+    chalk.red(
+      `Stopped waiting after ${minutes} minute${minutes === 1 ? "" : "s"}. The run is still going.`,
+    ),
+  );
+  if (!machine) {
+    console.log(chalk.yellow(`Follow it with: langwatch instant-eval status ${runId}`));
+  }
+}
+
+/** The result for a run that is over, reported on the spinner by how it ended. */
+function reportOverRun({
+  run,
+  spinner,
+}: {
+  run: InstantEvalRun;
+  spinner: WaitSpinner;
+}): InstantEvalWaitResult {
+  if (run.status === "finished") {
+    spinner.succeed(
+      `Judged ${grouped(run.progress)} row${run.progress === 1 ? "" : "s"}` +
+        (run.matched === null ? "" : `, ${chalk.green(`${grouped(run.matched)} matched`)}`),
+    );
+    return { outcome: "finished", run };
+  }
+  if (run.status === "cancelled") {
+    spinner.warn(`The run was cancelled after judging ${grouped(run.progress)} rows.`);
+    return { outcome: "cancelled", run };
+  }
+  process.exitCode = 1;
+  spinner.fail(chalk.red(`The run failed: ${run.error ?? "unknown"}`));
+  return { outcome: "failed", run };
 }

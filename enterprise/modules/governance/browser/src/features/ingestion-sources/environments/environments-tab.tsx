@@ -1,0 +1,237 @@
+import { Dialog } from "@langwatch/design-system/dialog";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import { ListTable } from "@langwatch/design-system/list-table";
+import {
+  Badge,
+  Box,
+  Field,
+  HStack,
+  Input,
+  Text,
+  Textarea,
+  VStack,
+} from "@langwatch/design-system/primitives";
+import { Temporal, toDate, toEpochMs } from "@langwatch/time";
+import { Boxes } from "lucide-react";
+import type { ReactNode } from "react";
+import { useState } from "react";
+
+import { GovernanceEmptyState } from "../../../ui/elements/governance-empty-state.tsx";
+import { PermissionRequiredNotice } from "../../../ui/elements/permission-required-notice.tsx";
+import {
+  discoverEnvironments,
+  type EnvironmentRow,
+  type EnvironmentSource,
+  SAMPLE_ENVIRONMENTS,
+} from "./discovered-environments";
+
+/**
+ * The Environments pane: where an organization's agents run.
+ *
+ * Nothing in the database is an environment yet, so this table has two honest
+ * sources and no third: rows DERIVED from the addresses configured sources
+ * already point at, and rows the reader adds here — which live in this
+ * component's own state and are gone on reload. The dialog says so in its own
+ * words rather than pretending, because a form that looks like it saves and
+ * does not is worse than no form.
+ *
+ * Spec: specs/ai-governance/dashboard/inventory-environments.feature
+ */
+
+function formatCreated(iso: string | null): string {
+  if (!iso) return "—";
+  const parsed = toDate(Temporal.Instant.from(iso));
+  if (Number.isNaN(parsed.getTime())) return "—";
+  return parsed.toLocaleDateString(undefined, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+  });
+}
+
+/**
+ * The add form.
+ *
+ * Client-side only, and the dialog says exactly that above the buttons. The
+ * row it produces is real enough to look at and gone on reload — which is the
+ * truth about environments on this branch, told where the reader is about to
+ * act on it rather than in a release note they will not read.
+ */
+export function AddEnvironmentDialog({
+  isOpen,
+  onClose,
+  onAdd,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  onAdd: (row: { name: string; description: string }) => void;
+}) {
+  const [name, setName] = useState("");
+  const [description, setDescription] = useState("");
+
+  const close = () => {
+    setName("");
+    setDescription("");
+    onClose();
+  };
+
+  return (
+    <Dialog
+      open={isOpen}
+      onClose={close}
+      size="md"
+      title="Add environment"
+      onSubmit={() => {
+        onAdd({ name: name.trim(), description: description.trim() });
+        close();
+      }}
+      primaryAction={{
+        label: "Add environment",
+        type: "submit",
+        disabledReason: name.trim() === "" ? "Enter a name" : void 0,
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required>
+          <Field.Label>Name</Field.Label>
+          <Input
+            size="sm"
+            value={name}
+            placeholder="Production"
+            onChange={(e) => setName(e.target.value)}
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea
+            size="sm"
+            rows={3}
+            value={description}
+            placeholder="What runs here, and who it is for."
+            onChange={(e) => setDescription(e.target.value)}
+          />
+        </Field.Root>
+        <Box role="note" borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+          <Text fontSize="xs" color="fg.muted">
+            Environments are not stored yet. This one stays on screen for as long as you have the
+            page open and is gone when you reload.
+          </Text>
+        </Box>
+      </VStack>
+    </Dialog>
+  );
+}
+
+/** Samples replace discovered and locally added environments until disabled. */
+export function environmentRows({
+  sources,
+  sampleActive,
+  added,
+}: {
+  sources: readonly EnvironmentSource[] | undefined;
+  sampleActive: boolean;
+  added: readonly EnvironmentRow[];
+}): EnvironmentRow[] {
+  if (sampleActive) return SAMPLE_ENVIRONMENTS;
+  const discovered = discoverEnvironments({
+    sources: (sources ?? []).map((source) => ({
+      ...source,
+      createdAt:
+        source.createdAt === null || source.createdAt === void 0
+          ? null
+          : Temporal.Instant.fromEpochMilliseconds(toEpochMs(source.createdAt)).toString(),
+    })),
+  });
+  return [...discovered, ...added];
+}
+
+export function EnvironmentsTab({
+  canRead = true,
+  sources,
+  sampleActive,
+  added,
+  createAction,
+}: {
+  /**
+   * Whether the viewer may read the source list the discovered rows come from.
+   * Same reasoning as the catalog pane: without it the table would report an
+   * empty estate rather than an unreadable one.
+   */
+  canRead?: boolean;
+  sources: readonly EnvironmentSource[] | undefined;
+  sampleActive: boolean;
+  added: readonly EnvironmentRow[];
+  /**
+   * The header's own Add environment control, rendered a second time inside
+   * the empty state. A reader looking at an empty pane is the one most likely
+   * to want it. Absent when the reader cannot create, and the copy adjusts.
+   */
+  createAction?: ReactNode;
+}) {
+  if (!canRead) {
+    return (
+      <PermissionRequiredNotice
+        permission="ingestionSources:view"
+        detail="Environments are discovered from the sources you have connected, so they stay hidden until then."
+      />
+    );
+  }
+
+  const rows = environmentRows({ sources, sampleActive, added });
+
+  if (rows.length === 0) {
+    return (
+      <GovernanceEmptyState
+        testId="environments-empty"
+        icon={Boxes}
+        headline="No environments yet"
+        // The sentence no longer points at "the button above": prose naming a
+        // control goes stale the moment the control is renamed, and nothing
+        // checks prose. The header's own control is passed instead.
+        description={
+          createAction
+            ? "Environments appear here once a source points at one, such as a Power Platform environment or a Databricks workspace. You can also add one by hand."
+            : "Environments appear here once a source points at one, such as a Power Platform environment or a Databricks workspace."
+        }
+        action={createAction}
+      />
+    );
+  }
+
+  return (
+    <ListTable size="sm" data-testid="environments-table" containerProps={{ overflowX: "auto" }}>
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Description</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Created by</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {rows.map((row) => (
+          <ListTable.Row key={row.id}>
+            <ListTable.Cell>
+              <HStack gap={2}>
+                <Text fontWeight="medium">{row.name}</Text>
+                {row.discoveredFrom && (
+                  <Badge size="xs" variant="surface" colorPalette="purple">
+                    Discovered from {row.discoveredFrom}
+                  </Badge>
+                )}
+                {row.isSample && (
+                  <Badge size="xs" variant="surface" colorPalette="orange">
+                    sample
+                  </Badge>
+                )}
+              </HStack>
+            </ListTable.Cell>
+            <ListTable.Cell tone="muted">{row.description}</ListTable.Cell>
+            <ListTable.Cell tone="muted">{formatCreated(row.createdIso)}</ListTable.Cell>
+            <ListTable.Cell tone="muted">{row.createdBy}</ListTable.Cell>
+          </ListTable.Row>
+        ))}
+      </ListTable.Body>
+    </ListTable>
+  );
+}

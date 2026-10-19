@@ -51,7 +51,7 @@ Feature: AI Gateway — Revoke CLI tokens on user deactivation
   # Wired into the deactivation path
   # ============================================================================
 
-  @bdd @phase-1b @cli-revoke @deactivation
+  @bdd @phase-1b @cli-revoke @deactivation @unit
   Scenario: userService.deactivate also revokes CLI tokens
     When the admin calls `userService.deactivate({ id: "user_alice" })`
     Then `user_alice.deactivatedAt` is set

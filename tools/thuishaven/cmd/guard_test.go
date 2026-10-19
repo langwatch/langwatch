@@ -30,20 +30,32 @@ func TestGuardSeedEnv(t *testing.T) {
 			clearSeedEnv(t)
 			dir := t.TempDir()
 			writeEnvFixture(t, dir, ".env", "DATABASE_URL=postgresql://prisma:prisma@db.prod.example.com:5432/langwatch\n")
-			if err := guardSeedEnv(dir); err == nil {
+			if err := guardSeedEnvIn(nil, dir); err == nil {
 				t.Fatal("expected a refusal for a non-local DATABASE_URL")
 			}
 		})
 	})
 
-	t.Run("given .env.portless overriding a stray .env DATABASE_URL", func(t *testing.T) {
+	t.Run("given the running stack's overlay overriding a stray .env DATABASE_URL", func(t *testing.T) {
 		t.Run("when guarding, the local override passes", func(t *testing.T) {
 			clearSeedEnv(t)
 			dir := t.TempDir()
 			writeEnvFixture(t, dir, ".env", "DATABASE_URL=postgresql://prisma:prisma@db.prod.example.com:5432/langwatch\n")
-			writeEnvFixture(t, dir, ".env.portless", "DATABASE_URL=postgresql://prisma:prisma@127.0.0.1:5432/lw_feat_x\n")
-			if err := guardSeedEnv(dir); err != nil {
-				t.Fatalf("local .env.portless override should pass, got %v", err)
+			overlay := []string{"DATABASE_URL=postgresql://prisma:prisma@127.0.0.1:5432/lw_feat_x"}
+			if err := guardSeedEnvIn(overlay, dir); err != nil {
+				t.Fatalf("the injected local URL is what the seed connects to, got %v", err)
+			}
+		})
+	})
+
+	t.Run("given the running stack's overlay and a stray production export", func(t *testing.T) {
+		t.Run("when guarding, the overlay wins because the child is handed it", func(t *testing.T) {
+			dir := t.TempDir()
+			t.Setenv("CLICKHOUSE_URL", "")
+			t.Setenv("DATABASE_URL", "postgresql://prisma:prisma@db.prod.example.com:5432/langwatch")
+			overlay := []string{"DATABASE_URL=postgresql://prisma:prisma@127.0.0.1:5432/lw_feat_x"}
+			if err := guardSeedEnvIn(overlay, dir); err != nil {
+				t.Fatalf("haven passes the overlay to the child explicitly, so it wins, got %v", err)
 			}
 		})
 	})
@@ -55,7 +67,7 @@ func TestGuardSeedEnv(t *testing.T) {
 			writeEnvFixture(t, dir, ".env",
 				"export DATABASE_URL=\"postgresql://prisma:prisma@localhost:5432/lw_x\"\n"+
 					"CLICKHOUSE_URL='http://default:pass@127.0.0.1:8123/lw_x'\n")
-			if err := guardSeedEnv(dir); err != nil {
+			if err := guardSeedEnvIn(nil, dir); err != nil {
 				t.Fatalf("quoted/export local URLs should pass, got %v", err)
 			}
 		})
@@ -66,7 +78,7 @@ func TestGuardSeedEnv(t *testing.T) {
 			clearSeedEnv(t)
 			dir := t.TempDir()
 			writeEnvFixture(t, dir, ".env", "DATABASE_URL=postgresql://prisma:prisma@localhost:5432/lw_x # local dev\n")
-			if err := guardSeedEnv(dir); err != nil {
+			if err := guardSeedEnvIn(nil, dir); err != nil {
 				t.Fatalf("inline comment should be stripped, got %v", err)
 			}
 		})
@@ -79,7 +91,7 @@ func TestGuardSeedEnv(t *testing.T) {
 			writeEnvFixture(t, dir, ".env",
 				"DATABASE_URL=postgresql://prisma:prisma@localhost:5432/lw_x\n"+
 					"CLICKHOUSE_URL=https://ch.eu-cluster.example.com/traces\n")
-			if err := guardSeedEnv(dir); err == nil {
+			if err := guardSeedEnvIn(nil, dir); err == nil {
 				t.Fatal("expected a refusal for a non-local CLICKHOUSE_URL")
 			}
 		})
@@ -94,7 +106,7 @@ func TestGuardSeedEnv(t *testing.T) {
 			writeEnvFixture(t, dir, ".env", "DATABASE_URL=postgresql://prisma:prisma@localhost:5432/lw_x\n")
 			t.Setenv("CLICKHOUSE_URL", "")
 			t.Setenv("DATABASE_URL", "postgresql://prisma:prisma@db.prod.example.com:5432/langwatch")
-			if err := guardSeedEnv(dir); err == nil {
+			if err := guardSeedEnvIn(nil, dir); err == nil {
 				t.Fatal("expected the exported production DATABASE_URL to be refused")
 			}
 		})

@@ -177,13 +177,6 @@ type CodeError struct {
 	Traceback string
 }
 
-// SecretsResolver resolves a secret reference like {{ secrets.NAME }} at
-// HTTP-block invocation time. Owned by Sarah; backed by a cached fetch
-// from the control plane.
-type SecretsResolver interface {
-	Resolve(ctx context.Context, projectID, name string) (string, error)
-}
-
 // IsCloseable is a helper for adapters that need to close on shutdown.
 type IsCloseable interface {
 	io.Closer

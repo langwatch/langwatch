@@ -1,16 +1,16 @@
-#!/usr/bin/env npx tsx
+#!/usr/bin/env node
 /**
  * Sync SKILL.mdx files into a checkout of langwatch/skills, inlining MDX
  * partials so the published .md files are self-contained.
- *
- * Usage: tsx skills/_publish/sync.ts <path-to-skills-repo>
+ * Usage: node skills/_publish/sync.ts <path-to-skills-repo>
  */
 
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
-import { inlineMdx } from "../_lib/mdx-inline.js";
-import { listPublishedSkills } from "../_lib/feature-skills.js";
+
+import { listPublishedSkills } from "../_lib/feature-skills.ts";
+import { inlineMdx } from "../_lib/mdx-inline.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -39,7 +39,7 @@ export function sync(targetDir: string): void {
     // path, typo). The workflow has its own guard but it runs after sync.
     throw new Error(
       `Refusing to sync into ${targetDir}: no .git directory. ` +
-        `Target must be a checkout of langwatch/skills.`
+        `Target must be a checkout of langwatch/skills.`,
     );
   }
   console.log(`Syncing skills to ${targetDir}...`);
@@ -47,13 +47,9 @@ export function sync(targetDir: string): void {
 
   // Same selection Langy's native generator uses (skills/_compiler/native.ts),
   // so the published set and the in-product set can never drift. Recipes nest
-  // under recipes/<slug> in the published repo.
-  //
-  // A skill declaring `feature-flag` is excluded here specifically: this repo
-  // is a fully public, unauthenticated GitHub checkout, so there is no
-  // per-viewer flag to resolve — "gated" can only mean "not published yet".
-  // Langy still gets it (native.ts calls listPublishedSkills/listNativeSkills
-  // too, without this filter) and resolves the flag live, per caller.
+  // under recipes/<slug>. A `feature-flag`'d skill is excluded here: this repo
+  // is a public, unauthenticated checkout with no per-viewer flag to resolve,
+  // so "gated" means "not published yet" — Langy still gets it and resolves live.
   for (const skill of listPublishedSkills(skillsRoot)) {
     const target = skill.isRecipe ? path.join("recipes", skill.slug) : skill.slug;
     if (skill.featureFlag) {
@@ -64,10 +60,7 @@ export function sync(targetDir: string): void {
     console.log(`  ✓ ${target}`);
   }
 
-  fs.copyFileSync(
-    path.join(skillsRoot, "version.txt"),
-    path.join(targetDir, "version.txt")
-  );
+  fs.copyFileSync(path.join(skillsRoot, "version.txt"), path.join(targetDir, "version.txt"));
   console.log("  ✓ version.txt");
   console.log("Done.");
 }

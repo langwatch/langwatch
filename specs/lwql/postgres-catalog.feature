@@ -26,7 +26,7 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       When the catalog builds its entry
       Then a view named after the model in snake_case exists in the catalog
       And its projectId column is exposed as TenantId
-      And every other column is exposed in PascalCase
+      And every other column is listed explicitly, PascalCase by convention
 
     @unit
     Scenario: A hand-written view is an override on the derived default, not a second definition
@@ -101,11 +101,10 @@ Feature: Every catalogued Postgres model is queryable through LangWatchQL
       And a userId column on any other model is exposed as an opaque id with no join to a person
 
     @unit
-    Scenario: An override that re-admits a stripped column carries a reason
-      Given an override that exposes a column the safe defaults would strip
-      When the override is validated
-      Then it carries a non-empty reason
-      And an override without one fails the build
+    Scenario: A catalogue entry exposing a stripped column fails the build
+      Given a catalogue entry that exposes a secret-, email- or binary-named column, even renamed
+      When the Postgres catalog is derived
+      Then the build is refused naming the column
 
     @unit @integration
     Scenario: Per-user visibility is enforced at the approved view

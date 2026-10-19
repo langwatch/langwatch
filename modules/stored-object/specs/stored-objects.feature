@@ -1,0 +1,184 @@
+# See ../adrs/001-package-boundary.md
+#
+# `@unimplemented` was a file-level tag, which merged into every scenario and
+# left the whole file enforcing nothing. It now sits on each scenario that is
+# genuinely unbuilt, so a scenario without it is bound to a test that runs.
+Feature: Stored Objects service and API
+  As a feature or API client
+  I want durable project-scoped byte references
+  So that bytes can be stored and delivered without exposing provider details
+
+  @architecture @typecheck @unit
+  Scenario: Stored Objects lives in one feature package
+    Given Stored Objects is installed
+    Then @langwatch/stored-object-contract contains portable schemas, errors and RPC contracts
+    And @langwatch/stored-object-process contains the concrete store, service, migration and API registration
+    And the feature has no web package or separate object-storage package
+    And neither package imports the application
+
+  @architecture @persistence @unit
+  Scenario: One Postgres row owns current state
+    Given Stored Objects persists operational metadata
+    Then StoredObject is its only Postgres domain table
+    And the row contains tenant, object, status, owner, provider-relative identity, byte facts and expiry timestamps
+    And StoredObjectRecordRepository is one interface with a Prisma and a memory backend
+    And StoredObjectService is a concrete class
+    And no Stored Object event projection, process manager or parallel lifecycle store exists
+
+  @unit @persistence
+  Scenario: The memory and Postgres stored-object repositories answer alike
+    Given the same rows are written through either backend
+    When a reader asks for one row, counts the project's active bytes, or pages the project
+    Then both backends answer with the same rows in the same order
+    And neither answers with a row another project wrote
+    And rewriting a row replaces it rather than adding a second one
+
+  @unit @composition
+  Scenario: A process boots the Stored Objects feature over either backend
+    Given a process installs the Stored Objects feature and selects a persistence backend
+    When it boots in the api, worker or task role
+    Then the feature answers as the StoredObjectApi token for that process
+    And each installation holds its own rows
+    And a read scoped to another project is refused as not found
+
+  @architecture @storage @unit
+  Scenario: Stored Objects has one portable storage URI owner
+    Given a storage destination of the S3, Azure Blob or local-filesystem kind
+    Then @langwatch/stored-object-contract formats its URI and redacts destinations and credentials
+    And only the configured driver schemes are recognised
+
+  @unimplemented @integration @stored-objects
+  Scenario: Internal storage is content addressed
+    Given a feature stores bytes through app.storedObjects
+    When the same project stores identical bytes again
+    Then both calls derive the same stored-object ID from project and SHA-256
+    And one available StoredObject row describes the bytes
+    And each caller may retain its own presentation metadata
+
+  @unimplemented @integration @public-rpc
+  Scenario: A public client creates a direct upload
+    Given an authenticated project whose selected storage driver supports direct upload
+    When the client calls storedObjects.createUpload with bounded metadata and byte facts
+    Then a pending StoredObject row with an expiry is persisted before the response is returned
+    And the response contains an opaque upload token and signed provider target
+    And provider credentials and relative identity are not returned
+
+  @unimplemented @integration @public-rpc @integrity
+  Scenario: A client confirms a direct upload
+    Given a client uploaded bytes to its signed target
+    When it calls storedObjects.confirmUpload
+    Then the service verifies the stored length and SHA-256
+    And the same StoredObject row becomes available
+    And retrying confirmation returns the same reference
+    And absent, expired or mismatched bytes never become available
+
+  @unimplemented @integration @cleanup
+  Scenario: Expired pending uploads are cleaned from the same row
+    Given a pending upload has passed expiresAt without confirmation
+    When the bounded cleanup pass visits it
+    Then the service deletes its provider bytes if present
+    And the StoredObject row becomes failed
+    And retrying cleanup is safe
+
+  @unimplemented @integration @delivery @security
+  Scenario: An authorized caller resolves and streams bytes
+    Given an available stored object belongs to the authenticated project
+    When the caller resolves it or uses its GET or HEAD delivery route
+    Then the public RPC authorizes the object's validated audience through the request context
+    And metadata comes from Postgres
+    And bytes stream through the existing storage adapter
+    And the response reveals no provider, credential or filesystem detail
+    And an object from another project is not read
+
+  @unimplemented @integration @delete
+  Scenario: Deletion immediately revokes delivery
+    Given an available stored object
+    When its project calls storedObjects.delete
+    Then the row becomes deleted before physical cleanup is attempted
+    And later delivery is refused
+    And failed physical cleanup remains retryable from that same row
+    And repeating deletion is safe
+
+  @unit
+  Scenario: The storage checkup probe writes and removes one canary object
+    Given a project whose storage destination accepts writes
+    When the storage checkup probe runs for it
+    Then one canary object is written under the project's checkup prefix
+    And the canary object is removed again
+
+  @unimplemented @integration @api @authorization
+  Scenario: The public API uses the unified API package
+    Given the Stored Objects public API is installed
+    Then createUpload and confirmUpload require project:update
+    And get requires project:view
+    And delete requires project:manage
+    And @langwatch/api supplies routing, validation, OpenAPI, telemetry, handled errors and registration
+    And rate limiting is declared through the existing endpoint capability
+
+  @unimplemented @integration @trpc
+  Scenario: Application tRPC remains separate
+    Given the dashboard uses its existing Stored Objects procedure
+    When the procedure resolves an object
+    Then it delegates to the composed app.storedObjects service
+    And it does not expose public upload or migration operations
+    And it does not construct a second service
+
+  @unimplemented @integration @delivery @compatibility
+  Scenario: Historical id-only delivery resolves the owner without masking degradation
+    Given a historical GET or HEAD /api/files/:id URL has no project scope
+    When the server-only owner resolver fans out to the configured ClickHouse instances
+    Then a healthy matching instance identifies the project before byte authorization
+    And a miss across healthy instances remains not found
+    And a miss with any failed instance is mapped to the existing 502 response
+    And a project-scoped URL does not invoke the cross-tenant resolver
+
+  @unit @migration
+  Scenario: The Stored Objects import waits until no old image serves
+    Given old images are the only writers of the legacy ClickHouse index
+    When stored-object declares the ClickHouse import
+    Then it is a background tenant step walking projects one at a time
+    And it waits until the serving roster shows no old image, in place of a drain proof
+
+  @unit @migration
+  Scenario: The Stored Objects import copies one project's latest legacy rows
+    Given a project has stored_objects rows in ClickHouse
+    When the import runs for that project
+    Then each row's latest version is copied into the row store with its id and storage location
+    And the ClickHouse rows stay in place and legacy reads keep working
+
+  @unit @migration
+  Scenario: A second Stored Objects import of a project changes nothing
+    Given the import already copied a project's rows
+    When it runs for that project again
+    Then it reports every row unchanged and writes nothing
+
+  @unit @migration
+  Scenario: A legacy row stored outside its project fails the Stored Objects import
+    Given a legacy row's storage location does not sit under its project
+    When the import runs for that project
+    Then the project's import fails with a bounded error
+    And no row is written for it
+
+  @unimplemented @integration @migration @startup
+  Scenario: Stored Objects startup migration blocks readiness until finalization
+    Given a replica has declared the Stored Objects ClickHouse migration in startup mode
+    When import or finalization is incomplete
+    Then the replica does not construct the Postgres-backed Stored Objects service
+    And readiness remains blocked
+    And the replica does not accept traffic or consumers
+
+  @unimplemented @integration @migration @startup
+  Scenario: A failed import leaves startup blocked
+    Given a legacy page cannot be imported or validated
+    When the startup migration records the failure
+    Then the migration remains unfinished
+    And Postgres is not made authoritative
+    And readiness remains blocked until the durable migration state is completed
+
+  @unimplemented @integration @migration @startup
+  Scenario: Another replica observes durable migration completion
+    Given one replica has completed the final scan and persisted migration completion
+    When another replica starts with the same migration declaration
+    Then it observes the durable completion state
+    And it may pass readiness only after its startup migration checks succeed
+    And it does not run a second migration or serve from a partial import

@@ -5,45 +5,46 @@ Feature: OpsScope status probe never throws FORBIDDEN
 
   Background: tracking lw#3584. `useOpsPermission()` (called from
   MainMenu, SettingsLayout, every ops shell, ...) was wrapped around
-  `api.ops.getScope`, which itself ran `checkOpsPermission` middleware
-  and threw FORBIDDEN for non-admin users. Result: every non-admin saw a
-  tRPC error in the console on every page load, even though the UI is
-  *probing* for access — "no" is the honest answer, not an error.
+  `api.ops.getScope`, which itself ran a permission middleware and threw
+  FORBIDDEN for non-admin users. Result: every non-admin saw a tRPC error
+  in the console on every page load, even though the UI is *probing* for
+  access — "no" is the honest answer, not an error.
 
   Now `OpsScope` is a discriminated union — every authenticated user has
-  a scope, even if that scope is `{ kind: "none" }`. The probe endpoint
-  returns the scope; the middleware-guarded mutating endpoints still
-  throw FORBIDDEN on `kind: "none"`.
+  a scope, even if that scope is `{ kind: "none" }`. The ops app answers
+  the scope (`operatorScope`) and the probe endpoint returns it; every other
+  ops procedure declares its platform-operator grant, and the door refuses
+  a caller without it before the handler runs.
 
   @unit
-  Scenario: resolveOpsScope returns kind=none for non-ops users instead of null
+  Scenario: The operator scope of a user outside the operator list is none, never a refusal
     Given a non-admin authenticated user
-    When resolveOpsScope is called
+    When the ops app answers their operator scope
     Then it returns `{ kind: "none" }`
 
   @unit
-  Scenario: resolveOpsScope returns kind=platform for admin users
+  Scenario: The operator scope of a platform operator is platform
     Given an admin authenticated user
-    When resolveOpsScope is called
+    When the ops app answers their operator scope
     Then it returns `{ kind: "platform" }`
 
   @unit
-  Scenario: checkOpsPermission still throws FORBIDDEN for non-ops callers
-    Given the checkOpsPermission middleware wrapping a mutation
+  Scenario: An ops write is refused at the door for a non-operator
+    Given an ops mutation that declares `ops:manage`
     When a non-admin user calls the mutation
-    Then the middleware throws TRPCError code=FORBIDDEN
-    And `next` is NOT invoked
+    Then the door refuses it as FORBIDDEN, naming `ops:manage`
+    And the handler is NOT invoked
 
   @unit
-  Scenario: checkOpsPermission grants access for admin callers
-    Given the checkOpsPermission middleware wrapping a query
+  Scenario: An operator's gated ops read is admitted
+    Given an ops query that declares `ops:view`
     When an admin user calls the query
-    Then `next` is invoked
-    And `ctx.opsScope.kind` is "platform"
+    Then the query answers
+    And the scope probe answers `{ kind: "platform" }`
 
   @unit
-  Scenario: checkOpsPermission with throwOnDeny=false populates kind=none for status probes
-    Given the checkOpsPermission middleware constructed with `{ throwOnDeny: false }`
-    When a non-admin user calls the wrapped procedure
-    Then `next` is invoked
-    And `ctx.opsScope.kind` is "none"
+  Scenario: The scope probe answers a non-operator with kind none
+    Given the `ops.getScope` status probe
+    When a non-admin user calls it
+    Then it answers `{ scope: { kind: "none" } }`
+    And nothing is refused

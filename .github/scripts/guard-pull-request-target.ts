@@ -29,14 +29,12 @@ const workflowFiles = (repoRoot: string): string[] => {
   const workflowDir = resolve(repoRoot, ".github/workflows");
   return readdirSync(workflowDir)
     .filter((file) => file.endsWith(".yml") || file.endsWith(".yaml"))
-    .sort()
+    .toSorted()
     .map((file) => resolve(workflowDir, file));
 };
 
 export const jobBlocks = (lines: string[]): JobBlock[] => {
-  const jobsStart = lines.findIndex((line) =>
-    /^jobs:\s*(?:#.*)?$/.test(line),
-  );
+  const jobsStart = lines.findIndex((line) => /^jobs:\s*(?:#.*)?$/.test(line));
   if (jobsStart === -1) {
     return [];
   }
@@ -53,11 +51,7 @@ export const jobBlocks = (lines: string[]): JobBlock[] => {
 
     const match = /^(\s+)["']?([A-Za-z0-9_-]+)["']?:\s*(?:#.*)?$/.exec(line);
     const indent = match?.[1]?.length;
-    if (
-      match?.[2] &&
-      indent !== undefined &&
-      (jobIndent === undefined || indent === jobIndent)
-    ) {
+    if (match?.[2] && indent !== undefined && (jobIndent === undefined || indent === jobIndent)) {
       jobIndent ??= indent;
       if (current) {
         jobs.push(current);
@@ -86,19 +80,14 @@ const stripYamlComment = (line: string): string => {
 };
 
 export const usesPullRequestTarget = (lines: string[]): boolean =>
-  lines.some((line) =>
-    /(^|[{,\s])pull_request_target\s*:/.test(stripYamlComment(line)),
-  );
+  lines.some((line) => /(^|[{,\s])pull_request_target\s*:/.test(stripYamlComment(line)));
 
 const hasUnsafeCheckout = (jobText: string): boolean =>
   jobText.includes("actions/checkout") &&
   unsafeHeadRefPatterns.some((pattern) => jobText.includes(pattern));
 
 export const hasSensitivePermissions = (text: string): boolean => {
-  const uncommentedText = text
-    .split(/\r?\n/)
-    .map(stripYamlComment)
-    .join("\n");
+  const uncommentedText = text.split(/\r?\n/).map(stripYamlComment).join("\n");
 
   return [
     /(^|\n)permissions:\s*write-all\b/,
@@ -111,15 +100,11 @@ export const usesNonGithubTokenSecret = (text: string): boolean =>
   /secrets\.(?!GITHUB_TOKEN\b)[A-Za-z0-9_]+/.test(text);
 
 export const jobIfExpression = (job: JobBlock): string | undefined => {
-  const fieldPattern = new RegExp(
-    `^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`,
-  );
+  const fieldPattern = new RegExp(`^(\\s{${job.indent + 1},})([A-Za-z0-9_-]+):\\s*`);
   const fieldIndent = job.lines.reduce<number | undefined>((minimum, line) => {
     const match = fieldPattern.exec(line);
     const indent = match?.[1]?.length;
-    return indent === undefined || (minimum !== undefined && minimum <= indent)
-      ? minimum
-      : indent;
+    return indent === undefined || (minimum !== undefined && minimum <= indent) ? minimum : indent;
   }, undefined);
   if (fieldIndent === undefined) {
     return undefined;
@@ -134,10 +119,7 @@ export const jobIfExpression = (job: JobBlock): string | undefined => {
 
   const firstLine = job.lines[ifStart] ?? "";
   const firstValue = stripYamlComment(firstLine.replace(ifPattern, ""));
-  const ifLines =
-    /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === ""
-      ? []
-      : [firstValue];
+  const ifLines = /^(?:[>|][+-]?)?$/.test(firstValue) || firstValue === "" ? [] : [firstValue];
 
   for (let index = ifStart + 1; index < job.lines.length; index++) {
     const line = job.lines[index] ?? "";
@@ -181,6 +163,30 @@ const validateGuardWorkflow = (repoRoot: string, errors: string[]): void => {
 const displayPath = (repoRoot: string, path: string): string =>
   relative(resolve(repoRoot), path) || path;
 
+/** The pull_request_target jobs in one workflow that take a risk without a safe gate. */
+const unsafeJobs = ({ repoRoot, path }: { repoRoot: string; path: string }): string[] => {
+  const lines = readFileSync(path, "utf8").split(/\r?\n/);
+  if (!usesPullRequestTarget(lines)) return [];
+
+  const workflowHasSensitivePermissions = hasSensitivePermissions(lines.join("\n"));
+  return jobBlocks(lines).flatMap((job) => {
+    const jobText = job.lines.join("\n");
+    const risks = [
+      hasUnsafeCheckout(jobText) ? "checks out PR-head code" : undefined,
+      workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
+        ? "has write permissions"
+        : undefined,
+      usesNonGithubTokenSecret(jobText) ? "uses non-GITHUB_TOKEN secrets" : undefined,
+    ].filter((risk) => risk !== undefined);
+
+    if (risks.length === 0 || hasSafeGate(job)) return [];
+    return [
+      `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` ${risks.join(", ")} ` +
+        "from pull_request_target without an `approved-ci` or same-repo gate",
+    ];
+  });
+};
+
 const main = (): number => {
   const repoRoot = process.argv[2] ?? defaultRepoRoot;
   const errors: string[] = [];
@@ -188,34 +194,7 @@ const main = (): number => {
   validateGuardWorkflow(repoRoot, errors);
 
   for (const path of workflowFiles(repoRoot)) {
-    const lines = readFileSync(path, "utf8").split(/\r?\n/);
-    if (!usesPullRequestTarget(lines)) {
-      continue;
-    }
-
-    const workflowHasSensitivePermissions = hasSensitivePermissions(
-      lines.join("\n"),
-    );
-
-    for (const job of jobBlocks(lines)) {
-      const jobText = job.lines.join("\n");
-      const risks = [
-        hasUnsafeCheckout(jobText) ? "checks out PR-head code" : undefined,
-        workflowHasSensitivePermissions || hasSensitivePermissions(jobText)
-          ? "has write permissions"
-          : undefined,
-        usesNonGithubTokenSecret(jobText)
-          ? "uses non-GITHUB_TOKEN secrets"
-          : undefined,
-      ].filter((risk) => risk !== undefined);
-
-      if (risks.length > 0 && !hasSafeGate(job)) {
-        errors.push(
-          `${displayPath(repoRoot, path)}:${job.startLine}: job \`${job.name}\` ${risks.join(", ")} ` +
-            "from pull_request_target without an `approved-ci` or same-repo gate",
-        );
-      }
-    }
+    errors.push(...unsafeJobs({ repoRoot, path }));
   }
 
   if (errors.length > 0) {
@@ -231,8 +210,7 @@ const main = (): number => {
 };
 
 const isEntrypoint = (): boolean =>
-  process.argv[1] !== undefined &&
-  import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+  process.argv[1] !== undefined && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
 
 if (isEntrypoint()) {
   process.exitCode = main();

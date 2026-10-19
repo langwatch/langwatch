@@ -1,6 +1,12 @@
 # D11 — Resilient invitations
 
-Epic: `../identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifiers) only · Invite changes additive
+Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wave 2 · Depends on: D01 (identifiers) only · Invite changes additive
+
+> **Historical (marked 2026-10-05):** written against main's monolith, before `platform/app` was
+> deleted. Paths under `src/server/`, `server/app-layer/` and `packages/authz*` describe that tree.
+> Today a feature is a module (ARCHITECTURE.md §3), pipelines are `definePipeline` in
+> `modules/<name>/process/src/eventing` (§9), and the permission registry is
+> `packages/authorization/src/registry.ts`. Check the current tree before treating a path below as live.
 
 # Overview
 
@@ -30,7 +36,7 @@ Acceptance lookup: invite.email → normalize → all VERIFIED identifiers match
 
 # Out of Scope
 
-- Join requests (D12 — but note the interplay rules there: answering a request with an invite, and invite acceptance auto-withdrawing a pending request). The acceptance *screen* set (D13's invitation-acceptance screen; this deliverable ships the logic inside today's members UI). Team-assignment UX changes.
+- Join requests (D12 — but note the interplay rules there: answering a request with an invite, and invite acceptance auto-withdrawing a pending request). The acceptance _screen_ set (D13's invitation-acceptance screen; this deliverable ships the logic inside today's members UI). Team-assignment UX changes.
 
 # Research
 

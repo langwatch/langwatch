@@ -52,12 +52,13 @@ graph LR
 
 The data plane requires:
 
-| Component | Minimum | Recommended |
-|-----------|---------|-------------|
+| Component      | Minimum                        | Recommended               |
+| -------------- | ------------------------------ | ------------------------- |
 | **ClickHouse** | Single node, 2 vCPU, 4 GiB RAM | 3-node replicated cluster |
-| **S3 storage** | Any S3-compatible provider | Same region as ClickHouse |
+| **S3 storage** | Any S3-compatible provider     | Same region as ClickHouse |
 
 ClickHouse can be deployed as:
+
 - A managed service (e.g., ClickHouse Cloud, Aiven, Altinity)
 - Self-hosted on your Kubernetes cluster using our [clickhouse-serverless helm chart](https://github.com/langwatch/langwatch/tree/main/charts/clickhouse-serverless)
 - Self-hosted on VMs

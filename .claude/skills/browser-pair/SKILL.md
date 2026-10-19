@@ -1,85 +1,30 @@
 ---
 name: browser-pair
-description: "Collaborative headed browser session for UI work. Launch Playwright Chromium visible to the user, handle auth, then interactively drive the browser while the user watches and gives real-time visual feedback. Edit code and refresh to verify fixes live. Use when the user says 'browser pair', 'paired browser', 'let's look at this together', 'open chromium', or wants to iterate on UI with live visual feedback."
+description: "Iterate on UI with a person watching and giving live visual feedback. Pointer skill: the person uses their own tab on the stack and the haven orb; you read their notes and check fixes with `haven browser`. Use when the user says 'browser pair', 'paired browser', 'let's look at this together', 'open chromium', or wants live visual feedback on a UI change."
 user-invocable: true
-argument-hint: "[url-or-port] [page-or-feature]"
+argument-hint: "[page-or-feature]"
 ---
 
-# Browser Pair — Collaborative UI Session
+# Browser pair: a person and you on one stack
 
-Open a headed Chromium browser the user can see, then drive it interactively. The user watches, gives visual feedback, you make code changes and verify live. This is pair programming for UI.
+There is no separate headed browser. Where haven is installed its gate refuses Playwright's MCP
+tools, and `haven browser` is headless. The person looks at their own tab; you work from their
+notes. `haven-browser` is the one authority for driving a browser.
 
-**Key difference from `/browser-test`:** This is interactive and headed. You wait for user direction between actions. You edit code when they spot issues, then refresh to verify.
+1. **Stack.** `haven status` gives the app URL. If none runs, `haven up --agent -d` only when asked
+   (`haven-lifecycle`). Tell the person the URL, and the mode: the default stack serves the built
+   UI (an edit shows after a rebuild), `pnpm dev:hmr` serves Vite (an edit shows on save).
+2. **Their feedback.** The haven orb on the page lets them point at an element or drag a region and
+   leave a note. Read it with `haven orb feedback list --open --agent`, or block on
+   `haven orb feedback wait` (`haven-orb`). Resolve a note once fixed.
+3. **Your look.** Check a fix with `haven browser open <path> --lane pair --as admin`
+   (`haven-auth` for sign-in). Use `snapshot --grep` to find controls and a `screenshot` when the
+   change is visual (width, padding, colour, clipping, dark mode); a snapshot cannot show paint.
+4. **Edits.** Read the component, make the smallest edit, say in one line what to look for, then
+   tell them when the rebuild or save has landed. Components come from the design system
+   (`design-system` skill); do not reach for raw Chakra.
 
-## Setup
+Keep reports to a sentence or two: the person can see the page. Wait for their direction between
+changes.
 
-Parse `$ARGUMENTS` for:
-- **URL or port** (optional): full URL or just a port number (e.g. `5560` becomes `http://localhost:5560`)
-- **Page** (optional): where to navigate after login (e.g. "agents page", "run plans")
-
-If not provided, check for `.dev-port` file or ask the user.
-
-## Tools
-
-Use **only** `mcp__playwright-headed__*` tools. Never use `mcp__playwright__*` (headless). The user must see the browser.
-
-Key tools:
-- `mcp__playwright-headed__browser_navigate` — go to a URL
-- `mcp__playwright-headed__browser_snapshot` — read page state (preferred over screenshots)
-- `mcp__playwright-headed__browser_click` — click elements by ref
-- `mcp__playwright-headed__browser_type` — type into inputs by ref
-- `mcp__playwright-headed__browser_take_screenshot` — only when user asks to capture something
-
-## Workflow
-
-### Step 0: Track Progress
-
-Before starting, create a task for each step below using TaskCreate. Chain sequential steps with addBlockedBy. As you work, update each task's status to `in_progress` when starting it and `completed` when done.
-
-### 1. Launch and authenticate
-
-Navigate to the app URL. Take a snapshot to see the page state.
-
-If you land on a login/signup page:
-1. Check `dev/scripts/verify-browser-test.js` in the project for test credentials
-2. Register or sign in with those credentials
-3. Complete any onboarding flow (pick quick defaults)
-4. Navigate to the main app
-
-### 2. Navigate to the requested page
-
-If the user specified a page, navigate there. Otherwise, take a snapshot and tell the user where you are.
-
-### 3. Interactive loop
-
-This is the core. Repeat:
-
-1. **Snapshot** the current page
-2. **Report** what's visible in 1-2 sentences — don't dump the full tree
-3. **Wait** for the user's direction
-
-When the user gives feedback:
-- **Navigation:** "go to X" — navigate and snapshot
-- **UI issue:** "the fonts don't match" — read the relevant component code, edit it, tell the user to refresh (or navigate away and back)
-- **Interaction:** "click the button" — click it and snapshot the result
-- **Verification:** "does it look right now?" — snapshot and describe
-
-### 4. Code changes
-
-When editing code based on visual feedback:
-1. Read the component file first
-2. Make the edit
-3. Tell the user the change is saved — Next.js hot reload should pick it up
-4. Navigate or refresh to verify: `mcp__playwright-headed__browser_navigate` to the same URL
-
-### Final Check
-
-Run TaskList. If any task is not `completed`, go back and finish it now.
-
-## Rules
-
-- Always use `browser_snapshot` for state awareness, not screenshots
-- Keep reports concise — the user can see the browser, they don't need a full description
-- Don't take autonomous actions — wait for the user between steps
-- When making code edits, describe the change briefly so the user knows what to look for
-- If the app isn't running, tell the user and suggest `make dev` or the relevant start command
+For a walk through scenarios with a pass/fail report, use `browser-test`.

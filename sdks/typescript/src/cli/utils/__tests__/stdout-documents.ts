@@ -1,20 +1,7 @@
 /**
- * The stdout a machine-readable command run produced, read back as documents.
- *
- * A caller that asked for `--format json` gets exactly one document per
- * result and nothing else on stdout (specs/features/test-suite-cli.feature,
- * "no other line is printed on stdout"). A filter that only kept the lines
- * starting with `{` would let a stray progress line through unnoticed, so
- * every line is parsed here, and a line that is not JSON fails the test that
- * asked.
- *
- * Reads the `console.log` spy the calling suite installed, plus a
- * `process.stdout.write` spy when the suite installed one: the port prints
- * through `console.log`, and the spy on the raw stream is what catches a
- * future direct write.
- *
- * Not named `*.test.ts` on purpose: vitest's `include` is `src/**\/*.test.ts`,
- * so this module is imported by the suites rather than collected as one.
+ * A machine-format run's stdout read back as documents: every line must parse
+ * (specs/features/test-suite-cli.feature). Not named `*.test.ts`, so vitest
+ * imports it rather than collecting it.
  */
 import { vi } from "vitest";
 
@@ -36,10 +23,8 @@ export const stdoutLines = (): string[] => {
 };
 
 /**
- * Every line on stdout, each one required to be a JSON document.
- *
- * Returned as the printed strings so a test can parse the one it expects;
- * a line that does not parse throws with that line in the message.
+ * Every line on stdout, each one required to be a JSON document; a line that
+ * does not parse throws with that line in the message.
  */
 export const stdoutDocuments = (): string[] => {
   const lines = stdoutLines();
@@ -47,9 +32,7 @@ export const stdoutDocuments = (): string[] => {
     try {
       JSON.parse(line);
     } catch {
-      throw new Error(
-        `stdout carried a line that is not a JSON document: ${JSON.stringify(line)}`,
-      );
+      throw new Error(`stdout carried a line that is not a JSON document: ${JSON.stringify(line)}`);
     }
   }
   return lines;

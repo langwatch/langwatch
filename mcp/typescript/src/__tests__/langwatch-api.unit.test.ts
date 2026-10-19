@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
-import { initConfig } from "../config.js";
+
+import { initConfig } from "../config.ts";
 
 const TEST_ENDPOINT = "https://test.langwatch.ai";
 const TEST_API_KEY = "test-key";
@@ -39,13 +40,15 @@ describe("langwatch-api", () => {
       ok: true,
       status: 204,
       text: async () => "",
-      json: async () => { throw new Error("No content"); },
+      json: async () => {
+        throw new Error("No content");
+      },
     });
   }
 
   describe("searchTraces()", () => {
-    it("sends POST to /api/traces/search with format digest by default", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+    it("sends POST to /api/v1/traces/search with format digest by default", async () => {
+      const { searchTraces } = await import("../langwatch-api.ts");
       const responseData = { traces: [] };
       mockJsonResponse(responseData);
 
@@ -56,7 +59,7 @@ describe("langwatch-api", () => {
       });
 
       const [calledUrl, calledOptions] = mockFetch.mock.calls[0]!;
-      expect(calledUrl).toBe(`${TEST_ENDPOINT}/api/traces/search`);
+      expect(calledUrl).toBe(`${TEST_ENDPOINT}/api/v1/traces/search`);
       expect(calledOptions.method).toBe("POST");
       expect(calledOptions.headers["X-Auth-Token"]).toBe(TEST_API_KEY);
       expect(calledOptions.headers["Content-Type"]).toBe("application/json");
@@ -72,7 +75,7 @@ describe("langwatch-api", () => {
     });
 
     it("sends format json when specified", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockJsonResponse({ traces: [] });
 
       await searchTraces({
@@ -87,65 +90,60 @@ describe("langwatch-api", () => {
 
     describe("when response is not OK", () => {
       it("throws a descriptive error with status code and body", async () => {
-        const { searchTraces } = await import("../langwatch-api.js");
+        const { searchTraces } = await import("../langwatch-api.ts");
         mockErrorResponse(401, "Unauthorized");
 
-        await expect(
-          searchTraces({ startDate: 1000, endDate: 2000 })
-        ).rejects.toThrow("401");
+        await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("401");
       });
     });
   });
 
   describe("getTraceById()", () => {
-    it("sends GET to /api/traces/{id}?format=digest by default", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+    it("sends GET to /api/v1/traces/{id}?format=digest by default", async () => {
+      const { getTraceById } = await import("../langwatch-api.ts");
       const responseData = { trace: { id: "abc" } };
       mockJsonResponse(responseData);
 
       const result = await getTraceById("abc");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/traces/abc?format=digest`,
+        `${TEST_ENDPOINT}/api/v1/traces/abc?format=digest`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
             "X-Auth-Token": TEST_API_KEY,
           }),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
 
     it("sends format=json when specified", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+      const { getTraceById } = await import("../langwatch-api.ts");
       mockJsonResponse({});
 
       await getTraceById("abc", "json");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/traces/abc?format=json`,
-        expect.anything()
+        `${TEST_ENDPOINT}/api/v1/traces/abc?format=json`,
+        expect.anything(),
       );
     });
 
     it("does not include Content-Type for GET requests", async () => {
-      const { getTraceById } = await import("../langwatch-api.js");
+      const { getTraceById } = await import("../langwatch-api.ts");
       mockJsonResponse({});
 
       await getTraceById("abc");
 
-      const callHeaders = mockFetch.mock.calls[0]![1]!.headers as Record<
-        string,
-        string
-      >;
+      const callHeaders = mockFetch.mock.calls[0]![1]!.headers as Record<string, string>;
       expect(callHeaders["Content-Type"]).toBeUndefined();
     });
   });
 
   describe("getAnalyticsTimeseries()", () => {
-    it("sends POST to /api/analytics/timeseries", async () => {
-      const { getAnalyticsTimeseries } = await import("../langwatch-api.js");
+    it("sends POST to /api/v1/analytics/timeseries", async () => {
+      const { getAnalyticsTimeseries } = await import("../langwatch-api.ts");
       const params = {
         series: [{ metric: "performance.completion_time", aggregation: "avg" }],
         startDate: 1000,
@@ -157,7 +155,7 @@ describe("langwatch-api", () => {
       const result = await getAnalyticsTimeseries(params);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/analytics/timeseries`,
+        `${TEST_ENDPOINT}/api/v1/analytics/timeseries`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -165,61 +163,61 @@ describe("langwatch-api", () => {
             "Content-Type": "application/json",
           }),
           body: JSON.stringify(params),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
   });
 
   describe("listPrompts()", () => {
-    it("sends GET to /api/prompts", async () => {
-      const { listPrompts } = await import("../langwatch-api.js");
+    it("sends GET to /api/v1/prompts", async () => {
+      const { listPrompts } = await import("../langwatch-api.ts");
       const responseData = [{ id: "1", name: "test" }];
       mockJsonResponse(responseData);
 
       const result = await listPrompts();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts`,
+        `${TEST_ENDPOINT}/api/v1/prompts`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
             "X-Auth-Token": TEST_API_KEY,
           }),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
   });
 
   describe("getPrompt()", () => {
-    it("sends GET to /api/prompts/{id} with encoded ID", async () => {
-      const { getPrompt } = await import("../langwatch-api.js");
+    it("sends GET to /api/v1/prompts/{id} with encoded ID", async () => {
+      const { getPrompt } = await import("../langwatch-api.ts");
       const responseData = { id: "1", name: "test" };
       mockJsonResponse(responseData);
 
       const result = await getPrompt("my prompt/v1");
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("my prompt/v1")}`,
+        `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("my prompt/v1")}`,
         expect.objectContaining({
           method: "GET",
           headers: expect.objectContaining({
             "X-Auth-Token": TEST_API_KEY,
           }),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
   });
 
   describe("createPrompt()", () => {
-    it("sends POST to /api/prompts with body", async () => {
-      const { createPrompt } = await import("../langwatch-api.js");
+    it("sends POST to /api/v1/prompts with body", async () => {
+      const { createPrompt } = await import("../langwatch-api.ts");
       const data = {
         handle: "test-prompt",
         messages: [{ role: "system", content: "You are helpful." }],
-        model: "openai/gpt-4o",
+        model: "openai/gpt-5-mini",
       };
       const responseData = { id: "new-id", ...data };
       mockJsonResponse(responseData);
@@ -227,7 +225,7 @@ describe("langwatch-api", () => {
       const result = await createPrompt(data);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts`,
+        `${TEST_ENDPOINT}/api/v1/prompts`,
         expect.objectContaining({
           method: "POST",
           headers: expect.objectContaining({
@@ -235,15 +233,15 @@ describe("langwatch-api", () => {
             "Content-Type": "application/json",
           }),
           body: JSON.stringify(data),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
   });
 
   describe("updatePrompt()", () => {
-    it("sends PUT to /api/prompts/{id} with body", async () => {
-      const { updatePrompt } = await import("../langwatch-api.js");
+    it("sends PUT to /api/v1/prompts/{id} with body", async () => {
+      const { updatePrompt } = await import("../langwatch-api.ts");
       const data = {
         messages: [{ role: "system", content: "Updated" }],
         commitMessage: "update system prompt",
@@ -254,7 +252,7 @@ describe("langwatch-api", () => {
       const result = await updatePrompt("p1", data);
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("p1")}`,
+        `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("p1")}`,
         expect.objectContaining({
           method: "PUT",
           headers: expect.objectContaining({
@@ -262,60 +260,60 @@ describe("langwatch-api", () => {
             "Content-Type": "application/json",
           }),
           body: JSON.stringify(data),
-        })
+        }),
       );
       expect(result).toEqual(responseData);
     });
   });
 
-  describe("getPrompt() with tag options", () => {
+  describe("when getPrompt is called with tag options", () => {
     describe("when called with tag option", () => {
       it("appends tag query parameter", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt", { tag: "production" });
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}?tag=production`,
-          expect.objectContaining({ method: "GET" })
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}?tag=production`,
+          expect.objectContaining({ method: "GET" }),
         );
       });
     });
 
     describe("when called with version option", () => {
       it("appends version query parameter", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt", { version: 2 });
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}?version=2`,
-          expect.objectContaining({ method: "GET" })
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}?version=2`,
+          expect.objectContaining({ method: "GET" }),
         );
       });
     });
 
     describe("when called with no options", () => {
       it("sends no query string", async () => {
-        const { getPrompt } = await import("../langwatch-api.js");
+        const { getPrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "1" });
 
         await getPrompt("pizza-prompt");
 
         expect(mockFetch).toHaveBeenCalledWith(
-          `${TEST_ENDPOINT}/api/prompts/${encodeURIComponent("pizza-prompt")}`,
-          expect.objectContaining({ method: "GET" })
+          `${TEST_ENDPOINT}/api/v1/prompts/${encodeURIComponent("pizza-prompt")}`,
+          expect.objectContaining({ method: "GET" }),
         );
       });
     });
   });
 
-  describe("createPrompt() with tags", () => {
+  describe("when createPrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
-        const { createPrompt } = await import("../langwatch-api.js");
+        const { createPrompt } = await import("../langwatch-api.ts");
         const data = {
           handle: "test",
           messages: [{ role: "system", content: "hi" }],
@@ -332,10 +330,10 @@ describe("langwatch-api", () => {
     });
   });
 
-  describe("updatePrompt() with tags", () => {
+  describe("when updatePrompt is called with tags", () => {
     describe("when called with tags", () => {
       it("includes tags in the request body", async () => {
-        const { updatePrompt } = await import("../langwatch-api.js");
+        const { updatePrompt } = await import("../langwatch-api.ts");
         mockJsonResponse({ id: "p1" });
 
         await updatePrompt("p1", {
@@ -350,72 +348,76 @@ describe("langwatch-api", () => {
   });
 
   describe("assignPromptTag()", () => {
-    it("sends PUT to /api/prompts/{id}/tags/{tag} with versionId", async () => {
-      const { assignPromptTag } = await import("../langwatch-api.js");
+    it("sends PUT to /api/v1/prompts/{id}/tags/{tag} with versionId", async () => {
+      const { assignPromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ success: true });
 
-      await assignPromptTag({ idOrHandle: "pizza-prompt", tag: "production", versionId: "v123" });
+      await assignPromptTag({
+        idOrHandle: "pizza-prompt",
+        tag: "production",
+        versionId: "v123",
+      });
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/pizza-prompt/tags/production`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/pizza-prompt/tags/production`);
       expect(opts.method).toBe("PUT");
       expect(JSON.parse(opts.body as string)).toEqual({ versionId: "v123" });
     });
   });
 
   describe("listPromptTags()", () => {
-    it("sends GET to /api/prompts/tags", async () => {
-      const { listPromptTags } = await import("../langwatch-api.js");
+    it("sends GET to /api/v1/prompts/tags", async () => {
+      const { listPromptTags } = await import("../langwatch-api.ts");
       const tags = [{ id: "1", name: "production" }];
       mockJsonResponse(tags);
 
       const result = await listPromptTags();
 
       expect(mockFetch).toHaveBeenCalledWith(
-        `${TEST_ENDPOINT}/api/prompts/tags`,
-        expect.objectContaining({ method: "GET" })
+        `${TEST_ENDPOINT}/api/v1/prompts/tags`,
+        expect.objectContaining({ method: "GET" }),
       );
       expect(result).toEqual(tags);
     });
   });
 
   describe("createPromptTag()", () => {
-    it("sends POST to /api/prompts/tags with name", async () => {
-      const { createPromptTag } = await import("../langwatch-api.js");
+    it("sends POST to /api/v1/prompts/tags with name", async () => {
+      const { createPromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ id: "t1", name: "canary" });
 
       await createPromptTag("canary");
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags`);
       expect(opts.method).toBe("POST");
       expect(JSON.parse(opts.body as string)).toEqual({ name: "canary" });
     });
   });
 
   describe("renamePromptTag()", () => {
-    it("sends PUT to /api/prompts/tags/{tag} with new name", async () => {
-      const { renamePromptTag } = await import("../langwatch-api.js");
+    it("sends PUT to /api/v1/prompts/tags/{tag} with new name", async () => {
+      const { renamePromptTag } = await import("../langwatch-api.ts");
       mockJsonResponse({ id: "t1", name: "preview" });
 
       await renamePromptTag({ tag: "canary", name: "preview" });
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags/canary`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags/canary`);
       expect(opts.method).toBe("PUT");
       expect(JSON.parse(opts.body as string)).toEqual({ name: "preview" });
     });
   });
 
   describe("deletePromptTag()", () => {
-    it("sends DELETE to /api/prompts/tags/{tag}", async () => {
-      const { deletePromptTag } = await import("../langwatch-api.js");
+    it("sends DELETE to /api/v1/prompts/tags/{tag}", async () => {
+      const { deletePromptTag } = await import("../langwatch-api.ts");
       mock204Response();
 
       const result = await deletePromptTag("canary");
 
       const [url, opts] = mockFetch.mock.calls[0]!;
-      expect(url).toBe(`${TEST_ENDPOINT}/api/prompts/tags/canary`);
+      expect(url).toBe(`${TEST_ENDPOINT}/api/v1/prompts/tags/canary`);
       expect(opts.method).toBe("DELETE");
       expect(result).toBeNull();
     });
@@ -424,7 +426,7 @@ describe("langwatch-api", () => {
   describe("makeRequest()", () => {
     describe("when response is 204 No Content", () => {
       it("returns null without calling json()", async () => {
-        const { listPromptTags } = await import("../langwatch-api.js");
+        const { listPromptTags } = await import("../langwatch-api.ts");
         mock204Response();
 
         const result = await listPromptTags();
@@ -435,21 +437,19 @@ describe("langwatch-api", () => {
 
   describe("when the API returns an error", () => {
     it("includes the status code in the error message", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(500, "Internal Server Error");
 
-      await expect(
-        searchTraces({ startDate: 1000, endDate: 2000 })
-      ).rejects.toThrow("500");
+      await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow("500");
     });
 
     it("includes the response body in the error message", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(403, "Forbidden: invalid API key");
 
-      await expect(
-        searchTraces({ startDate: 1000, endDate: 2000 })
-      ).rejects.toThrow("Forbidden: invalid API key");
+      await expect(searchTraces({ startDate: 1000, endDate: 2000 })).rejects.toThrow(
+        "Forbidden: invalid API key",
+      );
     });
   });
 
@@ -463,9 +463,7 @@ describe("langwatch-api", () => {
     };
 
     it("parses code, tips, docsUrl and fault into LangWatchApiError fields", async () => {
-      const { searchTraces, LangWatchApiError } = await import(
-        "../langwatch-api.js"
-      );
+      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.ts");
       mockErrorResponse(400, JSON.stringify(handledErrorBody));
 
       const error = await searchTraces({
@@ -483,7 +481,7 @@ describe("langwatch-api", () => {
     });
 
     it("formats the message with the server message, Tips section and Docs link", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       mockErrorResponse(400, JSON.stringify(handledErrorBody));
 
       const error = await searchTraces({
@@ -492,14 +490,12 @@ describe("langwatch-api", () => {
       }).catch((e) => e);
 
       expect(error.message).toContain(
-        "LangWatch API error 400: Filter 'llm.model' is not supported"
+        "LangWatch API error 400: Filter 'llm.model' is not supported",
       );
       expect(error.message).toContain("Tips:");
       expect(error.message).toContain("- Use 'metadata.model' instead");
       expect(error.message).toContain("- See the filter reference");
-      expect(error.message).toContain(
-        "Docs: https://docs.langwatch.ai/api/filters"
-      );
+      expect(error.message).toContain("Docs: https://docs.langwatch.ai/api/filters");
     });
 
     // A validation failure names the offending field AND the values it would
@@ -507,6 +503,7 @@ describe("langwatch-api", () => {
     // advice ("pick one of the types in this error's expected list") naming a
     // list the caller was never given.
     describe("when the failure carries the values it would have accepted", () => {
+      let error: Error & { reasons?: unknown; message: string };
       const rejectedTypeBody = {
         error: "validation_error",
         message:
@@ -524,32 +521,27 @@ describe("langwatch-api", () => {
         ],
       };
 
-      /** @scenario A rejection over MCP carries the accepted types */
-      it("keeps the reasons on the error", async () => {
-        const { createEvaluator } = await import(
-          "../langwatch-api-evaluators.js"
-        );
+      beforeEach(async () => {
+        const { createEvaluator } = await import("../langwatch-api-evaluators.ts");
         mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
 
-        const error = await createEvaluator({
+        error = await createEvaluator({
           name: "Relevancy",
           config: { evaluatorType: "ragas/answer_relevancy" },
-        }).catch((e) => e);
+        }).then(
+          () => {
+            throw new Error("expected the evaluator create to be refused");
+          },
+          (caught: Error) => caught,
+        );
+      });
 
+      /** @scenario A rejection over MCP carries the accepted types */
+      it("keeps the reasons on the error", async () => {
         expect(error.reasons).toEqual(rejectedTypeBody.reasons);
       });
 
       it("names the rejected field and the accepted values in the message", async () => {
-        const { createEvaluator } = await import(
-          "../langwatch-api-evaluators.js"
-        );
-        mockErrorResponse(422, JSON.stringify(rejectedTypeBody));
-
-        const error = await createEvaluator({
-          name: "Relevancy",
-          config: { evaluatorType: "ragas/answer_relevancy" },
-        }).catch((e) => e);
-
         expect(error.message).toContain("config.evaluatorType");
         expect(error.message).toContain("ragas/response_relevancy");
         expect(error.message).toContain("langevals/llm_boolean");
@@ -558,7 +550,7 @@ describe("langwatch-api", () => {
     });
 
     it("parses the tRPC shape using `code` instead of `error`", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       const body = {
         code: "dataset_not_found",
         message: "Dataset 'abc' not found",
@@ -584,11 +576,8 @@ describe("langwatch-api", () => {
     });
 
     it("omits the Tips and Docs sections when absent", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
-      mockErrorResponse(
-        401,
-        JSON.stringify({ error: "unauthorized", message: "Invalid API key" })
-      );
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockErrorResponse(401, JSON.stringify({ error: "unauthorized", message: "Invalid API key" }));
 
       const error = await searchTraces({
         startDate: 1000,
@@ -599,17 +588,12 @@ describe("langwatch-api", () => {
       expect(error.tips).toBeUndefined();
       expect(error.docsUrl).toBeUndefined();
       expect(error.fault).toBeUndefined();
-      expect(error.message).toBe(
-        "LangWatch API error 401: Invalid API key"
-      );
+      expect(error.message).toBe("LangWatch API error 401: Invalid API key");
     });
 
     it("ignores an invalid fault value", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
-      mockErrorResponse(
-        500,
-        JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" })
-      );
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockErrorResponse(500, JSON.stringify({ error: "boom", message: "Boom", fault: "nobody" }));
 
       const error = await searchTraces({
         startDate: 1000,
@@ -622,9 +606,7 @@ describe("langwatch-api", () => {
 
   describe("when the error body is not a handled-error envelope", () => {
     it("keeps the raw text as the message and sets no extra fields", async () => {
-      const { searchTraces, LangWatchApiError } = await import(
-        "../langwatch-api.js"
-      );
+      const { searchTraces, LangWatchApiError } = await import("../langwatch-api.ts");
       mockErrorResponse(502, "<html>Bad Gateway</html>");
 
       const error = await searchTraces({
@@ -635,9 +617,7 @@ describe("langwatch-api", () => {
       expect(error).toBeInstanceOf(LangWatchApiError);
       expect(error.status).toBe(502);
       expect(error.responseBody).toBe("<html>Bad Gateway</html>");
-      expect(error.message).toBe(
-        "LangWatch API error 502: <html>Bad Gateway</html>"
-      );
+      expect(error.message).toBe("LangWatch API error 502: <html>Bad Gateway</html>");
       expect(error.code).toBeUndefined();
       expect(error.tips).toBeUndefined();
       expect(error.docsUrl).toBeUndefined();
@@ -645,7 +625,7 @@ describe("langwatch-api", () => {
     });
 
     it("treats JSON without error/code/message fields as raw text", async () => {
-      const { searchTraces } = await import("../langwatch-api.js");
+      const { searchTraces } = await import("../langwatch-api.ts");
       const body = JSON.stringify({ unexpected: true });
       mockErrorResponse(500, body);
 
@@ -656,6 +636,22 @@ describe("langwatch-api", () => {
 
       expect(error.code).toBeUndefined();
       expect(error.message).toBe(`LangWatch API error 500: ${body}`);
+    });
+  });
+
+  describe("when the MCP server calls the LangWatch API", () => {
+    /** @scenario The MCP server identifies itself on every request */
+    it("names itself and its version on the request", async () => {
+      const { searchTraces } = await import("../langwatch-api.ts");
+      mockJsonResponse({ traces: [] });
+
+      await searchTraces({ startDate: 1000, endDate: 2000 });
+
+      const [, calledOptions] = mockFetch.mock.calls[0]!;
+      expect(calledOptions.headers["X-LangWatch-SDK-Name"]).toBe("langwatch-mcp");
+      expect(calledOptions.headers["X-LangWatch-SDK-Language"]).toBe("typescript");
+      expect(calledOptions.headers["X-LangWatch-SDK-Version"]).toMatch(/^\d+\.\d+\.\d+/);
+      expect(calledOptions.headers["User-Agent"]).toMatch(/^langwatch-mcp\//);
     });
   });
 });

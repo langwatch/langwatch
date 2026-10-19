@@ -1,32 +1,7 @@
 /**
  * Declarations that could not be delivered, held for a seam that can.
- *
- * `langwatch ingest context` runs inside the agent's shell, and under codex's
- * default sandbox that shell has no network at all. The command's own retry
- * is worthless there, because every retry runs in the same sandbox. What does
- * get out is the session report: codex spawns its notify program from its own
- * process, outside the sandbox, and the claude hooks run outside it too.
- *
- * So a declaration that cannot be sent is written here instead, and the next
- * seam that reports for any session sends it. One entry per agent and session
- * id: the newest declaration replaces the pending one, since an older one is a
- * checkout the agent has already left. An entry older than an hour is dropped
- * unsent, for the same reason.
- *
- * The drain runs AFTER the seam posts its own directory-derived context, so
- * the declared context is the last record written and becomes the session's
- * current branch. It posts without consulting the fingerprint, because the
- * fingerprint describes what the seam just posted, and it writes the declared
- * fingerprint afterwards so the next turn stays quiet.
- *
- * The queue lives beside the fingerprints, except that codex's sandbox denies
- * every write under the home directory, including into a directory that
- * already exists. It does allow the temp directory, so that is the fallback
- * and a drain reads both. The temp queue is trusted only when its directory
- * belongs to this user and no one else can write to it, since an entry there
- * decides which checkout a session is credited with.
- *
- * Spec: specs/ai-governance/cli-wrappers/session-context-declare.feature
+ * Codex's sandboxed shell has no network, but its notify program runs
+ * outside it, so a declaration queues here and drains on the next seam.
  */
 
 import * as fs from "node:fs";
@@ -81,13 +56,7 @@ function isPrivateToThisUser(dir: string): boolean {
 }
 
 /** One entry per agent and session, so a newer declaration replaces an older. */
-export function spoolFileName({
-  agent,
-  sessionId,
-}: {
-  agent: string;
-  sessionId: string;
-}): string {
+export function spoolFileName({ agent, sessionId }: { agent: string; sessionId: string }): string {
   const name = `${agent}-${sessionId}`.replace(/[^A-Za-z0-9._-]/g, "_");
   return `${name.slice(0, 128)}.json`;
 }
@@ -158,15 +127,11 @@ function parseEntry(file: string): SpooledDeclaration | null {
     const sessionId = record.session_id;
     const fingerprint = record.fingerprint;
     const queuedAtMs = record.queued_at_ms;
-    if (
-      typeof agent !== "string" ||
-      typeof sessionId !== "string" ||
-      typeof fingerprint !== "string" ||
-      typeof queuedAtMs !== "number" ||
-      record.payload === undefined
-    ) {
-      return null;
-    }
+    if (typeof agent !== "string") return null;
+    if (typeof sessionId !== "string") return null;
+    if (typeof fingerprint !== "string") return null;
+    if (typeof queuedAtMs !== "number") return null;
+    if (record.payload === undefined) return null;
     return {
       agent,
       sessionId,
@@ -185,6 +150,7 @@ function removeQuietly(file: string): void {
     fs.unlinkSync(file);
   } catch {
     /* raced with another seam draining the same entry */
+    void 0;
   }
 }
 
@@ -209,32 +175,13 @@ export function readSpooledDeclarations({
     } catch {
       continue;
     }
-    for (const name of names) {
-      if (!name.endsWith(".json")) continue;
-      const file = path.join(dir, name);
-      const entry = parseEntry(file);
-      if (!entry) {
-        removeQuietly(file);
-        continue;
-      }
-      if (now() - entry.queuedAtMs > SPOOL_MAX_AGE_MS) {
-        removeQuietly(file);
-        continue;
-      }
-      entries.push(entry);
-    }
+    appendSpooledDeclarations(entries, dir, names, now);
   }
-  return entries.sort((a, b) => a.queuedAtMs - b.queuedAtMs);
+  return entries.toSorted((a, b) => a.queuedAtMs - b.queuedAtMs);
 }
 
 /** Keep the directory small: the newest entries are the ones worth keeping. */
-export function pruneSpool({
-  stateDir,
-  now,
-}: {
-  stateDir: string;
-  now: () => number;
-}): void {
+export function pruneSpool({ stateDir, now }: { stateDir: string; now: () => number }): void {
   try {
     const entries = readSpooledDeclarations({ stateDir, now });
     for (const entry of entries.slice(0, -SPOOL_MAX_ENTRIES)) {
@@ -242,15 +189,14 @@ export function pruneSpool({
     }
   } catch {
     /* the directory is bookkeeping: never worth failing a seam over */
+    void 0;
   }
 }
 
 /**
- * Send every queued declaration, newest per session, and record what landed.
- *
- * Returns how many were delivered. Never throws and never reports failure to
- * the caller in a way that could change its exit status: a seam's own work
- * has already succeeded by the time this runs.
+ * Sends every queued declaration, newest per session, recording what
+ * landed. Never throws or reports failure in a way that changes exit
+ * status -- a seam's own work has already succeeded by the time this runs.
  */
 export async function drainSessionContextSpool({
   stateDir,
@@ -288,10 +234,34 @@ export async function drainSessionContextSpool({
       } catch {
         // The record landed. A fingerprint we cannot write costs one
         // duplicate next turn and nothing more.
+        void 0;
       }
     }
   } catch {
     /* a drain must never be why a seam reported failure */
+    void 0;
   }
   return delivered;
+}
+
+function appendSpooledDeclarations(
+  entries: SpooledDeclaration[],
+  dir: string,
+  names: string[],
+  now: () => number,
+): void {
+  for (const name of names) {
+    if (!name.endsWith(".json")) continue;
+    const file = path.join(dir, name);
+    const entry = parseEntry(file);
+    if (!entry) {
+      removeQuietly(file);
+      continue;
+    }
+    if (now() - entry.queuedAtMs > SPOOL_MAX_AGE_MS) {
+      removeQuietly(file);
+      continue;
+    }
+    entries.push(entry);
+  }
 }

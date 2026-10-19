@@ -4,7 +4,7 @@ Feature: Dataset REST API
   So that I can programmatically manage datasets without the UI
 
   # All scenarios are bound to integration tests in
-  # platform/app/src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
+  # [gone] src/app/api/dataset/__tests__/dataset-rest-api.integration.test.ts.
 
   Background:
     Given a project with a valid API key in the X-Auth-Token header
@@ -18,6 +18,12 @@ Feature: Dataset REST API
     Then I receive a paginated response with 3 datasets
     And each dataset includes id, name, slug, columnTypes, and record count
     And the archived dataset is not included
+
+  @unit @regression
+  Scenario: List datasets counts the rows of a dataset built from an uploaded file
+    Given a dataset whose rows were prepared from an uploaded file
+    When I call GET /api/dataset
+    Then that dataset's recordCount is the number of rows the file held
 
   @integration
   Scenario: List datasets with page and limit parameters
@@ -79,11 +85,11 @@ Feature: Dataset REST API
     Then the request fails with 404 Not Found
 
   @integration
-  Scenario: Get dataset enforces 25MB response size limit
-    Given a dataset with records exceeding 25MB total
+  Scenario: Get dataset refuses a dataset too large for one response
+    Given a dataset with more records than one response carries
     When I call GET /api/dataset/large-dataset
     Then the request fails with 400 Bad Request
-    And the error indicates the response size exceeds the limit
+    And the error tells me to read the records page by page
 
   # ── Update Dataset ─────────────────────────────────────────────
 

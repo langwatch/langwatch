@@ -27,13 +27,13 @@ adversarially re-verified against the actual code path.
 
 ## Headline counts
 
-| Metric | Count |
-|--------|-------|
-| Routes audited | 258 |
-| No authorization gate where one was expected | 26 |
-| Declared permission weaker/wrong vs. action | 31 |
-| High-risk cross-tenant exposure | 2 |
-| Routes with no permission/tenant regression test | 189 |
+| Metric                                               | Count                         |
+| ---------------------------------------------------- | ----------------------------- |
+| Routes audited                                       | 258                           |
+| No authorization gate where one was expected         | 26                            |
+| Declared permission weaker/wrong vs. action          | 31                            |
+| High-risk cross-tenant exposure                      | 2                             |
+| Routes with no permission/tenant regression test     | 189                           |
 | Confirmed/partial vulnerabilities after verification | 22 (3 high, 6 medium, 13 low) |
 
 ## Confirmed vulnerabilities and remediation
@@ -58,14 +58,14 @@ permission, so any valid project token reached the handler regardless of its
 role bindings. **Fixed** by migrating each to the `SecuredApp` builder, which
 makes the permission a mandatory, compile-time-checked argument:
 
-| Route | Permission |
-|-------|-----------|
-| `GET /api/model-providers` | `project:view` |
-| `PUT /api/model-providers/:provider` | `project:update` |
-| `POST /api/analytics/timeseries` | `analytics:view` |
-| `GET /api/experiments` | `experiments:view` |
-| `GET /api/model-defaults` | `project:view` |
-| `POST /api/copilotkit` | `prompts:view` |
+| Route                                | Permission         |
+| ------------------------------------ | ------------------ |
+| `GET /api/model-providers`           | `project:view`     |
+| `PUT /api/model-providers/:provider` | `project:update`   |
+| `POST /api/analytics/timeseries`     | `analytics:view`   |
+| `GET /api/experiments`               | `experiments:view` |
+| `GET /api/model-defaults`            | `project:view`     |
+| `POST /api/copilotkit`               | `prompts:view`     |
 
 Permissions mirror the equivalent tRPC procedure where one exists (the
 authoritative, type-checked surface) rather than a heuristic guess.

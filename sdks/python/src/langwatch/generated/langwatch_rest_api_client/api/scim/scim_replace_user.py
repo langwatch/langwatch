@@ -5,6 +5,7 @@ import httpx
 
 from ... import errors
 from ...client import AuthenticatedClient, Client
+from ...models.scim_replace_user_body import ScimReplaceUserBody
 from ...models.scim_replace_user_response_200 import ScimReplaceUserResponse200
 from ...models.scim_replace_user_response_400 import ScimReplaceUserResponse400
 from ...models.scim_replace_user_response_401 import ScimReplaceUserResponse401
@@ -15,7 +16,10 @@ from ...types import Response, safe_http_status
 
 def _get_kwargs(
     id: str,
+    *,
+    body: ScimReplaceUserBody,
 ) -> dict[str, Any]:
+    headers: dict[str, Any] = {}
 
     _kwargs: dict[str, Any] = {
         "method": "put",
@@ -24,6 +28,11 @@ def _get_kwargs(
         ),
     }
 
+    _kwargs["json"] = body.to_dict()
+
+    headers["Content-Type"] = "application/scim+json"
+
+    _kwargs["headers"] = headers
     return _kwargs
 
 
@@ -92,6 +101,7 @@ def sync_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
+    body: ScimReplaceUserBody,
 ) -> Response[
     ScimReplaceUserResponse200
     | ScimReplaceUserResponse400
@@ -107,6 +117,7 @@ def sync_detailed(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -118,6 +129,7 @@ def sync_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = client.get_httpx_client().request(
@@ -131,6 +143,7 @@ def sync(
     id: str,
     *,
     client: AuthenticatedClient,
+    body: ScimReplaceUserBody,
 ) -> (
     ScimReplaceUserResponse200
     | ScimReplaceUserResponse400
@@ -147,6 +160,7 @@ def sync(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -159,6 +173,7 @@ def sync(
     return sync_detailed(
         id=id,
         client=client,
+        body=body,
     ).parsed
 
 
@@ -166,6 +181,7 @@ async def asyncio_detailed(
     id: str,
     *,
     client: AuthenticatedClient,
+    body: ScimReplaceUserBody,
 ) -> Response[
     ScimReplaceUserResponse200
     | ScimReplaceUserResponse400
@@ -181,6 +197,7 @@ async def asyncio_detailed(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -192,6 +209,7 @@ async def asyncio_detailed(
 
     kwargs = _get_kwargs(
         id=id,
+        body=body,
     )
 
     response = await client.get_async_httpx_client().request(**kwargs)
@@ -203,6 +221,7 @@ async def asyncio(
     id: str,
     *,
     client: AuthenticatedClient,
+    body: ScimReplaceUserBody,
 ) -> (
     ScimReplaceUserResponse200
     | ScimReplaceUserResponse400
@@ -219,6 +238,7 @@ async def asyncio(
 
     Args:
         id (str):
+        body (ScimReplaceUserBody):
 
     Raises:
         errors.UnexpectedStatus: If the server returns an undocumented status code and Client.raise_on_unexpected_status is True.
@@ -232,5 +252,6 @@ async def asyncio(
         await asyncio_detailed(
             id=id,
             client=client,
+            body=body,
         )
     ).parsed

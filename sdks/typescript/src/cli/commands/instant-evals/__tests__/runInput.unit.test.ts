@@ -1,20 +1,17 @@
 /**
- * The body one command line becomes.
- *
- * Every flag combination that has a meaning, and every one that does not:
- * a line that says two things at once is refused BEFORE anything is sent, so
- * these assert on the body or on the exit rather than on any request.
- *
+ * The body one command line becomes: every meaningful flag combination, and every contradictory one
+ * refused BEFORE sending, so these assert on the body or the exit.
  * @see specs/features/instant-eval-cli.feature
  */
 
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { buildInstantEvalRunBody } from "../runInput";
 import type { QuestionDraft } from "../questionFlags";
+import { buildInstantEvalRunBody } from "../runInput";
 
 class ProcessExitError extends Error {
   constructor(readonly code: number) {
@@ -64,9 +61,7 @@ const build = (args: {
 /** What the refusal said, for a line that was refused. */
 const refusalOf = async (promise: Promise<unknown>): Promise<string> => {
   await expect(promise).rejects.toThrow(ProcessExitError);
-  return errorSpy.mock.calls
-    .map((call: unknown[]) => String(call[0]))
-    .join("\n");
+  return errorSpy.mock.calls.map((call: unknown[]) => String(call[0])).join("\n");
 };
 
 describe("readLast, given a window far past any date", () => {
@@ -100,9 +95,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
       expect(body).toMatchObject({
         target: "traces",
         limit: 1_000,
-        questions: [
-          { kind: "boolean", instructions: "the customer sounds annoyed" },
-        ],
+        questions: [{ kind: "boolean", instructions: "the customer sounds annoyed" }],
       });
     });
   });
@@ -113,16 +106,12 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
       const body = await build({ drafts: [ask("the customer sounds annoyed")] });
 
       expect(body).toMatchObject({
-        questions: [
-          { kind: "boolean", instructions: "the customer sounds annoyed" },
-        ],
+        questions: [{ kind: "boolean", instructions: "the customer sounds annoyed" }],
       });
     });
 
     it("refuses the positional argument alongside it", async () => {
-      const said = await refusalOf(
-        build({ instructions: "one", drafts: [ask("two")] }),
-      );
+      const said = await refusalOf(build({ instructions: "one", drafts: [ask("two")] }));
 
       expect(said).toContain("not both");
     });
@@ -171,9 +160,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
     });
 
     it("refuses one outside nought to one", async () => {
-      const said = await refusalOf(
-        build({ drafts: [ask("annoyed", { threshold: "7" })] }),
-      );
+      const said = await refusalOf(build({ drafts: [ask("annoyed", { threshold: "7" })] }));
 
       expect(said).toContain("--threshold");
     });
@@ -193,9 +180,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
 
     /** @scenario "A malformed --score range is refused before anything is sent" */
     it("refuses a value that is not a range", async () => {
-      const said = await refusalOf(
-        build({ drafts: [ask("how satisfied", { score: "5" })] }),
-      );
+      const said = await refusalOf(build({ drafts: [ask("how satisfied", { score: "5" })] }));
 
       expect(said).toContain("min..max");
     });
@@ -207,10 +192,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
       const body = await build({
         drafts: [
           ask("what is being asked for", {
-            categories: [
-              "refund=wants money back",
-              "bug=something is broken",
-            ],
+            categories: ["refund=wants money back", "bug=something is broken"],
           }),
         ],
       });
@@ -229,9 +211,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
     });
 
     it("refuses an option written without a name", async () => {
-      const said = await refusalOf(
-        build({ drafts: [ask("what", { categories: ["=nothing"] })] }),
-      );
+      const said = await refusalOf(build({ drafts: [ask("what", { categories: ["=nothing"] })] }));
 
       expect(said).toContain("--category");
     });
@@ -305,9 +285,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
     });
 
     it("refuses a file it cannot read", async () => {
-      const said = await refusalOf(
-        build({ flags: { questionsFile: "/no/such/questions.json" } }),
-      );
+      const said = await refusalOf(build({ flags: { questionsFile: "/no/such/questions.json" } }));
 
       expect(said).toContain("Could not read");
     });
@@ -390,9 +368,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
     });
 
     it("refuses a --last value with no unit", async () => {
-      const said = await refusalOf(
-        build({ instructions: "annoyed", flags: { last: "7" } }),
-      );
+      const said = await refusalOf(build({ instructions: "annoyed", flags: { last: "7" } }));
 
       expect(said).toContain("--last");
     });
@@ -423,9 +399,7 @@ describe("buildInstantEvalRunBody, given the shorthand", () => {
     });
 
     it("refuses one that is not a positive whole number", async () => {
-      const said = await refusalOf(
-        build({ instructions: "annoyed", flags: { limit: "-5" } }),
-      );
+      const said = await refusalOf(build({ instructions: "annoyed", flags: { limit: "-5" } }));
 
       expect(said).toContain("--limit");
     });
@@ -468,17 +442,13 @@ describe("buildInstantEvalRunBody, given a statement", () => {
     });
 
     it("refuses a file it cannot read", async () => {
-      const said = await refusalOf(
-        build({ flags: { sqlFile: "/no/such/query.sql" } }),
-      );
+      const said = await refusalOf(build({ flags: { sqlFile: "/no/such/query.sql" } }));
 
       expect(said).toContain("Could not read");
     });
 
     it("refuses --sql alongside it", async () => {
-      const said = await refusalOf(
-        build({ flags: { sql: SQL, sqlFile: "/tmp/query.sql" } }),
-      );
+      const said = await refusalOf(build({ flags: { sql: SQL, sqlFile: "/tmp/query.sql" } }));
 
       expect(said).toContain("--sql-file");
     });
@@ -487,17 +457,13 @@ describe("buildInstantEvalRunBody, given a statement", () => {
   describe("when the line also describes a shorthand", () => {
     /** @scenario "A statement and a shorthand flag together are refused by the command" */
     it("refuses a target", async () => {
-      const said = await refusalOf(
-        build({ flags: { sql: SQL, target: "traces" } }),
-      );
+      const said = await refusalOf(build({ flags: { sql: SQL, target: "traces" } }));
 
       expect(said).toContain("not both");
     });
 
     it("refuses a question", async () => {
-      const said = await refusalOf(
-        build({ drafts: [ask("annoyed")], flags: { sql: SQL } }),
-      );
+      const said = await refusalOf(build({ drafts: [ask("annoyed")], flags: { sql: SQL } }));
 
       expect(said).toContain("not both");
     });

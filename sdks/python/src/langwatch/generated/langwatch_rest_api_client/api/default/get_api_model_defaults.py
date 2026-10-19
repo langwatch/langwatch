@@ -16,7 +16,7 @@ def _get_kwargs() -> dict[str, Any]:
 
     _kwargs: dict[str, Any] = {
         "method": "get",
-        "url": "/api/model-defaults",
+        "url": "/api/v1/model-defaults",
     }
 
     return _kwargs

@@ -35,32 +35,32 @@ an error. Tokens never touch disk.
 
 ## What already exists (reuse, don't reinvent)
 
-| Thing | Where | Reuse for |
-|---|---|---|
-| Credential handoff seam | `LangyCredentialService.getOrProvision()` (`platform/app/src/server/services/langy/LangyCredentialService.ts:72`) → `/api/langy/chat` body (`platform/app/src/server/routes/langy.ts:310-326`) → `spawnWorker()` env (`services/langy-agent/server.js:321-350`) | `githubToken` + `githubLogin` ride the same path; **no second secrets channel** |
-| Provisioning module pattern | `langyApiKey.ts`, `langyVirtualKey.ts` (idempotent provision + `findFirst` read + P2002 race handling) | New `langyGithubToken.ts` mirrors the shape |
-| Encrypted secret storage | `ProjectSecret` model + `encrypt()`/`decrypt()` from `platform/app/src/utils/encryption.ts` (aes-256-gcm, `CREDENTIALS_SECRET`) | Same encryption for the new `UserGitHubCredential` model (new model because this is **per-user**, not per-project) |
-| GitHub OAuth *login* provider | `platform/app/src/server/better-auth/index.ts:63-72` (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`) | Callback-route conventions only. **Do not reuse the login app** — identity login ≠ App user-to-server auth |
-| Worker skills | `services/langy-agent/skills/*.md`, seeded by `entrypoint.sh:19-21`, symlinked per-worker in `setupWorkerHome()` | New `skills/github.md` |
-| CLI install point | `infra/docker/Dockerfile.langy_agent` apt block (~line 23) | Add `gh` |
-| Egress policy | `charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*` | `github.com`/`api.github.com`/`codeload.github.com` egress |
-| Idle reaper | `server.js:393-400` (30s sweep, 10 min TTL, kills worker + home dir) | Clone dir lives inside worker home → cleaned for free |
-| Rate limiting | `checkLangyMessageRateLimit` (`rate-limit-langy.ts`, 30 msg/min, Redis sliding window) | PR creation already behind it; add per-user daily PR cap in skill/manager |
-| Audit log | `auditLog(...)` pattern (`routes/langy.ts:501-508`) | `langy.github.connect` / `.disconnect` / `.pr_created` actions |
-| Scenario tests | `platform/app/src/tests/langy/langy.scenario.test.ts` (judge + Layer-2 REST verification) | New github scenario |
+| Thing                         | Where                                                                                                                                                                                                                                                           | Reuse for                                                                                                          |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Credential handoff seam       | `LangyCredentialService.getOrProvision()` (`platform/app/src/server/services/langy/LangyCredentialService.ts:72`) → `/api/langy/chat` body (`platform/app/src/server/routes/langy.ts:310-326`) → `spawnWorker()` env (`services/langy-agent/server.js:321-350`) | `githubToken` + `githubLogin` ride the same path; **no second secrets channel**                                    |
+| Provisioning module pattern   | `langyApiKey.ts`, `langyVirtualKey.ts` (idempotent provision + `findFirst` read + P2002 race handling)                                                                                                                                                          | New `langyGithubToken.ts` mirrors the shape                                                                        |
+| Encrypted secret storage      | `ProjectSecret` model + `encrypt()`/`decrypt()` from `platform/app/src/utils/encryption.ts` (aes-256-gcm, `CREDENTIALS_SECRET`)                                                                                                                                 | Same encryption for the new `UserGitHubCredential` model (new model because this is **per-user**, not per-project) |
+| GitHub OAuth _login_ provider | `platform/app/src/server/better-auth/index.ts:63-72` (`GITHUB_CLIENT_ID`/`GITHUB_CLIENT_SECRET`)                                                                                                                                                                | Callback-route conventions only. **Do not reuse the login app** — identity login ≠ App user-to-server auth         |
+| Worker skills                 | `services/langy-agent/skills/*.md`, seeded by `entrypoint.sh:19-21`, symlinked per-worker in `setupWorkerHome()`                                                                                                                                                | New `skills/github.md`                                                                                             |
+| CLI install point             | `infra/docker/Dockerfile.langy_agent` apt block (~line 23)                                                                                                                                                                                                      | Add `gh`                                                                                                           |
+| Egress policy                 | `charts/langy-agent/templates/networkpolicy.yaml` + `values.networkPolicy.*`                                                                                                                                                                                    | `github.com`/`api.github.com`/`codeload.github.com` egress                                                         |
+| Idle reaper                   | `server.js:393-400` (30s sweep, 10 min TTL, kills worker + home dir)                                                                                                                                                                                            | Clone dir lives inside worker home → cleaned for free                                                              |
+| Rate limiting                 | `checkLangyMessageRateLimit` (`rate-limit-langy.ts`, 30 msg/min, Redis sliding window)                                                                                                                                                                          | PR creation already behind it; add per-user daily PR cap in skill/manager                                          |
+| Audit log                     | `auditLog(...)` pattern (`routes/langy.ts:501-508`)                                                                                                                                                                                                             | `langy.github.connect` / `.disconnect` / `.pr_created` actions                                                     |
+| Scenario tests                | `platform/app/src/tests/langy/langy.scenario.test.ts` (judge + Layer-2 REST verification)                                                                                                                                                                       | New github scenario                                                                                                |
 
 ## Locked decisions
 
-| What | Choice | Why |
-|---|---|---|
-| Auth mechanism | GitHub App with **user-to-server OAuth** | PRs attribute to the user; installation bounds reachable repos; org admin controls scope. OAuth apps can't bound repos; PATs are unmanageable/unattributable. |
-| Token storage | New `UserGitHubCredential` Prisma model, encrypted refresh token only | Per-user (not per-project) lifetime; `ProjectSecret` is the wrong scope. Access tokens (8h) are minted on demand, never stored. |
-| Token transport | Extend `LangyCredentials` with optional `githubToken` + `githubLogin` | Existing route → manager → worker handoff; zero new channels. |
-| Worker git auth | `GH_TOKEN` env + `gh` CLI; git pushes via `credential.helper '!gh auth git-credential'` | gh reads the token from env — nothing written to `.gitconfig`/`.git-credentials` on disk. |
-| Commit author | `git config user.name <githubLogin>` + `<id>+<login>@users.noreply.github.com` | Commits AND the PR attribute to the user without exposing their email. |
-| Unconnected users | `githubToken` absent → skill tells Langy to reply with settings deep link | Graceful degradation, not an error. |
-| Token expiry | Keep GitHub App token expiration ON (8h access / 6mo refresh, rotating) | Short blast radius; refresh handled server-side in `langyGithubToken.ts`. |
-| New REST surface | One OAuth callback route (`/api/github-langy/callback`) + connect/disconnect via existing tRPC settings routers | Callback is unavoidable for OAuth; everything else stays in existing routers. |
+| What              | Choice                                                                                                          | Why                                                                                                                                                           |
+| ----------------- | --------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Auth mechanism    | GitHub App with **user-to-server OAuth**                                                                        | PRs attribute to the user; installation bounds reachable repos; org admin controls scope. OAuth apps can't bound repos; PATs are unmanageable/unattributable. |
+| Token storage     | New `UserGitHubCredential` Prisma model, encrypted refresh token only                                           | Per-user (not per-project) lifetime; `ProjectSecret` is the wrong scope. Access tokens (8h) are minted on demand, never stored.                               |
+| Token transport   | Extend `LangyCredentials` with optional `githubToken` + `githubLogin`                                           | Existing route → manager → worker handoff; zero new channels.                                                                                                 |
+| Worker git auth   | `GH_TOKEN` env + `gh` CLI; git pushes via `credential.helper '!gh auth git-credential'`                         | gh reads the token from env — nothing written to `.gitconfig`/`.git-credentials` on disk.                                                                     |
+| Commit author     | `git config user.name <githubLogin>` + `<id>+<login>@users.noreply.github.com`                                  | Commits AND the PR attribute to the user without exposing their email.                                                                                        |
+| Unconnected users | `githubToken` absent → skill tells Langy to reply with settings deep link                                       | Graceful degradation, not an error.                                                                                                                           |
+| Token expiry      | Keep GitHub App token expiration ON (8h access / 6mo refresh, rotating)                                         | Short blast radius; refresh handled server-side in `langyGithubToken.ts`.                                                                                     |
+| New REST surface  | One OAuth callback route (`/api/github-langy/callback`) + connect/disconnect via existing tRPC settings routers | Callback is unavoidable for OAuth; everything else stays in existing routers.                                                                                 |
 
 ## UX: auth + PR live inside the conversation (claude.design-style)
 
@@ -111,7 +111,8 @@ exception.
 ## Phased delivery (6 PRs, each independently shippable)
 
 ### PR 1 — Spec + data model
-*Branch `langy/github-prs-1-model`, base `langy/per-session-manager`*
+
+_Branch `langy/github-prs-1-model`, base `langy/per-session-manager`_
 
 - [ ] `specs/langy/langy-github-prs.feature` — `@unimplemented` scenarios (shipped with this plan; flip tags as built)
 - [ ] Prisma: `UserGitHubCredential` model
@@ -138,7 +139,8 @@ exception.
 - [ ] Env plumbing: `GITHUB_LANGY_APP_ID`, `GITHUB_LANGY_CLIENT_ID`, `GITHUB_LANGY_CLIENT_SECRET` in `env.mjs` + `.env.example` (all optional — feature silently off when unset)
 
 ### PR 2 — Connect/disconnect (settings + popup) + OAuth callback
-*Branch `langy/github-prs-2-connect`*
+
+_Branch `langy/github-prs-2-connect`_
 
 - [ ] `GET /api/github-langy/connect?mode=popup|redirect&return=...` — redirects to `https://github.com/login/oauth/authorize` with the App's client_id + CSRF `state` (signed, short-lived, carries `mode`)
 - [ ] `GET /api/github-langy/callback` — exchanges code → `{access_token, refresh_token, expires_in}`; fetches `/user` for `githubLogin`/`githubUserId`; upserts `UserGitHubCredential` with `encrypt(refresh_token)`. **`mode=popup`** → tiny HTML shim that calls `window.opener.postMessage({type:"github-connected", login})` and closes; **`mode=redirect`** → 302 back to `return` URL (defaults to settings deep link).
@@ -147,7 +149,8 @@ exception.
 - [ ] Deep link constant (e.g. `/settings/integrations#github`) exported for the skill to reference
 
 ### PR 3 — Token minting in the credential handoff
-*Branch `langy/github-prs-3-credentials`*
+
+_Branch `langy/github-prs-3-credentials`_
 
 - [ ] `platform/app/src/server/services/langy/langyGithubToken.ts`:
   - `getGithubTokenForUser({ prisma, userId, organizationId })` → `{ token, githubLogin } | null`
@@ -166,7 +169,8 @@ exception.
 - [ ] No change needed in `routes/langy.ts` — `credentials` is already posted whole (`langy.ts:310-326`) ✨
 
 ### PR 4 — Worker side: gh CLI, env injection, github skill
-*Branch `langy/github-prs-4-worker`*
+
+_Branch `langy/github-prs-4-worker`_
 
 - [ ] `infra/docker/Dockerfile.langy_agent` — install `gh` (GitHub's apt repo, pinned version; ubuntu 24.04 base at line 11)
 - [ ] `services/langy-agent/server.js`:
@@ -182,7 +186,8 @@ exception.
 - [ ] `charts/langy-agent/templates/networkpolicy.yaml` + `values.yaml` — `networkPolicy.allowGithub` toggle. **Reality check:** the chart already ships `allowExternalHttps: true` (0.0.0.0/0:443) so GitHub works today; the new toggle matters for hardened installs that turn that off. NetworkPolicy is L3/L4 — true FQDN-bounded egress needs the issue's follow-up, document as such.
 
 ### PR 6 — Sidebar UX (chat cards + popup + acting-as chip)
-*Branch `langy/github-prs-6-ux`, depends on PR 2 (endpoints) + PR 4 (structured events)*
+
+_Branch `langy/github-prs-6-ux`, depends on PR 2 (endpoints) + PR 4 (structured events)_
 
 - [ ] Structured message types in the Langy chat protocol:
   - `connect_github` — `{repoHint?, attribution: githubLogin}` → rendered as a card with a Connect button
@@ -195,7 +200,8 @@ exception.
 - [ ] Tests: storybook + a scenario where the user goes connect-card → popup-resolved → PR-card without losing chat state
 
 ### PR 5 — Tests, verification, docs
-*Branch `langy/github-prs-5-tests`*
+
+_Branch `langy/github-prs-5-tests`_
 
 - [ ] Unit: `langyGithubToken` (mock GitHub token endpoint — refresh rotation persisted, race lock, revoked → row deleted)
 - [ ] Integration: connect callback upserts encrypted row; disconnect deletes + revokes; multitenancy guard accepts/blocks correctly

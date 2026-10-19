@@ -1,5 +1,6 @@
-import { describe, expect, it } from "vitest";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { describe, expect, it } from "vitest";
+
 import {
   MISSING_PLACEHOLDER_PUSHBACK,
   MISSING_REVEAL_ID_PUSHBACK,
@@ -35,18 +36,15 @@ function secretSnippetTool(): RegisteredTool {
   return registered!;
 }
 
-const TEMPLATE = 'export OPENAI_BASE_URL="https://gateway.example/v1"\nexport OPENAI_API_KEY="{{secret}}"';
+const TEMPLATE =
+  'export OPENAI_BASE_URL="https://gateway.example/v1"\nexport OPENAI_API_KEY="{{secret}}"';
 
 describe("secret_snippet", () => {
   describe("given the registered tool", () => {
     it("registers under its name with the three arguments", () => {
       const tool = secretSnippetTool();
       expect(tool.name).toBe(SECRET_SNIPPET_TOOL_NAME);
-      expect(Object.keys(tool.parameters.properties)).toEqual([
-        "revealId",
-        "template",
-        "preview",
-      ]);
+      expect(Object.keys(tool.parameters.properties)).toEqual(["revealId", "template", "preview"]);
       expect(tool.parameters.required).toEqual(["revealId", "template"]);
       expect(tool.description).toContain("never print a value that starts with vk-lw-");
     });
@@ -80,9 +78,7 @@ describe("secret_snippet", () => {
 
   describe("when the reveal id is missing", () => {
     it("refuses and says where the id comes from", () => {
-      expect(answerSecretSnippet({ template: TEMPLATE })).toBe(
-        MISSING_REVEAL_ID_PUSHBACK,
-      );
+      expect(answerSecretSnippet({ template: TEMPLATE })).toBe(MISSING_REVEAL_ID_PUSHBACK);
       expect(answerSecretSnippet({ revealId: "  ", template: TEMPLATE })).toBe(
         MISSING_REVEAL_ID_PUSHBACK,
       );

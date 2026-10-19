@@ -8,7 +8,7 @@ Feature: All Runs page group-by selector
 
   # Parity status: 4 of 4 scenarios bound to existing tests.
 
-  @e2e
+  @integration
   Scenario: User groups All Runs results by scenario
     When I open the All Runs page
     Then results are grouped by batch run by default

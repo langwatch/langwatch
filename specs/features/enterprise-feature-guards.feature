@@ -64,7 +64,7 @@ Feature: Enterprise-only feature guards
   Scenario: Non-enterprise org cannot assign custom roles via team update
     Given the organization plan is not ENTERPRISE
     When an admin updates a team member with a custom role
-    Then the request is rejected with FORBIDDEN
+    Then the request is refused with enterprise_plan_required
 
   @unit
   Scenario: Non-enterprise org can update team members with built-in roles
@@ -94,7 +94,7 @@ Feature: Enterprise-only feature guards
   Scenario: Non-enterprise org cannot create teams with custom role members
     Given the organization plan is not ENTERPRISE
     When an admin creates a team with a member assigned a custom role
-    Then the request is rejected with FORBIDDEN
+    Then the request is refused with enterprise_plan_required
 
   @unit
   Scenario: Non-enterprise org cannot update team member role to custom role

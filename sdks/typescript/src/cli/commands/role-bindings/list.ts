@@ -1,25 +1,19 @@
 import chalk from "chalk";
+
 import { RoleBindingsApiService } from "@/client-sdk/services/role-bindings/role-bindings-api.service";
+
 import { formatTable } from "../../utils/formatting";
 import {
   composeRoleBindingFilters,
   type RoleBindingFilterFlags,
 } from "../../utils/managementFlags";
 import type { CommandResult } from "../../utils/output";
-import {
-  asDate,
-  counted,
-  printEmpty,
-  runManagement,
-  withParsedFlags,
-} from "../management/_shared";
+import { asDate, counted, printEmpty, runManagement, withParsedFlags } from "../management/_shared";
 
 /**
- * List role bindings, optionally narrowed by principal and scope.
- *
- * Filters are passed through unchanged, and a filter the caller did not give
- * is absent from the request rather than sent empty: an empty filter matches
- * nothing, which would turn "everything" into "nothing".
+ * List role bindings, optionally narrowed by principal and scope. A filter
+ * the caller didn't give is absent from the request, not sent empty -- an
+ * empty filter matches nothing, turning "everything" into "nothing".
  */
 export const listRoleBindingsCommand = async (
   options: RoleBindingFilterFlags = {},

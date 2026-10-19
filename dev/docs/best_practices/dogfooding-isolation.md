@@ -15,6 +15,7 @@ dogfood in, before the first `langwatch` command:
 export LANGWATCH_CLI_CONFIG="$PWD/.claude/tmp/dogfood/langwatch-config.json"
 export CLAUDE_CONFIG_DIR="$PWD/.claude/tmp/dogfood/claude"
 export CODEX_HOME="$PWD/.claude/tmp/dogfood/codex"
+export NODE_EXTRA_CA_CERTS="$HOME/.portless/ca.pem"   # trust haven's local CA, or login stores the default gateway
 ```
 
 They relocate the CLI config file, the Claude Code settings directory, and the codex

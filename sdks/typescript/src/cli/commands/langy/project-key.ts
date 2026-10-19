@@ -1,28 +1,24 @@
 /**
- * The project's LangWatch key for the credentials call, fetched with the
- * developer's own device session. The project routes never reveal a base key
- * to an API key, the organization key this command also holds included, so
- * the key comes from POST /api/auth/cli/project-key, which answers a signed-in
- * person with project administration on that project. That route names a
- * project by slug and the Langy request names it by id, so the id is looked up
- * first.
+ * The project's ingestion key, minted with a child of the developer's own device session
+ * (traces:create on the project required). The fork takes a slug and the Langy request an id,
+ * so the id is looked up first.
  */
 
 import { ProjectsApiService } from "../../../client-sdk/services/projects/projects-api.service";
 import { loadConfig } from "../../utils/governance/config";
-import { fetchProjectKeyBySlug } from "../../utils/governance/session-api";
+import { mintProjectIngestionKey } from "../../utils/governance/session-api";
 
 export interface ProjectKeySources {
   /** The project's slug, read with the credentials the command signed in with. */
   lookupSlug: (projectId: string) => Promise<string>;
-  /** The project's key, traded for the device session. */
+  /** The project's ingestion key, minted with the device session. */
   fetchKeyBySlug: (slug: string) => Promise<string>;
 }
 
 /**
  * A failure on the way to the key, naming the step that failed: the lookup
  * answers to the permission to view the project, the key to the permission to
- * manage it, so the caller's guidance depends on which one refused.
+ * send it traces, so the caller's guidance depends on which one refused.
  */
 export class ProjectKeyError extends Error {
   constructor(
@@ -36,6 +32,10 @@ export class ProjectKeyError extends Error {
   }
 }
 
+function pickNumber(value: unknown): number | undefined {
+  return typeof value === "number" ? value : undefined;
+}
+
 function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyError {
   const { status, httpStatus, code, message } = (error ?? {}) as {
     status?: unknown;
@@ -45,7 +45,7 @@ function asProjectKeyError(stage: "lookup" | "key", error: unknown): ProjectKeyE
   };
   return new ProjectKeyError(
     stage,
-    typeof status === "number" ? status : typeof httpStatus === "number" ? httpStatus : undefined,
+    pickNumber(status) ?? pickNumber(httpStatus),
     typeof code === "string" ? code : undefined,
     typeof message === "string" ? message : "the project's key could not be read",
   );
@@ -70,7 +70,7 @@ export function createProjectKeyReader(
   };
 }
 
-/** The reader over the platform: the signed-in credentials for the lookup, the device session for the key. */
+/** The reader over the platform: signed-in credentials look up, the device session fetches. */
 export function platformProjectKeyReader({
   endpoint,
   apiKey,
@@ -81,6 +81,6 @@ export function platformProjectKeyReader({
   const projects = new ProjectsApiService({ endpoint, apiKey });
   return createProjectKeyReader({
     lookupSlug: async (projectId) => (await projects.get(projectId)).slug,
-    fetchKeyBySlug: async (slug) => (await fetchProjectKeyBySlug(loadConfig(), slug)).api_key,
+    fetchKeyBySlug: async (slug) => (await mintProjectIngestionKey(loadConfig(), slug)).api_key,
   });
 }

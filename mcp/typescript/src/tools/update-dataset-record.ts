@@ -1,4 +1,4 @@
-import { updateDatasetRecord as apiUpdateDatasetRecord } from "../langwatch-api-datasets.js";
+import { updateDatasetRecord as apiUpdateDatasetRecord } from "../langwatch-api-datasets.ts";
 
 /**
  * Handles the platform_update_dataset_record MCP tool invocation.

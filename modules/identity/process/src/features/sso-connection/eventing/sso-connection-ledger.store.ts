@@ -1,0 +1,217 @@
+import { createTenantId, type StateProjectionStore } from "@langwatch/eventing";
+/**
+ * The SSO connection ledger writer, in the identity ledger's shape (ADR-110): it stages the command
+ * and waits for the fold. The queued run is the sole appender; the api has no log to append to.
+ */
+import {
+  ACTIVATE_CONNECTION_COMMAND_TYPE,
+  APPROVE_DOMAIN_CLAIM_COMMAND_TYPE,
+  ATTEST_DOMAIN_COMMAND_TYPE,
+  WITHDRAW_DOMAIN_COMMAND_TYPE,
+  CLAIM_DOMAIN_COMMAND_TYPE,
+  COMPLETE_TEARDOWN_COMMAND_TYPE,
+  DISCARD_CONNECTION_COMMAND_TYPE,
+  GRANDFATHER_CONNECTION_COMMAND_TYPE,
+  REGISTER_CONNECTION_COMMAND_TYPE,
+  REJECT_DOMAIN_CLAIM_COMMAND_TYPE,
+  REQUEST_TEARDOWN_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE,
+  RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE,
+  REQUEST_VERIFICATION_COMMAND_TYPE,
+  RESUME_CONNECTION_COMMAND_TYPE,
+  SET_ARRIVAL_POLICY_COMMAND_TYPE,
+  RENAME_CONNECTION_COMMAND_TYPE,
+  UPDATE_CONNECTION_IDP_COMMAND_TYPE,
+  REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE,
+  SELECT_MIGRATION_ROUTE_COMMAND_TYPE,
+  BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE,
+  FINALIZE_MIGRATION_COMMAND_TYPE,
+  type SsoConnectionCommand,
+  type SsoConnectionCommandType,
+  type SsoConnectionFact,
+  type SsoConnectionFactInput,
+  SUSPEND_CONNECTION_COMMAND_TYPE,
+  VERIFY_DOMAIN_COMMAND_TYPE,
+  SSO_CONNECTION_PIPELINE_NAME,
+} from "@langwatch/identity-contract";
+import { createLogger } from "@langwatch/observability";
+import { nowInstant } from "@langwatch/time";
+
+import type { IdentityEventing } from "../../../eventing/identity-command-senders.store.ts";
+import type { SsoConnectionLedger } from "../rules/sso-connection-ledger.rules.ts";
+import { ssoConnectionEventsFor } from "./sso-connection-events.intent.ts";
+import type {
+  SsoConnectionEvent,
+  SsoConnectionFoldState,
+} from "./sso-connection-state.projection.ts";
+
+const logger = createLogger("langwatch:identity:sso-connection-ledger");
+
+/** The read-your-writes window, the identity ledger's convergence shape. */
+const SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS = 2_000;
+const SSO_CONNECTION_CONVERGENCE_POLL_MS = 25;
+
+type SsoConnectionStagedSender = {
+  send(data: unknown): Promise<unknown>;
+};
+
+export const SENDER_NAME_BY_COMMAND: Record<SsoConnectionCommandType, string> = {
+  [REGISTER_CONNECTION_COMMAND_TYPE]: "registerConnection",
+  [CLAIM_DOMAIN_COMMAND_TYPE]: "claimDomain",
+  [APPROVE_DOMAIN_CLAIM_COMMAND_TYPE]: "approveDomainClaim",
+  [REJECT_DOMAIN_CLAIM_COMMAND_TYPE]: "rejectDomainClaim",
+  [DISCARD_CONNECTION_COMMAND_TYPE]: "discardConnection",
+  [REQUEST_VERIFICATION_COMMAND_TYPE]: "requestVerification",
+  [ATTEST_DOMAIN_COMMAND_TYPE]: "attestDomain",
+  [WITHDRAW_DOMAIN_COMMAND_TYPE]: "withdrawDomain",
+  [RECORD_DOMAIN_PROOF_PRESENT_COMMAND_TYPE]: "recordDomainProofPresent",
+  [RECORD_DOMAIN_PROOF_ABSENT_COMMAND_TYPE]: "recordDomainProofAbsent",
+  [VERIFY_DOMAIN_COMMAND_TYPE]: "verifyDomain",
+  [ACTIVATE_CONNECTION_COMMAND_TYPE]: "activateConnection",
+  [SUSPEND_CONNECTION_COMMAND_TYPE]: "suspendConnection",
+  [RESUME_CONNECTION_COMMAND_TYPE]: "resumeConnection",
+  [REQUEST_TEARDOWN_COMMAND_TYPE]: "requestTeardown",
+  [COMPLETE_TEARDOWN_COMMAND_TYPE]: "completeTeardown",
+  [GRANDFATHER_CONNECTION_COMMAND_TYPE]: "grandfatherConnection",
+  [SET_ARRIVAL_POLICY_COMMAND_TYPE]: "setArrivalPolicy",
+  [RENAME_CONNECTION_COMMAND_TYPE]: "renameConnection",
+  [UPDATE_CONNECTION_IDP_COMMAND_TYPE]: "updateConnectionIdp",
+  [REGISTER_REPLACEMENT_CONNECTION_COMMAND_TYPE]: "registerReplacementConnection",
+  [SELECT_MIGRATION_ROUTE_COMMAND_TYPE]: "selectMigrationRoute",
+  [BEGIN_MIGRATION_FINALIZATION_COMMAND_TYPE]: "beginMigrationFinalization",
+  [FINALIZE_MIGRATION_COMMAND_TYPE]: "finalizeMigration",
+};
+
+interface SsoConnectionLedgerWriterDeps {
+  projectionStore: StateProjectionStore<SsoConnectionFoldState>;
+  stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
+  convergence?: { timeoutMs: number; pollMs: number };
+}
+
+export class SsoConnectionLedgerStore implements SsoConnectionLedger {
+  /** Over the senders the process connected. */
+  static forPipeline(options: {
+    projectionStore: StateProjectionStore<SsoConnectionFoldState>;
+    commands: IdentityEventing;
+  }): SsoConnectionLedgerStore {
+    const { projectionStore, commands } = options;
+    return SsoConnectionLedgerStore.create({
+      projectionStore,
+      stagedSender: async (command) => {
+        const resolved = await commands.resolvePipelineCommand({
+          pipeline: SSO_CONNECTION_PIPELINE_NAME,
+          command,
+        });
+        return resolved.kind === "registered" ? resolved.sender : null;
+      },
+    });
+  }
+
+  static create(deps: SsoConnectionLedgerWriterDeps): SsoConnectionLedgerStore {
+    return new SsoConnectionLedgerStore(deps);
+  }
+
+  private readonly projectionStore: StateProjectionStore<SsoConnectionFoldState>;
+  private readonly stagedSender: (name: string) => Promise<SsoConnectionStagedSender | null>;
+  private readonly convergence: { timeoutMs: number; pollMs: number };
+
+  constructor(deps: SsoConnectionLedgerWriterDeps) {
+    this.projectionStore = deps.projectionStore;
+    this.stagedSender = deps.stagedSender;
+    this.convergence = deps.convergence ?? {
+      timeoutMs: SSO_CONNECTION_CONVERGENCE_TIMEOUT_MS,
+      pollMs: SSO_CONNECTION_CONVERGENCE_POLL_MS,
+    };
+  }
+
+  async commit({
+    command,
+    facts,
+  }: {
+    command: SsoConnectionCommand;
+    facts: SsoConnectionFactInput[];
+  }): Promise<SsoConnectionFact[]> {
+    const events = ssoConnectionEventsFor({ command, facts });
+    if (events.length === 0) return [];
+    const { connectionId, tenantId } = command.data;
+
+    await this.stage({ command });
+    await this.awaitFold({ connectionId, tenantId, events });
+    return events;
+  }
+
+  private async stage({ command }: { command: SsoConnectionCommand }): Promise<void> {
+    const senderName = SENDER_NAME_BY_COMMAND[command.type];
+    const sender = await this.stagedSender(senderName);
+    if (!sender) {
+      // A wiring defect, not a transient: the pipeline exposed no sender for
+      // a command type it declares. Loud, because nothing downstream folds.
+      throw new Error(
+        `sso connection ledger cannot stage: the pipeline exposes no "${senderName}" sender`,
+      );
+    }
+    await sender.send(command.data);
+  }
+
+  private async awaitFold({
+    connectionId,
+    tenantId,
+    events,
+  }: {
+    connectionId: string;
+    tenantId: string;
+    events: SsoConnectionEvent[];
+  }): Promise<void> {
+    const last = events[events.length - 1];
+    if (!last) return;
+    const context = {
+      aggregateId: connectionId,
+      tenantId: createTenantId(tenantId),
+    };
+    // Wall-clock, not injectable business time: a frozen test clock would
+    // otherwise make this loop unable to time out.
+    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
+    let isReached = await this.foldReached({ connectionId, context, last });
+    while (!isReached && nowInstant().epochMilliseconds < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      isReached = await this.foldReached({ connectionId, context, last });
+    }
+    if (isReached) return;
+
+    logger.warn(
+      { connectionId, commandCount: events.length },
+      "sso connection projection did not land a command's events within the read-your-writes window; the command is queued and the fold will converge",
+    );
+  }
+
+  private async foldReached({
+    connectionId,
+    context,
+    last,
+  }: {
+    connectionId: string;
+    context: {
+      aggregateId: string;
+      tenantId: ReturnType<typeof createTenantId>;
+    };
+    last: SsoConnectionEvent;
+  }): Promise<boolean> {
+    try {
+      const stored = await this.projectionStore.get(connectionId, context);
+      if (stored.kind === "empty") return false;
+      const { cursor } = stored.projection;
+      return (
+        cursor.acceptedAt > last.createdAt ||
+        (cursor.acceptedAt === last.createdAt && cursor.eventId >= last.id)
+      );
+    } catch (error) {
+      // An unreadable projection is not a failed command: the command is
+      // queued. Stop waiting and let the caller proceed.
+      logger.warn(
+        { connectionId, error },
+        "could not read the sso connection projection while waiting for convergence; continuing",
+      );
+      return true;
+    }
+  }
+}

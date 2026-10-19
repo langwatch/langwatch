@@ -4,16 +4,9 @@ from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
-from ..models.patch_api_triggers_by_id_response_200_templates_slack_template_type_type_1 import (
-    PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1,
-)
-from ..models.patch_api_triggers_by_id_response_200_templates_slack_template_type_type_2_type_1 import (
-    PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1,
-)
-from ..models.patch_api_triggers_by_id_response_200_templates_slack_template_type_type_3_type_1 import (
-    PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1,
+from ..models.patch_api_triggers_by_id_response_200_templates_slack_template_type_type_0 import (
+    PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0,
 )
 from ..types import UNSET, Unset
 
@@ -26,35 +19,22 @@ class PatchApiTriggersByIdResponse200Templates:
     channel.
 
         Attributes:
-            slack_template_type (None | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1 |
-                PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1 |
-                PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1 | Unset):
+            slack_template_type (None | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0 | Unset):
             slack_template (None | str | Unset):
             email_subject_template (None | str | Unset):
             email_body_template (None | str | Unset):
     """
 
-    slack_template_type: (
-        None
-        | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1
-        | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1
-        | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1
-        | Unset
-    ) = UNSET
+    slack_template_type: None | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0 | Unset = UNSET
     slack_template: None | str | Unset = UNSET
     email_subject_template: None | str | Unset = UNSET
     email_body_template: None | str | Unset = UNSET
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         slack_template_type: None | str | Unset
         if isinstance(self.slack_template_type, Unset):
             slack_template_type = UNSET
-        elif isinstance(self.slack_template_type, PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1):
-            slack_template_type = self.slack_template_type.value
-        elif isinstance(self.slack_template_type, PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1):
-            slack_template_type = self.slack_template_type.value
-        elif isinstance(self.slack_template_type, PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1):
+        elif isinstance(self.slack_template_type, PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0):
             slack_template_type = self.slack_template_type.value
         else:
             slack_template_type = self.slack_template_type
@@ -78,7 +58,7 @@ class PatchApiTriggersByIdResponse200Templates:
             email_body_template = self.email_body_template
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update({})
         if slack_template_type is not UNSET:
             field_dict["slackTemplateType"] = slack_template_type
@@ -97,13 +77,7 @@ class PatchApiTriggersByIdResponse200Templates:
 
         def _parse_slack_template_type(
             data: object,
-        ) -> (
-            None
-            | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1
-            | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1
-            | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1
-            | Unset
-        ):
+        ) -> None | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0 | Unset:
             if data is None:
                 return data
             if isinstance(data, Unset):
@@ -111,39 +85,12 @@ class PatchApiTriggersByIdResponse200Templates:
             try:
                 if not isinstance(data, str):
                     raise TypeError()
-                slack_template_type_type_1 = PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1(data)
+                slack_template_type_type_0 = PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0(data)
 
-                return slack_template_type_type_1
+                return slack_template_type_type_0
             except (TypeError, ValueError, AttributeError, KeyError):
                 pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                slack_template_type_type_2_type_1 = PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1(
-                    data
-                )
-
-                return slack_template_type_type_2_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            try:
-                if not isinstance(data, str):
-                    raise TypeError()
-                slack_template_type_type_3_type_1 = PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1(
-                    data
-                )
-
-                return slack_template_type_type_3_type_1
-            except (TypeError, ValueError, AttributeError, KeyError):
-                pass
-            return cast(
-                None
-                | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType1
-                | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType2Type1
-                | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType3Type1
-                | Unset,
-                data,
-            )
+            return cast(None | PatchApiTriggersByIdResponse200TemplatesSlackTemplateTypeType0 | Unset, data)
 
         slack_template_type = _parse_slack_template_type(d.pop("slackTemplateType", UNSET))
 
@@ -181,21 +128,4 @@ class PatchApiTriggersByIdResponse200Templates:
             email_body_template=email_body_template,
         )
 
-        patch_api_triggers_by_id_response_200_templates.additional_properties = d
         return patch_api_triggers_by_id_response_200_templates
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

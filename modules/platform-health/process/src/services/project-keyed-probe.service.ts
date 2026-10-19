@@ -1,0 +1,138 @@
+import type { ProjectKeyedProbeRequest } from "@langwatch/platform-health-contract";
+import { deriveRunActor } from "@langwatch/scenario-contract";
+
+import { canaryAnswer, MAX_CANARY_QUERY_PARAM_LENGTH } from "../rules/scenario-canary.rules.ts";
+import type { ScenarioCanaryService } from "./scenario-canary.service.ts";
+import type { SubsystemProbeOutcome, SubsystemProbeService } from "./subsystem-probe.service.ts";
+
+/** Who a probe's key acts as: its project, and the key and its owner when it is an API key. */
+type ProbeCaller = Readonly<{ projectId: string; userId: string | null; apiKeyId: string | null }>;
+
+/** Resolves a raw token, project key or API key, to its caller as main's TokenResolver did. */
+type ProbeCallerResolver = (
+  input: Readonly<{ token: string; projectId: string | null }>,
+) => Promise<ProbeCaller | null>;
+
+const json = (status: number, body: unknown, headers: Record<string, string> = {}): Response =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { "Content-Type": "application/json", ...headers },
+  });
+
+/** A monitor must see each canary run's real result, so no canary answer is cacheable. */
+const NO_STORE = { "Cache-Control": "no-store" };
+
+const answerOf = (outcome: SubsystemProbeOutcome): Response =>
+  outcome.ok
+    ? json(200, { status: outcome.status, body: outcome.body })
+    : json(outcome.httpStatus, { message: outcome.message });
+
+/**
+ * The project-keyed `/api/health/*` door: the caller's own key is resolved to a project and
+ * forwarded to the canaries, and each answer is main's `{ status, body }` or `{ message }`.
+ */
+export class ProjectKeyedProbeService {
+  readonly #probes: SubsystemProbeService;
+  readonly #resolveCaller: ProbeCallerResolver;
+  readonly #scenarioCanary: ScenarioCanaryService;
+
+  private constructor(options: {
+    probes: SubsystemProbeService;
+    resolveCaller: ProbeCallerResolver;
+    scenarioCanary: ScenarioCanaryService;
+  }) {
+    this.#probes = options.probes;
+    this.#resolveCaller = options.resolveCaller;
+    this.#scenarioCanary = options.scenarioCanary;
+  }
+
+  static create(options: {
+    probes: SubsystemProbeService;
+    resolveCaller: ProbeCallerResolver;
+    scenarioCanary: ScenarioCanaryService;
+  }): ProjectKeyedProbeService {
+    return new ProjectKeyedProbeService(options);
+  }
+
+  async probe(request: ProjectKeyedProbeRequest): Promise<Response> {
+    const answer = await this.#answer(request);
+    if (request.check !== "scenarios") return answer;
+    for (const [name, value] of Object.entries(NO_STORE)) answer.headers.set(name, value);
+    return answer;
+  }
+
+  async #answer(request: ProjectKeyedProbeRequest): Promise<Response> {
+    const { authorization } = request.headers;
+    const authToken =
+      request.headers["x-auth-token"] ??
+      (authorization?.startsWith("Bearer ") ? authorization.slice(7) : null);
+    if (!authToken) {
+      return json(401, {
+        message:
+          "Authentication token is required. Use X-Auth-Token header or Authorization: Bearer token.",
+      });
+    }
+
+    const caller = await this.#resolveCaller({
+      token: authToken,
+      projectId: request.headers["x-project-id"] ?? null,
+    });
+    if (!caller) return json(401, { message: "Invalid auth token." });
+    const { projectId } = caller;
+
+    if (request.check === "scenarios")
+      return this.#runScenarioCanary({ caller, requested: request.runPlanId });
+
+    return answerOf(await this.#run(request, { authToken, projectId, signal: request.signal }));
+  }
+
+  async #runScenarioCanary({
+    caller,
+    requested,
+  }: {
+    caller: ProbeCaller;
+    requested: string | undefined;
+  }): Promise<Response> {
+    const runPlanId = requested?.trim();
+    if (runPlanId && runPlanId.length > MAX_CANARY_QUERY_PARAM_LENGTH) {
+      return json(400, { message: "runPlanId query parameter is invalid." });
+    }
+    if (!runPlanId) return json(400, { message: "runPlanId query parameter is required." });
+
+    // The run acts as the probe's own key, as a REST start would; a project key starts it
+    // as nobody.
+    const actor = deriveRunActor({
+      userId: caller.userId,
+      surfaceHeader: null,
+      apiKeyId: caller.apiKeyId,
+    });
+    const { projectId } = caller;
+    const outcome = await this.#scenarioCanary.run({ projectId, runPlanId, actor });
+    const { status, body } = canaryAnswer(outcome);
+    return json(status, body);
+  }
+
+  #run(
+    request: Exclude<ProjectKeyedProbeRequest, { check: "scenarios" }>,
+    credential: Readonly<{ authToken: string; projectId: string; signal: AbortSignal | undefined }>,
+  ): Promise<SubsystemProbeOutcome> {
+    const { authToken, projectId, signal } = credential;
+    switch (request.check) {
+      case "collector":
+        return this.#probes.runCollector(credential);
+      case "evaluations":
+        return this.#probes.runEvaluations(credential);
+      case "processor":
+        return this.#probes.runProcessor(credential);
+      case "triggers":
+        return this.#probes.runTriggers({ projectId, triggerId: request.triggerId ?? "" });
+      case "workflows":
+        return this.#probes.runWorkflows({
+          projectId,
+          workflowId: request.workflowId ?? "",
+          authToken,
+          signal,
+        });
+    }
+  }
+}

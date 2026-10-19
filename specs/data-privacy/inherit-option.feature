@@ -38,12 +38,11 @@ Feature: Inherit option on privacy rules
     Then trace input shows "Inherit" resolving to "Dropped"
 
   @unit
-  Scenario: Saving a rule with everything inheriting stores a rule that sets no fields
-    Given an admin opens the privacy rule drawer for project "web-app"
+  Scenario: A new rule with everything inheriting cannot be saved
+    Given an admin opens the privacy rule drawer to add a rule for project "web-app"
     And every setting is left on "Inherit"
-    When the rule is saved
-    Then the stored rule sets no fields
-    And project "web-app" resolves to the same policy as before the rule
+    Then the rule sets no fields
+    And Save stays disabled, as on main, because the rule would change nothing
 
   @unit
   Scenario: Setting one category leaves the rest inheriting

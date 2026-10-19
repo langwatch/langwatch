@@ -26,7 +26,11 @@ Feature: Webhook settings and the billing events ledger
     @integration
     Scenario: Saving requires a URL and at least one selected event
       Given an empty URL and no selected events
-      Then the save action is disabled
+      Then the save action is enabled
+      When the save action is pressed
+      Then each missing or out-of-range field shows an error naming what to fix
+      And the first of them is focused
+      And nothing is sent
 
   Rule: The drawer asks for the destination before it asks for its address
 
@@ -46,7 +50,11 @@ Feature: Webhook settings and the billing events ledger
     @integration
     Scenario: A queue endpoint saves only once its queue URL is filled in
       Given the drawer is open with Amazon SQS chosen and events selected
-      Then the save action is disabled until a queue URL is entered
+      Then the save action is enabled
+      When the save action is pressed without a queue URL
+      Then the queue URL field shows an error and is focused
+      And nothing is sent
+      And once a queue URL is entered the save is sent
 
     @integration
     Scenario: The list says where each endpoint delivers
@@ -132,10 +140,18 @@ Feature: Webhook settings and the billing events ledger
       Then the response maps virtual key ids to their names
 
     @unit
+    Scenario: Unknown project tenants do not resolve virtual-key names
+      Given the project resolves to no organization
+      Then the response carries no virtual key names
+      And no name resolution is attempted
+
+    @unit
     Scenario: The ledger requires the gateway usage view scope
       Given a member without gateway usage view
       Then the list query is rejected before any read
 
     @unit
-    Scenario: The ledger degrades to an empty page without ClickHouse
-      Then the query returns an empty page flagged clickHouseDisabled
+    Scenario: Spend history is served with no ClickHouse-absent degrade path
+      Given ClickHouse is a mandatory boot member of the gateway module
+      Then the ledger query always returns the repository's page
+      And a deployment with no ClickHouse does not boot this module at all

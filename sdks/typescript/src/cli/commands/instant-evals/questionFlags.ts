@@ -1,31 +1,12 @@
 /**
- * What to ask, read off the command line in the order it was written.
- *
- * `--ask` opens a question and `--criteria`, `--score`, `--category` and
- * `--threshold` describe the one before them, the same way `--required`
- * describes the `--evaluator` before it. Order matters because a line may ask
- * two questions of the same text:
- *
- * ```
- * langwatch instant-eval run \
- *   --ask "the customer sounds annoyed" --criteria "sarcasm counts" --criteria "a calm complaint does not" \
- *   --ask "the agent apologised" --threshold 0.8
- * ```
- *
- * Commander gives no order across different options, so the order is read off
- * the option events as the tree parses, by `trackQuestionFlags` in
- * `cli/program.ts`. What arrives here is the drafts it collected, and this is
- * where they become questions: a modifier written before any `--ask` describes
- * the question given as the positional argument, so `run "annoyed"
- * --threshold 0.8` reads the way it looks.
- *
+ * What to ask, read in command-line order: `--ask` opens a question and
+ * `--criteria`/`--score`/`--category`/`--threshold` modify the one before; modifiers before any
+ * `--ask` modify the positional question.
  * @see specs/features/instant-eval-cli.feature
+ * @see cli/program.ts trackQuestionFlags
  */
 
-import {
-  commandValidationError,
-  reportCommandError,
-} from "../../utils/errorOutput";
+import { commandValidationError, reportCommandError } from "../../utils/errorOutput";
 
 /** One question, as the command line described it. */
 export interface QuestionDraft {
@@ -58,11 +39,9 @@ function refuse(message: string): never {
 }
 
 /**
- * The questions the command line asked, or the refusal that says what is
- * missing.
- *
- * `instructions` is the positional argument, which fills the question a
- * modifier opened without an `--ask` of its own.
+ * The questions the command line asked, or the refusal that says what is missing. `instructions` is
+ * the positional argument, which fills the question a modifier opened without an `--ask` of its
+ * own.
  */
 export function readQuestionFlags({
   drafts,
@@ -78,7 +57,7 @@ export function readQuestionFlags({
       written[0] = { ...implicit, instructions };
     } else if (written.some((draft) => draft.instructions !== undefined)) {
       refuse(
-        "Ask the question as the argument or with --ask, not both: langwatch instant-eval run \"the customer sounds annoyed\", or langwatch instant-eval run --ask \"...\".",
+        'Ask the question as the argument or with --ask, not both: langwatch instant-eval run "the customer sounds annoyed", or langwatch instant-eval run --ask "...".',
       );
     } else {
       written.unshift({ instructions, criteria: [], categories: [] });
@@ -118,9 +97,7 @@ function questionFrom(draft: QuestionDraft): InstantEvalQuestionInput {
     ...base,
     kind: "boolean",
     ...(draft.criteria.length > 0 ? { criteria: draft.criteria } : {}),
-    ...(draft.threshold === undefined
-      ? {}
-      : { threshold: readThreshold(draft.threshold) }),
+    ...(draft.threshold === undefined ? {} : { threshold: readThreshold(draft.threshold) }),
   };
 }
 
@@ -141,16 +118,12 @@ function readRange(raw: string): { min: number; max: number } {
 function readCategory(raw: string): { name: string; description: string } {
   const separator = raw.indexOf("=");
   if (separator <= 0) {
-    refuse(
-      `Invalid --category value: ${raw} (an option is written name=what it means)`,
-    );
+    refuse(`Invalid --category value: ${raw} (an option is written name=what it means)`);
   }
   const name = raw.slice(0, separator).trim();
   const description = raw.slice(separator + 1).trim();
   if (name === "" || description === "") {
-    refuse(
-      `Invalid --category value: ${raw} (an option needs a name and what it means)`,
-    );
+    refuse(`Invalid --category value: ${raw} (an option needs a name and what it means)`);
   }
   return { name, description };
 }
@@ -158,23 +131,17 @@ function readCategory(raw: string): { name: string; description: string } {
 function readThreshold(raw: string): number {
   const value = Number(raw);
   if (!Number.isFinite(value) || value < 0 || value > 1) {
-    refuse(
-      `Invalid --threshold value: ${raw} (a threshold is a probability between 0 and 1)`,
-    );
+    refuse(`Invalid --threshold value: ${raw} (a threshold is a probability between 0 and 1)`);
   }
   return value;
 }
 
 /**
- * The questions a file holds, read as JSON or as YAML.
- *
- * The file is the way to ask several questions that each carry their own
- * criteria, scale or options, and the way to name them: a command line with
- * ten questions on it is a file that wants writing.
+ * The questions a file holds, read as JSON or as YAML. The file is the way to ask several questions
+ * that each carry their own criteria, scale or options, and the way to name them: a command line
+ * with ten questions on it is a file that wants writing.
  */
-export async function readQuestionsFile(
-  path: string,
-): Promise<InstantEvalQuestionInput[]> {
+export async function readQuestionsFile(path: string): Promise<InstantEvalQuestionInput[]> {
   const { readFileSync } = await import("fs");
   let raw: string;
   try {
@@ -184,9 +151,7 @@ export async function readQuestionsFile(
   }
 
   const parsed = await parseQuestions({ raw: raw!, path });
-  const list = Array.isArray(parsed)
-    ? parsed
-    : (parsed as { questions?: unknown }).questions;
+  const list = Array.isArray(parsed) ? parsed : (parsed as { questions?: unknown }).questions;
   if (!Array.isArray(list)) {
     refuse(
       `The questions file must hold a list of questions, or an object with a questions list: ${path}`,
@@ -195,13 +160,7 @@ export async function readQuestionsFile(
   return list as InstantEvalQuestionInput[];
 }
 
-async function parseQuestions({
-  raw,
-  path,
-}: {
-  raw: string;
-  path: string;
-}): Promise<unknown> {
+async function parseQuestions({ raw, path }: { raw: string; path: string }): Promise<unknown> {
   const isYaml = /\.ya?ml$/i.test(path);
   try {
     if (isYaml) {

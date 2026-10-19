@@ -218,6 +218,14 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the response body contains a fresh `access_token` and a fresh `refresh_token`
     And both tokens are persisted as in the previous scenario
 
+  @bdd @cli @refresh
+  Scenario: A refresh retried within a minute keeps the session
+    Given the CLI or an MCP client presented its refresh_token and lost the response
+    When it POSTs to "/api/auth/cli/refresh" with the same refresh_token within 60 seconds
+    Then the response status is 200
+    And the response body carries the same tokens the first refresh minted
+    And after 60 seconds the same refresh_token is answered 401 "invalid_grant"
+
   @bdd @cli @refresh @errors
   Scenario: CLI handles refresh-token revocation cleanly
     Given the refresh_token has been revoked (e.g. user deactivated, admin revoke)
@@ -226,6 +234,26 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     And the CLI deletes the local config + keyring entry
     And the CLI prints "Session revoked — run `langwatch login` to sign in again"
     And the CLI exits non-zero
+
+  # Each refresh mints a fresh refresh_token, so its lifetime is how long a CLI
+  # session survives idle. LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS shortens it.
+  @unit @cli @refresh
+  Scenario: A CLI refresh token lives 90 days unless the deployment says otherwise
+    Given the deployment sets no CLI refresh-token lifetime
+    When a CLI session is minted
+    Then its refresh_token expires 90 days after it was issued
+
+  @unit @cli @refresh
+  Scenario: An operator shortens the CLI refresh-token lifetime
+    Given the deployment sets "LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS" to "3600"
+    When a CLI session is minted
+    Then its refresh_token expires one hour after it was issued
+
+  @unit @cli @refresh
+  Scenario: An unreadable CLI refresh-token lifetime keeps the default
+    Given the deployment sets "LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS" to "0", "-5", "1.5", "soon" or ""
+    Then the deployment still boots
+    And CLI refresh tokens keep the 90 day lifetime, never a lifetime of zero
 
   # ---------------------------------------------------------------------------
   # Personal virtual key: issued on first gateway use
@@ -306,6 +334,28 @@ Feature: AI Gateway Governance — CLI login (RFC 8628 device-code flow)
     Then login completion succeeds
     And no "contact your admin" address is offered
     And the CLI receives a policy entry for every tool it can run
+
+  # ---------------------------------------------------------------------------
+  # A personal workspace still being set up
+  # ---------------------------------------------------------------------------
+
+  @unit @cli
+  Scenario: A device session names no personal project while it is still being created
+    Given Jane's personal project is still being created
+    When her device session is approved
+    Then the session carries no personal project
+
+  @unit @cli
+  Scenario: The CLI personal-project read answers failed while the personal project is still being created
+    Given Jane's personal project is still being created
+    When the CLI reads her personal project
+    Then it answers failed without an error log
+
+  @unit @cli
+  Scenario: The CLI key route refuses with a retryable 409 while the personal workspace is set up
+    Given Jane's personal project is still being created
+    When the CLI asks for her personal virtual key
+    Then it refuses with "personal_workspace_pending", a retryable 409, and issues no key
 
   # ---------------------------------------------------------------------------
   # Multi-org user (out of scope this iteration but pinned for design clarity)

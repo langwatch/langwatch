@@ -135,6 +135,26 @@ Feature: Organization members and invites REST API
     Then the request is refused with code duplicate_invite and status 409
     And the organization still has one invite for that address
 
+  @unit
+  # The management API validates STRICTLY: a provisioning caller that names the
+  # wrong team is told so, rather than being handed a 201 with an empty invite
+  # list while nobody is invited.
+  Scenario: Creating invites naming a team outside the organization is refused
+    Given a team that is not in the organization
+    When I invite two people and one of them is assigned to that team
+    Then the request is refused with code team_not_in_organization and status 422
+    And neither invite is created
+
+  @unit
+  # The invite form validates LENIENTLY, and keeps doing so: an admin filling in
+  # a batch by hand does not lose the whole batch to one assignment the server
+  # will not grant.
+  Scenario: The invite form drops a team assignment it cannot grant
+    Given a team that is not in the organization
+    When the invite form invites someone assigned to that team
+    Then the response reports no invite created
+    And the organization has no pending invite for that address
+
   @integration
   Scenario: Invites beyond the seat limit are refused
     Given the plan has one seat left

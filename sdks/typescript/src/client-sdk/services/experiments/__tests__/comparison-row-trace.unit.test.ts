@@ -1,11 +1,7 @@
 /**
- * Which trace a comparison is attributed to when rows are judged concurrently.
- *
+ * Which trace a comparison is attributed to when rows judge concurrently:
+ * a real tracer avoids a shared all-zero trace hiding a wrong attribution.
  * Spec: specs/experiments/comparison-sdk.feature
- *
- * A real tracer is installed here, unlike the sibling comparison suites: under
- * the no-op tracer every row reports the same all-zero trace, so a verdict
- * pinned to another row's trace would be indistinguishable from a correct one.
  */
 
 import { trace } from "@opentelemetry/api";
@@ -15,6 +11,7 @@ import {
   SimpleSpanProcessor,
 } from "@opentelemetry/sdk-trace-node";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
+
 import { ComparisonError } from "../errors";
 import {
   type ComparisonHarness,
@@ -83,16 +80,14 @@ describe("Experiment.compare", () => {
   };
 
   /**
-   * How many of these entries name a trace, and which of those name a row
-   * other than their own. An entry with no trace id is evidence of nothing,
-   * so it is counted out rather than passed silently: the count is what makes
-   * "no mismatches" mean something, since a run that attributed nothing would
-   * otherwise read the same as a run that attributed everything correctly.
+   * How many entries name a trace, and which name a row other than their
+   * own. A traceless entry is counted out rather than silently passed, so
+   * "no mismatches" can't mean a run that attributed nothing.
    */
   const attribution = (
     owners: Map<string, number>,
     source: string,
-    entries: { row: number | null | undefined; traceId: string | null | undefined }[]
+    entries: { row: number | null | undefined; traceId: string | null | undefined }[],
   ): { traced: number; mismatched: Mismatch[] } => {
     const traced = entries.filter((entry) => entry.traceId);
 
@@ -103,9 +98,7 @@ describe("Experiment.compare", () => {
         .map((entry) => ({
           source,
           row: entry.row,
-          tracedToRow:
-            owners.get(entry.traceId ?? "") ??
-            "a trace no row of this run opened",
+          tracedToRow: owners.get(entry.traceId ?? "") ?? "a trace no row of this run opened",
         })),
     };
   };
@@ -128,10 +121,7 @@ describe("Experiment.compare", () => {
           async ({ item, index }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             if (index === 0) await laterRowsCompared.promise;
@@ -142,7 +132,7 @@ describe("Experiment.compare", () => {
               laterRowsCompared.resolve();
             }
           },
-          { concurrency: CAPITALS.length }
+          { concurrency: CAPITALS.length },
         );
 
         const owners = rowPerTrace();
@@ -157,7 +147,7 @@ describe("Experiment.compare", () => {
           harness.judgeRequests.map((request) => ({
             row: request.data.row_index,
             traceId: request.trace_id,
-          }))
+          })),
         );
         const filed = attribution(
           owners,
@@ -165,17 +155,13 @@ describe("Experiment.compare", () => {
           recorded.map((evaluation) => ({
             row: evaluation.index,
             traceId: evaluation.trace_id,
-          }))
+          })),
         );
 
-        // One traced comparison per side, not four. Only the row that runs
-        // before any withTarget() call gets an iteration span, because the
-        // switch to target-rooted traces is a run-wide latch, so the other
-        // rows compare with no row-level trace to be attributed to. Asserting
-        // the count is what keeps "no mismatches" meaningful: blanking every
-        // trace id would leave nothing to mismatch. Give every row its own
-        // trace and this number becomes CAPITALS.length, which is a change to
-        // make here deliberately rather than discover as a passing test.
+        // One traced comparison per side, not four: only the row before any
+        // withTarget() call gets a span, since the switch to target-rooted
+        // traces is a run-wide latch. Asserting the count keeps "no
+        // mismatches" meaningful -- blanking every id would leave nothing to mismatch.
         expect({
           mismatched: [...judged.mismatched, ...filed.mismatched],
           tracedJudged: judged.traced,
@@ -196,15 +182,12 @@ describe("Experiment.compare", () => {
           async ({ item }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             await experiment.compare({ input: item.question });
           },
-          { concurrency: 1 }
+          { concurrency: 1 },
         );
 
         const iterationTraceId = exporter
@@ -226,7 +209,7 @@ describe("Experiment.compare", () => {
         // background caller comparing while rows are in flight.
         const rowsInFlight = deferred();
         const comparedFromOutside = rowsInFlight.promise.then(() =>
-          experiment.compare().catch((error: unknown) => error)
+          experiment.compare().catch((error: unknown) => error),
         );
 
         // Every other row stays open until that caller has its answer, so a
@@ -239,10 +222,7 @@ describe("Experiment.compare", () => {
           async ({ item, index }) => {
             await Promise.all([
               experiment.withTarget("gpt-5-mini", () => `${item.answer}.`),
-              experiment.withTarget(
-                "claude-sonnet-5",
-                () => `The answer is ${item.answer}.`
-              ),
+              experiment.withTarget("claude-sonnet-5", () => `The answer is ${item.answer}.`),
             ]);
 
             if (index === 1) {
@@ -255,7 +235,7 @@ describe("Experiment.compare", () => {
 
             await experiment.compare({ input: item.question });
           },
-          { concurrency: CAPITALS.length }
+          { concurrency: CAPITALS.length },
         );
 
         expect(outcome).toBeInstanceOf(ComparisonError);

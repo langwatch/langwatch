@@ -1,9 +1,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { AnalyticsApiError } from "@/client-sdk/services/analytics/analytics-api.service";
+
+import {
+  AnalyticsApiError,
+  AnalyticsApiService,
+} from "@/client-sdk/services/analytics/analytics-api.service";
 
 vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOriginal) => {
-  // eslint-disable-next-line @typescript-eslint/no-unnecessary-type-assertion
-  const actual = (await importOriginal()) as Record<string, unknown>;
+  const actual = await importOriginal<Record<string, unknown>>();
   return {
     ...actual,
     AnalyticsApiService: vi.fn(),
@@ -11,7 +14,11 @@ vi.mock("@/client-sdk/services/analytics/analytics-api.service", async (importOr
 });
 
 vi.mock("../../../utils/apiKey", () => ({
-  resolveCredentials: vi.fn(async () => ({ apiKey: "test-key", source: "env", endpoint: "https://app.langwatch.ai" })),
+  resolveCredentials: vi.fn(async () => ({
+    apiKey: "test-key",
+    source: "env",
+    endpoint: "https://app.langwatch.ai",
+  })),
 }));
 
 vi.mock("ora", () => ({
@@ -22,7 +29,6 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import { AnalyticsApiService } from "@/client-sdk/services/analytics/analytics-api.service";
 import { queryAnalyticsCommand } from "../query";
 
 class ProcessExitError extends Error {
@@ -47,9 +53,11 @@ describe("queryAnalyticsCommand()", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockTimeseries = vi.fn();
-    vi.mocked(AnalyticsApiService).mockImplementation(function () { return ({
-      timeseries: mockTimeseries,
-    }) as unknown as AnalyticsApiService; });
+    vi.mocked(AnalyticsApiService).mockImplementation(function () {
+      return {
+        timeseries: mockTimeseries,
+      } as unknown as AnalyticsApiService;
+    });
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
@@ -175,9 +183,9 @@ describe("queryAnalyticsCommand()", () => {
   describe("when the metric is neither a preset nor a metric path", () => {
     /** @scenario "An unknown metric is refused with the known list" */
     it("exits with code 1 before any request, listing presets and metrics", async () => {
-      await expect(
-        queryAnalyticsCommand({ metric: "spans.count" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(queryAnalyticsCommand({ metric: "spans.count" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(mockTimeseries).not.toHaveBeenCalled();
       const printed = vi.mocked(console.error).mock.calls.flat().join("\n");
@@ -210,9 +218,7 @@ describe("queryAnalyticsCommand()", () => {
 
   describe("when the API call fails", () => {
     it("exits with code 1", async () => {
-      mockTimeseries.mockRejectedValue(
-        new AnalyticsApiError("Network error", "query analytics"),
-      );
+      mockTimeseries.mockRejectedValue(new AnalyticsApiError("Network error", "query analytics"));
 
       await expect(queryAnalyticsCommand({})).rejects.toThrow(ProcessExitError);
     });

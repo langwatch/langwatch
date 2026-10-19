@@ -1,0 +1,153 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { SUITE_RUN_EVENT_TYPES, SUITE_RUN_EVENT_VERSIONS } from "./suite-run.constants.ts";
+
+const suiteRunEventSchema = z.object({
+  id: z.string(),
+  aggregateId: z.string(),
+  aggregateType: z.string().trim().min(1),
+  tenantId: z.string().trim().min(1).brand<"TenantId">(),
+  createdAt: z.number().int().nonnegative(),
+  occurredAt: z.number().int().nonnegative(),
+  type: z.string().trim().min(1),
+  version: z.string().date(),
+  data: z.unknown(),
+  metadata: z.object({ processingTraceparent: z.string().optional() }).passthrough().optional(),
+  idempotencyKey: z.string().optional(),
+});
+
+/**
+ * SuiteRunStarted event - emitted when a suite run begins.
+ */
+const suiteRunStartedEventDataSchemaDefinition = z.object({
+  batchRunId: z.string(),
+  scenarioSetId: z.string(),
+  suiteId: z.string(),
+  total: z.number(),
+  scenarioIds: z.array(z.string()),
+  targetIds: z.array(z.string()),
+});
+export interface SuiteRunStartedEventDataSchema extends Named<
+  typeof suiteRunStartedEventDataSchemaDefinition
+> {}
+export const suiteRunStartedEventDataSchema: SuiteRunStartedEventDataSchema =
+  suiteRunStartedEventDataSchemaDefinition;
+export type SuiteRunStartedEventData = z.infer<typeof suiteRunStartedEventDataSchema>;
+
+const SuiteRunStartedEventSchemaDefinition = z.object({
+  ...suiteRunEventSchema.shape,
+  type: z.literal(SUITE_RUN_EVENT_TYPES.STARTED),
+  version: z.literal(SUITE_RUN_EVENT_VERSIONS.STARTED),
+  data: suiteRunStartedEventDataSchema,
+});
+export interface SuiteRunStartedEventSchema extends Named<
+  typeof SuiteRunStartedEventSchemaDefinition
+> {}
+export const SuiteRunStartedEventSchema: SuiteRunStartedEventSchema =
+  SuiteRunStartedEventSchemaDefinition;
+export type SuiteRunStartedEvent = z.infer<typeof SuiteRunStartedEventSchema>;
+
+/**
+ * SuiteRunItemStarted event - emitted when an individual item in the suite starts.
+ */
+const suiteRunItemStartedEventDataSchemaDefinition = z.object({
+  batchRunId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+});
+export interface SuiteRunItemStartedEventDataSchema extends Named<
+  typeof suiteRunItemStartedEventDataSchemaDefinition
+> {}
+export const suiteRunItemStartedEventDataSchema: SuiteRunItemStartedEventDataSchema =
+  suiteRunItemStartedEventDataSchemaDefinition;
+export type SuiteRunItemStartedEventData = z.infer<typeof suiteRunItemStartedEventDataSchema>;
+
+const SuiteRunItemStartedEventSchemaDefinition = z.object({
+  ...suiteRunEventSchema.shape,
+  type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_STARTED),
+  version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_STARTED),
+  data: suiteRunItemStartedEventDataSchema,
+});
+export interface SuiteRunItemStartedEventSchema extends Named<
+  typeof SuiteRunItemStartedEventSchemaDefinition
+> {}
+export const SuiteRunItemStartedEventSchema: SuiteRunItemStartedEventSchema =
+  SuiteRunItemStartedEventSchemaDefinition;
+export type SuiteRunItemStartedEvent = z.infer<typeof SuiteRunItemStartedEventSchema>;
+
+/**
+ * SuiteRunItemCompleted event - emitted when an individual item finishes.
+ */
+const suiteRunItemCompletedEventDataSchemaDefinition = z.object({
+  batchRunId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  status: z.string(),
+  verdict: z.string().optional(),
+  durationMs: z.number().optional(),
+  reasoning: z.string().optional(),
+  error: z.string().optional(),
+});
+export interface SuiteRunItemCompletedEventDataSchema extends Named<
+  typeof suiteRunItemCompletedEventDataSchemaDefinition
+> {}
+export const suiteRunItemCompletedEventDataSchema: SuiteRunItemCompletedEventDataSchema =
+  suiteRunItemCompletedEventDataSchemaDefinition;
+export type SuiteRunItemCompletedEventData = z.infer<typeof suiteRunItemCompletedEventDataSchema>;
+
+const SuiteRunItemCompletedEventSchemaDefinition = z.object({
+  ...suiteRunEventSchema.shape,
+  type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_COMPLETED),
+  version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_COMPLETED),
+  data: suiteRunItemCompletedEventDataSchema,
+});
+export interface SuiteRunItemCompletedEventSchema extends Named<
+  typeof SuiteRunItemCompletedEventSchemaDefinition
+> {}
+export const SuiteRunItemCompletedEventSchema: SuiteRunItemCompletedEventSchema =
+  SuiteRunItemCompletedEventSchemaDefinition;
+export type SuiteRunItemCompletedEvent = z.infer<typeof SuiteRunItemCompletedEventSchema>;
+
+/**
+ * SuiteRunItemRegraded — emitted when a completed item's verdict changes
+ * because an attached evaluator gates it. Carries the before/after verdict
+ * so the fold moves counters without per-item state.
+ */
+const suiteRunItemRegradedEventDataSchemaDefinition = z.object({
+  batchRunId: z.string(),
+  scenarioRunId: z.string(),
+  scenarioId: z.string(),
+  previousStatus: z.string(),
+  previousVerdict: z.string().optional(),
+  status: z.string(),
+  verdict: z.string().optional(),
+});
+export interface SuiteRunItemRegradedEventDataSchema extends Named<
+  typeof suiteRunItemRegradedEventDataSchemaDefinition
+> {}
+export const suiteRunItemRegradedEventDataSchema: SuiteRunItemRegradedEventDataSchema =
+  suiteRunItemRegradedEventDataSchemaDefinition;
+export type SuiteRunItemRegradedEventData = z.infer<typeof suiteRunItemRegradedEventDataSchema>;
+
+const SuiteRunItemRegradedEventSchemaDefinition = z.object({
+  ...suiteRunEventSchema.shape,
+  type: z.literal(SUITE_RUN_EVENT_TYPES.ITEM_REGRADED),
+  version: z.literal(SUITE_RUN_EVENT_VERSIONS.ITEM_REGRADED),
+  data: suiteRunItemRegradedEventDataSchema,
+});
+export interface SuiteRunItemRegradedEventSchema extends Named<
+  typeof SuiteRunItemRegradedEventSchemaDefinition
+> {}
+export const SuiteRunItemRegradedEventSchema: SuiteRunItemRegradedEventSchema =
+  SuiteRunItemRegradedEventSchemaDefinition;
+export type SuiteRunItemRegradedEvent = z.infer<typeof SuiteRunItemRegradedEventSchema>;
+
+/**
+ * Union of all suite run processing event types.
+ */
+export type SuiteRunProcessingEvent =
+  | SuiteRunStartedEvent
+  | SuiteRunItemStartedEvent
+  | SuiteRunItemCompletedEvent
+  | SuiteRunItemRegradedEvent;

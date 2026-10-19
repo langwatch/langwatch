@@ -1,0 +1,414 @@
+/**
+ * The install end of Connect (ADR-156): the credential derived from the license
+ * an organization holds, and what Settings, Connect reads and writes.
+ * @see specs/self-hosting/connected-services/connect-settings.feature
+ */
+
+import type { LicenseCryptography } from "@langwatch/enterprise-license-signing";
+import {
+  type ConnectClassifyAnswer,
+  type ConnectCredential,
+  type ConnectDeploymentView,
+  type ConnectService,
+  type ConnectServiceState,
+  type ConnectStatus,
+  type ConnectSyncView,
+  type ConnectUpstream,
+  ConnectDisabledError,
+  ConnectLicenseRequiredError,
+  ConnectServiceNotEntitledError,
+  DEFAULT_LICENSE_PUBLIC_KEY,
+} from "@langwatch/enterprise-licensing-contract";
+import { HandledError } from "@langwatch/handled-error";
+
+import type { ConnectGatewayChannel } from "../channels/connect-gateway.channel.ts";
+import type {
+  ConnectOrganizationRecord,
+  ConnectOrganizationRepository,
+} from "../repositories/connect-organization.repository.ts";
+import {
+  connectServicesDisabledAfter,
+  connectServicesNamedBy,
+  enabledConnectServices,
+} from "../rules/connect-entitlement.rules.ts";
+import { licenseKeyFingerprint } from "../rules/license-key.rules.ts";
+import type { InstanceIdentityService } from "./instance-identity.service.ts";
+import type { LicenseLogger } from "./license.service.ts";
+import type { LicensingCustomerFactsService } from "./licensing-customer-facts.service.ts";
+
+/** How long the settings read waits for the hosted usage route before showing it unavailable. */
+const USAGE_READ_TIMEOUT_MS = 10_000;
+
+/** Codes that mean LangWatch was not reached; every other refusal is shown as one. */
+const USAGE_UNREACHABLE_CODES: ReadonlySet<string> = new Set([
+  "connect_unreachable",
+  "hosted_service_unavailable",
+]);
+
+/** What a deployment decided about Connect, before any license has its say. */
+interface ConnectDeployment {
+  /**
+   * False only where an operator switched Connect off. True is not a claim that
+   * anything is reachable: the license decides that.
+   */
+  readonly permitted: boolean;
+  readonly gatewayEndpoint: string;
+  readonly licenseEndpoint: string;
+}
+
+interface ConnectInstallServiceDependencies {
+  readonly organizations: ConnectOrganizationRepository;
+  /** Where a switch is recorded; organization writes it to its own row (ORG-CONNECT-WRITES). */
+  readonly facts: Pick<
+    LicensingCustomerFactsService,
+    "connectServiceSwitched" | "connectUpstreamSet" | "connectUpstreamCleared"
+  >;
+  readonly identity: InstanceIdentityService;
+  readonly cryptography: LicenseCryptography;
+  readonly deployment: ConnectDeployment;
+  /** Composed only where Connect is permitted; absent means no outbound call. */
+  readonly gateway?: ConnectGatewayChannel;
+  /** The key this whole deployment is licensed by, where one is set. */
+  readonly instanceLicenseKey: () => string | undefined;
+  /** The key licenses are verified against, where the deployment names one. */
+  readonly publicKey?: string;
+  /** Where a failed usage read is recorded; absent, it is not. */
+  readonly logger?: LicenseLogger;
+}
+
+/** The hosted service the install's gateway slot serves. */
+const MANAGED_MODELS = "managed_models";
+
+export class ConnectInstallService {
+  static create(deps: ConnectInstallServiceDependencies): ConnectInstallService {
+    return new ConnectInstallService(deps);
+  }
+
+  private constructor(private readonly deps: ConnectInstallServiceDependencies) {}
+
+  /**
+   * The credential this organization calls LangWatch with; empty where it holds
+   * no license, where the license is not a license, or where Connect is off.
+   */
+  async findCredential(organizationId: string): Promise<ConnectCredential[]> {
+    if (!this.deps.deployment.permitted) return [];
+
+    const organization = await this.deps.organizations.findById(organizationId);
+    const licenseKey = this.licenseKeyOf(organization);
+    if (!licenseKey) return [];
+
+    const token = this.tokenOf(licenseKey);
+    if (!token) return [];
+
+    return [{ token, instanceId: await this.deps.identity.getInstanceId() }];
+  }
+
+  /** Where this organization's gateway reaches hosted models; empty where no credential is held. */
+  async findUpstream(organizationId: string): Promise<ConnectUpstream[]> {
+    const [credential] = await this.findCredential(organizationId);
+    if (!credential) return [];
+    return [{ ...credential, baseUrl: this.deps.deployment.gatewayEndpoint }];
+  }
+
+  /** The hosted services this organization's license names. */
+  async findEntitledServices(organizationId: string): Promise<ConnectService[]> {
+    if (!this.deps.deployment.permitted) return [];
+    const organization = await this.deps.organizations.findById(organizationId);
+    return this.entitledOf(organization);
+  }
+
+  /** The entitled services, less the ones an administrator switched off. */
+  async findEnabledServices(organizationId: string): Promise<ConnectService[]> {
+    if (!this.deps.deployment.permitted) return [];
+    const organization = await this.deps.organizations.findById(organizationId);
+    return enabledConnectServices({
+      entitled: this.entitledOf(organization),
+      disabled: organization?.servicesDisabled ?? [],
+    });
+  }
+
+  /** Whether one hosted service is both entitled and switched on. */
+  async isServiceEnabled({
+    organizationId,
+    service,
+  }: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<boolean> {
+    const enabled = await this.findEnabledServices(organizationId);
+    return enabled.includes(service);
+  }
+
+  /** Both halves of one service's answer apart, from one read of the organization's row. */
+  async getServiceState({
+    organizationId,
+    service,
+  }: {
+    organizationId: string;
+    service: ConnectService;
+  }): Promise<ConnectServiceState> {
+    if (!this.deps.deployment.permitted) return { isEntitled: false, isSwitchedOn: false };
+    const organization = await this.deps.organizations.findById(organizationId);
+    const isEntitled = this.entitledOf(organization).includes(service);
+    const isSwitchedOff = (organization?.servicesDisabled ?? []).includes(service);
+    return { isEntitled, isSwitchedOn: isEntitled && !isSwitchedOff };
+  }
+
+  /**
+   * What the deployment decided, and whether any license on the install names a
+   * hosted service: the usage report goes to the connect host only then.
+   */
+  async getDeployment(): Promise<ConnectDeploymentView> {
+    const { deployment, publicKey, cryptography } = this.deps;
+    const [licenseKey] = await this.findActiveLicenseKey();
+    const signed = licenseKey ? cryptography.parseLicenseKey(licenseKey) : null;
+    return {
+      permitted: deployment.permitted,
+      connected: await this.isInstallConnected(),
+      licenseEndpoint: deployment.licenseEndpoint,
+      gatewayEndpoint: deployment.gatewayEndpoint,
+      licenseKeySource: publicKey ? "override" : "embedded",
+      licenseKeyFingerprint: licenseKeyFingerprint(publicKey ?? DEFAULT_LICENSE_PUBLIC_KEY),
+      licenseId: signed?.data.licenseId ?? null,
+      licenseVerified: licenseKey
+        ? signed !== null && cryptography.verifySignature(signed, publicKey)
+        : null,
+    };
+  }
+
+  /** The instance-wide license, else the first organization's; empty where none is held. */
+  private async findActiveLicenseKey(): Promise<string[]> {
+    const instanceKey = this.deps.instanceLicenseKey();
+    if (instanceKey) return [instanceKey];
+    const [organizationId] = await this.deps.organizations.findLicensedOrganizationIds();
+    if (organizationId === undefined) return [];
+    const license = (await this.deps.organizations.findById(organizationId))?.license;
+    return license ? [license] : [];
+  }
+
+  /** Every organization holding a license, which the daily sync passes over. */
+  findLicensedOrganizationIds(): Promise<string[]> {
+    return this.deps.organizations.findLicensedOrganizationIds();
+  }
+
+  private async isInstallConnected(): Promise<boolean> {
+    if (!this.deps.deployment.permitted) return false;
+    for (const organizationId of await this.deps.organizations.findLicensedOrganizationIds()) {
+      const organization = await this.deps.organizations.findById(organizationId);
+      if (this.entitledOf(organization).length > 0) return true;
+    }
+    return false;
+  }
+
+  /** What Settings, Connect renders for this organization. */
+  async getStatus(organizationId: string): Promise<ConnectStatus> {
+    const { deployment } = this.deps;
+    if (!deployment.permitted) return { deployment: "off" };
+
+    const organization = await this.deps.organizations.findById(organizationId);
+    const entitled = this.entitledOf(organization);
+    const base = {
+      deployment: "on",
+      gatewayHost: new URL(deployment.gatewayEndpoint).host,
+      enabledServices: enabledConnectServices({
+        entitled,
+        disabled: organization?.servicesDisabled ?? [],
+      }),
+      sync: syncOf(organization),
+    } as const;
+
+    const [credential] = await this.findCredential(organizationId);
+    if (!credential) {
+      return {
+        ...base,
+        licensed: false,
+        entitledServices: null,
+        usage: null,
+        refusal: null,
+        isUsageUnavailable: false,
+      };
+    }
+
+    try {
+      const usage = await this.gateway().usage({
+        credential,
+        signal: AbortSignal.timeout(USAGE_READ_TIMEOUT_MS),
+      });
+      return {
+        ...base,
+        licensed: true,
+        entitledServices: usage.services,
+        usage,
+        refusal: null,
+        isUsageUnavailable: false,
+      };
+    } catch (error) {
+      if (HandledError.isHandled(error) && !USAGE_UNREACHABLE_CODES.has(error.code)) {
+        return {
+          ...base,
+          licensed: true,
+          entitledServices: null,
+          usage: null,
+          refusal: { code: error.code, meta: error.meta },
+          isUsageUnavailable: false,
+        };
+      }
+      this.deps.logger?.error(
+        { error, organizationId },
+        "hosted usage read failed, showing usage as unavailable",
+      );
+      return {
+        ...base,
+        licensed: true,
+        entitledServices: null,
+        usage: null,
+        refusal: null,
+        isUsageUnavailable: true,
+      };
+    }
+  }
+
+  /**
+   * Switches one hosted service on or off for this organization. Switching one
+   * on asks the host first, because the license the install holds may name a
+   * service the registry has since revoked.
+   */
+  async setService({
+    organizationId,
+    service,
+    enabled,
+  }: {
+    organizationId: string;
+    service: string;
+    enabled: boolean;
+  }): Promise<{ enabledServices: ConnectService[] }> {
+    const credential = await this.requireCredential(organizationId);
+
+    if (enabled) {
+      const usage = await this.gateway().usage({ credential });
+      if (!usage.services.includes(service)) throw new ConnectServiceNotEntitledError(service);
+    }
+
+    const organization = await this.deps.organizations.findById(organizationId);
+    const servicesDisabled = connectServicesDisabledAfter({
+      current: organization?.servicesDisabled ?? [],
+      service,
+      enabled,
+    });
+    await this.deps.facts.connectServiceSwitched({ organizationId, service, enabled });
+    const enabledServices = enabledConnectServices({
+      entitled: this.entitledOf(organization),
+      disabled: servicesDisabled,
+    });
+    // Organization applies the switch seconds later: the slot follows this answer, not a re-read.
+    await this.publishUpstreamWith({
+      organizationId,
+      enabled: enabledServices.includes(MANAGED_MODELS),
+    });
+
+    return { enabledServices };
+  }
+
+  /**
+   * Judges one text on LangWatch. The judgement leaves the install only for an
+   * organization whose license names the service and whose administrator has
+   * not switched it off; both are checked by the caller that holds the judge.
+   */
+  async classify({
+    organizationId,
+    text,
+    questions,
+  }: {
+    organizationId: string;
+    text: string;
+    questions: readonly unknown[];
+  }): Promise<ConnectClassifyAnswer> {
+    const credential = await this.requireCredential(organizationId);
+    return this.gateway().classify({ credential, text, questions });
+  }
+
+  /** Moves the customer's own hosted usage cap, up to the contract maximum. */
+  async setCap({
+    organizationId,
+    capUsd,
+  }: {
+    organizationId: string;
+    capUsd: number;
+  }): Promise<{ capUsd: number; maximumCapUsd: number }> {
+    const credential = await this.requireCredential(organizationId);
+    return this.gateway().setBudget({ credential, capUsd });
+  }
+
+  /**
+   * Records that the gateway's hosted provider slot is set while Connect is on, managed models
+   * are entitled and switched on, and a license yields a token; that it is cleared otherwise.
+   */
+  async publishUpstream(organizationId: string): Promise<void> {
+    const enabled = await this.isServiceEnabled({ organizationId, service: MANAGED_MODELS });
+    await this.publishUpstreamWith({ organizationId, enabled });
+  }
+
+  private async publishUpstreamWith({
+    organizationId,
+    enabled,
+  }: {
+    organizationId: string;
+    enabled: boolean;
+  }): Promise<void> {
+    const [credential] = await this.findCredential(organizationId);
+    if (credential && enabled) await this.deps.facts.connectUpstreamSet({ organizationId });
+    else await this.deps.facts.connectUpstreamCleared({ organizationId });
+  }
+
+  /** The credential a change needs, or the reason it cannot be made. */
+  private async requireCredential(organizationId: string): Promise<ConnectCredential> {
+    if (!this.deps.deployment.permitted) throw new ConnectDisabledError();
+    const [credential] = await this.findCredential(organizationId);
+    if (!credential) throw new ConnectLicenseRequiredError();
+    return credential;
+  }
+
+  private gateway(): ConnectGatewayChannel {
+    const { gateway } = this.deps;
+    if (!gateway) throw new ConnectDisabledError();
+    return gateway;
+  }
+
+  /**
+   * Falls back to the instance-wide license, so a deployment licensed through
+   * one key is entitled on every organization it carries.
+   */
+  private licenseKeyOf(organization: ConnectOrganizationRecord | null): string | undefined {
+    return organization?.license ?? this.deps.instanceLicenseKey() ?? void 0;
+  }
+
+  private entitledOf(organization: ConnectOrganizationRecord | null): ConnectService[] {
+    const licenseKey = this.licenseKeyOf(organization);
+    if (!licenseKey) return [];
+
+    const result = this.deps.cryptography.validateLicense({
+      licenseKey,
+      ...(this.deps.publicKey ? { publicKey: this.deps.publicKey } : {}),
+    });
+    if (!result.valid) return [];
+
+    return connectServicesNamedBy(result.licenseData.connectServices);
+  }
+
+  /** A pasted key that is not a license yields no credential, not a crash. */
+  private tokenOf(licenseKey: string): string | undefined {
+    try {
+      return this.deps.cryptography.getLicenseToken(licenseKey);
+    } catch {
+      return void 0;
+    }
+  }
+}
+
+/** Where the daily sync stands, for the page to say so. */
+function syncOf(organization: ConnectOrganizationRecord | null): ConnectSyncView {
+  return {
+    lastSyncAt: organization?.lastSyncAt?.toString() ?? null,
+    lastError: organization?.lastSyncError ? { code: organization.lastSyncError } : null,
+  };
+}

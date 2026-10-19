@@ -50,6 +50,10 @@ def _parse_response(
     | DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse500
     | None
 ):
+    if response.status_code == 200:
+        response_200 = response.json()
+        return response_200
+
     if response.status_code == 204:
         response_204 = cast(Any, None)
         return response_204

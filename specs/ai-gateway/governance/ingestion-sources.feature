@@ -201,6 +201,29 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin opens it for editing
       Then the drawer title reads "Edit source"
 
+  Rule: The source drawers and the once-shown secret keep their controls
+
+    @integration
+    Scenario: The source drawers keep Cancel and say why Save is off
+      When the admin opens the Add or Edit drawer
+      Then the provider's logo is decorative and the title names the source
+      And the footer has Cancel, which closes the drawer once
+      And the primary action is off with a reason while the display name is blank
+
+    @integration
+    Scenario: The once-shown secret ignores an outside click but closes by X or Escape
+      Given a new source's secret is shown
+      When the admin clicks outside the dialog
+      Then the dialog stays open
+      And the X closes it, and so does Escape
+      And "I've saved it" closes it
+
+    @integration
+    Scenario: The secret dialog leads to the source page
+      Given a new source's secret is shown
+      When the admin chooses "View source page"
+      Then the admin goes to that source's page
+
   Rule: Notes about why a field is locked sit behind the title, not above the fields
 
     @integration
@@ -650,6 +673,16 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       Anthropic Admin Console → Cowork → Telemetry"
     And once the upstream platform begins pushing, events appear in the
       Activity Monitor within 30 seconds
+
+  # Ruled 2026-10-09 alongside the trace door: a failed handoff is retryable,
+  # and the resend dedupes the spans the pipeline already took.
+  @unit
+  Scenario: A span batch whose pipeline handoff fails is answered as retryable
+    Given an OTel source pushes a span batch to its OTLP URL
+    And the trace pipeline fails to take one of the batch's spans
+    When the receiver answers
+    Then the batch is answered 503 and marked retryable
+    And no event is recorded against the source, so the resend counts once
 
   Scenario: S3 audit log source with custom parser DSL
     Given a customer's homegrown agent system writes audit logs to S3

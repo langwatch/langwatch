@@ -1,0 +1,17 @@
+{
+  // What every emitting project states identically. A package's tsconfig.build.json
+  // extends its own tsconfig.json for lib/types/jsx/paths, then this for the emit
+  // half -- later entries win, so noEmit:false beats the typecheck config's true.
+  "extends": "./tsconfig.base.json",
+  // rootDir, outDir and tsBuildInfoFile stay in each package: a path-valued
+  // option resolves against the file that declares it, so hoisting them here
+  // would point every package at the repository root.
+  "compilerOptions": {
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "emitDeclarationOnly": true,
+    "noEmit": false,
+    "noEmitOnError": true
+  }
+}

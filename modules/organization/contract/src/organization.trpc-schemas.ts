@@ -1,0 +1,336 @@
+import type { Named } from "@langwatch/module";
+import { z } from "zod";
+
+import { organizationIntentSchema } from "./organization.ts";
+
+/** Transport inputs: what callers must send to the tRPC surface. */
+
+/** The organization a call is about, and the only scope most of them carry. */
+const organizationApiScopeSchemaDefinition = z.object({ organizationId: z.string() });
+export interface OrganizationApiScopeSchema extends Named<
+  typeof organizationApiScopeSchemaDefinition
+> {}
+export const organizationApiScopeSchema: OrganizationApiScopeSchema =
+  organizationApiScopeSchemaDefinition;
+export type OrganizationApiScope = z.infer<typeof organizationApiScopeSchema>;
+
+/** One member of one organization. */
+const organizationApiMemberScopeSchemaDefinition = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
+});
+export interface OrganizationApiMemberScopeSchema extends Named<
+  typeof organizationApiMemberScopeSchemaDefinition
+> {}
+export const organizationApiMemberScopeSchema: OrganizationApiMemberScopeSchema =
+  organizationApiMemberScopeSchemaDefinition;
+export type OrganizationApiMemberScope = z.infer<typeof organizationApiMemberScopeSchema>;
+
+/**
+ * Restated from the Postgres enum `OrganizationUserRole`, since a portable
+ * contract cannot depend on the generated Prisma client — `team.ts`'s roles
+ * are restated the same way.
+ */
+export const organizationApiMemberRoleSchema = z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]);
+export type OrganizationApiMemberRole = z.infer<typeof organizationApiMemberRoleSchema>;
+
+export const organizationApiCustomTeamRoleSchema = z
+  .string()
+  .regex(/^custom:[a-zA-Z0-9_-]+$/, "Custom role must be in format 'custom:{roleId}'");
+
+/**
+ * Whether a role string names one an organization defined for itself. A naming
+ * convention on a stored string, not an entitlement, so the contract can say
+ * it and every writer reads the same answer.
+ */
+export function isOrganizationApiCustomRole(role: string): boolean {
+  return role.startsWith("custom:");
+}
+
+const assignedRoleSchema = z.object({ role: z.string(), customRoleId: z.string().nullish() });
+
+/** Every place a granting write names team roles: one role, members, updates, invitations. */
+const assignedRolesSchema = z.object({
+  role: z.string().optional(),
+  customRoleId: z.string().nullish(),
+  members: z.array(assignedRoleSchema).optional(),
+  teamRoleUpdates: z.array(assignedRoleSchema).optional(),
+  invites: z.array(z.object({ teams: z.array(assignedRoleSchema).optional() })).optional(),
+});
+
+/** Whether a write assigns any custom team role: the question only Enterprise answers yes to. */
+export function assignsOrganizationCustomRole(input: unknown): boolean {
+  const parsed = assignedRolesSchema.safeParse(input);
+  if (!parsed.success) return false;
+
+  const { role, customRoleId, members = [], teamRoleUpdates = [], invites = [] } = parsed.data;
+  const assigned = [
+    { role: role ?? "", customRoleId },
+    ...members,
+    ...teamRoleUpdates,
+    ...invites.flatMap((invite) => invite.teams ?? []),
+  ];
+
+  return assigned.some(
+    (assignment) =>
+      Boolean(assignment.customRoleId) || isOrganizationApiCustomRole(assignment.role),
+  );
+}
+
+/**
+ * The built-in team roles an invitation or a role change may name. `CUSTOM` is
+ * deliberately absent: a custom role arrives as the `custom:<id>` form below.
+ */
+export const organizationApiBuiltInTeamRoleSchema = z.enum(["ADMIN", "MEMBER", "VIEWER"]);
+
+const organizationApiTeamRoleSchemaDefinition = z.union([
+  organizationApiBuiltInTeamRoleSchema,
+  organizationApiCustomTeamRoleSchema,
+]);
+export interface OrganizationApiTeamRoleSchema extends Named<
+  typeof organizationApiTeamRoleSchemaDefinition
+> {}
+export const organizationApiTeamRoleSchema: OrganizationApiTeamRoleSchema =
+  organizationApiTeamRoleSchemaDefinition;
+export type OrganizationApiTeamRole = z.infer<typeof organizationApiTeamRoleSchema>;
+
+const organizationApiSetMemberDisabledInputSchemaDefinition = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
+  disabled: z.boolean(),
+});
+export interface OrganizationApiSetMemberDisabledInputSchema extends Named<
+  typeof organizationApiSetMemberDisabledInputSchemaDefinition
+> {}
+export const organizationApiSetMemberDisabledInputSchema: OrganizationApiSetMemberDisabledInputSchema =
+  organizationApiSetMemberDisabledInputSchemaDefinition;
+export type OrganizationApiSetMemberDisabledInput = z.infer<
+  typeof organizationApiSetMemberDisabledInputSchema
+>;
+
+const organizationApiGetAllInputSchemaDefinition = z.object({ isDemo: z.boolean().optional() });
+export interface OrganizationApiGetAllInputSchema extends Named<
+  typeof organizationApiGetAllInputSchemaDefinition
+> {}
+export const organizationApiGetAllInputSchema: OrganizationApiGetAllInputSchema =
+  organizationApiGetAllInputSchemaDefinition;
+export type OrganizationApiGetAllInput = z.infer<typeof organizationApiGetAllInputSchema>;
+
+const organizationApiUpdateInputSchemaDefinition = z
+  .object({
+    organizationId: z.string(),
+    name: z.string(),
+    s3Endpoint: z.string().optional(),
+    s3AccessKeyId: z.string().optional(),
+    s3SecretAccessKey: z.string().optional(),
+    s3Bucket: z.string().optional(),
+    presenceEnabled: z.boolean().optional(),
+    traceSharingEnabled: z.boolean().optional(),
+    supportContact: z.string().max(500).nullable().optional(),
+    primaryIntent: organizationIntentSchema.nullable().optional(),
+  })
+  .refine(
+    (data) => {
+      const hasEndpoint = !!data.s3Endpoint?.trim();
+      const hasAccessKey = !!data.s3AccessKeyId?.trim();
+      const hasSecretKey = !!data.s3SecretAccessKey?.trim();
+
+      return (hasEndpoint && hasAccessKey) || (!hasEndpoint && !hasAccessKey && !hasSecretKey);
+    },
+    {
+      message:
+        "S3 Endpoint and Access Key ID must be provided together; a blank Secret Access Key leaves the stored one unchanged",
+    },
+  );
+export interface OrganizationApiUpdateInputSchema extends Named<
+  typeof organizationApiUpdateInputSchemaDefinition
+> {}
+export const organizationApiUpdateInputSchema: OrganizationApiUpdateInputSchema =
+  organizationApiUpdateInputSchemaDefinition;
+export type OrganizationApiUpdateInput = z.infer<typeof organizationApiUpdateInputSchema>;
+
+const organizationApiWithMembersInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  includeDeactivated: z.boolean().optional(),
+});
+export interface OrganizationApiWithMembersInputSchema extends Named<
+  typeof organizationApiWithMembersInputSchemaDefinition
+> {}
+export const organizationApiWithMembersInputSchema: OrganizationApiWithMembersInputSchema =
+  organizationApiWithMembersInputSchemaDefinition;
+export type OrganizationApiWithMembersInput = z.infer<typeof organizationApiWithMembersInputSchema>;
+
+const organizationApiCreateInvitesInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  invites: z.array(
+    z.object({
+      email: z.string().email(),
+      teamIds: z.string().optional(), // Keep for backward compatibility
+      teams: z
+        .array(
+          z.object({
+            teamId: z.string(),
+            role: organizationApiTeamRoleSchema,
+            customRoleId: z.string().optional(),
+          }),
+        )
+        .optional(),
+      role: organizationApiMemberRoleSchema,
+    }),
+  ),
+});
+export interface OrganizationApiCreateInvitesInputSchema extends Named<
+  typeof organizationApiCreateInvitesInputSchemaDefinition
+> {}
+export const organizationApiCreateInvitesInputSchema: OrganizationApiCreateInvitesInputSchema =
+  organizationApiCreateInvitesInputSchemaDefinition;
+export type OrganizationApiCreateInvitesInput = z.infer<
+  typeof organizationApiCreateInvitesInputSchema
+>;
+
+const organizationApiInviteScopeSchemaDefinition = z.object({
+  inviteId: z.string(),
+  organizationId: z.string(),
+});
+export interface OrganizationApiInviteScopeSchema extends Named<
+  typeof organizationApiInviteScopeSchemaDefinition
+> {}
+export const organizationApiInviteScopeSchema: OrganizationApiInviteScopeSchema =
+  organizationApiInviteScopeSchemaDefinition;
+export type OrganizationApiInviteScope = z.infer<typeof organizationApiInviteScopeSchema>;
+
+/**
+ * A seat checkout and the invitations that motivated it, the wire billing's
+ * `subscription.upgradeWithInvites` had; organization's invite door now holds it (C2 A).
+ */
+const organizationApiSeatCheckoutInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  baseUrl: z.string(),
+  currency: z.enum(["USD", "EUR"]).optional(),
+  billingInterval: z.enum(["monthly", "annual"]).optional(),
+  totalSeats: z.number().min(1),
+  invites: z.array(
+    z.object({
+      email: z.string().email(),
+      role: z.enum(["ADMIN", "MEMBER", "EXTERNAL", "DEVELOPER"]),
+    }),
+  ),
+});
+export interface OrganizationApiSeatCheckoutInputSchema extends Named<
+  typeof organizationApiSeatCheckoutInputSchemaDefinition
+> {}
+export const organizationApiSeatCheckoutInputSchema: OrganizationApiSeatCheckoutInputSchema =
+  organizationApiSeatCheckoutInputSchemaDefinition;
+export type OrganizationApiSeatCheckoutInput = z.infer<
+  typeof organizationApiSeatCheckoutInputSchema
+>;
+
+/** Where the browser is sent to pay; none when the provider answered no page. */
+const organizationSeatCheckoutRedirectSchemaDefinition = z
+  .object({ url: z.string().nullable() })
+  .strict();
+export interface OrganizationSeatCheckoutRedirectSchema extends Named<
+  typeof organizationSeatCheckoutRedirectSchemaDefinition
+> {}
+export const organizationSeatCheckoutRedirectSchema: OrganizationSeatCheckoutRedirectSchema =
+  organizationSeatCheckoutRedirectSchemaDefinition;
+export type OrganizationSeatCheckoutRedirect = z.infer<
+  typeof organizationSeatCheckoutRedirectSchema
+>;
+
+const organizationApiAcceptInviteInputSchemaDefinition = z.object({ inviteCode: z.string() });
+export interface OrganizationApiAcceptInviteInputSchema extends Named<
+  typeof organizationApiAcceptInviteInputSchemaDefinition
+> {}
+export const organizationApiAcceptInviteInputSchema: OrganizationApiAcceptInviteInputSchema =
+  organizationApiAcceptInviteInputSchemaDefinition;
+export type OrganizationApiAcceptInviteInput = z.infer<
+  typeof organizationApiAcceptInviteInputSchema
+>;
+
+const organizationApiUpdateMemberRoleInputSchemaDefinition = z.object({
+  userId: z.string(),
+  organizationId: z.string(),
+  role: organizationApiMemberRoleSchema,
+  teamRoleUpdates: z
+    .array(
+      z.object({
+        teamId: z.string(),
+        userId: z.string(),
+        role: organizationApiTeamRoleSchema,
+        customRoleId: z.string().optional(),
+      }),
+    )
+    .optional(),
+});
+export interface OrganizationApiUpdateMemberRoleInputSchema extends Named<
+  typeof organizationApiUpdateMemberRoleInputSchemaDefinition
+> {}
+export const organizationApiUpdateMemberRoleInputSchema: OrganizationApiUpdateMemberRoleInputSchema =
+  organizationApiUpdateMemberRoleInputSchemaDefinition;
+export type OrganizationApiUpdateMemberRoleInput = z.infer<
+  typeof organizationApiUpdateMemberRoleInputSchema
+>;
+
+/**
+ * One team-role change. `customRoleId` travels with a custom role and with
+ * nothing else: the pairing is part of what a caller has to send, so it is
+ * stated here rather than re-derived by whichever transport carries it.
+ */
+const organizationApiUpdateTeamMemberRoleInputSchemaDefinition = z
+  .object({
+    teamId: z.string(),
+    userId: z.string(),
+    role: organizationApiTeamRoleSchema,
+    customRoleId: z.string().optional(),
+  })
+  .superRefine((data, issues) => {
+    if (isOrganizationApiCustomRole(data.role)) {
+      if (!data.customRoleId || data.customRoleId.trim() === "") {
+        issues.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: "customRoleId is required when using a custom role",
+          path: ["customRoleId"],
+        });
+      }
+      return;
+    }
+
+    if (data.customRoleId !== undefined) {
+      issues.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: "customRoleId must not be provided when using a built-in role",
+        path: ["customRoleId"],
+      });
+    }
+  });
+export interface OrganizationApiUpdateTeamMemberRoleInputSchema extends Named<
+  typeof organizationApiUpdateTeamMemberRoleInputSchemaDefinition
+> {}
+export const organizationApiUpdateTeamMemberRoleInputSchema: OrganizationApiUpdateTeamMemberRoleInputSchema =
+  organizationApiUpdateTeamMemberRoleInputSchemaDefinition;
+export type OrganizationApiUpdateTeamMemberRoleInput = z.infer<
+  typeof organizationApiUpdateTeamMemberRoleInputSchema
+>;
+
+const organizationApiAuditLogsInputSchemaDefinition = z.object({
+  organizationId: z.string(),
+  projectId: z.string().optional(),
+  userId: z.string().optional(),
+  pageOffset: z.number().min(0).default(0),
+  pageSize: z.number().min(1).max(10000).default(25),
+  action: z.string().optional(),
+  startDate: z.number().optional(),
+  endDate: z.number().optional(),
+  // Gateway deep-link filters — forwarded to the UNION query so a
+  // VK/budget detail page can link operators straight to the
+  // pre-filtered history of that resource.
+  targetKind: z.string().optional(),
+  targetId: z.string().optional(),
+});
+export interface OrganizationApiAuditLogsInputSchema extends Named<
+  typeof organizationApiAuditLogsInputSchemaDefinition
+> {}
+export const organizationApiAuditLogsInputSchema: OrganizationApiAuditLogsInputSchema =
+  organizationApiAuditLogsInputSchemaDefinition;
+export type OrganizationApiAuditLogsInput = z.infer<typeof organizationApiAuditLogsInputSchema>;

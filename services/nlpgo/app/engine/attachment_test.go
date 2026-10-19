@@ -2,6 +2,7 @@ package engine
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -220,8 +221,7 @@ func TestRewriteRejectsOversizedAttachment(t *testing.T) {
 		_, _ = w.Write([]byte(big))
 	}))
 	defer srv.Close()
-	f := loopbackFetcher()
-	f.maxBytes = 1024 // smaller than the body
+	f := loopbackFetcher().withMaxBytes(1024) // smaller than the body
 
 	out, ne := f.rewrite(context.Background(), imagePartMessage(srv.URL+"/big.png"))
 	require.Nil(t, out)
@@ -595,4 +595,140 @@ func TestDataURLWithNameSurvivesPunctuationInTheFileName(t *testing.T) {
 	file := firstPartOfType(t, msgs[0], "file")
 	data, _ := file["file"].(map[string]any)
 	assert.Equal(t, "q3, final; v2.pdf", data["filename"])
+}
+
+// sizedImageServer serves a PNG-typed body of exactly n bytes. With chunked set
+// it withholds Content-Length, so the cap is enforced on the bytes read rather
+// than on the declared length.
+func sizedImageServer(t *testing.T, n int, chunked bool) *httptest.Server {
+	t.Helper()
+	body := make([]byte, n)
+	copy(body, pngBytes)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		w.Header().Set("Content-Type", "image/png")
+		if chunked {
+			w.(http.Flusher).Flush()
+		}
+		_, _ = w.Write(body)
+	}))
+	t.Cleanup(srv.Close)
+	return srv
+}
+
+const testMiB = 1024 * 1024
+
+// @scenario "An attachment over the default size is fetched when the request raises the limit"
+func TestFetchHonorsARequestLimitAboveTheDefault(t *testing.T) {
+	size := int(app.DefaultMaxAttachmentBytes) + 1
+	for name, chunked := range map[string]bool{"declared length": false, "chunked": true} {
+		t.Run(name, func(t *testing.T) {
+			srv := sizedImageServer(t, size, chunked)
+			shared := loopbackFetcher()
+
+			_, ne := shared.fetch(context.Background(), srv.URL+"/big.png")
+			require.NotNil(t, ne, "one byte past the default must be refused when no limit is named")
+			assert.Contains(t, ne.Message, "larger than the 20 MB attachment limit")
+
+			att, ne := shared.withMaxBytes(21*testMiB).fetch(context.Background(), srv.URL+"/big.png")
+			require.Nil(t, ne)
+			assert.Len(t, att.data, size)
+			assert.Equal(t, app.DefaultMaxAttachmentBytes, shared.maxBytes,
+				"the engine-wide fetcher keeps the default for the runs beside this one")
+		})
+	}
+}
+
+// @scenario "A request that lowers the limit refuses an attachment the default would accept"
+func TestFetchHonorsARequestLimitBelowTheDefault(t *testing.T) {
+	for name, chunked := range map[string]bool{"declared length": false, "chunked": true} {
+		t.Run(name, func(t *testing.T) {
+			srv := sizedImageServer(t, 4096, chunked)
+			shared := loopbackFetcher()
+
+			_, ne := shared.withMaxBytes(1024).fetch(context.Background(), srv.URL+"/a.png")
+			require.NotNil(t, ne)
+			assert.Equal(t, "attachment_fetch_error", ne.Type)
+
+			at, ne := shared.withMaxBytes(4096).fetch(context.Background(), srv.URL+"/a.png")
+			require.Nil(t, ne, "a body exactly at the limit is accepted")
+			assert.Len(t, at.data, 4096)
+		})
+	}
+}
+
+func TestFormatAttachmentLimit(t *testing.T) {
+	assert.Equal(t, "20 MB", formatAttachmentLimit(20*testMiB))
+	assert.Equal(t, "1024 MB", formatAttachmentLimit(1024*testMiB))
+	assert.Equal(t, "1.50 MB", formatAttachmentLimit(testMiB+testMiB/2))
+}
+
+func TestEncodeDataURLMatchesTheStandardEncoding(t *testing.T) {
+	for _, data := range [][]byte{nil, []byte("a"), []byte("ab"), []byte("abc"), pngBytes} {
+		att := &fetchedAttachment{mediaType: "image/png", data: data}
+		assert.Equal(t, "data:image/png;base64,"+base64.StdEncoding.EncodeToString(data), dataURL(att))
+	}
+}
+
+// imageInputWorkflow is a signature node with one image-typed input.
+func imageInputWorkflow(t *testing.T) *dsl.Workflow {
+	t.Helper()
+	llmConfigJSON, err := json.Marshal(map[string]any{"model": "openai/gpt-5-mini"})
+	require.NoError(t, err)
+	return &dsl.Workflow{
+		WorkflowID: "wf_attachment_limit",
+		Nodes: []dsl.Node{
+			{ID: "entry", Type: dsl.ComponentEntry, Data: dsl.Component{
+				Outputs: []dsl.Field{{Identifier: "picture", Type: dsl.FieldTypeImage}},
+			}},
+			{ID: "answer", Type: dsl.ComponentSignature, Data: dsl.Component{
+				Parameters: []dsl.Field{{Identifier: "llm", Type: dsl.FieldTypeLLM, Value: llmConfigJSON}},
+				Inputs:     []dsl.Field{{Identifier: "picture", Type: dsl.FieldTypeImage}},
+				Outputs:    []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+			{ID: "end", Type: dsl.ComponentEnd, Data: dsl.Component{
+				Inputs: []dsl.Field{{Identifier: "answer", Type: dsl.FieldTypeStr}},
+			}},
+		},
+		Edges: []dsl.Edge{
+			{Source: "entry", SourceHandle: "outputs.picture", Target: "answer", TargetHandle: "inputs.picture"},
+			{Source: "answer", SourceHandle: "outputs.answer", Target: "end", TargetHandle: "inputs.answer"},
+		},
+	}
+}
+
+// @scenario "The too-large error names the limit the run was under"
+// @scenario "A request that names no limit runs under the default limit"
+func TestEngineExecute_AppliesTheRequestAttachmentLimitPerRun(t *testing.T) {
+	srv := sizedImageServer(t, testMiB+1, false)
+	eng := New(Options{
+		LLM:  &fakeLLMClient{resp: &app.LLMResponse{Content: "a cat"}},
+		SSRF: httpblock.SSRFOptions{AllowedHosts: []string{"127.0.0.1"}},
+	})
+	run := func(maxAttachmentBytes int64) *ExecuteResult {
+		res, err := eng.Execute(context.Background(), ExecuteRequest{
+			Workflow:           imageInputWorkflow(t),
+			Inputs:             map[string]any{"picture": srv.URL + "/big.png"},
+			MaxAttachmentBytes: maxAttachmentBytes,
+		})
+		require.NoError(t, err)
+		return res
+	}
+
+	limited := run(testMiB)
+	require.Equal(t, "error", limited.Status)
+	require.NotNil(t, limited.Error)
+	assert.Equal(t, "attachment_fetch_error", limited.Error.Type)
+	assert.Contains(t, limited.Error.Message, "is larger than the 1 MB attachment limit")
+
+	// The same engine, with no limit named, serves the default again.
+	unlimited := run(0)
+	assert.Equal(t, "success", unlimited.Status, "engine error: %+v", unlimited.Error)
+	assert.Equal(t, "success", run(-5).Status)
+}
+
+func TestForwardedMaxAttachmentBytes(t *testing.T) {
+	assert.Equal(t, int64(0), forwardedMaxAttachmentBytes(ExecuteRequest{}))
+	assert.Equal(t, int64(0), forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: -1}))
+	assert.Equal(t, int64(5*testMiB), forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: 5 * testMiB}))
+	assert.Equal(t, app.MaxAttachmentBytesCeiling, forwardedMaxAttachmentBytes(ExecuteRequest{MaxAttachmentBytes: 1 << 40}))
 }

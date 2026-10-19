@@ -11,11 +11,7 @@ T = TypeVar("T", bound="RunTestSuiteResponse200ItemsItemTargetRunParameters")
 
 @_attrs_define
 class RunTestSuiteResponse200ItemsItemTargetRunParameters:
-    """Parameter values this target alone runs with, by name. They are merged over the run-level parameters and the target
-    wins, so two targets may name the same agent with different values: that is how one run compares one agent on two
-    models, and the results show one column for each target.
-
-    """
+    """ """
 
     additional_properties: dict[str, bool | float | str] = _attrs_field(init=False, factory=dict)
 

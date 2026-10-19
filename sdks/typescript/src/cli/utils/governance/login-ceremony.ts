@@ -1,34 +1,7 @@
 /**
- * Render the "You're in!" ceremony emitted by `langwatch login` after a
- * successful device-flow exchange.
- *
- * Two clearly-separated lists, sourced from the org's AI Tools catalog:
- *
- *   ✓ Logged in as jane@acme.com @ Acme
- *
- *   Your AI tools (run any of these):
- *     $ langwatch claude   # Claude Code
- *     $ langwatch codex    # Codex
- *
- *   Model providers you can issue a virtual key for:
- *     • anthropic   Claude
- *     • openai      (not configured yet)
- *
- *   Budgets that apply to your key:
- *     $2.43 used of $100.00 this month (whole organization budget), resets Aug 1
- *     $0.00 used of $25.00 this month (personal budget), resets Aug 1
- *
- *   Or open the app in your browser:
- *     $ langwatch open
- *
- * The two sections answer two different questions: which coding assistants
- * can I run right now (`tools`), and which model providers can I mint my own
- * virtual key for (`providers`). They are NOT the same thing — conflating
- * them was the bug this rewrite fixes.
- *
- * Pure function: takes the data, returns an array of lines. Caller applies
- * any chalk colouring + writes to stdout. Lets unit tests assert on the
- * literal output without colour/escape noise.
+ * Renders the "You're in!" ceremony lines after a device-flow exchange:
+ * identity, tools, providers eligible for a VK, and budgets. Tools and
+ * providers must not be conflated. Pure: returns lines, caller colors + writes.
  */
 
 export interface LoginCeremonyTool {
@@ -92,17 +65,15 @@ export interface LoginCeremonyInput {
   /** Model providers the user can mint their own virtual key for. */
   providers?: LoginCeremonyProvider[];
   /**
-   * Legacy single-number budget from /bootstrap. Only rendered when
-   * `budgets` is undefined (older server without the overview endpoint):
-   * the collapsed number cannot say which budget it is, which is the
-   * mislabel the overview replaced.
+   * Legacy single-number budget from /bootstrap, rendered only when
+   * `budgets` is undefined (older server): a collapsed number can't say
+   * which budget it is, the mislabel the overview replaced.
    */
   budget?: LoginCeremonyBudget;
   /**
-   * Budgets that bind the user's key, most binding first. When present
-   * it supersedes `budget`; an empty array renders nothing at all (the
-   * user has gateway access but no budget applies). Undefined means the
-   * server predates the overview endpoint.
+   * Budgets that bind the user's key, most binding first. Supersedes
+   * `budget` when present; empty renders nothing (gateway access, no
+   * budget applies). Undefined means the server predates this endpoint.
    */
   budgets?: LoginCeremonyBudgetLine[];
   /** Where "…and N more" points when more than three budgets apply. */
@@ -156,7 +127,8 @@ function windowPhrase(window: string): string {
 function formatResetDay(resetsAt: string | null | undefined): string | null {
   if (!resetsAt) return null;
   const date = new Date(resetsAt);
-  if (Number.isNaN(date.getTime())) return null;
+  const dateMs = date.getTime();
+  if (Number.isNaN(dateMs)) return null;
   // Reset boundaries are computed in UTC on the server, so format the
   // promised day on the same clock instead of the terminal's zone.
   return date.toLocaleDateString("en-US", {
@@ -177,45 +149,26 @@ function formatBudgetLine(line: LoginCeremonyBudgetLine): string {
   return `${formatUsedUsd(line.spentUsd)} used of ${formatUsedUsd(line.limitUsd)} ${windowPhrase(line.window)} (${line.scopePhrase}${provider})${resets}`;
 }
 
-export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
+function formatProviderSection(providers: LoginCeremonyProvider[]): string[] {
   const lines: string[] = [];
-
-  const orgSuffix = input.organizationName ? ` @ ${input.organizationName}` : "";
-  lines.push(`✓ Logged in as ${input.email}${orgSuffix}`);
-
-  // AI tools (coding assistants). Fall back to the built-in wrappers when the
-  // org published none, so the user always gets a runnable next-step.
-  const tools =
-    input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
   lines.push("");
-  lines.push("Your AI tools (run any of these):");
-  const cmdWidth = Math.max(
-    ...tools.map((t) => `langwatch ${t.slug}`.length),
-  );
-  for (const tool of tools) {
-    const cmd = `langwatch ${tool.slug}`;
-    const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
-    lines.push(`  $ ${padRight(cmd, cmdWidth)}${labelSuffix}`);
-  }
-
-  // Model providers the user can mint a virtual key for — a different concept
-  // from the tools above. Only shown when the org published provider tiles.
-  if (input.providers && input.providers.length > 0) {
-    lines.push("");
-    lines.push("Model providers you can issue a virtual key for:");
-    const nameWidth = Math.max(...input.providers.map((p) => p.name.length));
-    for (const p of input.providers) {
-      const padded = padRight(p.name, nameWidth);
-      const annotations: string[] = [];
-      if (p.displayName && p.displayName !== p.name) {
-        annotations.push(p.displayName);
-      }
-      if (p.configured === false) annotations.push("(not configured yet)");
-      const suffix = annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
-      lines.push(`  • ${padded}${suffix}`);
+  lines.push("Model providers you can issue a virtual key for:");
+  const nameWidth = Math.max(...providers.map((p) => p.name.length));
+  for (const p of providers) {
+    const padded = padRight(p.name, nameWidth);
+    const annotations: string[] = [];
+    if (p.displayName && p.displayName !== p.name) {
+      annotations.push(p.displayName);
     }
+    if (p.configured === false) annotations.push("(not configured yet)");
+    const suffix = annotations.length > 0 ? `  ${annotations.join("  ")}` : "";
+    lines.push(`  • ${padded}${suffix}`);
   }
+  return lines;
+}
 
+function formatBudgetSection(input: LoginCeremonyInput): string[] {
+  const lines: string[] = [];
   if (input.budgets !== undefined) {
     if (input.budgets.length > 0) {
       lines.push("");
@@ -234,12 +187,39 @@ export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
     // still better than silence, even though it cannot name its scope.
     lines.push("");
     const period =
-      input.budget.period.charAt(0).toUpperCase() +
-      input.budget.period.slice(1).toLowerCase();
+      input.budget.period.charAt(0).toUpperCase() + input.budget.period.slice(1).toLowerCase();
     lines.push(
       `${period} budget: ${formatUsd(input.budget.limitUsd)}   |   Used: ${formatUsedUsd(input.budget.usedUsd)}`,
     );
   }
+  return lines;
+}
+
+export function formatLoginCeremony(input: LoginCeremonyInput): string[] {
+  const lines: string[] = [];
+
+  const orgSuffix = input.organizationName ? ` @ ${input.organizationName}` : "";
+  lines.push(`✓ Logged in as ${input.email}${orgSuffix}`);
+
+  // AI tools (coding assistants). Fall back to the built-in wrappers when the
+  // org published none, so the user always gets a runnable next-step.
+  const tools = input.tools && input.tools.length > 0 ? input.tools : DEFAULT_TOOLS;
+  lines.push("");
+  lines.push("Your AI tools (run any of these):");
+  const cmdWidth = Math.max(...tools.map((t) => `langwatch ${t.slug}`.length));
+  for (const tool of tools) {
+    const cmd = `langwatch ${tool.slug}`;
+    const labelSuffix = tool.displayName ? `  # ${tool.displayName}` : "";
+    lines.push(`  $ ${padRight(cmd, cmdWidth)}${labelSuffix}`);
+  }
+
+  // Model providers the user can mint a virtual key for — a different concept
+  // from the tools above. Only shown when the org published provider tiles.
+  if (input.providers && input.providers.length > 0) {
+    lines.push(...formatProviderSection(input.providers));
+  }
+
+  lines.push(...formatBudgetSection(input));
 
   if (input.openCommand !== false) {
     lines.push("");

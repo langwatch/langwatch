@@ -1,0 +1,231 @@
+import type { AnalyticsApi } from "@langwatch/analytics-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { EntitlementApi as EntitlementApiContract } from "@langwatch/entitlement-contract";
+import type { EvaluationApi } from "@langwatch/evaluation-contract";
+import type { EvaluatorApi } from "@langwatch/evaluator-contract";
+import type { MonitorApi } from "@langwatch/monitor-contract";
+import { PrismaClient, type Trigger as PrismaTrigger } from "@langwatch/prisma-client/generated";
+import { ResourceScope } from "@langwatch/process";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { nowInstant, type Instant } from "@langwatch/time";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
+import { vi } from "vitest";
+
+import {
+  createTestSlackConnections,
+  createTestSlackDestinations,
+} from "../../__tests__/testing.ts";
+import type { AutomationGraphNotifier } from "../../channels/automation-graph-alert.channel.ts";
+import type { AutomationRunawayNotice } from "../../channels/automation-runaway-notice.channel.ts";
+import type { AutomationTestFire } from "../../channels/automation-test-fire.channel.ts";
+import type { AutomationRunawaySignals } from "../../features/runaway/services/runaway-containment.service.ts";
+import type { AutomationRunawayRepository } from "../../repositories/automation-runaway.repository.ts";
+import type { AutomationClock } from "../../repositories/automation.repositories.ts";
+import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
+import { PostgresAutomationRepositories } from "../../repositories/prisma/prisma.automation.repositories.ts";
+import type { AutomationLogger } from "../../services/automation.service.ts";
+import type { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
+import { AutomationModule, type AutomationInfrastructure } from "../automation.app.ts";
+
+export function createCanonicalAutomationApp(): {
+  app: AutomationModule;
+  triggerCreate: ReturnType<typeof vi.fn>;
+  resources: ResourceScope;
+} {
+  const database = new PrismaClient({ accelerateUrl: "prisma://localhost/test" });
+  const triggerCreate = vi.spyOn(database.trigger, "create").mockResolvedValue({
+    id: "trigger_new",
+    projectId: "project_1",
+    name: "test",
+    action: "SEND_SLACK_MESSAGE",
+    triggerKind: "AUTOMATION",
+    actionParams: {},
+    filters: {},
+    filterQuery: null,
+    lastRunAt: 0,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+    active: true,
+    pausedReason: null,
+    pausedAt: null,
+    message: null,
+    deleted: false,
+    alertType: null,
+    slackTemplateType: null,
+    slackTemplate: null,
+    emailSubjectTemplate: null,
+    emailBodyTemplate: null,
+    notificationCadence: "immediate",
+    traceDebounceMs: 0,
+    customGraphId: null,
+  } satisfies PrismaTrigger);
+  const verifier: UnsubscribeTokenVerifier = {
+    findVerifiedPayload: vi.fn(() => null),
+  };
+  const clock: AutomationClock = {
+    now: vi.fn<() => Instant>(() => nowInstant()),
+  };
+  const notifier: AutomationGraphNotifier = {
+    dispatch: vi.fn<AutomationGraphNotifier["dispatch"]>(async () => ({
+      channel: "none",
+      didSend: false,
+      missingVariables: [],
+      renderErrors: [],
+    })),
+  };
+  const logger: AutomationLogger = {
+    error: vi.fn(),
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+  };
+  const runaway: AutomationRunawayRepository & AutomationRunawayNotice & AutomationRunawaySignals =
+    {
+      countProjectTraces24h: vi.fn(async () => 0),
+      notificationRecipients: vi.fn(async () => []),
+      sendLimitEmail: vi.fn(async () => undefined),
+      findNextStep: vi.fn(async () => undefined),
+      claimOnce: vi.fn(async () => "already-claimed" as const),
+      releaseClaim: vi.fn(async () => undefined),
+      projectName: vi.fn(async () => "Test project"),
+      automationUrl: vi.fn(async () => "https://app.test/automations"),
+      onCeilingBreach: vi.fn(),
+      onAutoPaused: vi.fn(),
+      onContainmentFailed: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+    };
+  const testFire: AutomationTestFire = {
+    sendEmail: vi.fn(async () => undefined),
+    sendSlack: vi.fn(async () => undefined),
+    sendSlackBot: vi.fn(async () => undefined),
+    sendWebhook: vi.fn(async () => ({ status: 200 })),
+  };
+  const projects = createApiFixture<ProjectApi>({
+    isPresenceEnabled: vi.fn(),
+    findById: vi.fn(),
+    getOrganizationId: vi.fn(),
+    findSummaryById: vi.fn(async () => ({ name: "Test project", slug: "test-project" })),
+    getWithTeam: vi.fn(),
+    findWithTeam: vi.fn(),
+    create: vi.fn(),
+    updateSettings: vi.fn(),
+    archive: vi.fn(),
+    listByOrganization: vi.fn(),
+    listByTeam: vi.fn(),
+    touchCodingAgentPullRequestSeen: vi.fn(),
+  });
+  const analytics = createApiFixture<AnalyticsApi>({
+    getTimeseries: vi.fn(),
+    getFeedbacks: vi.fn(),
+    getTopUsedDocuments: vi.fn(),
+    upsertEvaluationAnalytics: vi.fn(),
+    upsertEvaluationAnalyticsBatch: vi.fn(),
+    findEvaluationAnalytics: vi.fn(),
+    appendEvaluationAnalyticsRollup: vi.fn(),
+    appendEvaluationAnalyticsRollupBatch: vi.fn(),
+    filterOptions: vi.fn(),
+    isLangWatchQLAvailable: vi.fn(() => false),
+    describeLangWatchQLSchema: vi.fn(),
+    validateLangWatchQL: vi.fn(),
+    executeLangWatchQL: vi.fn(),
+  });
+  const monitors = createApiFixture<MonitorApi>({
+    list: vi.fn(),
+    getEnabledOnMessageMonitors: vi.fn(),
+    listEnabledGuardrailMonitors: vi.fn(),
+    getById: vi.fn(),
+    findById: vi.fn(),
+    getAllByIds: vi.fn(),
+    toggle: vi.fn(),
+    create: vi.fn(),
+    update: vi.fn(),
+    patch: vi.fn(),
+    delete: vi.fn(),
+    deleteForExperiment: vi.fn(),
+    upsertForExperiment: vi.fn(),
+    isNameAvailable: vi.fn(),
+    assertCheckRunnable: vi.fn(),
+    copy: vi.fn(),
+    replicate: vi.fn(),
+  });
+  const infrastructure: AutomationInfrastructure = {
+    verifier,
+    clock,
+    notifier,
+    logger,
+    runaway,
+    testFire,
+    slackDestinations: createTestSlackDestinations(),
+    slackConnections: createTestSlackConnections(),
+    dispatchErrors: { isTerminal: vi.fn(), createTerminal: vi.fn() },
+    persistCaps: MemoryAutomationPersistCapRepository.create(),
+    providers: {
+      actionParamsSchemaFor: vi.fn<AutomationInfrastructure["providers"]["actionParamsSchemaFor"]>(
+        () => ({ safeParse: (data: unknown) => ({ success: true, data }) }),
+      ),
+      persistActionParamsFor: vi.fn(async (_action, args) => args.incoming),
+      redactActionParamsFor: vi.fn((_action, params) => params),
+      decryptWebhookHeaders: vi.fn(() => ({})),
+      decryptWebhookSigningSecrets: vi.fn(() => []),
+    },
+    slackChannels: { list: vi.fn(async () => ({ channels: [], error: null, gaps: [] })) },
+    traceFilters: { assertCompiles: vi.fn() },
+    limits: { count: vi.fn(async () => ({ allowed: true, resetAt: 0 })) },
+    audit: { record: vi.fn(async () => undefined) },
+  };
+  const resources = new ResourceScope();
+  resources.own("automation-test-database", () => database.$disconnect());
+  const auditLog: AuditLogApi = {
+    record: vi.fn(async () => ({ id: "audit", occurredAt: 0 })),
+    listEntityHistory: vi.fn(async () => []),
+    hasRecordedSince: vi.fn(async () => false),
+    findByTargetKind: vi.fn(async () => []),
+  };
+  return {
+    app: AutomationModule.fromInfrastructure({
+      repositories: PostgresAutomationRepositories.create({
+        prisma: database,
+        redis: memoryRedisDouble(),
+        encryption: { encrypt: (value) => value, decrypt: (value) => value },
+      }),
+      dependencies: {
+        analytics,
+        monitors,
+        evaluators: createApiFixture<EvaluatorApi>({ findById: vi.fn(async () => undefined) }),
+        projects,
+        entitlement: {
+          getActivePlan: vi.fn<EntitlementApiContract["getActivePlan"]>(),
+          getUsage: vi.fn<EntitlementApiContract["getUsage"]>(),
+          sendUsageLimitWarning: vi.fn<EntitlementApiContract["sendUsageLimitWarning"]>(),
+          listOrganizationSpend: vi.fn<EntitlementApiContract["listOrganizationSpend"]>(),
+          requestBound: vi.fn<EntitlementApiContract["requestBound"]>(),
+          resolvePlanNextStep: vi.fn<EntitlementApiContract["resolvePlanNextStep"]>(),
+          assertWithinUsageLimit: vi.fn<EntitlementApiContract["assertWithinUsageLimit"]>(),
+        },
+        auditLog,
+        traces: createApiFixture<TraceApi>({}),
+        evaluations: createApiFixture<EvaluationApi>({}),
+        webhooks: createApiFixture<WebhookApi>({}),
+        retention: createApiFixture({}),
+      },
+      infrastructure,
+      config: {
+        emailHourlyCap: 100,
+        tenantDailyCap: 10_000,
+        persistDailyCapFree: 50,
+        persistDailyCapPaid: 500,
+        persistDailyCapEnterprise: 5_000,
+        publicBaseUrl: undefined,
+        slackApiBase: "https://slack.com/api",
+        slackWebhookBase: "https://hooks.slack.com",
+        allowInsecureLocalUrls: false,
+      },
+    }),
+    triggerCreate,
+    resources,
+  };
+}

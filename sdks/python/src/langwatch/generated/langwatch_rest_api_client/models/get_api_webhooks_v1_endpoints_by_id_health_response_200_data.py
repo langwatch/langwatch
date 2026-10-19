@@ -4,7 +4,6 @@ from collections.abc import Mapping
 from typing import Any, TypeVar, cast
 
 from attrs import define as _attrs_define
-from attrs import field as _attrs_field
 
 from ..models.get_api_webhooks_v1_endpoints_by_id_health_response_200_data_status import (
     GetApiWebhooksV1EndpointsByIdHealthResponse200DataStatus,
@@ -39,7 +38,6 @@ class GetApiWebhooksV1EndpointsByIdHealthResponse200Data:
     sends_per_minute: float
     success_rate: float | None
     p95_latency_ms: int | None
-    additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
         status = self.status.value
@@ -70,7 +68,7 @@ class GetApiWebhooksV1EndpointsByIdHealthResponse200Data:
         p95_latency_ms = self.p95_latency_ms
 
         field_dict: dict[str, Any] = {}
-        field_dict.update(self.additional_properties)
+
         field_dict.update(
             {
                 "status": status,
@@ -159,21 +157,4 @@ class GetApiWebhooksV1EndpointsByIdHealthResponse200Data:
             p95_latency_ms=p95_latency_ms,
         )
 
-        get_api_webhooks_v1_endpoints_by_id_health_response_200_data.additional_properties = d
         return get_api_webhooks_v1_endpoints_by_id_health_response_200_data
-
-    @property
-    def additional_keys(self) -> list[str]:
-        return list(self.additional_properties.keys())
-
-    def __getitem__(self, key: str) -> Any:
-        return self.additional_properties[key]
-
-    def __setitem__(self, key: str, value: Any) -> None:
-        self.additional_properties[key] = value
-
-    def __delitem__(self, key: str) -> None:
-        del self.additional_properties[key]
-
-    def __contains__(self, key: str) -> bool:
-        return key in self.additional_properties

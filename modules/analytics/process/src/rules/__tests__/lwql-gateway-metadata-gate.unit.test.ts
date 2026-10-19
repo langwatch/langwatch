@@ -1,0 +1,33 @@
+/** The gateway spend metadata map must be content-gated (#8085 security finding 2: HIGH). */
+import { describe, expect, it } from "vitest";
+
+import { LangWatchQLCatalogShapesService } from "../../services/langwatch-ql-catalog-shapes.service.ts";
+import {
+  LWQL_CLICKHOUSE_CATALOGUE,
+  LWQL_VIEW_CATALOG,
+  pickLwqlViewByName,
+} from "../lwql-view-catalog.rules.ts";
+
+const catalogShapes = LangWatchQLCatalogShapesService.create();
+
+describe("given the gateway_request_spend view", () => {
+  describe("when its metadata map is exposed", () => {
+    it("declares the MetadataMap column output content in the catalogue", () => {
+      expect(LWQL_CLICKHOUSE_CATALOGUE.gateway_request_spend.columns.MetadataMap).toEqual({
+        content: "output",
+      });
+    });
+
+    it("carries the output gate on the built column", () => {
+      const view = pickLwqlViewByName("gateway_request_spend");
+      expect(view, "gateway_request_spend must be in the catalog").toBeDefined();
+      const column = view!.columns.find((c) => c.name === "MetadataMap");
+      expect(column, "MetadataMap must be an exposed column").toBeDefined();
+      expect(column!.gates).toContain("output");
+    });
+
+    it("is reported as a content-gated column of the catalog", () => {
+      expect(catalogShapes.contentGatedColumns(LWQL_VIEW_CATALOG)).toContain("MetadataMap");
+    });
+  });
+});

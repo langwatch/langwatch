@@ -1,0 +1,128 @@
+/**
+ * The scope reading every feature-web package makes, answered from ONE place. Eleven packages
+ * carried their own `useOrganizationTeamProject`, each bound to its own feature host provider.
+ */
+
+import { createContext, useContext, useMemo } from "react";
+
+/** The project the reader is standing in, as every family reads it. */
+export type UiHostProject = {
+  id: string;
+  name: string;
+  slug: string;
+  /** The project's kind (`application`, `aggregate`, ...), when the host has read it. */
+  kind?: string;
+  /** A Mustache template turning a `user_id` into a link, when the project set one. */
+  userLinkTemplate?: string | null;
+};
+
+export type UiHostOrganization = { id: string; name?: string };
+
+export type UiHostTeam = { id: string; name?: string };
+
+/**
+ * The one thing a scope reading is asked of: where the reader stands. Grants are the session's
+ * answer, read through each module's own host.
+ */
+export abstract class UiScopeHost {
+  abstract project(): UiHostProject | undefined;
+
+  abstract organization(): UiHostOrganization | undefined;
+
+  abstract team(): UiHostTeam | undefined;
+
+  /** The reader's role in the organization, or undefined before it resolves. */
+  abstract organizationRole(): string | undefined;
+
+  abstract isDemoProject(): boolean;
+
+  /** Whether the scope answer is still arriving; the session's grants have their own flag. */
+  abstract isLoading(): boolean;
+}
+
+/** The readings a host publishes, without it having to declare a class. */
+export type UiScopeHostReadings = {
+  project: () => UiHostProject | undefined;
+  organization: () => UiHostOrganization | undefined;
+  team: () => UiHostTeam | undefined;
+  organizationRole?: () => string | undefined;
+  isDemoProject?: () => boolean;
+  isLoading?: () => boolean;
+};
+
+/**
+ * Publishes a feature host's own scope readings as the canonical one. A family that already
+ * resolved the scope for its own port answers this from the same readings rather than from a
+ * second source of truth.
+ */
+export function createUiScopeHost(readings: UiScopeHostReadings): UiScopeHost {
+  return {
+    project: () => readings.project(),
+    organization: () => readings.organization(),
+    team: () => readings.team(),
+    organizationRole: () => readings.organizationRole?.(),
+    isDemoProject: () => readings.isDemoProject?.() ?? false,
+    isLoading: () => readings.isLoading?.() ?? false,
+  };
+}
+
+const UiScopeHostContext = createContext<UiScopeHost | undefined>(void 0);
+
+export const UiScopeHostProvider = UiScopeHostContext.Provider;
+
+/** The scope host above this screen, or undefined where none is mounted. */
+function useOptionalUiScopeHost(): UiScopeHost | undefined {
+  return useContext(UiScopeHostContext);
+}
+
+export type UiScopeReading = {
+  project: UiHostProject | undefined;
+  /** The platform hook published it flat as well, and call sites read it that way. */
+  projectId: string | undefined;
+  organization: UiHostOrganization | undefined;
+  team: UiHostTeam | undefined;
+  organizationRole: string | undefined;
+  isDemoProject: boolean;
+  isLoading: boolean;
+  isRefetching: boolean;
+  /** False when no scope host is mounted at all, which is not the same as loading. */
+  isResolved: boolean;
+};
+
+const NO_SCOPE: UiScopeReading = {
+  project: void 0,
+  projectId: void 0,
+  organization: void 0,
+  team: void 0,
+  organizationRole: void 0,
+  isDemoProject: false,
+  isLoading: false,
+  isRefetching: false,
+  isResolved: false,
+};
+
+/**
+ * The scope this page is about. The options object is accepted and ignored.
+ */
+export function useOrganizationTeamProject(_options?: {
+  redirectToProjectOnboarding?: boolean;
+  redirectToOnboarding?: boolean;
+  keepFetching?: boolean;
+}): UiScopeReading {
+  const host = useOptionalUiScopeHost();
+  return useMemo(() => {
+    if (!host) return NO_SCOPE;
+    const project = host.project();
+    return {
+      project,
+      projectId: project?.id,
+      organization: host.organization(),
+      team: host.team(),
+      organizationRole: host.organizationRole(),
+      isDemoProject: host.isDemoProject(),
+      isLoading: host.isLoading(),
+      isRefetching: false,
+      isResolved: true,
+    };
+  }, [host]);
+}

@@ -90,6 +90,24 @@ Feature: Going live with your own identity provider, without asking us
     Then it is sent to the connection this organization registered
     And nothing about anybody else's sign-in changes
 
+  # The addresses an identity provider posts back to are served by the single
+  # sign-on module, so the setup read folds them in beside identity's own
+  # reading of the journey rather than asking identity to answer them.
+
+  @unit
+  Scenario: The setup read carries the addresses an identity provider is pointed at
+    Given an organization whose identity provider is registered
+    When its administrator opens single sign-on setup
+    Then the addresses to paste into the identity provider name that connection
+    And they come from the deployment that serves them
+
+  @unit
+  Scenario: Before a connection exists the addresses show their shape
+    Given an organization that has registered no identity provider yet
+    When its administrator opens single sign-on setup
+    Then the addresses show where the connection's identifier will go
+    And no identifier is invented to fill the gap
+
   @integration
   Scenario: The test sign-in is offered on the setup screen once a provider is registered
     When the administrator opens single sign-on setup
@@ -194,11 +212,11 @@ Feature: Going live with your own identity provider, without asking us
     And arrivals are turned away
 
   @unit
-  Scenario: A connection registered before the question keeps what it did
-    Given a connection whose history carries no answer
-    When anything asks who it admits
-    Then it answers with what allowsJit already said
-    And nothing about its behaviour changed
+  Scenario: A connection registered before the question turns new arrivals away
+    Given a connection whose history carries no answer, though allowsJit says it admits
+    When a new user arrives through it
+    Then the connection answers that it turns arrivals away
+    And the arrival is refused, because allowsJit is no fallback for an unanswered policy
 
   @unit
   Scenario: Saying it out loud is a fact even where the behaviour is the same
@@ -436,6 +454,13 @@ Feature: Going live with your own identity provider, without asking us
     When the administrator tries to turn the connection on
     Then it is refused with "sso_activation_break_glass_missing"
     And the refusal says the deployment has no password door for a grant to be a way in through
+
+  @unit
+  Scenario: Going live counts only a way back in somebody could walk
+    Given the only live way back in is held by somebody who holds no password
+    When the administrator tries to turn the connection on
+    Then it is refused with "sso_activation_break_glass_missing"
+    And the connection is not on
 
   @unit
   Scenario: A way back in names somebody who holds a password, not merely somebody senior

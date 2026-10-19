@@ -18,7 +18,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the trace-search capability and it returns matching traces
     Then Langy shows a traces card listing the matched traces
     And each trace row links to that trace
-    And the card offers an "Open in Traces" link
+    And the card offers a "View in Trace Explorer" link
     And the card shows no Apply or Discard action
 
   @integration
@@ -32,7 +32,7 @@ Feature: Langy renders domain-capability cards for tool calls
     When Langy runs the analytics capability and it returns numbers
     Then Langy shows a metrics card with the reported figures
     And each figure rolls up from zero as a rolling number
-    And the card offers an "Open in Analytics" link
+    And the card offers no deep link, since a link that did not carry the query would mislead
 
   @integration
   Scenario: A trace count split by model reads as a count of traces
@@ -171,8 +171,9 @@ Feature: Langy renders domain-capability cards for tool calls
 
   @integration
   Scenario: An unmapped tool falls through to the raw view
+    Given developer mode is on
     When Langy runs a tool that is not a LangWatch action and has no capability card
-    Then Langy shows the tool's raw name, state, input, and output
+    Then I can show the tool's raw name, state, input, and output
     And it does not fabricate a card it has no mapping for
 
   @integration

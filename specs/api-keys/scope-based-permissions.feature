@@ -102,6 +102,7 @@ Feature: API Key Scope and Fine-Grained Permissions
       | Organization           | read, write   |
       | Gateway                | read, write   |
       | Governance             | read, write   |
+      | Feature Flags          | write         |
 
   @unit
   Scenario: Project write carries creation and deletion, because manage implies them
@@ -193,7 +194,7 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given a personal API key has project access
     When its stored owner loses that access
     Then the key loses that access on its next permission check
-    And supplying a different or absent owner does not bypass the stored owner's ceiling
+    And the owner is read from storage by the key's id, never supplied by the caller
 
   @integration @unimplemented
   Scenario: Changing scope recalculates ceiling and resets out-of-bounds selections
@@ -203,10 +204,10 @@ Feature: API Key Scope and Fine-Grained Permissions
     Then Traces resets to "None" because Write exceeds my Viewer ceiling on Team Beta
 
   @integration @unimplemented
-  Scenario: Service key bypasses creator ceiling
+  Scenario: A service key is offered every permission its creator's organization role holds
     Given I am an organization admin
     When I create a service key with "Restricted" permissions
-    Then all resource menus offer None, Read, and Write regardless of my personal role
+    Then each resource menu offers the levels my organization role holds, and no more
 
   # ── Create flow ─────────────────────────────────────────────
 
@@ -375,6 +376,13 @@ Feature: API Key Scope and Fine-Grained Permissions
     And the bindings are recreated with the CustomRole id
 
   @unit
+  Scenario: Editing a key without changing its scopes keeps them
+    Given an API key already bound to a project
+    When I save an edit that resubmits the same scope unchanged
+    Then the key keeps that binding
+    And the key still works afterwards
+
+  @unit
   Scenario: Restricted key with camelCase permissions saves without error
     When I create a restricted key with permissions including "auditLog:view"
     Then the CustomRole is created successfully
@@ -385,3 +393,35 @@ Feature: API Key Scope and Fine-Grained Permissions
     Given every permission category at its maximum access level
     When I compute the backend permissions for each category
     Then every permission string matches the CustomRole schema regex
+
+  # ── Cost visibility on the REST read doors ──────────────────
+
+  # A key's grants decide what its reads may see, and cost is one of them. The
+  # governed-SQL door and the trace doors both used to answer "yes" to
+  # cost:view for every key alike, on the reasoning that project keys predate
+  # RBAC — true of a legacy project key, and false of every key minted since.
+
+  @unit
+  Scenario: A key without the cost grant reads the query surface with costs redacted
+    Given a key that may run governed queries but does not carry "cost:view"
+    When the query surface resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A key carrying the cost grant reads the query surface with costs
+    Given a key that carries "cost:view" for its project
+    When the query surface resolves what that key may see
+    Then costs are visible to it
+
+  @unit
+  Scenario: A key without the cost grant reads traces with costs redacted
+    Given a key that may view traces but does not carry "cost:view"
+    When the trace read resolves what that key may see
+    Then costs are hidden from it
+
+  @unit
+  Scenario: A legacy project key still reads costs without a grant lookup
+    Given a legacy project key, which predates fine-grained permissions
+    When either read door resolves what that key may see
+    Then costs are visible to it
+    And no per-key permission is looked up

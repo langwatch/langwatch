@@ -16,6 +16,28 @@ import (
 type ctxKey struct{}
 type spanCtxKey struct{}
 type clientSessionIDKey struct{}
+type mirrorWithheldKey struct{}
+
+// HeaderLangyMirror is set by the Langy relay, never the worker, on a model
+// call whose turn mirrors nothing (ADR-061 amendment 2026-10-12). The gateway
+// tiers the mirror by virtual key, and a chat turn and a read-only run share
+// one Langy key, so only the relay knows the turn's own tier. The header can
+// only withhold a mirror copy, never ask for one.
+const HeaderLangyMirror = "X-LangWatch-Langy-Mirror"
+
+// LangyMirrorWithheld is the one HeaderLangyMirror value the gateway honors.
+const LangyMirrorWithheld = "skip"
+
+// WithMirrorWithheld marks the call as one whose turn mirrors nothing.
+func WithMirrorWithheld(ctx context.Context) context.Context {
+	return context.WithValue(ctx, mirrorWithheldKey{}, true)
+}
+
+// MirrorWithheld reports whether the call's turn mirrors nothing.
+func MirrorWithheld(ctx context.Context) bool {
+	withheld, _ := ctx.Value(mirrorWithheldKey{}).(bool)
+	return withheld
+}
 
 // WithTraceParent stashes the customer's raw traceparent header value on the
 // context. The middleware should call this after extracting (and stripping) the

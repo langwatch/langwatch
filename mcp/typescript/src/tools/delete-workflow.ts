@@ -1,4 +1,4 @@
-import { deleteWorkflow as apiDeleteWorkflow } from "../langwatch-api-workflows.js";
+import { deleteWorkflow as apiDeleteWorkflow } from "../langwatch-api-workflows.ts";
 
 export async function handleDeleteWorkflow(params: { id: string }): Promise<string> {
   const result = await apiDeleteWorkflow(params.id);

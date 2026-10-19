@@ -8,11 +8,11 @@ sidebarTitle: TypeScript
 
 Two settings change: the base URL points at the gateway, and the API key is a virtual key. The request body, streaming, tools and every other SDK feature stay the same. Name the model as `provider/model` on the OpenAI-shaped and Anthropic-shaped routes; the Gemini passthrough at `/v1beta` names the model in Google's own form. See [Model naming](/ai-gateway/model-naming).
 
-| SDK | Base URL | Where the key goes |
-|---|---|---|
-| OpenAI | `https://gateway.langwatch.ai/v1` | `apiKey`, sent as `Authorization: Bearer` |
-| Anthropic | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Api-Key` |
-| Google GenAI | `https://gateway.langwatch.ai` | `apiKey`, sent as `X-Goog-Api-Key` |
+| SDK          | Base URL                          | Where the key goes                        |
+| ------------ | --------------------------------- | ----------------------------------------- |
+| OpenAI       | `https://gateway.langwatch.ai/v1` | `apiKey`, sent as `Authorization: Bearer` |
+| Anthropic    | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Api-Key`             |
+| Google GenAI | `https://gateway.langwatch.ai`    | `apiKey`, sent as `X-Goog-Api-Key`        |
 
 ## OpenAI SDK
 
@@ -115,11 +115,11 @@ The [LangWatch TypeScript SDK](/integration/typescript/guide) uses OpenTelemetry
 
 ## Headers you can send
 
-| Header | Purpose |
-|---|---|
-| `traceparent` | Nests the gateway span in your trace. |
+| Header                    | Purpose                                                                                                   |
+| ------------------------- | --------------------------------------------------------------------------------------------------------- |
+| `traceparent`             | Nests the gateway span in your trace.                                                                     |
 | `X-LangWatch-End-User-Id` | The end user of your product, for per-end-user budgets and spend. The OpenAI `user` body field works too. |
-| `X-LangWatch-Metadata` | A JSON object, at most 4096 bytes, copied onto the spend event. |
+| `X-LangWatch-Metadata`    | A JSON object, at most 4096 bytes, copied onto the spend event.                                           |
 
 Pass them per request in the second argument of the OpenAI SDK methods, `{ headers: { ... } }`. The gateway removes them before it forwards the request to the provider. See [Billing and spend events](/ai-gateway/billing-events#attribution-what-the-request-carries).
 
@@ -134,8 +134,8 @@ const { data, response } = await client.chat.completions
   .withResponse();
 
 console.log(response.headers.get("X-LangWatch-Gateway-Request-Id")); // quote this to support
-console.log(response.headers.get("X-LangWatch-Budget-Warning"));     // "project:84" when a budget is at 80 percent or more
-console.log(response.headers.get("Traceparent"));                    // the gateway span in your project
+console.log(response.headers.get("X-LangWatch-Budget-Warning")); // "project:84" when a budget is at 80 percent or more
+console.log(response.headers.get("Traceparent")); // the gateway span in your project
 ```
 
 ## Manage keys and budgets from TypeScript
@@ -147,7 +147,10 @@ The `langwatch` package wraps the management routes: `VirtualKeysApiService`, `G
 Replace the host with your gateway's URL. Everything else is the same.
 
 ```typescript
-const client = new OpenAI({ baseURL: "https://gateway.acme.internal/v1", apiKey: process.env.LANGWATCH_VIRTUAL_KEY });
+const client = new OpenAI({
+  baseURL: "https://gateway.acme.internal/v1",
+  apiKey: process.env.LANGWATCH_VIRTUAL_KEY,
+});
 ```
 
 ## In the browser
@@ -156,11 +159,11 @@ The gateway sends no CORS headers on `/v1`, and a virtual key in browser code is
 
 ## Troubleshooting
 
-| Symptom | Cause |
-|---|---|
-| `401` on every request | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
-| `400 model_not_allowed` | The key restricts its models under **Provider access**, or its routing policy does. |
-| Two spans per call in Trace Explorer | The OpenAI client is also instrumented by the LangWatch SDK. Remove that instrumentation for gateway calls. |
-| The gateway span is its own trace | No `traceparent` on the request, or the headers were computed outside the active span. |
+| Symptom                              | Cause                                                                                                                                                                |
+| ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `401` on every request               | The key is wrong, revoked, or sent in a header the gateway does not read. The gateway reads `Authorization: Bearer`, `X-Api-Key`, `X-Goog-Api-Key` and `Xi-Api-Key`. |
+| `400 model_not_allowed`              | The key restricts its models under **Provider access**, or its routing policy does.                                                                                  |
+| Two spans per call in Trace Explorer | The OpenAI client is also instrumented by the LangWatch SDK. Remove that instrumentation for gateway calls.                                                          |
+| The gateway span is its own trace    | No `traceparent` on the request, or the headers were computed outside the active span.                                                                               |
 
 See [Errors](/ai-gateway/api/errors) for every error code.

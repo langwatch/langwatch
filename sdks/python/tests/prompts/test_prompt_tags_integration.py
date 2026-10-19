@@ -267,7 +267,7 @@ class TestTagAssignment:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/pizza-prompt/tags/production" in url
+                    assert "/api/v1/prompts/pizza-prompt/tags/production" in url
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
                     assert json_body.get("versionId") == "prompt_version_abc123"
 
@@ -461,7 +461,7 @@ class TestListAllTags:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "get" or call_kwargs[1].get("method") == "get"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/tags" in url
+                    assert "/api/v1/prompts/tags" in url
 
                     assert len(result) == 2
                     assert result[0]["name"] == "canary"
@@ -499,7 +499,7 @@ class TestCreateTagIntegration:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "post" or call_kwargs[1].get("method") == "post"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/tags" in url
+                    assert "/api/v1/prompts/tags" in url
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
                     assert json_body.get("name") == "canary"
 
@@ -538,7 +538,7 @@ class TestRenameTagIntegration:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/tags/canary" in url
+                    assert "/api/v1/prompts/tags/canary" in url
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
                     assert json_body.get("name") == "alpha"
 
@@ -573,7 +573,7 @@ class TestDeleteTagIntegration:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "delete" or call_kwargs[1].get("method") == "delete"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/tags/canary" in url
+                    assert "/api/v1/prompts/tags/canary" in url
 
                     assert result is None
 
@@ -667,7 +667,7 @@ class TestCustomTagAssignment:
                     call_kwargs = mock_request.call_args
                     assert call_kwargs.kwargs.get("method") == "put" or call_kwargs[1].get("method") == "put"
                     url = call_kwargs.kwargs.get("url") or call_kwargs[1].get("url", "")
-                    assert "/api/prompts/pizza-prompt/tags/canary" in url
+                    assert "/api/v1/prompts/pizza-prompt/tags/canary" in url
                     json_body = call_kwargs.kwargs.get("json") or call_kwargs[1].get("json", {})
                     assert json_body.get("versionId") == "prompt_version_abc123"
 

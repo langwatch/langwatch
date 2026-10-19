@@ -8,11 +8,11 @@ the story is `skills/README.md` at the repo root.
 
 ## What lives here
 
-| Path | What it is |
-|---|---|
-| `AGENTS.md` | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
-| `skills/` | The compiled skill set, synced from `skills/_compiled/native/` by `skills/_compiled/generate.sh`. Generated — never hand-edit; edit the authored source under the repo-root `skills/` workspace and regenerate. |
-| `assets.go` / `assets_test.go` | The embed + materialization code and its pins. |
+| Path                           | What it is                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
+| `AGENTS.md`                    | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
+| `skills/`                      | The compiled skill set, synced from `skills/_compiled/native/` by `skills/_compiled/generate.sh`. Generated — never hand-edit; edit the authored source under the repo-root `skills/` workspace and regenerate. |
+| `assets.go` / `assets_test.go` | The embed + materialization code and its pins.                                                                                 |
 
 ## Two kinds of skills, one directory at build time
 
@@ -61,7 +61,7 @@ cannot drift out of date again.
   appear in it, not even as an example of what not to say. `assets_test.go`
   pins that.
 - **The byte budget has almost no room left.** `assets_test.go` caps the
-  template at 16,384 bytes and it currently sits at 16,364, so about 20 bytes
+  template at 16,384 bytes and it currently sits at 16,384, so no bytes
   are free. Any new sentence has to pay for itself out of an old one. The
   budget test logs the live figure on every run, so read that rather than this
   line if the two disagree. A
@@ -81,7 +81,7 @@ cannot drift out of date again.
   command that does not exist teaches the model to hallucinate.
 - **URLs must be real routes.** The UI is project-scoped
   (`/<projectSlug>/...`); the worker does not know the slug, so AGENTS.md uses
-  the `/@project/<path>` redirect (`platform/app/src/pages/@project/[...path]`)
+  the `/@project/<path>` redirect (`apps/ui/src/model/ui-route-table.ts`)
   and prefers the `platformUrl` field the REST API returns on resources.
 
 After any change run:
@@ -98,4 +98,7 @@ go test ./services/langyagent/...
 - **Langy-only** (depends on the provisioned worker environment): author it in
   repo-root `skills/<name>/SKILL.mdx`, add it to `NATIVE_ONLY_SKILLS`, regenerate
   the native output, and mirror it here for local Go builds. Add a row to the
-  AGENTS.md routing table so the model routes to it.
+  AGENTS.md routing table so the model routes to it. A skill that only a module's
+  own brief names (`daily-insights`, which a scheduled insights run names) takes
+  no row: mark it `internal: true` in its front matter, so the palette never
+  offers it.

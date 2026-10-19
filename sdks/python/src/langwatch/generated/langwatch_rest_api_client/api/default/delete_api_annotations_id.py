@@ -6,8 +6,6 @@ import httpx
 from ... import errors
 from ...client import AuthenticatedClient, Client
 from ...models.delete_api_annotations_id_response_200 import DeleteApiAnnotationsIdResponse200
-from ...models.delete_api_annotations_id_response_404 import DeleteApiAnnotationsIdResponse404
-from ...models.error import Error
 from ...types import Response, safe_http_status
 
 
@@ -17,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "delete",
-        "url": "/api/annotations/{id}".format(
+        "url": "/api/v1/annotations/{id}".format(
             id=quote(str(id), safe=""),
         ),
     }
@@ -27,21 +25,11 @@ def _get_kwargs(
 
 def _parse_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error | None:
+) -> DeleteApiAnnotationsIdResponse200 | None:
     if response.status_code == 200:
         response_200 = DeleteApiAnnotationsIdResponse200.from_dict(response.json())
 
         return response_200
-
-    if response.status_code == 400:
-        response_400 = Error.from_dict(response.json())
-
-        return response_400
-
-    if response.status_code == 404:
-        response_404 = DeleteApiAnnotationsIdResponse404.from_dict(response.json())
-
-        return response_404
 
     if client.raise_on_unexpected_status:
         raise errors.UnexpectedStatus(response.status_code, response.content)
@@ -51,7 +39,7 @@ def _parse_response(
 
 def _build_response(
     *, client: AuthenticatedClient | Client, response: httpx.Response
-) -> Response[DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error]:
+) -> Response[DeleteApiAnnotationsIdResponse200]:
     # LangWatch override: use safe_http_status to tolerate non-IANA status codes
     # (Cloudflare 520-527, AWS WAF 561, etc). Upstream still crashes here.
     # Tracked upstream: https://github.com/openapi-generators/openapi-python-client/pull/1407
@@ -66,9 +54,9 @@ def _build_response(
 def sync_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error]:
-    """Deletes a single annotation based on the ID supplied
+    client: AuthenticatedClient,
+) -> Response[DeleteApiAnnotationsIdResponse200]:
+    """Delete an annotation in the caller’s project
 
     Args:
         id (str):
@@ -78,7 +66,7 @@ def sync_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error]
+        Response[DeleteApiAnnotationsIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -95,9 +83,9 @@ def sync_detailed(
 def sync(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error | None:
-    """Deletes a single annotation based on the ID supplied
+    client: AuthenticatedClient,
+) -> DeleteApiAnnotationsIdResponse200 | None:
+    """Delete an annotation in the caller’s project
 
     Args:
         id (str):
@@ -107,7 +95,7 @@ def sync(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error
+        DeleteApiAnnotationsIdResponse200
     """
 
     return sync_detailed(
@@ -119,9 +107,9 @@ def sync(
 async def asyncio_detailed(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> Response[DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error]:
-    """Deletes a single annotation based on the ID supplied
+    client: AuthenticatedClient,
+) -> Response[DeleteApiAnnotationsIdResponse200]:
+    """Delete an annotation in the caller’s project
 
     Args:
         id (str):
@@ -131,7 +119,7 @@ async def asyncio_detailed(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        Response[DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error]
+        Response[DeleteApiAnnotationsIdResponse200]
     """
 
     kwargs = _get_kwargs(
@@ -146,9 +134,9 @@ async def asyncio_detailed(
 async def asyncio(
     id: str,
     *,
-    client: AuthenticatedClient | Client,
-) -> DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error | None:
-    """Deletes a single annotation based on the ID supplied
+    client: AuthenticatedClient,
+) -> DeleteApiAnnotationsIdResponse200 | None:
+    """Delete an annotation in the caller’s project
 
     Args:
         id (str):
@@ -158,7 +146,7 @@ async def asyncio(
         httpx.TimeoutException: If the request takes longer than Client.timeout.
 
     Returns:
-        DeleteApiAnnotationsIdResponse200 | DeleteApiAnnotationsIdResponse404 | Error
+        DeleteApiAnnotationsIdResponse200
     """
 
     return (

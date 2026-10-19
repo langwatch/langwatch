@@ -1,14 +1,12 @@
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
+
 import { ChartsApiService } from "@/client-sdk/services/charts/charts-api.service";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
-import {
-  ChartInputError,
-  type DefinitionFlags,
-  resolveDefinitionInput,
-} from "./definitionInput";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
+import { ChartInputError, type DefinitionFlags, resolveDefinitionInput } from "./definitionInput";
 
 /**
  * Returns the created chart rather than printing it: the output port renders
@@ -35,9 +33,7 @@ export const createChartCommand = async (
     throw error;
   }
   if (!definition) {
-    console.error(
-      chalk.red("Error: a chart needs its statement — pass --sql or --sql-file"),
-    );
+    console.error(chalk.red("Error: a chart needs its statement — pass --sql or --sql-file"));
     process.exit(1);
   }
 
@@ -47,17 +43,13 @@ export const createChartCommand = async (
   try {
     const chart = await service.create({ name: options.name, definition });
 
-    spinner.succeed(
-      `Created chart "${chalk.cyan(chart.name)}" ${chalk.gray(`(id: ${chart.id})`)}`,
-    );
+    spinner.succeed(`Created chart "${chalk.cyan(chart.name)}" ${chalk.gray(`(id: ${chart.id})`)}`);
 
     return {
       data: chart,
       table: () => {
         if (chart.platformUrl) {
-          console.log(
-            `  ${chalk.bold("View:")}  ${chalk.underline(chart.platformUrl)}`,
-          );
+          console.log(`  ${chalk.bold("View:")}  ${chalk.underline(chart.platformUrl)}`);
         }
       },
     };

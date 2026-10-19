@@ -12,8 +12,8 @@ We'll use LangWatch to create a simple, repeatable evaluation script to measure 
 
 Our LLM's job is to interpret short chat messages and extract key details for a ride booking.
 
-* **Input:** A vague user message like `"Schiphol, 2 people"` or `"Herengracht 500 now"`.
-* **Output:** A structured JSON object with the booking details.
+- **Input:** A vague user message like `"Schiphol, 2 people"` or `"Herengracht 500 now"`.
+- **Output:** A structured JSON object with the booking details.
 
 We need to evaluate how accurately our model can extract fields like `pickup_address`, `airport_found`, and `passenger_count`, even when the input is incomplete.
 
@@ -154,9 +154,9 @@ print("Evaluation complete! Check your results in the LangWatch dashboard.")
 
 After running the script, you can navigate to the LangWatch dashboard to see your results. You'll get:
 
-* **High-Level Metrics**: An overview of correctness scores across your dataset.
-* **Sample-by-Sample Breakdown**: The ability to inspect each user message, see the model's output vs. the expected output, and identify exactly where it failed.
-* **Historical Tracking**: A record of all your evaluation runs, so you can compare model versions and track improvements over time.
+- **High-Level Metrics**: An overview of correctness scores across your dataset.
+- **Sample-by-Sample Breakdown**: The ability to inspect each user message, see the model's output vs. the expected output, and identify exactly where it failed.
+- **Historical Tracking**: A record of all your evaluation runs, so you can compare model versions and track improvements over time.
 
 For example, you could quickly filter for all samples where `hallucination_check` failed to debug why your model is inventing a destination_address. This level of detail is crucial for iterating on your prompts and improving model reliability.
 

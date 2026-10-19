@@ -1,11 +1,15 @@
 package domain
 
-import "testing"
+import (
+	"testing"
+	"time"
+)
 
 const checkGiB = uint64(1) << 30
 
 // @scenario "haven derives the same limit the JavaScript queue would"
 func TestResolveCheckSlots(t *testing.T) {
+	// @scenario "The default limit is derived from the machine"
 	t.Run("given no explicit limit on a developer machine", func(t *testing.T) {
 		cases := []struct {
 			name string
@@ -27,6 +31,8 @@ func TestResolveCheckSlots(t *testing.T) {
 		}
 	})
 
+	// @scenario "An explicit limit is honored"
+	// @scenario "The limit can be turned off"
 	t.Run("given an explicit CHECK_SLOTS", func(t *testing.T) {
 		if slots, source := ResolveCheckSlots(CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}, CheckEnv{CheckSlots: "5", CI: "true"}); slots != 5 || source != "CHECK_SLOTS" {
 			t.Fatalf("an explicit limit must win, even under CI: got %d from %q", slots, source)
@@ -39,6 +45,7 @@ func TestResolveCheckSlots(t *testing.T) {
 		}
 	})
 
+	// @scenario "CI does not queue by default"
 	t.Run("given CI without an explicit limit", func(t *testing.T) {
 		if slots, source := ResolveCheckSlots(CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}, CheckEnv{CheckSlots: "", CI: "true"}); slots != 0 || source != "CI" {
 			t.Fatalf("CI must not queue, got %d from %q", slots, source)
@@ -64,6 +71,8 @@ func TestResolveCheckSlots(t *testing.T) {
 	})
 
 	// @scenario "haven ignores an agent's gate-off the same way"
+	// @scenario "An agent shell cannot turn the queue off"
+	// @scenario "A run the queue spawned itself stays unqueued in an agent shell"
 	t.Run("given a gate-off from an agent shell", func(t *testing.T) {
 		machine := CheckMachine{TotalRAMBytes: 18 * checkGiB, NumCPU: 11, Pressure: Green}
 		for _, raw := range []string{"0", "off", "none", "unlimited", "false"} {
@@ -179,28 +188,103 @@ func TestCheckGoMemLimit(t *testing.T) {
 	})
 }
 
-// @scenario "Memory pressure halves the compiler's parallelism"
+// @scenario "A run's parallelism is the units it holds, on every machine"
+// @scenario "An operator's explicit parallelism wins, up to the units held"
 func TestCheckGoMaxProcs(t *testing.T) {
-	t.Run("a green machine sets nothing", func(t *testing.T) {
-		if got := CheckGoMaxProcs(11, "", Green); got != "" {
-			t.Fatalf("green must leave GOMAXPROCS unset, got %q", got)
+	for units, want := range map[int]string{2: "2", 4: "4", 0: "1"} {
+		if got := CheckGoMaxProcs(units, ""); got != want {
+			t.Fatalf("CheckGoMaxProcs(%d) = %q, want %q", units, got, want)
 		}
-	})
+	}
+	if got := CheckGoMaxProcs(2, "8"); got != "8" {
+		t.Fatalf("got %q, want the operator's 8", got)
+	}
+}
 
-	t.Run("a pressured machine halves the cores, never below two", func(t *testing.T) {
-		for cpus, want := range map[int]string{11: "5", 4: "2", 2: "2", 1: "2"} {
-			if got := CheckGoMaxProcs(cpus, "", Red); got != want {
-				t.Fatalf("CheckGoMaxProcs(%d, red) = %q, want %q", cpus, got, want)
-			}
+// @scenario "The budget is counted in core units and narrows with pressure"
+func TestResolveCheckUnits(t *testing.T) {
+	machine := func(p Pressure) CheckMachine {
+		return CheckMachine{TotalRAMBytes: 64 * checkGiB, NumCPU: 10, Pressure: p}
+	}
+	for level, want := range map[Pressure]int{Green: 8, Amber: 4, Red: 2} {
+		if got, _ := ResolveCheckUnits(machine(level), CheckEnv{}); got != want {
+			t.Fatalf("%s: %d units, want %d", level, got, want)
 		}
-		if got := CheckGoMaxProcs(11, "", Amber); got != "5" {
-			t.Fatalf("amber caps too, got %q", got)
-		}
-	})
+	}
+	if got, _ := ResolveCheckUnits(CheckMachine{TotalRAMBytes: 8 * checkGiB, NumCPU: 10}, CheckEnv{}); got != 2 {
+		t.Fatalf("an 8 GiB machine is bounded by memory to 2 units, got %d", got)
+	}
+	if got, src := ResolveCheckUnits(machine(Red), CheckEnv{CheckSlots: "3"}); got != 6 || src != "CHECK_SLOTS" {
+		t.Fatalf("CHECK_SLOTS=3 is 6 units, got %d from %s", got, src)
+	}
+	if got, _ := ResolveCheckUnits(machine(Green), CheckEnv{CheckSlots: "0"}); got != 0 {
+		t.Fatalf("a person's gate-off is no budget, got %d", got)
+	}
+	if got, _ := ResolveCheckUnits(machine(Green), CheckEnv{CI: "true"}); got != 0 {
+		t.Fatalf("CI queues nothing, got %d", got)
+	}
+}
 
-	t.Run("an operator's explicit setting always wins", func(t *testing.T) {
-		if got := CheckGoMaxProcs(11, "8", Red); got != "8" {
-			t.Fatalf("got %q, want the operator's 8", got)
+// @scenario "Each class takes its weight in units"
+func TestSlotWeight(t *testing.T) {
+	cases := []struct {
+		class   SlotClass
+		workers string
+		want    int
+	}{
+		{ClassCheck, "", 2}, {ClassTypecheck, "9", 2}, {ClassLint, "", 2}, {ClassBuild, "", 2},
+		{ClassTest, "", 2}, {ClassTest, "3", 3}, {ClassTest, "8", 4}, {ClassTest, "1", 1}, {ClassTest, "x", 2},
+	}
+	for _, c := range cases {
+		if got := SlotWeight(c.class, c.workers); got != c.want {
+			t.Fatalf("SlotWeight(%s, %q) = %d, want %d", c.class, c.workers, got, c.want)
 		}
-	})
+	}
+	if _, err := ParseSlotClass("tests"); err == nil {
+		t.Fatal("an unknown class must be refused")
+	}
+	if class, err := ParseSlotClass(""); err != nil || class != ClassCheck {
+		t.Fatalf("no --class is a check, got %q %v", class, err)
+	}
+}
+
+// @scenario "A test run is told its worker count"
+// @scenario "An operator's explicit parallelism wins, up to the units held"
+func TestCheckVitestWorkers(t *testing.T) {
+	if got := CheckVitestWorkers(ClassTest, 2, ""); got != "2" {
+		t.Fatalf("a test run holding 2 units gets 2 workers, got %q", got)
+	}
+	if got := CheckVitestWorkers(ClassTypecheck, 2, ""); got != "" {
+		t.Fatalf("a typecheck sets no worker count, got %q", got)
+	}
+	if got := CheckVitestWorkers(ClassTest, 4, "3"); got != "3" {
+		t.Fatalf("the operator's 3 wins under the units held, got %q", got)
+	}
+	if got := CheckVitestWorkers(ClassTest, 2, "4"); got != "2" {
+		t.Fatalf("an operator's 4 on 2 held units is capped at 2, got %q", got)
+	}
+	if got := CheckVitestWorkers(ClassLint, 2, "4"); got != "4" {
+		t.Fatalf("a lint run leaves the worker count alone, got %q", got)
+	}
+}
+
+// @scenario "A big run at the head of the queue is not starved by small ones"
+// @scenario "Waiters are served in arrival order"
+func TestWaitBehind(t *testing.T) {
+	head := WaiterState{Caller: SubAgent, Waited: 5 * time.Second}
+	late := WaiterState{Caller: SubAgent, Waited: time.Second}
+	if !WaitBehind(late, []WaiterState{head}) {
+		t.Fatal("a later same-class waiter must let the head go first")
+	}
+	if WaitBehind(head, []WaiterState{late}) {
+		t.Fatal("the head must not wait behind a later arrival")
+	}
+	sameTick := WaiterState{Caller: SubAgent, Waited: 5*time.Second - 50*time.Millisecond}
+	if WaitBehind(sameTick, []WaiterState{head}) {
+		t.Fatal("arrivals inside one poll tick race, as before")
+	}
+	person := WaiterState{Caller: Interactive, Waited: 0}
+	if WaitBehind(person, []WaiterState{head}) {
+		t.Fatal("a higher class still goes first, whatever the arrival order")
+	}
 }

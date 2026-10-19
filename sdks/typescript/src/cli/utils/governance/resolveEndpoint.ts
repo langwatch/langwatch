@@ -1,22 +1,12 @@
 /**
- * Single source of truth for resolving the LangWatch control-plane URL
- * across the CLI. Replaces the previous three drifted readers
- * (`endpoint.ts:getEndpoint`, `governance/config.ts:defaults`, and the
- * inline `process.env.LANGWATCH_ENDPOINT ?? ...` literal in
- * `commands/status.ts`) so every command sees the same value for the
- * same inputs.
- *
- * Priority (highest wins):
- *   1. opts.flag           — per-command override (e.g. `langwatch login --endpoint <url>`)
- *   2. LANGWATCH_ENDPOINT  — env var (CI / scripts)
- *   3. persisted config    — `~/.langwatch/config.json:control_plane_url` (daily driver)
- *   4. DEFAULT_ENDPOINT    — `https://app.langwatch.ai` (cloud default)
- *
+ * Single source of truth for the control-plane URL. Priority: 1. `opts.flag`
+ * 2. `LANGWATCH_ENDPOINT` 3. persisted config 4. `DEFAULT_ENDPOINT`.
  * Spec: specs/ai-governance/cli-onboarding/login-unified.feature
  */
 
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
+
 import { loadConfig } from "./config";
 
 export interface ResolveEndpointOptions {
@@ -34,14 +24,11 @@ export interface ResolvedEndpoint {
 }
 
 /**
- * Resolve the control-plane endpoint per the documented priority order.
- *
- * Returns both the resolved URL and the source that won, so
- * `langwatch config list` can show the user where each value came from.
+ * Resolves the control-plane endpoint per the documented priority order,
+ * returning both the URL and the source that won, so `langwatch config
+ * list` can show the user where each value came from.
  */
-export function resolveControlPlaneEndpoint(
-  opts: ResolveEndpointOptions = {},
-): ResolvedEndpoint {
+export function resolveControlPlaneEndpoint(opts: ResolveEndpointOptions = {}): ResolvedEndpoint {
   // Each source is judged on what it normalizes to, not on truthiness: both a
   // whitespace-only value and a slash-only one reduce to the empty string, and
   // returning that as the resolved URL is worse than falling through to the
@@ -80,8 +67,6 @@ export function resolveControlPlaneEndpoint(
  * the source-attribution. Equivalent to
  * `resolveControlPlaneEndpoint(opts).url`.
  */
-export function resolveControlPlaneUrl(
-  opts: ResolveEndpointOptions = {},
-): string {
+export function resolveControlPlaneUrl(opts: ResolveEndpointOptions = {}): string {
   return resolveControlPlaneEndpoint(opts).url;
 }

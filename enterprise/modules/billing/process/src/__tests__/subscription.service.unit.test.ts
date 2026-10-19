@@ -1,0 +1,837 @@
+import {
+  BillingPriceCatalogue,
+  PlanTypes,
+  SubscriptionStatus,
+} from "@langwatch/enterprise-billing-contract";
+import { Temporal } from "@langwatch/time";
+import Stripe from "stripe";
+import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+
+import { MemoryStripeCustomersChannel } from "../channels/memory/memory.stripe-customers.channel.ts";
+import { MemoryStripeInvoicesChannel } from "../channels/memory/memory.stripe-invoices.channel.ts";
+import { MemoryStripeSubscriptionsChannel } from "../channels/memory/memory.stripe-subscriptions.channel.ts";
+import { type BillingSubscriptionRepository, type BillingSubscriptionNotifier } from "../index.ts";
+import { type BillingAccountFactsRepository } from "../repositories/billing-account-facts.repository.ts";
+import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
+import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
+import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
+import type {
+  BillingSubscription,
+  BillingSubscriptionStatus,
+} from "../rules/billing-stripe-shapes.rules.ts";
+import { RECENT_INVOICES_LIMIT } from "../services/billing-invoices.service.ts";
+import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
+import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
+import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
+import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
+import { BillingSubscriptionService } from "../services/subscription.service.ts";
+
+const subscriptionRecord = (
+  overrides: Partial<BillingSubscriptionRecord>,
+): BillingSubscriptionRecord => ({
+  id: "sub_1",
+  organizationId: "org_123",
+  status: "ACTIVE",
+  plan: "LAUNCH",
+  stripeSubscriptionId: null,
+  createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
+  startDate: null,
+  endDate: null,
+  maxMembers: null,
+  maxMembersLite: null,
+  maxMessagesPerMonth: null,
+  lastPaymentFailedDate: null,
+  ...overrides,
+});
+
+const mockSendSlackSubscriptionEvent = vi.fn().mockResolvedValue(undefined);
+
+/** A subscription as the provider holds it, with only the fields these paths read. */
+const providerSubscription = ({
+  id = "sub_stripe_1",
+  status = "active",
+  items = [],
+}: {
+  id?: string;
+  status?: BillingSubscriptionStatus;
+  items?: { id: string; priceId: string }[];
+}): BillingSubscription => ({
+  id,
+  status,
+  canceledAt: null,
+  billingThreshold: null,
+  items: items.map((item) => ({ ...item, unitAmount: null, interval: null })),
+});
+
+const createMockRepository = (): {
+  [K in keyof BillingSubscriptionRepository]: Mock<BillingSubscriptionRepository[K]>;
+} => ({
+  findActive: vi.fn(),
+  findLastNonCancelled: vi.fn(),
+  hasAnyForOrganization: vi.fn(),
+  createPending: vi.fn(),
+  updateStatus: vi.fn(),
+  updatePlan: vi.fn(),
+  findByStripeId: vi.fn(),
+  linkStripeId: vi.fn(),
+  activate: vi.fn(),
+  recordPaymentFailure: vi.fn(),
+  cancel: vi.fn(),
+  cancelTrialSubscriptions: vi.fn(),
+  migrateToSeatEvent: vi.fn(),
+  updateQuantities: vi.fn(),
+});
+
+const TEST_PRICES = BillingPriceCatalogue.create("test").prices;
+
+const createMockItemCalculator = () =>
+  Object.assign(
+    SubscriptionItemCalculatorService.create({ ...TEST_PRICES, LAUNCH: "price_launch" }),
+    {
+      getItemsToUpdate: vi.fn().mockReturnValue([]),
+      createItemsToAdd: vi.fn().mockReturnValue([]),
+    },
+  );
+
+const createMockOrganizationRepository = (): {
+  [K in keyof BillingAccountFactsRepository]: Mock<BillingAccountFactsRepository[K]>;
+} => ({
+  findPricingModel: vi.fn(),
+  findStripeCustomerId: vi.fn(),
+  findName: vi.fn(),
+  findFirstTeamId: vi.fn(),
+  findBillingProfile: vi.fn(),
+  claimStripeCustomerId: vi.fn(),
+  findWithAdministrators: vi.fn(),
+  findActiveMemberIds: vi.fn(),
+  findSelfHostedCustomers: vi.fn(),
+  listIds: vi.fn(),
+});
+
+const createMockNotifier = (): BillingSubscriptionNotifier => ({
+  send: mockSendSlackSubscriptionEvent,
+});
+
+const createMockSeatEventService = () =>
+  Object.assign(
+    SeatEventSubscriptionService.create({
+      stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
+      subscriptions: MemorySeatEventSubscriptionRepository.create(MemoryBillingStore.create()),
+      abandoned: { seatCheckoutsAbandoned: vi.fn() },
+      prices: TEST_PRICES,
+      customerCurrency: StripeCustomerCurrencyService.create({
+        customers: MemoryStripeCustomersChannel.create(),
+        stripeErrors: StripeErrorTranslatorService.create(),
+      }),
+    }),
+    {
+      createSeatEventCheckout: vi.fn(),
+      updateSeatEventItems: vi.fn(),
+      previewProration: vi.fn(),
+      seatEventBillingPortalUrl: vi.fn(),
+    },
+  );
+
+const createServiceWithSeatEventFns = ({
+  repository,
+  itemCalculator: calc,
+  organizationRepository: orgRepo,
+  seatEventService,
+}: {
+  repository: ReturnType<typeof createMockRepository>;
+  itemCalculator: ReturnType<typeof createMockItemCalculator>;
+  organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
+  seatEventService: ReturnType<typeof createMockSeatEventService>;
+}) =>
+  BillingSubscriptionService.create({
+    repository,
+    organizationRepository: orgRepo,
+    stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
+    stripeInvoices: MemoryStripeInvoicesChannel.create(),
+    itemCalculator: calc,
+    seatEventService,
+    notifier: createMockNotifier(),
+    stripeErrors: StripeErrorTranslatorService.create(),
+  });
+
+describe("BillingSubscriptionService", () => {
+  let stripeInvoices: MemoryStripeInvoicesChannel;
+  let stripeSubscriptions: MemoryStripeSubscriptionsChannel;
+  let repository: ReturnType<typeof createMockRepository>;
+  let itemCalculator: ReturnType<typeof createMockItemCalculator>;
+  let organizationRepository: ReturnType<typeof createMockOrganizationRepository>;
+  let service: BillingSubscriptionService;
+
+  describe("when checking interface conformance", () => {
+    /** @scenario "New class implements the same interface as old factory" */
+    it("implements the SubscriptionService app-layer interface", () => {
+      const localService = BillingSubscriptionService.create({
+        repository: createMockRepository(),
+        organizationRepository: createMockOrganizationRepository(),
+        stripeSubscriptions: MemoryStripeSubscriptionsChannel.create(),
+        stripeInvoices: MemoryStripeInvoicesChannel.create(),
+        itemCalculator: createMockItemCalculator(),
+        notifier: createMockNotifier(),
+        stripeErrors: StripeErrorTranslatorService.create(),
+      });
+
+      expect(typeof localService.updateSubscriptionItems).toBe("function");
+      expect(typeof localService.createOrUpdateSubscription).toBe("function");
+      expect(typeof localService.createBillingPortalSession).toBe("function");
+      expect(typeof localService.findLastNonCancelledSubscription).toBe("function");
+      expect(typeof localService.notifyProspective).toBe("function");
+    });
+  });
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    stripeInvoices = MemoryStripeInvoicesChannel.create();
+    stripeSubscriptions = MemoryStripeSubscriptionsChannel.create();
+    repository = createMockRepository();
+    itemCalculator = createMockItemCalculator();
+    organizationRepository = createMockOrganizationRepository();
+    service = BillingSubscriptionService.create({
+      repository,
+      organizationRepository: organizationRepository,
+      stripeSubscriptions,
+      stripeInvoices,
+      itemCalculator: itemCalculator,
+      notifier: createMockNotifier(),
+      stripeErrors: StripeErrorTranslatorService.create(),
+    });
+  });
+
+  describe("updateSubscriptionItems()", () => {
+    describe("when active subscription exists", () => {
+      /** @scenario EESubscriptionService updates subscription items via Stripe */
+      it("updates subscription items via Stripe", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
+        });
+        itemCalculator.getItemsToUpdate.mockReturnValue([{ id: "si_1", quantity: 1 }]);
+
+        const result = await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: true,
+          upgradeTraces: true,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(stripeSubscriptions.updates).toEqual([
+          { subscriptionId: "sub_stripe_1", change: { items: [{ id: "si_1", quantity: 1 }] } },
+        ]);
+      });
+    });
+
+    describe("when upgradeTraces is false", () => {
+      it("passes zero traces to the item calculator", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
+        });
+        itemCalculator.getItemsToUpdate.mockReturnValue([]);
+
+        await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: true,
+          upgradeTraces: false,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tracesToAdd: 0,
+            membersToAdd: 5,
+          }),
+        );
+      });
+    });
+
+    describe("when upgradeMembers is false", () => {
+      it("passes zero members to the item calculator", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+            plan: PlanTypes.LAUNCH,
+          }),
+        );
+        stripeSubscriptions.seed({
+          subscription: providerSubscription({
+            items: [{ id: "si_1", priceId: "price_launch" }],
+          }),
+        });
+        itemCalculator.getItemsToUpdate.mockReturnValue([]);
+
+        await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: false,
+          upgradeTraces: true,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(itemCalculator.getItemsToUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            tracesToAdd: 30_000,
+            membersToAdd: 0,
+          }),
+        );
+      });
+    });
+
+    describe("when no active subscription exists", () => {
+      it("returns success false", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+
+        const result = await service.updateSubscriptionItems({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          upgradeMembers: true,
+          upgradeTraces: true,
+          totalMembers: 5,
+          totalTraces: 30_000,
+        });
+
+        expect(result).toEqual({ success: false });
+      });
+    });
+  });
+
+  describe("createOrUpdateSubscription()", () => {
+    describe("when cancelling to FREE with existing subscription", () => {
+      /** @scenario EESubscriptionService cancels subscription when downgrading to free */
+      it("cancels Stripe subscription and updates status via repository", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
+
+        const result = await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: PlanTypes.FREE,
+          customerId: "cus_123",
+        });
+
+        expect(result.url).toBe("https://app.test/settings/subscription");
+        expect(stripeSubscriptions.cancellations).toEqual([{ subscriptionId: "sub_stripe_1" }]);
+        expect(repository.updateStatus).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          status: SubscriptionStatus.CANCELLED,
+        });
+      });
+    });
+
+    describe("when upgrading existing subscription", () => {
+      it("updates Stripe subscription items and plan via repository", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
+
+        const result = await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: PlanTypes.ACCELERATE,
+          customerId: "cus_123",
+        });
+
+        expect(result.url).toBe("https://app.test/settings/subscription?success");
+        expect(repository.updatePlan).toHaveBeenCalledWith({
+          id: "sub_db_1",
+          plan: PlanTypes.ACCELERATE,
+        });
+      });
+    });
+
+    describe("when creating new subscription", () => {
+      /** @scenario EESubscriptionService creates checkout for new subscription */
+      it("creates checkout session for new plan", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+        repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
+        const result = await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: PlanTypes.LAUNCH,
+          customerId: "cus_123",
+        });
+
+        expect(result.url).toBe(stripeSubscriptions.checkoutSessions[0]?.url);
+        expect(repository.createPending).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+        });
+        expect(stripeSubscriptions.checkoutSessions[0]?.request).toMatchObject({
+          customerId: "cus_123",
+          clientReferenceId: "subscription_setup_sub_new",
+        });
+      });
+    });
+
+    describe("when plan is invalid", () => {
+      it("raises billing_plan_price_missing without creating a pending subscription", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+
+        await expect(
+          service.createOrUpdateSubscription({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            plan: "INVALID_PLAN" as any,
+            customerId: "cus_123",
+          }),
+        ).rejects.toMatchObject({ code: "billing_plan_price_missing" });
+
+        expect(repository.createPending).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when selecting FREE with no existing subscription", () => {
+      it("returns subscription settings URL", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+
+        const result = await service.createOrUpdateSubscription({
+          organizationId: "org_123",
+          baseUrl: "https://app.test",
+          plan: PlanTypes.FREE,
+          customerId: "cus_123",
+        });
+
+        expect(result.url).toBe("https://app.test/settings/subscription");
+      });
+    });
+
+    describe("when createPending succeeds but stripe checkout throws", () => {
+      it("propagates the error", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(null);
+        repository.createPending.mockResolvedValue(subscriptionRecord({ id: "sub_new" }));
+        stripeSubscriptions.refuse({
+          operation: "createCheckoutSession",
+          error: new Error("Stripe checkout failed"),
+        });
+
+        await expect(
+          service.createOrUpdateSubscription({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            plan: PlanTypes.LAUNCH,
+            customerId: "cus_123",
+          }),
+        ).rejects.toThrow("Stripe checkout failed");
+      });
+    });
+
+    describe("when upgrading and stripe subscriptions.update throws", () => {
+      it("does not call repository.updatePlan", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
+        stripeSubscriptions.seed({ subscription: providerSubscription({}) });
+        stripeSubscriptions.refuse({
+          operation: "updateSubscription",
+          error: new Error("Stripe update failed"),
+        });
+
+        await expect(
+          service.createOrUpdateSubscription({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            plan: PlanTypes.ACCELERATE,
+            customerId: "cus_123",
+          }),
+        ).rejects.toThrow("Stripe update failed");
+
+        expect(repository.updatePlan).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when cancelling and stripe subscriptions.cancel throws", () => {
+      it("does not call repository.updateStatus", async () => {
+        repository.findLastNonCancelled.mockResolvedValue(
+          subscriptionRecord({
+            id: "sub_db_1",
+            stripeSubscriptionId: "sub_stripe_1",
+            status: SubscriptionStatus.ACTIVE,
+          }),
+        );
+        stripeSubscriptions.refuse({
+          operation: "cancelSubscription",
+          error: new Error("Stripe cancel failed"),
+        });
+
+        await expect(
+          service.createOrUpdateSubscription({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            plan: PlanTypes.FREE,
+            customerId: "cus_123",
+          }),
+        ).rejects.toThrow("Stripe cancel failed");
+
+        expect(repository.updateStatus).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("createBillingPortalSession()", () => {
+    describe("when called with valid customer and base URL", () => {
+      /** @scenario EESubscriptionService creates billing portal session */
+      it("creates portal session with return URL", async () => {
+        const result = await service.createBillingPortalSession({
+          customerId: "cus_123",
+          baseUrl: "https://app.test",
+          organizationId: "org_123",
+        });
+
+        expect(stripeSubscriptions.portalSessions).toEqual([
+          {
+            customerId: "cus_123",
+            returnUrl: "https://app.test/settings/subscription",
+            url: result.url,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("findLastNonCancelledSubscription()", () => {
+    describe("when querying for an organization", () => {
+      it("delegates to repository and returns the result", async () => {
+        const mockSub = subscriptionRecord({ id: "sub_1", status: "ACTIVE" });
+        repository.findLastNonCancelled.mockResolvedValue(mockSub);
+
+        const result = await service.findLastNonCancelledSubscription("org_123");
+
+        expect(result).toEqual(mockSub);
+        expect(repository.findLastNonCancelled).toHaveBeenCalledWith("org_123");
+      });
+    });
+  });
+
+  describe("notifyProspective()", () => {
+    describe("when organization exists", () => {
+      /** @scenario EESubscriptionService notifies for prospective subscription */
+      it("dispatches prospective notification", async () => {
+        organizationRepository.findName.mockResolvedValue({
+          id: "org_123",
+          name: "Acme",
+        });
+
+        const result = await service.notifyProspective({
+          organizationId: "org_123",
+          plan: PlanTypes.LAUNCH,
+          customerName: "John",
+          customerEmail: "john@example.com",
+          actorEmail: "actor@example.com",
+        });
+
+        expect(result).toEqual({ success: true });
+        expect(mockSendSlackSubscriptionEvent).toHaveBeenCalledWith({
+          type: "prospective",
+          organizationId: "org_123",
+          organizationName: "Acme",
+          plan: PlanTypes.LAUNCH,
+          customerName: "John",
+          customerEmail: "john@example.com",
+          actorEmail: "actor@example.com",
+          note: undefined,
+        });
+      });
+    });
+
+    describe("when organization not found", () => {
+      it("raises organization_not_found", async () => {
+        organizationRepository.findName.mockResolvedValue(null);
+
+        await expect(
+          service.notifyProspective({
+            organizationId: "org_missing",
+            plan: PlanTypes.LAUNCH,
+            actorEmail: "actor@example.com",
+          }),
+        ).rejects.toMatchObject({ code: "organization_not_found" });
+      });
+    });
+
+    describe("when the caller has no address of their own", () => {
+      it("refuses by name and tells sales nothing", async () => {
+        await expect(
+          service.notifyProspective({
+            organizationId: "org_123",
+            plan: PlanTypes.LAUNCH,
+            actorEmail: null,
+          }),
+        ).rejects.toMatchObject({ code: "billing_customer_email_required" });
+        expect(organizationRepository.findName).not.toHaveBeenCalled();
+        expect(mockSendSlackSubscriptionEvent).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("createSeatCheckout()", () => {
+    describe("when seatEventFns is not configured", () => {
+      it("raises seat_billing_unavailable", async () => {
+        await expect(
+          service.createSeatCheckout({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            membersToAdd: 3,
+            customerId: "cus_123",
+          }),
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
+      });
+    });
+
+    describe("when seatEventFns is configured", () => {
+      it("opens a seat checkout and answers its pending subscription", async () => {
+        const seatEventService = createMockSeatEventService();
+        const svcWithSeats = createServiceWithSeatEventFns({
+          repository,
+          itemCalculator,
+          organizationRepository,
+          seatEventService,
+        });
+
+        organizationRepository.findPricingModel.mockResolvedValue("TIERED");
+        (seatEventService.createSeatEventCheckout as ReturnType<typeof vi.fn>).mockResolvedValue({
+          url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
+        });
+
+        await expect(
+          svcWithSeats.createSeatCheckout({
+            organizationId: "org_123",
+            baseUrl: "https://app.test",
+            membersToAdd: 2,
+            customerId: "cus_123",
+          }),
+        ).resolves.toEqual({
+          url: "https://checkout.stripe.com/seat-session",
+          subscriptionId: "sub_pending",
+        });
+        expect(seatEventService.createSeatEventCheckout).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          customerId: "cus_123",
+          baseUrl: "https://app.test",
+          currency: "EUR",
+          billingInterval: "monthly",
+          membersToAdd: 2,
+          isUpgradeFromTiered: true,
+        });
+      });
+    });
+  });
+
+  describe("previewProration()", () => {
+    describe("when seatEventFns is not configured", () => {
+      it("raises seat_billing_unavailable", async () => {
+        await expect(
+          service.previewProration({
+            organizationId: "org_123",
+            newTotalSeats: 5,
+          }),
+        ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
+      });
+    });
+
+    describe("when seatEventFns is configured", () => {
+      it("delegates to seatEventFns.previewProration", async () => {
+        const seatEventService = createMockSeatEventService();
+        const svcWithSeats = createServiceWithSeatEventFns({
+          repository,
+          itemCalculator,
+          organizationRepository,
+          seatEventService,
+        });
+
+        const mockResult = {
+          formattedAmountDue: "$10.00",
+          formattedRecurringTotal: "$50.00",
+          billingInterval: "month",
+        };
+        (seatEventService.previewProration as ReturnType<typeof vi.fn>).mockResolvedValue(
+          mockResult,
+        );
+
+        const result = await svcWithSeats.previewProration({
+          organizationId: "org_123",
+          newTotalSeats: 5,
+        });
+
+        expect(result).toEqual(mockResult);
+        expect(seatEventService.previewProration).toHaveBeenCalledWith({
+          organizationId: "org_123",
+          newTotalSeats: 5,
+        });
+      });
+    });
+  });
+
+  describe("listInvoices()", () => {
+    describe("when organization has no stripeCustomerId", () => {
+      it("returns an empty array", async () => {
+        organizationRepository.findStripeCustomerId.mockResolvedValue(null);
+
+        const result = await service.listInvoices({
+          organizationId: "org_no_stripe",
+        });
+
+        expect(result).toEqual([]);
+        expect(stripeInvoices.listings).toEqual([]);
+      });
+    });
+
+    describe("when organization is not found", () => {
+      it("returns an empty array", async () => {
+        organizationRepository.findStripeCustomerId.mockResolvedValue(null);
+
+        const result = await service.listInvoices({
+          organizationId: "org_missing",
+        });
+
+        expect(result).toEqual([]);
+      });
+    });
+
+    describe("when the provider rate-limits the invoice list", () => {
+      it("fails with a retryable provider-unavailable error", async () => {
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
+        stripeInvoices.refuse({
+          operation: "listInvoices",
+          error: new Stripe.errors.StripeRateLimitError({
+            message: "slow down",
+            type: "rate_limit_error",
+          }),
+        });
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the provider is unreachable for the invoice list", () => {
+      it("fails with the same retryable provider-unavailable error", async () => {
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
+        stripeInvoices.refuse({
+          operation: "listInvoices",
+          error: new Stripe.errors.StripeConnectionError({
+            message: "network down",
+            type: "api_error",
+          }),
+        });
+
+        await expect(
+          service.listInvoices({ organizationId: "org_with_stripe" }),
+        ).rejects.toMatchObject({ code: "billing_provider_unavailable" });
+      });
+    });
+
+    describe("when the invoice list fails for a reason we cannot name", () => {
+      it("lets the original error through rather than dressing it as handled", async () => {
+        const providerError = new Error("No such customer");
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
+        stripeInvoices.refuse({ operation: "listInvoices", error: providerError });
+
+        const error = await service
+          .listInvoices({ organizationId: "org_with_stripe" })
+          .catch((caught: unknown) => caught);
+
+        expect(error).toBe(providerError);
+        expect(error).not.toHaveProperty("isHandled");
+      });
+    });
+
+    describe("when organization has a stripeCustomerId", () => {
+      it("returns mapped invoices excluding drafts", async () => {
+        organizationRepository.findStripeCustomerId.mockResolvedValue("cus_123");
+
+        stripeInvoices.seed({
+          invoice: {
+            id: "inv_1",
+            customerId: "cus_123",
+            number: "INV-001",
+            created: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
+        });
+        stripeInvoices.seed({
+          invoice: {
+            id: "inv_draft",
+            customerId: "cus_123",
+            number: null,
+            created: 1700001000,
+            amountDue: 3000,
+            currency: "eur",
+            status: "draft",
+            pdfUrl: null,
+            hostedUrl: null,
+          },
+        });
+
+        const result = await service.listInvoices({
+          organizationId: "org_with_stripe",
+        });
+
+        expect(stripeInvoices.listings).toEqual([
+          { customerId: "cus_123", limit: RECENT_INVOICES_LIMIT },
+        ]);
+
+        expect(result).toEqual([
+          {
+            id: "inv_1",
+            number: "INV-001",
+            date: 1700000000,
+            amountDue: 5000,
+            currency: "usd",
+            status: "paid",
+            pdfUrl: "https://pdf.example.com/inv_1",
+            hostedUrl: "https://hosted.example.com/inv_1",
+          },
+        ]);
+      });
+    });
+  });
+});

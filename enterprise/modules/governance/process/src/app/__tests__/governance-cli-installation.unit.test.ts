@@ -1,0 +1,176 @@
+import type { AgentApi } from "@langwatch/agent-contract";
+import { OrganizationInvalidCredentialsError } from "@langwatch/api";
+import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import { BearerIdentity, RestHost } from "@langwatch/api/rest";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuthApi } from "@langwatch/auth-contract";
+import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
+import type { EnterpriseGatewayApi } from "@langwatch/enterprise-gateway-contract";
+import type { ScimApi } from "@langwatch/enterprise-scim-contract";
+import type { EntitlementApi } from "@langwatch/entitlement-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { LogApi } from "@langwatch/log-contract";
+import type { MetricApi } from "@langwatch/metric-contract";
+import type { ModelProviderApi } from "@langwatch/model-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import { createApp } from "@langwatch/process";
+import { memoryStores } from "@langwatch/process-stores";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+/**
+ * @vitest-environment node
+ */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
+import type { TraceApi } from "@langwatch/trace-contract";
+import type { UserApi } from "@langwatch/user-contract";
+import type { WebhookApi } from "@langwatch/webhook-contract";
+import { describe, expect, it } from "vitest";
+
+import { governanceProcessModule } from "../../governance.module.ts";
+import { governanceCliRest } from "../../transport/governance-cli.rest.ts";
+import { governanceIngestRest } from "../../transport/governance-ingest.rest.ts";
+import { governanceRest } from "../../transport/governance.rest.ts";
+
+const MAIN_CLI_ROUTES = [
+  "GET /api/auth/cli/budget/status",
+  "GET /api/auth/cli/bootstrap",
+  "GET /api/auth/cli/budget-overview",
+  "GET /api/auth/cli/personal-project",
+  "POST /api/auth/cli/virtual-key",
+  "POST /api/auth/cli/project-key",
+  "GET /api/auth/cli/governance/ingest/sources",
+  "GET /api/auth/cli/governance/ingest/sources/:sourceId/events",
+  "GET /api/auth/cli/governance/ingest/sources/:sourceId/health",
+  "GET /api/auth/cli/governance/status",
+  "GET /api/auth/cli/governance/ingestion-templates",
+  "POST /api/auth/cli/governance/ingestion-key",
+  "GET /api/auth/cli/governance/ingestion-keys",
+  "GET /api/auth/cli/governance/ingestion-keys/:lookup_id",
+];
+
+function restHost() {
+  const closed = BearerIdentity.create({ name: "unconfigured", token: void 0 });
+  return RestHost.create({
+    authz: restTestAuthorization().forRequest(),
+    identities: {
+      project: closed,
+      organization: closed,
+      api_key: closed,
+      instance_admin: closed,
+      browser: closed,
+    },
+    bearers: () => closed,
+    audit: { record: async () => {} },
+    // The process's plan port, as the api surface supplies it; the CLI plane asks it (Q31).
+    entitlements: { holds: async () => true },
+  });
+}
+
+async function boot(rest: RestHost) {
+  const resolver = SecretsResolver.over(SecretsChain.start({ environment: {} }).withEnv());
+  await resolver.preflight(Object.values(governanceProcessModule.secrets ?? {}));
+  return createApp({ role: "api", secrets: (owner, declared) => resolver.scopeTo(owner, declared) })
+    .withModules([governanceProcessModule])
+    .withStores(memoryStores())
+    .expose(() => ({ hosts: { rest, trpc: { mount: () => ({}) } }, serve: () => undefined }))
+    .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
+      webhook: createApiFixture<WebhookApi>(),
+      agent: createApiFixture<AgentApi>(),
+      project: createApiFixture<ProjectApi>(),
+      auth: createApiFixture<AuthApi>({
+        getCliAccessSession: () => Promise.reject(new OrganizationInvalidCredentialsError()),
+      }),
+      entitlement: createApiFixture<EntitlementApi>(),
+      organization: createApiFixture<OrganizationApi>(),
+      authz: createApiFixture<AuthzApi>(),
+      scim: createApiFixture<ScimApi>(),
+      "feature-flag": createApiFixture<FeatureFlagApi>(),
+      trace: createApiFixture<TraceApi>(),
+      "api-key": createApiFixture<ApiKeyApi>(),
+      gateway: createApiFixture<GatewayApi>(),
+      "enterprise-gateway": createApiFixture<EnterpriseGatewayApi>(),
+      "model-provider": createApiFixture<ModelProviderApi>(),
+      user: createApiFixture<UserApi>(),
+      "audit-log": createApiFixture<AuditLogApi>(),
+      log: createApiFixture<LogApi>(),
+      metric: createApiFixture<MetricApi>(),
+    })
+    .boot();
+}
+
+describe("the governance installation's CLI plane", () => {
+  /** @scenario "The api answers the CLI governance routes main serves" */
+  it("mounts main's fourteen routes and answers them from the installed app", async () => {
+    const rest = restHost();
+    const runtime = await boot(rest);
+
+    try {
+      const transports = governanceProcessModule.transports;
+      if (!transports) throw new Error("the governance module declares no transports");
+      const mounted = transports.includes(governanceCliRest);
+      const routes = governanceCliRest
+        .router()
+        .routes.map((route) => `${route.method.toUpperCase()} ${route.path}`);
+      const response = await rest.app.fetch(
+        new Request("http://api.test/api/auth/cli/budget/status", {
+          headers: { Authorization: "Bearer lw_at_unknown" },
+        }),
+      );
+
+      expect(mounted).toBe(true);
+      expect(routes.toSorted()).toEqual(MAIN_CLI_ROUTES.toSorted());
+      expect(response.status).toBe(401);
+      await expect(response.json()).resolves.toMatchObject({ code: "invalid_credentials" });
+    } finally {
+      await runtime.stop();
+    }
+  });
+});
+
+describe("the governance installation's REST families", () => {
+  /** @scenario Every governance REST family answers from the installed module */
+  it("serves the project family, the CLI plane and the push receivers from one installed app", async () => {
+    const rest = restHost();
+    const runtime = await boot(rest);
+
+    try {
+      const probes = [
+        {
+          family: governanceRest,
+          request: () => new Request("http://api.test/api/governance/ingestion-templates"),
+        },
+        {
+          family: governanceCliRest,
+          request: () =>
+            new Request("http://api.test/api/auth/cli/budget/status", {
+              headers: { Authorization: "Bearer lw_at_unknown" },
+            }),
+        },
+        {
+          family: governanceIngestRest,
+          request: () =>
+            new Request("http://api.test/api/ingest/otel/src_unknown", {
+              method: "POST",
+              body: "{}",
+            }),
+        },
+      ];
+
+      for (const probe of probes) {
+        expect(governanceProcessModule.transports).toContain(probe.family);
+        const response = await rest.app.fetch(probe.request());
+        const body = (await response.json()) as { code?: string };
+
+        expect(response.status, String(body.code)).toBeLessThan(500);
+        expect(body.code).not.toBe("unknown_error");
+      }
+    } finally {
+      await runtime.stop();
+    }
+  });
+});

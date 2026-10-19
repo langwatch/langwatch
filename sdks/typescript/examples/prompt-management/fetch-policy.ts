@@ -1,19 +1,16 @@
 /**
- * Fetch policy examples.
- *
- * Note: Local imports are used to avoid conflicts with internal caching
+ * Fetch policy examples. Local imports avoid conflicts with internal caching
  * and file management.
  */
 
 import type { CliRunner } from "../../__tests__/e2e/cli/helpers/cli-runner";
+import { FetchPolicy, LangWatch } from "../../dist";
 
 /**
  * Demonstrates the default (materialized-first) fetch policy.
  * Assumes the prompt already exists (locally and/or remotely).
  */
 export const runDefaultFetchPolicy = async (handle: string) => {
-  const { FetchPolicy, LangWatch } = await import("../../dist");
-
   const langwatch = new LangWatch();
   return langwatch.prompts.get(handle);
 };
@@ -23,8 +20,6 @@ export const runDefaultFetchPolicy = async (handle: string) => {
  * Assumes the prompt already exists remotely.
  */
 export const runAlwaysFetchPolicy = async (handle: string) => {
-  const { FetchPolicy, LangWatch } = await import("../../dist");
-
   const langwatch = new LangWatch();
   return langwatch.prompts.get(handle, {
     fetchPolicy: FetchPolicy.ALWAYS_FETCH,
@@ -36,8 +31,6 @@ export const runAlwaysFetchPolicy = async (handle: string) => {
  * Requires the Langwatch CLI for local prompt management.
  */
 export const runMaterializedOnlyPolicy = async (handle: string, cli: CliRunner) => {
-  const { LangWatch, FetchPolicy } = await import("../../dist");
-
   // Add the prompt to the local filesystem from the
   cli.run(`prompt add ${handle}`);
   // Sync the prompt to the local filesystem
@@ -53,12 +46,7 @@ export const runMaterializedOnlyPolicy = async (handle: string, cli: CliRunner) 
  * Demonstrates CACHE_TTL happy path (first fetch hits API).
  * Assumes the prompt already exists remotely.
  */
-export const runCacheTtlPolicy = async (
-  handle: string,
-  cacheTtlMinutes = 5,
-) => {
-  const { LangWatch, FetchPolicy } = await import("../../dist");
-
+export const runCacheTtlPolicy = async (handle: string, cacheTtlMinutes = 5) => {
   const langwatch = new LangWatch();
   return langwatch.prompts.get(handle, {
     fetchPolicy: FetchPolicy.CACHE_TTL,

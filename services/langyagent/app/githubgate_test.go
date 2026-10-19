@@ -278,3 +278,51 @@ func TestCommandNeedsGithubAuth(t *testing.T) {
 		}
 	}
 }
+
+// A turn that answers a question with no GitHub command in it is never
+// stopped: the gate reads settled commands, so prose, ordinary tools and
+// tool starts all pass with no credential and no cancel.
+// @scenario "A turn that never needs GitHub is untouched"
+func TestGithubGate_TurnWithNoGithubCommandIsUntouched(t *testing.T) {
+	canceled := false
+	gate := newGithubGate(false, func() { canceled = true })
+
+	prose, err := frames.Delta("Your last ten traces all finished without errors.")
+	if err != nil {
+		t.Fatal(err)
+	}
+	gate.Observe(prose)
+	gate.Observe(toolStartFrameFor(t, "langwatch trace search --limit 10"))
+	gate.Observe(toolEndFrame(t, "langwatch trace search --limit 10", false, "10 traces"))
+	gate.Observe(toolEndFrame(t, "ls -la && cat README.md", false, "README.md"))
+
+	if message, code, tripped := gate.Tripped(); tripped {
+		t.Fatalf("the gate stopped a turn that never touched GitHub: code=%q message=%q", code, message)
+	}
+	if canceled {
+		t.Error("the stream of a turn that never touched GitHub must not be canceled")
+	}
+}
+
+// Local git work (add, commit, branch, status, log, diff) never reaches the
+// remote, so a user with no GitHub account connected is not asked for one.
+// @scenario "Local git work does not demand a GitHub account"
+func TestGithubGate_LocalGitWorkNeverAsksForAGithubAccount(t *testing.T) {
+	canceled := false
+	gate := newGithubGate(false, func() { canceled = true })
+
+	for _, command := range []string{
+		"git checkout -b langy/tracing",
+		"git add -A && git commit -m 'add tracing'",
+		"git status && git log --oneline -5 && git diff HEAD~1",
+	} {
+		gate.Observe(toolEndFrame(t, command, false, ""))
+	}
+
+	if message, code, tripped := gate.Tripped(); tripped {
+		t.Fatalf("local git work tripped the GitHub gate: code=%q message=%q", code, message)
+	}
+	if canceled {
+		t.Error("a turn that only committed locally must not be canceled")
+	}
+}

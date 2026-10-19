@@ -3,17 +3,27 @@
  */
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+
 import { describe, expect, it } from "vitest";
+
 import {
+  ANOTHER_FOLDER_LINE,
   ANSWERED_CARD_MESSAGE,
   CLOSING_LINE,
   CLOSING_LINE_PUSHBACK,
   closingLineRefusal,
   COMPLETE_PATH_COMMAND,
   completePathRan,
+  CONTINUATION_DEAD_END_LINE,
+  CONTINUATION_NOTE_OPENER,
+  continuationPrompt,
   FRAMEWORK_LINE_SHAPE,
   LLMOPS_STEP_TITLES,
   MAX_TURN_CONTINUATIONS,
+  MID_SETUP_LINE,
+  MID_SETUP_LINE_PUSHBACK,
+  midSetupLineRefusal,
+  STARTER_FRAMEWORK_LINE,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
   TRANSPARENT_TOOL_NAMES,
@@ -57,7 +67,9 @@ const answered = () =>
   call(
     "question",
     { questions: [{ header: "Propose the first scenario" }] },
-    { output: `Q: The proposal\nA: Create "Guest completes checkout" as your first scenario test\n\n${ANSWERED_CONTINUE_LINE}` },
+    {
+      output: `Q: The proposal\nA: Create "Guest completes checkout" as your first scenario test\n\n${ANSWERED_CONTINUE_LINE}`,
+    },
   );
 
 describe("the guided turn end guard", () => {
@@ -91,7 +103,11 @@ describe("the guided turn end guard", () => {
       ).toEqual({ kind: "leave", reason: "closing_line" });
       expect(
         decideGuidedContinuation({
-          calls: [plan("in_progress"), shell("uv add langwatch", 1), say("The install failed: no uv.")],
+          calls: [
+            plan("in_progress"),
+            shell("uv add langwatch", 1),
+            say("The install failed: no uv."),
+          ],
           guided: true,
           continuations: 0,
         }),
@@ -100,39 +116,61 @@ describe("the guided turn end guard", () => {
 
     it("never continues a turn outside the guided path", () => {
       expect(
-        decideGuidedContinuation({ calls: [say("Here is what I found.")], guided: false, continuations: 0 }),
+        decideGuidedContinuation({
+          calls: [say("Here is what I found.")],
+          guided: false,
+          continuations: 0,
+        }),
       ).toEqual({ kind: "leave", reason: "not_guided" });
     });
   });
 
   describe("when the turn ends on calls that say nothing", () => {
-    const navigate = (id: string, tool = "bash") => call(tool, { command: `langwatch navigate open ${id}`, timeout: 30 });
+    const navigate = (id: string, tool = "bash") =>
+      call(tool, { command: `langwatch navigate open ${id}`, timeout: 30 });
     const closing = say("All ready! Let me know if there is anything I can help with.");
 
     /** @scenario "Calls that say nothing are transparent to the ender" */
     it("reads through navigates and lookups to the closing line, and names the calls it reads through", () => {
       // The t1 turn as the panel's record orders it: complete-path, the
       // closing line, then the two navigates.
-      const t1 = [shell(`${COMPLETE_PATH_COMMAND} llmops`), closing, navigate("scenario_1"), navigate("scenariorun_1", "local_bash")];
+      const t1 = [
+        shell(`${COMPLETE_PATH_COMMAND} llmops`),
+        closing,
+        navigate("scenario_1"),
+        navigate("scenariorun_1", "local_bash"),
+      ];
       expect(guidedTurnEnding(t1)).toBe("closing_line");
       expect(decideGuidedContinuation({ calls: t1, guided: true, continuations: 0 })).toEqual({
         kind: "leave",
         reason: "closing_line",
       });
-      expect(guidedTurnEnding([shell(`${COMPLETE_PATH_COMMAND} llmops`), navigate("scenariorun_1"), closing])).toBe(
-        "closing_line",
-      );
       expect(
-        guidedTurnEnding([question(), call("local_read", { path: "app/graph.py" }), call("skill", { name: "tracing" })]),
+        guidedTurnEnding([
+          shell(`${COMPLETE_PATH_COMMAND} llmops`),
+          navigate("scenariorun_1"),
+          closing,
+        ]),
+      ).toBe("closing_line");
+      expect(
+        guidedTurnEnding([
+          question(),
+          call("local_read", { path: "app/graph.py" }),
+          call("skill", { name: "tracing" }),
+        ]),
       ).toBe("card");
 
       // A line that is not the closing line, followed by the same calls, still ends bare.
-      const bare = [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things."), navigate("scenariorun_1")];
+      const bare = [
+        shell("langwatch scenario run scenario_1 --wait --format json"),
+        say("Two things."),
+        navigate("scenariorun_1"),
+      ];
       expect(guidedTurnEnding(bare)).toBe("bare");
       // A file write is not read through: the turn ended on it.
       expect(guidedTurnEnding([...t1, call("local_edit", { path: "app/graph.py" })])).toBe("bare");
 
-      expect([...TRANSPARENT_TOOL_NAMES].sort()).toEqual([
+      expect([...TRANSPARENT_TOOL_NAMES].toSorted()).toEqual([
         "find",
         "grep",
         "local_find",
@@ -141,6 +179,8 @@ describe("the guided turn end guard", () => {
         "local_ls",
         "local_read",
         "ls",
+        "notify",
+        "offer_notifications",
         "read",
         "skill",
         "todowrite",
@@ -151,7 +191,13 @@ describe("the guided turn end guard", () => {
   describe("when a guided turn ends bare", () => {
     /** @scenario "A guided turn that ends bare is continued once" */
     it("continues once with a message, and gives up on the second bare end", () => {
-      const calls = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(PULL_REQUEST), plan("completed")];
+      const calls = [
+        plan("completed"),
+        say(FRAMEWORK),
+        say(BRANCH),
+        say(PULL_REQUEST),
+        plan("completed"),
+      ];
       expect(guidedTurnEnding(calls)).toBe("bare");
       const first = decideGuidedContinuation({ calls, guided: true, continuations: 0 });
       expect(first).toEqual({
@@ -169,7 +215,10 @@ describe("the guided turn end guard", () => {
     });
 
     it("names the next step on a turn that is not step 2", () => {
-      const calls = [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things.")];
+      const calls = [
+        shell("langwatch scenario run scenario_1 --wait --format json"),
+        say("Two things."),
+      ];
       expect(decideGuidedContinuation({ calls, guided: true, continuations: 0 })).toEqual({
         kind: "continue",
         segment: 1,
@@ -181,12 +230,20 @@ describe("the guided turn end guard", () => {
   });
 
   describe("when the history shows how far the llmops path got", () => {
-    const KICKOFF = { role: "user", content: "Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).\nTour: completed." };
+    const KICKOFF = {
+      role: "user",
+      content:
+        "Guided onboarding kickoff.\nPath to set up now: llmops (Evals & LLM Ops).\nTour: completed.",
+    };
     const step2 = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(PULL_REQUEST)];
 
     /** @scenario "The continuation names what the history shows done and the step to continue from" */
     it("lists what is done and names the step to continue from, by the skill's numbering", () => {
-      expect(readGuidedProgress([])).toEqual({ done: [], next: "step 2 (Read the code and wire it)", closingLineOnly: false });
+      expect(readGuidedProgress([])).toEqual({
+        done: [],
+        next: "step 2 (Read the code and wire it)",
+        closingLineOnly: false,
+      });
       expect(readGuidedProgress([say(FRAMEWORK)])).toMatchObject({
         done: ["the framework line said"],
         next: "step 2 (Read the code and wire it)",
@@ -199,9 +256,17 @@ describe("the guided turn end guard", () => {
         done: ["the three step 2 lines said", "the first scenario card answered"],
         next: "step 4 (The checklist, then create, explain, run)",
       });
-      const ran = [...step2, answered(), shell("langwatch scenario run scenario_1 --wait --format json")];
+      const ran = [
+        ...step2,
+        answered(),
+        shell("langwatch scenario run scenario_1 --wait --format json"),
+      ];
       expect(readGuidedProgress(ran)).toMatchObject({
-        done: ["the three step 2 lines said", "the first scenario card answered", "the first scenario run"],
+        done: [
+          "the three step 2 lines said",
+          "the first scenario card answered",
+          "the first scenario run",
+        ],
         next: "step 5 (From one run to a suite)",
       });
       const suite = [...ran, shell("langwatch test-suite run suite_1 --wait --format json")];
@@ -214,7 +279,9 @@ describe("the guided turn end guard", () => {
         ],
         next: "item 8 of step 5 (From one run to a suite), Open the suite run",
       });
-      expect(readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)])).toMatchObject({
+      expect(
+        readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)]),
+      ).toMatchObject({
         done: expect.arrayContaining(["complete-path run"]),
         next: "the closing line of step 5 (From one run to a suite)",
         closingLineOnly: true,
@@ -225,7 +292,9 @@ describe("the guided turn end guard", () => {
       expect(progressMessage(readGuidedProgress([]))).toBe(
         "The path is not finished. The history shows none of the path's steps done. Continue from step 2 (Read the code and wire it), through `langwatch onboarding complete-path` and the closing line.",
       );
-      expect(progressMessage(readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)]))).toBe(
+      expect(
+        progressMessage(readGuidedProgress([...suite, shell(`${COMPLETE_PATH_COMMAND} llmops`)])),
+      ).toBe(
         "The path is not finished. The history shows: the three step 2 lines said, the first scenario card answered, the first scenario run, the suite run and complete-path run. Say the closing line of step 5 (From one run to a suite), and stop.",
       );
     });
@@ -239,13 +308,38 @@ describe("the guided turn end guard", () => {
             { type: "toolCall", id: "c1", name: "say", arguments: { text: FRAMEWORK } },
             { type: "toolCall", id: "c2", name: "say", arguments: { text: BRANCH } },
             { type: "toolCall", id: "c3", name: "say", arguments: { text: PULL_REQUEST } },
-            { type: "toolCall", id: "c4", name: "question", arguments: { questions: [{ header: "Propose the first scenario" }] } },
+            {
+              type: "toolCall",
+              id: "c4",
+              name: "question",
+              arguments: { questions: [{ header: "Propose the first scenario" }] },
+            },
           ],
         },
-        { role: "toolResult", toolCallId: "c1", toolName: "say", content: [{ type: "text", text: "Said." }] },
-        { role: "toolResult", toolCallId: "c2", toolName: "say", content: [{ type: "text", text: "Said." }] },
-        { role: "toolResult", toolCallId: "c3", toolName: "say", content: [{ type: "text", text: "Said." }] },
-        { role: "toolResult", toolCallId: "c4", toolName: "question", content: [{ type: "text", text: `A: Create it\n\n${ANSWERED_CONTINUE_LINE}` }] },
+        {
+          role: "toolResult",
+          toolCallId: "c1",
+          toolName: "say",
+          content: [{ type: "text", text: "Said." }],
+        },
+        {
+          role: "toolResult",
+          toolCallId: "c2",
+          toolName: "say",
+          content: [{ type: "text", text: "Said." }],
+        },
+        {
+          role: "toolResult",
+          toolCallId: "c3",
+          toolName: "say",
+          content: [{ type: "text", text: "Said." }],
+        },
+        {
+          role: "toolResult",
+          toolCallId: "c4",
+          toolName: "question",
+          content: [{ type: "text", text: `A: Create it\n\n${ANSWERED_CONTINUE_LINE}` }],
+        },
       ];
       const seed = [
         "[Resumed conversation: digest of the previous worker's session. Newest messages last; the oldest may be truncated.]",
@@ -270,7 +364,9 @@ describe("the guided turn end guard", () => {
         message:
           "The path is not finished. The history shows: the three step 2 lines said and the first scenario card answered. Continue from step 4 (The checklist, then create, explain, run), through `langwatch onboarding complete-path` and the closing line.",
       };
-      expect(decideGuidedContinuation({ calls: turn, guided: true, continuations: 0, history: live })).toEqual(expected);
+      expect(
+        decideGuidedContinuation({ calls: turn, guided: true, continuations: 0, history: live }),
+      ).toEqual(expected);
       expect(
         decideGuidedContinuation({
           calls: turn,
@@ -283,7 +379,12 @@ describe("the guided turn end guard", () => {
 
     it("continues from step 2 when the history shows nothing done, and reads the turn's own calls with it", () => {
       expect(
-        decideGuidedContinuation({ calls: [say("Continuing the setup.")], guided: true, continuations: 0, history: [KICKOFF] }),
+        decideGuidedContinuation({
+          calls: [say("Continuing the setup.")],
+          guided: true,
+          continuations: 0,
+          history: [KICKOFF],
+        }),
       ).toMatchObject({
         kind: "continue",
         message:
@@ -291,7 +392,10 @@ describe("the guided turn end guard", () => {
       });
       expect(
         decideGuidedContinuation({
-          calls: [shell("langwatch scenario run scenario_1 --wait --format json"), say("Two things.")],
+          calls: [
+            shell("langwatch scenario run scenario_1 --wait --format json"),
+            say("Two things."),
+          ],
           guided: true,
           continuations: 0,
           history: [KICKOFF],
@@ -303,12 +407,27 @@ describe("the guided turn end guard", () => {
     });
 
     it("keeps the plain continuation on a path without numbered steps, and the step 2 and answered-card ones as they are", () => {
-      const gateway = { role: "user", content: "Guided onboarding kickoff.\nPath to set up now: gateway (Gateway)." };
+      const gateway = {
+        role: "user",
+        content: "Guided onboarding kickoff.\nPath to set up now: gateway (Gateway).",
+      };
       expect(guidedPathInHistory([KICKOFF])).toBe("llmops");
-      expect(guidedPathInHistory([KICKOFF, { role: "user", content: `Let's set up Gateway then.\n${gateway.content}` }])).toBe("gateway");
-      expect(guidedPathInHistory([{ role: "user", content: "How do I add a trace?" }])).toBeUndefined();
       expect(
-        decideGuidedContinuation({ calls: [say("Here is the key.")], guided: true, continuations: 0, history: [gateway] }),
+        guidedPathInHistory([
+          KICKOFF,
+          { role: "user", content: `Let's set up Gateway then.\n${gateway.content}` },
+        ]),
+      ).toBe("gateway");
+      expect(
+        guidedPathInHistory([{ role: "user", content: "How do I add a trace?" }]),
+      ).toBeUndefined();
+      expect(
+        decideGuidedContinuation({
+          calls: [say("Here is the key.")],
+          guided: true,
+          continuations: 0,
+          history: [gateway],
+        }),
       ).toMatchObject({
         message:
           "The path is not finished. Continue with the next step of the guided onboarding skill; end on the question card or the closing line.",
@@ -322,7 +441,12 @@ describe("the guided turn end guard", () => {
         }),
       ).toMatchObject({ missing: ["the branch line", "the first scenario card"] });
       expect(
-        decideGuidedContinuation({ calls: [...step2, answered()], guided: true, continuations: 0, history: [KICKOFF] }),
+        decideGuidedContinuation({
+          calls: [...step2, answered()],
+          guided: true,
+          continuations: 0,
+          history: [KICKOFF],
+        }),
       ).toMatchObject({ segment: 2, message: ANSWERED_CARD_MESSAGE });
     });
   });
@@ -344,28 +468,40 @@ describe("the guided turn end guard", () => {
       expect(ANSWERED_CARD_MESSAGE).toBe(
         "The card was answered. Continue with the work that follows the answer: step 4 and step 5 of the guided onboarding skill, through `langwatch onboarding complete-path` and the closing line.",
       );
-      // Lines only after the answer are bare too, and the step 2 reading does not follow the answer.
+      // Lines only after the answer are bare too, and step 2 reading does not follow the answer.
       const linesOnly = [...stopped, say("Running it against your agent now."), plan("completed")];
-      expect(decideGuidedContinuation({ calls: linesOnly, guided: true, continuations: 0 })).toMatchObject({
+      expect(
+        decideGuidedContinuation({ calls: linesOnly, guided: true, continuations: 0 }),
+      ).toMatchObject({
         kind: "continue",
         segment: 2,
         message: ANSWERED_CARD_MESSAGE,
       });
       // A card still waiting is an ending, before and after an answer.
-      expect(decideGuidedContinuation({ calls: [...step2, question()], guided: true, continuations: 0 })).toEqual({
+      expect(
+        decideGuidedContinuation({ calls: [...step2, question()], guided: true, continuations: 0 }),
+      ).toEqual({
         kind: "leave",
         reason: "card",
       });
-      expect(decideGuidedContinuation({ calls: [...stopped, question()], guided: true, continuations: 0 })).toEqual({
+      expect(
+        decideGuidedContinuation({
+          calls: [...stopped, question()],
+          guided: true,
+          continuations: 0,
+        }),
+      ).toEqual({
         kind: "leave",
         reason: "card",
       });
       // The work after the answer, done to the closing line, is left alone.
       const finished = [...stopped, shell(`${COMPLETE_PATH_COMMAND} llmops`), say(CLOSING_LINE)];
-      expect(decideGuidedContinuation({ calls: finished, guided: true, continuations: 0 })).toEqual({
-        kind: "leave",
-        reason: "closing_line",
-      });
+      expect(decideGuidedContinuation({ calls: finished, guided: true, continuations: 0 })).toEqual(
+        {
+          kind: "leave",
+          reason: "closing_line",
+        },
+      );
     });
 
     /** @scenario "An answered card is not an ending" */
@@ -380,10 +516,20 @@ describe("the guided turn end guard", () => {
       // A fresh segment with the turn's cap reached is left too.
       expect(MAX_TURN_CONTINUATIONS).toBe(3);
       expect(
-        decideGuidedContinuation({ calls: stopped, guided: true, continuations: 0, turnContinuations: 3 }),
+        decideGuidedContinuation({
+          calls: stopped,
+          guided: true,
+          continuations: 0,
+          turnContinuations: 3,
+        }),
       ).toEqual({ kind: "give_up", segment: 2, missing: ["the work that follows the answer"] });
       expect(
-        decideGuidedContinuation({ calls: stopped, guided: true, continuations: 0, turnContinuations: 2 }),
+        decideGuidedContinuation({
+          calls: stopped,
+          guided: true,
+          continuations: 0,
+          turnContinuations: 2,
+        }),
       ).toMatchObject({ kind: "continue", segment: 2 });
       // Two answered cards: the third segment.
       const twice = [...stopped, say("Running it against your agent now."), answered()];
@@ -396,7 +542,13 @@ describe("the guided turn end guard", () => {
     it("names the missing line and the card, and only the card when every line was said", () => {
       // The r40 turn: the framework line, the pull request line, the plan all
       // done, and the branch line never said.
-      const r40 = [say(FRAMEWORK), plan("in_progress"), say(PULL_REQUEST), plan("completed"), plan("completed")];
+      const r40 = [
+        say(FRAMEWORK),
+        plan("in_progress"),
+        say(PULL_REQUEST),
+        plan("completed"),
+        plan("completed"),
+      ];
       expect(missingStep2Lines(r40)).toEqual(["the branch line"]);
       expect(decideGuidedContinuation({ calls: r40, guided: true, continuations: 0 })).toEqual({
         kind: "continue",
@@ -407,7 +559,9 @@ describe("the guided turn end guard", () => {
       });
 
       const twoMissing = [plan("completed"), say(PULL_REQUEST)];
-      expect(decideGuidedContinuation({ calls: twoMissing, guided: true, continuations: 0 })).toMatchObject({
+      expect(
+        decideGuidedContinuation({ calls: twoMissing, guided: true, continuations: 0 }),
+      ).toMatchObject({
         kind: "continue",
         message:
           "Step 2 is not finished: the framework line and the branch line were not said, and the first scenario card was not asked. Say the missing lines, then continue with step 3 and end on the question card.",
@@ -415,18 +569,27 @@ describe("the guided turn end guard", () => {
 
       const allLines = [plan("completed"), say(FRAMEWORK), say(BRANCH), say(NO_REMOTE)];
       expect(missingStep2Lines(allLines)).toEqual([]);
-      expect(decideGuidedContinuation({ calls: allLines, guided: true, continuations: 0 })).toMatchObject({
+      expect(
+        decideGuidedContinuation({ calls: allLines, guided: true, continuations: 0 }),
+      ).toMatchObject({
         kind: "continue",
         missing: ["the first scenario card"],
       });
 
       expect(
-        decideGuidedContinuation({ calls: [...allLines, question()], guided: true, continuations: 0 }),
+        decideGuidedContinuation({
+          calls: [...allLines, question()],
+          guided: true,
+          continuations: 0,
+        }),
       ).toEqual({ kind: "leave", reason: "card" });
     });
 
     it("reads a turn as step 2 from the wait command when the plan was never written", () => {
-      const calls = [shell('langwatch agent list --wait-online "acme" --format json'), say(PULL_REQUEST)];
+      const calls = [
+        shell('langwatch agent list --wait-online "acme" --format json'),
+        say(PULL_REQUEST),
+      ];
       expect(decideGuidedContinuation({ calls, guided: true, continuations: 0 })).toMatchObject({
         missing: ["the framework line", "the branch line", "the first scenario card"],
       });
@@ -448,6 +611,10 @@ describe("the guided turn end guard", () => {
       expect(skill).toContain(`11. ${STEP2_LINES_ITEM}`);
       expect(skill).toContain(`${COMPLETE_PATH_COMMAND} <path>`);
       expect(skill).toContain(`\n${CLOSING_LINE}\n`);
+      expect(skill).toContain(MID_SETUP_LINE);
+      expect(skill).toContain(`\n${ANOTHER_FOLDER_LINE}\n`);
+      expect(skill).toContain(STARTER_FRAMEWORK_LINE);
+      expect(skill).toContain(CONTINUATION_NOTE_OPENER);
     });
 
     /** @scenario "The continuation names what the history shows done and the step to continue from" */
@@ -464,6 +631,88 @@ describe("the guided turn end guard", () => {
       expect(branch.test(BRANCH)).toBe(true);
       expect(branch.test("I left the branch checked out.")).toBe(false);
       expect(branch.test(`${BRANCH} Next I will write a scenario.`)).toBe(false);
+    });
+  });
+
+  describe("when the worker continues a turn", () => {
+    /** @scenario "The continuation says the person sent nothing and names the way out" */
+    it("opens on the note that the person sent nothing, carries the guard's message, and ends on the way out", () => {
+      const message = "The path is not finished. Continue with the next step.";
+      const prompt = continuationPrompt(message);
+      expect(prompt.startsWith(`${CONTINUATION_NOTE_OPENER} `)).toBe(true);
+      expect(CONTINUATION_NOTE_OPENER).toBe("LangWatch note: the person sent nothing.");
+      expect(prompt).toContain(message);
+      expect(prompt.endsWith(CONTINUATION_DEAD_END_LINE)).toBe(true);
+      expect(CONTINUATION_DEAD_END_LINE).toContain(
+        'ask the matching question of "When a step fails"',
+      );
+    });
+
+    // The turn a test account ran on a folder with no LLM agent: Langy read
+    // the folder, wrote the plan with one item done and said the setup was
+    // not done, with no command failed and no card.
+    it("continues the turn that stopped on a line with no failed command and no card", () => {
+      const calls = [
+        call("offer_notifications", {}),
+        call("local_ls", { path: "" }),
+        shell("git status --short --branch"),
+        call("local_read", { path: "hello_world/ContentView.swift" }),
+        call("todowrite", {
+          todos: [{ content: "Read the code and name the framework", status: "completed" }],
+        }),
+        say(
+          "The tracing setup is not done because this folder contains a SwiftUI Bluetooth app and ESP32 firmware, with no LLM agent entry point to instrument or connect.",
+        ),
+      ];
+      expect(guidedTurnEnding(calls)).toBe("bare");
+      expect(decideGuidedContinuation({ calls, guided: true, continuations: 0 }).kind).toBe(
+        "continue",
+      );
+    });
+  });
+
+  describe("when the mid-setup line is said", () => {
+    /** @scenario "The mid-setup line is refused in a continued turn" */
+    it("is refused once the worker continued the turn, and said as usual before", () => {
+      expect(midSetupLineRefusal({ text: MID_SETUP_LINE, continued: true })).toBe(
+        MID_SETUP_LINE_PUSHBACK,
+      );
+      expect(
+        midSetupLineRefusal({
+          text: "We’ll get to that! Let me finish getting you set up first.",
+          continued: true,
+        }),
+      ).toBe(MID_SETUP_LINE_PUSHBACK);
+      expect(midSetupLineRefusal({ text: MID_SETUP_LINE, continued: false })).toBeUndefined();
+      expect(midSetupLineRefusal({ text: FRAMEWORK, continued: true })).toBeUndefined();
+      expect(MID_SETUP_LINE_PUSHBACK).toContain("the person sent nothing");
+    });
+  });
+
+  describe("when the turn hands the setup back for another folder", () => {
+    /** @scenario "A folder with no LLM agent gets a question, never a stop" */
+    it("ends the turn on the no-agent question card or on the another-folder line as its last words", () => {
+      const asked = [shell("ls"), say("I read acme-pocket and found no LLM agent."), question()];
+      expect(guidedTurnEnding(asked)).toBe("card");
+      expect(decideGuidedContinuation({ calls: asked, guided: true, continuations: 0 }).kind).toBe(
+        "leave",
+      );
+      expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE)])).toBe("handover");
+      expect(guidedTurnEnding([say(`Got it. ${ANOTHER_FOLDER_LINE}`)])).toBe("handover");
+      expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE), say("Anything else?")])).toBe("bare");
+      expect(guidedTurnEnding([say(`${ANOTHER_FOLDER_LINE} Let me start the setup now.`)])).toBe(
+        "bare",
+      );
+      expect(
+        decideGuidedContinuation({
+          calls: [shell("git status"), say(ANOTHER_FOLDER_LINE)],
+          guided: true,
+          continuations: 0,
+        }),
+      ).toEqual({ kind: "leave", reason: "handover" });
+      expect(missingStep2Lines([say(STARTER_FRAMEWORK_LINE), say(BRANCH), say(NO_REMOTE)])).toEqual(
+        [],
+      );
     });
   });
 
@@ -491,7 +740,12 @@ describe("the guided turn end guard", () => {
   describe("given pi's session events", () => {
     it("records each settled call with the input its start carried", () => {
       const log = new TurnCallLog();
-      log.record({ type: "tool_execution_start", toolCallId: "c1", toolName: "Say", args: { text: FRAMEWORK } });
+      log.record({
+        type: "tool_execution_start",
+        toolCallId: "c1",
+        toolName: "Say",
+        args: { text: FRAMEWORK },
+      });
       log.record({ type: "tool_execution_update", toolCallId: "c1", toolName: "Say" });
       log.record({
         type: "tool_execution_end",
@@ -500,7 +754,9 @@ describe("the guided turn end guard", () => {
         isError: false,
         result: { content: [{ type: "text", text: "Said." }] },
       });
-      expect(log.calls).toEqual([{ name: "say", input: { text: FRAMEWORK }, isError: false, output: "Said." }]);
+      expect(log.calls).toEqual([
+        { name: "say", input: { text: FRAMEWORK }, isError: false, output: "Said." },
+      ]);
     });
   });
 });

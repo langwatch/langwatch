@@ -4,8 +4,9 @@
  * a locked-down sandbox with no hostname or no passwd entry still connects.
  */
 
-import * as os from "node:os";
 import { randomUUID } from "node:crypto";
+import * as os from "node:os";
+
 import { LANGWATCH_SDK_VERSION } from "../internal/constants";
 import { resolveEndpoint } from "../internal/endpoint";
 import type { RegisterInstance, RegisterSdk } from "./protocol";
@@ -79,7 +80,9 @@ export function resolveEnabled({
   env?: NodeJS.ProcessEnv;
 }): boolean {
   const flag = env.LANGWATCH_AGENT_CONNECT;
-  if (isSet(flag) && !isTruthy(flag)) return false;
+  if (isSet(flag)) {
+    if (!isTruthy(flag)) return false;
+  }
   if (explicit !== undefined) return explicit;
   return !isTruthy(env.CI);
 }
@@ -107,10 +110,8 @@ const HOST_LABEL_MAX_LENGTH = 24;
 
 /**
  * A short label for this machine: lowercase, `[a-z0-9-]`, 24 characters.
- *
- * The platform scopes a development agent connected with a project key to
- * this label, and the Python SDK sends the same shape, so one machine reads
- * the same whichever SDK connected it.
+ * The platform scopes a dev agent connected with a project key to this
+ * label; the Python SDK sends the same shape, so one machine reads the same.
  */
 export function hostLabel(hostname: string): string {
   return hostname

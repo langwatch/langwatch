@@ -4,9 +4,10 @@
  * plain-text tree rendering.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 import { commandsCommand } from "../commands";
 import { helpTreeCommand } from "../help-tree";
-import { AGENT_MODE_ENV_VARS } from "../../utils/output";
 
 // program.ts reads the tsup-injected __CLI_VERSION__ build constant; under
 // vitest there is no bundler define, so stub it before buildProgram() runs.
@@ -32,8 +33,7 @@ describe("commandsCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("renders the compact tree as its human form", () => {
     commandsCommand({}).table();
@@ -96,8 +96,7 @@ describe("helpTreeCommand", () => {
     }
   });
 
-  const logged = (): string =>
-    consoleLogSpy.mock.calls.flat().join("\n");
+  const logged = (): string => consoleLogSpy.mock.calls.flat().join("\n");
 
   it("prints the annotated tree as plain text by default", () => {
     // No explicit format request, so it prints itself and returns nothing for
@@ -113,7 +112,7 @@ describe("helpTreeCommand", () => {
     expect(helpTreeCommand({ agent: true })).toBeUndefined();
     const out = logged();
     expect(out.split("\n")[0]).toBe("langwatch");
-    expect(() => JSON.parse(out)).toThrow();
+    expect(() => JSON.parse(out)).toThrow(SyntaxError);
   });
 
   it("hands the catalog to the port when a format is explicitly requested", () => {

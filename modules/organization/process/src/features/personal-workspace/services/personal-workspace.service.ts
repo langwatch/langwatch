@@ -1,0 +1,209 @@
+/**
+ * A person's own workspace: the organization, team and project minted for them on first
+ * sight, and the per-feature switches on that project. Only the owner may read or change
+ * them, and a project that is not a personal one is refused rather than quietly edited.
+ */
+import { SYSTEM_ACTORS } from "@langwatch/authorization";
+import { AuthzLedgerUnavailableError, type AuthzApi } from "@langwatch/authz-contract";
+import {
+  PersonalProjectOwnerMismatchError,
+  findPersonalWorkspaceInputSchema,
+  personalWorkspaceFeaturesInputSchema,
+  personalWorkspaceInputSchema,
+  readPersonalFeatures,
+  type EnsuredPersonalWorkspace,
+  type FindPersonalWorkspaceInput,
+  type PersonalFeatures,
+  type PersonalWorkspace,
+  type PersonalWorkspaceFeaturesInput,
+  type PersonalWorkspaceInput,
+} from "@langwatch/organization-contract";
+
+import type {
+  OrganizationRepository,
+  PersonalWorkspaceFeatureProject,
+} from "../../../repositories/organization.repository.ts";
+import type { PersonalWorkspaceDiagnostics } from "./personal-workspace-diagnostics.service.ts";
+import type { PersonalWorkspaceIdentity } from "./personal-workspace-identity.service.ts";
+
+const ALL_PERSONAL_FEATURES_DISABLED: PersonalFeatures = {
+  evaluations: false,
+  datasets: false,
+  annotations: false,
+  automations: false,
+};
+
+const ALL_PERSONAL_FEATURES_ENABLED: PersonalFeatures = {
+  evaluations: true,
+  datasets: true,
+  annotations: true,
+  automations: true,
+};
+
+/** Organization's personal-workspace facts for project (§9); the awaited ones throw unrecorded. */
+export type PersonalWorkspaceNotices = Readonly<{
+  personalTeamCreated(
+    input: Readonly<{
+      organizationId: string;
+      userId: string;
+      teamId: string;
+      projectId: string;
+      projectSlug: string;
+    }>,
+  ): void;
+  personalWorkspaceRevived(
+    input: Readonly<{ organizationId: string; userId: string; teamId: string }>,
+  ): Promise<void>;
+  personalWorkspaceFeaturesChanged(
+    input: Readonly<{
+      organizationId: string | null;
+      userId: string;
+      projectId: string;
+      features: PersonalFeatures;
+    }>,
+  ): Promise<void>;
+}>;
+
+type PersonalWorkspaceOptions = {
+  repository: OrganizationRepository;
+  identities: PersonalWorkspaceIdentity;
+  grants: AuthzApi;
+  diagnostics: PersonalWorkspaceDiagnostics | undefined;
+  notices: PersonalWorkspaceNotices | undefined;
+};
+
+export class PersonalWorkspaceService {
+  static create(deps: PersonalWorkspaceOptions): PersonalWorkspaceService {
+    return new PersonalWorkspaceService(deps);
+  }
+
+  private constructor(private readonly deps: PersonalWorkspaceOptions) {}
+
+  async ensurePersonalWorkspace(input: PersonalWorkspaceInput): Promise<EnsuredPersonalWorkspace> {
+    const parsed = personalWorkspaceInputSchema.parse(input);
+    const resources = this.deps.identities.create(parsed);
+    const result = await this.deps.repository.ensurePersonalWorkspace({
+      workspace: parsed,
+      resources,
+    });
+    const team = result.kind === "ready" ? result.workspace.team : result.team;
+    // After the commit and before the grant (main's order). Recorded on every pending answer:
+    // keyed by the team, so project creates once (the first id wins) and a lost record heals.
+    // Revived too: project revives only an archived personal project, so a new team is a no-op.
+    if (result.kind === "pending") {
+      this.deps.notices?.personalTeamCreated({
+        organizationId: parsed.organizationId,
+        userId: parsed.userId,
+        teamId: team.id,
+        projectId: this.deps.identities.newProjectId(),
+        projectSlug: resources.projectSlug,
+      });
+      await this.deps.notices?.personalWorkspaceRevived({
+        organizationId: parsed.organizationId,
+        userId: parsed.userId,
+        teamId: team.id,
+      });
+    }
+    const grant = { userId: parsed.userId, organizationId: parsed.organizationId, teamId: team.id };
+    try {
+      await this.deps.grants.attachBindings({
+        organizationId: grant.organizationId,
+        bindings: [
+          {
+            bindingId: resources.ownerBindingId,
+            principal: { userId: grant.userId },
+            role: "ADMIN",
+            customRoleId: null,
+            scopeType: "TEAM",
+            scopeId: grant.teamId,
+          },
+        ],
+        caller: { type: "system" },
+        actor: { type: "system", id: SYSTEM_ACTORS.personalWorkspace },
+        source: "grants-service",
+        onDuplicate: "skip",
+        awaitProjection: false,
+      });
+    } catch (error) {
+      if (!(error instanceof AuthzLedgerUnavailableError)) {
+        throw error;
+      }
+
+      this.deps.diagnostics?.warn(
+        "Personal workspace owner grant could not append; the next ensure retries",
+        grant,
+      );
+    }
+
+    return result.kind === "ready" ? result : { kind: "pending", team };
+  }
+
+  /** Throws `TeamNotFoundError` when the user has no personal workspace there. */
+  getPersonalWorkspace(input: FindPersonalWorkspaceInput): Promise<PersonalWorkspace> {
+    return this.deps.repository.getPersonalWorkspace(findPersonalWorkspaceInputSchema.parse(input));
+  }
+
+  async getPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    const project = await this.getOwnedPersonalWorkspaceProject(input);
+
+    return readPersonalFeatures(project.personalFeatures);
+  }
+
+  enableAllPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    return this.setPersonalWorkspaceFeatures(
+      input,
+      ALL_PERSONAL_FEATURES_ENABLED,
+      "personalWorkspaceFeatures.enableAll",
+    );
+  }
+
+  disableAllPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalFeatures> {
+    return this.setPersonalWorkspaceFeatures(
+      input,
+      ALL_PERSONAL_FEATURES_DISABLED,
+      "personalWorkspaceFeatures.disableAll",
+    );
+  }
+
+  private async setPersonalWorkspaceFeatures(
+    input: PersonalWorkspaceFeaturesInput,
+    next: PersonalFeatures,
+    action: string,
+  ): Promise<PersonalFeatures> {
+    const project = await this.getOwnedPersonalWorkspaceProject(input);
+    await this.deps.repository.appendPersonalWorkspaceFeaturesAudit({
+      projectId: project.id,
+      callerUserId: input.callerUserId,
+      organizationId: project.organizationId,
+      action,
+      before: readPersonalFeatures(project.personalFeatures),
+      after: next,
+    });
+    await this.deps.notices?.personalWorkspaceFeaturesChanged({
+      organizationId: project.organizationId,
+      userId: input.callerUserId,
+      projectId: project.id,
+      features: next,
+    });
+
+    return next;
+  }
+
+  private async getOwnedPersonalWorkspaceProject(
+    input: PersonalWorkspaceFeaturesInput,
+  ): Promise<PersonalWorkspaceFeatureProject> {
+    const parsed = personalWorkspaceFeaturesInputSchema.parse(input);
+    const project = await this.deps.repository.getPersonalWorkspaceFeatureProject(parsed.projectId);
+    if (!project.isPersonal || project.ownerUserId !== parsed.callerUserId) {
+      throw new PersonalProjectOwnerMismatchError(parsed.projectId);
+    }
+
+    return project;
+  }
+}

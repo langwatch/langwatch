@@ -18,10 +18,7 @@ vi.mock("ora", () => ({
   }),
 }));
 
-import type {
-  InstantEvalJudgment,
-  InstantEvalRun,
-} from "@/client-sdk/services/instant-evals";
+import type { InstantEvalJudgment, InstantEvalRun } from "@/client-sdk/services/instant-evals";
 
 import {
   elapsedLabel,
@@ -37,7 +34,9 @@ const run = (overrides: Partial<InstantEvalRun> = {}): InstantEvalRun =>
     name: null,
     sql: "SELECT argMax(m.TraceId, m.OccurredAt) AS TraceId, m.ConversationId AS ThreadId FROM analytics.trace_metrics AS m GROUP BY m.ConversationId",
     parameters: {},
-    questions: [{ id: "q1", function: "eval", kind: "boolean", reads: "probability", threshold: 0.5 }],
+    questions: [
+      { id: "q1", function: "eval", kind: "boolean", reads: "probability", threshold: 0.5 },
+    ],
     limit: 10_000,
     status: "running",
     total: 10_000,
@@ -129,9 +128,7 @@ describe("instantEvalHeadline, given a finished run", () => {
       const line = instantEvalHeadline(
         run({
           status: "finished",
-          questions: [
-            { id: "q1", function: "eval_score", kind: "score", reads: "score" },
-          ] as never,
+          questions: [{ id: "q1", function: "eval_score", kind: "score", reads: "score" }] as never,
         }),
         1_000,
       );
@@ -226,9 +223,7 @@ describe("printInstantEvalRows, given a model-call run", () => {
         status: "finished",
         sql: "SELECT TraceId, SpanId FROM analytics.spans WHERE SpanAttributes['langwatch.span.type'] = 'llm'",
       });
-      const judgment = (
-        overrides: Partial<InstantEvalJudgment>,
-      ): InstantEvalJudgment =>
+      const judgment = (overrides: Partial<InstantEvalJudgment>): InstantEvalJudgment =>
         ({
           traceId: "trace_1",
           questionId: "q1",
@@ -246,11 +241,9 @@ describe("printInstantEvalRows, given a model-call run", () => {
           ...overrides,
         }) as InstantEvalJudgment;
       const printed: string[] = [];
-      const logSpy = vi
-        .spyOn(console, "log")
-        .mockImplementation((...parts: unknown[]) => {
-          printed.push(parts.map(String).join(" "));
-        });
+      const logSpy = vi.spyOn(console, "log").mockImplementation((...parts: unknown[]) => {
+        printed.push(parts.map(String).join(" "));
+      });
 
       try {
         printInstantEvalRows({

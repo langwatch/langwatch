@@ -98,6 +98,14 @@ Feature: Restricting who can sign up on a self-hosted installation
     And no confirmation email is sent
 
   @unit
+  Scenario: A refused sign-up reads that sign-up is by invitation
+    Given the sign-up policy refuses "stranger@example.com"
+    When the sign-up screen shows the refusal
+    Then it reads "Sign-up on this installation is by invitation"
+    And it tells the person to ask an administrator for an invitation
+    And it does not read as a fault on the installation's side
+
+  @unit
   Scenario: An identity provider sign-in for an uninvited address creates no account
     Given SIGN_UP_MODE is "invite_only"
     When "stranger@example.com" signs in through an identity provider for the first time

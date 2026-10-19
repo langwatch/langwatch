@@ -1,15 +1,14 @@
 import chalk from "chalk";
+
 import type { SuiteFieldDefinition } from "@/client-sdk/services/test-suites";
-import { createSpinner } from "../../utils/spinner";
+
 import { resolveCredentials } from "../../utils/apiKey";
-import { failSpinner } from "../../utils/spinnerError";
 import type { CommandResult } from "../../utils/output";
+import { createSpinner } from "../../utils/spinner";
+import { failSpinner } from "../../utils/spinnerError";
 import { parseScenarioFieldFlags } from "../../utils/suiteFieldFlags";
+import { resolveSuiteReference, SuiteReferenceError } from "../test-suites/resolveSuite";
 import { createCliScenariosService } from "./cli-scenarios-service";
-import {
-  resolveSuiteReference,
-  SuiteReferenceError,
-} from "../test-suites/resolveSuite";
 
 export const createScenarioCommand = async (
   name: string,
@@ -56,12 +55,8 @@ export const createScenarioCommand = async (
   const spinner = createSpinner(`Creating scenario "${name}"...`).start();
 
   try {
-    const criteria = options.criteria
-      ? options.criteria.split(",").map((c) => c.trim())
-      : [];
-    const labels = options.labels
-      ? options.labels.split(",").map((l) => l.trim())
-      : [];
+    const criteria = options.criteria ? options.criteria.split(",").map((c) => c.trim()) : [];
+    const labels = options.labels ? options.labels.split(",").map((l) => l.trim()) : [];
 
     const scenario = await service.create({
       name,

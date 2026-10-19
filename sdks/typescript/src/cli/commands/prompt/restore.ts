@@ -1,14 +1,15 @@
-import { scopedApiKey } from "@/internal/credentialContext";
 import chalk from "chalk";
-import { createSpinner } from "../../utils/spinner";
-import { resolveCredentials } from "../../utils/apiKey";
-import { formatFetchError } from "../../utils/formatFetchError";
-import { failSpinner } from "../../utils/spinnerError";
-import { buildAuthHeaders } from "@/internal/api/auth";
 
 import { resolveControlPlaneUrl } from "@/cli/utils/governance/resolveEndpoint";
-import type { CommandResult } from "../../utils/output";
+import { buildRequestHeaders } from "@/internal/api/request-headers";
+import { scopedApiKey } from "@/internal/credentialContext";
 import { langwatchFetch } from "@/internal/http/langwatchFetch";
+
+import { resolveCredentials } from "../../utils/apiKey.ts";
+import { formatFetchError } from "../../utils/formatFetchError.ts";
+import type { CommandResult } from "../../utils/output.ts";
+import { createSpinner } from "../../utils/spinner.ts";
+import { failSpinner } from "../../utils/spinnerError.ts";
 
 /**
  * Returns the restored version rather than printing it: the output port renders
@@ -21,23 +22,20 @@ export const promptRestoreCommand = async (
   await resolveCredentials();
 
   const apiKey = scopedApiKey() ?? process.env.LANGWATCH_API_KEY ?? "";
-  const endpoint =
-    resolveControlPlaneUrl();
+  const endpoint = resolveControlPlaneUrl();
 
-  const spinner = createSpinner(
-    `Restoring "${handle}" to version ${versionId}...`
-  ).start();
+  const spinner = createSpinner(`Restoring "${handle}" to version ${versionId}...`).start();
 
   try {
     const response = await langwatchFetch(
-      `${endpoint}/api/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
+      `${endpoint}/api/v1/prompts/${encodeURIComponent(handle)}/versions/${encodeURIComponent(versionId)}/restore`,
       {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          ...buildAuthHeaders({ apiKey }),
+          ...buildRequestHeaders({ apiKey }),
         },
-      }
+      },
     );
 
     if (!response.ok) {
@@ -56,20 +54,14 @@ export const promptRestoreCommand = async (
       commitMessage: string | null;
     };
 
-    spinner.succeed(
-      `Restored "${handle}" — new version v${restored.version} created`
-    );
+    spinner.succeed(`Restored "${handle}" — new version v${restored.version} created`);
 
     return {
       data: restored,
       table: () => {
         console.log();
-        console.log(
-          `  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`
-        );
-        console.log(
-          `  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`
-        );
+        console.log(`  ${chalk.gray("New version:")} ${chalk.cyan(`v${restored.version}`)}`);
+        console.log(`  ${chalk.gray("Message:")}     ${restored.commitMessage ?? chalk.gray("—")}`);
         console.log();
       },
     };

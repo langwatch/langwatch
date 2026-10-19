@@ -1,10 +1,10 @@
-Feature: Backoffice User Impersonation Reason
+Feature: Admin User Impersonation Reason
   As an ops admin
   I want to enter an impersonation reason in a single-line field
   So that I can quickly submit the audit reason without adding accidental line breaks
 
   Background:
-    Given an ops admin is viewing the backoffice users page
+    Given an ops admin is viewing the admin users page
     And the users table includes an active user named "Yoel Ernst"
 
   @integration

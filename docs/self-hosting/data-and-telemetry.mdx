@@ -55,7 +55,6 @@ With a license that names hosted services, the install also runs the daily licen
 | Host | Component | When | What it carries | How to stop it |
 |---|---|---|---|---|
 | Model providers you add (OpenAI, Anthropic, Azure OpenAI, Bedrock, Vertex AI, Gemini, custom endpoints and others) | AI Gateway, NLP, LangEvals; App when it validates a key | A feature uses a provider you configured | Content: prompts and completions | Remove the provider |
-| `api.typesafe.ai`, or `JEV_BASE_URL` | App, Workers | `JEV_API_KEY` is set. Instant Evals then use your own key and skip `gateway.langwatch.ai` | Content: the text being judged and the questions | Unset `JEV_API_KEY` |
 | `dlp.googleapis.com` | App, Workers | Strict PII redaction, only when the in-cluster Presidio call fails and Google credentials are set (`app.evaluators.google.enabled`) | Content: span text to redact | `LANGWATCH_DISABLE_GOOGLE_DLP=true` |
 | `api.github.com`, or `GITHUB_LANGY_HOST` | App | The Langy GitHub App is configured | Repository and installation metadata, token requests | Leave the GitHub App unset |
 | `github.com`, `api.github.com`, `codeload.github.com`, the npm registry, and hosts on a project's allow-list | Langy agent | `networkPolicy.allowExternalHttps: true` on the Langy agent. The NetworkPolicy then allows `:443` to any public address. The agent's L7 egress adapter checks proxied traffic against the allow-list, which is cooperative by default | git clone and push, `gh`, `npm` | Off by default, see [Langy networking](/self-hosting/langy/networking-and-egress) |
@@ -71,7 +70,7 @@ Libraries inside the images can call third parties on their own. A self-hosted i
 | Host | Component | What it would do | Default | How to turn it on |
 |---|---|---|---|---|
 | `api.trycloudflare.com` and the Cloudflare tunnel edge; `cloudflare-dns.com`, `dns.google` | Workers | Open a public `*.trycloudflare.com` hostname to the worker's voice media listener, so phone calls can reach it | Off: the app leaves the tunnel off on a self-hosted production install, and the chart sets `VOICE_TUNNEL=false` | `VOICE_TUNNEL=true` on the Workers. Or set `VOICE_PUBLIC_BASE_URL` to your own hostname, which needs no tunnel |
-| `checkpoint.prisma.io` | App, Workers | Prisma's version check during the migration at each start: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
+| `checkpoint.prisma.io` | App (the upgrade Job, or the app's first boot) | Prisma's version check while `pnpm task upgrade` applies migrations: CLI version, hashed project path, database type, command name | Never: LangWatch sets `CHECKPOINT_DISABLE=1` in every environment, in the app's Prisma config, the image, the chart and the launcher | No switch |
 | `openaipublic.blob.core.windows.net` | App, Workers, LangEvals | Download a tokenizer file for token counting | Never: the app image ships every file and sets `TIKTOKENS_PATH`, and the LangEvals image ships them in its tiktoken cache | No switch |
 | `raw.githubusercontent.com` | LangEvals | Download the LiteLLM model price list at startup | Never: LangEvals prices model calls from LangWatch's own model catalog, shipped in the image, on top of the list bundled with the pinned LiteLLM | No switch |
 | `t.explodinggradients.com` | LangEvals | RAGAS usage analytics: a random id, the RAGAS version, provider and model names, request counts | Off: LangEvals, its image and the chart set `RAGAS_DO_NOT_TRACK=true` | `RAGAS_DO_NOT_TRACK=false` |
@@ -100,7 +99,7 @@ Both services run only when three things hold: the license names the service, no
 
 Instant Evals judge rows of an LWQL query or a trace search with a hosted model. The App or the Workers send the text being judged (a rendered trace or conversation) and the questions to `gateway.langwatch.ai/v1/instant-evals/classify`. Trace search also sends a typed sentence, the active query and the field list, to route the sentence to a filter.
 
-With `JEV_API_KEY` set, the same calls go to `api.typesafe.ai` with your own key instead, and no Instant Evals call goes to LangWatch. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
+A self-hosted install never judges with a key of its own, so no Instant Evals call goes anywhere else. `INSTANT_EVAL_CLASSIFIER=null` turns the judge off entirely.
 
 ### Managed models
 

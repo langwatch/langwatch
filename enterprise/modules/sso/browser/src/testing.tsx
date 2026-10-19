@@ -1,0 +1,120 @@
+// SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+// Test harness for mounting single sign-on sections: a fake host that records
+// what it was told. Internal only, not exported from the package.
+
+import type { UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { render } from "@testing-library/react";
+import type { ReactElement } from "react";
+
+import {
+  SsoHostApi,
+  SsoHostProvider,
+  type SsoFailureNotice,
+  type SsoRouteReading,
+  type SsoSuccessNotice,
+  type SsoTestSignInResult,
+} from "./model/sso-host.ts";
+
+export class FakeSsoHost extends SsoHostApi {
+  readonly failures: SsoFailureNotice[] = [];
+  /** Every drawer this host was asked to open, in order. */
+  readonly overlays: { drawer: UiDrawerToken<unknown>; props?: unknown }[] = [];
+  /** Every acknowledgement this host was asked to show, in order. */
+  readonly acknowledgements: SsoSuccessNotice[] = [];
+  /** Every test sign-in this host was asked to start, in order. */
+  readonly testSignIns: {
+    connectionId: string;
+    callbackQuery: Record<string, string | undefined>;
+  }[] = [];
+
+  constructor(
+    private readonly options: {
+      organizationId?: string | null;
+      currentUserAddress?: string | null;
+      /** Whether the reader holds `sso:manage`; they do unless a test says not. */
+      canManage?: boolean;
+      /** Whether the reader holds `sso:view`; they do unless a test says not. */
+      canView?: boolean;
+      query?: Record<string, string | undefined>;
+      /** What the sign-in answers, or throws when it is an error. */
+      testSignIn?: SsoTestSignInResult | Error;
+    } = {},
+  ) {
+    super();
+  }
+
+  organizationId(): string | undefined {
+    if (this.options.organizationId === null) return void 0;
+
+    return this.options.organizationId ?? "org-1";
+  }
+
+  failed(failure: SsoFailureNotice): void {
+    this.failures.push(failure);
+  }
+
+  succeeded(notice: SsoSuccessNotice): void {
+    this.acknowledgements.push(notice);
+  }
+
+  canManage(): boolean {
+    return this.options.canManage ?? true;
+  }
+
+  canView(): boolean {
+    return this.options.canView ?? true;
+  }
+
+  currentUserAddress(): string | undefined {
+    if (this.options.currentUserAddress === null) return void 0;
+
+    return this.options.currentUserAddress ?? "ana@acme.com";
+  }
+
+  route(): SsoRouteReading {
+    return { query: this.options.query ?? {} };
+  }
+
+  async testSignIn(options: {
+    connectionId: string;
+    callbackQuery: Record<string, string | undefined>;
+  }): Promise<SsoTestSignInResult> {
+    this.testSignIns.push(options);
+    const answer = this.options.testSignIn;
+    if (answer instanceof Error) throw answer;
+
+    return Promise.resolve(answer ?? {});
+  }
+
+  openOverlay<Props>(drawer: UiDrawerToken<Props>, props?: Partial<Props>): void {
+    this.overlays.push({ drawer: drawer as UiDrawerToken<unknown>, props });
+  }
+
+  /** The one aliasing the engine actually emits, so the hook is exercised. */
+  normalizeSignInErrorCode(code: string): string {
+    return code === "account_not_linked" ? "OAuthAccountNotLinked" : code;
+  }
+}
+
+/**
+ * Renders a section inside the design system's provider and a host.
+ * `rerenderWithSsoHost` puts new props on the same mounted tree, which is how
+ * a test watches a section answer a read that has caught up.
+ */
+export function renderWithSsoHost(element: ReactElement, host: FakeSsoHost = new FakeSsoHost()) {
+  const wrap = (child: ReactElement) => (
+    <DesignSystemProvider forcedTheme="light">
+      <SsoHostProvider value={host}>{child}</SsoHostProvider>
+    </DesignSystemProvider>
+  );
+  const rendered = render(wrap(element));
+
+  return {
+    host,
+    ...rendered,
+    rerenderWithSsoHost: (next: ReactElement) => {
+      rendered.rerender(wrap(next));
+    },
+  };
+}
