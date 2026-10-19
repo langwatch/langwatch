@@ -6,7 +6,6 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { AutomationPersistActionRepository } from "../../../repositories/automation-persist-action.repository.ts";
 
 const ANNOTATOR_REFERENCE_INVALID = "annotation_annotator_reference_invalid";
-const DATASET_REFUSALS = new Set(["dataset_invalid_column", "dataset_not_found"]);
 
 type DatasetPeer = Pick<DatasetApi, "batchCreateRecords" | "findBySlugOrId">;
 
@@ -105,14 +104,11 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         entries,
       });
     } catch (error) {
-      const code = readCode(error);
-      if (typeof code !== "string" || !DATASET_REFUSALS.has(code)) throw error;
+      // A column refusal here means one was removed since the trim: a redelivery re-reads them.
+      if (readCode(error) !== "dataset_not_found") throw error;
       throw datasetRefusal({
         datasetId: input.datasetId,
-        reason:
-          code === "dataset_not_found"
-            ? "it is gone or archived"
-            : "it rejected a column the rows name",
+        reason: "it is gone or archived",
         cause: error,
       });
     }
