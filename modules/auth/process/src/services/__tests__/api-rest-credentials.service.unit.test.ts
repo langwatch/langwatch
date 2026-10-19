@@ -11,7 +11,7 @@ import type {
 } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   ApiRestCredentialsService,
@@ -616,5 +616,56 @@ describe("given a credential for an aggregate project", () => {
         aggregateDoor.authenticate({ request: asked, permissions: ["traces:view"] }),
       ),
     ).toBe("aggregate_project_has_no_credential");
+  });
+});
+
+describe("given an API key whose ceiling does not hold the route's permission", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  function refusingDoor(logger: { error: () => void; warn: () => void }) {
+    return ApiRestCredentialsService.create({
+      apiKeys: store,
+      authz: {
+        hasApiKeyPermission: () => Promise.resolve(false),
+        getApiKeyProjectDecision: () => Promise.reject(new Error("asked through the ceiling")),
+        hasProjectPermission: () => Promise.reject(new Error("no person is asked")),
+        listApiKeyBindings: () => Promise.reject(new Error("no bindings are listed")),
+        getScope: () => Promise.reject(new Error("no scope is read")),
+      },
+      cliProjects: {
+        getCliAccessProject: () => Promise.reject(new Error("no CLI session is read")),
+      },
+      organizations: { getSettings: () => Promise.reject(new Error("no organization is read")) },
+      logger,
+    });
+  }
+
+  describe("when the key is refused again and again", () => {
+    /** @scenario "Repeated ceiling refusals for one key log one warning per window" */
+    it("logs one warning per window, carrying the refusals held back", async () => {
+      vi.useFakeTimers();
+      const logger = { error: vi.fn(), warn: vi.fn() };
+      const door = refusingDoor(logger);
+      const refuse = () =>
+        door
+          .authenticate({
+            request: request({ authorization: "Bearer sk-lw-project" }),
+            permissions: ["traces:create"],
+          })
+          .catch((refusal: unknown) => refusal);
+
+      for (let attempt = 0; attempt < 3; attempt++) await refuse();
+      vi.advanceTimersByTime(5 * 60_000);
+      await refuse();
+
+      expect(logger.error).not.toHaveBeenCalled();
+      expect(logger.warn).toHaveBeenCalledTimes(2);
+      expect(logger.warn).toHaveBeenLastCalledWith(
+        expect.objectContaining({ apiKeyId: "key-project", suppressedRefusals: 2 }),
+        "API key ceiling denial",
+      );
+    });
   });
 });

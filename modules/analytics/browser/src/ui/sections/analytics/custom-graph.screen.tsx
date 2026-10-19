@@ -1,4 +1,4 @@
-import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { customGraphInputSchema, parseStoredTimeScale } from "@langwatch/dashboard-contract";
 import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
@@ -562,7 +562,8 @@ export const customGraphFormToCustomGraphInput = (
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
-    timeScale: formData.timeScale,
+    // The native select hands its value back as text; the saved chart carries minutes.
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
     connected: formData.connected,
     height: 517,
   };

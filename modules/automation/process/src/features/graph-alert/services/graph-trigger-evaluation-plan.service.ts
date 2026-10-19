@@ -8,6 +8,7 @@ import {
   type GraphTriggerEvaluationResult,
   type Trigger,
 } from "@langwatch/automation-contract";
+import { parseStoredTimeScale } from "@langwatch/dashboard-contract";
 import { type Instant } from "@langwatch/time";
 
 import type { AutomationGraphNotifier } from "../../../channels/automation-graph-alert.channel.ts";
@@ -123,6 +124,18 @@ export class GraphTriggerEvaluationPlanService {
       return series;
     }
 
+    // A chart saved without a time scale queries hourly; one whose stored scale cannot be
+    // read is the author's configuration to fix, not a failure to redeliver.
+    const timeScale = graph.timeScale === void 0 ? 60 : parseStoredTimeScale(graph.timeScale);
+    if (timeScale === null) {
+      return this.skip({
+        request,
+        detail: "graph time scale is neither full nor a number of minutes",
+        skipCode: "incomplete_configuration",
+        condition,
+      });
+    }
+
     const now = request.deps.clock.now();
     const startDate = now.subtract({ milliseconds: trigger.params.timePeriod! * 60 * 1000 });
 
@@ -143,6 +156,7 @@ export class GraphTriggerEvaluationPlanService {
         filters: customGraph.filters,
         graph,
         series,
+        timeScale,
         startDate,
         endDate: now,
       }),
@@ -188,6 +202,7 @@ export class GraphTriggerEvaluationPlanService {
     filters,
     graph,
     series,
+    timeScale,
     startDate,
     endDate,
   }: {
@@ -195,6 +210,7 @@ export class GraphTriggerEvaluationPlanService {
     filters: unknown;
     graph: StoredGraphConfig;
     series: GraphSeries;
+    timeScale: "full" | number;
     startDate: Instant;
     endDate: Instant;
   }): TimeseriesInputType {
@@ -207,7 +223,7 @@ export class GraphTriggerEvaluationPlanService {
       // Not the graph's `groupBy`: the threshold is one number, and only the
       // database can compute it across every group (summing per-group values
       // adds averages and counts an array grouping once per group).
-      timeScale: graph.timeScale ?? 60,
+      timeScale,
       timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone,
     };
   }
@@ -313,7 +329,8 @@ type StoredGraphConfig = {
   series: GraphSeries[];
   groupBy?: string;
   groupByKey?: string;
-  timeScale?: "full" | number;
+  /** Raw stored JSON: older charts hold it as text, read through `parseStoredTimeScale`. */
+  timeScale?: unknown;
 };
 
 export type GraphTriggerEvaluationDeps = {
