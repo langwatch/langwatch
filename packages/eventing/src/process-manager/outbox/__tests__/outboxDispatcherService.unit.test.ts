@@ -1,4 +1,5 @@
 import { HandledError } from "@langwatch/handled-error";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -434,6 +435,13 @@ describe("OutboxDispatcherService", () => {
         }
       }
 
+      let meter = createRecordingMeterProvider();
+      beforeEach(() => {
+        meter = createRecordingMeterProvider();
+        meter.install();
+      });
+      afterEach(() => meter.uninstall());
+
       /** @scenario "A process-manager outbox message whose project no longer exists is retired as completed" */
       it("retires the message as dispatched with a warning, neither dead nor retried", async () => {
         const { logger, lines } = createTestLogger();
@@ -455,6 +463,26 @@ describe("OutboxDispatcherService", () => {
         const second = await dispatcher.runOnce({ now: T0 + 60_000 });
         expect(second.dispatched).toEqual([]);
         expect(handler).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "A job or outbox message completed because its project is gone is counted" */
+      it("counts the retirement once, under the outbox queue and its intent type", async () => {
+        const handler = vi.fn().mockRejectedValue(new ProjectNotFound());
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(
+          meter.valueOf("es_jobs_project_gone_total", {
+            queue: "process_outbox",
+            job_type: "worker-dispatch",
+          }),
+        ).toBe(1);
       });
     });
 
@@ -512,9 +540,32 @@ describe("OutboxDispatcherService", () => {
         expect(first.dead).toEqual([]);
       });
 
-      /** @scenario "A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt" */
-      it("still retires a refusal whose cause is permanent", async () => {
+      /** @scenario "A platform-fault refusal is retried like the group queue retries it" */
+      it("retries a platform refusal even when its cause looks permanent", async () => {
         const handler = vi.fn().mockRejectedValue(refusedOver(new Error("Syntax error in SQL")));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(first.dead).toEqual([]);
+      });
+
+      /** @scenario "A customer-fault refusal is dead on its first attempt" */
+      it("retires a customer refusal at once", async () => {
+        class InvalidAction extends HandledError {
+          constructor() {
+            super("invalid_action", "Trigger action parameters are invalid", {
+              httpStatus: 422,
+              fault: "customer",
+            });
+          }
+        }
+        const handler = vi.fn().mockRejectedValue(new InvalidAction());
         const dispatcher = new OutboxDispatcherService({
           store,
           handlers: { "worker-dispatch": handler },

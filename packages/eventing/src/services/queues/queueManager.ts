@@ -491,9 +491,10 @@ export class QueueManager<EventType extends Event = Event> {
           ? undefined
           : this.buildPreflightGroupKey(`${jobPath}/${handlerName}`),
         scoreFn: (event: EventType) => event.occurredAt ?? event.createdAt,
-        process: async (event: EventType) => {
+        process: async (event: EventType, delivery?: JobDelivery) => {
           await onEvent(handlerName, event, {
             tenantId: event.tenantId,
+            deliveryAttempt: delivery?.attempt,
           });
         },
         processBatch:

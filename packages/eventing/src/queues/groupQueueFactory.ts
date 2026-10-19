@@ -12,6 +12,7 @@ import {
 } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 
+import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
@@ -87,6 +88,11 @@ export async function completeWhenProjectGone({
   } catch (error) {
     if (!isProjectGone(error)) throw error;
     const first = payloads[0];
+    incrementEsJobsProjectGone({
+      queue: queueName,
+      jobType: typeof first?.__jobType === "string" ? first.__jobType : "unknown",
+      count: payloads.length,
+    });
     logger.warn(
       {
         tenantId: first?.tenantId ?? null,

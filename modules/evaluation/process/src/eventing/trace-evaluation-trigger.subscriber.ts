@@ -22,6 +22,9 @@ import type {
 /** Main's 30s quiet window per trace, before the trace's monitors are offered it. */
 export const TRACE_EVALUATION_TRIGGER_SETTLE_MS = 30_000;
 
+/** Twelve retries, about 27 minutes of the queue's 500ms-doubling backoff capped at 600s, for a fold that lags the settle (a backlog). */
+export const TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS = 13;
+
 /** All of span_received the trigger reads: the span's name and its attributes. */
 export const traceEvaluationTriggerSpanSchema = z.object({
   span: spanSchema.pick({ name: true, attributes: true }),
@@ -71,16 +74,16 @@ export function isDispatchableTraceSpan(
 /**
  * Evaluation's peer reaction to trace's span_received and origin_resolved: reads the folded
  * summary, applies the origin, cap and loop guards, then queues one evaluation per enabled
- * on-message monitor. A summary still missing after the settle completes with a warning.
+ * on-message monitor. A missing summary retries a bounded number of times, then completes.
  */
-export function createTraceEvaluationTrigger(
-  deps: TraceEvaluationTriggerDeps,
-): (input: {
+export function createTraceEvaluationTrigger(deps: TraceEvaluationTriggerDeps): (input: {
   tenantId: string;
   traceId: string;
   event: TraceEvaluationTriggerEvent;
+  /** The queue's 1-based delivery attempt; absent means one attempt, as before it was carried. */
+  deliveryAttempt?: number;
 }) => Promise<void> {
-  return async ({ tenantId, traceId, event }) => {
+  return async ({ tenantId, traceId, event, deliveryAttempt }) => {
     // Anchored on the event's own time; a full miss reads 31 days once, so retries stay cheap.
     const foldState = await deps.findSummary({
       projectId: tenantId,
@@ -88,10 +91,18 @@ export function createTraceEvaluationTrigger(
       occurredAtMs: event.occurredAt,
     });
     if (!foldState) {
-      // The settle window is the wait; a retry storm blocked a group per trace (no attempt count here).
+      // Bounded: unbounded retries once blocked a queue group per trace whose summary never folds.
+      if (
+        deliveryAttempt !== undefined &&
+        deliveryAttempt < TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS
+      ) {
+        throw new Error(
+          `Trace has no folded summary yet (attempt ${deliveryAttempt}); retrying the evaluation trigger`,
+        );
+      }
       logger.warn(
-        { tenantId, observedTraceId: traceId, eventType: event.type },
-        "Skipping evaluation dispatch: trace has no folded summary after the settle window",
+        { tenantId, observedTraceId: traceId, eventType: event.type, deliveryAttempt },
+        "Skipping evaluation dispatch: trace has no folded summary after the settle window and its retries",
       );
       return;
     }

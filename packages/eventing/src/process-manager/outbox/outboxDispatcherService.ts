@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
@@ -12,6 +13,7 @@ import {
 } from "@opentelemetry/api";
 
 import {
+  incrementEsJobsProjectGone,
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
@@ -151,9 +153,9 @@ function retryAfterMsOf(error: unknown): number | undefined {
  */
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  // A handled refusal defaults to `retryable: false`; a transient ClickHouse cause still retries.
+  // A transient ClickHouse cause still retries; otherwise the group queue's refusal rule decides.
   if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
-  return Reflect.get(error, "retryable") === false;
+  return refusesRetry(error);
 }
 
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
@@ -638,6 +640,7 @@ export class OutboxDispatcherService {
       intentType: message.intentType,
       status: "dispatched",
     });
+    incrementEsJobsProjectGone({ queue: "process_outbox", jobType: message.intentType, count: 1 });
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     this.logger.warn(
       {

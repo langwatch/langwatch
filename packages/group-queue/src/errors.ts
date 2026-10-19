@@ -72,7 +72,7 @@ const TRANSIENT_FAULTS: ReadonlySet<unknown> = new Set([
  * every attempt, unless it names a platform or provider fault or a 429 or unattributed 5xx
  * status: there `retryable: false` is only HandledError's default, so it still retries (ADR-027).
  */
-function refusesRetry(error: unknown): boolean {
+export function refusesRetry(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
   if (Reflect.get(error, "retryable") !== false) return false;
   const fault = Reflect.get(error, "fault");

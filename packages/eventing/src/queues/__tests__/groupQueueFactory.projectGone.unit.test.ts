@@ -1,7 +1,8 @@
 import { ProjectNotFoundError } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
 import type * as observabilityModule from "@langwatch/observability";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 // Capture the factory's own logger so the no-op can be asserted to warn.
 const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
@@ -36,9 +37,18 @@ class ProjectContractNotFound extends HandledError {
 const projectContractRefusal = () => new ProjectContractNotFound();
 
 describe("completeWhenProjectGone", () => {
+  let meter = createRecordingMeterProvider();
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
   afterEach(() => {
+    meter.uninstall();
     vi.clearAllMocks();
   });
+
+  const goneCount = (jobType: string) =>
+    meter.valueOf("es_jobs_project_gone_total", { queue: QUEUE, job_type: jobType });
 
   describe.each([
     { kind: "command", jobType: "command", error: () => new ProjectNotFoundError(TENANT) },
@@ -90,6 +100,17 @@ describe("completeWhenProjectGone", () => {
         expect.any(String),
       );
     });
+
+    /** @scenario "A job or outbox message completed because its project is gone is counted" */
+    it("counts every job in the batch under its queue and job type", async () => {
+      await completeWhenProjectGone({
+        queueName: QUEUE,
+        payloads: [job("projection"), job("projection"), job("projection")],
+        run: () => Promise.reject(new ProjectNotFoundError(TENANT)),
+      });
+
+      expect(goneCount("projection")).toBe(3);
+    });
   });
 
   describe("given a job that fails for any other reason", () => {
@@ -105,6 +126,7 @@ describe("completeWhenProjectGone", () => {
         }),
       ).rejects.toBe(transient);
       expect(warnSpy).not.toHaveBeenCalled();
+      expect(goneCount("projection")).toBe(0);
     });
   });
 });

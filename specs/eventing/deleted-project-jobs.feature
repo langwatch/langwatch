@@ -43,6 +43,12 @@ Feature: A job for a deleted project completes instead of retrying
     Then the message is marked dispatched with a warning, not dead and not retried
 
   @unit
+  Scenario: A job or outbox message completed because its project is gone is counted
+    Given a queue job batch or an outbox message whose project was deleted afterwards
+    When it completes as a no-op because the project was not found
+    Then es_jobs_project_gone_total rises by its job count, labelled with its queue and job type
+
+  @unit
   Scenario: A retention lookup for a project with no row gets the platform default, never cached
     Given a retention read names a project that project's table holds no row for
     When the Data Retention service resolves that project
@@ -67,3 +73,9 @@ Feature: A job for a deleted project completes instead of retrying
     Given a project that does not exist
     When platform code asks authz for a read pass on it
     Then authz refuses with project_not_found, not access_not_granted
+
+  @unit
+  Scenario: A subscriber is told which delivery attempt it is running
+    Given a subscriber job the queue delivers on its third attempt
+    When the queue runs it
+    Then the subscriber's context carries delivery attempt 3, so a handler can bound its own retries

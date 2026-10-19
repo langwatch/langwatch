@@ -398,17 +398,20 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeSubscriberQueues(subscriberDefs, async (subscriberName, event) => {
-      const subscriber = this.eventSubscribers.get(subscriberName);
-      if (!subscriber) {
-        throw new ConfigurationError(
-          "ProjectionRouter",
-          `Event subscriber "${subscriberName}" not found`,
-          { subscriberName },
-        );
-      }
-      await this.handleSubscriber(subscriber, event);
-    });
+    this.queueManager.initializeSubscriberQueues(
+      subscriberDefs,
+      async (subscriberName, event, context) => {
+        const subscriber = this.eventSubscribers.get(subscriberName);
+        if (!subscriber) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Event subscriber "${subscriberName}" not found`,
+            { subscriberName },
+          );
+        }
+        await this.handleSubscriber(subscriber, event, deliveryAttemptOf(context));
+      },
+    );
   }
 
   private subscriberQueueDefinitions({
@@ -1497,6 +1500,7 @@ export class ProjectionRouter<
   private async handleSubscriber(
     subscriber: EventSubscriberDefinition<EventType>,
     event: EventType,
+    delivery: { deliveryAttempt?: number } = {},
   ): Promise<void> {
     await this.tracer.withActiveSpan(
       "EventSubscriber.handle",
@@ -1517,6 +1521,7 @@ export class ProjectionRouter<
             subscriber.handle(event, {
               tenantId: String(event.tenantId),
               aggregateId: String(event.aggregateId),
+              ...delivery,
             }),
           onComplete: (ms) => {
             incrementEsSubscriberTotal({

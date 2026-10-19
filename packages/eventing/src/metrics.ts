@@ -225,6 +225,11 @@ const processIntentsSuppressed = counter(
   "Already-dispatched process-manager intents suppressed",
   ["process_name"],
 );
+const jobsProjectGone = counter(
+  "es_jobs_project_gone_total",
+  "Jobs and outbox messages completed as no-ops because their project no longer exists",
+  ["queue", "job_type"],
+);
 
 export const incrementEsProjectionTotal = ({
   pipelineName,
@@ -513,6 +518,15 @@ export const incrementEsProcessIntentsSuppressed = ({
   processName: string;
   count: number;
 }) => processIntentsSuppressed.labels(processName).inc(count);
+export const incrementEsJobsProjectGone = ({
+  queue,
+  jobType,
+  count,
+}: {
+  queue: string;
+  jobType: string;
+  count: number;
+}) => jobsProjectGone.labels(queue, jobType).inc(count);
 
 /**
  * Store-side metrics series. Colocated with es_* family and the code that increments them.
