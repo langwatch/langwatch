@@ -288,6 +288,7 @@ Feature: Scenario run hooks: setup and teardown
       When the hook results are recorded
       Then the run keeps its status, its verdict and its finish time
 
+    # Decided 2026-10-19 by Drew's assistant under delegation (reversible); see ADR 180.
     @unit
     Scenario: A hook's error is cut to the length the record keeps
       Given a hook result whose error is longer than 1000 characters
