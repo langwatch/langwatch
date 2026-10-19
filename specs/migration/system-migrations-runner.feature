@@ -178,8 +178,8 @@ Feature: Running system migrations across organizations
 
   # The worker's pass is a run too, so a kick or re-drive does not stop at one
   # pass while the fleet still moves. A tenant a run newly holds is often
-  # waiting on a fold the run itself started, so one follow-up pass comes a
-  # minute later instead of the hourly re-drive (Alex, 2026-10-11).
+  # waiting on a fold the run itself started, so the next pass comes within a
+  # minute instead of the hourly re-drive (Alex, 2026-10-11, 2026-10-13).
   @unit
   Scenario: A worker's pass keeps running while a pass still advances something
     When the worker runs a pass and that pass advances an organization
@@ -187,15 +187,20 @@ Feature: Running system migrations across organizations
     And the first pass that advances nothing ends the run
 
   @unit
-  Scenario: A run that newly holds a tenant asks for one follow-up pass a minute later
+  Scenario: A run that newly holds a tenant leaves the pass pending
     When the worker's run advances a tenant and ends with a tenant held
-    Then one follow-up pass is requested about 60 seconds later
+    Then the run tells the scheduled process that a pass is pending
 
   @unit
-  Scenario: Tenants that stay held never loop the follow-up pass
-    When the follow-up pass runs and still ends with a tenant held
-    Then it asks for no further pass
-    And a run that advanced nothing asks for no follow-up either
+  Scenario: A tenant held while its queued work drains is pending
+    When a run ends with a tenant held because its queued work has not drained
+    Then the run tells the scheduled process that a pass is pending
+
+  @unit
+  Scenario: Tenants that wait on an operator are never pending
+    When a run advanced nothing and ends with tenants held or parked
+    Then it tells the scheduled process nothing
+    And the short cadence ends
 
   # The barrier's deadline is the one refusal a booting fleet cannot answer:
   # every replica runs this preflight before it starts consuming, so work it
@@ -464,6 +469,14 @@ Feature: Running system migrations across organizations
     When a later pass finalizes it
     Then its record carries no held reason
 
+  # A step whose `migrated` is its steady state never finalizes by design (Alex, 2026-10-12).
+  @unit
+  Scenario: A step that never finalizes by design keeps its tenants settled, not held
+    Given a migration declaring migratedIsSteady that reports "org_acme" migrated
+    When a pass records it
+    Then its record carries no held reason and no held-since moment
+    And the migration has no unfinished tenant
+
   # ═══ Re-driving after startup ═════════════════════════════════════════
   # The preflight converges once and then stops. Every stored status but
   # `finalized` and `rolled_back` is re-entrant, so a tenant that parks an
@@ -509,9 +522,41 @@ Feature: Running system migrations across organizations
   @unit
   Scenario: The hourly re-drive runs as a scheduled process once across the fleet
     Given several workers are running
-    When an hour passes
-    Then one scheduled process wakes on one of them
+    When the scheduled process comes round
+    Then it wakes on one of them
     And it asks for exactly one re-drive pass for that wake
+
+  @unit
+  Scenario: A pending pass runs on each short wake
+    Given the last pass left a tenant pending
+    When the scheduled process wakes
+    Then the wake is due and asks for a pass
+    And the pending flag is cleared until a pass says it again
+
+  @unit
+  Scenario: A fleet with nothing pending re-drives hourly
+    Given the last pass left nothing pending
+    When the scheduled process wakes within the hour
+    Then the wake is not due
+    And an hour after the last pass the wake is due
+
+  @unit
+  Scenario: Pending work speeds the cadence up again
+    Given the scheduled process was idle between hourly passes
+    When a pass leaves a tenant pending
+    Then the next wake is due, a minute on rather than an hour on
+
+  @unit
+  Scenario: The first wake in a state runs a pass
+    Given no pass has been requested in the process's state
+    When the scheduled process wakes
+    Then the wake is due
+
+  @unit
+  Scenario: An operator's kick runs at once and the pass's pending request only flags
+    When an operator kicks a pass
+    Then it asks for a pass at once
+    And a pending request from the scheduled process asks for none but flags the next wake
 
   @unit
   Scenario: A pass whose worker died is taken again within one short lease

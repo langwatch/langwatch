@@ -5,9 +5,11 @@ import { NOTICE_TONES, type RegisteredNotice, type SlackNoticeMessage } from "..
 import {
   billingThresholdFailureNotice,
   licensePurchaseNotice,
+  newOrganizationNotice,
   newUserNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
+  scimSyncSummaryNotice,
   selfHostedSignalNotice,
   slackNotices,
   subscriptionActivatedNotice,
@@ -20,8 +22,15 @@ const TONE_EMOJI = Object.values(NOTICE_TONES);
 
 const headerOf = (message: SlackNoticeMessage): string => {
   const header = message.blocks[0];
+  if (header?.type === "card" && header.title) return header.title.text;
   if (header?.type !== "header") throw new Error("expected the first block to be a header");
   return header.text.text;
+};
+
+const cardOf = (message: SlackNoticeMessage) => {
+  const card = message.blocks[0];
+  if (card?.type !== "card") throw new Error("expected the first block to be a card");
+  return card;
 };
 
 const fieldLabelsOf = (message: SlackNoticeMessage): string[] =>
@@ -32,19 +41,22 @@ const fieldLabelsOf = (message: SlackNoticeMessage): string[] =>
   );
 
 const buttonUrlsOf = (message: SlackNoticeMessage): string[] =>
-  message.blocks.flatMap((block) =>
-    block.type === "actions"
-      ? block.elements.flatMap((element) =>
-          element.type === "button" && element.url ? [element.url] : [],
-        )
-      : [],
-  );
+  message.blocks.flatMap((block) => {
+    if (block.type === "card") return (block.actions ?? []).flatMap((b) => (b.url ? [b.url] : []));
+    if (block.type !== "actions") return [];
+    return block.elements.flatMap((element) =>
+      element.type === "button" && element.url ? [element.url] : [],
+    );
+  });
 
 const urlsIn = (props: unknown): string[] =>
   typeof props === "object" && props !== null
-    ? Object.values(props).filter(
-        (value): value is string => typeof value === "string" && value.startsWith("https://"),
-      )
+    ? Object.entries(props)
+        .filter(([key]) => key !== "appUrl")
+        .map(([, value]) => value)
+        .filter(
+          (value): value is string => typeof value === "string" && value.startsWith("https://"),
+        )
     : [];
 
 describe("given the Slack notice registry", () => {
@@ -74,6 +86,7 @@ describe("given the Slack notice registry", () => {
     });
 
     /** @scenario "Every notice opens with one status emoji in its header" */
+    /** @scenario "A card notice opens its title with one status emoji" */
     it("opens its header with exactly one status emoji", () => {
       const header = headerOf(message);
       expect(TONE_EMOJI.filter((emoji) => header.startsWith(`${emoji} `))).toHaveLength(1);
@@ -100,18 +113,74 @@ describe("given the Slack notice registry", () => {
 const render = ({ notice, props }: { notice: RegisteredNotice; props: unknown }) =>
   notice.renderUnknown({ props, origin });
 
-describe("the new-user notice", () => {
-  /** @scenario "A new user's announcement names who signed up and where" */
-  it("names the user, their email, the organization, the phone and the campaign", () => {
-    const message = render({ notice: newUserNotice, props: newUserNotice.fixtures[0]?.props });
-    expect(fieldLabelsOf(message)).toEqual(["Name", "Email", "Organization", "Phone", "Campaign"]);
-    expect(message.text).toContain("morgan@acme.example");
+describe("the new-organisation notice", () => {
+  const [campaign, bare] = newOrganizationNotice.fixtures;
+
+  /** @scenario "A new organisation's card names who created it and where" */
+  it("names the organisation, the person, their campaign and phone", () => {
+    const card = cardOf(render({ notice: newOrganizationNotice, props: campaign?.props }));
+    expect(card.title?.text).toBe("🏢 Acme Robotics · new organisation");
+    expect(card.subtitle?.text).toBe("Morgan Ellis · morgan.ellis@acme.example");
+    expect(card.body?.text).toBe("Campaign launch-week · +31 20 555 0100");
   });
 
-  it("says Unknown where the sign-up left a name out", () => {
-    const message = render({ notice: newUserNotice, props: { userEmail: "morgan@acme.example" } });
-    expect(fieldLabelsOf(message)).toEqual(["Name", "Email", "Organization"]);
-    expect(message.text).toContain("Name: Unknown");
+  it("leaves the body out where the sign-up gave neither campaign nor phone", () => {
+    const card = cardOf(render({ notice: newOrganizationNotice, props: bare?.props }));
+    expect(card.body).toBeUndefined();
+  });
+
+  /** @scenario "A card's buttons open the user and the organisation in ops" */
+  it("opens the user and the organisation in ops, the organisation as primary", () => {
+    const card = cardOf(render({ notice: newOrganizationNotice, props: campaign?.props }));
+    expect(card.actions?.map((button) => [button.text.text, button.url, button.style])).toEqual([
+      ["User in ops", "https://app.langwatch.ai/ops/users?q=user_morgan", undefined],
+      [
+        "Organisation in ops",
+        "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+        "primary",
+      ],
+    ]);
+  });
+});
+
+describe("the new-user notice", () => {
+  const [invitation, sso, scim] = newUserNotice.fixtures;
+
+  /** @scenario "A join card names the person, the organisation and the route they came by" */
+  it.each([
+    [invitation, "👋 Riley Chen joined Acme Robotics", "riley.chen@acme.example · via invitation"],
+    [sso, "👋 Riley Chen joined Acme Robotics", "riley.chen@acme.example · via SSO (Okta)"],
+    [scim, "👋 Somebody joined an organisation", "via SCIM"],
+  ])("names the route in %#", (fixture, title, subtitle) => {
+    const card = cardOf(render({ notice: newUserNotice, props: fixture?.props }));
+    expect(card.title?.text).toBe(title);
+    expect(card.subtitle?.text).toBe(subtitle);
+  });
+
+  it("opens the user and the organisation in ops", () => {
+    const message = render({ notice: newUserNotice, props: invitation?.props });
+    expect(buttonUrlsOf(message)).toEqual([
+      "https://app.langwatch.ai/ops/users?q=user_riley",
+      "https://app.langwatch.ai/ops/organizations?q=organization_acme",
+    ]);
+  });
+});
+
+describe("the SCIM sync summary notice", () => {
+  const [large, deactivations] = scimSyncSummaryNotice.fixtures;
+
+  /** @scenario "A SCIM summary omits zero counts and caps the names" */
+  it("caps the added names at three and counts the rest", () => {
+    const card = cardOf(render({ notice: scimSyncSummaryNotice, props: large?.props }));
+    expect(card.title?.text).toBe("📇 SCIM updated Acme Robotics");
+    expect(card.subtitle?.text).toBe("42 added · 3 updated · 2 deactivated · 1 failed");
+    expect(card.body?.text).toBe("Added: Riley Chen, Morgan Ellis, Sam Okafor and 39 more");
+  });
+
+  it("omits zero counts and the names line", () => {
+    const card = cardOf(render({ notice: scimSyncSummaryNotice, props: deactivations?.props }));
+    expect(card.subtitle?.text).toBe("2 deactivated");
+    expect(card.body).toBeUndefined();
   });
 });
 

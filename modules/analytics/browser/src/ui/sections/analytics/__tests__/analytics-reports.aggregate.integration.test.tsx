@@ -10,9 +10,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../../testing.tsx";
 
-const { projectRef, deniedRef } = vi.hoisted(() => ({
+const { projectRef, deniedRef, graphsRef } = vi.hoisted(() => ({
   projectRef: { current: { id: "proj-1", slug: "proj", kind: "application" } },
   deniedRef: { current: new Set<string>() },
+  graphsRef: { current: [] as { id: string }[] },
 }));
 
 vi.mock("@langwatch/browser-host/use-organization-team-project", async (importOriginal) => ({
@@ -30,10 +31,6 @@ vi.mock("../../../../behavior/analytics-api.ts", () => {
       useUtils: () => ({ graphs: { getAll: { invalidate: vi.fn() } } }),
       dashboards: { rename: { useMutation: mutation } },
       graphs: { delete: { useMutation: mutation }, batchUpdateLayouts: { useMutation: mutation } },
-      dashboardWidgets: {
-        delete: { useMutation: mutation },
-        batchUpdateLayouts: { useMutation: mutation },
-      },
     },
   };
 });
@@ -41,12 +38,7 @@ vi.mock("../../../../behavior/analytics-api.ts", () => {
 vi.mock("../../../../behavior/use-dashboards.ts", () => ({
   useFirstDashboard: () => ({ data: null }),
   useDashboards: () => ({ data: [], refetch: vi.fn() }),
-  useDashboardGraphs: () => ({ data: [], isLoading: false, refetch: vi.fn() }),
-  useDashboardWidgets: () => ({ data: [], isLoading: false, refetch: vi.fn() }),
-}));
-
-vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: false }),
+  useDashboardGraphs: () => ({ data: graphsRef.current, isLoading: false, refetch: vi.fn() }),
 }));
 
 // The layout is the page chrome; what the body hands it is under test.
@@ -65,13 +57,17 @@ vi.mock("../../analytics-layout.tsx", () => ({
     </div>
   ),
 }));
-vi.mock("../../report-grid.tsx", () => ({ ReportGrid: () => null }));
+vi.mock("../../report-grid.tsx", () => ({
+  ReportGrid: ({ graphs }: { graphs: { id: string }[] }) => (
+    <ul data-testid="report-grid">
+      {graphs.map(({ id }) => (
+        <li key={id}>{id}</li>
+      ))}
+    </ul>
+  ),
+}));
 vi.mock("../../filter-sidebar.tsx", () => ({ FilterSidebar: () => null }));
 vi.mock("../../dashboard-auto-refresh-menu.tsx", () => ({ DashboardAutoRefreshMenu: () => null }));
-vi.mock(
-  "../../../../features/dashboard-widget/ui/sections/create-dashboard-widget-drawer.tsx",
-  () => ({ CreateDashboardWidgetDrawer: () => null }),
-);
 
 import { ReportsContent } from "../analytics-reports.screen.tsx";
 
@@ -93,6 +89,7 @@ const renderReports = () =>
 afterEach(() => {
   cleanup();
   deniedRef.current = new Set();
+  graphsRef.current = [];
 });
 
 describe("<ReportsContent/>", () => {
@@ -144,6 +141,22 @@ describe("<ReportsContent/>", () => {
       expect(screen.queryByRole("button", { name: /Add chart/ })).toBeNull();
       expect(screen.queryByText(/Click \+ Add chart/)).toBeNull();
     });
+  });
+});
+
+describe("<ReportsContent/> and Dashboards widgets", () => {
+  /** @scenario "The legacy reports page neither shows nor adds dashboard widgets" */
+  it("draws only the charts made in Reports and links Add chart to the chart builder", () => {
+    projectRef.current = { id: "proj-1", slug: "proj", kind: "application" };
+    graphsRef.current = [{ id: "builder_chart" }];
+
+    renderReports();
+
+    expect(screen.getByTestId("report-grid").textContent).toBe("builder_chart");
+    expect(screen.getByTestId("analytics-add-chart")).toHaveAttribute(
+      "href",
+      expect.stringContaining("/proj/analytics/custom"),
+    );
   });
 });
 

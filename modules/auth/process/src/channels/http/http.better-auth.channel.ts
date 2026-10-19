@@ -179,6 +179,9 @@ function refusesCredentialRoute({
 /** Whether an organization's own connection governs this address (D04). */
 type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
 
+/** The two assertion questions the connection's own sign-in route asks of identity. */
+type SsoAssertions = Pick<SsoAssertionApi, "decide" | "resolveUser">;
+
 /**
  * A password reset for an address an organization signs in through its own
  * provider would mint the local password that connection exists to prevent,
@@ -849,7 +852,7 @@ function ssoPlugin({
   assertions,
   evidence,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   evidence: Pick<SessionCallbackEvidenceChannel, "recordAuthenticatedSsoAccount">;
 }): ReturnType<typeof sso> {
   return sso({
@@ -909,7 +912,7 @@ export async function resolveSsoUser({
   input,
   context,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   input: SSOUserResolutionInput;
   context: SSOUserResolutionContext;
 }): Promise<SSOUserResolution> {
@@ -987,7 +990,7 @@ type BetterAuthTransportOptions = Readonly<{
   /** The connection's arrival door every federated sign-in is asked of. */
   arrivals: BetterAuthHookCollaborators["arrivals"];
   /** Whether a customer's identity provider may assert this address at all. */
-  ssoAssertions: SsoAssertionApi;
+  ssoAssertions: SsoAssertions;
   /** Whose registered issuers this request is allowed to reach. */
   ssoIssuers: BetterAuthSsoIssuers;
   /** Where a sign-in through a connection is recorded as having happened. */

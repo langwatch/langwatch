@@ -328,6 +328,8 @@ interface DrawerBaseProps {
   onBack?: () => void;
   /** A maximum, capped by the viewport and the docked panel's inset. Default "md". */
   size?: DrawerSize;
+  /** The side it opens from; "start" leaves a panel docked on the right in view. Default "end". */
+  placement?: "start" | "end";
   /** The drawer's accessible name, kept stable even while `titleContent` edits it. */
   title: string;
   /** Drawn in the title's place: an inline-rename element. `title` still names the drawer. */
@@ -659,6 +661,7 @@ export function Drawer({
   onClose,
   onBack,
   size = "md",
+  placement = "end",
   title,
   titleContent,
   icon,
@@ -731,6 +734,7 @@ export function Drawer({
     <DrawerRoot
       open={open}
       size={size === "full" ? "full" : undefined}
+      placement={placement}
       closeOnEscape={!busy && closeOnEscape !== false}
       preventScroll={preventScroll}
       onEscapeKeyDown={(event) => {
@@ -763,7 +767,7 @@ export function Drawer({
       >
         <DrawerCloseTrigger
           disabled={busy}
-          zIndex={glass ? 2 : void 0}
+          zIndex={glass || chrome === "content" ? 2 : void 0}
           data-testid={slot("close")}
         />
         {onSubmit ? (

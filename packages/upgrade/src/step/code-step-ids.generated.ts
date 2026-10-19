@@ -9,6 +9,7 @@ export type CodeStepId =
   | "automation:reconcile-report-schedules"
   | "automation:reconcile-report-schedules-after-rollout"
   | "automation:reconcile-slack-claims"
+  | "automation:unwrap-trigger-json-text"
   | "billing:record-usage-billing-catch-up"
   | "billing:fill-seat-change-organizations"
   | "data-retention:keep-control-plane-events-forever"
@@ -42,5 +43,6 @@ export type CodeStepId =
   | "trace:track-updated-at-index-materialisation"
   | "trace:send-month-trace-ids"
   | "user:record-created-facts"
+  | "user:lower-case-stored-addresses"
   | "workflow:record-current-version-fields"
   | "workflow:move-http-credentials-to-secrets";

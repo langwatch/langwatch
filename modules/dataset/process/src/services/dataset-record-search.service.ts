@@ -11,6 +11,7 @@ import {
   matchesDatasetSearch,
   type DatasetSearchCaps,
 } from "../rules/dataset-search.rules.ts";
+import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetRequestBoundsService } from "./dataset-request-bounds.service.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
@@ -19,6 +20,7 @@ type DatasetSearchPageInput = { projectId: string; page: number; limit: number }
 type DatasetRecordSearchDeps = {
   records: DatasetServiceOptions["records"];
   content: DatasetServiceOptions["content"];
+  singleFile: DatasetServiceOptions["singleFile"];
   requestBounds: Pick<DatasetRequestBoundsService, "limit">;
 };
 
@@ -28,6 +30,13 @@ export class DatasetRecordSearchService {
   }
 
   private constructor(private readonly deps: DatasetRecordSearchDeps) {}
+
+  /** The object-backed layout that answers a search, when the rows are not in the table. */
+  private contentOf(dataset: Dataset) {
+    if (dataset.contentLayout === "s3_jsonl") return this.deps.content;
+    if (isSingleFileDataset(dataset)) return this.deps.singleFile;
+    return undefined;
+  }
 
   /** The rows and bytes one search may read, as the project's organization answers them. */
   private async searchCaps(projectId: string): Promise<DatasetSearchCaps> {
@@ -64,8 +73,9 @@ export class DatasetRecordSearchService {
       });
     }
 
-    if (dataset.contentLayout === "s3_jsonl" && this.deps.content) {
-      return this.deps.content.searchRecords({
+    const content = this.contentOf(dataset);
+    if (content) {
+      return content.searchRecords({
         dataset,
         projectId: input.projectId,
         page: input.page,

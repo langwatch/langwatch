@@ -1,4 +1,5 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
 import { bootInstalledProcess } from "@langwatch/process";
@@ -10,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { dashboardProcessModule } from "../../dashboard.module.ts";
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestAutomation,
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
@@ -22,6 +24,7 @@ function process(role: "api" | "worker") {
     stores: memoryStores(),
     peers: [
       testPeer({ token: AnalyticsApi, instance: createDashboardTestAnalytics() }),
+      testPeer({ token: AuthzApi, instance: createDashboardTestAuthz() }),
       testPeer({ token: AutomationApi, instance: createDashboardTestAutomation() }),
       testPeer({ token: ProjectApi, instance: createDashboardTestProjects() }),
     ],

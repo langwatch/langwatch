@@ -348,11 +348,22 @@ export function parseJsonArray(value: string | undefined): string[] | null {
     return null;
   }
 
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(value);
-
-    return Array.isArray(parsed) ? parsed : null;
+    parsed = JSON.parse(value);
   } catch {
     return null;
   }
+
+  if (!Array.isArray(parsed)) {
+    return null;
+  }
+
+  // The fold stores the array as sent; a number or boolean reads as its text, anything else
+  // (null, an object) is not a label or an id and is left out.
+  return parsed.flatMap((item: unknown) => {
+    if (typeof item === "string") return [item];
+    if (typeof item === "number" || typeof item === "boolean") return [String(item)];
+    return [];
+  });
 }

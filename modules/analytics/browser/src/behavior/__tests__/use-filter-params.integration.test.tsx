@@ -33,4 +33,24 @@ describe("the analytics read scope", () => {
 
     expect(result.current.filterParams.excludeOrigins).toEqual([]);
   });
+
+  /** @scenario "A personal project's Analytics reads keep Langy's turns" */
+  it("excludes no origin in a personal project", () => {
+    const host = new StubAnalyticsHost({
+      route: { params: {}, query: { period: "7d" } },
+      project: {
+        id: "personal-1",
+        slug: "me",
+        name: "Me",
+        hasFirstMessage: true,
+        isPersonal: true,
+      },
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <AnalyticsTestHarness host={host}>{children}</AnalyticsTestHarness>
+    );
+    const { result } = renderHook(() => useFilterParams(), { wrapper });
+
+    expect(result.current.filterParams.excludeOrigins).toEqual([]);
+  });
 });

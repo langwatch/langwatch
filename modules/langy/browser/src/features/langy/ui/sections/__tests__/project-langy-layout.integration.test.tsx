@@ -17,6 +17,8 @@ type GateProject = { id: string; slug: string; name: string } | undefined;
 
 const gate = {
   flagEnabled: true,
+  // The minimised peek: on, the closed panel is the affordance and loads with the page.
+  peekDock: true,
   permissions: ["langy:view"] as string[],
   project: { id: "project-demo", slug: "demo", name: "demo" } as GateProject,
   isDemoProject: false,
@@ -81,7 +83,10 @@ function LangySidecarStub() {
 }
 
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: () => ({ enabled: gate.flagEnabled, isLoading: false }),
+  useFeatureFlag: (flag: { name: string }) => ({
+    enabled: flag.name === "release_ui_langy_peek_dock_enabled" ? gate.peekDock : gate.flagEnabled,
+    isLoading: false,
+  }),
 }));
 
 class FakeLangyHost extends LangyHostApi {
@@ -220,10 +225,13 @@ const renderRoutedAt = (initialPath: string) => {
 };
 
 const drawer = () => screen.queryByTestId("langy-drawer");
-const openLangy = () => userEvent.click(screen.getByRole("button", { name: "open-langy" }));
+// The panel's code loads lazily, so the stub appears a tick after the page.
+const openLangy = async () =>
+  userEvent.click(await screen.findByRole("button", { name: "open-langy" }));
 
 beforeEach(() => {
   gate.flagEnabled = true;
+  gate.peekDock = true;
   gate.permissions = ["langy:view"];
   gate.project = { id: "project-demo", slug: "demo", name: "demo" };
   gate.isDemoProject = false;
@@ -244,11 +252,11 @@ afterEach(() => cleanup());
 describe("ProjectLangyLayout", () => {
   describe("given the router mounts the layout as a route with no children", () => {
     /** @scenario A product page renders inside the Langy layout */
-    it("draws the routed page inside the Langy provider, beside the panel", () => {
+    it("draws the routed page inside the Langy provider, beside the panel", async () => {
       renderRoutedAt("/demo/experiments/workbench");
 
       expect(screen.getByText("workbench page")).toBeTruthy();
-      expect(drawer()).toBeTruthy();
+      expect(await screen.findByTestId("langy-drawer")).toBeTruthy();
     });
   });
 
@@ -266,7 +274,7 @@ describe("ProjectLangyLayout", () => {
     it("stays open when navigating to another page of the same project", async () => {
       const router = renderAt("/demo/traces");
       expect(screen.getByText("traces page")).toBeTruthy();
-      expect(drawer()?.getAttribute("data-open")).toBe("false");
+      expect((await screen.findByTestId("langy-drawer")).getAttribute("data-open")).toBe("false");
 
       await openLangy();
       expect(drawer()?.getAttribute("data-open")).toBe("true");
@@ -322,15 +330,31 @@ describe("ProjectLangyLayout", () => {
     });
   });
 
+  describe("given the peek dock is off and Langy is closed", () => {
+    /** @scenario "A page loads the Langy panel only when Langy opens" */
+    it("shows the launcher without the panel, and loads the panel when it opens", async () => {
+      gate.peekDock = false;
+      renderAt("/demo/traces");
+
+      expect(screen.getByText("traces page")).toBeTruthy();
+      expect(drawer()).toBeNull();
+      expect(sidecarMounts.count).toBe(0);
+
+      await userEvent.click(screen.getByRole("button", { name: "Open Langy assistant" }));
+
+      expect((await screen.findByTestId("langy-drawer")).getAttribute("data-open")).toBe("true");
+    });
+  });
+
   // Visibility gate (mirrors the server-side gate). The rollout flag is the
   // only lever — the registry default is off, so the panel is dark until a
   // user is opted in.
   describe("given the rollout-flag visibility gate", () => {
     describe("when the rollout flag is on", () => {
-      it("renders Langy for a team member", () => {
+      it("renders Langy for a team member", async () => {
         gate.flagEnabled = true;
         renderAt("/demo/traces");
-        expect(drawer()).not.toBeNull();
+        expect(await screen.findByTestId("langy-drawer")).not.toBeNull();
       });
     });
 

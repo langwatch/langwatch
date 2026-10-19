@@ -146,6 +146,10 @@ class ProducerOnlyModelCosts implements TraceModelCost {
   estimate(): number {
     throw producerOnly(this.role, "price a span against the model catalogue");
   }
+
+  isUnpriced(): boolean {
+    throw producerOnly(this.role, "ask whether a span has a price");
+  }
 }
 
 class ProducerOnlySpanNormalization implements TraceSpanNormalization {

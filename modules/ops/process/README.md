@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:428`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:430`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -110,6 +110,14 @@ listPausedSchedules(input: ListPausedSchedulesInput): Promise<ListPausedSchedule
 
 ```typescript
 listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]>;
+```
+
+#### `listInsightSchedules`
+
+Every person's daily insights schedule, across projects: the ones that are on first.
+
+```typescript
+listInsightSchedules(input: ListInsightSchedulesInput): Promise<OpsInsightSchedule[]>;
 ```
 
 #### `setScheduleActive`
@@ -933,7 +941,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -948,7 +956,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:59`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:60`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
@@ -1073,7 +1081,7 @@ Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/tran
 | `checkup.status`                 | query    | Permission `organization:view`   | `organizationInput` | `checkupAnswer`     |
 | `checkup.run`                    | mutation | Permission `organization:manage` | inline              | `checkupAnswer`     |
 | `checkup.usageReport`            | query    | Permission `organization:view`   | `organizationInput` | `usageReportAnswer` |
-| `checkup.setUsageReportSwitches` | mutation | Permission `organization:manage` | inline              | `usageReportAnswer` |
+| `checkup.setUsageReportSwitches` | mutation | Platform permission `ops:manage` | inline              | `usageReportAnswer` |
 
 ```typescript
 // checkup.status
@@ -1130,7 +1138,7 @@ type Output = z.infer<typeof bugReportSchema>; // ../contract/src/ops-bug-report
 
 ### `ops`
 
-Contract `../contract/src/features/dashboard/ops-dashboard.trpc.ts:34`, router `src/transport/ops-dashboard.trpc.ts:12`.
+Contract `../contract/src/features/dashboard/ops-dashboard.trpc.ts:36`, router `src/transport/ops-dashboard.trpc.ts:12`.
 
 | Procedure                  | Kind         | Gate                                                                                                                                  | Input                                 | Output                             |
 | -------------------------- | ------------ | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | ---------------------------------- |
@@ -1144,13 +1152,14 @@ Contract `../contract/src/features/dashboard/ops-dashboard.trpc.ts:34`, router `
 | `ops.listScheduledJobs`    | query        | Platform permission `ops:view`                                                                                                        | `opsListScheduledJobsInputSchema`     | inline                             |
 | `ops.listPausedSchedules`  | query        | Platform permission `ops:view`                                                                                                        | `opsListPausedSchedulesInputSchema`   | `opsPausedSchedulesPageSchema`     |
 | `ops.listSchedulerActions` | query        | Platform permission `ops:view`                                                                                                        | `opsListSchedulerActionsInputSchema`  | inline                             |
+| `ops.listInsightSchedules` | query        | Platform permission `ops:view`                                                                                                        | `opsListInsightSchedulesInputSchema`  | inline                             |
 | `ops.setScheduleActive`    | mutation     | Platform permission `ops:manage`                                                                                                      | `opsSetScheduleActiveInputSchema`     | `opsScheduledJobSchema`            |
 | `ops.clearScheduleSlot`    | mutation     | Platform permission `ops:manage`                                                                                                      | `opsScheduleIdInputSchema`            | `opsScheduledJobSchema`            |
 | `ops.runScheduleNow`       | mutation     | Platform permission `ops:manage`                                                                                                      | `opsScheduleIdInputSchema`            | `opsScheduledJobSchema`            |
 
 ```typescript
 // ops.getScope
-// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:41
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:43
 type Input = unknown;
 // Output: opsScopeProbeSchema, ../contract/src/ops.responses.ts:66
 interface Output {
@@ -1164,12 +1173,12 @@ interface Output {
 }
 
 // ops.getDashboardSnapshot
-// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:45
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:47
 type Input = unknown;
-// Output: dashboardDataSchema.nullable() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:46)
+// Output: dashboardDataSchema.nullable() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:48)
 
 // ops.getBadgeCounts
-// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:54
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:56
 type Input = unknown;
 // Output: opsApiGetBadgeCountsOutputSchema, ../contract/src/ops.responses.ts:84
 interface Output {
@@ -1194,7 +1203,7 @@ interface Output {
 }
 
 // ops.dashboardStream
-// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:63
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:65
 type Input = unknown;
 type Output = z.infer<typeof dashboardDataSchema>; // ../contract/src/features/dashboard/ops-dashboard.ts:281
 
@@ -1221,9 +1230,9 @@ interface Output {
 }
 
 // ops.listQueues
-// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:76
+// Input: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:78
 type Input = unknown;
-// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:77
+// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:79
 type Output = {
   name: string;
   displayName: string;
@@ -1236,25 +1245,25 @@ type Output = {
 }[];
 
 // ops.listScheduledJobs
-// Input: opsListScheduledJobsInputSchema, ../contract/src/ops-scheduler.ts:92
+// Input: opsListScheduledJobsInputSchema, ../contract/src/ops-scheduler.ts:131
 interface Input {
   limit?: number;
 }
-// Output: opsScheduledJobSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:81)
+// Output: opsScheduledJobSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:83)
 
 // ops.listPausedSchedules
-// Input: opsListPausedSchedulesInputSchema, ../contract/src/ops-scheduler.ts:101
+// Input: opsListPausedSchedulesInputSchema, ../contract/src/ops-scheduler.ts:149
 interface Input {
   limit?: number;
 }
 type Output = z.infer<typeof opsPausedSchedulesPageSchema>; // ../contract/src/ops.responses.ts:293
 
 // ops.listSchedulerActions
-// Input: opsListSchedulerActionsInputSchema, ../contract/src/ops-scheduler.ts:110
+// Input: opsListSchedulerActionsInputSchema, ../contract/src/ops-scheduler.ts:158
 interface Input {
   limit?: number;
 }
-// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:94
+// Output: inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:96
 type Output = {
   id: string;
   at: string;
@@ -1264,8 +1273,15 @@ type Output = {
   actor: string | null;
 }[];
 
+// ops.listInsightSchedules
+// Input: opsListInsightSchedulesInputSchema, ../contract/src/ops-scheduler.ts:140
+interface Input {
+  limit?: number;
+}
+// Output: opsInsightScheduleSchema.array() (inline, ../contract/src/features/dashboard/ops-dashboard.trpc.ts:101)
+
 // ops.setScheduleActive
-// Input: opsSetScheduleActiveInputSchema, ../contract/src/ops-scheduler.ts:120
+// Input: opsSetScheduleActiveInputSchema, ../contract/src/ops-scheduler.ts:168
 interface Input {
   scheduleId: string;
   active: boolean;
@@ -1273,14 +1289,14 @@ interface Input {
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 
 // ops.clearScheduleSlot
-// Input: opsScheduleIdInputSchema, ../contract/src/ops-scheduler.ts:83
+// Input: opsScheduleIdInputSchema, ../contract/src/ops-scheduler.ts:122
 interface Input {
   scheduleId: string;
 }
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 
 // ops.runScheduleNow
-type Input = z.infer<typeof opsScheduleIdInputSchema>; // ../contract/src/ops-scheduler.ts:83
+type Input = z.infer<typeof opsScheduleIdInputSchema>; // ../contract/src/ops-scheduler.ts:122
 type Output = z.infer<typeof opsScheduledJobSchema>; // ../contract/src/ops-scheduler.ts:26
 ```
 
@@ -2491,13 +2507,13 @@ Declared at `src/eventing/ops-storage-stats.pipeline.ts:27`.
 
 ### Pipeline `ops_system_migrations` (aggregate `system_migration_pass`)
 
-Declared at `src/eventing/ops-system-migrations.pipeline.ts:65`. Events: `systemMigrationPassRequestedEventSchema`, `tenantMigrationRolledBackEventSchema`.
+Declared at `src/eventing/ops-system-migrations.pipeline.ts:66`. Events: `systemMigrationPassRequestedEventSchema`, `tenantMigrationRolledBackEventSchema`.
 
-| Kind            | Name                              | Handles                                                                                      | Declared at                                         |
-| --------------- | --------------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------- |
-| command         | `requestSystemMigrationPass`      | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:70` |
-| command         | `recordTenantMigrationRolledBack` | –                                                                                            | `src/eventing/ops-system-migrations.pipeline.ts:71` |
-| process manager | `systemMigrationPass`             | every 1 h (`SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS = 60 * 60_000`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:72` |
+| Kind            | Name                              | Handles                                                                       | Declared at                                         |
+| --------------- | --------------------------------- | ----------------------------------------------------------------------------- | --------------------------------------------------- |
+| command         | `requestSystemMigrationPass`      | –                                                                             | `src/eventing/ops-system-migrations.pipeline.ts:71` |
+| command         | `recordTenantMigrationRolledBack` | –                                                                             | `src/eventing/ops-system-migrations.pipeline.ts:72` |
+| process manager | `systemMigrationPass`             | every 1 min (`SYSTEM_MIGRATION_WAKE_INTERVAL_MS`); intents `runPass` (outbox) | `src/eventing/ops-system-migrations.pipeline.ts:73` |
 
 ### Pipeline `ops_usage_report` (aggregate `global`)
 
@@ -2531,11 +2547,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:803`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:804`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:806`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:807`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:808`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:811`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:812`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:814`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:815`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:816`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |

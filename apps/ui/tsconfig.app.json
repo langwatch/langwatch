@@ -87,6 +87,9 @@
       "path": "../../modules/integration/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/insight/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../packages/handled-error/tsconfig.build.json"
     },
     {

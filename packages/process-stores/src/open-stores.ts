@@ -99,6 +99,33 @@ function objectStorageConfig(options: {
   }
 }
 
+/** A deployment whose every tenant is private names no shared URL, and still has ClickHouse. */
+function clickhouseConfigOf({
+  config,
+  url,
+  clickhouseRoutes,
+}: {
+  config: StoresConfig;
+  url: string | undefined;
+  clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
+}) {
+  return url || clickhouseRoutes.routes.length > 0
+    ? {
+        clickhouse: {
+          ...(url ? { url: url } : {}),
+          ...(clickhouseRoutes.routes.length > 0 ? { privateRoutes: clickhouseRoutes.routes } : {}),
+          ...(clickhouseRoutes.malformed.length > 0
+            ? { malformedRoutes: clickhouseRoutes.malformed }
+            : {}),
+          poolSizing: config.clickhousePool,
+          ...(config.clickhouseStatementLaneReserveShare === undefined
+            ? {}
+            : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
+        },
+      }
+    : {};
+}
+
 function processConfigOf(options: {
   name: string;
   config: StoresConfig;
@@ -107,6 +134,7 @@ function processConfigOf(options: {
     database: string | undefined;
     clickhouse: string | undefined;
     redis: string | undefined;
+    redisClusterEndpoints: string | undefined;
   }>;
   clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
   encryption: string | undefined;
@@ -117,25 +145,7 @@ function processConfigOf(options: {
   const { name, config, pipelines, urls, clickhouseRoutes, encryption, storage, production } =
     options;
   const previousEncryptionKey = options.previousEncryption;
-  // A deployment whose every tenant is private names no shared URL, and still has ClickHouse.
-  const clickhouse =
-    urls.clickhouse || clickhouseRoutes.routes.length > 0
-      ? {
-          clickhouse: {
-            ...(urls.clickhouse ? { url: urls.clickhouse } : {}),
-            ...(clickhouseRoutes.routes.length > 0
-              ? { privateRoutes: clickhouseRoutes.routes }
-              : {}),
-            ...(clickhouseRoutes.malformed.length > 0
-              ? { malformedRoutes: clickhouseRoutes.malformed }
-              : {}),
-            poolSizing: config.clickhousePool,
-            ...(config.clickhouseStatementLaneReserveShare === undefined
-              ? {}
-              : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
-          },
-        }
-      : {};
+  const clickhouse = clickhouseConfigOf({ config, url: urls.clickhouse, clickhouseRoutes });
   return {
     processName: name,
     encryptionKey: encryption ?? "",
@@ -144,10 +154,11 @@ function processConfigOf(options: {
     rateLimit: config.rateLimit,
     ...(urls.database ? { database: { url: urls.database } } : {}),
     ...clickhouse,
-    ...(urls.redis
+    ...(urls.redis || urls.redisClusterEndpoints
       ? {
           redis: {
-            url: urls.redis,
+            ...(urls.redis ? { url: urls.redis } : {}),
+            ...(urls.redisClusterEndpoints ? { clusterEndpoints: urls.redisClusterEndpoints } : {}),
             ...(config.redis.dbIndex === undefined ? {} : { dbIndex: config.redis.dbIndex }),
           },
         }
@@ -180,23 +191,25 @@ export function openStores(options: {
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
         secrets.into(storesOwner.secrets.redis, (redis) =>
-          secrets.into(storesOwner.secrets.encryption, (credentials) =>
-            secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-              secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
-                withStorageSecrets(secrets, (storage) =>
-                  buildProcessStores({
-                    config: processConfigOf({
-                      name,
-                      config,
-                      pipelines,
-                      urls: { database, clickhouse, redis },
-                      clickhouseRoutes: clickhouseRouteFamilyOf(routes),
-                      encryption: credentials ?? session,
-                      previousEncryption: previous,
-                      storage,
-                      production,
+          secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
+            secrets.into(storesOwner.secrets.encryption, (credentials) =>
+              secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+                secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                  withStorageSecrets(secrets, (storage) =>
+                    buildProcessStores({
+                      config: processConfigOf({
+                        name,
+                        config,
+                        pipelines,
+                        urls: { database, clickhouse, redis, redisClusterEndpoints },
+                        clickhouseRoutes: clickhouseRouteFamilyOf(routes),
+                        encryption: credentials ?? session,
+                        previousEncryption: previous,
+                        storage,
+                        production,
+                      }),
                     }),
-                  }),
+                  ),
                 ),
               ),
             ),

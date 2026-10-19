@@ -22,6 +22,10 @@ class StagingScriptsDouble {
     return null;
   }
 
+  async getEarliestCandidateScore(): Promise<number | null> {
+    return null;
+  }
+
   dispatchBatch(): Promise<DispatchResult[]> {
     return new Promise((resolve) => this.claims.push(resolve));
   }

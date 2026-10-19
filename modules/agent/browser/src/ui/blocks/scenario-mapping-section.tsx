@@ -14,6 +14,8 @@ import {
 } from "@langwatch/design-system/variable-mapping";
 import { useMemo } from "react";
 
+import { selectedScenarioOutput, storedScenarioOutput } from "../../model/scenario-output-field.ts";
+
 const SCENARIO_FIELDS: Variable[] = [
   { identifier: "input", type: "str" },
   { identifier: "messages", type: "str" },
@@ -35,6 +37,19 @@ export type ScenarioMappingSectionProps = {
   /** Stored mappings: agent input to the scenario field it reads. */
   mappings: Record<string, FieldMapping>;
   onMappingChange: (identifier: string, mapping: FieldMapping | undefined) => void;
+  /**
+   * The agent's declared outputs. Given, the section also shows which one is the scenario's
+   * result; absent (an HTTP agent reads its result by path), it shows inputs only.
+   */
+  outputs?: { identifier: string; type?: string }[];
+  /** The stored scenario output field: unset, cleared (`""`) or the chosen output. */
+  outputField?: string;
+  onOutputFieldChange?: (field: string | undefined) => void;
+};
+
+const SCENARIO_OUTPUT_FIELD: Variable[] = [{ identifier: "output", type: "str" }];
+const SCENARIO_OUTPUT_INFO: Record<string, string> = {
+  output: "The agent output the scenario reads as the agent's reply",
 };
 
 /** Stored agent-input mappings, turned round to one row per scenario field. */
@@ -52,6 +67,9 @@ export function ScenarioMappingSection({
   inputs,
   mappings,
   onMappingChange,
+  outputs,
+  outputField,
+  onOutputFieldChange,
 }: ScenarioMappingSectionProps) {
   const displayMappings = useMemo(() => byScenarioField(mappings), [mappings]);
   const agentSource = useMemo<AvailableSource>(
@@ -148,6 +166,72 @@ export function ScenarioMappingSection({
           </VStack>
         )}
       </Box>
+      {outputs !== undefined && (
+        <ScenarioOutputMapping
+          outputs={outputs}
+          outputField={outputField}
+          onOutputFieldChange={onOutputFieldChange}
+        />
+      )}
     </VStack>
+  );
+}
+
+function ScenarioOutputMapping({
+  outputs,
+  outputField,
+  onOutputFieldChange,
+}: {
+  outputs: { identifier: string; type?: string }[];
+  outputField: string | undefined;
+  onOutputFieldChange: ((field: string | undefined) => void) | undefined;
+}) {
+  const selected = selectedScenarioOutput({ outputField, outputs });
+  const outputSource = useMemo<AvailableSource>(
+    () => ({
+      id: "agent_output",
+      name: "Agent Outputs",
+      type: "evaluator",
+      fields: outputs.map((output) => ({
+        name: output.identifier,
+        label: output.identifier,
+        type: (output.type ?? "str") as AvailableSource["fields"][number]["type"],
+      })),
+    }),
+    [outputs],
+  );
+  const displayMappings: Record<string, FieldMapping> =
+    selected !== null && outputs.length > 0
+      ? { output: { type: "source", sourceId: "agent_output", path: [selected] } }
+      : {};
+
+  return (
+    <Box>
+      <VariablesSection
+        variables={SCENARIO_OUTPUT_FIELD}
+        onChange={() => undefined}
+        mappings={displayMappings}
+        onMappingChange={(_field, mapping) =>
+          onOutputFieldChange?.(
+            storedScenarioOutput(
+              mapping?.type === "source" && mapping.path[0] ? mapping.path[0] : void 0,
+            ),
+          )
+        }
+        availableSources={[outputSource]}
+        showMappings
+        canAddRemove={false}
+        readOnly
+        title="Output"
+        variableInfo={SCENARIO_OUTPUT_INFO}
+        missingMappingIds={displayMappings.output ? new Set<string>() : new Set(["output"])}
+        showMissingMappingsError={false}
+      />
+      {outputs.length === 0 && (
+        <Text fontSize="xs" color="fg.error" marginTop={1}>
+          Add at least one output to the agent
+        </Text>
+      )}
+    </Box>
   );
 }

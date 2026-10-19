@@ -24,7 +24,7 @@
 import { isGatedSsoPath } from "@langwatch/auth-contract";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
-import { genericOAuth } from "better-auth/plugins";
+import { genericOAuth } from "better-auth/plugins/generic-oauth";
 import { describe, expect, it } from "vitest";
 
 /**

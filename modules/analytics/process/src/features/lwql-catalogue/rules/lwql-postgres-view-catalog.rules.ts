@@ -350,6 +350,23 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       UpdatedAt: { source: "updatedAt" },
     },
   }),
+  dashboard_widgets: defineTableCatalogue({
+    sourceTable: "DashboardWidget",
+    access: { allOf: ["analytics:view"] },
+    columns: {
+      TenantId: { source: "projectId" },
+      DashboardWidgetId: { source: "id" },
+      DashboardId: { source: "dashboardId" },
+      Name: { source: "name" },
+      Definition: { source: "definition", content: "output" },
+      GridColumn: { source: "gridColumn" },
+      GridRow: { source: "gridRow" },
+      ColSpan: { source: "colSpan" },
+      RowSpan: { source: "rowSpan" },
+      CreatedAt: { source: "createdAt" },
+      UpdatedAt: { source: "updatedAt" },
+    },
+  }),
   dashboards: defineTableCatalogue({
     sourceTable: "Dashboard",
     access: { allOf: ["analytics:view"] },
@@ -358,6 +375,25 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       DashboardId: { source: "id" },
       Name: { source: "name" },
       Order: { source: "order" },
+      Description: { source: "description", content: "output" },
+      CreatedById: { source: "createdById" },
+      scope: "omit", // an Only me board is not in the view at all; see the visibility overrides
+      organizationId: "omit", // set only once a board is shared with the organization
+      CreatedAt: { source: "createdAt" },
+      UpdatedAt: { source: "updatedAt" },
+    },
+  }),
+  dashboards_v2: defineTableCatalogue({
+    sourceTable: "DashboardsV2",
+    access: { allOf: ["analytics:view"] },
+    columns: {
+      TenantId: { source: "projectId" },
+      DashboardId: { source: "id" },
+      Name: { source: "name" },
+      Description: { source: "description", content: "output" },
+      CreatedById: { source: "createdById" },
+      Scope: { source: "scope" },
+      organizationId: "omit", // set only once a board is shared with the organization
       CreatedAt: { source: "createdAt" },
       UpdatedAt: { source: "updatedAt" },
     },
@@ -930,6 +966,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       CurrentTurnId: "inherit",
       LastError: { content: "output" },
       LastModel: "inherit",
+      Origin: "inherit",
       PendingHandoffToken: "omit", // secret
       PendingHandoffTurnId: "inherit",
       RunToken: "omit", // secret
@@ -1129,7 +1166,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       Language: { source: "language", content: "output" },
       Framework: { source: "framework", content: "output" },
       Kind: { source: "kind" },
-      aggregateRule: "omit",
+      aggregateRule: "omit", // not offered until the project module decides how its rule reads
       FirstMessage: { source: "firstMessage" },
       Integrated: { source: "integrated" },
       CreatedAt: { source: "createdAt" },
@@ -1560,7 +1597,7 @@ export const LWQL_POSTGRES_CATALOGUE = defineLwqlCatalog({
       licenseTokenHash: "omit", // secret
       LicenseInstanceId: { source: "licenseInstanceId" },
       LicenseExpiresAt: { source: "licenseExpiresAt" },
-      licenseId: "omit",
+      licenseId: "omit", // not offered until gateway decides how its licence columns read
     },
   }),
   webhook_endpoint_deliveries: defineTableCatalogue({

@@ -80,7 +80,7 @@ export interface UserApi {
   ): Promise<UserNotificationPreference>;
   /** Whether the account behind an id holds the platform-operator grant. */
   isOperator(input: { userId: string }): Promise<boolean>;
-  /** The account an address belongs to, ignoring case; the exact address wins over case-twins. */
+  /** The account holding an address, matched on its stored lower-cased form, however typed. */
   findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
   /** Mints a directory account with no sign-in method of its own. */
   create(input: CreateUserInput): Promise<UserProfile>;

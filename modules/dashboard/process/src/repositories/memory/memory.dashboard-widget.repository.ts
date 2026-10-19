@@ -22,15 +22,31 @@ import type {
   DashboardWidgetScope,
   UpdateDashboardWidgetInput,
 } from "../dashboard-widget.repository.ts";
+import { MemoryDashboardDatabase } from "./memory.dashboard.database.ts";
 
 /** In-memory parity for widget CRUD; dashboard ownership is enforced by the live transaction. */
 export class MemoryDashboardWidgetRepository implements DashboardWidgetRepository {
-  #rows: DashboardWidgetRow[] = [];
+  #database: MemoryDashboardDatabase;
 
-  private constructor() {}
+  private constructor(database: MemoryDashboardDatabase) {
+    this.#database = database;
+  }
 
-  static create(): MemoryDashboardWidgetRepository {
-    return new MemoryDashboardWidgetRepository();
+  /** `database` is shared with the module's other memory repositories; a fresh one otherwise. */
+  static create(
+    options: { database?: MemoryDashboardDatabase } = {},
+  ): MemoryDashboardWidgetRepository {
+    return new MemoryDashboardWidgetRepository(
+      options.database ?? MemoryDashboardDatabase.create(),
+    );
+  }
+
+  get #rows(): DashboardWidgetRow[] {
+    return this.#database.widgets;
+  }
+
+  set #rows(rows: DashboardWidgetRow[]) {
+    this.#database.widgets = rows;
   }
 
   async findAll(input: { projectId: string }): Promise<DashboardWidgetRow[]> {
@@ -58,6 +74,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
         code: input.input.code,
         queries: [...input.input.queries],
+        ...(input.input.description === undefined ? {} : { description: input.input.description }),
+        ...(input.input.prompt === undefined ? {} : { prompt: input.input.prompt }),
+        ...(input.input.source === undefined ? {} : { source: input.input.source }),
       },
       createdAt: nowInstant(),
       updatedAt: nowInstant(),
@@ -78,6 +97,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
     if (!definition.success) {
       throw new DashboardWidgetDefinitionInvalidError(current.id, { reasons: [definition.error] });
     }
+    const description = input.input.description ?? definition.data.description;
+    const prompt = input.input.prompt ?? definition.data.prompt;
+    const source = input.input.source ?? definition.data.source;
     const updated: DashboardWidgetRow = {
       ...current,
       ...(input.input.name === undefined ? {} : { name: input.input.name }),
@@ -85,6 +107,9 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
         version: DASHBOARD_WIDGET_DEFINITION_VERSION,
         code: input.input.code ?? definition.data.code,
         queries: input.input.queries ?? definition.data.queries,
+        ...(description === undefined ? {} : { description }),
+        ...(prompt === undefined ? {} : { prompt }),
+        ...(source === undefined ? {} : { source }),
       },
       updatedAt: nowInstant(),
     };
@@ -95,7 +120,15 @@ export class MemoryDashboardWidgetRepository implements DashboardWidgetRepositor
 
   async deleteWidget(input: DashboardWidgetScope): Promise<void> {
     const row = this.#require(input);
-    this.#rows = this.#rows.filter((candidate) => candidate.id !== row.id);
+    this.#rows = this.#rows.filter((candidate) => candidate !== row);
+    this.#database.charts = this.#database.charts.filter(
+      (chart) =>
+        !(
+          chart.id === row.id &&
+          chart.projectId === row.projectId &&
+          chart.kind === "dashboard_srcdoc"
+        ),
+    );
   }
 
   async assignToDashboard(input: AssignDashboardWidgetInput): Promise<DashboardWidgetRow> {

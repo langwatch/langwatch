@@ -1,3 +1,5 @@
+import { HStack } from "@langwatch/design-system/primitives";
+import { Switch } from "@langwatch/design-system/switch";
 import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
@@ -24,6 +26,8 @@ export default function LicensesView() {
   const [openId, setOpenId] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const [revoking, setRevoking] = useState<License | null>(null);
+  const [showInactive, setShowInactive] = useState(false);
+  const [showInternal, setShowInternal] = useState(false);
   const commands = useLicenseCommands();
 
   const list = api.licenseRegistry.getAll.useQuery({
@@ -31,6 +35,8 @@ export default function LicensesView() {
     page: page - 1,
     pageSize: PAGE_SIZE,
     search: debouncedSearch || undefined,
+    onlyActive: !showInactive,
+    hideInternal: !showInternal,
   });
 
   return (
@@ -43,6 +49,32 @@ export default function LicensesView() {
           setPage(1);
         }}
         searchPlaceholder="Search by customer, email or license id"
+        filters={
+          <HStack gap={4} paddingX={1}>
+            <Switch
+              colorPalette="accent"
+              size="sm"
+              checked={showInactive}
+              onCheckedChange={(event) => {
+                setShowInactive(event.checked);
+                setPage(1);
+              }}
+            >
+              Show revoked and expired
+            </Switch>
+            <Switch
+              colorPalette="accent"
+              size="sm"
+              checked={showInternal}
+              onCheckedChange={(event) => {
+                setShowInternal(event.checked);
+                setPage(1);
+              }}
+            >
+              Show internal test licenses
+            </Switch>
+          </HStack>
+        }
         isLoading={list.isLoading}
         isFetching={list.isFetching}
         error={list.error}

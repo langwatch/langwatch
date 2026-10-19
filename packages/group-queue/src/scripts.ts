@@ -28,6 +28,16 @@ export const RECONCILE_INTERVAL_MS = 2000;
 /** How far back a listed run's jobless group that stays (a failure, say) goes in its candidates. */
 const SETTLED_CANDIDATE_DELAY_MS = 3_600_000;
 
+/** How long a listed run's in-flight group stays out of its scan, unless COMPLETE finds work. */
+const IN_FLIGHT_CANDIDATE_DELAY_MS = 1_000;
+
+/**
+ * How long a listed run's group holding work it can't run yet (parked at its tenant's cap,
+ * blocked, or paused) stays out of its scan. Re-reading such groups on every claim kept the
+ * listed consumer polling every 50ms over the whole parked backlog.
+ */
+const WAITING_CANDIDATE_DELAY_MS = 5_000;
+
 /** Dynamic cap TTL (5x RECONCILE_INTERVAL_MS); fails safe to static cap if stale. */
 export const DYNAMIC_CAP_TTL_MS = 5 * RECONCILE_INTERVAL_MS;
 
@@ -881,11 +891,19 @@ const DISPATCH_BATCH_LUA =
   CLAIMED_RECORD_HELPER_LUA +
   SETTLED_TARGET_HELPER_LUA +
   `
-local function gqCandidateScore(keyPrefix, groupId, readyScore, nowMs)
+local function gqCandidateScore(keyPrefix, blockedKey, groupId, readyScore, nowMs)
   local groupPrefix = keyPrefix .. "group:" .. groupId
-  if redis.call("EXISTS", groupPrefix .. ":active") == 1 then return nowMs end
+  if redis.call("EXISTS", groupPrefix .. ":claimed") > 0 then return nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS} end
+  -- A retry backoff drops the claim, keeps :active and moves the ready score to its due time.
+  if redis.call("EXISTS", groupPrefix .. ":active") > 0 then
+    return math.max(nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, tonumber(readyScore) or 0)
+  end
   if redis.call("ZCARD", groupPrefix .. ":jobs") == 0 then return nowMs + ${SETTLED_CANDIDATE_DELAY_MS} end
-  if readyScore and tonumber(readyScore) > nowMs then return tonumber(readyScore) end
+  -- Work out of ready is parked or paused; work in ready may still be blocked.
+  if not readyScore or redis.call("SISMEMBER", blockedKey, groupId) == 1 then
+    return nowMs + ${WAITING_CANDIDATE_DELAY_MS}
+  end
+  if tonumber(readyScore) > nowMs then return tonumber(readyScore) end
   return nowMs
 end
 
@@ -955,6 +973,13 @@ if staticCap > 0 and globalBudget > 0 then
   tenantCap = effectiveCap(keyPrefix, staticCap)
 end
 
+-- A listed run's group this scan parked waits out its delay before the run's scan looks again.
+local function deferCandidate(groupId)
+  if restrictedDispatch then
+    redis.call("ZADD", allowedGroupsKey, nowMs + ${WAITING_CANDIDATE_DELAY_MS}, groupId)
+  end
+end
+
 -- Scan ready in priority order and dispatch up to maxJobs, appending to results.
 -- effCap gates the per-tenant cap (0 = off). bypassPark skips the over-cap PARK
 -- decision (work-conserving override) while still recording the in-flight slot.
@@ -981,7 +1006,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
     if not restrictedDispatch then
       groups = redis.call("ZRANGEBYSCORE", readyKey, "-inf", nowMs, "LIMIT", offset, pageSize)
     else
-      groups = redis.call("ZRANGE", allowedGroupsKey, offset, offset + pageSize - 1)
+      -- Below nowMs only: each examined group leaves or is re-scored to nowMs or later, so a
+      -- call looks at a candidate once instead of re-reading the same head until its budget.
+      groups = redis.call("ZRANGEBYSCORE", allowedGroupsKey, "-inf", "(" .. ARGV[2], "LIMIT", offset, pageSize)
     end
     if #groups == 0 then break end
     scanned = scanned + #groups
@@ -1011,7 +1038,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
         else
           -- Re-queued by when it can next run: a waiting group at its due time, a failed one an
           -- hour back, so a retried job is not stuck behind every group the run already finished.
-          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, groupId, readyScore, nowMs), groupId)
+          redis.call("ZADD", allowedGroupsKey, gqCandidateScore(keyPrefix, blockedKey, groupId, readyScore, nowMs), groupId)
         end
         removedAllowed = removedAllowed + 1
       end
@@ -1035,6 +1062,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
             if cached then
               tenantOverCap = true
               removed = removed + parkGroup(readyKey, groupId)
+              deferCandidate(groupId)
             end
           end
         end
@@ -1046,6 +1074,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
         if redis.call("SISMEMBER", pausedJobKey, "tenant:" .. parkTenantOf(groupId)) == 1 then
           tenantPaused = true
           removed = removed + parkGroup(readyKey, groupId)
+          deferCandidate(groupId)
         end
       end
 
@@ -1094,6 +1123,7 @@ local function scanBatch(effCap, bypassPark, dispatched)
                 if pausedBy then
                   paused = true
                   removed = removed + parkLaneGroup(readyKey, groupId, pausedBy)
+                  deferCandidate(groupId)
                 end
               end
             end
@@ -1105,6 +1135,9 @@ local function scanBatch(effCap, bypassPark, dispatched)
 
               -- Mark group as actively-processing in ready zset (future score suppresses redispatch).
               redis.call("ZADD", readyKey, activeUntil, groupId)
+              if restrictedDispatch then
+                redis.call("ZADD", allowedGroupsKey, nowMs + ${IN_FLIGHT_CANDIDATE_DELAY_MS}, groupId)
+              end
 
               -- Tenant in-flight slot (self-healing ZSET; only when cap is set).
               -- Recorded even under bypassPark so override dispatches are counted.
@@ -1186,7 +1219,9 @@ local overrideDispatched = 0
 -- the idle slots from the least-served over-cap tenant rather than return short
 -- and idle the fleet (the static-cap idle-behind-cap sin). Bounded to the
 -- remaining slots; this pod's free-slot budget keeps the fleet total at G.
-if globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
+-- Not on a listed run's claim: its scan only runs the run's groups, so the groups it would
+-- unpark go straight back to parked on the next full dispatch.
+if not restrictedDispatch and globalBudget > 0 and tenantCap > 0 and dispatched < maxJobs and redis.call("SCARD", keyPrefix .. "parked-tenants") > 0 then
   unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs, maxJobs - dispatched)
   local beforeOverride = dispatched
   dispatched = scanBatch(tenantCap, true, dispatched)
@@ -1282,6 +1317,10 @@ local signalKey       = KEYS[4]
 local statsKey        = KEYS[5]
 local errorKey        = KEYS[6]
 local claimedKey      = KEYS[7]
+local failStreakKey   = KEYS[8]
+local attemptKey      = KEYS[9]
+-- The listed run's candidates the job was sent under, if any: a group left with work rejoins its scan.
+local candidatesKey   = KEYS[10]
 
 local groupId      = ARGV[1]
 local stagedJobId  = ARGV[2]
@@ -1306,6 +1345,8 @@ local isDropped = ARGV[7] == "1"
 -- The claim's token. A former owner whose claim another worker recovered no
 -- longer matches, so its late completion changes nothing (no double-complete).
 local claimToken = ARGV[8] or ""
+-- "1" when the group's retry chain ends here: its failure streak and attempt count go with the slot.
+local endsRetryChain = ARGV[9] == "1"
 
 if not gqOwnsClaim(claimedKey, activeKey, stagedJobId, claimToken) then
   return 0
@@ -1313,6 +1354,9 @@ end
 
 redis.call("DEL", claimedKey)
 redis.call("DEL", activeKey)
+if endsRetryChain then
+  redis.call("DEL", failStreakKey, attemptKey)
+end
 
 -- Free the tenant in-flight slot when the soft-cap is enabled.
 if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
@@ -1347,6 +1391,9 @@ if pendingCount > 0 then
   local nextJob = redis.call("ZRANGE", jobsKey, 0, 0, "WITHSCORES")
   if #nextJob >= 2 then
     addToReadyOrParked(readyKey, groupId, tonumber(nextJob[2]), false)
+    if candidatesKey then
+      redis.call("ZADD", candidatesKey, "XX", "LT", tonumber(nextJob[2]), groupId)
+    end
   else
     redis.call("ZREM", readyKey, groupId)
   end
@@ -2337,12 +2384,18 @@ export class GroupStagingScripts {
     jobName,
     dropped = false,
     claimToken = "",
+    candidatesKey,
+    endsRetryChain = false,
   }: {
     groupId: string;
     stagedJobId: string;
     jobName?: string;
     /** The dispatch's token; without it the active key alone decides ownership, as before. */
     claimToken?: string;
+    /** The listed run's candidates the job was sent under; a group with more work rejoins it. */
+    candidatesKey?: string;
+    /** Clears the group's failure streak and retry-chain attempt with the slot, in one step. */
+    endsRetryChain?: boolean;
     /**
      * The slot is being freed because the job was DISCARDED, not processed
      * (#5538) — keeps the group advancing while withholding the completed
@@ -2357,9 +2410,11 @@ export class GroupStagingScripts {
     const statsKey = `${this.keyPrefix}stats:completed`;
     const errorKey = `${this.keyPrefix}group:${groupId}:error`;
 
+    // Only a key in this queue's slot: a cluster refuses a script whose keys span two.
+    const listedKeys = candidatesKey?.startsWith(this.keyPrefix) ? [candidatesKey] : [];
     const result = await completeScript.run(
       this.redis,
-      7,
+      9 + listedKeys.length,
       activeKey,
       jobsKey,
       readyKey,
@@ -2367,6 +2422,9 @@ export class GroupStagingScripts {
       statsKey,
       errorKey,
       this.claimedKey(groupId),
+      this.failStreakKey(groupId),
+      this.groupAttemptKey(groupId),
+      ...listedKeys,
       groupId,
       stagedJobId,
       jobName ?? "",
@@ -2375,6 +2433,7 @@ export class GroupStagingScripts {
       String(nowInstant().epochMilliseconds),
       dropped ? "1" : "",
       claimToken,
+      endsRetryChain ? "1" : "",
     );
 
     return result === 1;
@@ -2559,7 +2618,7 @@ export class GroupStagingScripts {
   }): Promise<boolean> {
     const activeKey = `${this.keyPrefix}group:${groupId}:active`;
     const totalPendingKey = `${this.keyPrefix}stats:total-pending`;
-    const attemptKey = `${this.keyPrefix}group:${groupId}:attempt`;
+    const attemptKey = this.groupAttemptKey(groupId);
     // TTL = backoff + 2s buffer so the key expires just after the job becomes eligible
     const retryTtlSec = Math.ceil(backoffMs / 1000) + 2;
 
@@ -2709,6 +2768,14 @@ export class GroupStagingScripts {
 
   private failStreakKey(groupId: string): string {
     return `${this.keyPrefix}group:${groupId}:failstreak`;
+  }
+
+  /**
+   * Per-group retry-chain counter: a re-staged sibling carries no `__attempt`
+   * of its own, so without this it would read as a fresh delivery.
+   */
+  groupAttemptKey(groupId: string): string {
+    return `${this.keyPrefix}group:${groupId}:attempt`;
   }
 
   /**
@@ -2925,6 +2992,32 @@ export class GroupStagingScripts {
     if (result.length < 2) return null;
     const score = Number(result[1]);
     return Number.isFinite(score) ? score : null;
+  }
+
+  /** The soonest candidate score after `afterMs` across listed runs' candidates, if any. */
+  async getEarliestCandidateScore({
+    candidatesKeys,
+    afterMs,
+  }: {
+    candidatesKeys: readonly string[];
+    afterMs: number;
+  }): Promise<number | null> {
+    const scores = await Promise.all(
+      candidatesKeys.map(async (key) => {
+        const result = await this.redis.zrangebyscore(
+          key,
+          `(${afterMs}`,
+          "+inf",
+          "WITHSCORES",
+          "LIMIT",
+          0,
+          1,
+        );
+        return result.length < 2 ? Number.NaN : Number(result[1]);
+      }),
+    );
+    const finite = scores.filter((score) => Number.isFinite(score));
+    return finite.length === 0 ? null : Math.min(...finite);
   }
 
   /**

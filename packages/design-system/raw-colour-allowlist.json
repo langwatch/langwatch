@@ -7,5 +7,9 @@
   "modules/trace/browser/src/ui/elements/icons/deep-seek.tsx": "DeepSeek trademark artwork.",
   "modules/trace/browser/src/model/explorer/ai/ai-brand-palette.ts": "Langy identity colours and faithful Claude, Gemini and OpenCode startup artwork.",
   "modules/trace/browser/src/behavior/use-konami-easter-egg.ts": "Fixed novelty artwork for the Konami easter egg.",
-  "modules/trace/browser/src/behavior/explorer/onboarding/data/sample-preview-traces.ts": "Sample trace payloads, not application styling."
+  "modules/trace/browser/src/behavior/explorer/onboarding/data/sample-preview-traces.ts": "Sample trace payloads, not application styling.",
+  "modules/analytics/browser/src/features/dashboards/templates/model/widget-code-parts.ts": "Widget source text that runs in the sandboxed widget frame, which has no design tokens; not application styling.",
+  "modules/analytics/browser/src/features/dashboards/catalogue/widgets/answer-quality-code.ts": "Widget source text that runs in the sandboxed widget frame, which has no design tokens; not application styling.",
+  "modules/analytics/browser/src/features/dashboards/catalogue/widgets/breaks-widgets-code.ts": "Widget source text that runs in the sandboxed widget frame, which has no design tokens; not application styling.",
+  "modules/analytics/browser/src/features/dashboards/catalogue/widgets/running-costs-code.ts": "Widget source text that runs in the sandboxed widget frame, which has no design tokens; not application styling."
 }

@@ -140,9 +140,80 @@ export const parseOnly = (value: string | undefined): Set<string> | undefined =>
   return new Set(parsed);
 };
 
-/** Round-robin over the sorted list, so every package lands on exactly one shard. */
-export const shardOf = <T>(items: readonly T[], shard: { index: number; total: number }): T[] =>
-  items.filter((_, position) => position % shard.total === shard.index - 1);
+/** Seconds a package costs when the weights file does not name it. */
+export const DEFAULT_WEIGHT_SECONDS = 5;
+
+/**
+ * Parses the weights file. A line is `<package>  <seconds>`, optionally followed
+ * by `# note`. A bad line is an error: one that silently parsed to nothing would
+ * put the split back to guessing.
+ */
+export const parseWeights = (
+  source: string,
+  file: string,
+): { weights: Map<string, number>; errors: string[] } => {
+  const weights = new Map<string, number>();
+  const errors: string[] = [];
+  source.split("\n").forEach((raw, index) => {
+    const line = (raw.includes("#") ? raw.slice(0, raw.indexOf("#")) : raw).trim();
+    if (line === "") return;
+    const match = /^(\S+)\s+(\d+(?:\.\d+)?)$/.exec(line);
+    const seconds = match ? Number(match[2]) : Number.NaN;
+    if (!match || !Number.isFinite(seconds) || seconds <= 0 || weights.has(match[1])) {
+      errors.push(
+        `::error file=${file},line=${index + 1}::'${line}' is not '<package>  <seconds>' with a positive number, once per package.`,
+      );
+      return;
+    }
+    weights.set(match[1], seconds);
+  });
+  return { weights, errors };
+};
+
+/**
+ * Splits `items` into `total` groups, heaviest first onto the lightest group.
+ * Every shard computes this alone, so ties break on name then lowest group:
+ * the answers must agree exactly or a package runs twice or not at all.
+ */
+export const balanceShards = <T extends { name: string }>({
+  items,
+  weightOf,
+  total,
+}: {
+  items: readonly T[];
+  weightOf: (item: T) => number;
+  total: number;
+}): T[][] => {
+  const loads = Array.from({ length: total }, () => 0);
+  const groupOf = new Map<string, number>();
+  const heaviestFirst = items
+    .map((item) => ({ item, weight: weightOf(item) }))
+    .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
+  for (const { item, weight } of heaviestFirst) {
+    const lightest = loads.indexOf(Math.min(...loads));
+    groupOf.set(item.name, lightest);
+    loads[lightest] += weight;
+  }
+  return loads.map((_, group) => items.filter((item) => groupOf.get(item.name) === group));
+};
+
+/** This shard's share of `items` under the weighted split. */
+export const shardOf = <T extends { name: string }>({
+  items,
+  weightOf,
+  shard,
+}: {
+  items: readonly T[];
+  weightOf: (item: T) => number;
+  shard: { index: number; total: number };
+}): T[] => balanceShards({ items, weightOf, total: shard.total })[shard.index - 1] ?? [];
+
+/** The slow packages of a run, in the weights file's own format, to paste back. */
+export const formatMeasured = (measured: { name: string; seconds: number }[]): string[] =>
+  measured
+    .filter((entry) => entry.seconds >= 20)
+    .toSorted((a, b) => b.seconds - a.seconds || (a.name < b.name ? -1 : 1))
+    .map((entry) => `${entry.name}  ${Math.round(entry.seconds)}`);
 
 /** Runs one package's scripts and reports the package's single verdict. */
 export const runPackage = (
@@ -266,28 +337,65 @@ if (isEntrypoint()) {
   // Narrowed after the stale-register check, which has to see every package.
   const reached = only ? discovered.filter((pkg) => only.has(pkg.name)) : discovered;
   if (only) console.log(`Affected by this change: ${reached.length} of ${discovered.length}.`);
-  const assigned = shardOf(reached, shard);
+  const weightsPath = join(root, ".github/package-suites.weights");
+  const parsedWeights = parseWeights(
+    existsSync(weightsPath) ? readFileSync(weightsPath, "utf8") : "",
+    ".github/package-suites.weights",
+  );
+  for (const error of parsedWeights.errors) console.error(error);
+  if (parsedWeights.errors.length > 0) process.exit(1);
+  const known = new Set(discovered.map((p) => p.name));
+  for (const name of parsedWeights.weights.keys()) {
+    if (!known.has(name)) {
+      console.log(`::warning::'${name}' has a weight but is not a workspace package.`);
+    }
+  }
+  // An excluded package runs nothing, so it adds nothing to a shard's time.
+  const weightOf = (pkg: DiscoveredPackage): number =>
+    excluded.has(pkg.name) ? 0 : (parsedWeights.weights.get(pkg.name) ?? DEFAULT_WEIGHT_SECONDS);
+  const assigned = shardOf({ items: reached, weightOf, shard });
+  const expected = assigned.reduce((sum, pkg) => sum + weightOf(pkg), 0);
   console.log(
-    `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages.`,
+    `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
+      `about ${Math.round(expected)}s of suites.`,
   );
   // Serial on purpose. Each suite is its own vitest with its own worker pool,
   // so several at once oversubscribe a 4-core runner and turn real results into
   // "[vitest-pool]: Worker forks emitted error" — which looks like a broken
   // test and is not one.
-  const outcomes = assigned.map((pkg) =>
-    runPackage(
+  const measured: { name: string; seconds: number }[] = [];
+  const outcomes = assigned.map((pkg) => {
+    const startedAt = Date.now();
+    const outcome = runPackage(
       pkg,
       excluded,
       (name, script) =>
         spawnSync("pnpm", ["--filter", name, "run", script], { stdio: "inherit" }).status ?? 1,
       (line) => console.log(line),
-    ),
-  );
+    );
+    if (outcome.outcome === "passed") {
+      measured.push({ name: pkg.name, seconds: (Date.now() - startedAt) / 1000 });
+    }
+    return outcome;
+  });
 
   const summary = summarise(outcomes);
   for (const line of summary) console.log(line);
   if (process.env.GITHUB_STEP_SUMMARY) {
-    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summary.join("\n")}\n`);
+    const times = formatMeasured(measured);
+    const refresh =
+      times.length === 0
+        ? []
+        : [
+            "",
+            "<details><summary>Measured seconds (weights file format)</summary>",
+            "",
+            "```",
+            ...times,
+            "```",
+            "</details>",
+          ];
+    appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${[...summary, ...refresh].join("\n")}\n`);
   }
 
   const failed = outcomes.filter((o) => o.outcome === "failed");

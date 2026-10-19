@@ -130,6 +130,10 @@
   "/:project/analytics/users",
   "/:project/analytics/custom",
   "/:project/analytics/custom/:id",
+  "/:project/dashboards",
+  "/:project/dashboards/templates",
+  "/:project/dashboards/curated/:templateId",
+  "/:project/dashboards/:dashboardId",
   "/:project/experiments",
   "/:project/experiments/workbench",
   "/:project/experiments/workbench/:slug",
@@ -183,6 +187,7 @@
   "/:project/automations/schedules",
   "/:project/datasets",
   "/:project/datasets/:id",
+  "/:project/insights",
   "/:project/online-evaluations",
   "/:project",
   "/:project/prompts"

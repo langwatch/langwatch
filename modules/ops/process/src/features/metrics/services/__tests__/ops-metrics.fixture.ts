@@ -108,6 +108,10 @@ export class OpsMetricsTestAdapter {
     return this.unavailable();
   }
 
+  listInsightSchedules(): never {
+    return this.unavailable();
+  }
+
   setScheduleActive(): never {
     return this.unavailable();
   }

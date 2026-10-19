@@ -350,7 +350,13 @@ export class SsoArrivalService {
     );
 
     void this.deps.signups
-      ?.announce({ userName: user.name, userEmail: user.email, organizationName: org.name })
+      ?.announceJoin({
+        userId: user.id,
+        userName: user.name,
+        userEmail: user.email,
+        organizationId: org.id,
+        organizationName: org.name,
+      })
       .catch((error: unknown) =>
         logger.error({ error, organizationId: org.id }, "the sign-up announcement was not posted"),
       );

@@ -69,8 +69,10 @@ import {
   isEnterpriseTier,
 } from "@langwatch/entitlement-contract";
 import type { EventingCommandSender, EventingParticipation } from "@langwatch/eventing";
+import { createLogger } from "@langwatch/observability";
 import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
+import { internalSlackSignupsWebhook } from "@langwatch/secrets";
 import { nowInstant, type Instant } from "@langwatch/time";
 import { UserApi } from "@langwatch/user-contract";
 import type { ZodError, ZodType } from "zod";
@@ -81,6 +83,7 @@ import {
   buildScimDirectoryPipeline,
   type ScimDirectoryDefinition,
 } from "../eventing/scim-directory.pipeline.ts";
+import type { ScimSyncSummary } from "../eventing/scim-sync-summary.process.ts";
 import { scimOperatorReads } from "../repositories/prisma/prisma.scim-sync-projection.repository.ts";
 import type { ScimRepositories } from "../repositories/scim.repositories.ts";
 import { newScimSyncCommandId } from "../rules/scim-sync-id.rules.ts";
@@ -104,6 +107,7 @@ import { ScimReconciliationService } from "../services/scim-reconciliation.servi
 import { ScimSyncGuardsService } from "../services/scim-sync-guards.service.ts";
 import { ScimSyncLifecycleService } from "../services/scim-sync-lifecycle.service.ts";
 import { ScimSyncReadsService } from "../services/scim-sync-reads.service.ts";
+import { ScimSyncSummaryService } from "../services/scim-sync-summary.service.ts";
 import { ScimTokenMintService } from "../services/scim-token-mint.service.ts";
 import type { ScimService } from "../services/scim.service.ts";
 
@@ -233,7 +237,11 @@ export class ScimModule implements ScimApiContract {
     auditLog: AuditLogApi,
   };
   static readonly config = scimConfig;
-  static readonly secrets = { ...scimSecrets, ...scimTokenPepperSecrets } as const;
+  static readonly secrets = {
+    ...scimSecrets,
+    ...scimTokenPepperSecrets,
+    internalSlackSignupsWebhook,
+  } as const;
   static readonly operatorReads: Readonly<Record<string, unknown>> = scimOperatorReads;
 
   readonly #scim: Pick<ScimService, keyof ScimService>;
@@ -251,6 +259,7 @@ export class ScimModule implements ScimApiContract {
   #requestDirectoryMove: ScimDirectoryMoveSender | undefined;
   #scimSyncLedger: ScimSyncLedgerWriterService | undefined;
   #costCenterFacts: ScimCostCenterFactsService | undefined;
+  #syncSummaries: ScimSyncSummaryService | undefined;
 
   private constructor(options: ScimAppOptions) {
     this.#scim = options.scim;
@@ -348,6 +357,12 @@ export class ScimModule implements ScimApiContract {
     });
     app.#scimSyncLedger = scimSyncLedger;
     app.#costCenterFacts = costCenterFacts;
+    app.#syncSummaries = ScimSyncSummaryService.create({
+      channel: channels.syncSummaries,
+      publicBaseUrl: config.publicBaseUrl,
+      directory: repositories.scim,
+      logger: createLogger("langwatch:scim:sync-summary"),
+    });
     return app;
   }
 
@@ -368,6 +383,11 @@ export class ScimModule implements ScimApiContract {
   /** scim_cost_center's senders: each member's cost center is recorded through them. */
   connectCostCenter(commands: ScimCostCenterSenders): void {
     this.#costCenterFacts?.connect(commands);
+  }
+
+  /** One directory push's summary card, posted by the worker once the push has gone quiet. */
+  async postSyncSummary(summary: ScimSyncSummary): Promise<void> {
+    await this.#syncSummaries?.post(summary);
   }
 
   /** scim-sync's senders: the directory-sync history stages each fact through them. */

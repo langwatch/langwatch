@@ -63,15 +63,10 @@ jobs:
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
       feature-parity: ${{ steps.detect.outputs.feature-parity }}
-      # Draft PRs get the fast, cheap signal only: lint, typecheck,
-      # feature-parity. The 10 test shards and the build are the runner budget,
-      # and on a draft they mostly re-run against work in progress.
-      #
-      # A PR labelled `ci:full` gets the full suite as a draft too.
-      # Everything heavy comes back on ready_for_review, and `merge_group`
-      # is never a draft — so nothing reaches main without the full suite
-      # having run on it.
-      heavy: ${{ github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
+      # Drafts and release-please PRs (rewritten on every merge) get lint, typecheck and
+      # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
+      # runs the full suite, so nothing lands without it.
+      heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
       # One shard each on a draft, because the draft run is affected-tests-only
       # and a subset does not need splitting.
       #
@@ -108,8 +103,8 @@ jobs:
       # healthy shard before the four-minute floor. At that measured rate,
       # eight shards put about 315 files and three minutes on each runner,
       # preserving the floor's intended minute of headroom.
-      unit-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
-      unit-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8' || '1' }}
+      unit-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3,4,5,6,7,8]' || '[1]' }}
+      unit-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '8' || '1' }}
       # Six became four when the component lane took the files that never
       # needed a datastore. 540 of the 1017 integration files declare jsdom and
       # name no database, queue or cache; they now run on `test-component`
@@ -129,7 +124,7 @@ jobs:
       # the shared lane runs ~4x faster per file, so 331 shared files and 146
       # mocking ones are close to balanced at 2+2 — the same four runners as
       # before, finishing sooner.
-      integration-matrix: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
+      integration-matrix: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[{"lane":"shared","shard":1,"count":2},{"lane":"shared","shard":2,"count":2},{"lane":"mocking","shard":1,"count":2},{"lane":"mocking","shard":2,"count":2}]' || '[{"lane":"shared","shard":1,"count":1},{"lane":"mocking","shard":1,"count":1}]' }}
       # The component lane is unit-shaped: forked VM workers and concurrent
       # files, with no service containers to wait on, so a shard gets through
       # its files far faster than a datastore shard does. (It does NOT share a
@@ -146,8 +141,8 @@ jobs:
       # outgrew its split, so the cost of being close to it is a confusing
       # failure rather than a slow pass. Every PR that adds a component test
       # spends that margin, so the split has to leave some.
-      component-shards: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3]' || '[1]' }}
-      component-shard-count: ${{ (github.event_name != 'pull_request' || github.event.pull_request.draft == false || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '3' || '1' }}
+      component-shards: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '[1,2,3]' || '[1]' }}
+      component-shard-count: ${{ (github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !startsWith(github.head_ref, 'release-please--')) || contains(github.event.pull_request.labels.*.name, 'ci:full')) && '3' || '1' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -310,6 +305,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 12
     env:
       # Flip to 'false' to observe the selection for a few weeks without
@@ -344,7 +343,19 @@ jobs:
 
       # The graph is derived, not source: it is rebuilt whenever the workspace
       # shape changes and is cheap to recompute, so a miss costs seconds.
+      # Main and same-repository pull requests save; a pull request keeps one copy.
+      - name: Restore the Nx project graph
+        if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .nx/workspace-data
+          key: ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-${{ github.sha }}
+          restore-keys: |
+            ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
+            ${{ runner.os }}-nx-graph-
+
       - name: Cache the Nx project graph
+        if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/workspace-data
@@ -352,6 +363,10 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-nx-graph-${{ hashFiles('pnpm-lock.yaml', 'nx.json') }}-
             ${{ runner.os }}-nx-graph-
+
+      - uses: ./.github/actions/prune-pr-caches
+        with:
+          prefix: ${{ runner.os }}-nx-graph-
 
       - name: Decide which applications this change reaches
         id: pick
@@ -466,6 +481,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     timeout-minutes: 30
     steps:
       - name: Checkout
@@ -478,9 +497,11 @@ jobs:
             !/docs/images/
           sparse-checkout-cone-mode: false
 
+      # The one job that saves the pnpm store (not on the critical path).
       - uses: ./.github/actions/setup-pnpm-node
         with:
           install: all
+          save-store: "true"
 
       - uses: ./.github/actions/prepare-generated-files
 
@@ -494,9 +515,10 @@ jobs:
       #
       # The restore key is pinned to the lockfile and the root compiler
       # options: a snapshot built against other dependency types is never
-      # restored. The source hashes beside it let the next step drop what changed.
-      - name: Cache TypeScript incremental build info
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      # restored. Saved below, once the typecheck has run; a pull request keeps one copy.
+      - name: Restore TypeScript incremental build info
+        id: tsbuildinfo
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           # One level per package: a `**` walks every node_modules symlink below
           # it, and the save then outlives the job's timeout.
@@ -550,7 +572,29 @@ jobs:
       # migration in flight tends to break several at once. The job still fails.
       # One pass: the step above leaves no stale declaration to re-check against.
       - name: Run typecheck (every workspace package)
+        id: typecheck
         run: pnpm run typecheck
+
+      # Saved even when the typecheck fails, so one red commit on main does not
+      # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a
+      # fix changes the package's sources, which drops it and its dependants.
+      - name: Save TypeScript incremental build info
+        if: ${{ !cancelled() && steps.tsbuildinfo.outputs.cache-hit != 'true' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') && ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            packages/*/dist
+            modules/*/*/dist
+            enterprise/modules/*/*/dist
+            apps/*/dist
+            node_modules/.cache/typecheck-dist
+          key: ${{ steps.tsbuildinfo.outputs.cache-primary-key }}
+
+      # After the save, so a run that fails before saving keeps the previous copy.
+      - uses: ./.github/actions/prune-pr-caches
+        if: ${{ !cancelled() && steps.typecheck.outcome != 'skipped' }}
+        with:
+          prefix: ${{ runner.os }}-pkg-dist-
 
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
@@ -705,8 +749,8 @@ jobs:
     # pool, and several at once on a 4-core runner produce "[vitest-pool]:
     # Worker forks emitted error", which reads as a broken test and is not one.
     # Parallel across legs: over two hundred package suites run one after
-    # another take well past two hours, so the list is split round-robin
-    # (PACKAGE_SUITES_SHARD) over separate runners.
+    # another take well past two hours, so the list is split by measured weight
+    # (PACKAGE_SUITES_SHARD, .github/package-suites.weights) over separate runners.
     strategy:
       fail-fast: false
       matrix:
@@ -782,6 +826,11 @@ jobs:
           CLICKHOUSE_PASSWORD: ci_password
         run: bash .github/scripts/start-clickhouse-with-storage-policy.sh
 
+      # Build only: the upgrade runs below without BUILD_TIME, which it reads as
+      # "no datastore here" (that made every package suite skip).
+      - name: Build workspace packages
+        run: pnpm run ensure:built
+
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
       - name: Run the upgrade (Postgres and ClickHouse migrations)
@@ -841,6 +890,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true'
     runs-on: ubuntu-latest
+    env:
+      # 0 turns off oxlint's local slot queue (patches/oxlint@1.85.0.patch). On a
+      # runner only this job uses, it parks the third process of `lint:types`.
+      LANGWATCH_LINT_SLOTS: "0"
     # Read-only. This job used to carry `pull-requests: write` so that a
     # reviewdog pass could post inline lint annotations through the Review
     # API. The Oxlint gate reports through the job's exit code and writes
@@ -1087,6 +1140,7 @@ jobs:
         uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: uv.lock
 
       - name: Regenerate the clients and the docs copy
@@ -1124,6 +1178,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     env:
       # Disable telemetry and optimize build for CI
       NEXT_TELEMETRY_DISABLED: 1

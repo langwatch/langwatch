@@ -4,15 +4,34 @@
  * row IS the widget, so the dashboard's list query already has it live.
  */
 
+import type { LangWatchQLAcceptedGranularityStep } from "@langwatch/analytics-contract";
 import type { ChartFrameDashboardContext } from "@langwatch/analytics-contract/chart-frame-protocol";
 import { dashboardWidgetDefinitionSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box, Text } from "@langwatch/design-system/primitives";
-import { useMemo } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { useAnalyticsPeriod } from "../../../../behavior/use-analytics-period.ts";
 import { useFrameDiagnostic } from "../../../../behavior/use-frame-diagnostic.ts";
+import { useWidgetQueryRecords } from "../../../../behavior/use-widget-query-records.ts";
+import { usePublishWidgetCompleteness } from "../../../../behavior/widget-completeness-sink.ts";
+import { useAnalyticsHost } from "../../../../model/analytics-host.ts";
 import { declaredParamDefaults } from "../../../../model/dashboard-widget/params-snapshot.ts";
+import { withheldWords } from "../../../../model/dashboard-widget/widget-access.ts";
+import {
+  type WidgetFace,
+  widgetFace,
+} from "../../../../model/dashboard-widget/widget-completeness.ts";
+import {
+  type WidgetExport,
+  widgetExportStatus,
+} from "../../../../model/dashboard-widget/widget-export.ts";
+import {
+  WidgetFailedFace,
+  WidgetNoAccessFace,
+  WidgetNoTrafficFace,
+  WidgetSetupFace,
+} from "../../../../ui/elements/widget-state-face.tsx";
 import { useDashboardRefreshedAt } from "../../../../ui/sections/use-dashboard-auto-refresh.ts";
 import { useDashboardWidgetChartNavigate } from "../../behavior/use-dashboard-widget-chart-navigate.ts";
 import { useDashboardWidgetExecutor } from "../../behavior/use-dashboard-widget-executor.ts";
@@ -33,19 +52,9 @@ export interface DashboardWidgetFrameProps {
   readonly widgetName?: string;
 }
 
-export function DashboardWidgetFrame({
-  id,
-  graph,
-  projectId,
-  projectSlug,
-  maxHeight,
-  dashboardId,
-  widgetName,
-}: DashboardWidgetFrameProps) {
-  const { colorMode } = useColorMode();
+/** A widget over the page's period selector, as the analytics dashboard draws it. */
+export function DashboardWidgetFrame(props: DashboardWidgetFrameProps) {
   const { period } = useAnalyticsPeriod();
-  const refreshedAt = useDashboardRefreshedAt();
-  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
 
   // Epoch milliseconds, not the `Instant` objects `useAnalyticsPeriod` hands
   // back: two `Instant`s for the same instant are never `Object.is`-equal, so a
@@ -59,17 +68,80 @@ export function DashboardWidgetFrame({
     [period.startDate, period.endDate],
   );
 
+  return <DashboardWidgetFrameOverWindow {...props} timeWindow={timeWindow} />;
+}
+
+/**
+ * A widget over a window its caller owns, such as a Dashboards board's period.
+ * `granularitySeconds`, when given, is the step the reserved parameters carry.
+ * What its queries report decides its face (features/dashboards/WIDGET_STANDARD.md).
+ */
+export function DashboardWidgetFrameOverWindow({
+  id,
+  graph,
+  projectId,
+  projectSlug,
+  maxHeight,
+  dashboardId,
+  widgetName,
+  timeWindow,
+  granularitySeconds,
+  excludeOrigins,
+  onAskLangyToSetUp,
+  onFaceChange,
+  onExportChange,
+}: DashboardWidgetFrameProps & {
+  readonly timeWindow: { start: number; end: number };
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the board leaves out of every query this widget runs. */
+  readonly excludeOrigins?: readonly string[];
+  /** Drafts the step that sends a field no trace carries; absent, the setup view has no button. */
+  readonly onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+  /** Told which face the frame draws, so the card offers only what that face allows. */
+  readonly onFaceChange?: (face: WidgetFace["kind"]) => void;
+  /** Handed what "Export CSV" would write now: the rows the widget's queries last returned. */
+  readonly onExportChange?: (widgetExport: WidgetExport) => void;
+}) {
+  const { colorMode } = useColorMode();
+  const refreshedAt = useDashboardRefreshedAt();
+  const onNavigate = useDashboardWidgetChartNavigate(projectSlug);
+
   // A row this build never wrote — an old shape, a hand-edited one — fails
   // safeParse and degrades to an empty file with no queries rather than
   // crashing the grid.
   const parsed = dashboardWidgetDefinitionSchema.safeParse(graph);
   const definition = parsed.success ? parsed.data : { code: "", queries: [] };
 
-  const { executeQuery, params: hostParams } = useDashboardWidgetExecutor(
+  const { executeQuery: runQuery, params: hostParams } = useDashboardWidgetExecutor(
     projectId,
     definition.queries,
-    { timeWindow },
+    {
+      timeWindow,
+      ...(granularitySeconds === void 0 ? {} : { granularitySeconds }),
+      ...(excludeOrigins ? { excludeOrigins } : {}),
+    },
   );
+  const { executeQuery, records, results, reset } = useWidgetQueryRecords({
+    executeQuery: runQuery,
+    timeWindow,
+  });
+  const face = useMemo(() => widgetFace(records), [records]);
+  usePublishWidgetCompleteness(face.kind === "chart" ? face.completeness : null);
+  useEffect(() => onFaceChange?.(face.kind), [onFaceChange, face.kind]);
+
+  const hasQueries = definition.queries.length > 0;
+  const widgetExport = useMemo(
+    () => ({ status: widgetExportStatus({ face: face.kind, hasQueries, results }), results }),
+    [face.kind, hasQueries, results],
+  );
+  useEffect(() => onExportChange?.(widgetExport), [onExportChange, widgetExport]);
+
+  // Retry starts the frame over, so every query of the widget runs again.
+  const [attempt, setAttempt] = useState(0);
+  const retry = useCallback(() => {
+    reset();
+    setAttempt((n) => n + 1);
+  }, [reset]);
 
   // Known host-side at this boundary; timezone reads the browser's own zone
   // the same way a widget's clock would. dashboardId/widgetName are optional
@@ -112,19 +184,72 @@ export function DashboardWidgetFrame({
     );
   }
 
+  const cover = faceInPlaceOfChart({
+    face,
+    name: widgetName ?? "this widget",
+    onRetry: retry,
+    onAskLangyToSetUp,
+  });
+
+  // The frame stays mounted under a face, so a new period can bring the chart back.
   return (
-    <Box position="relative">
-      <SandboxedChartFrame
-        key={id}
-        code={definition.code}
-        executeQuery={executeQuery}
-        dashboardContext={dashboardContext}
-        params={paramsSnapshot}
-        onLog={onLog}
-        onNavigate={onNavigate}
-        maxHeight={maxHeight}
-      />
+    <Box position="relative" height="full">
+      <Box visibility={cover ? "hidden" : "visible"} aria-hidden={cover ? true : undefined}>
+        <SandboxedChartFrame
+          key={`${id}:${attempt}`}
+          code={definition.code}
+          executeQuery={executeQuery}
+          dashboardContext={dashboardContext}
+          params={paramsSnapshot}
+          onLog={onLog}
+          onNavigate={onNavigate}
+          maxHeight={maxHeight}
+        />
+      </Box>
+      {cover && (
+        <Box position="absolute" inset={0} data-testid="widget-state-face">
+          {cover}
+        </Box>
+      )}
       <FrameDiagnosticBadge diagnostic={diagnostic} />
     </Box>
   );
+}
+
+/** The face drawn over the frame, or null when the widget's own code draws the card. */
+function faceInPlaceOfChart({
+  face,
+  name,
+  onRetry,
+  onAskLangyToSetUp,
+}: {
+  face: WidgetFace;
+  name: string;
+  onRetry: () => void;
+  onAskLangyToSetUp?: (missing: { field: string; label: string }) => void;
+}) {
+  switch (face.kind) {
+    case "no_access":
+      return <NoAccessFace missingGates={face.missingGates} />;
+    case "failed":
+      return <WidgetFailedFace name={name} message={face.error.message} onRetry={onRetry} />;
+    case "no_traffic":
+      return <WidgetNoTrafficFace unit={face.unit} />;
+    case "missing":
+      return (
+        <WidgetSetupFace
+          label={face.missing.label}
+          unit={face.unit}
+          onAskLangy={onAskLangyToSetUp && (() => onAskLangyToSetUp(face.missing))}
+        />
+      );
+    case "chart":
+      return null;
+  }
+}
+
+/** The no-access state in the words for the project the reader is in. */
+function NoAccessFace({ missingGates }: { missingGates: readonly string[] }) {
+  const projectName = useAnalyticsHost().project()?.name;
+  return <WidgetNoAccessFace {...withheldWords({ missingGates, projectName })} />;
 }

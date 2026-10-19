@@ -1,6 +1,5 @@
 import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
-import { MetricTabs } from "@langwatch/design-system/metric-tabs";
 import {
   Box,
   Button,
@@ -13,19 +12,13 @@ import {
 } from "@langwatch/design-system/primitives";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { ArrowUpRight, Plus } from "lucide-react";
-import { useMemo } from "react";
 import { BarChart2 } from "react-feather";
 
-import { useTopUsedDocuments } from "../../../behavior/use-analytics-documents.ts";
 import { useDashboards } from "../../../behavior/use-dashboards.ts";
-import { useFilterParams } from "../../../behavior/use-filter-params.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
 import { Link } from "../../../ui/elements/analytics-link.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
-import {
-  DocumentsCountsSummary,
-  DocumentsCountsTable,
-} from "../../../ui/sections/documents-counts-table.tsx";
+import { DocumentsMetrics } from "../../../ui/sections/documents-metrics.tsx";
 import { FilterSidebar } from "../../../ui/sections/filter-sidebar.tsx";
 import { LLMMetrics } from "../../../ui/sections/llm-metrics.tsx";
 import { UserMetrics } from "../../../ui/sections/user-metrics.tsx";
@@ -63,48 +56,6 @@ function AnalyticsContent() {
         <FilterSidebar hideTopics={true} />
       </HStack>
     </AnalyticsLayout>
-  );
-}
-
-/** The documents section has one metric, so there is no other tab to select. */
-function keepOnlyTab() {}
-
-function DocumentsMetrics() {
-  const { filterParams, queryOpts } = useFilterParams();
-  const params = useMemo(() => ({ filterParams, queryOpts }), [filterParams, queryOpts]);
-  const documents = useTopUsedDocuments(params);
-
-  const count = documents.data?.totalUniqueDocuments;
-
-  // A failed query says nothing about whether there are documents, so the section stays up
-  // and its panels show the error with a Retry.
-  if (!documents.error && (!count || count === 0)) {
-    return null;
-  }
-
-  return (
-    <>
-      <HStack width="full" align="top">
-        <Heading as="h2" size="sm" paddingTop={6} paddingBottom={2}>
-          Documents
-        </Heading>
-      </HStack>
-      <Card padding="lg">
-        <MetricTabs
-          value="total-documents"
-          onValueChange={keepOnlyTab}
-          label="Documents"
-          items={[
-            {
-              value: "total-documents",
-              label: "Total documents",
-              figure: <DocumentsCountsSummary params={params} />,
-              content: <DocumentsCountsTable params={params} />,
-            },
-          ]}
-        />
-      </Card>
-    </>
   );
 }
 

@@ -5,7 +5,12 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
-import { dashboardIdSchema, dashboardNameSchema, dashboardSchema } from "./dashboard.ts";
+import {
+  dashboardIdSchema,
+  dashboardNameSchema,
+  dashboardProjectSchema,
+  dashboardSchema,
+} from "./dashboard.ts";
 import { graphSchema } from "./graph.ts";
 
 /**
@@ -14,7 +19,7 @@ import { graphSchema } from "./graph.ts";
  * no `platformUrl`) — the tRPC client reads the same shape the service holds.
  */
 
-/** `getAll`: each dashboard, with the card count the grid renders. */
+/** `dashboards.getAll`: each Reports board, with the card count the grid renders. */
 const dashboardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardSchema.shape,
@@ -26,6 +31,18 @@ export interface DashboardTrpcSummarySchema extends Named<
 > {}
 export const dashboardTrpcSummarySchema: DashboardTrpcSummarySchema =
   dashboardTrpcSummarySchemaDefinition;
+
+/** `boards.getAll`: each Dashboards board, its widget count and the reader's star. */
+const boardTrpcSummarySchemaDefinition = z
+  .object({
+    ...dashboardTrpcSummarySchema.shape,
+    isStarred: z.boolean(),
+    /** The project that owns an Organization board listed in another project; null at home. */
+    ownerProject: dashboardProjectSchema.nullable(),
+  })
+  .strict();
+export interface BoardTrpcSummarySchema extends Named<typeof boardTrpcSummarySchemaDefinition> {}
+export const boardTrpcSummarySchema: BoardTrpcSummarySchema = boardTrpcSummarySchemaDefinition;
 
 /** `getById`: one dashboard with its graphs, in grid order. */
 const dashboardTrpcDetailSchemaDefinition = z

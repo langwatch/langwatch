@@ -13,6 +13,7 @@ import {
   cliRefreshTokenKey,
   cliUserTokensIndexKey,
 } from "@langwatch/auth-contract";
+import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { nowInstant } from "@langwatch/time";
 
 import type { CliDeviceSettlementChannel } from "../../../channels/cli-device-settlement.channel.ts";
@@ -40,6 +41,11 @@ import {
   type CliMintedSession,
   type CliRefreshTokenRecord,
 } from "../rules/cli-device-session.rules.ts";
+import {
+  CliDeviceRotationReplayService,
+  spentRefreshToken,
+  type CliRotationAnswer,
+} from "./cli-device-rotation-replay.service.ts";
 import { CliDeviceTokenRecordsService } from "./cli-device-token-records.service.ts";
 
 export {
@@ -69,18 +75,26 @@ export class CliDeviceSessionService {
      * default quarter.
      */
     refreshTokenTtlSeconds?: number | undefined;
+    /** Where a refresh token's one rotation is claimed and its pair shared, sealed at rest. */
+    rotations: SharedCredentialStore;
   }): CliDeviceSessionService {
     return new CliDeviceSessionService(
       options.store,
       options.refreshTokenTtlSeconds ?? DEFAULT_REFRESH_TOKEN_TTL_SECONDS,
-      options.settlements,
+      {
+        settlements: options.settlements,
+        rotationReplays: CliDeviceRotationReplayService.create({ rotations: options.rotations }),
+      },
     );
   }
 
   private constructor(
     private readonly store: CliDeviceSessionRepository,
     readonly refreshTokenTtlSeconds: number,
-    private readonly settlements: CliDeviceSettlementChannel,
+    private readonly peers: Readonly<{
+      settlements: CliDeviceSettlementChannel;
+      rotationReplays: CliDeviceRotationReplayService;
+    }>,
   ) {
     this.tokenRecords = CliDeviceTokenRecordsService.create({ store });
   }
@@ -197,21 +211,11 @@ export class CliDeviceSessionService {
     });
   }
 
-  /**
-   * Claims the one rotation a refresh token may buy, so two concurrent presentations of the same
-   * token cannot both mint a pair. The loser is refused as a spent token.
-   */
-  claimRotation(refreshToken: string): Promise<boolean> {
-    return this.store.setIfAbsent({
-      key: `lwcli:refresh-claim:${refreshToken}`,
-      value: "1",
-      ttlSeconds: EXCHANGE_CLAIM_SECONDS,
-    });
-  }
-
-  /** Releases a rotation claim that minted nothing, so the token can be presented again. */
-  releaseRotationClaim(refreshToken: string): Promise<void> {
-    return this.store.delete(`lwcli:refresh-claim:${refreshToken}`);
+  /** A refresh token's one rotation on every server; a retry in the window gets its pair. */
+  rotateOnce(
+    input: Parameters<CliDeviceRotationReplayService["rotateOnce"]>[0],
+  ): Promise<CliRotationAnswer> {
+    return this.peers.rotationReplays.rotateOnce(input);
   }
 
   /**
@@ -273,7 +277,7 @@ export class CliDeviceSessionService {
       key_selection: input.keySelection,
     };
     await this.rewriteDeviceCode(updated);
-    await this.settlements.publish({ deviceCode: input.deviceCode, status: "approved" });
+    await this.peers.settlements.publish({ deviceCode: input.deviceCode, status: "approved" });
 
     return { approved: true };
   }
@@ -292,7 +296,7 @@ export class CliDeviceSessionService {
     }
 
     await this.rewriteDeviceCode({ ...record, status: "denied" });
-    await this.settlements.publish({ deviceCode: record.device_code, status: "denied" });
+    await this.peers.settlements.publish({ deviceCode: record.device_code, status: "denied" });
   }
 
   /** Hears the next settlement of one device code; resolves once live, with its release. */
@@ -300,7 +304,7 @@ export class CliDeviceSessionService {
     deviceCode: string;
     onSettled: (status: string) => void;
   }): Promise<() => void> {
-    return this.settlements.listen(input);
+    return this.peers.settlements.listen(input);
   }
 
   /** Rewrites a device code in place, preserving what is left of its lifetime. */
@@ -393,15 +397,7 @@ export class CliDeviceSessionService {
       throw error;
     });
     const record = raw === undefined ? null : decodeCliSession<CliRefreshTokenRecord>(raw);
-    if (!record) {
-      throw new CliDeviceFlowRefusedError({
-        refusal: {
-          error: "invalid_grant",
-          error_description: "Refresh token is invalid or revoked",
-        },
-        httpStatus: 401,
-      });
-    }
+    if (!record) throw spentRefreshToken();
 
     return record;
   }

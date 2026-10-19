@@ -2,7 +2,7 @@
   "name": "@langwatch/sims",
   "version": "0.0.1",
   "private": true,
-  "description": "The simulators' consoles (llm, mail, idp, payment, storage, analytics, outbound, telemetry, voice, lambda): one multi-page React app built by Vite into services/sims/simconsole/dist, each page served by its own Go simulator (ADR-160).",
+  "description": "The simulators' consoles (llm, mail, idp, payment, storage, analytics, outbound, telemetry, voice, lambda, mcp): one multi-page React app built by Vite into services/sims/simconsole/dist, each page served by its own Go simulator (ADR-160).",
   "license": "MIT",
   "type": "module",
   "scripts": {

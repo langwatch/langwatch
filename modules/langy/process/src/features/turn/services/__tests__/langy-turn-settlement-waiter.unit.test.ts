@@ -44,6 +44,15 @@ const completedTurn = turn({
   EndedAt: 2,
 });
 
+const settledAnswer = {
+  succeeded: true,
+  outcome: "completed",
+  text: "from the projection",
+  messageId: "langymsg_turn-turn-1",
+  parts: [{ type: "text", text: "from the projection" }],
+  error: null,
+};
+
 const args = {
   langy: { findTurn: mockFindTurn },
   openBuffer: () => ({
@@ -77,14 +86,32 @@ describe("awaitTurnSettlement", () => {
 
     expect(settlement).toEqual({
       kind: "settled",
+      settlement: settledAnswer,
+    });
+    expect(mockDisconnect).toHaveBeenCalled();
+  });
+
+  /** @scenario "A settled turn answers its message id and parts" */
+  it("hands back the answer's message id and its parts beside its text", async () => {
+    mockFindTurn.mockResolvedValue([completedTurn]);
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
+    });
+
+    expect(settlement).toEqual({
+      kind: "settled",
       settlement: {
         succeeded: true,
         outcome: "completed",
         text: "from the projection",
+        messageId: "langymsg_turn-turn-1",
+        parts: [{ type: "text", text: "from the projection" }],
         error: null,
       },
     });
-    expect(mockDisconnect).toHaveBeenCalled();
   });
 
   /** @scenario "A wait is satisfied only by the turn this request started" */
@@ -232,12 +259,7 @@ describe("awaitTurnSettlement (user wait)", () => {
 
       expect(settlement).toEqual({
         kind: "settled",
-        settlement: {
-          succeeded: true,
-          outcome: "completed",
-          text: "from the projection",
-          error: null,
-        },
+        settlement: settledAnswer,
       });
     });
   });

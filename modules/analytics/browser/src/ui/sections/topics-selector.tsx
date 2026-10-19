@@ -15,6 +15,7 @@ import {
   toggleTopic,
   toListParam,
 } from "../../model/topic-selection.ts";
+import { ChartErrorState } from "../elements/chart-error-state.tsx";
 
 const TOPICS_NEXT: EmptyNext = [
   {
@@ -86,6 +87,13 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </Delayed>
+        )}
+        {topicCountsQuery.error && !topicData && (
+          <ChartErrorState
+            error={topicCountsQuery.error}
+            onRetry={() => void topicCountsQuery.refetch()}
+            fallbackTitle="Couldn't load topics"
+          />
         )}
         {!isLoadingTopics && topicData && topicCounts.length > 0 && (
           <>

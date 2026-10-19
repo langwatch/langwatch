@@ -28,6 +28,8 @@ export interface LangWatchQLVegaLiteChartProps {
   pinnedConfig: LangWatchQLVegaConfig;
   colorMode: LangWatchQLVegaColorMode;
   ariaLabel?: string;
+  /** Keeps the workbench's note under the chart for screen readers only, where no table is near. */
+  isResultNoteHidden?: boolean;
 }
 
 /**

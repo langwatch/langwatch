@@ -31,6 +31,7 @@ export default function CheckupScreen() {
 function CheckupSettings({ organizationId }: { organizationId: string }) {
   const host = useCheckupHost();
   const canManage = host.canManageOrganization();
+  const canManageInstall = host.canManageInstall();
   const screen = useCheckupScreen(organizationId);
   const { status, usageReport } = screen;
 
@@ -82,7 +83,7 @@ function CheckupSettings({ organizationId }: { organizationId: string }) {
       {report && report.deployment === "self-hosted" ? (
         <UsageReportSection
           report={report}
-          canManage={canManage}
+          canManage={canManageInstall}
           isSaving={screen.isSavingSwitches}
           onSwitch={(change) => screen.setSwitches.mutate({ organizationId, ...change })}
         />

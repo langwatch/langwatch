@@ -47,6 +47,14 @@ Feature: Upgrade alerts reach platform operators
       And its idempotency key names the wake and the recipient
 
     @unit
+    Scenario: The alert email links each failed step to its own page
+      Given a step failed and the runner's lease expired since the last wake
+      When the upgrade alert check runs
+      Then the email names the installation by its host
+      And each failed step carries its error, its release and a link that opens that step
+      And the stopped runner is named by its owner and host
+
+    @unit
     Scenario: Nothing is sent when nothing changed
       Given no step failed and no lease expired since the last wake
       When the upgrade alert check runs

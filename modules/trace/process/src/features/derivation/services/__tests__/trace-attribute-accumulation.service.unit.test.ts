@@ -25,6 +25,7 @@ describe("TraceAttributeAccumulationService", () => {
         outputSource: "test",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -39,6 +40,7 @@ describe("TraceAttributeAccumulationService", () => {
         outputSource: "test",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -50,6 +52,7 @@ describe("TraceAttributeAccumulationService", () => {
         outputSource: "test",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -80,6 +83,7 @@ describe("TraceAttributeAccumulationService", () => {
         outputSource: "test",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -94,6 +98,7 @@ describe("TraceAttributeAccumulationService", () => {
         outputSource: "test",
         inputIsFallback: false,
         outputIsFallback: false,
+        inputSpanStartTimeMs: null,
         inputMediaRefs: null,
         outputMediaRefs: null,
       });
@@ -121,6 +126,7 @@ describe("TraceAttributeAccumulationService", () => {
           outputSource: "test",
           inputIsFallback: false,
           outputIsFallback: false,
+          inputSpanStartTimeMs: null,
           inputMediaRefs: null,
           outputMediaRefs: null,
         });

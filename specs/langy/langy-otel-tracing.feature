@@ -161,6 +161,16 @@ Feature: Langy agent activity is traced into the user's project
     Then the customer's trace is complete
     And nothing about the turn reaches the prod Langy project
 
+  # A run reads one person's trace text with nobody watching (ADR-061 amendment 2026-10-12).
+  @unit
+  Scenario: A read-only run's model calls never reach the mirror
+    Given a customer organization at the default content tier
+    And a read-only run whose turn mirrors nothing, on the same Langy key a chat turn uses
+    When the gateway records the run's model calls
+    Then the customer's trace has the calls as Langy's
+    And nothing about them reaches the prod Langy project
+    And the worker cannot choose whether its calls are mirrored
+
   @unit
   Scenario: An install with no mirror sends model calls without the mirror's markers
     Given an install with no mirror project configured

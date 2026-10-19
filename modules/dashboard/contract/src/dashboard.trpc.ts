@@ -1,6 +1,6 @@
 /**
- * Every `dashboards.*` procedure, declared once: its name, its kind, what it
- * takes and what it answers.
+ * Every `dashboards.*` procedure, declared once: the Analytics Reports boards, which have no
+ * scope, and the Flight Deck's source presence. The Dashboards area's boards are `boards.*`.
  * Spec: modules/dashboard/specs/dashboard-service.feature.
  */
 import { defineTrpcContract } from "@langwatch/module";
@@ -12,9 +12,10 @@ import {
   dashboardTrpcRowSchema,
   dashboardTrpcSummarySchema,
 } from "./dashboard.responses.ts";
+import { dashboardSourcePresenceSchema } from "./dashboard.ts";
 
 const projectScopeSchema = z.object({ projectId: z.string() });
-const dashboardScopeSchema = z.object({
+const dashboardRefSchema = z.object({
   ...projectScopeSchema.shape,
   dashboardId: z.string(),
 });
@@ -30,7 +31,7 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withOutput(dashboardTrpcSummarySchema.array())
 
   .query("getById")
-  .withInput(dashboardScopeSchema)
+  .withInput(dashboardRefSchema)
   .withOutput(dashboardTrpcDetailSchema)
 
   .mutation("create")
@@ -38,14 +39,15 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .withOutput(dashboardTrpcRowSchema)
 
   .mutation("rename")
-  .withInput(z.object({ ...dashboardScopeSchema.shape, name: z.string() }))
+  .withInput(z.object({ ...dashboardRefSchema.shape, name: z.string() }))
   .withOutput(dashboardTrpcRowSchema)
 
-  /** Cascades to the dashboard's graphs. */
+  /** Cascades to the board's charts; the Dashboards area's boards and stars stay. */
   .mutation("delete")
-  .withInput(dashboardScopeSchema)
+  .withInput(dashboardRefSchema)
   .withOutput(dashboardTrpcRowSchema)
 
+  /** Legacy board ordering, kept for the Analytics reports section only. */
   .mutation("reorderDashboards")
   .withInput(z.object({ ...projectScopeSchema.shape, dashboardIds: z.array(z.string()) }))
   .withOutput(dashboardReorderResponseSchema)
@@ -54,4 +56,9 @@ export const dashboardTrpc = defineTrpcContract("dashboards")
   .query("getOrCreateFirst")
   .withInput(projectScopeSchema)
   .withOutput(dashboardTrpcRowSchema.nullable())
+
+  /** Per Flight Deck source, whether the project ever recorded a row. */
+  .query("sourcePresence")
+  .withInput(projectScopeSchema)
+  .withOutput(dashboardSourcePresenceSchema)
   .build();

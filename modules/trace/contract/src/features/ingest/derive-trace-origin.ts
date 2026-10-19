@@ -20,10 +20,15 @@ export function deriveTraceOrigin(attributes: Record<string, unknown> | undefine
 export const LANGY_TRACE_ORIGIN = "langy";
 
 /**
- * The origins the Explorer leaves out unless the query names `origin` itself:
- * Langy's turns are not the customer's traffic, so the list, the lenses and the
- * counts skip them, while the origin facet keeps offering the pick.
+ * The origins the Explorer leaves out unless the query names `origin`: Langy's
+ * turns are not the customer's traffic, but the origin facet keeps the pick. A
+ * personal project hides nothing: there they are the owner's own traffic.
  */
-export function explorerHiddenOrigins(query: string | null | undefined): string[] {
+export function explorerHiddenOrigins(
+  query: string | null | undefined,
+  { personalProject = false }: { personalProject?: boolean } = {},
+): string[] {
+  if (personalProject) return [];
+
   return queryNamesField(query ?? "", "origin") ? [] : [LANGY_TRACE_ORIGIN];
 }

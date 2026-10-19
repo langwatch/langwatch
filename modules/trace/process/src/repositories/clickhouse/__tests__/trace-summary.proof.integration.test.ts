@@ -142,6 +142,8 @@ function analyticsRow({
     labels: [],
     totalCost: 0.1,
     nonBilledCost: null,
+    unpricedSpanCount: 0,
+    unpricedModels: [],
     totalDurationMs: 100,
     timeToFirstTokenMs: null,
     tokensPerSecond: null,

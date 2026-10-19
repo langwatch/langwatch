@@ -7,7 +7,6 @@ import {
   analyticsServerConfig,
   type AnalyticsServerConfig,
   AnalyticsApi as AnalyticsApiToken,
-  CustomChartPlaygroundNotEnabledError,
   MAX_LWQL_LENGTH,
   type AnalyticsFeedbacksPageParams,
   type AnalyticsFeedbacksPageResult,
@@ -54,6 +53,7 @@ import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { NotFoundError, ValidationError } from "@langwatch/handled-error";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { OverloadedRefusal, StatementBoundTelemetry } from "@langwatch/process-stores";
 import { ProjectApi } from "@langwatch/project-contract";
@@ -74,6 +74,7 @@ import {
 } from "../features/hydration/services/langwatch-ql-hydration-read.service.ts";
 import { LangWatchQLHydrationService } from "../features/hydration/services/langwatch-ql-hydration.service.ts";
 import { LangWatchQLProductionProvisioningService } from "../features/provisioning/services/langwatch-ql-production-provisioning.service.ts";
+import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { AnalyticsRecencyRepository } from "../repositories/analytics-recency.repository.ts";
 import type {
   AnalyticsRepositories,
@@ -95,11 +96,11 @@ import { savedWorkbenchChartPlatformUrl as savedWorkbenchChartPlatformUrl_ } fro
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import { langWatchQLJudgementCalls } from "../rules/langwatch-ql-judgement-questions.rules.ts";
 import { DEFAULT_LWQL_RESULT_LIMITS } from "../rules/langwatch-ql-result-limits.rules.ts";
-import { instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
+import { dashboardsEnabled, instantEvalsEnabled, lwqlEnabled } from "../rules/lwql-access.rules.ts";
 import { buildQueryReference } from "../rules/query-reference.rules.ts";
 import { LoggingAnalyticsTripwireService } from "../services/analytics-tripwire.service.ts";
 import { AnalyticsService as AnalyticsServiceClass } from "../services/analytics.service.ts";
-import { CustomChartPlaygroundAccessService } from "../services/custom-chart-playground-access.service.ts";
+import { DashboardWidgetAccessService } from "../services/dashboard-widget-access.service.ts";
 import { FilterService } from "../services/filter.service.ts";
 import { LangWatchQLBoundsService } from "../services/langwatch-ql-bounds.service.ts";
 import {
@@ -120,6 +121,8 @@ import { WorkbenchProtectionsService } from "../services/workbench-protections.s
 import {
   convergeLwqlAccessModel,
   fillLwqlProjectKeys,
+  findLwqlAppOwnedDrift,
+  type LwqlConvergencePlan,
   type LwqlProjectKeyFillReport,
 } from "../tasks/lwql-provision.task.ts";
 import type {
@@ -218,12 +221,20 @@ type AnalyticsDependencies = Readonly<{
 type LwqlProvisioningOperations = Readonly<{
   probeOwner: () => Promise<LwqlAccessModelOwner>;
   converge: () => Promise<void>;
+  findAppOwnedDrift: () => Promise<LwqlAppOwnedDrift>;
+  convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
   fillProjectKeys: (input: { dryRun: boolean }) => Promise<LwqlProjectKeyFillReport>;
 }>;
+
+const NO_DRIFT: LwqlAppOwnedDrift = { clickHouse: [], postgres: [], isKeyMapMissing: false };
+
+const lwqlLogger = createLogger("langwatch:analytics:lwql:provisioning");
 
 const LWQL_UNAVAILABLE: LwqlProvisioningOperations = {
   probeOwner: () => Promise.resolve("none"),
   converge: () => Promise.resolve(),
+  findAppOwnedDrift: () => Promise.resolve(NO_DRIFT),
+  convergeAppOwned: () => Promise.resolve(),
   fillProjectKeys: () => Promise.resolve({ inserted: 0, blankKeys: 0 }),
 };
 
@@ -248,37 +259,49 @@ function lwqlProvisioningOperations({
   const names = LangWatchQLProductionProvisioningService.create().names({ connection });
   const openRepository = () =>
     ClickHouseLangWatchQLProvisioningRepository.create({ statements: admin.statements });
-  return {
+  const plan = (postgresReaderPassword: string): LwqlConvergencePlan => ({
+    request: {
+      requested: true,
+      complete: true,
+      connection,
+      postgresReaderPassword,
+      endpoint: {
+        host: settings.postgresHost || postgres.host,
+        port: postgres.port,
+        database: postgres.database,
+      },
+    },
+    names,
+    sourceDatabase: () => admin.target.database,
+    schema: postgres.schema,
+    ...(postgres.connectionLimit === undefined
+      ? {}
+      : { connectionLimit: postgres.connectionLimit }),
+    settings: {
+      LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
+      LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
+    },
+    openRepository,
+  });
+  const operations: LwqlProvisioningOperations = {
     probeOwner: () => openRepository().probeOwner({ names }),
     converge: async () => {
-      // Main arms the watch only in SQL mode; a config store owns the rest.
+      // SQL mode only: in rendered mode a config store owns the access entities.
       if (settings.accessModelMode !== "sql" || readerPassword === undefined) return;
+      await convergeLwqlAccessModel({ database: database(), plan: plan(readerPassword) });
+    },
+    // Rendered mode only: SQL mode keeps its owner-probe re-provision, unchanged.
+    findAppOwnedDrift: async () => {
+      if (settings.accessModelMode === "sql" || readerPassword === undefined) return NO_DRIFT;
+      return findLwqlAppOwnedDrift({ database: database(), plan: plan(readerPassword) });
+    },
+    convergeAppOwned: async (drift) => {
+      if (settings.accessModelMode === "sql" || readerPassword === undefined) return;
       await convergeLwqlAccessModel({
         database: database(),
-        plan: {
-          request: {
-            requested: true,
-            complete: true,
-            connection,
-            postgresReaderPassword: readerPassword,
-            endpoint: {
-              host: settings.postgresHost || postgres.host,
-              port: postgres.port,
-              database: postgres.database,
-            },
-          },
-          names,
-          sourceDatabase: () => admin.target.database,
-          schema: postgres.schema,
-          ...(postgres.connectionLimit === undefined
-            ? {}
-            : { connectionLimit: postgres.connectionLimit }),
-          settings: {
-            LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
-            LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
-          },
-          openRepository,
-        },
+        plan: plan(readerPassword),
+        failOnError: true,
+        only: drift,
       });
     },
     fillProjectKeys: ({ dryRun }) =>
@@ -289,6 +312,30 @@ function lwqlProvisioningOperations({
         sourceDatabase: admin.target.database,
         dryRun,
       }),
+  };
+  return readerPassword === undefined ? warningCheckOff(operations) : operations;
+}
+
+/** Without the reader password the check is off; said once, where a check runs, not on the api. */
+function warningCheckOff(operations: LwqlProvisioningOperations): LwqlProvisioningOperations {
+  let warned = false;
+  const warn = (): void => {
+    if (warned) return;
+    warned = true;
+    lwqlLogger.warn(
+      "LWQL_POSTGRES_READER_PASSWORD is not set, so the LangWatchQL reconvergence check is off on this worker",
+    );
+  };
+  return {
+    ...operations,
+    converge: () => {
+      warn();
+      return operations.converge();
+    },
+    findAppOwnedDrift: () => {
+      warn();
+      return operations.findAppOwnedDrift();
+    },
   };
 }
 
@@ -471,7 +518,7 @@ export class AnalyticsModule
 
   #dependencies: AnalyticsAppDependencies;
   #publicBaseUrl: string | undefined;
-  #playgroundAccess: CustomChartPlaygroundAccessService;
+  #widgetAccess: DashboardWidgetAccessService;
   #hydration: LangWatchQLHydrationService;
   #queryScope: LangWatchQLQueryScopeService;
   #protections: WorkbenchProtectionsService;
@@ -486,7 +533,7 @@ export class AnalyticsModule
       protections: this.#protections,
     });
     this.#publicBaseUrl = publicBaseUrl;
-    this.#playgroundAccess = CustomChartPlaygroundAccessService.create(dependencies);
+    this.#widgetAccess = DashboardWidgetAccessService.create(dependencies);
     this.#hydration = dependencies.hydration;
   }
 
@@ -498,6 +545,16 @@ export class AnalyticsModule
   /** Re-provisions the access model once a config store released it (SQL mode only). */
   convergeLwqlAccessModel(): Promise<void> {
     return this.#dependencies.lwqlProvisioning.converge();
+  }
+
+  /** What rendered mode's app-owned objects lack now, from catalog reads; empty in SQL mode. */
+  findLwqlAppOwnedDrift(): Promise<LwqlAppOwnedDrift> {
+    return this.#dependencies.lwqlProvisioning.findAppOwnedDrift();
+  }
+
+  /** Converges the halves the drift names, never the config store's entities; throws on failure. */
+  convergeLwqlAppOwnedObjects(drift: LwqlAppOwnedDrift): Promise<void> {
+    return this.#dependencies.lwqlProvisioning.convergeAppOwned(drift);
   }
 
   /** The `analytics:fill-lwql-project-keys` step's body: each project's missing key-map row. */
@@ -579,6 +636,7 @@ export class AnalyticsModule
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
+    readonly excludeOrigins?: readonly string[];
   }): Promise<Instant[]> {
     return this.#dependencies.recency.findLastOccurredAt(input);
   }
@@ -858,6 +916,15 @@ export class AnalyticsModule
     });
   }
 
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean> {
+    return dashboardsEnabled({
+      featureFlags: this.#dependencies.featureFlags,
+      projectId: input.projectId,
+      projects: this.#dependencies.projects,
+    });
+  }
+
   /** What one signed-in member may see of a project's content and spend. */
   resolveProtections(input: {
     userId: string;
@@ -943,9 +1010,7 @@ export class AnalyticsModule
    * This must be implemented on the bound app so refusal returns the domain 403
    * instead of the feature-api proxy's “not callable” error.
    */
-  async assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void> {
-    const enabled = await this.#playgroundAccess.isEnabled(input);
-
-    if (!enabled) throw new CustomChartPlaygroundNotEnabledError();
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void> {
+    return this.#widgetAccess.assertEnabled(input);
   }
 }

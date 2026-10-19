@@ -1335,6 +1335,8 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Lambda
 	case domain.GithubService:
 		return opts.Selection.Github
+	case domain.McpService:
+		return opts.Selection.Mcp
 	default:
 		return true
 	}

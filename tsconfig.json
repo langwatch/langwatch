@@ -797,6 +797,15 @@
     },
     {
       "path": "./modules/ops/client"
+    },
+    {
+      "path": "./modules/insight/contract"
+    },
+    {
+      "path": "./modules/insight/browser"
+    },
+    {
+      "path": "./modules/insight/process"
     }
   ]
 }

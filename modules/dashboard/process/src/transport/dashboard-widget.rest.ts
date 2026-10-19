@@ -1,4 +1,5 @@
 import type { DashboardWidget } from "@langwatch/analytics-contract";
+import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 /**
  * Dashboard widgets under `/api/v1/projects/:projectId/analytics/dashboard-widgets`,
  * the `CustomGraph`-playground twin of saved-workbench-chart. This feature owns the
@@ -25,12 +26,20 @@ import {
 } from "@langwatch/dashboard-contract";
 import { z } from "zod";
 
+import { viewerOfActor } from "../rules/dashboard-viewer.rules.ts";
+
 /**
  * The deep link back into the dashboards page for the project this credential
  * resolved. Middleware context, because the deployment's own origin is the process's
  * answer and not a module's — the same reasoning as `savedWorkbenchChartUrl`.
  */
 export const dashboardWidgetUrl = defineMiddlewareContext("dashboardWidgetUrl", z.string());
+
+/** The source a widget created through this API records when its body names none. */
+export const dashboardWidgetCallerSource = defineMiddlewareContext(
+  "dashboardWidgetCallerSource",
+  dashboardWidgetSourceSchema,
+);
 
 /** The tags every operation in this file carries in the published document. */
 const WIDGET_TAGS = ["Analytics / LangWatchQL"];
@@ -97,9 +106,9 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The project's dashboard widgets" },
     },
   })
-  .handle(async ({ app, scope }, platformUrl) => {
+  .handle(async ({ app, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const widgets = await app.listDashboardWidgets({ projectId });
+    const widgets = await app.listDashboardWidgets({ projectId, ...viewerOfActor({ actor }) });
 
     return { data: widgets.map((widget) => widgetResource(widget, platformUrl)) };
   })
@@ -113,26 +122,29 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withParams(dashboardWidgetProjectParamsSchema)
   .withInput(createDashboardWidgetSchema)
   .withPermission("analytics:create")
-  .withMiddlewareContext(dashboardWidgetUrl)
+  .withMiddlewareContext(dashboardWidgetUrl, dashboardWidgetCallerSource)
   .withOutput(dashboardWidgetResourceSchema)
   .withStatus(201)
   .withDocs({
     summary: "Create a dashboard widget",
     description:
-      "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
+      "Saves a React source file and the named LangWatchQL queries it runs as one dashboard widget, with an optional description the card shows behind its info icon and an optional prompt Langy is drafted with when asked about it. `source` records where the widget came from; without it, the widget is recorded as made through the API. The queries' shape is validated against the widget schema; their SQL is governed at run time by LW.query inside the sandbox, not at save.",
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
       201: { description: "The widget was saved" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope }, platformUrl, callerSource) => {
     const projectId = scope.id;
     const widget = await app.createDashboardWidget({
       projectId,
       name: input.name,
       code: input.code,
       queries: input.queries,
+      ...(input.description === undefined ? {} : { description: input.description }),
+      ...(input.prompt === undefined ? {} : { prompt: input.prompt }),
+      source: input.source ?? callerSource,
     });
 
     return widgetResource(widget, platformUrl);
@@ -158,9 +170,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The dashboard widget" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const widget = await app.getDashboardWidget({ id: input.widgetId, projectId });
+    const widget = await app.getDashboardWidget({
+      id: input.widgetId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
 
     return widgetResource(widget, platformUrl);
   })
@@ -179,7 +195,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withDocs({
     summary: "Update a dashboard widget",
     description:
-      "Replaces a dashboard widget's name, its { code, queries } definition, or both. code and queries are rewritten together — the graph blob holds them as one — so a request that offers one without the other, or neither field at all, is refused.",
+      "Changes a dashboard widget's name, code, queries, description or source. A field the body leaves out keeps its stored value, so code alone keeps the queries and the source is kept unless the body names one. A body with none of these fields is refused.",
     tags: WIDGET_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -187,15 +203,18 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The updated widget" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
-    const { name, code, queries } = input;
+    const { name, code, queries, description, source } = input;
     const widget = await app.updateDashboardWidget({
       id: input.widgetId,
       projectId,
+      ...viewerOfActor({ actor }),
       ...(name === undefined ? {} : { name }),
       ...(code === undefined ? {} : { code }),
       ...(queries === undefined ? {} : { queries }),
+      ...(description === undefined ? {} : { description }),
+      ...(source === undefined ? {} : { source }),
     });
 
     return widgetResource(widget, platformUrl);
@@ -223,12 +242,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       200: { description: "The widget was added to the dashboard" },
     },
   })
-  .handle(async ({ app, input, scope }, platformUrl) => {
+  .handle(async ({ app, input, scope, actor }, platformUrl) => {
     const projectId = scope.id;
     const widget = await app.assignDashboardWidgetToDashboard({
       id: input.widgetId,
       projectId,
       dashboardId: input.dashboardId,
+      ...viewerOfActor({ actor }),
     });
 
     return widgetResource(widget, platformUrl);
@@ -254,9 +274,13 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       204: { description: "The widget was deleted", content: {} },
     },
   })
-  .handle(async ({ app, input, scope }) => {
+  .handle(async ({ app, input, scope, actor }) => {
     const projectId = scope.id;
 
-    await app.deleteDashboardWidget({ id: input.widgetId, projectId });
+    await app.deleteDashboardWidget({
+      id: input.widgetId,
+      projectId,
+      ...viewerOfActor({ actor }),
+    });
   })
   .build();

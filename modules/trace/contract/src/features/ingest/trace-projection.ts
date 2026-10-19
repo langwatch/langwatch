@@ -72,6 +72,11 @@ const traceSummaryDataSchemaDefinition = z.object({
   // folded before the column existed; the read layer falls back to the legacy
   // trace-level boolean for those.
   nonBilledCost: z.number().nullable(),
+  // Spans whose model no price rule covers, and those models, sorted: their zero cost is
+  // unknown, not free. Absent on a state folded before they were recorded, which reads as
+  // "not known" rather than "fully priced".
+  unpricedSpanCount: z.number().optional(),
+  unpricedModels: z.array(z.string()).optional(),
   tokensEstimated: z.boolean(),
   totalPromptTokenCount: z.number().nullable(),
   totalCompletionTokenCount: z.number().nullable(),

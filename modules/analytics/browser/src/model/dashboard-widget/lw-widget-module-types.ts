@@ -106,6 +106,13 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     projectionFrom?: string | number;
     colors?: readonly string[];
     height?: number;
+    /** How the hover prints a value. */
+    format?: MetricFormat;
+    /**
+     * What the hover says over a bucket with no data, from its date. Default "No data on Oct 7".
+     * A null value is a gap: the area breaks and a faint dashed line bridges it.
+     */
+    gapLabel?: (date: string) => string;
   }
   export interface StackedBarsProps {
     data: readonly Row[];
@@ -147,6 +154,8 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     format?: MetricFormat;
     height?: number;
     navigateTo?: { target: string; params: (row: Row) => object };
+    /** \`completeness.unpriced\`: each model gets a "no price" row with a dash, never $0. */
+    unpriced?: { models: readonly string[] };
   }
   export interface HeatmapProps {
     data: readonly Row[];
@@ -156,7 +165,17 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     xLabels?: readonly string[];
     yLabels?: readonly string[];
     colorScale?: [string, string];
+    /** "count": a cell with no row is 0. "measure" (default): it is a gap, drawn empty. */
+    kind?: SeriesKind;
     height?: number;
+  }
+  /** A count may be a real 0; a measure (rate, average, percentile) with no data is a gap. */
+  export type SeriesKind = "count" | "measure";
+  /** A series key, or a key with its kind. A bare key is a measure, the safe default. */
+  export type SeriesSpec = string | { key: string; kind?: SeriesKind };
+  export interface CompletenessBucket {
+    start: string;
+    n: number;
   }
   export type LwqlChartKind = "area" | "bars" | "donut" | "leaderboard" | "table";
   export interface LwqlChartProps {
@@ -167,6 +186,21 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
     series?: string;
     colors?: readonly string[];
     height?: number;
+    /** \`completeness.unpriced\`: a leaderboard lists each model with "no price". */
+    unpriced?: { models: readonly string[] };
+  }
+  /** A query's completeness report, as \`LW.useChartQuery\` returns it. */
+  export interface CompletenessReport {
+    readonly state: "complete" | "partial" | "missing" | "no_traffic";
+    readonly unit: string;
+    readonly total: number;
+    readonly fields: readonly {
+      readonly field: string;
+      readonly label: string;
+      readonly present: number;
+    }[];
+    readonly buckets?: readonly CompletenessBucket[];
+    readonly unpriced?: { readonly count: number; readonly models: readonly string[] };
   }
 
   export const Sparkline: Chart<SparklineProps>;
@@ -181,6 +215,36 @@ const CHARTS_DTS = `declare module "@langwatch/charts" {
   export const LwqlChart: Chart<LwqlChartProps>;
   export function parseHexRgb(hex: string): [number, number, number] | null;
   export function interpolateColor(from: string, to: string, t: number): string;
+  /** A value as a number, or null when it is missing (null, undefined, NaN, ""). */
+  export function toNumber(value: unknown): number | null;
+  /**
+   * The rows with every bucket of \`completeness.buckets\` present, in time order: a bucket with
+   * no row gets one, its count series 0 and its measure series null (a gap in the line).
+   */
+  export function mergeBuckets(input: {
+    rows: readonly Row[];
+    buckets: readonly CompletenessBucket[] | null | undefined;
+    x: string;
+    series?: readonly SeriesSpec[];
+  }): Row[];
+  /**
+   * Whether a sum over \`field\` is a lower bound, so its figure reads "$830+": the report is
+   * partial and some rows lack the field, or the field is a cost and some traces have no price.
+   * Never on an average or a rate.
+   */
+  export function isLowerBound(input: {
+    completeness: CompletenessReport | null | undefined;
+    field: string;
+  }): boolean;
+  /**
+   * The mean of \`key\` over the rows that have it, so an empty bucket never pulls a big number
+   * down; with \`weight\` (a row count column) each row counts by it. Null when none has a value.
+   */
+  export function averageOf(input: {
+    rows: readonly Row[];
+    key: string;
+    weight?: string;
+  }): number | null;
 }`;
 
 /**

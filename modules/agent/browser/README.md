@@ -37,7 +37,7 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
 - Lends: `HttpConfigEditorToken`.
 - Host APIs it requires: `AgentManagementHostApi`.
 

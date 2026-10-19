@@ -3543,7 +3543,9 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -7403,8 +7405,10 @@ langwatch chart run <chart-id> \
 
 ## Step 4: Place it on a dashboard
 
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+
 ```bash
-langwatch dashboard list -f json          # find or create the target
+langwatch dashboard list -f json          # the options for that question
 langwatch chart place <chart-id> --dashboard-id <dashboard-id> -f json
 ```
 
@@ -7422,7 +7426,6 @@ langwatch chart delete <chart-id>
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `saved_workbench_charts_disabled_for_playground` — the custom-chart-playground is enabled for this project, which turns `chart` commands off; do not retry any `chart` command. Use the `dashboard-widgets` skill / `langwatch dashboard-widget` commands instead.
 - A save that succeeds but a run that fails naming a column — the SQL names one that does not exist; re-read the schema (Step 1) and fix the column, then update the chart.
 - `saved_workbench_chart_specification_refused` — the Vega-Lite specification breaks the chart policy; simplify it (one `query_result` data source, fields matching the SQL columns).
 - `saved_workbench_chart_dashboard_not_found` — the dashboard id is not in this project; list dashboards again.
@@ -7583,7 +7586,7 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
@@ -7606,10 +7609,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
+
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
@@ -7677,7 +7683,7 @@ langwatch dashboard-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.

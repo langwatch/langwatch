@@ -10,6 +10,7 @@ import {
 } from "@langwatch/langy-contract";
 
 import type { LangyTokenBufferRepository } from "../../../repositories/langy-token-buffer.repository.ts";
+import { turnMessageId } from "../../../rules/langy-conversation-shape.rules.ts";
 
 /** The turn-state projection, read for a caller who may see the conversation. */
 export type LangyTurnSettlementReader = {
@@ -64,6 +65,8 @@ export class LangyTurnSettlementWaiterService {
           succeeded: true,
           outcome: turn.Status,
           text: extractLangyTextFromParts(turn.AnswerParts),
+          messageId: turnMessageId(turn.TurnId),
+          parts: turn.AnswerParts,
           error: null,
         };
       }

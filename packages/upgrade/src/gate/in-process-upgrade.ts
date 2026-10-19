@@ -233,6 +233,7 @@ async function runWhole({
   openPublisher = () => null,
   signal = new AbortController().signal,
   run = runImageUpgrade,
+  admitAtBlockingDone,
   onBlockingDone,
 }: InProcessUpgradeInput & { onBlockingDone: () => void }): Promise<UpgradeRunResult> {
   const pool = new pg.Pool(runnerPoolConfig({ databaseUrl }));
@@ -247,7 +248,12 @@ async function runWhole({
           development,
           steps: modules.migrationSteps(isDeclaredMigrationStep),
           upcasts: upcastStepsOf({ app: modules }),
-          reconcilers: [langWatchQlReconciler({ environment }), passRequestReconciler({ modules })],
+          // A run-once upgrade has no worker beside it to take the pass request; the next
+          // serving worker's own run sends it, and the hourly re-drive backs that up.
+          reconcilers: [
+            langWatchQlReconciler({ environment }),
+            ...(admitAtBlockingDone ? [passRequestReconciler({ modules })] : []),
+          ],
           onBlockingDone,
           ...(publisher ? { publish: publisher.publish } : {}),
         },

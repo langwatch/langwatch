@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:15`.
+`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -124,7 +124,7 @@ isOperator(input: { userId: string }): Promise<boolean>;
 
 #### `findByEmail`
 
-The account an address belongs to, ignoring case; the exact address wins over case-twins.
+The account holding an address, matched on its stored lower-cased form, however typed.
 
 ```typescript
 findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
@@ -449,7 +449,7 @@ Contract `../contract/src/user.trpc.ts:39`, router `src/transport/user.trpc.ts:3
 ```typescript
 // user.getAvatarUrl
 type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:32
-// Output: userAvatarUrlSchema, ../contract/src/user.ts:382
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:383
 interface Output {
   url: string;
 }
@@ -457,7 +457,7 @@ interface Output {
 // user.getTraceExplorerTourPreference
 // Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:18
 type Input = Record<string, unknown>;
-// Output: userTourPreferenceSchema, ../contract/src/user.ts:273
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:274
 interface Output {
   dismissed: boolean;
   dismissedAt: unknown | null;
@@ -465,14 +465,14 @@ interface Output {
 
 // user.dismissTraceExplorerTour
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:273
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:274
 
 // user.getNotificationPreference
 // Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:28
 interface Input {
   topic: "langy";
 }
-// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:298
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:299
 interface Output {
   topic: "langy";
   choice: "enabled" | "declined" | null;
@@ -484,7 +484,7 @@ interface Input {
   topic: "langy";
   choice: "enabled" | "declined";
 }
-type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:298
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:299
 
 // user.isAdmin
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
@@ -498,14 +498,14 @@ type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.sc
 
 // user.getSsoStatus
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSsoStatusSchema, ../contract/src/user.ts:260
+// Output: userSsoStatusSchema, ../contract/src/user.ts:261
 interface Output {
   pendingSsoSetup: boolean;
 }
 
 // user.getAccountInfo
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userAccountInfoSchema, ../contract/src/user.ts:255
+// Output: userAccountInfoSchema, ../contract/src/user.ts:256
 interface Output {
   createdAt: unknown;
 }
@@ -521,7 +521,7 @@ type Output = {
 
 // user.secureAccountNudge
 type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:510
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:511
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -566,7 +566,7 @@ interface Input {
   organizationId: string;
   imageDataUrl: string;
 }
-// Output: userAvatarResultSchema, ../contract/src/user.ts:376
+// Output: userAvatarResultSchema, ../contract/src/user.ts:377
 interface Output {
   image: string;
 }

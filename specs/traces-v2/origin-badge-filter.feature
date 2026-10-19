@@ -65,6 +65,14 @@ Rule: Langy's own turns stay out of the explorer until the origin is asked for
     Then the origin facet counts the "langy" origin
     And its row reads "Langy"
 
+  # A personal ("Me") project is its owner's own workspace, where Langy's turns
+  # are their own traffic, so nothing is hidden there.
+  @unit
+  Scenario: A personal project shows Langy's turns
+    Given the person's own personal project with Langy's turns in it
+    When the explorer reads the list or the facet counts with no origin term
+    Then no origin is hidden
+
   @unit
   Scenario: Naming an origin turns the default off
     Given the query names the origin field, with any value, negated or not

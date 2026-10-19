@@ -8,7 +8,7 @@ Feature: Product colours
   Scenario: The map gives Me blue and keeps the current accent for the other products
     Given the product colour map
     Then Me is blue
-    And LLM Ops, Gateway and Governance are the accent
+    And LLM Ops, Dashboards, Gateway and Governance are the accent
     And each product's roles resolve to the same values as that palette in both colour modes
 
   @unit

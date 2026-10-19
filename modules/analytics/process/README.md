@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:68`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:75`; nothing else in this package is public.
 
 #### `getTimeseries`
 
@@ -48,12 +48,12 @@ getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsRes
 filterOptions(input: { readonly projectId: string; readonly field: string; readonly startDate: number; readonly endDate: number; readonly query?: string; readonly key?: string; readonly subkey?: string; readonly filters?: Record<string, unknown>; }): Promise<AnalyticsFilterOption[]>;
 ```
 
-#### `assertCustomChartPlaygroundEnabled`
+#### `assertDashboardWidgetsEnabled`
 
-Refuses the dashboard-widget surface while its project rollout is disabled.
+Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on.
 
 ```typescript
-assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
 ```
 
 #### `upsertEvaluationAnalytics`
@@ -88,10 +88,10 @@ appendEvaluationAnalyticsRollupBatch(input: AnalyticsEvaluationRollupAppendBatch
 
 #### `findLastOccurredAt`
 
-When the project's newest trace or evaluation since `since` occurred, from the analytics tables this module owns; empty when none did. The graph-alert heartbeat reads it.
+When the project's newest trace or evaluation since `since` occurred, from the analytics tables this module owns; empty when none did. The graph-alert heartbeat reads it. `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
 
 ```typescript
-findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; }): Promise<Instant[]>;
+findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; readonly excludeOrigins?: readonly string[]; }): Promise<Instant[]>;
 ```
 
 #### `isLangWatchQLAvailable`
@@ -184,6 +184,14 @@ Whether this project's rollout admits it to the Workbench at all.
 
 ```typescript
 isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+```
+
+#### `isDashboardsEnabled`
+
+Whether this project's rollout admits it to the Dashboards area at all.
+
+```typescript
+isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
 ```
 
 #### `resolveProtections`
@@ -310,7 +318,7 @@ interface Body {
     start: string | number | unknown;
     end: string | number | unknown;
   };
-  granularitySeconds?: 1 | 60 | 3600;
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
   projectId?: string;
 }
 type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
@@ -344,14 +352,14 @@ type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/feature
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:62`, router `src/transport/analytics-lwql.trpc.ts:68`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/transport/analytics-lwql.trpc.ts:68`.
 
 | Procedure                     | Kind     | Gate                        | Input                    | Output                          |
 | ----------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
 | `analytics.lwql.availability` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema` |
 | `analytics.lwql.schema`       | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`             |
 | `analytics.lwql.validate`     | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
-| `analytics.lwql.query`        | mutation | Permission `analytics:view` | `lwqlRunRequestSchema`   | `langWatchQLQueryResultSchema`  |
+| `analytics.lwql.query`        | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`  |
 
 ```typescript
 // analytics.lwql.availability
@@ -359,7 +367,7 @@ Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:62`, router `src/
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:435
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:464
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
@@ -367,7 +375,7 @@ interface Output {
 
 // analytics.lwql.schema
 type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
-type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:185
+type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:212
 
 // analytics.lwql.validate
 // Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:32
@@ -379,13 +387,24 @@ interface Input {
     start: string | number | unknown;
     end: string | number | unknown;
   };
-  granularitySeconds?: 1 | 60 | 3600;
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
 }
-type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:58
+type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:70
 
 // analytics.lwql.query
-type Input = z.infer<typeof lwqlRunRequestSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:32
-type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:84
+// Input: lwqlQueryRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:43
+interface Input {
+  projectId: string;
+  sql: string;
+  parameters?: Record<string, string | number | boolean | null>;
+  timeWindow?: {
+    start: string | number | unknown;
+    end: string | number | unknown;
+  };
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+  excludeOrigins?: string[];
+}
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:111
 ```
 
 ### `analytics`
@@ -456,19 +475,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `lwql_reconvergence` (aggregate `global`)
 
-Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:51`.
+Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
 
-| Kind            | Name                | Handles                                                                          | Declared at                                                |
-| --------------- | ------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| process manager | `lwqlReconvergence` | every 5 s (`LWQL_RECONVERGENCE_INITIAL_DELAY_MS`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:61` |
-| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                     | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:56` |
+| Kind            | Name                | Handles                                                                                    | Declared at                                                |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:63` |
+| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:58` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:354`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:355`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:401`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:402`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

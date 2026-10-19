@@ -4,7 +4,7 @@ user-prompt: "Build me a custom chart widget"
 description: Author a dashboard widget — a small React component backed by named LangWatchQL queries — from a plain question. Discovers the analytics schema, writes the queries, writes the widget file, saves it, then proves it renders. Use when asked to build, prototype, or iterate on a custom chart widget, or to add a widget beyond what a standard saved chart can express.
 license: MIT
 compatibility: Requires the `langwatch` CLI with a valid `LANGWATCH_API_KEY`, and a project with LangWatchQL analytics enabled. Works with Claude Code and similar coding agents.
-feature-flag: release_custom_chart_playground
+feature-flag: release_dashboards
 metadata:
   category: recipe
 ---
@@ -93,7 +93,7 @@ More worked examples: `platform/app/scripts/north-star-widgets/`.
 
 ### Drill-down: `LW.navigate`
 
-`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget — `target` is `"traces"` or `"trace"`, and `params` is keyed by filter field ids (e.g. `"metadata.user_id"`) that the host resolves into the Trace Explorer URL.
+`LW.navigate(target, params)` sends the user to another LangWatch page from inside a widget. `target` is a route key, never a path: `"traces"` and `"trace"` take `params` keyed by filter field ids (e.g. `"metadata.user_id"`) or `traceId`, which the host resolves into the Trace Explorer URL; `"scenarios"`, `"onlineEvaluations"`, `"annotations"`, `"gatewayVirtualKeys"` and `"codingSessions"` open that page of the project and take no params.
 
 `Leaderboard` wraps this for you: pass `navigateTo={{ target, params: (row) => ({ ... }) }}` and a row click navigates. An unknown `target` is ignored rather than erroring.
 
@@ -116,10 +116,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — the widget still lives and is edited on the custom-chart-playground page. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
+
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
@@ -187,7 +190,7 @@ langwatch dashboard-widget create \
 ## Failure modes worth knowing
 
 - `lwql_not_enabled` — the project's LangWatchQL switch is off; stop and say so.
-- `custom_chart_playground_not_enabled` — the custom-chart-playground feature flag is off for this project; do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
+- `custom_chart_playground_not_enabled` — dashboard widgets are not enabled for this project (they need Dashboards and LangWatchQL); do not retry any `dashboard-widget` command, and do not fall back to guessing. Use the `lwql-charts` skill / `langwatch chart` commands for a saved dashboard chart instead.
 - A save that succeeds but a blank or errored widget when opened — the SQL names a column that does not exist, or the component threw at render; re-read the schema (Step 1) and the error panel shown in the widget frame, then update.
 - `dashboard_widget_query_undeclared_param` (shows up in the hook's `error`) — the widget code passed a param the query's `parameters` array doesn't declare; add the declaration or stop passing it.
 - `dashboard_widget_query_reserved_param` (shows up in the hook's `error`) — the widget code passed `dashboard_context_period_start`, `dashboard_context_period_end`, or `dashboard_context_granularity_seconds` directly as a param; these are bound by the executor from the page window, never by the caller.

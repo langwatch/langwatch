@@ -22,6 +22,9 @@ export abstract class CheckupHostApi {
   /** Whether the reader may manage the organization. Fail-closed. */
   abstract canManageOrganization(): boolean;
 
+  /** Whether the reader may change the install's report (platform operator). Fail-closed. */
+  abstract canManageInstall(): boolean;
+
   abstract failed(failure: CheckupFailureNotice): void;
 
   /** One failure as a sentence, its words resolved from its code. */

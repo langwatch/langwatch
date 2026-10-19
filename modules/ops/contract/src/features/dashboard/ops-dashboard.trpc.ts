@@ -7,6 +7,8 @@ import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  opsInsightScheduleSchema,
+  opsListInsightSchedulesInputSchema,
   opsListPausedSchedulesInputSchema,
   opsListScheduledJobsInputSchema,
   opsListSchedulerActionsInputSchema,
@@ -92,6 +94,11 @@ export const opsDashboardTrpc = defineTrpcContract("ops")
   .query("listSchedulerActions")
   .withInput(opsListSchedulerActionsInputSchema)
   .withOutput(schedulerAuditEntryViewSchema.array())
+
+  /** Every person's daily insights schedule. A read: a schedule is its person's own setting. */
+  .query("listInsightSchedules")
+  .withInput(opsListInsightSchedulesInputSchema)
+  .withOutput(opsInsightScheduleSchema.array())
 
   /**
    * Pause or resume a schedule (ADR-091). Never touches an in-flight slot: the

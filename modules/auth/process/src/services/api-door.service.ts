@@ -124,7 +124,7 @@ export class ApiDoorService {
           scope: { type: "platform" },
         }),
       }),
-      organizationOf: (scope) => this.#audit.organizationOf(scope),
+      organizationOf: async (scope) => (await this.#audit.findOrganizationIds(scope))[0] ?? null,
       projectKindOf: (projectId) => this.#projectKindOf(projectId),
       authorization: (input) => this.#mintProof(input),
       assertSecondFactor: (input) => this.#assertSecondFactor(input),

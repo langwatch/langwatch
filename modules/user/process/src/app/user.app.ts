@@ -394,13 +394,8 @@ export class UserModule implements UserApi {
 
   /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
   async registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser> {
-    // Sign-in lowercases the address on every lookup, so an account stored as
-    // typed is one sign-in can never find, no matter the password.
-    const email = input.email.toLowerCase();
-
-    // Case-insensitive on purpose: rows written before the lowercasing above
-    // may carry capitals, and minting a case-twin beside one would leave two
-    // accounts answering for one person.
+    // The user service's parse lower-cases the address for the check and the mint alike.
+    const { email } = input;
     if (await this.#users.emailIsTaken({ email })) throw new EmailAlreadyRegisteredError();
 
     const account = {

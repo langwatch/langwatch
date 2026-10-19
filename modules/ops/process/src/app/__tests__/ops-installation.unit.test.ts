@@ -23,6 +23,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { InsightApi } from "@langwatch/insight-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -121,6 +122,7 @@ function process(
       prompt: createApiFixture<PromptApi>(),
       workflow: createApiFixture<WorkflowApi>(),
       automation: createApiFixture<AutomationApi>({}),
+      insight: createApiFixture<InsightApi>(),
       github: createApiFixture<GithubApi>(),
       langy: createApiFixture<LangyApi>(),
       dashboard: createApiFixture<DashboardApi>(),

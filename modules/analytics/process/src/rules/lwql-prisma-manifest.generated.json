@@ -8233,7 +8233,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "The project that owns the board; only there can it be edited."
         },
         {
           "name": "project",
@@ -8269,7 +8269,43 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": ""
+          "documentation": "Legacy board sort position. The Dashboards v2 app orders boards by a\nmember's favourites and never writes this; kept because the legacy\nAnalytics reports section and the REST reorder endpoint still write it,\nand a rolling deploy's older image still reads it."
+        },
+        {
+          "name": "description",
+          "columnName": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Free text under the board's name; null until a member writes one.\nRetiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it."
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member who created it; null for boards that predate the column.\nRetiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it."
+        },
+        {
+          "name": "scope",
+          "columnName": "scope",
+          "type": "DashboardScope",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who sees it. Only the author changes it; a board with no author stays PROJECT.\nRetiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before. No relation, per the database rule.\nRetiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it."
         },
         {
           "name": "createdAt",
@@ -8302,6 +8338,930 @@
             "references": [],
             "to": "CustomGraph"
           }
+        }
+      ]
+    },
+    {
+      "name": "DashboardFavourite",
+      "tableName": "DashboardFavourite",
+      "documentation": "A member's star, in their own order within a project: a board or a From\nLangWatch template. Personal: one member's stars never show to another. No\nforeign key (per the database rule): the dashboard service removes a board's\nfavourites when it deletes the board, so a star never outlives its dashboard.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "dashboardId",
+          "columnName": "dashboardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "A DashboardsV2 board's id (copied boards kept their Dashboard id); null when\nthe star is a template."
+        },
+        {
+          "name": "templateId",
+          "columnName": "templateId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The starred From LangWatch template id; null when the star is a board."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "position",
+          "columnName": "position",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The member's drag order among their own stars in the project."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DashboardsV2",
+      "tableName": "DashboardsV2",
+      "documentation": "A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards\nmade before the split were copied here with their ids, so stars and insight\npointers still name them. No relation, per the database rule.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The project that owns the board; only there can it be edited."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "description",
+          "columnName": "description",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Free text under the board's name; null until a member writes one."
+        },
+        {
+          "name": "createdById",
+          "columnName": "createdById",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The member who created it; null for boards that predate authorship."
+        },
+        {
+          "name": "scope",
+          "columnName": "scope",
+          "type": "DashboardScope",
+          "kind": "enum",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who sees it. Only the author changes it; a board with no author stays PROJECT."
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The owning project's organization, stamped when the board is first set to\nORGANIZATION; null before."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "DashboardWidget",
+      "tableName": "DashboardWidget",
+      "documentation": "A Dashboards v2 widget: a srcdoc definition placed on a DashboardsV2 board, or\nunplaced. Widgets made before the split were copied from CustomGraph with their\nids. No relation, per the database rule.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "dashboardId",
+          "columnName": "dashboardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The DashboardsV2 board it sits on; null while unplaced."
+        },
+        {
+          "name": "name",
+          "columnName": "name",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "definition",
+          "columnName": "definition",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The widget's srcdoc definition."
+        },
+        {
+          "name": "gridColumn",
+          "columnName": "gridColumn",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "gridRow",
+          "columnName": "gridRow",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "colSpan",
+          "columnName": "colSpan",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "rowSpan",
+          "columnName": "rowSpan",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "InsightProjection",
+      "tableName": "InsightProjection",
+      "documentation": "One insight in its owner's inbox in a project, folded from its `insight` aggregate\n(modules/insight). A read model: rebuildable by replaying the event log. Epochs in\nmilliseconds.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The insight id, which is also its aggregate id."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "title",
+          "columnName": "title",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "body",
+          "columnName": "body",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "tone",
+          "columnName": "tone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "bad | watch | good"
+        },
+        {
+          "name": "topic",
+          "columnName": "topic",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "validDays",
+          "columnName": "validDays",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lwql",
+          "columnName": "lwql",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "sourceConversationId",
+          "columnName": "sourceConversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "sourceMessageId",
+          "columnName": "sourceMessageId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "filedByUserId",
+          "columnName": "filedByUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "filedAt",
+          "columnName": "filedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "renewedAt",
+          "columnName": "renewedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Set by a later run that found the insight still true."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "boardId",
+          "columnName": "boardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The board and widget it came from. A pointer only, never a relation: the row reads the\nsame once either is deleted, so the names are kept as filed."
+        },
+        {
+          "name": "boardName",
+          "columnName": "boardName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "widgetId",
+          "columnName": "widgetId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "widgetName",
+          "columnName": "widgetName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "filedVia",
+          "columnName": "filedVia",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "chat | run"
+        },
+        {
+          "name": "replayStart",
+          "columnName": "replayStart",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The fixed window `lwql` replays over (epoch milliseconds, half-open) and its step."
+        },
+        {
+          "name": "replayEnd",
+          "columnName": "replayEnd",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replayGranularitySeconds",
+          "columnName": "replayGranularitySeconds",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "replayContext",
+          "columnName": "replayContext",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The values in force when it was filed: `{ period, parameters }`."
+        },
+        {
+          "name": "ownerUserId",
+          "columnName": "ownerUserId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "Whose insight it is: the one person who reads it. NULL on a row folded before the\ncolumn existed, which is owned by whoever filed it (`filedByUserId`)."
+        },
+        {
+          "name": "findingKey",
+          "columnName": "findingKey",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The stable key a daily run matches a repeated finding by, so it renews the insight\nand files no twin. NULL for an insight saved from a chat and on a row folded before\nthe column existed."
+        }
+      ]
+    },
+    {
+      "name": "InsightReaderProjection",
+      "tableName": "InsightReaderProjection",
+      "documentation": "One reader's own state on one insight (seen, done, kept), folded from the same stream.\nAn insight has one reader today, its owner; a later forward may add more.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "insightId",
+          "columnName": "insightId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "seenAt",
+          "columnName": "seenAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "archivedAt",
+          "columnName": "archivedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "keptAt",
+          "columnName": "keptAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        }
+      ]
+    },
+    {
+      "name": "InsightDailyScheduleProjection",
+      "tableName": "InsightDailyScheduleProjection",
+      "documentation": "One person's daily insights run on one board in a project, folded from its\n`insight_daily_schedule` aggregate (modules/insight). A read model: rebuildable by\nreplaying the event log. Epochs in milliseconds.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The schedule id, which is also its aggregate id: one per project, person and board."
+        },
+        {
+          "name": "projectId",
+          "columnName": "projectId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "boardKind",
+          "columnName": "boardKind",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "dashboard | template. A pointer only, never a relation: a run checks the board is there."
+        },
+        {
+          "name": "boardId",
+          "columnName": "boardId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "boardName",
+          "columnName": "boardName",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "state",
+          "columnName": "state",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "on | off | undecided."
+        },
+        {
+          "name": "offReason",
+          "columnName": "offReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "board_deleted | skipped_days | member_removed | project_archived. Why the system turned\nit off. NULL while it is on, and when the person turned it off."
+        },
+        {
+          "name": "hour",
+          "columnName": "hour",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "timezone",
+          "columnName": "timezone",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "maxInsights",
+          "columnName": "maxInsights",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunId",
+          "columnName": "lastRunId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The last run that recorded an outcome. NULL until one did."
+        },
+        {
+          "name": "lastRunAt",
+          "columnName": "lastRunAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunOutcome",
+          "columnName": "lastRunOutcome",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "filed | nothing | failed | skipped"
+        },
+        {
+          "name": "lastRunReason",
+          "columnName": "lastRunReason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunFiled",
+          "columnName": "lastRunFiled",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "lastRunRenewed",
+          "columnName": "lastRunRenewed",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "How many insights the run found still true and renewed."
+        },
+        {
+          "name": "lastRunConversationId",
+          "columnName": "lastRunConversationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "consecutiveSkips",
+          "columnName": "consecutiveSkips",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The scheduled days in a row whose run ended skipped, and the slot of the newest counted."
+        },
+        {
+          "name": "skipStreakSlot",
+          "columnName": "skipStreakSlot",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": ""
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "updatedAt",
+          "columnName": "updatedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "occurredAt",
+          "columnName": "occurredAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "acceptedAt",
+          "columnName": "acceptedAt",
+          "type": "Float",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "lastEventId",
+          "columnName": "lastEventId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "projectionVersion",
+          "columnName": "projectionVersion",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
         }
       ]
     },
@@ -8528,7 +9488,7 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "Discriminator for the two chart shapes that share this table:\n- \"builder\" (default) - the chart builder's own `graph` payload\n- \"workbench_sql\"     - a saved LangWatchQL workbench chart, whose\n`graph` holds the versioned { sql, parameters, vegaLiteSpec }\ndefinition (see server/analytics/saved-workbench-charts)\nEach reader filters by its own kind, so neither sees the other's rows and\na builder chart can never be interpreted as a workbench definition."
+          "documentation": "Discriminator for the chart shapes that share this table:\n- \"builder\" (default) - the chart builder's own `graph` payload\n- \"workbench_sql\"     - a saved LangWatchQL workbench chart, whose\n`graph` holds the versioned { sql, parameters, vegaLiteSpec }\ndefinition (see server/analytics/saved-workbench-charts)\n- \"dashboard_srcdoc\"  - frozen legacy copies of Dashboards v2 widgets, which\nnow live in DashboardWidget; nothing new writes this kind\nEach reader filters by its own kind, so neither sees the other's rows and\na builder chart can never be interpreted as a workbench definition."
         },
         {
           "name": "createdAt",
@@ -11351,6 +12311,15 @@
           "isList": false,
           "isOptional": false,
           "documentation": "derived | auto | user — governs auto-title precedence (user is sticky)."
+        },
+        {
+          "name": "Origin",
+          "columnName": "origin",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Who started the conversation: `interactive` for the person in the panel, `run` for a\nmodule acting for them with nobody at the keyboard. A row folded before the column\nexisted reads as interactive."
         },
         {
           "name": "Status",
@@ -25252,6 +26221,14 @@
         "TRACE",
         "PROJECT",
         "BATCH"
+      ]
+    },
+    {
+      "name": "DashboardScope",
+      "values": [
+        "PRIVATE",
+        "PROJECT",
+        "ORGANIZATION"
       ]
     },
     {

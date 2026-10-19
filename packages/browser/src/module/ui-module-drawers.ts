@@ -5,6 +5,7 @@
  */
 
 import type { UiDrawerComponent, UiDrawerRegistry } from "@langwatch/browser-host/drawer";
+import { loadChunk } from "@langwatch/browser-host/navigation";
 import { lazy } from "react";
 
 import { installedDrawerLoaders } from "../installed-drawers.ts";
@@ -33,7 +34,7 @@ function drawerComponent({
   load: () => Promise<unknown>;
 }): UiDrawerComponent {
   const component = lazy(async () => {
-    const loaded = await load();
+    const loaded = await loadChunk(load);
     if (!isDrawerModule(loaded)) {
       throw new Error(`Drawer ${JSON.stringify(drawer)} did not load a component.`);
     }

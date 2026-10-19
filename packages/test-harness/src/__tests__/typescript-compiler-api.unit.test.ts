@@ -84,7 +84,8 @@ describe("given TypeScript 7 is the compiler", () => {
       );
 
       expect(offenders).toEqual([]);
-    });
+      // Reads every tracked source file: ~10 s on a CI runner.
+    }, 60_000);
   });
 
   describe("when a workspace package declares its compiler", () => {

@@ -54,3 +54,11 @@ Feature: The API process serves the auth door
     When the browser reads the session endpoint
     Then the session answers null, signed out
     And a sign-in attempt is refused as unavailable with the code service_unavailable
+
+  @integration
+  Scenario: Signing out of a single sign-on session ends only the LangWatch session
+    Given a session that came through an SSO identity provider
+    And that provider's discovery document advertises its own sign-out page
+    When the user signs out of LangWatch
+    Then only the LangWatch session ends
+    And the user lands on the sign-in page, never on the provider's sign-out page

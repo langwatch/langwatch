@@ -30,6 +30,6 @@ None: audit-log declares no peers.
 
 ## Who depends on audit-log
 
-[agent](../agent/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [enterprise-ops](../../enterprise/modules/enterprise-ops/README.md), [evaluator](../evaluator/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [sso](../../enterprise/modules/sso/README.md) (as a peer).
+[agent](../agent/README.md), [auth](../auth/README.md), [automation](../automation/README.md), [coding-agent](../coding-agent/README.md), [enterprise-ops](../../enterprise/modules/enterprise-ops/README.md), [evaluator](../evaluator/README.md), [github](../github/README.md), [governance](../../enterprise/modules/governance/README.md), [identity](../identity/README.md), [insight](../insight/README.md), [ops](../ops/README.md), [project](../project/README.md), [scenario](../scenario/README.md), [scim](../../enterprise/modules/scim/README.md), [sso](../../enterprise/modules/sso/README.md) (as a peer).
 
 <!-- readme:generated:end -->

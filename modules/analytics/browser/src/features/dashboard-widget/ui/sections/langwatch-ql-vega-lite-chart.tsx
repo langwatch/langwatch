@@ -9,13 +9,15 @@ import type {
   LangWatchQLVegaLiteChartProps,
   VegaValidationWarning,
 } from "@langwatch/analytics-contract/visualization";
-import { Box, Stack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Stack, Text, VisuallyHidden, VStack } from "@langwatch/design-system/primitives";
 import { type RefObject, useId } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 
 import { useLangWatchQLChartModel } from "../../../../behavior/use-langwatch-ql-chart-model.ts";
 import type { LangWatchQLVegaViewStatus } from "../../../../behavior/use-langwatch-ql-vega-view.ts";
 import { LangWatchQLChartFailure } from "../../../../ui/elements/langwatch-ql-chart-failure.tsx";
+
+import "./langwatch-ql-vega-lite-chart.css";
 
 /** The minimum a chart is given, so a refusal never collapses the pane. */
 const CHART_MIN_HEIGHT = "260px";
@@ -28,6 +30,7 @@ export function LangWatchQLVegaLiteChart({
   themeConfig,
   pinnedConfig,
   colorMode,
+  isResultNoteHidden = false,
 }: LangWatchQLVegaLiteChartProps) {
   const descriptionId = useId();
   const { containerRef, state, failures, warnings, isRefused } = useLangWatchQLChartModel({
@@ -64,6 +67,7 @@ export function LangWatchQLVegaLiteChart({
           descriptionId={descriptionId}
           status={state.status}
           isRefused={isRefused}
+          isResultNoteHidden={isResultNoteHidden}
         />
       </ErrorBoundary>
     </VStack>
@@ -76,13 +80,17 @@ function LangWatchQLChartCanvas({
   descriptionId,
   status,
   isRefused,
+  isResultNoteHidden,
 }: {
   containerRef: RefObject<HTMLDivElement | null>;
   ariaLabel: string | undefined;
   descriptionId: string;
   status: LangWatchQLVegaViewStatus;
   isRefused: boolean;
+  isResultNoteHidden: boolean;
 }) {
+  const note =
+    "Drawn from the result of the query you ran. Switch to the table to read every returned row.";
   /*
     The mount point stays in the tree (hidden, not removed) while a refusal
     is shown: removing it would deadlock, since the re-embed effect for a
@@ -102,11 +110,20 @@ function LangWatchQLChartCanvas({
         data-testid="lwql-vega-chart-view"
         data-chart-status={status}
       >
-        <Box ref={containerRef} width="full" minHeight={CHART_MIN_HEIGHT} />
+        <Box
+          ref={containerRef}
+          width="full"
+          minHeight={CHART_MIN_HEIGHT}
+          data-lwql-chart-mount=""
+        />
       </Box>
-      <Text id={descriptionId} textStyle="caption" color="fg.muted">
-        Drawn from the result of the query you ran. Switch to the table to read every returned row.
-      </Text>
+      {isResultNoteHidden ? (
+        <VisuallyHidden id={descriptionId}>{note}</VisuallyHidden>
+      ) : (
+        <Text id={descriptionId} textStyle="caption" color="fg.muted">
+          {note}
+        </Text>
+      )}
     </Box>
   );
 }

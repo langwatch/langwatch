@@ -241,8 +241,9 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
   });
 
   /** @scenario "the other still signs in with its own GitHub link" */
-  it("finalizes the account yielding a shared address and leaves its GitHub link in place", async () => {
-    const address = `gil-${namespace}@example.com`;
+  it("finalizes an account whose case twin the address step plus-tagged, keeping its GitHub link", async () => {
+    // Addresses are stored lower-cased; user's address step gave the case twin a plus tag.
+    const address = `gil-${namespace}@example.com`.toLowerCase();
     const gil = await prisma.user.create({
       data: {
         name: "gil",
@@ -264,7 +265,7 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     const twin = await prisma.user.create({
       data: {
         name: "gil twin",
-        email: address.toUpperCase(),
+        email: address.replace("@", "+2@"),
         emailVerified: true,
         lastLoginAt: new Date("2026-01-01"),
       },
@@ -273,25 +274,22 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
 
     const outcome = await backfill.migrateUser({ userId: gil.id });
 
-    expect(outcome).toMatchObject({
-      status: "finalized",
-      report: { sharedAddress: { kind: "yielded", userIds: [twin.id] } },
-    });
+    expect(outcome).toMatchObject({ status: "finalized" });
+    expect(outcome.report).not.toHaveProperty("sharedAddress");
     expect(await prisma.account.count({ where: { userId: gil.id, provider: "github" } })).toBe(1);
-    // No identifier names the subject, so the GitHub callback falls through to the Account row.
-    expect(await prisma.identifier.count({ where: { providerAccountId: `${namespace}-gh` } })).toBe(
-      0,
-    );
     const kept = await backfill.migrateUser({ userId: twin.id });
-    expect(kept).toMatchObject({ report: { sharedAddress: { kind: "kept", userIds: [gil.id] } } });
+    expect(kept).toMatchObject({ status: "finalized" });
+    expect(kept.report).not.toHaveProperty("sharedAddress");
   });
 
   /** @scenario "Two email-only accounts sharing an address each get a plus-tagged duplicate address" */
-  it("tags two email-only accounts sharing an address and finalizes both unverified", async () => {
+  it("finalizes both unverified, on their own addresses, once the address step plus-tagged one", async () => {
+    // Addresses are stored lower-cased; user's address step gave the case twin a plus tag.
+    const address = `eve-${namespace}@example.com`.toLowerCase();
     const eve = await prisma.user.create({
       data: {
         name: "eve",
-        email: `eve-${namespace}@example.com`,
+        email: address,
         emailVerified: false,
         createdAt: new Date("2026-01-01"),
       },
@@ -300,7 +298,7 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     const eveTwin = await prisma.user.create({
       data: {
         name: "eve twin",
-        email: `EVE-${namespace}@example.com`,
+        email: address.replace("@", "+2@"),
         emailVerified: false,
         createdAt: new Date("2026-02-01"),
       },
@@ -316,16 +314,13 @@ describe.skipIf(!DB_URL)("an unproven account an earlier pass finalized", () => 
     });
     expect(new Map(emails.map((row) => [row.id, row.email]))).toEqual(
       new Map([
-        // user's updateEmail lower-cases the whole address.
-        [eve.id, `eve-${namespace}+duplicate-1@example.com`.toLowerCase()],
-        [eveTwin.id, `eve-${namespace}+duplicate-2@example.com`.toLowerCase()],
+        [eve.id, address],
+        [eveTwin.id, address.replace("@", "+2@")],
       ]),
     );
     expect(emails.every((row) => !row.emailVerified)).toBe(true);
-    expect(first).toMatchObject({
-      status: "finalized",
-      report: { sharedAddress: { kind: "retagged" } },
-    });
+    expect(first).toMatchObject({ status: "finalized", report: { kind: "adopted" } });
+    expect(first.report).not.toHaveProperty("sharedAddress");
     expect(second).toMatchObject({ status: "finalized", report: { kind: "adopted" } });
   });
 });

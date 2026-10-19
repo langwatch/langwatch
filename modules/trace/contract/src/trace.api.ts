@@ -686,8 +686,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out
-   * unless the query (or `originNamed`) names one; `dateField` refuses a
-   * span/event clause on the `updated` axis.
+   * unless the query (or `originNamed`) names one or the project is personal;
+   * `dateField` refuses a span/event clause on the `updated` axis.
    */
   compileExplorerTraceFilter(input: {
     query: string;
@@ -697,7 +697,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     originNamed?: boolean;
     dateField?: TraceDateField;
     protections?: Protections;
-  }): { sql: string; params: Record<string, unknown> };
+  }): Promise<{ sql: string; params: Record<string, unknown> }>;
   /**
    * The filter compiled against the LangWatchQL trace view, for a statement a
    * caller runs; throws `FilterParseError` on syntax the language cannot read.

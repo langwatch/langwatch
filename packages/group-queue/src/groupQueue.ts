@@ -157,6 +157,14 @@ function scopeKeyOf(metadata: GroupQueueContextMetadata | undefined): string | u
   return typeof value === "string" ? value : undefined;
 }
 
+/** The listed run's candidates a job was sent under, where COMPLETE puts a group with work back. */
+function listedCandidatesOf(metadata: GroupQueueContextMetadata | undefined): {
+  candidatesKey?: string;
+} {
+  const scopeKey = scopeKeyOf(metadata);
+  return scopeKey ? { candidatesKey: `${scopeKey}:candidates` } : {};
+}
+
 async function withActiveSpan<T>(
   name: string,
   options: Parameters<ReturnType<typeof trace.getTracer>["startActiveSpan"]>[1],
@@ -244,10 +252,10 @@ function nonEmptyString(value: unknown): string | undefined {
  */
 export const GROUP_QUEUE_CONFIG = {
   /**
-   * Max parallel groups per consumer. Jobs mostly wait on flushed ClickHouse inserts (~200 ms),
-   * so slots set throughput; a listed run's bench reached 1,474 jobs/s at 1,000 (Alex, 2026-10-12).
+   * Max parallel groups per consumer: the previous release's 100 (Alex, 2026-10-13).
+   * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
    */
-  defaultGlobalConcurrency: 1_000,
+  defaultGlobalConcurrency: 100,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -753,7 +761,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
       if (delay && delay > 0) {
         gqJobsDelayedTotal.inc({ queue_name: this.queueName });
-        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, delay);
+        gqJobDelayMilliseconds.observe(delay, { queue_name: this.queueName });
       }
       void Promise.resolve(
         this.activity?.staged({
@@ -807,7 +815,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (effectiveDelay && effectiveDelay > 0) {
       gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
       for (let i = 0; i < newStagedCount; i++) {
-        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+        gqJobDelayMilliseconds.observe(effectiveDelay, { queue_name: this.queueName });
       }
     }
     for (const [group, value] of countStagedPerGroup({ jobsToStage, payloads })) {
@@ -993,6 +1001,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // The beacon must exist before this worker owns a marker, or a peer would
     // read our live claim as an abandoned one.
     await this.livenessReady;
+    // Read beside the claim marker's write, so the two share one round trip to Redis.
+    const groupAttempt = this.readGroupAttempt(groupId);
 
     const { deathThreshold } = this;
     const guardEnabled = deathThreshold > 0 && this.beaconLive;
@@ -1025,7 +1035,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
 
     try {
-      await this.processClaimedJob(dispatched);
+      await this.processClaimedJob(dispatched, groupAttempt);
     } finally {
       if (guardEnabled) {
         // Compare-and-delete: this job may have outlived its own active lease
@@ -1066,10 +1076,13 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * Processes a dispatched job with retries, OTEL tracing, heartbeats, and
    * error handling.
    */
-  private async processClaimedJob(dispatched: DispatchResult): Promise<void> {
+  private async processClaimedJob(
+    dispatched: DispatchResult,
+    groupAttempt?: Promise<number>,
+  ): Promise<void> {
     const [jobData] = await this.decodeClaimedJob(dispatched);
     if (!jobData) return;
-    const [job] = await this.claimedJobFrom({ dispatched, jobData });
+    const [job] = await this.claimedJobFrom({ dispatched, jobData, groupAttempt });
     if (!job) return;
 
     const { groupId, stagedJobId, jobDataJson, claimToken, drainedSiblings, routingLabels } = job;
@@ -1099,7 +1112,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       stopHeartbeat();
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
-      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
+      gqJobDurationMilliseconds.observe(jobDurationMs, routingLabels);
       this.recordJobLatency(jobDurationMs);
     }
   }
@@ -1162,16 +1175,19 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
   private async claimedJobFrom({
     dispatched,
     jobData,
+    groupAttempt,
   }: {
     dispatched: DispatchResult;
     jobData: Record<string, unknown>;
+    /** The group's chain counter, when the caller already asked for it. */
+    groupAttempt?: Promise<number>;
   }): Promise<ClaimedJob<Payload>[]> {
     const { stagedJobId, groupId, jobDataJson, originalScore, claimToken } = dispatched;
     const contextMetadata = jobData.__context as GroupQueueContextMetadata | undefined;
     const jobAttempt = typeof jobData.__attempt === "number" ? jobData.__attempt : 1;
     // A re-staged sibling carries no __attempt of its own, so fall back to the
     // group's chain counter rather than reading it as a fresh delivery.
-    const attempt = Math.max(jobAttempt, await this.readGroupAttempt(groupId));
+    const attempt = Math.max(jobAttempt, await (groupAttempt ?? this.readGroupAttempt(groupId)));
     const handedBackSince =
       typeof jobData.__handedBackSince === "number" ? jobData.__handedBackSince : undefined;
     // Checked, not asserted: these become Prometheus label values, and `??`
@@ -1509,7 +1525,15 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // Success — complete the group slot. Drained siblings were
     // removed from staging during the drain, so completing the
     // dispatched job is enough to free the group.
-    const completed = await this.scripts.complete({ groupId, stagedJobId, jobName, claimToken });
+    const completed = await this.scripts.complete({
+      groupId,
+      stagedJobId,
+      jobName,
+      claimToken,
+      // A success ends the group's retry chain: no stale streak or attempt outlives it.
+      endsRetryChain: true,
+      ...listedCandidatesOf(job.contextMetadata),
+    });
     if (!completed) {
       // Another worker recovered this claim after our active key lapsed and runs the job
       // now; its lease and the group's chain are that worker's (claimed-job-recovery.feature).
@@ -1555,17 +1579,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         },
         "Group job completed, slot freed",
       );
-
-      // A success means the group is draining, so it must not carry a stale failure
-      // streak toward the quarantine threshold. Ordered after the counter and audit
-      // deliberately: this write can blip without costing that bookkeeping, only the
-      // streak reset (bounded by its own TTL).
-      if (this.quarantineFailStreakThreshold > 0) {
-        await this.scripts.clearGroupFailures(groupId);
-      }
-
-      // The chain is over: anything it recorded is no longer live.
-      await this.clearGroupAttempt(groupId);
 
       await this.blobLifecycle.releaseLease({
         values: [jobDataJson, ...drainedSiblings.map((sibling) => sibling.jobDataJson)],
@@ -1741,8 +1754,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // exponential backoff. A caller can lengthen but never shorten
     // the wait, so its policy cannot cause a retry storm.
     const backoffMs = Math.max(getBackoffMs(attempt), decision.retryAfterMs ?? 0);
-    gqRetryAttempt.observe(routingLabels, attempt);
-    gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
+    gqRetryAttempt.observe(attempt, routingLabels);
+    gqRetryBackoffMilliseconds.observe(backoffMs, routingLabels);
     // The job keeps the id it was dispatched under (ADR-080). Its
     // staging member was removed at claim time, so re-staging under
     // the same id inserts one that is genuinely absent.
@@ -1780,6 +1793,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobName,
         dropped: true,
         claimToken,
+        ...listedCandidatesOf(contextMetadata),
       });
       // A recovering worker's job carries this value and its lease; only the owner releases it.
       if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
@@ -1908,6 +1922,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         jobName,
         dropped: true,
         claimToken,
+        ...listedCandidatesOf(contextMetadata),
       });
       if (completed) await this.blobLifecycle.releaseLease({ values: [jobDataJson], groupId });
       return;
@@ -2096,6 +2111,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       jobName,
       dropped: true,
       claimToken: job.claimToken,
+      // The chain is over for this group: the next job starts with a fresh budget and streak.
+      endsRetryChain: true,
+      ...listedCandidatesOf(contextMetadata),
     });
     if (!completed) {
       // The recovering worker now owns the group's chain, its failures and its attempt count.
@@ -2112,10 +2130,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       );
       return { deadPayloads, claimLost: true };
     }
-    // The chain is over for this group: the next job starts with a fresh budget and streak.
-    await this.scripts.clearGroupFailures(groupId).catch(() => {});
-    await this.clearGroupAttempt(groupId);
-
     gqJobsExhaustedTotal.inc(routingLabels);
     this.logger.error(
       {
@@ -2233,18 +2247,9 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
    * not thrown, so it never masks the original processing error.
    */
 
-  /**
-   * Per-group retry-chain counter: a re-staged sibling carries no `__attempt`
-   * of its own, so without this it would read as a fresh delivery and the fold
-   * would think nothing in the chain had applied yet.
-   */
-  private groupAttemptKey(groupId: string): string {
-    return `${this.queueName}:gq:group:${groupId}:attempt`;
-  }
-
   private async readGroupAttempt(groupId: string): Promise<number> {
     try {
-      const raw = await this.redisConnection.get(this.groupAttemptKey(groupId));
+      const raw = await this.redisConnection.get(this.scripts.groupAttemptKey(groupId));
       const parsed = raw === null ? 0 : Number.parseInt(raw, 10);
       return Number.isFinite(parsed) && parsed > 0 ? parsed : 0;
     } catch (err) {
@@ -2258,14 +2263,6 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         "Could not read the group retry-chain counter — a sibling-led retry may read as a fresh delivery and re-apply already-folded events",
       );
       return 0;
-    }
-  }
-
-  private async clearGroupAttempt(groupId: string): Promise<void> {
-    try {
-      await this.redisConnection.del(this.groupAttemptKey(groupId));
-    } catch {
-      // The TTL reclaims it.
     }
   }
 

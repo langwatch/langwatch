@@ -46,6 +46,10 @@
   --sim-accent: var(--amber);
 }
 
+.sim-console[data-sim="mcp"] {
+  --sim-accent: var(--brand-deep);
+}
+
 .sim-console .ds-topbar-mark {
   background: var(--sim-accent);
 }

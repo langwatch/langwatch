@@ -2236,19 +2236,235 @@ model DatasetRecord {
   @@index([projectId, datasetId])
 }
 
+/// Who sees a dashboard, named as the prompt scope is, with one more level.
+enum DashboardScope {
+  /// Its author alone: "Only me".
+  PRIVATE
+  PROJECT
+  /// Every project of the owning project's organization, each with its own data.
+  ORGANIZATION
+}
+
 model Dashboard {
   id        String        @id @default(nanoid())
+  /// The project that owns the board; only there can it be edited.
   projectId String
   project   Project       @relation(fields: [projectId], references: [id])
   name      String
+  /// Legacy board sort position. The Dashboards v2 app orders boards by a
+  /// member's favourites and never writes this; kept because the legacy
+  /// Analytics reports section and the REST reorder endpoint still write it,
+  /// and a rolling deploy's older image still reads it.
   order     Int           @default(0)
+  /// Free text under the board's name; null until a member writes one.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
+  description String?
+  /// The member who created it; null for boards that predate the column.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
+  createdById String?
+  /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
+  scope          DashboardScope @default(PROJECT)
+  /// The owning project's organization, stamped when the board is first set to
+  /// ORGANIZATION; null before. No relation, per the database rule.
+  /// Retiring: Dashboards v2 boards live in DashboardsV2, so no new write sets it.
+  organizationId String?
   createdAt DateTime      @default(now())
   updatedAt DateTime      @default(now()) @updatedAt
   graphs    CustomGraph[]
 
   @@index([projectId])
   @@index([projectId, order])
+  // A project's list also reads the organization's shared boards; scope in the
+  // index keeps that lookup selective, as on LlmPromptConfig.
+  @@index([organizationId, scope])
   @@map("Dashboard")
+}
+
+/// A member's star, in their own order within a project: a board or a From
+/// LangWatch template. Personal: one member's stars never show to another. No
+/// foreign key (per the database rule): the dashboard service removes a board's
+/// favourites when it deletes the board, so a star never outlives its dashboard.
+model DashboardFavourite {
+  id          String   @id @default(nanoid())
+  userId      String
+  /// A DashboardsV2 board's id (copied boards kept their Dashboard id); null when
+  /// the star is a template.
+  dashboardId String?
+  /// The starred From LangWatch template id; null when the star is a board.
+  templateId  String?
+  projectId   String
+  /// The member's drag order among their own stars in the project.
+  position    Int
+  createdAt   DateTime @default(now())
+
+  @@unique([userId, dashboardId])
+  @@unique([userId, projectId, templateId])
+  @@index([userId, projectId, position])
+  @@index([dashboardId])
+  @@map("DashboardFavourite")
+}
+
+/// A Dashboards v2 board, apart from the Analytics Reports boards in Dashboard. Boards
+/// made before the split were copied here with their ids, so stars and insight
+/// pointers still name them. No relation, per the database rule.
+model DashboardsV2 {
+  id             String         @id @default(nanoid())
+  /// The project that owns the board; only there can it be edited.
+  projectId      String
+  name           String
+  /// Free text under the board's name; null until a member writes one.
+  description    String?
+  /// The member who created it; null for boards that predate authorship.
+  createdById    String?
+  /// Who sees it. Only the author changes it; a board with no author stays PROJECT.
+  scope          DashboardScope @default(PROJECT)
+  /// The owning project's organization, stamped when the board is first set to
+  /// ORGANIZATION; null before.
+  organizationId String?
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @default(now()) @updatedAt
+
+  @@index([projectId])
+  @@index([organizationId, scope])
+}
+
+/// A Dashboards v2 widget: a srcdoc definition placed on a DashboardsV2 board, or
+/// unplaced. Widgets made before the split were copied from CustomGraph with their
+/// ids. No relation, per the database rule.
+model DashboardWidget {
+  id          String   @id @default(nanoid())
+  projectId   String
+  /// The DashboardsV2 board it sits on; null while unplaced.
+  dashboardId String?
+  name        String
+  /// The widget's srcdoc definition.
+  definition  Json
+  gridColumn  Int      @default(0)
+  gridRow     Int      @default(0)
+  colSpan     Int      @default(1)
+  rowSpan     Int      @default(1)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @default(now()) @updatedAt
+
+  @@index([projectId, dashboardId])
+}
+
+/// One insight in its owner's inbox in a project, folded from its `insight` aggregate
+/// (modules/insight). A read model: rebuildable by replaying the event log. Epochs in
+/// milliseconds.
+model InsightProjection {
+  /// The insight id, which is also its aggregate id.
+  id                       String  @id
+  projectId                String
+  title                    String
+  body                     String
+  /// bad | watch | good
+  tone                     String
+  topic                    String?
+  validDays                Int
+  lwql                     String?
+  sourceConversationId     String?
+  sourceMessageId          String?
+  filedByUserId            String?
+  filedAt                  Float
+  /// Set by a later run that found the insight still true.
+  renewedAt                Float?
+  createdAt                Float
+  updatedAt                Float
+  occurredAt               Float
+  acceptedAt               Float
+  lastEventId              String
+  projectionVersion        String
+  /// The board and widget it came from. A pointer only, never a relation: the row reads the
+  /// same once either is deleted, so the names are kept as filed.
+  boardId                  String?
+  boardName                String?
+  widgetId                 String?
+  widgetName               String?
+  /// chat | run
+  filedVia                 String  @default("chat")
+  /// The fixed window `lwql` replays over (epoch milliseconds, half-open) and its step.
+  replayStart              Float?
+  replayEnd                Float?
+  replayGranularitySeconds Int?
+  /// The values in force when it was filed: `{ period, parameters }`.
+  replayContext            Json?
+  /// Whose insight it is: the one person who reads it. NULL on a row folded before the
+  /// column existed, which is owned by whoever filed it (`filedByUserId`).
+  ownerUserId              String?
+  /// The stable key a daily run matches a repeated finding by, so it renews the insight
+  /// and files no twin. NULL for an insight saved from a chat and on a row folded before
+  /// the column existed.
+  findingKey               String?
+
+  @@index([projectId, filedAt])
+  @@index([projectId, ownerUserId, filedAt])
+}
+
+/// One reader's own state on one insight (seen, done, kept), folded from the same stream.
+/// An insight has one reader today, its owner; a later forward may add more.
+model InsightReaderProjection {
+  id                String @id
+  projectId         String
+  insightId         String
+  userId            String
+  seenAt            Float?
+  archivedAt        Float?
+  keptAt            Float?
+  createdAt         Float
+  updatedAt         Float
+  occurredAt        Float
+  acceptedAt        Float
+  lastEventId       String
+  projectionVersion String
+
+  @@unique([projectId, insightId, userId])
+  @@index([projectId, userId])
+}
+
+/// One person's daily insights run on one board in a project, folded from its
+/// `insight_daily_schedule` aggregate (modules/insight). A read model: rebuildable by
+/// replaying the event log. Epochs in milliseconds.
+model InsightDailyScheduleProjection {
+  /// The schedule id, which is also its aggregate id: one per project, person and board.
+  id                    String  @id
+  projectId             String
+  userId                String
+  /// dashboard | template. A pointer only, never a relation: a run checks the board is there.
+  boardKind             String
+  boardId               String
+  boardName             String
+  /// on | off | undecided.
+  state                 String  @default("undecided")
+  /// board_deleted | skipped_days | member_removed | project_archived. Why the system turned
+  /// it off. NULL while it is on, and when the person turned it off.
+  offReason             String?
+  hour                  Int?
+  timezone              String?
+  maxInsights           Int?
+  /// The last run that recorded an outcome. NULL until one did.
+  lastRunId             String?
+  lastRunAt             Float?
+  /// filed | nothing | failed | skipped
+  lastRunOutcome        String?
+  lastRunReason         String?
+  lastRunFiled          Int?
+  /// How many insights the run found still true and renewed.
+  lastRunRenewed        Int?
+  lastRunConversationId String?
+  /// The scheduled days in a row whose run ended skipped, and the slot of the newest counted.
+  consecutiveSkips      Int     @default(0)
+  skipStreakSlot        Float?
+  createdAt             Float
+  updatedAt             Float
+  occurredAt            Float
+  acceptedAt            Float
+  lastEventId           String
+  projectionVersion     String
+
+  /// Named by hand: the generated name is longer than Postgres keeps.
+  @@unique([projectId, userId, boardKind, boardId], map: "InsightDailySchedule_projectId_userId_board_key")
 }
 
 model SavedView {
@@ -2284,11 +2500,13 @@ model CustomGraph {
   /// The chart's definition, in the shape its `kind` names.
   graph     Json
   filters   Json?
-  /// Discriminator for the two chart shapes that share this table:
+  /// Discriminator for the chart shapes that share this table:
   ///   - "builder" (default) - the chart builder's own `graph` payload
   ///   - "workbench_sql"     - a saved LangWatchQL workbench chart, whose
   ///     `graph` holds the versioned { sql, parameters, vegaLiteSpec }
   ///     definition (see server/analytics/saved-workbench-charts)
+  ///   - "dashboard_srcdoc"  - frozen legacy copies of Dashboards v2 widgets, which
+  ///     now live in DashboardWidget; nothing new writes this kind
   /// Each reader filters by its own kind, so neither sees the other's rows and
   /// a builder chart can never be interpreted as a workbench definition.
   kind      String   @default("builder")
@@ -3092,6 +3310,10 @@ model LangyConversationProjection {
   Title                String?                    @map("title")
   /// derived | auto | user — governs auto-title precedence (user is sticky).
   TitleSource          LangyProjectionTitleSource @map("titleSource")
+  /// Who started the conversation: `interactive` for the person in the panel, `run` for a
+  /// module acting for them with nobody at the keyboard. A row folded before the column
+  /// existed reads as interactive.
+  Origin               String                     @default("interactive") @map("origin")
   Status               String                     @map("status")
   IsShared             Boolean                    @default(false) @map("isShared")
   SharedAt             Float?                     @map("sharedAt")
@@ -5929,15 +6151,13 @@ model ProcessManagerInbox {
   /// adds NOT NULL once the fleet has cycled and closes it.
   sourceEventKey String?
   consumedAt     DateTime @db.Timestamptz(3)
-  // Do not add an index on `consumedAt` here. The retention sweep can use one,
-  // but a deploy-time CREATE INDEX holds a SHARE lock that blocks INSERT on
-  // this table, the highest-volume write path in the system. The index is
-  // ops-managed instead: built with CREATE INDEX CONCURRENTLY, see
-  // dev/docs/runbooks/process-manager-table-purge.md. The sweep works without
-  // it on the bounded table it maintains.
 
   @@unique([processName, projectId, sourceEventKey])
   @@index([processName, projectId, processKey, consumedAt])
+  // The retention sweep reaps by age across every process name. Migration
+  // 20261014150000_process_manager_sweep_age_indexes builds it; that file
+  // carries the ops pre-build note for installs with real traffic.
+  @@index([consumedAt])
 }
 
 enum ProcessManagerOutboxStatus {
@@ -5976,13 +6196,11 @@ model ProcessManagerOutbox {
   dispatchedAt  DateTime?                  @db.Timestamptz(3)
   createdAt     DateTime                   @db.Timestamptz(3)
   updatedAt     DateTime                   @db.Timestamptz(3)
-  // Do not add an index on `dispatchedAt` here. The retention sweep can use a
-  // partial one (WHERE status = 'dispatched'), but Prisma cannot express a
-  // partial index and a deploy-time CREATE INDEX holds a SHARE lock that
-  // blocks INSERT on this table, the highest-volume write path in the system.
-  // The index is ops-managed instead: built with CREATE INDEX CONCURRENTLY,
-  // see dev/docs/runbooks/process-manager-table-purge.md. The sweep works
-  // without it on the bounded table it maintains.
+  // A PARTIAL INDEX on (dispatchedAt) WHERE status = 'dispatched', for the
+  // retention sweep, is added by migration
+  // 20261014150000_process_manager_sweep_age_indexes - Prisma cannot express a
+  // partial index, so it is raw SQL there and this comment is its home in the
+  // model.
 
   attemptLog ProcessManagerOutboxAttempt[]
 

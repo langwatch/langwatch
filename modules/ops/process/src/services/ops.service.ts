@@ -13,11 +13,13 @@ import {
   type StopImpersonationInput,
   type AdminOperationInput,
   type AdminOperationResult,
+  type ListInsightSchedulesInput,
   type ListPausedSchedulesInput,
   type ListScheduledJobsInput,
   type ListSchedulerActionsInput,
   type OpsScheduledJob,
   type ScheduleControlInput,
+  type OpsInsightSchedule,
   type SchedulerAuditEntryView,
   type SetScheduleActiveInput,
   type Anomaly,
@@ -42,6 +44,7 @@ import type { AnomalyStateRepository } from "../repositories/anomaly.repository.
 import type { AdminAccess } from "./admin-access.service.ts";
 import type { BlobStoreService } from "./blob-store.service.ts";
 import type { ImpersonationService } from "./impersonation.service.ts";
+import type { InsightScheduleOpsService } from "./insight-schedule-ops.service.ts";
 import type { InstanceAdminService } from "./instance-admin.service.ts";
 import type { QueueService } from "./queue.service.ts";
 import type { SchedulerOpsService } from "./scheduler-ops.service.ts";
@@ -53,6 +56,7 @@ export class OpsService {
   private readonly instanceAdmin: InstanceAdminService;
   private readonly blobStore: BlobStoreService;
   private readonly scheduler: SchedulerOpsService;
+  private readonly insightSchedules: InsightScheduleOpsService;
   private readonly anomalyState: AnomalyStateRepository | null;
   private readonly queues: QueueService;
   readonly eventExplorer: OpsExplorers["eventExplorer"];
@@ -66,6 +70,7 @@ export class OpsService {
     instanceAdmin: InstanceAdminService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
+    insightSchedules: InsightScheduleOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
     explorers: OpsExplorers;
@@ -79,6 +84,7 @@ export class OpsService {
     this.instanceAdmin = deps.instanceAdmin;
     this.blobStore = deps.blobStore;
     this.scheduler = deps.scheduler;
+    this.insightSchedules = deps.insightSchedules;
     this.anomalyState = deps.anomalyState;
     this.queues = deps.queues;
   }
@@ -89,6 +95,7 @@ export class OpsService {
     instanceAdmin: InstanceAdminService;
     blobStore: BlobStoreService;
     scheduler: SchedulerOpsService;
+    insightSchedules: InsightScheduleOpsService;
     anomalyState: AnomalyStateRepository | null;
     queues: QueueService;
     explorers: OpsExplorers;
@@ -182,6 +189,10 @@ export class OpsService {
 
   listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]> {
     return this.scheduler.listRecentActions(input);
+  }
+
+  listInsightSchedules(input: ListInsightSchedulesInput): Promise<OpsInsightSchedule[]> {
+    return this.insightSchedules.list(input);
   }
 
   setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob> {

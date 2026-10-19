@@ -7,6 +7,11 @@ Feature: Lent components, hooks and drawers
     Then it renders with the reader's props
 
   @integration
+  Scenario: A lent component whose code will not load shows its fallback
+    When the code of a lent component fails to load
+    Then the reader shows the fallback in its place and the page around it stays
+
+  @integration
   Scenario: An unlent component reads as nothing
     When a reader asks for a token nobody lent
     Then it answers nothing

@@ -9,6 +9,7 @@ import { projectNavigation } from "@langwatch/project-contract";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
+import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
 import {
   type CodingAgentLinks,
@@ -29,7 +30,7 @@ import { SidebarSection } from "./sidebar-section.tsx";
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group
  * is gone because the product switcher replaces it, and the Ops group because
- * the settings menu holds the operations pages.
+ * the settings menu holds the operations pages. Dashboards is its own product.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
@@ -63,6 +64,7 @@ export const MainMenuSections = function MainMenuSections({
           showLabel={showExpanded}
         />
       )}
+      {navigation.home && <InsightsMenuLink {...sectionProps} />}
 
       <ObserveSection
         {...sectionProps}
@@ -84,6 +86,27 @@ interface ProjectSectionProps {
   showExpanded: boolean;
   project: NavigationProject | undefined;
   pathname: string;
+}
+
+/**
+ * Insights sits first, under Home: the inbox is where a day in the product starts. Hidden
+ * until `release_insights` answers on; the unread pill is the one insight lends.
+ */
+function InsightsMenuLink({ showExpanded, project, pathname }: ProjectSectionProps) {
+  const host = useNavigationHost();
+  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
+  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
+  return (
+    <PageMenuLink
+      path={projectNavItems.insights.path}
+      icon={featureIcons.insights.icon}
+      label={projectNavItems.insights.title}
+      project={project}
+      isActive={pathname.startsWith(projectNavItems.insights.path)}
+      showLabel={showExpanded}
+      rightElement={<InsightsNavCount />}
+    />
+  );
 }
 
 function ObserveSection({
@@ -326,6 +349,7 @@ type PageMenuLinkProps = {
   path: string;
   project?: NavigationProject;
   badgeNumber?: number;
+  rightElement?: React.ReactNode;
   isActive: boolean;
   showLabel?: boolean;
   beta?: string | boolean;
@@ -340,6 +364,7 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
+  rightElement,
   isActive,
   showLabel = true,
   beta,
@@ -357,6 +382,7 @@ const PageMenuLink = ({
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
+      rightElement={rightElement}
       showLabel={showLabel}
       beta={beta}
       betaLabel={betaLabel}

@@ -171,10 +171,12 @@ function useNavigationHostReading({
     deployment.demoProjectSlug && routeReading.projectParam === deployment.demoProjectSlug,
   );
 
+  // A signed-out visitor is sent to sign in by the session read; the graph would only answer 401.
+  const signedIn = !!session.currentUser();
   const organizations = scopeHostService.useUiOrganizations({
     transport: rpc,
     isDemo,
-    enabled: true,
+    enabled: signedIn,
     userId: session.currentUser()?.id,
   });
 
@@ -338,7 +340,7 @@ function useNavigationHostReading({
           // The project comes off the scope, which settles after the session and
           // after this graph: until both have, a missing project is not a not-found.
           // specs/navigation/workspace-resolution.feature
-          isLoading: organizations.isLoading || !session.isSettled(),
+          isLoading: organizations.isLoading || !session.isSettled() || !signedIn,
           currentUser,
           organizationRole,
           rememberedProjectSlug: memory.selection.projectSlug,
@@ -384,6 +386,7 @@ function useNavigationHostReading({
       project,
       openableTeams,
       organizations.isLoading,
+      signedIn,
       currentUser,
       organizationRole,
       memory.selection.projectSlug,

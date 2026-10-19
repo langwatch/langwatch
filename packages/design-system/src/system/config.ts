@@ -96,7 +96,7 @@ export const designSystemConfig = defineConfig({
     keyframes: {
       // A toast rises a few pixels into place and fades out where it is: no blur, no scale.
       "toast-in": {
-        from: { transform: "translateY(16px) scale(0.96)", opacity: 0 },
+        from: { transform: "translateY(16px)", opacity: 0 },
         to: { transform: "none", opacity: 1 },
       },
       "toast-fade": { from: { opacity: 1 }, to: { opacity: 0 } },

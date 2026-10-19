@@ -80,6 +80,28 @@ const UNKNOWN_IDENTIFIER: ServerError = {
   name: "UNKNOWN_IDENTIFIER",
 };
 
+/**
+ * Refusals that say the statement itself is malformed or mis-typed, as written. Each is
+ * the caller's SQL to fix; none describes the deployment. Names and numbers are from
+ * ClickHouse's `ErrorCodes.cpp`.
+ */
+const INVALID_QUERY_ERRORS: readonly ServerError[] = [
+  { code: "6", name: "CANNOT_PARSE_TEXT" },
+  { code: "10", name: "NOT_FOUND_COLUMN_IN_BLOCK" },
+  { code: "27", name: "CANNOT_PARSE_INPUT_ASSERTION_FAILED" },
+  { code: "36", name: "BAD_ARGUMENTS" },
+  { code: "42", name: "NUMBER_OF_ARGUMENTS_DOESNT_MATCH" },
+  { code: "43", name: "ILLEGAL_TYPE_OF_ARGUMENT" },
+  { code: "44", name: "ILLEGAL_COLUMN" },
+  { code: "53", name: "TYPE_MISMATCH" },
+  { code: "62", name: "SYNTAX_ERROR" },
+  { code: "70", name: "CANNOT_CONVERT_TYPE" },
+  { code: "184", name: "ILLEGAL_AGGREGATION" },
+  { code: "215", name: "NOT_AN_AGGREGATE" },
+  { code: "352", name: "AMBIGUOUS_COLUMN_NAME" },
+  { code: "386", name: "NO_COMMON_TYPE" },
+];
+
 /** A bound value that does not parse as its placeholder's declared type: the caller's input. */
 const BAD_QUERY_PARAMETER: ServerError = { code: "457", name: "BAD_QUERY_PARAMETER" };
 
@@ -136,6 +158,16 @@ export function isClickHouseObjectMissingError(error: unknown): boolean {
 export function isClickHouseUnknownIdentifierError(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
   return raisedServerError({ error, variants: [UNKNOWN_IDENTIFIER] });
+}
+
+/**
+ * True when the server refused the statement as written (see `INVALID_QUERY_ERRORS`). Not
+ * mapped in {@link translateClickHouseQueryError}: on our own connection it is a bug (ADR-045).
+ * Exported for the LangWatchQL executor; check it after the deployment-describing predicates.
+ */
+export function isClickHouseInvalidQueryError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  return raisedServerError({ error, variants: INVALID_QUERY_ERRORS });
 }
 
 /**

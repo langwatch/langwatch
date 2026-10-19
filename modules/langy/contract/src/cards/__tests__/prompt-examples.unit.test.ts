@@ -22,16 +22,27 @@ function repoRoot(): string {
   return dir;
 }
 
-const promptPath = path.join(repoRoot(), "services/langyagent/internal/assets/AGENTS.md");
+const assetsPath = path.join(repoRoot(), "services/langyagent/internal/assets");
+const promptPath = path.join(assetsPath, "AGENTS.md");
+/** A kind only one skill writes is taught by that skill: the prompt has no room for it. */
+const skillPaths = [path.join(assetsPath, "skills/daily-insights/SKILL.md")];
 
 /** The backticked `{"kind": …}` objects in the prompt's "Drawing data" bullets. */
 function documentedCardExamples(prompt: string): string[] {
   return [...prompt.matchAll(/`(\{"kind":[\s\S]*?\})`/g)].map((m) => m[1]!);
 }
 
+/** The `langy-card` fenced examples a skill shows. */
+function fencedCardExamples(skill: string): string[] {
+  return [...skill.matchAll(/^```langy-card\n([\s\S]*?)\n```$/gm)].map((m) => m[1]!);
+}
+
 describe("given the Langy prompt documents the derived-card shapes", () => {
   const prompt = fs.readFileSync(promptPath, "utf8");
-  const examples = documentedCardExamples(prompt);
+  const examples = [
+    ...documentedCardExamples(prompt),
+    ...skillPaths.flatMap((skillPath) => fencedCardExamples(fs.readFileSync(skillPath, "utf8"))),
+  ];
 
   describe("when each documented example is checked against the card contract", () => {
     /** @scenario The card shapes the prompt teaches are shapes the panel renders */

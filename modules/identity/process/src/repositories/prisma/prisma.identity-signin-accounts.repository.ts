@@ -34,9 +34,8 @@ export class PrismaIdentitySignInAccountsRepository implements IdentitySignInAcc
   private constructor(private readonly database: PrismaIdentitySignInAccountsDatabase) {}
 
   /**
-   * Case-insensitive for the same reason the collision guard is: rows written
-   * before addresses were lowercased may carry capitals. A finalized user
-   * keeps their credential on `AccountCredential`, so both tables count.
+   * A plain match: user stores addresses lower-cased (`user:lower-case-stored-addresses`).
+   * A finalized user keeps their credential on `AccountCredential`, so both tables count.
    */
   async findLegacySignInAccounts({
     normalizedValue,
@@ -44,7 +43,7 @@ export class PrismaIdentitySignInAccountsRepository implements IdentitySignInAcc
     normalizedValue: string;
   }): Promise<LegacySignInAccount[]> {
     const user = await this.database.user.findFirst({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
+      where: { email: normalizedValue },
       select: {
         id: true,
         // The subject rides along for exactly one reader: the connection

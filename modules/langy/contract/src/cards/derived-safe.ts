@@ -9,6 +9,7 @@ import * as z from "zod";
 import {
   type CARD_SHAPE,
   choicesCardFields,
+  insightsCardFields,
   statsCardFields,
   tableCardFields,
   timeseriesComparisonFields,
@@ -33,6 +34,7 @@ export const DERIVED_SAFE_CARD_KINDS = [
   "timeseries",
   "table",
   "stats",
+  "insights",
 ] as const satisfies readonly PresentationCardKind[];
 
 export type DerivedSafeCardKind = (typeof DERIVED_SAFE_CARD_KINDS)[number];
@@ -132,6 +134,23 @@ export const langyDerivedStatsCardSchema: LangyDerivedStatsCardSchema =
 export type LangyDerivedStatsCard = z.infer<typeof langyDerivedStatsCardSchema>;
 
 /**
+ * `insights` — findings about one board. Strict where its siblings strip: a key the card
+ * does not list refuses it whole, so no finding names an owner, a project or a board.
+ */
+const langyDerivedInsightsCardSchemaDefinition = z.strictObject({
+  ...derivedCardBase,
+  kind: z.literal("insights"),
+  ...insightsCardFields,
+});
+export interface LangyDerivedInsightsCardSchema extends Named<
+  typeof langyDerivedInsightsCardSchemaDefinition
+> {}
+export const langyDerivedInsightsCardSchema: LangyDerivedInsightsCardSchema =
+  langyDerivedInsightsCardSchemaDefinition;
+export type LangyDerivedInsightsCard = z.infer<typeof langyDerivedInsightsCardSchema>;
+export type LangyInsightsCardFinding = LangyDerivedInsightsCard["findings"][number];
+
+/**
  * `choices` — the one sanctioned way to offer options (ADR-060 §6), panel-
  * stamped from a `question` tool call. Option ids must be unique — selection
  * binds by `{blockId, optionId}`.
@@ -179,6 +198,7 @@ const DERIVED_SCHEMA_BY_KIND = {
   timeseries: langyDerivedTimeseriesCardSchema,
   table: langyDerivedTableCardSchema,
   stats: langyDerivedStatsCardSchema,
+  insights: langyDerivedInsightsCardSchema,
   choices: choicesCardObjectSchema,
 } as const satisfies Record<RenderedCardKind, z.ZodObject>;
 
@@ -190,6 +210,7 @@ const langyModelEmittedCardSchemaDefinition = z.discriminatedUnion("kind", [
   DERIVED_SCHEMA_BY_KIND.timeseries,
   DERIVED_SCHEMA_BY_KIND.table,
   DERIVED_SCHEMA_BY_KIND.stats,
+  DERIVED_SCHEMA_BY_KIND.insights,
 ]);
 export interface LangyModelEmittedCardSchema extends Named<
   typeof langyModelEmittedCardSchemaDefinition
@@ -207,6 +228,7 @@ const langyDerivedCardSchemaDefinition = z
     DERIVED_SCHEMA_BY_KIND.timeseries,
     DERIVED_SCHEMA_BY_KIND.table,
     DERIVED_SCHEMA_BY_KIND.stats,
+    DERIVED_SCHEMA_BY_KIND.insights,
     DERIVED_SCHEMA_BY_KIND.choices,
   ])
   .superRefine((card, ctx) => {

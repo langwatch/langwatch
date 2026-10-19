@@ -15,9 +15,10 @@ import {
 import { ProjectNotFoundError } from "@langwatch/project-contract";
 
 import type { InstantEvalJudgeRoute } from "../rules/instant-eval-judge-choice.rules.ts";
+import type { InstantEvalPlanReader } from "./instant-eval-access.service.ts";
 
 /** The peers the offer and the switch ask, each narrowed to one question. */
-export interface InstantEvalOptInPeers {
+export interface InstantEvalOptInPeers extends InstantEvalPlanReader {
   findOrganizationId(projectId: string): Promise<string | undefined>;
   /** Whether this is the hosted service; a self-hosted install is never offered the switch. */
   isSaas(): boolean;
@@ -25,7 +26,6 @@ export interface InstantEvalOptInPeers {
   judgeRoute(): Promise<InstantEvalJudgeRoute>;
   /** Whether the organization's license names Instant Evals, and whether an admin left them on. */
   licenseStateOf(organizationId: string): Promise<ConnectServiceState>;
-  isEnterprisePlan(organizationId: string): Promise<boolean>;
   /** The authority the switch's route declares (`organization:manage`), asked of the reader. */
   mayManageOrganization(input: { userId: string; organizationId: string }): Promise<boolean>;
   isReleased(input: { projectId: string }): Promise<boolean>;

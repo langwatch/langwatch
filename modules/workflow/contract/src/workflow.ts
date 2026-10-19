@@ -36,14 +36,27 @@ export const workflowRunOriginSchema = z.enum([
 ]);
 export type WorkflowRunOrigin = z.infer<typeof workflowRunOriginSchema>;
 
+/** Where and why the engine stopped, when a run fails. */
+const workflowRunErrorSchema = z.object({
+  type: z.string(),
+  message: z.string(),
+  node_id: z.string().optional(),
+  traceback: z.string().optional(),
+});
+
 /**
- * What one synchronous workflow run answers with: the execution state the
- * engine finished in, and the workflow's own output fields, keyed by the names
- * the workflow gives them.
+ * What one synchronous workflow run answers with: the engine's state, the
+ * workflow's own output fields, and the trace, cost, timing, per-node results
+ * and error the engine reports alongside them.
  */
 const workflowRunAnswerSchemaDefinition = z.object({
   result: z.record(z.string(), z.unknown()).nullable().optional(),
   status: z.enum(["idle", "waiting", "running", "success", "error", "skipped"]),
+  trace_id: z.string().optional(),
+  nodes: z.record(z.string(), z.unknown()).optional(),
+  total_cost: z.number().optional(),
+  duration_ms: z.number().optional(),
+  error: workflowRunErrorSchema.optional(),
 });
 export interface WorkflowRunAnswerSchema extends Named<typeof workflowRunAnswerSchemaDefinition> {}
 export const workflowRunAnswerSchema: WorkflowRunAnswerSchema = workflowRunAnswerSchemaDefinition;

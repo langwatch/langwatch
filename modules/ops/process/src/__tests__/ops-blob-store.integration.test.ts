@@ -9,6 +9,7 @@ import {
   LEGACY_HOLDER_LEASE_GUARD,
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
+import type { InsightApi } from "@langwatch/insight-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -97,6 +98,7 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
       scheduler: {
         schedules,
         projects,
+        insights: createApiFixture<InsightApi>(),
       },
       explorers: {
         eventExplorer: createApiFixture<OpsEventExplorer>(),

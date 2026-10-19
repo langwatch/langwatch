@@ -2,6 +2,7 @@ import { chartGridBottomRow } from "@langwatch/analytics-contract/chart-grid";
 import {
   dashboardSchema,
   graphSchema,
+  isDashboardAuthor,
   savedWorkbenchChartSchema,
   SavedWorkbenchChartAlreadyExistsError,
   SavedWorkbenchChartNotFoundError,
@@ -9,48 +10,53 @@ import {
   type SavedWorkbenchChartDefinition,
   type DashboardUsageCount,
 } from "@langwatch/dashboard-contract";
-import { Temporal, toDate } from "@langwatch/time";
 
 import type {
   DashboardGraphKind,
+  DashboardReach,
   DashboardRecord,
   DashboardRepository,
   DashboardSummaryRecord,
+  DashboardUpdate,
   GraphRecord,
   SavedWorkbenchChartRecord,
 } from "../dashboard.repository.ts";
+import { MemoryDashboardDatabase, type StoredChart } from "./memory.dashboard.database.ts";
 
-/**
- * The one JSON column both chart kinds share: a builder graph payload, or a
- * saved workbench chart's definition as the contract names it.
- */
-type StoredChartPayload = Record<string, unknown> | SavedWorkbenchChartDefinition;
+/** A Reports chart: any kind but the stale srcdoc copies of Dashboards widgets. */
+const isReportsChart = (chart: StoredChart) => chart.kind !== "dashboard_srcdoc";
 
-/** One stored chart row, of either kind, as the shared table holds it. */
-type StoredChart = Pick<GraphRecord, "createdAt" | "updatedAt"> & {
-  id: string;
-  projectId: string;
-  name: string;
-  kind: DashboardGraphKind;
-  graph: StoredChartPayload;
-  filters: Record<string, unknown> | null;
-  dashboardId: string | null;
-  gridColumn: number;
-  gridRow: number;
-  colSpan: number;
-  rowSpan: number;
-};
+/** An Only me row is its author's alone, so a project credential sees none (AC199m). */
+const seenBy = (reach: DashboardReach, dashboard: DashboardRecord) =>
+  dashboard.scope !== "PRIVATE" || isDashboardAuthor({ board: dashboard, viewer: reach.viewer });
 
-/** The same observable behaviour as the Prisma twin, over two arrays. */
+/** The same observable behaviour as the Prisma twin, over the shared memory tables. */
 export class MemoryDashboardRepository implements DashboardRepository {
-  #dashboards: DashboardRecord[] = [];
-  #charts: StoredChart[] = [];
-  #clock = 0;
+  #database: MemoryDashboardDatabase;
 
-  private constructor() {}
+  private constructor(database: MemoryDashboardDatabase) {
+    this.#database = database;
+  }
 
-  static create(): MemoryDashboardRepository {
-    return new MemoryDashboardRepository();
+  /** `database` is shared with the module's other memory repositories; a fresh one otherwise. */
+  static create(options: { database?: MemoryDashboardDatabase } = {}): MemoryDashboardRepository {
+    return new MemoryDashboardRepository(options.database ?? MemoryDashboardDatabase.create());
+  }
+
+  get #dashboards(): DashboardRecord[] {
+    return this.#database.dashboards;
+  }
+
+  set #dashboards(rows: DashboardRecord[]) {
+    this.#database.dashboards = rows;
+  }
+
+  get #charts(): StoredChart[] {
+    return this.#database.charts;
+  }
+
+  set #charts(rows: StoredChart[]) {
+    this.#database.charts = rows;
   }
 
   async countUsage({
@@ -59,32 +65,48 @@ export class MemoryDashboardRepository implements DashboardRepository {
     projectIds: readonly string[];
   }): Promise<DashboardUsageCount> {
     const inScope = this.#charts.filter((chart) => projectIds.includes(chart.projectId));
+    const widgets = this.#database.widgets.filter((widget) =>
+      projectIds.includes(widget.projectId),
+    );
     return {
       builderCharts: inScope.filter((chart) => chart.kind === "builder").length,
-      charts: inScope.length,
+      charts: inScope.filter(isReportsChart).length + widgets.length,
     };
   }
 
-  async findAllDashboards(input: {
+  async findDashboardsOnlyIds(input: {
     projectId: string;
-    graphKinds: readonly DashboardGraphKind[];
-  }): Promise<DashboardSummaryRecord[]> {
+    dashboardIds: readonly string[];
+  }): Promise<string[]> {
+    return input.dashboardIds.filter((dashboardId) =>
+      this.#database.isDashboardsOnly({ projectId: input.projectId, dashboardId }),
+    );
+  }
+
+  async findAllDashboards(
+    input: DashboardReach & { graphKinds: readonly DashboardGraphKind[] },
+  ): Promise<DashboardSummaryRecord[]> {
     return this.#dashboards
-      .filter((dashboard) => dashboard.projectId === input.projectId)
-      .toSorted((left, right) => left.order - right.order)
+      .filter((dashboard) => this.#reaches(input, dashboard))
+      .toSorted((left, right) => left.order - right.order || left.name.localeCompare(right.name))
       .map((dashboard) => ({
         ...dashboard,
         graphCount: this.#charts.filter(
-          (chart) => chart.dashboardId === dashboard.id && input.graphKinds.includes(chart.kind),
+          (chart) =>
+            chart.projectId === dashboard.projectId &&
+            chart.dashboardId === dashboard.id &&
+            (chart.kind === "builder" || chart.kind === "workbench_sql") &&
+            input.graphKinds.includes(chart.kind),
         ).length,
       }));
   }
 
-  async findDashboard(input: {
-    projectId: string;
-    dashboardId: string;
-  }): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
-    const dashboard = this.#dashboard(input);
+  async findDashboard(
+    input: DashboardReach & { dashboardId: string },
+  ): Promise<(DashboardRecord & { graphs: GraphRecord[] }) | undefined> {
+    const dashboard = this.#dashboards.find(
+      (row) => row.id === input.dashboardId && this.#reaches(input, row),
+    );
     if (!dashboard) return undefined;
 
     const graphs = this.#charts
@@ -95,25 +117,18 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return { ...dashboard, graphs };
   }
 
-  async findFirstDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
-    return this.#dashboards
-      .filter((dashboard) => dashboard.projectId === input.projectId)
-      .toSorted((left, right) => left.order - right.order)[0];
+  async findDashboards(
+    input: DashboardReach & { dashboardIds: string[] },
+  ): Promise<DashboardRecord[]> {
+    return this.#dashboards.filter(
+      (dashboard) => input.dashboardIds.includes(dashboard.id) && this.#reaches(input, dashboard),
+    );
   }
 
   async findLastDashboard(input: { projectId: string }): Promise<DashboardRecord | undefined> {
     return this.#dashboards
       .filter((dashboard) => dashboard.projectId === input.projectId)
       .toSorted((left, right) => right.order - left.order)[0];
-  }
-
-  async findDashboardIds(input: { projectId: string; dashboardIds: string[] }): Promise<string[]> {
-    return this.#dashboards
-      .filter(
-        (dashboard) =>
-          dashboard.projectId === input.projectId && input.dashboardIds.includes(dashboard.id),
-      )
-      .map((dashboard) => dashboard.id);
   }
 
   async createDashboard(input: {
@@ -124,6 +139,10 @@ export class MemoryDashboardRepository implements DashboardRepository {
   }): Promise<DashboardRecord> {
     const dashboard = dashboardSchema.parse({
       ...input,
+      description: null,
+      createdById: null,
+      scope: "PROJECT",
+      organizationId: null,
       createdAt: this.#now(),
       updatedAt: this.#now(),
     });
@@ -134,10 +153,14 @@ export class MemoryDashboardRepository implements DashboardRepository {
   async updateDashboard(input: {
     projectId: string;
     dashboardId: string;
-    data: { name: string };
+    data: DashboardUpdate;
   }): Promise<DashboardRecord> {
     const dashboard = this.#requireDashboard(input);
-    const updated = { ...dashboard, name: input.data.name, updatedAt: this.#now() };
+    const updated = dashboardSchema.parse({
+      ...dashboard,
+      ...Object.fromEntries(Object.entries(input.data).filter(([, value]) => value !== undefined)),
+      updatedAt: this.#now(),
+    });
     this.#dashboards = this.#dashboards.map((row) => (row.id === dashboard.id ? updated : row));
     return updated;
   }
@@ -147,10 +170,31 @@ export class MemoryDashboardRepository implements DashboardRepository {
     dashboardId: string;
   }): Promise<DashboardRecord> {
     const dashboard = this.#requireDashboard(input);
-    this.#dashboards = this.#dashboards.filter((row) => row.id !== dashboard.id);
-    // The stored foreign key cascades, as the schema's does.
-    this.#charts = this.#charts.filter((chart) => chart.dashboardId !== dashboard.id);
+    this.#dashboards = this.#dashboards.filter((row) => row !== dashboard);
+    // The stored foreign key cascades, as the schema's does; the Dashboards area's rows stay.
+    this.#charts = this.#charts.filter(
+      (chart) => !(chart.projectId === dashboard.projectId && chart.dashboardId === dashboard.id),
+    );
     return dashboard;
+  }
+
+  /** Whether a Reports read reaches the board: the project's own, seen by it, unless moved. */
+  #reaches(reach: DashboardReach, dashboard: DashboardRecord): boolean {
+    return (
+      dashboard.projectId === reach.projectId &&
+      seenBy(reach, dashboard) &&
+      !this.#database.isDashboardsOnly({ projectId: reach.projectId, dashboardId: dashboard.id })
+    );
+  }
+
+  /** A chart on no board, or on a board the reader sees, as the Prisma twin's relation filter. */
+  #chartReaches(reach: DashboardReach, chart: StoredChart): boolean {
+    if (chart.dashboardId === null) return true;
+    const dashboard = this.#dashboard({
+      projectId: chart.projectId,
+      dashboardId: chart.dashboardId,
+    });
+    return dashboard !== undefined && seenBy(reach, dashboard);
   }
 
   async updateDashboardOrder(input: { projectId: string; dashboardIds: string[] }): Promise<void> {
@@ -162,11 +206,12 @@ export class MemoryDashboardRepository implements DashboardRepository {
     }
   }
 
-  async findAllGraphs(input: { projectId: string; dashboardId?: string }): Promise<GraphRecord[]> {
+  async findAllGraphs(input: DashboardReach & { dashboardId?: string }): Promise<GraphRecord[]> {
     const rows = this.#charts.filter(
       (chart) =>
         chart.projectId === input.projectId &&
         chart.kind === "builder" &&
+        this.#chartReaches(input, chart) &&
         (input.dashboardId === undefined || chart.dashboardId === input.dashboardId),
     );
 
@@ -180,15 +225,18 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return ordered.map((chart) => graphOf(chart));
   }
 
-  async findGraph(input: { projectId: string; graphId: string }): Promise<GraphRecord | undefined> {
+  async findGraph(input: DashboardReach & { graphId: string }): Promise<GraphRecord | undefined> {
     const chart = this.#chart(input.projectId, input.graphId, "builder");
-    return chart ? graphOf(chart) : undefined;
+    return chart && this.#chartReaches(input, chart) ? graphOf(chart) : undefined;
   }
 
   async findNextFreeGridRow(input: { projectId: string; dashboardId: string }): Promise<number> {
     return chartGridBottomRow(
       this.#charts.filter(
-        (chart) => chart.projectId === input.projectId && chart.dashboardId === input.dashboardId,
+        (chart) =>
+          chart.projectId === input.projectId &&
+          chart.dashboardId === input.dashboardId &&
+          isReportsChart(chart),
       ),
     );
   }
@@ -262,21 +310,23 @@ export class MemoryDashboardRepository implements DashboardRepository {
     }
   }
 
-  async findAllSavedWorkbenchCharts(input: {
-    projectId: string;
-  }): Promise<SavedWorkbenchChartRecord[]> {
+  async findAllSavedWorkbenchCharts(input: DashboardReach): Promise<SavedWorkbenchChartRecord[]> {
     return this.#charts
-      .filter((chart) => chart.projectId === input.projectId && chart.kind === "workbench_sql")
+      .filter(
+        (chart) =>
+          chart.projectId === input.projectId &&
+          chart.kind === "workbench_sql" &&
+          this.#chartReaches(input, chart),
+      )
       .toSorted((left, right) => right.createdAt.getTime() - left.createdAt.getTime())
       .map((chart) => savedChartOf(chart));
   }
 
-  async findSavedWorkbenchChart(input: {
-    projectId: string;
-    chartId: string;
-  }): Promise<SavedWorkbenchChartRecord | undefined> {
+  async findSavedWorkbenchChart(
+    input: DashboardReach & { chartId: string },
+  ): Promise<SavedWorkbenchChartRecord | undefined> {
     const chart = this.#chart(input.projectId, input.chartId, "workbench_sql");
-    return chart ? savedChartOf(chart) : undefined;
+    return chart && this.#chartReaches(input, chart) ? savedChartOf(chart) : undefined;
   }
 
   async createSavedWorkbenchChart(input: {
@@ -394,10 +444,8 @@ export class MemoryDashboardRepository implements DashboardRepository {
     return updated;
   }
 
-  /** A monotonic clock, so "the newest row" is the one written last. */
   #now(): GraphRecord["createdAt"] {
-    this.#clock += 1;
-    return toDate(Temporal.Instant.fromEpochMilliseconds(this.#clock));
+    return this.#database.now();
   }
 }
 

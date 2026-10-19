@@ -74,7 +74,8 @@ export interface UserProfilesInputSchema extends Named<typeof userProfilesInputS
 export const userProfilesInputSchema: UserProfilesInputSchema = userProfilesInputSchemaDefinition;
 export type UserProfilesInput = z.infer<typeof userProfilesInputSchema>;
 
-export const userEmailSchema = z.string().trim().pipe(z.email());
+/** Stored and looked up lower-cased, so a plain match on the unique index finds the account. */
+export const userEmailSchema = z.string().trim().toLowerCase().pipe(z.email());
 const userEmailInputSchemaDefinition = z.object({ email: userEmailSchema }).strict();
 export interface UserEmailInputSchema extends Named<typeof userEmailInputSchemaDefinition> {}
 export const userEmailInputSchema: UserEmailInputSchema = userEmailInputSchemaDefinition;

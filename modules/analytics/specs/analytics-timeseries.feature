@@ -200,3 +200,9 @@ Feature: Analytics timeseries service
       When the Analytics page reads for a window
       Then every read excludes the origin "langy"
       And the Traces total equals the Trace Explorer count for the same window
+
+    @integration
+    Scenario: A personal project's Analytics reads keep Langy's turns
+      Given a personal project, where Langy's conversations are the member's own data
+      When the Analytics page reads for a window
+      Then no read excludes any origin

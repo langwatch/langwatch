@@ -3,7 +3,7 @@
  */
 
 import { uiTokens } from "@langwatch/module";
-import { render, renderHook, screen } from "@testing-library/react";
+import { render, renderHook, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,6 +42,28 @@ describe("a component lent by token", () => {
       render(<Lent of={Peek} props={{ traceId: "t1" }} />, { wrapper: within(declarations) });
 
       expect(await screen.findByText("peek t1")).toBeDefined();
+    });
+  });
+
+  describe("when its code fails to load", () => {
+    /** @scenario A lent component whose code will not load shows its fallback */
+    it("shows the fallback in its place", async () => {
+      const reported = vi.spyOn(console, "error").mockImplementation(() => {});
+      const declarations = uiDeclarations([
+        lendsOf("trace", [{ token: Peek, load: () => Promise.reject(new Error("chunk gone")) }]),
+      ]);
+
+      render(
+        <main>
+          page <Lent of={Peek} props={{ traceId: "t1" }} fallback={<i>no peek</i>} />
+        </main>,
+        { wrapper: within(declarations) },
+      );
+
+      await waitFor(() => expect(reported).toHaveBeenCalled(), { timeout: 5_000 });
+
+      expect(screen.getByRole("main").textContent).toBe("page no peek");
+      vi.restoreAllMocks();
     });
   });
 

@@ -16,6 +16,7 @@ import {
 const PENDING: ChartQueryState = {
   status: "pending",
   data: null,
+  completeness: null,
   error: null,
   refetchError: null,
   isFetching: true,
@@ -24,7 +25,7 @@ const BUSY = { code: "lwql_busy", retryable: true };
 const BROKEN = { code: "lwql_unknown_identifier" };
 
 /** A runner over a scripted query, with the hook's own state reduction and real retry plan. */
-function runnerOver(answers: (() => Promise<{ rows: unknown }>)[]) {
+function runnerOver(answers: (() => Promise<{ rows: unknown; completeness?: unknown }>)[]) {
   let state = PENDING;
   const delays: number[] = [];
   const query = vi.fn(() => answers.shift()!());
@@ -35,7 +36,7 @@ function runnerOver(answers: (() => Promise<{ rows: unknown }>)[]) {
     },
     toError: (rejection) => rejection,
     planRetry: ({ rejection, retriesUsed }) =>
-      planChartQueryRetry({ rejection, retriesUsed, random: () => 0.5 }),
+      planChartQueryRetry({ rejection, retriesUsed, maxRetries: 3, random: () => 0.5 }),
     setTimer: (callback, delayMs) => {
       delays.push(delayMs);
       return setTimeout(callback, delayMs);
@@ -46,6 +47,14 @@ function runnerOver(answers: (() => Promise<{ rows: unknown }>)[]) {
 }
 
 const rows = (value: unknown) => () => Promise.resolve({ rows: value });
+const rowsWith = (value: unknown, completeness: unknown) => () =>
+  Promise.resolve({ rows: value, completeness });
+const PARTIAL = {
+  state: "partial",
+  unit: "traces",
+  total: 10,
+  fields: [{ field: "TotalCost", label: "total cost", present: 4 }],
+};
 const refuse = (rejection: unknown) => () => Promise.reject(rejection);
 
 describe("the chart query runner", () => {
@@ -69,6 +78,7 @@ describe("the chart query runner", () => {
       expect(read()).toEqual({
         status: "success",
         data: [{ n: 1 }],
+        completeness: null,
         error: null,
         refetchError: BROKEN,
         isFetching: false,
@@ -83,6 +93,45 @@ describe("the chart query runner", () => {
       }
 
       expect(read()).toMatchObject({ status: "success", data: [2], refetchError: null });
+    });
+  });
+
+  describe("when a query answers with a completeness report", () => {
+    /** @scenario "useChartQuery returns completeness with its rows" */
+    it("hands the report to the widget beside the rows", async () => {
+      const { runner, read } = runnerOver([rowsWith([{ n: 1 }], PARTIAL)]);
+
+      runner.run();
+      await vi.runAllTimersAsync();
+
+      expect(read()).toMatchObject({ data: [{ n: 1 }], completeness: PARTIAL });
+    });
+
+    /** @scenario "A failed refresh keeps the completeness of the rows on screen" */
+    it("keeps the report with the rows when a refetch fails", async () => {
+      const { runner, read } = runnerOver([rowsWith([{ n: 1 }], PARTIAL), refuse(BROKEN)]);
+      runner.run();
+      await vi.runAllTimersAsync();
+
+      runner.run();
+      await vi.runAllTimersAsync();
+
+      expect(read()).toMatchObject({
+        data: [{ n: 1 }],
+        completeness: PARTIAL,
+        refetchError: BROKEN,
+      });
+    });
+
+    /** @scenario "useChartQuery returns completeness with its rows" */
+    it("reads an absent report as null, never as the previous one", async () => {
+      const { runner, read } = runnerOver([rowsWith([1], PARTIAL), rows([2])]);
+      for (let fetches = 0; fetches < 2; fetches += 1) {
+        runner.run();
+        await vi.runAllTimersAsync();
+      }
+
+      expect(read()).toMatchObject({ data: [2], completeness: null });
     });
   });
 
@@ -115,6 +164,7 @@ describe("the chart query runner", () => {
       expect(read()).toEqual({
         status: "success",
         data: [7],
+        completeness: null,
         error: null,
         refetchError: null,
         isFetching: false,
@@ -169,6 +219,7 @@ describe("the chart query runner", () => {
       expect(read()).toEqual({
         status: "error",
         data: null,
+        completeness: null,
         error: BROKEN,
         refetchError: null,
         isFetching: false,
@@ -181,7 +232,7 @@ describe("the retry plan", () => {
   /** @scenario "A retryable failure is retried with backoff before it counts" */
   it("spreads each wait over the upper half of a doubling ceiling", () => {
     const plan = (retriesUsed: number, random: number) =>
-      planChartQueryRetry({ rejection: BUSY, retriesUsed, random: () => random });
+      planChartQueryRetry({ rejection: BUSY, retriesUsed, maxRetries: 3, random: () => random });
 
     expect(plan(0, 0)).toEqual({ retry: true, delayMs: 200 });
     expect(plan(0, 0.999)).toEqual({ retry: true, delayMs: 400 });
@@ -191,7 +242,9 @@ describe("the retry plan", () => {
 
   it("retries only a rejection that says it is retryable", () => {
     for (const rejection of [BROKEN, { retryable: "yes" }, null, "busy", new Error("x")]) {
-      expect(planChartQueryRetry({ rejection, retriesUsed: 0, random: () => 0 })).toEqual({
+      expect(
+        planChartQueryRetry({ rejection, retriesUsed: 0, maxRetries: 3, random: () => 0 }),
+      ).toEqual({
         retry: false,
       });
     }

@@ -338,24 +338,24 @@ None: this module declares no REST family.
 
 ### `ssoConnections`
 
-Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:48`.
+Contract `../contract/src/sso-connection.trpc.ts:32`, router `src/transport/sso-connection.trpc.ts:37`.
 
-| Procedure                             | Kind     | Gate                                                                                                                                                  | Input                                     | Output                         |
-| ------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------- | ------------------------------ |
-| `ssoConnections.getAll`               | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `listSsoConnectionsInputSchema`           | `adminSsoConnectionPageSchema` |
-| `ssoConnections.getById`              | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
-| `ssoConnections.getHistory`           | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionByIdSchema`                 | inline                         |
-| `ssoConnections.getMigrationProgress` | query    | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `operatorSsoMigrationProgressInputSchema` | inline                         |
-| `ssoConnections.startLegacyMigration` | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`     |
-| `ssoConnections.register`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `registerSsoConnectionInputSchema`        | –                              |
-| `ssoConnections.claimDomain`          | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
-| `ssoConnections.approveDomainClaim`   | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoDomainTargetSchema`                   | inline                         |
-| `ssoConnections.rejectDomainClaim`    | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `rejectSsoDomainClaimInputSchema`         | inline                         |
-| `ssoConnections.attestDomain`         | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `attestSsoDomainInputSchema`              | inline                         |
-| `ssoConnections.activate`             | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `activateSsoConnectionInputSchema`        | inline                         |
-| `ssoConnections.suspend`              | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
-| `ssoConnections.resume`               | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionTargetSchema`               | inline                         |
-| `ssoConnections.requestTeardown`      | mutation | No permission: admin surface gated on the platform-operator grant (ops:* at the platform tier), not on an org RBAC permission; cross-tenant by design | `ssoConnectionReasonInputSchema`          | inline                         |
+| Procedure                             | Kind     | Gate                             | Input                                     | Output                         |
+| ------------------------------------- | -------- | -------------------------------- | ----------------------------------------- | ------------------------------ |
+| `ssoConnections.getAll`               | query    | Platform permission `ops:manage` | `listSsoConnectionsInputSchema`           | `adminSsoConnectionPageSchema` |
+| `ssoConnections.getById`              | query    | Platform permission `ops:manage` | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getHistory`           | query    | Platform permission `ops:manage` | `ssoConnectionByIdSchema`                 | inline                         |
+| `ssoConnections.getMigrationProgress` | query    | Platform permission `ops:manage` | `operatorSsoMigrationProgressInputSchema` | inline                         |
+| `ssoConnections.startLegacyMigration` | mutation | Platform permission `ops:manage` | `ssoSetupStartMigrationSchema`            | `ssoSetupRegisteredSchema`     |
+| `ssoConnections.register`             | mutation | Platform permission `ops:manage` | `registerSsoConnectionInputSchema`        | –                              |
+| `ssoConnections.claimDomain`          | mutation | Platform permission `ops:manage` | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.approveDomainClaim`   | mutation | Platform permission `ops:manage` | `ssoDomainTargetSchema`                   | inline                         |
+| `ssoConnections.rejectDomainClaim`    | mutation | Platform permission `ops:manage` | `rejectSsoDomainClaimInputSchema`         | inline                         |
+| `ssoConnections.attestDomain`         | mutation | Platform permission `ops:manage` | `attestSsoDomainInputSchema`              | inline                         |
+| `ssoConnections.activate`             | mutation | Platform permission `ops:manage` | `activateSsoConnectionInputSchema`        | inline                         |
+| `ssoConnections.suspend`              | mutation | Platform permission `ops:manage` | `ssoConnectionReasonInputSchema`          | inline                         |
+| `ssoConnections.resume`               | mutation | Platform permission `ops:manage` | `ssoConnectionTargetSchema`               | inline                         |
+| `ssoConnections.requestTeardown`      | mutation | Platform permission `ops:manage` | `ssoConnectionReasonInputSchema`          | inline                         |
 
 ```typescript
 // ssoConnections.getAll
@@ -735,23 +735,23 @@ Declared at `src/eventing/sso-sign-in-provider.pipeline.ts:34`. Events: `ssoSign
 | Kind   | Leaf               | Environment variable   | Declared at                                               |
 | ------ | ------------------ | ---------------------- | --------------------------------------------------------- |
 | secret | `–`                | `GOOGLE_CLIENT_SECRET` | `src/app/sso.app.ts:332`                                  |
-| config | `authProvider`     | `AUTH_PROVIDER`        | `../../../../packages/config/src/deployment-facts.ts:266` |
-| config | `legacyProvider`   | `NEXTAUTH_PROVIDER`    | `../../../../packages/config/src/deployment-facts.ts:268` |
-| config | `googleClientId`   | `GOOGLE_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:269` |
-| config | `githubClientId`   | `GITHUB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:270` |
-| config | `gitlabClientId`   | `GITLAB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:271` |
-| config | `azureAdClientId`  | `AZURE_AD_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:272` |
-| config | `azureAdTenantId`  | `AZURE_AD_TENANT_ID`   | `../../../../packages/config/src/deployment-facts.ts:273` |
-| config | `auth0ClientId`    | `AUTH0_CLIENT_ID`      | `../../../../packages/config/src/deployment-facts.ts:274` |
-| config | `auth0Issuer`      | `AUTH0_ISSUER`         | `../../../../packages/config/src/deployment-facts.ts:275` |
-| config | `oktaClientId`     | `OKTA_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:276` |
-| config | `oktaIssuer`       | `OKTA_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:277` |
-| config | `cognitoClientId`  | `COGNITO_CLIENT_ID`    | `../../../../packages/config/src/deployment-facts.ts:278` |
-| config | `cognitoIssuer`    | `COGNITO_ISSUER`       | `../../../../packages/config/src/deployment-facts.ts:279` |
-| config | `oneLoginClientId` | `ONELOGIN_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:280` |
-| config | `oneLoginIssuer`   | `ONELOGIN_ISSUER`      | `../../../../packages/config/src/deployment-facts.ts:281` |
-| config | `oidcClientId`     | `OIDC_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:282` |
-| config | `oidcIssuer`       | `OIDC_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:283` |
+| config | `authProvider`     | `AUTH_PROVIDER`        | `../../../../packages/config/src/deployment-facts.ts:271` |
+| config | `legacyProvider`   | `NEXTAUTH_PROVIDER`    | `../../../../packages/config/src/deployment-facts.ts:273` |
+| config | `googleClientId`   | `GOOGLE_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:274` |
+| config | `githubClientId`   | `GITHUB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:275` |
+| config | `gitlabClientId`   | `GITLAB_CLIENT_ID`     | `../../../../packages/config/src/deployment-facts.ts:276` |
+| config | `azureAdClientId`  | `AZURE_AD_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:277` |
+| config | `azureAdTenantId`  | `AZURE_AD_TENANT_ID`   | `../../../../packages/config/src/deployment-facts.ts:278` |
+| config | `auth0ClientId`    | `AUTH0_CLIENT_ID`      | `../../../../packages/config/src/deployment-facts.ts:279` |
+| config | `auth0Issuer`      | `AUTH0_ISSUER`         | `../../../../packages/config/src/deployment-facts.ts:280` |
+| config | `oktaClientId`     | `OKTA_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:281` |
+| config | `oktaIssuer`       | `OKTA_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:282` |
+| config | `cognitoClientId`  | `COGNITO_CLIENT_ID`    | `../../../../packages/config/src/deployment-facts.ts:283` |
+| config | `cognitoIssuer`    | `COGNITO_ISSUER`       | `../../../../packages/config/src/deployment-facts.ts:284` |
+| config | `oneLoginClientId` | `ONELOGIN_CLIENT_ID`   | `../../../../packages/config/src/deployment-facts.ts:285` |
+| config | `oneLoginIssuer`   | `ONELOGIN_ISSUER`      | `../../../../packages/config/src/deployment-facts.ts:286` |
+| config | `oidcClientId`     | `OIDC_CLIENT_ID`       | `../../../../packages/config/src/deployment-facts.ts:287` |
+| config | `oidcIssuer`       | `OIDC_ISSUER`          | `../../../../packages/config/src/deployment-facts.ts:288` |
 | config | `isSaas`           | `IS_SAAS`              | `../contract/src/sso.config.ts:12`                        |
 | config | `publicBaseUrl`    | `BASE_HOST`            | `../contract/src/sso.config.ts:12`                        |
 

@@ -176,6 +176,9 @@ function tenantLink(
  * other (an enum-discriminated shape, a paired credential) can't be satisfied by seeding
  */
 const SEED_COLUMN_OVERRIDES: Readonly<Record<string, Readonly<Record<string, string | null>>>> = {
+  // The views hide PRIVATE boards, and the enum's first value is PRIVATE.
+  Dashboard: { scope: `'PROJECT'::"DashboardScope"` },
+  DashboardsV2: { scope: `'PROJECT'::"DashboardScope"` },
   // `extraHeaders` is Json, so rule 4's string-only marker never fires for it;
   // this override nests the marker inside realistic header JSON so the
   // generic "no excluded- marker leaks" isolation proof also exercises it.

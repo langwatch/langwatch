@@ -4,7 +4,14 @@
  * Drawer -> Dialog on this branch; the wire name did not change.
  */
 
-import { CustomGraphToken, FilterSidebarToken } from "@langwatch/analytics-client";
+import {
+  CustomGraphToken,
+  DashboardPointerToken,
+  FilterSidebarToken,
+  LwqlReplayChartToken,
+  SavedDashboardsToken,
+  StarredDashboardsToken,
+} from "@langwatch/analytics-client";
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
 import { defineBrowserModule } from "@langwatch/browser";
 import { savedViewTrpc } from "@langwatch/dashboard-contract";
@@ -65,6 +72,19 @@ export const analyticsWeb = defineBrowserModule("analytics")
       requires: "analytics:view",
       load: customGraph("edit"),
     },
+    // Dashboards v1, behind `release_dashboards`; each screen gates itself.
+    "pages/[project]/dashboards/index": {
+      load: () => import("./features/dashboards/ui/sections/dashboards-index.screen.tsx"),
+    },
+    "pages/[project]/dashboards/templates": {
+      load: () => import("./features/dashboards/ui/sections/templates-library.screen.tsx"),
+    },
+    "pages/[project]/dashboards/curated/[templateId]": {
+      load: () => import("./features/dashboards/ui/sections/curated-board.screen.tsx"),
+    },
+    "pages/[project]/dashboards/[dashboardId]": {
+      load: () => import("./features/dashboards/ui/sections/dashboard-board.screen.tsx"),
+    },
   })
   .withDrawers({
     dashboardName: {
@@ -81,6 +101,34 @@ export const analyticsWeb = defineBrowserModule("analytics")
   .withCapabilities({
     /** The reader's applied trace filters, installed by the shell beside copy targets (§10.1). */
     traceFilters: { load: () => import("./behavior/trace-filters-capability.ts") },
+  })
+  /** The saved-dashboards list, lent to navigation's sidebar on dashboards pages. */
+  .lends(SavedDashboardsToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/saved-dashboards-section.tsx"))
+        .SavedDashboardsSection,
+    }),
+  })
+  /** The member's starred dashboards, lent to the other products' sidebars. */
+  .lends(StarredDashboardsToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/starred-dashboards-section.tsx"))
+        .StarredDashboardsSection,
+    }),
+  })
+  /** A kept pointer to a board and a widget, lent to the insight row that names its origin. */
+  .lends(DashboardPointerToken, {
+    load: async () => ({
+      default: (await import("./features/dashboards/ui/sections/dashboard-pointer.tsx"))
+        .DashboardPointer,
+    }),
+  })
+  /** One kept statement replayed over fixed dates, lent to the insight card as its evidence. */
+  .lends(LwqlReplayChartToken, {
+    load: async () => ({
+      default: (await import("./features/dashboard-widget/ui/sections/lwql-replay-chart.tsx"))
+        .LwqlReplayChart,
+    }),
   })
   /** The trace filter sidebar, lent to the evaluator's sample picker (§3.4 rule 7). */
   .lends(FilterSidebarToken, {

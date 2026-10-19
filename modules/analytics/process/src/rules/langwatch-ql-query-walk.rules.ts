@@ -83,7 +83,10 @@ export function extractPosition(node: SqlAstNode): SqlSourcePosition | undefined
 
 /** The sharper fields a call site can attach on top of the hint floor. */
 type ViolationExtra = Partial<
-  Pick<LangWatchQLViolation, "availableViews" | "view" | "availableColumns" | "maxRows">
+  Pick<
+    LangWatchQLViolation,
+    "availableViews" | "view" | "availableColumns" | "maxRows" | "missingGates"
+  >
 >;
 
 function report({
@@ -331,13 +334,19 @@ function gateColumnReference({
     ctx.policy.gatedColumns.has(segment.trim().toLowerCase()),
   );
   if (gatedIndex === -1) return;
+  const missingGates = ctx.policy.gatedColumnGates.get(
+    segments[gatedIndex]?.trim().toLowerCase() ?? "",
+  );
   report({
     ctx,
     frame,
     code: "GATED_COLUMN",
     message: `The field "${echoIdentifier(name)}" is not available to you. Remove it from the query.`,
     node,
-    extra: resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
+    extra: {
+      ...resolveGatedColumnView({ segments, gatedIndex, frame, ctx }),
+      ...(missingGates ? { missingGates } : {}),
+    },
   });
 }
 
@@ -707,6 +716,7 @@ function readNestedSource({
       code: "APP_FUNCTION_GATED",
       message: gatedMessage(nested),
       node: key,
+      extra: { missingGates: missingAppFunctionGates({ definition: nested, ctx }) },
     });
     return { kind: "refused" };
   }
@@ -746,8 +756,12 @@ function admitAppFunctionCall({
   frame: Frame;
   ctx: WalkContext;
 }): readonly string[] {
-  const refuse = (code: LangWatchQLViolationCode, message: string): readonly string[] => {
-    report({ ctx, frame, code, message, node });
+  const refuse = (
+    code: LangWatchQLViolationCode,
+    message: string,
+    extra?: ViolationExtra,
+  ): readonly string[] => {
+    report({ ctx, frame, code, message, node, ...(extra ? { extra } : {}) });
     return [];
   };
 
@@ -765,7 +779,9 @@ function admitAppFunctionCall({
   }
 
   if (!holdsAppFunctionGates({ definition, ctx })) {
-    return refuse("APP_FUNCTION_GATED", gatedMessage(definition));
+    return refuse("APP_FUNCTION_GATED", gatedMessage(definition), {
+      missingGates: missingAppFunctionGates({ definition, ctx }),
+    });
   }
 
   if (definition.kind === "eval" && !ctx.policy.isInstantEvalsEnabled) {
@@ -795,6 +811,17 @@ function holdsAppFunctionGates({
   ctx: WalkContext;
 }): boolean {
   return definition.gates.every((gate) => ctx.policy.heldPermissions.has(gate));
+}
+
+/** The permissions this function requires that the caller does not hold. */
+function missingAppFunctionGates({
+  definition,
+  ctx,
+}: {
+  definition: LangWatchQLAppFunctionDefinition;
+  ctx: WalkContext;
+}): readonly string[] {
+  return definition.gates.filter((gate) => !ctx.policy.heldPermissions.has(gate));
 }
 
 /**
@@ -985,6 +1012,8 @@ function enterSelectQuery({ node, frame, ctx }: NodeArgs): Frame {
     joins: [],
     filteredColumns: [],
     groupByColumns: [],
+    referencedColumns: [],
+    projectedColumns: [],
     appFunctionAliases: aliases,
     hasGroupBy:
       (Array.isArray(node.group_by) && node.group_by.length > 0) || node.group_by_all === true,
@@ -1366,18 +1395,19 @@ function visitIdentifier({ node, frame, ctx }: NodeArgs): Frame | null {
 }
 
 /**
- * Records a column named in a filter or grouping position on the block it sits in. The leaf
- * segment only: what a diagnostic asks is "was this dataset's time column filtered", and
- * `t.OccurredAt`, `OccurredAt` and `analytics.traces.OccurredAt` are all the same answer to it.
+ * Records a column the block reads, and again when it sits in a filter, grouping or projection
+ * position. The leaf segment only: what a diagnostic asks is "was this dataset's time column
+ * filtered", and `t.OccurredAt`, `OccurredAt` and `analytics.traces.OccurredAt` are all the same.
  */
 function noteColumnPosition({ name, frame }: { name: string; frame: Frame }): void {
   const { block, clause } = frame;
   if (!block) return;
-  if (clause !== "filter" && clause !== "group") return;
   const leaf = name.split(".").at(-1)?.trim().toLowerCase();
   if (!leaf) return;
+  addOnce(block.referencedColumns, leaf);
   if (clause === "filter") addOnce(block.filteredColumns, leaf);
-  else addOnce(block.groupByColumns, leaf);
+  else if (clause === "group") addOnce(block.groupByColumns, leaf);
+  else if (clause === "projection") addOnce(block.projectedColumns, leaf);
 }
 
 /**

@@ -235,8 +235,18 @@ function parseArray(cursor: Cursor): Step {
 }
 
 export type LangyDerivedCardParseResult =
-  | { ok: true; card: LangyModelEmittedCard }
+  /** `repaired`: the fence's JSON was damaged, and the card is what the repair left of it. */
+  | { ok: true; card: LangyModelEmittedCard; repaired: boolean }
   | { ok: false; reason: "unsalvageable" | "invalid" };
+
+function parsesAsWritten(raw: string): boolean {
+  try {
+    JSON.parse(raw);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The ONE decision the channel makes about a fence's content (ADR-060 §2):
@@ -248,5 +258,5 @@ export function salvageLangyDerivedCard(raw: string): LangyDerivedCardParseResul
   if (!salvaged.ok) return { ok: false, reason: "unsalvageable" };
   const parsed = langyModelEmittedCardSchema.safeParse(salvaged.value);
   if (!parsed.success) return { ok: false, reason: "invalid" };
-  return { ok: true, card: parsed.data };
+  return { ok: true, card: parsed.data, repaired: !parsesAsWritten(raw) };
 }

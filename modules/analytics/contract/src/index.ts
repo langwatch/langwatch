@@ -28,6 +28,7 @@ export * from "./features/dashboard-widget/dashboard-widget.errors.ts";
 export * from "./features/lwql/langwatch-ql-app-functions.ts";
 export * from "./features/lwql/langwatch-ql-app-function.errors.ts";
 export * from "./features/lwql/langwatch-ql-violation.ts";
+export * from "./features/lwql/langwatch-ql-access-refusal.ts";
 export * from "./features/lwql/langwatch-ql-validation.errors.ts";
 export * from "./analytics.config.ts";
 export * from "./analytics.filter-field.ts";

@@ -94,4 +94,7 @@ go test ./services/langyagent/...
 - **Langy-only** (depends on the provisioned worker environment): author it in
   repo-root `skills/<name>/SKILL.mdx`, add it to `NATIVE_ONLY_SKILLS`, regenerate
   the native output, and mirror it here for local Go builds. Add a row to the
-  AGENTS.md routing table so the model routes to it.
+  AGENTS.md routing table so the model routes to it. A skill that only a module's
+  own brief names (`daily-insights`, which a scheduled insights run names) takes
+  no row: mark it `internal: true` in its front matter, so the palette never
+  offers it.

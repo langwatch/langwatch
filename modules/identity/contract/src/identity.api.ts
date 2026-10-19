@@ -565,6 +565,12 @@ export interface SsoAssertionApi {
   /** Which existing person an assertion `decide` admitted signs in as, asked
    *  after it and never instead of it (specs/identity/scim-sso-signin.feature). */
   resolveUser(args: SsoUserResolutionInput): Promise<SsoUserResolution>;
+  /** Whether the organization that proved the address's domain pins the upstream connection
+   *  this broker subject came through; only then is a brokered SAML address verified (ADR-096). */
+  isBrokeredAddressProved(args: {
+    subject: string;
+    email: string | null | undefined;
+  }): Promise<boolean>;
 }
 
 /**

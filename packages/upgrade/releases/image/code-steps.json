@@ -69,6 +69,14 @@
     "needsOldWritersGone": true
   },
   {
+    "id": "automation:unwrap-trigger-json-text",
+    "kind": "data",
+    "mode": "background",
+    "owner": "automation",
+    "description": "Rewrites automation filters and action settings an earlier release saved as quoted JSON text into JSON objects; text that is not a JSON object is left as it is.",
+    "needsOldWritersGone": true
+  },
+  {
     "id": "billing:record-usage-billing-catch-up",
     "kind": "data",
     "mode": "background",
@@ -326,6 +334,14 @@
     "owner": "user",
     "description": "Records every existing account's created fact and re-states its standing, for peers to read.",
     "needsOldWritersGone": true
+  },
+  {
+    "id": "user:lower-case-stored-addresses",
+    "kind": "data",
+    "mode": "background",
+    "owner": "user",
+    "description": "Lower-cases every stored account address; when another account already holds the lower-cased address, the account is left as it is and listed in the step report for an admin to fix by hand.",
+    "needsOldWritersGone": false
   },
   {
     "id": "workflow:record-current-version-fields",

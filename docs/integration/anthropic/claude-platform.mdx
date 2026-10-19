@@ -1,0 +1,208 @@
+---
+title: "Claude Platform (Claude API OpenTelemetry)"
+sidebarTitle: Claude Platform
+description: Send OpenTelemetry traces from the Claude API and the Claude SDK to LangWatch, with no code changes for API tracing.
+icon: cloud
+keywords: anthropic, claude, claude platform, claude api, opentelemetry, otlp, managed agents, messages api, telemetry destination, langwatch
+---
+
+Claude Platform can export OpenTelemetry traces of your Claude API traffic straight to LangWatch. You add LangWatch as a destination in the Claude Console, and every Messages API request and Managed Agents session in the workspaces you pick arrives in LangWatch as a trace. API tracing needs no change to your code.
+
+<Note>
+  OpenTelemetry export is in beta at Anthropic. Span names and attributes can change during the beta. See Anthropic's [OpenTelemetry for the Claude API](https://platform.claude.com/docs/en/manage-claude/opentelemetry) guide for the full reference.
+</Note>
+
+## What gets traced
+
+- **Messages API requests**: one `anthropic.messages.create` span per request, with an `anthropic.model_request` span for each model run inside it.
+- **Managed Agents sessions**: a span per Sessions API request and an `anthropic.session.turn` span per agent turn, with the model requests, tool uses and outcome evaluations of that turn under it.
+- **Server tools and MCP tools**: a tool span (`anthropic.tool_use`, `anthropic.mcp_tool_use`) for each tool the API runs, such as web search, code execution or a tool on an MCP server you connect with the MCP connector.
+- **Token usage** on the request and model request spans.
+
+With the Claude SDK in your application you also get client spans, tool runner spans and spans for the client tools your code runs.
+
+## How it works
+
+There are two sources of spans, and you can use either one or both.
+
+| Source | What it sends | Setup |
+| --- | --- | --- |
+| **API export** | Spans the Claude API emits for each request, model run and server tool. Works for any client, including raw HTTP. | A destination in the Claude Console. Needs the admin role in the Claude Console organisation. |
+| **SDK export** | Spans the Claude SDK emits in your application: each request it sends and each tool the tool runner runs. | A tracer provider in your application, such as the one `langwatch.setup()` registers. |
+| **Both** | One trace per request: your own spans, the SDK client span and the API spans under it. | Both of the above, sent to the same LangWatch project. The SDK passes a W3C `traceparent` header so the API spans join your trace. |
+
+API export works for Claude Platform and Claude Platform on AWS. On Claude Platform on AWS, the API spans always start their own traces.
+
+## Add a LangWatch destination
+
+You need the admin role in your Claude Console organisation and a LangWatch API key from your project settings.
+
+<Steps>
+  <Step title="Open the OpenTelemetry settings">
+    In the Claude Console, open the [OpenTelemetry settings page](https://platform.claude.com/settings/telemetry-destinations) and click **Add destination**.
+  </Step>
+
+  <Step title="Fill in the destination">
+    | Field | Value |
+    | --- | --- |
+    | **Provider** | **Custom** |
+    | **Name** | `LangWatch` (optional) |
+    | **OTLP endpoint URL** | `https://app.langwatch.ai/api/otel` |
+    | **Request headers** | `Authorization` = `Bearer <LANGWATCH_API_KEY>` |
+    | **Content mode** | **Full content** |
+    | **Workspaces** | **All**, **Selected** or **All except** |
+    | **Maximum content size in MB** (under **Advanced settings**) | `0.25` |
+
+    Leave **OTLP traces endpoint URL** empty. Anthropic adds `/v1/traces` to the OTLP endpoint URL itself, so do not add it.
+
+    The `X-Auth-Token: <LANGWATCH_API_KEY>` header also works in place of `Authorization`. With a service API key, add an `X-Project-Id` header with your project ID.
+  </Step>
+
+  <Step title="Save">
+    Click **Add destination**. The Console does not show the header values again after you save.
+  </Step>
+</Steps>
+
+{/* Screenshot placeholder: the Claude Console "Add destination" form filled in with the values above (Provider Custom, the /api/otel endpoint, the Authorization header, Full content, 0.25 MB). */}
+
+Anthropic sends OTLP/HTTP protobuf with gzip compression. LangWatch accepts it on the endpoint above, so the protocol needs no setting.
+
+<Info>
+  **Content size.** LangWatch keeps up to 256 KB for each attribute value for now, and this limit will be raised. Setting the maximum content size to `0.25` MB makes Anthropic shorten long prompts and responses itself and set `anthropic.content.truncated` to `true` on the span, so you can see which spans were cut.
+</Info>
+
+**Metadata only** also works. With it, you see timing, status, models, token counts and tool names, but you cannot read conversations or build evaluations and datasets, because the spans hold no prompts or responses. If your organisation has a HIPAA, FERPA or K-12 data-handling restriction with Anthropic, the API exports only metadata whatever the content mode.
+
+### Self-hosted LangWatch
+
+Use your own LangWatch base URL with `/api/otel`, for example `https://langwatch.example.com/api/otel`, and an API key from your instance. Anthropic only delivers to an HTTPS hostname on port 443 that resolves to a public IP address, so the instance must be reachable from the internet.
+
+## Test it
+
+1. On the OpenTelemetry settings page, open the destination's **More actions** menu and click **Test**. The Console sends an `anthropic.test` span and shows whether it was delivered.
+2. Send a Messages API request in the [Console playground](https://platform.claude.com/playground) or from your application, in a workspace the destination covers.
+3. Check that the **Delivery** column shows **Healthy**. This can take about a minute.
+4. In LangWatch, open your project's traces and filter on `service.name` = `claude-platform`, the service name of every API span.
+
+## Read your trace
+
+{/* Screenshot placeholder: a Claude Platform trace in LangWatch, showing the anthropic.messages.create span with its anthropic.model_request and tool children, input and output visible. */}
+
+For a Messages API request, the trace has an `anthropic.messages.create` span with one `anthropic.model_request` span for each model run and a tool span for each server or MCP tool the API ran.
+
+- **Input and output** are on `anthropic.messages.create`. The system prompt is in `gen_ai.system_instructions`, the messages in `gen_ai.input.messages` and the response in `gen_ai.output.messages`.
+- **On `anthropic.model_request` spans you see no input or output**, by design. These spans hold the model, timing and token usage of each model run. An empty input there does not mean content export failed: open the parent `anthropic.messages.create` span to read the content.
+- **Tool spans** hold the tool arguments in `gen_ai.tool.call.arguments` and the result in `anthropic.tool_result.content`.
+
+For a Managed Agents session, read the `anthropic.session.turn` spans. A thread's first turn holds the system prompt, `gen_ai.input.messages` holds what came into the turn and `gen_ai.output.messages` what the agent produced. A session can span several traces: `gen_ai.conversation.id` holds the session thread ID and `anthropic.session.id` the session ID, so you can group spans by either.
+
+With both API and SDK export, each request appears as two `anthropic.messages.create` spans: the SDK span has kind `CLIENT`, and its child, the API span, has kind `SERVER` and `service.name` = `claude-platform`.
+
+## Counting tokens
+
+Anthropic puts token usage on several levels of the same request: on `anthropic.messages.create` and again on each `anthropic.model_request` under it, and on the SDK client span when you also use SDK export. The values overlap, they are not separate usage.
+
+LangWatch currently adds up the token counts of every span in a trace. For Claude Platform traces, the trace's token total, and the cost estimated from it, therefore counts the same tokens more than once. This will be fixed. Until then, to count each token once, add up only these spans:
+
+- **Messages API request**: the `anthropic.model_request` spans, plus any `anthropic.compaction` spans.
+- **Managed Agents session**: the `anthropic.model_request` and `anthropic.session.outcome_evaluation` spans.
+
+`gen_ai.usage.input_tokens` already includes tokens read from and written to the prompt cache. Anthropic's [token usage reference](https://platform.claude.com/docs/en/api/opentelemetry/spans#token-usage) lists every usage attribute.
+
+## Connect to your own app traces
+
+Set up SDK export to nest the Claude API spans under your own spans, next to the rest of your agent: retrieval, tools, other model calls. The Claude SDK emits its spans to the global OpenTelemetry tracer provider, which the LangWatch SDK registers.
+
+The Python SDK needs `anthropic` 1.14.0 or later. In TypeScript, use the latest `@anthropic-ai/sdk`. The Claude SDK records prompts and responses only in content mode, which you turn on separately from the destination's content mode.
+
+<CodeGroup>
+```python Python
+import langwatch
+from anthropic import Anthropic
+
+# Registers the global tracer provider; reads LANGWATCH_API_KEY.
+langwatch.setup()
+
+client = Anthropic(open_telemetry={"traces": {"content_mode": "content"}})
+
+
+@langwatch.trace(name="answer_question")
+def answer_question(question: str) -> str:
+    message = client.messages.create(
+        model="claude-sonnet-5-5",
+        max_tokens=1024,
+        messages=[{"role": "user", "content": question}],
+    )
+    return message.content[0].text
+
+
+print(answer_question("What is OpenTelemetry?"))
+```
+
+```typescript TypeScript
+import Anthropic from "@anthropic-ai/sdk";
+import { getLangWatchTracer } from "langwatch";
+import { setupObservability } from "langwatch/observability/node";
+
+// Registers the global tracer provider; reads LANGWATCH_API_KEY.
+setupObservability({ serviceName: "my-agent" });
+
+const tracer = getLangWatchTracer("my-agent");
+const client = new Anthropic({ openTelemetry: { traces: { contentMode: "content" } } });
+
+const answer = await tracer.withActiveSpan("answer_question", async () => {
+  const message = await client.messages.create({
+    model: "claude-sonnet-5-5",
+    max_tokens: 1024,
+    messages: [{ role: "user", content: "What is OpenTelemetry?" }],
+  });
+  return message.content;
+});
+
+console.log(answer);
+```
+</CodeGroup>
+
+In LangWatch you then see the API spans for the request nested under the SDK span, in the same trace, because the SDK sends the current span's trace context in a `traceparent` header. Send both to the same LangWatch project.
+
+You can also skip `langwatch.setup()` and point your own OpenTelemetry SDK at LangWatch with environment variables:
+
+```bash
+export LANGWATCH_API_KEY="<your project API key>"
+export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
+export OTEL_EXPORTER_OTLP_TRACES_ENDPOINT="https://app.langwatch.ai/api/otel/v1/traces"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${LANGWATCH_API_KEY}"
+export ANTHROPIC_OPEN_TELEMETRY_TRACES_CONTENT_MODE="content"
+```
+
+Here the URL ends in `/v1/traces`, because the OpenTelemetry SDK uses the traces endpoint as given.
+
+<Warning>
+  Use one instrumentation for the Claude SDK. If you also pass `AnthropicInstrumentor()` from OpenInference, as on the [Anthropic Python page](/integration/python/integrations/anthropic), each request is traced twice. Drop the instrumentor, or turn off the SDK's own spans with `Anthropic(open_telemetry=False)`.
+</Warning>
+
+## Turn traces into evaluations and datasets
+
+With Full content, each Claude Platform trace holds the prompt, the response and every tool call, so the rest of LangWatch works on it:
+
+- Run [online evaluations](/evaluations/online-evaluation/overview) on incoming traces, for example to score answer quality or catch PII.
+- Add traces to a [dataset](/datasets/automatically-from-traces) and use it in [experiments](/evaluations/experiments/overview) when you change a prompt or a model.
+- Group a Managed Agents session's turns as one conversation and add [threads to datasets](/datasets/dataset-threads).
+
+## Troubleshooting
+
+| Problem | What to check |
+| --- | --- |
+| **Failing**, status 401 or 403 | The API key in the `Authorization` header is wrong or revoked, or it misses the `Bearer ` prefix. With a service API key, add the `X-Project-Id` header. |
+| **Failing**, status 404 | The OTLP endpoint URL ends in `/v1/traces`. Set it to `https://app.langwatch.ai/api/otel` and leave **OTLP traces endpoint URL** empty. |
+| **Disabled** | Hover over **Disabled** to see the reason. Anthropic disables a destination when the endpoint answers with a `3xx` redirect (check the URL starts with `https://app.langwatch.ai`), when the hostname resolves to a non-public IP address (self-hosted instances must be reachable from the internet), or after 24 hours of failed deliveries. Fix the cause, then click **Enable** in the **More actions** menu. |
+| **Healthy**, but no traces in LangWatch | The API key belongs to another LangWatch project, or the request ran in a workspace the destination does not cover. |
+| Spans have no input or output | Check that the destination is on **Full content**. If it is, your organisation may have a HIPAA, FERPA or K-12 restriction with Anthropic. On an `anthropic.model_request` span, no content is expected: open its parent. |
+| Long prompts or responses are cut | Content over the maximum content size is shortened by Anthropic and marked with `anthropic.content.truncated`. Keep the limit at `0.25` MB for now: larger values are cut by LangWatch's 256 KB limit per attribute value. |
+| Each request appears twice | Another library also traces the Claude SDK, such as an OpenInference instrumentor. Keep only one. |
+
+## Related
+
+- [OpenTelemetry integration guide](/integration/opentelemetry/guide): send any OTLP traces to LangWatch.
+- [Anthropic Python instrumentation](/integration/python/integrations/anthropic) and [Anthropic Go instrumentation](/integration/go/integrations/anthropic).
+- Anthropic's [API tracing setup](https://platform.claude.com/docs/en/manage-claude/opentelemetry/api), [SDK tracing setup](https://platform.claude.com/docs/en/manage-claude/opentelemetry/sdk) and [span reference](https://platform.claude.com/docs/en/api/opentelemetry/spans).

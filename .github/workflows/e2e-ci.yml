@@ -74,6 +74,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     env:
       # App configuration
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"

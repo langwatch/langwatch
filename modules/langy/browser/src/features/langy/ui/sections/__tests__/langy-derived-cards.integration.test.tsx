@@ -5,6 +5,7 @@
  * @vitest-environment jsdom
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import type { LangyAnswerActionProps } from "@langwatch/langy-contract";
 import { cleanup, render, screen } from "@testing-library/react";
 import type { UIMessage } from "ai";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -41,11 +42,24 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
   };
 });
 
+/** What the row under a settled answer was handed; the lenders themselves are not mounted. */
+const lentActionProps: LangyAnswerActionProps[] = [];
+
+vi.mock("../../../../../behavior/lent-answer-actions.tsx", () => ({
+  LentAnswerActions: (props: LangyAnswerActionProps) => {
+    lentActionProps.push(props);
+    return null;
+  },
+}));
+
 import { toEngineMessage } from "../../../model/langy-engine-parts.ts";
 import { StreamingAnswerWithCards } from "../derived-cards/streaming-answer-with-cards.tsx";
 import { MessageContent } from "../message-content.tsx";
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  lentActionProps.length = 0;
+});
 
 const derivedFrames = () => document.querySelectorAll("[data-derived-by-langy]");
 
@@ -196,6 +210,109 @@ describe("given a stats card comparing readings on one scale", () => {
     ]) {
       expect(screen.getByText(label)).toBeDefined();
     }
+  });
+});
+
+describe("given an answer that carries an insights card", () => {
+  const findings = [
+    {
+      title: "Checkout errors doubled",
+      body: "Errors on checkout rose from 41 to 96 against the day before.",
+      tone: "bad",
+      topic: "errors",
+      widgetId: "widget-errors",
+    },
+    { title: "Cost per trace fell", body: "From 0.12 to 0.08 dollars.", tone: "good" },
+  ];
+  const card = { kind: "insights", blockId: "daily-insights", findings };
+  const stamped = {
+    type: "langy-card",
+    blockId: "daily-insights",
+    kind: "insights",
+    provenance: "derived",
+    card,
+  };
+  const prose = { type: "text", text: "I read each widget over the window." };
+
+  /** @scenario "The panel draws one row per finding with its verdict, title and body" */
+  it("draws one row per finding, in the derived frame, with the verdict in words", () => {
+    renderMessage(assistantMessage({ parts: [prose, stamped], metadata: recorded }));
+
+    const rows = screen.getAllByTestId("derived-insight-finding");
+    expect(derivedFrames()).toHaveLength(1);
+    expect(rows.map((row) => row.dataset.tone)).toEqual(["bad", "good"]);
+    expect(rows[0]?.textContent).toContain("Warning");
+    expect(rows[0]?.textContent).toContain("errors");
+    expect(rows[0]?.textContent).toContain("Checkout errors doubled");
+    expect(rows[0]?.textContent).toContain("rose from 41 to 96");
+    expect(rows[1]?.textContent).toContain("Good news");
+    expect(screen.getByText("I read each widget over the window.")).toBeDefined();
+  });
+
+  /** @scenario "An answer's insights card is handed to the actions under it" */
+  it("hands the stamped card to the actions under the answer, as typed data", () => {
+    renderMessage(assistantMessage({ parts: [prose, stamped], metadata: recorded }), {
+      conversationId: "conversation-1",
+    });
+
+    expect(lentActionProps.at(-1)).toMatchObject({
+      projectId: "p_demo",
+      conversationId: "conversation-1",
+      messageId: "m-assistant",
+      insights: { kind: "insights", findings },
+    });
+  });
+
+  it("hands the card of a copy this browser streamed, read off its fence", () => {
+    const fenced = {
+      type: "text",
+      text: `Done.\n\n\`\`\`langy-card\n${JSON.stringify(card)}\n\`\`\``,
+    };
+
+    renderMessage(assistantMessage({ parts: [fenced] }));
+
+    expect(lentActionProps.at(-1)?.insights?.findings).toHaveLength(2);
+  });
+
+  it("hands no card for an answer that has none, and none while it still streams", () => {
+    renderMessage(assistantMessage({ parts: [prose], metadata: recorded }));
+    expect(lentActionProps.at(-1)).not.toHaveProperty("insights");
+
+    lentActionProps.length = 0;
+    renderMessage(assistantMessage({ parts: [prose, stamped] }), { isStreaming: true });
+    expect(lentActionProps).toEqual([]);
+  });
+
+  /** @scenario "An insights card with no findings reads as nothing new" */
+  it("says nothing is new for a card with no findings", () => {
+    renderMessage(
+      assistantMessage({
+        parts: [{ ...stamped, card: { ...card, findings: [] } }],
+        metadata: recorded,
+      }),
+    );
+
+    expect(screen.getByText("Nothing new to report.")).toBeDefined();
+    expect(screen.queryAllByTestId("derived-insight-finding")).toHaveLength(0);
+  });
+
+  /** @scenario "A long list of findings stays a card" */
+  it("draws the first ten findings and says how many more the reply holds", () => {
+    const many = Array.from({ length: 13 }, (_, at) => ({
+      title: `Finding ${at}`,
+      body: "It moved.",
+      tone: "watch",
+    }));
+
+    renderMessage(
+      assistantMessage({
+        parts: [{ ...stamped, card: { ...card, findings: many } }],
+        metadata: recorded,
+      }),
+    );
+
+    expect(screen.getAllByTestId("derived-insight-finding")).toHaveLength(10);
+    expect(screen.getByText("+3 more findings in the reply")).toBeDefined();
   });
 });
 

@@ -199,11 +199,36 @@
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],
+  "dashboard_widgets": [
+    ["TenantId", "projectId", []],
+    ["DashboardWidgetId", "id", []],
+    ["DashboardId", "dashboardId", []],
+    ["Name", "name", []],
+    ["Definition", "definition", ["output"]],
+    ["GridColumn", "gridColumn", []],
+    ["GridRow", "gridRow", []],
+    ["ColSpan", "colSpan", []],
+    ["RowSpan", "rowSpan", []],
+    ["CreatedAt", "createdAt", []],
+    ["UpdatedAt", "updatedAt", []]
+  ],
   "dashboards": [
     ["TenantId", "projectId", []],
     ["DashboardId", "id", []],
     ["Name", "name", []],
     ["Order", "order", []],
+    ["Description", "description", ["output"]],
+    ["CreatedById", "createdById", []],
+    ["CreatedAt", "createdAt", []],
+    ["UpdatedAt", "updatedAt", []]
+  ],
+  "dashboards_v2": [
+    ["TenantId", "projectId", []],
+    ["DashboardId", "id", []],
+    ["Name", "name", []],
+    ["Description", "description", ["output"]],
+    ["CreatedById", "createdById", []],
+    ["Scope", "scope", []],
     ["CreatedAt", "createdAt", []],
     ["UpdatedAt", "updatedAt", []]
   ],
@@ -639,6 +664,7 @@
     ["CurrentTurnId", "currentTurnId", []],
     ["LastError", "lastError", ["output"]],
     ["LastModel", "lastModel", []],
+    ["Origin", "origin", []],
     ["PendingHandoffTurnId", "pendingHandoffTurnId", []],
     ["ArchivedAt", "archivedAt", []],
     ["CreatedAt", "createdAt", []],

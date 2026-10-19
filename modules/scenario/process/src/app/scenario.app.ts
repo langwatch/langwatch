@@ -444,7 +444,11 @@ export class ScenarioModule implements ScenarioApi {
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
-        pool: { slotBudget: config.slotBudget, consumed: config.consumedResourceClasses },
+        pool: {
+          slotBudget: config.slotBudget,
+          consumed: config.consumedResourceClasses,
+          voiceRunsMaxConcurrent: config.voiceRunsMaxConcurrent,
+        },
         runs: setup.repositories.simulationRunProcessing,
         cancellations,
         traces: setup.dependencies.traces,

@@ -29,6 +29,7 @@ import { githubProcessModule } from "@langwatch/github-process";
 import { governanceProcessModule } from "@langwatch/enterprise-governance-process";
 import { hostedMcpProcessModule } from "@langwatch/hosted-mcp-process";
 import { identityProcessModule } from "@langwatch/identity-process";
+import { insightProcessModule } from "@langwatch/insight-process";
 import { instantEvalJudgeProcessModule } from "@langwatch/instant-eval-judge-process";
 import { instantEvalProcessModule } from "@langwatch/instant-eval-process";
 import { langyProcessModule } from "@langwatch/langy-process";
@@ -95,6 +96,7 @@ export const processModules = [
   governanceProcessModule,
   hostedMcpProcessModule,
   identityProcessModule,
+  insightProcessModule,
   instantEvalJudgeProcessModule,
   instantEvalProcessModule,
   langyProcessModule,

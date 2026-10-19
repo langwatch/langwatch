@@ -78,6 +78,33 @@ describe("shikiManualChunk (vite.config eager Shiki allow-list)", () => {
     });
   });
 
+  describe("given Shiki's language registry", () => {
+    it("keeps it out of the engine chunk, so resolving a fence name loads no engine", () => {
+      for (const path of [
+        "/repo/node_modules/.pnpm/shiki@4.3.0/node_modules/shiki/dist/langs.mjs",
+        "/repo/node_modules/.pnpm/shiki@4.3.0/node_modules/shiki/dist/langs-bundle-full-4noeO3oH.mjs",
+      ]) {
+        expect(shikiManualChunk(path)).toBe("shiki-langs");
+      }
+    });
+  });
+
+  describe("given a hast helper that react-markdown also uses", () => {
+    /** @scenario "Markdown does not load the highlighter" */
+    it.each([
+      "property-information",
+      "comma-separated-tokens",
+      "space-separated-tokens",
+      "hast-util-whitespace",
+      "zwitch",
+      "ccount",
+    ])("puts %s in its own chunk, so markdown never imports the shiki chunk", (pkg) => {
+      expect(
+        shikiManualChunk(`/repo/node_modules/.pnpm/${pkg}@2.0.0/node_modules/${pkg}/index.js`),
+      ).toBe("hast-helpers");
+    });
+  });
+
   describe("given a non-Shiki module", () => {
     it("returns undefined (no opinion)", () => {
       expect(shikiManualChunk("/repo/node_modules/react/index.js")).toBeUndefined();

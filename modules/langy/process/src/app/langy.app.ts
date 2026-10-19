@@ -12,6 +12,7 @@ import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type {
   EventingCommands,
   EventingParticipation,
+  PriorEventsRead,
   StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import { ExperimentApi } from "@langwatch/experiment-contract";
@@ -125,6 +126,7 @@ import {
   type LangyGuidedOnboardingPipeline,
 } from "../eventing/langy-guided-onboarding.pipeline.ts";
 import { buildLangyMaintenancePipeline } from "../eventing/langy-maintenance.pipeline.ts";
+import { LangyConversationEventLogService } from "../features/conversation/services/langy-conversation-event-log.service.ts";
 import { LangyConversationUpdateService } from "../features/conversation/services/langy-conversation-update.service.ts";
 import { LangyGithubPrPermitService } from "../features/github/services/langy-github-pr-permit.service.ts";
 import {
@@ -151,6 +153,7 @@ import { LangyVirtualKeyGatewayService } from "../features/session-key/services/
 import { LangyVirtualKeyProvisioningService } from "../features/session-key/services/langy-virtual-key-provisioning.service.ts";
 import { LangyTurnSettlementWaiterService } from "../features/turn/services/langy-turn-settlement-waiter.service.ts";
 import { LangyTurnsBoundsService } from "../features/turn/services/langy-turns-bounds.service.ts";
+import { LangyUnattendedTurnService } from "../features/turn/services/langy-unattended-turn.service.ts";
 import { LangyUiActionBackendService } from "../features/ui-action/services/langy-ui-action-backend.service.ts";
 import { LangyUiActionCatalogService } from "../features/ui-action/services/langy-ui-action-catalog.service.ts";
 import { LangyUiActionDoorService } from "../features/ui-action/services/langy-ui-action-door.service.ts";
@@ -175,7 +178,7 @@ import {
   type LangyServiceCompositionOptions,
 } from "../services/langy-postgres.service.ts";
 import { LangyRestCallerService } from "../services/langy-rest-caller.service.ts";
-import { LangyRestMetricsPrometheusService } from "../services/langy-rest-metrics-prometheus.service.ts";
+import { LangyRestMetricsOtelService } from "../services/langy-rest-metrics-otel.service.ts";
 import { LangySkillGatesService } from "../services/langy-skill-gates.service.ts";
 import { LangyTitleGeneratorService } from "../services/langy-title-generator.service.ts";
 import type { LangyService, OpenLangyRelay } from "../services/langy.service.ts";
@@ -197,6 +200,8 @@ type LangyAppDependencies = {
   presence: PresenceApi;
   /** The per-project window every turn is counted against before it dispatches. */
   turnBounds: LangyTurnsBoundsService;
+  /** Turns a module starts for a person who is not at the keyboard, read-only. */
+  unattendedTurns: LangyUnattendedTurnService;
   virtualKeyProvisioning: LangyVirtualKeyProvisioningService;
   /** The rollout gate and key-owner bridge every key-authenticated door runs. */
   callers: LangyRestCallerService;
@@ -214,6 +219,8 @@ type LangyAppDependencies = {
   panelEgress: LangyPanelEgressService;
   /** The pipeline's senders, bound once the process registers it (§9). */
   conversationCommands: LangyConversationCommandSenders;
+  /** The conversation's own event log; bound only where the role holds a readable one. */
+  conversationEvents: LangyConversationEventLogService;
   /** The consume half of the pipeline: its folds, process manager and reactions. */
   conversationProcessing: EventingLangyConversationAdapter;
   /** langy_guided_onboarding, built once; its senders are bound when the process registers it. */
@@ -307,9 +314,11 @@ export class LangyModule implements LangyApiContract {
       sessionKeys,
     });
     const commands = LangyConversationCommandSenders.create();
+    const conversationEvents = LangyConversationEventLogService.create();
     const langy = adapter.build({
       ...built,
       commands,
+      events: conversationEvents,
     });
     const workspace = LangyLocalWorkspaceService.create({
       users: setup.dependencies.users,
@@ -443,6 +452,13 @@ export class LangyModule implements LangyApiContract {
       repositories: setup.repositories,
       presence: setup.dependencies.presence,
       turnBounds,
+      unattendedTurns: LangyUnattendedTurnService.create({
+        users: setup.dependencies.users,
+        projects: setup.dependencies.projects,
+        featureFlags: setup.dependencies.featureFlags,
+        bounds: turnBounds,
+        turns: langy,
+      }),
       virtualKeyProvisioning: LangyVirtualKeyProvisioningService.create({
         virtualKeys: built.credentials.virtualKeys,
       }),
@@ -488,6 +504,7 @@ export class LangyModule implements LangyApiContract {
       }),
       panelEgress: LangyPanelEgressService.create({ access, langy }),
       conversationCommands: commands,
+      conversationEvents,
       conversationProcessing,
       guidedOnboarding: {
         pipeline: buildLangyGuidedOnboardingPipeline(),
@@ -617,6 +634,14 @@ export class LangyModule implements LangyApiContract {
     });
   }
 
+  /**
+   * Hands the conversation reads the pipeline's own event log. Only a draining role calls
+   * it: a turn's settlement is read from that log, and a sending role's log refuses reads.
+   */
+  connectConversationEventLog(read: PriorEventsRead): void {
+    this.dependencies.conversationEvents.connect(read);
+  }
+
   /** The pipeline `langy_guided_onboarding` registers, built once by {@link create}. */
   guidedOnboardingPipeline(): LangyGuidedOnboardingPipeline {
     return this.dependencies.guidedOnboarding.pipeline;
@@ -647,7 +672,7 @@ export class LangyModule implements LangyApiContract {
   private constructor(private readonly dependencies: LangyAppDependencies) {
     this.#internal = LangyInternalService.create(
       dependencies.langy,
-      LangyRestMetricsPrometheusService.create(),
+      LangyRestMetricsOtelService.create(),
     );
   }
 
@@ -853,6 +878,14 @@ export class LangyModule implements LangyApiContract {
     await this.dependencies.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
 
     return this.dependencies.langy.startConversationTurn(input);
+  }
+
+  /** Counted against its own window, apart from the one chat turns start under. */
+  startUnattendedTurn(input: langyContractModule.LangyStartUnattendedTurnInput): Promise<{
+    conversationId: string;
+    turnId: string;
+  }> {
+    return this.dependencies.unattendedTurns.start(input);
   }
 
   /** A `Prefer: wait` hold borrows its own blocking connection and gives it back on release. */

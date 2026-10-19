@@ -5,7 +5,12 @@
  */
 import { describe, expect, it } from "vitest";
 
-import { renderLangyTurnContext } from "../langy-turn-context.ts";
+import {
+  disabledLangySkillIds,
+  LANGY_SKILL_GATES,
+  langyTurnContextSchema,
+  renderLangyTurnContext,
+} from "../langy-turn-context.ts";
 
 const experimentChip = { kind: "experiment", ref: "my-exp", label: "my-exp" } as const;
 
@@ -76,6 +81,26 @@ describe("renderLangyTurnContext - the live UI-action line", () => {
       });
 
       expect(block).not.toContain("langwatch ui actions");
+    });
+  });
+});
+
+describe("the daily-insights skill, which a scheduled run's brief names", () => {
+  describe("given the skills a turn withholds from the model", () => {
+    /** @scenario "The daily-insights skill is never withheld from a turn" */
+    it.each([true, false])("is not withheld with the gate flag %s", (flagOn) => {
+      expect(LANGY_SKILL_GATES).not.toHaveProperty("daily-insights");
+      expect(disabledLangySkillIds(() => flagOn)).not.toContain("daily-insights");
+    });
+  });
+
+  describe("given a skill chip that names it", () => {
+    /** @scenario "A skill chip cannot name the daily-insights skill" */
+    it("is refused at the turn boundary", () => {
+      const chip = { id: "daily-insights", label: "Daily insights" };
+
+      expect(langyTurnContextSchema.validate({ skills: [chip] })).toBe(false);
+      expect(langyTurnContextSchema.validate({ skills: [{ ...chip, id: "tracing" }] })).toBe(true);
     });
   });
 });

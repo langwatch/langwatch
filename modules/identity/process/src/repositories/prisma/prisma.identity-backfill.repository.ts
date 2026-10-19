@@ -65,7 +65,7 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
     normalizedValue: string;
   }): Promise<BackfillUserRow[]> {
     const users = await this.prisma.user.findMany({
-      where: { email: { equals: normalizedValue, mode: "insensitive" } },
+      where: { email: normalizedValue },
       select: BACKFILL_USER_COLUMNS,
       orderBy: { id: "asc" },
     });

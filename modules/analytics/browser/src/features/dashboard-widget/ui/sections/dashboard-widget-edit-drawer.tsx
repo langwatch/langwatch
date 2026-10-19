@@ -1,16 +1,16 @@
 /**
  * The widget editor: a wide drawer with a live chart preview, Code and
- * Queries tabs, holding no draft state — every value and handler comes
- * from the card that opened it, so both read/write the exact same state.
+ * Queries tabs (plus any a caller adds), holding no draft state — every value
+ * and handler comes from the card that opened it, so both read/write the same state.
  */
 
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { Card } from "@langwatch/design-system/card";
 import { ContentTabs } from "@langwatch/design-system/content-tabs";
-import { Drawer } from "@langwatch/design-system/drawer";
+import { Drawer, setDrawerEndInset } from "@langwatch/design-system/drawer";
 import { Box, Button } from "@langwatch/design-system/primitives";
 import { Plus } from "lucide-react";
-import { type ReactNode, useMemo } from "react";
+import { type ReactNode, useLayoutEffect, useMemo } from "react";
 
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
 import { DashboardWidgetCodeEditor } from "./dashboard-widget-code-editor.tsx";
@@ -22,7 +22,17 @@ import {
 import { declaredParamsAreValid } from "./dashboard-widget-query-params-editor.tsx";
 import { EditableWidgetName } from "./editable-widget-name.tsx";
 
-interface DashboardWidgetEditDrawerProps {
+/** The two tabs every widget editor has. */
+type WidgetEditTab = "code" | "queries";
+
+/** A tab a caller adds after Code and Queries, with its own panel. */
+export interface WidgetEditExtraTab<Tab extends string> {
+  value: Tab;
+  label: string;
+  content: ReactNode;
+}
+
+interface DashboardWidgetEditDrawerProps<Tab extends string> {
   open: boolean;
   /** The project the queries' SQL editor reads its schema for. */
   projectId: string;
@@ -42,8 +52,25 @@ interface DashboardWidgetEditDrawerProps {
   isSaving: boolean;
   onClose: () => void;
   onSave: () => void;
-  activeTab: "code" | "queries";
-  onTabChange: (tab: "code" | "queries") => void;
+  activeTab: WidgetEditTab | NoInfer<Tab>;
+  onTabChange: (tab: WidgetEditTab | NoInfer<Tab>) => void;
+  /** Tabs after Code and Queries. */
+  extraTabs?: readonly WidgetEditExtraTab<Tab>[];
+  /** Shown between the preview and the tabs, such as an assistant's suggestions. */
+  assist?: ReactNode;
+  /** The side it opens from; "start" leaves a panel docked on the right in view. */
+  placement?: "start" | "end";
+  /** Room kept free at the far edge, so a panel docked there sits beside the drawer. */
+  reserveEndPx?: number;
+}
+
+/** Holds room free at the right edge while open, so a panel docked there stays in view. */
+function useReservedEndInset({ open, reserveEndPx }: { open: boolean; reserveEndPx?: number }) {
+  useLayoutEffect(() => {
+    if (!open || reserveEndPx === void 0) return;
+    setDrawerEndInset(reserveEndPx);
+    return () => setDrawerEndInset(0);
+  }, [open, reserveEndPx]);
 }
 
 /** Why Save is off, or undefined when the draft can be saved. */
@@ -60,7 +87,7 @@ function saveBlockedReason({
   return void 0;
 }
 
-export function DashboardWidgetEditDrawer({
+export function DashboardWidgetEditDrawer<Tab extends string = WidgetEditTab>({
   open,
   projectId,
   chart,
@@ -79,12 +106,18 @@ export function DashboardWidgetEditDrawer({
   onSave,
   activeTab,
   onTabChange,
-}: DashboardWidgetEditDrawerProps) {
+  extraTabs = [],
+  assist,
+  placement = "end",
+  reserveEndPx,
+}: DashboardWidgetEditDrawerProps<Tab>) {
+  useReservedEndInset({ open, reserveEndPx });
   return (
     <Drawer
       open={open}
       onClose={onClose}
       size="xl"
+      placement={placement}
       title={name === "" ? "Widget" : name}
       titleContent={
         <EditableWidgetName name={name} id={id} onRename={onNameChange} fontSize="md" />
@@ -107,8 +140,14 @@ export function DashboardWidgetEditDrawer({
           {chart}
         </Box>
       )}
+      {assist && (
+        <Box flexShrink={0} marginBottom={3}>
+          {assist}
+        </Box>
+      )}
       <WidgetEditTabs
         projectId={projectId}
+        extraTabs={extraTabs}
         activeTab={activeTab}
         onTabChange={onTabChange}
         code={code}
@@ -122,9 +161,10 @@ export function DashboardWidgetEditDrawer({
   );
 }
 
-/** The Code / Queries tab switcher and its two full-height panels. */
-function WidgetEditTabs({
+/** The Code / Queries tab switcher, any added tabs, and their full-height panels. */
+function WidgetEditTabs<Tab extends string>({
   projectId,
+  extraTabs,
   activeTab,
   onTabChange,
   code,
@@ -135,8 +175,9 @@ function WidgetEditTabs({
   onRun,
 }: {
   projectId: string;
-  activeTab: "code" | "queries";
-  onTabChange: (tab: "code" | "queries") => void;
+  extraTabs: readonly WidgetEditExtraTab<Tab>[];
+  activeTab: WidgetEditTab | Tab;
+  onTabChange: (tab: WidgetEditTab | Tab) => void;
   code: string;
   onCodeChange: (code: string) => void;
   queries: DashboardWidgetQuery[];
@@ -202,6 +243,15 @@ function WidgetEditTabs({
             </Box>
           ),
         },
+        ...extraTabs.map(({ value, label, content }) => ({
+          value,
+          label,
+          content: (
+            <Box flex={1} minHeight={0} overflowY="auto" paddingTop={3}>
+              {content}
+            </Box>
+          ),
+        })),
       ]}
     />
   );

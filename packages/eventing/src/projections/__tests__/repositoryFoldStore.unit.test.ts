@@ -301,5 +301,25 @@ describe("RepositoryFoldStore", () => {
         expect.objectContaining({ tenantId: "tenant-99" }),
       );
     });
+
+    describe("when the fold reads with a declared read window", () => {
+      /** @scenario a repository-backed fold store hands the declared window to its repository */
+      it("hands the repository the same window, and none when the read has none", async () => {
+        const repo = makeMockRepo();
+        const store = new RepositoryFoldStore<TestData>(repo, "2026-03-01");
+        const readWindow = { fromMs: 1_000, toMs: 9_000 };
+
+        await store.get("agg-1", makeContext({ readWindow }));
+        await store.get("agg-1", makeContext());
+
+        expect(repo.findProjection).toHaveBeenNthCalledWith(1, "agg-1", {
+          tenantId: "tenant-1",
+          readWindow,
+        });
+        expect(repo.findProjection).toHaveBeenNthCalledWith(2, "agg-1", {
+          tenantId: "tenant-1",
+        });
+      });
+    });
   });
 });

@@ -24,6 +24,7 @@ import type {
 import type {
   DashboardWidgetDefinition,
   DashboardWidgetQuery,
+  DashboardWidgetSource,
 } from "./features/dashboard-widget/dashboard-widget-definition.ts";
 import type {
   LangWatchQLCaller,
@@ -62,6 +63,12 @@ export interface DashboardWidget {
 export interface DashboardWidgetDefinitionInput {
   readonly code: string;
   readonly queries: readonly DashboardWidgetQuery[];
+  /** What the card's info tip says; a widget without one shows no tip. */
+  readonly description?: string;
+  /** What Langy is drafted with when asked about the widget; Langy falls back without one. */
+  readonly prompt?: string;
+  /** Where the widget came from; an update without one keeps the stored source. */
+  readonly source?: DashboardWidgetSource;
 }
 
 /** The callable analytics capability shared by process peers. */
@@ -89,8 +96,8 @@ export interface AnalyticsApi {
     readonly subkey?: string;
     readonly filters?: Record<string, unknown>;
   }): Promise<AnalyticsFilterOption[]>;
-  /** Refuses the dashboard-widget surface while its project rollout is disabled. */
-  assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+  /** Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on. */
+  assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
   upsertEvaluationAnalytics(input: AnalyticsEvaluationUpsertInput): Promise<void>;
   upsertEvaluationAnalyticsBatch(input: AnalyticsEvaluationUpsertInput[]): Promise<void>;
   findEvaluationAnalytics(input: AnalyticsEvaluationReadInput): Promise<{
@@ -104,11 +111,13 @@ export interface AnalyticsApi {
   /**
    * When the project's newest trace or evaluation since `since` occurred, from the analytics
    * tables this module owns; empty when none did. The graph-alert heartbeat reads it.
+   * `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
    */
   findLastOccurredAt(input: {
     readonly projectId: string;
     readonly source: AnalyticsMetricSource;
     readonly since: Instant;
+    readonly excludeOrigins?: readonly string[];
   }): Promise<Instant[]>;
   isLangWatchQLAvailable(): boolean;
   /**
@@ -174,6 +183,8 @@ export interface AnalyticsApi {
   ): Promise<readonly Record<string, unknown>[]>;
   /** Whether this project's rollout admits it to the Workbench at all. */
   isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+  /** Whether this project's rollout admits it to the Dashboards area at all. */
+  isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
   /** What one signed-in member may see of a project's content and spend. */
   resolveProtections(input: { userId: string; projectId: string }): Promise<LangWatchQLProtections>;
   /**

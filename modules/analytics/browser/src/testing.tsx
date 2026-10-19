@@ -15,6 +15,8 @@ import {
   type AnalyticsAlertAuthoring,
   type AnalyticsFailureNotice,
   type AnalyticsHostProject,
+  type AnalyticsLangyAskRequest,
+  type AnalyticsLangyDraftAbout,
   type AnalyticsRouteReading,
   type AnalyticsSuccessNotice,
 } from "./model/analytics-host.ts";
@@ -22,9 +24,27 @@ import {
 export type StubAnalyticsHostOptions = {
   project?: AnalyticsHostProject | undefined;
   organizationId?: string | undefined;
+  /** "Acme" unless a test says otherwise. */
+  organizationName?: string | undefined;
+  /** The signed-in member; "user-1" unless a test says otherwise. */
+  userId?: string | undefined;
   permissions?: readonly string[];
+  /** Whether the grants have arrived; settled unless a test says otherwise. */
+  settled?: boolean;
+  /** A flag named here answers its value, `undefined` included; any other is off. */
+  flags?: Readonly<Record<string, boolean | undefined>>;
   route?: AnalyticsRouteReading;
 };
+
+/** A member who reads and edits analytics; a test of a narrower role names its own grants. */
+export const ANALYTICS_MEMBER_PERMISSIONS: readonly string[] = [
+  "analytics:view",
+  "analytics:create",
+  "analytics:update",
+  "analytics:delete",
+  "cost:view",
+  "traces:view",
+];
 
 /** A host that answers from fixtures and records everything it is told. */
 export class StubAnalyticsHost extends AnalyticsHostApi {
@@ -33,6 +53,9 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
   readonly navigations: string[] = [];
   readonly queries: Readonly<Record<string, string | undefined>>[] = [];
   readonly alertAuthorings: AnalyticsAlertAuthoring[] = [];
+  readonly langyAsks: AnalyticsLangyAskRequest[] = [];
+  /** What the screens told Langy is on screen, in order. */
+  readonly langyScreens: (AnalyticsLangyDraftAbout | null)[] = [];
 
   constructor(private readonly options: StubAnalyticsHostOptions = {}) {
     super();
@@ -53,10 +76,25 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
     return "organizationId" in this.options ? this.options.organizationId : "org-1";
   }
 
+  organizationName(): string | undefined {
+    return "organizationName" in this.options ? this.options.organizationName : "Acme";
+  }
+
+  userId(): string | undefined {
+    return "userId" in this.options ? this.options.userId : "user-1";
+  }
+
   hasPermission(permission: string): boolean {
-    return (this.options.permissions ?? ["analytics:view", "cost:view", "traces:view"]).includes(
-      permission,
-    );
+    return (this.options.permissions ?? ANALYTICS_MEMBER_PERMISSIONS).includes(permission);
+  }
+
+  isSettled(): boolean {
+    return this.options.settled ?? true;
+  }
+
+  featureFlag(flag: string): boolean | undefined {
+    const flags = this.options.flags ?? {};
+    return flag in flags ? flags[flag] : false;
   }
 
   route(): AnalyticsRouteReading {
@@ -81,6 +119,14 @@ export class StubAnalyticsHost extends AnalyticsHostApi {
 
   failed(failure: AnalyticsFailureNotice): void {
     this.failures.push(failure);
+  }
+
+  askLangy(request: AnalyticsLangyAskRequest): void {
+    this.langyAsks.push(request);
+  }
+
+  showLangy(about: AnalyticsLangyDraftAbout | null): void {
+    this.langyScreens.push(about);
   }
 
   /** The last query write, which is what an address assertion is about. */
