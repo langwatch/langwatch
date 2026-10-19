@@ -148,6 +148,7 @@ constraint-dependencies = [
   # open until instructor lifts that cap. Without this floor in range the
   # resolver satisfies a higher one by walking arize-phoenix back to 14.x.
   "pydantic-ai-slim>=2.30.0",
+  "mcp>=1.30.0", # MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 (#2828)
 ]
 
 [tool.uv.workspace]
