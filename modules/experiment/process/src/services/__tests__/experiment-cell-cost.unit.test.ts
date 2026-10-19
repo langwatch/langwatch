@@ -35,7 +35,7 @@ const NO_CACHE = { cacheReadTokens: 0, cacheCreationTokens: 0 };
 
 describe("ExperimentRunModelCostService.findTokenPrice with cached tokens", () => {
   describe("when 9000 of 10000 prompt tokens were cached", () => {
-    /** @scenario Cached prompt tokens are priced at the cache-read rate */
+    /** @scenario "Cached prompt tokens are priced at the cache-read rate" */
     it("costs less than a cell with no cached tokens", async () => {
       const base = { projectId: "project_1", model: MODEL, inputTokens: 10000, outputTokens: 0 };
       const cached = await pricing().findTokenPrice({
@@ -50,7 +50,7 @@ describe("ExperimentRunModelCostService.findTokenPrice with cached tokens", () =
   });
 
   describe("when a prompt has cache reads and cache writes", () => {
-    /** @scenario Cached tokens are not priced twice */
+    /** @scenario "Cached tokens are not priced twice" */
     it("prices fresh input, cache reads and cache writes once each", async () => {
       const price = await pricing().findTokenPrice({
         projectId: "project_1",
@@ -87,7 +87,7 @@ describe("ExperimentCellExecutionService.findPriceMetrics", () => {
     return { service, lookups };
   }
 
-  /** @scenario A cell with only cached tokens is still priced */
+  /** @scenario "A cell with only cached tokens is still priced" */
   it("looks up a price for a cell that reported only cached tokens", async () => {
     const { service, lookups } = priceLookups();
 
@@ -104,7 +104,7 @@ describe("ExperimentCellExecutionService.findPriceMetrics", () => {
     });
   });
 
-  /** @scenario A cell with no tokens of any kind is left unpriced */
+  /** @scenario "A cell with no tokens of any kind is left unpriced" */
   it("looks up no price when every count is zero", async () => {
     const { service, lookups } = priceLookups();
 
