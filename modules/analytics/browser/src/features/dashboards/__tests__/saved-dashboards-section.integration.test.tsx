@@ -66,11 +66,11 @@ const STORED_WIDGETS = [
 ].map((widget) => ({ ...widget, colSpan: 4, rowSpan: 3, graph }));
 
 const ACK_PATHS = [
-  "dashboards.updateDetails",
-  "dashboards.star",
-  "dashboards.unstar",
-  "dashboards.reorderStars",
-  "dashboards.delete",
+  "boards.update",
+  "boards.star",
+  "boards.unstar",
+  "boards.reorderStars",
+  "boards.delete",
   "dashboardWidgets.batchUpdateLayouts",
 ];
 
@@ -87,13 +87,13 @@ function project({
   const calls: UiProcedureCall[] = [];
   const answer = (call: UiProcedureCall) => {
     calls.push(call);
-    if (call.path === "dashboards.listStarred") {
+    if (call.path === "boards.listStarred") {
       return listFails
         ? Promise.reject(new UiProcedureRefusal("FORBIDDEN", 403))
         : Promise.resolve(stars);
     }
-    if (call.path === "dashboards.getAll") return Promise.resolve(boards);
-    if (call.path === "dashboards.create") {
+    if (call.path === "boards.getAll") return Promise.resolve(boards);
+    if (call.path === "boards.create") {
       return Promise.resolve({ ...board({ id: "board-new", name: "Untitled" }) });
     }
     if (call.path === "dashboardWidgets.list") return Promise.resolve(STORED_WIDGETS);
@@ -199,7 +199,7 @@ describe("the Dashboards sidebar", () => {
 
       await user.click(screen.getByRole("button", { name: "New dashboard" }));
       expect(screen.queryByRole("menuitem")).toBeNull();
-      await waitFor(() => expect(inputsTo(calls, "dashboards.create")).toHaveLength(1));
+      await waitFor(() => expect(inputsTo(calls, "boards.create")).toHaveLength(1));
     });
   });
 
@@ -256,7 +256,7 @@ describe("the Dashboards sidebar", () => {
       await user.click(within(data!).getByRole("button", { name: "Star dashboard" }));
 
       await waitFor(() =>
-        expect(inputsTo(calls, "dashboards.star")).toEqual([
+        expect(inputsTo(calls, "boards.star")).toEqual([
           { projectId: "proj-1", star: { kind: "template", templateId: "data" } },
         ]),
       );
@@ -271,7 +271,7 @@ describe("the Dashboards sidebar", () => {
       await user.click(starred.getAllByRole("button", { name: "Unstar dashboard" })[0]!);
 
       await waitFor(() =>
-        expect(inputsTo(calls, "dashboards.unstar")).toEqual([
+        expect(inputsTo(calls, "boards.unstar")).toEqual([
           { projectId: "proj-1", star: { kind: "board", dashboardId: "board-2" } },
         ]),
       );
@@ -365,7 +365,7 @@ describe("the Dashboards sidebar", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Move Release check up" }));
 
       await waitFor(() =>
-        expect(inputsTo(calls, "dashboards.reorderStars")).toEqual([
+        expect(inputsTo(calls, "boards.reorderStars")).toEqual([
           {
             projectId: "proj-1",
             stars: [
@@ -385,13 +385,13 @@ describe("the Dashboards sidebar", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Duplicate" }));
 
       await waitFor(() => expect(host.navigations).toEqual(["/test-project/dashboards/board-new"]));
-      expect(inputsTo(calls, "dashboards.create")).toEqual([
+      expect(inputsTo(calls, "boards.create")).toEqual([
         { projectId: "proj-1", name: "Latency copy" },
       ]);
       expect(
         inputsTo(calls, "dashboardWidgets.create").map((input) => (input as { name: string }).name),
       ).toEqual(["Traffic", "Cost"]);
-      expect(inputsTo(calls, "dashboards.star")).toEqual([]);
+      expect(inputsTo(calls, "boards.star")).toEqual([]);
     });
 
     /** @scenario "From LangWatch: Duplicate to edit makes an own board named after the template" */
@@ -404,7 +404,7 @@ describe("the Dashboards sidebar", () => {
       await user.click(await screen.findByRole("menuitem", { name: "Duplicate to edit" }));
 
       await waitFor(() =>
-        expect(inputsTo(calls, "dashboards.create")).toEqual([
+        expect(inputsTo(calls, "boards.create")).toEqual([
           { projectId: "proj-1", name: "Where my agent breaks (copy)" },
         ]),
       );
@@ -417,11 +417,11 @@ describe("the Dashboards sidebar", () => {
       await user.click(await screen.findByRole("button", { name: "Actions for Weekly review" }));
       await user.click(await screen.findByRole("menuitem", { name: "Delete" }));
       const dialog = await screen.findByRole("alertdialog");
-      expect(inputsTo(calls, "dashboards.delete")).toEqual([]);
+      expect(inputsTo(calls, "boards.delete")).toEqual([]);
       fireEvent.click(within(dialog).getByRole("button", { name: "Delete" }));
 
       await waitFor(() =>
-        expect(inputsTo(calls, "dashboards.delete")).toEqual([
+        expect(inputsTo(calls, "boards.delete")).toEqual([
           { projectId: "proj-1", dashboardId: "board-1" },
         ]),
       );

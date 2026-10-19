@@ -22,6 +22,16 @@ export const dataPrivacyConfig = Config.define((c) => ({
 
 export type DataPrivacyServerConfig = ConfigOf<typeof dataPrivacyConfig>;
 
+/** `true` in any case turns Google DLP off, as the previous release read it. */
+export function isGoogleDlpDisabled({
+  config,
+}: {
+  config: Pick<DataPrivacyServerConfig, "googleDlpDisabled">;
+}): boolean {
+  const value = config.googleDlpDisabled;
+  return value === true || (typeof value === "string" && value.toLowerCase() === "true");
+}
+
 /**
  * How long a redaction call may take. Not configurable: the ceiling belongs
  * to the pipeline's own budget, and no deployment has ever set it.

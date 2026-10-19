@@ -346,6 +346,8 @@ export class SsoModule implements SsoApiContract {
   readonly #selfServeContext: SsoSelfServeContextService;
   readonly #authorization: AuthzApi;
   readonly #auditLog: AuditLogApi;
+  /** Asked per sign-in, never while the process constructs. */
+  readonly #identity: IdentityApi;
   readonly #signInProviderFacts: SsoSignInProviderFactsService;
 
   private constructor({
@@ -409,6 +411,7 @@ export class SsoModule implements SsoApiContract {
     });
     this.#authorization = dependencies.authorization;
     this.#auditLog = dependencies.auditLog;
+    this.#identity = dependencies.identity;
   }
 
   static async create({ dependencies, config, secrets }: SsoSetup): Promise<SsoModule> {
@@ -574,7 +577,13 @@ export class SsoModule implements SsoApiContract {
         input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
       ),
       genericOAuthConfigs:
-        buildGenericOAuthConfigs({ ...this.#configuration, baseUrl: input.baseUrl }) ?? [],
+        buildGenericOAuthConfigs(
+          { ...this.#configuration, baseUrl: input.baseUrl },
+          {
+            isBrokeredAddressProved: (args) =>
+              this.#identity.ssoAssertion().isBrokeredAddressProved(args),
+          },
+        ) ?? [],
     };
     await this.#signInProviderFacts.signInProviderMounted({
       provider: this.#configuration.provider,

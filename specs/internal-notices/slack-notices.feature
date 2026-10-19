@@ -21,6 +21,11 @@ Feature: The Slack notices LangWatch posts to its own team
     Then its header starts with exactly one of the status emoji
 
   @unit
+  Scenario: A card notice opens its title with one status emoji
+    When a notice laid out as a card is rendered
+    Then its card title starts with exactly one of the status emoji
+
+  @unit
   Scenario: Every notice carries a plain-text fallback for notifications
     When a notice is rendered
     Then its text names the header, the summary and every field
@@ -49,10 +54,29 @@ Feature: The Slack notices LangWatch posts to its own team
     Then rendering is refused rather than posting a half-filled notice
 
   @unit
-  Scenario: A new user's announcement names who signed up and where
-    When the new-user notice is rendered
-    Then it names the user, their email and their organization
-    And their phone number and campaign when the sign-up gave them
+  Scenario: A new organisation's card names who created it and where
+    When the new-organisation notice is rendered
+    Then its title names the organisation
+    And its subtitle names the person and their email
+    And its body names the campaign and phone number when the sign-up gave them
+
+  @unit
+  Scenario: A join card names the person, the organisation and the route they came by
+    When the new-user notice is rendered for an invitation, SSO or SCIM arrival
+    Then its title names the person and the organisation they joined
+    And its subtitle names their email and the route they came by
+
+  @unit
+  Scenario: A card's buttons open the user and the organisation in ops
+    When a new-organisation or new-user card is rendered
+    Then one button opens the user in ops
+    And the primary button opens the organisation in ops
+
+  @unit
+  Scenario: A SCIM summary omits zero counts and caps the names
+    When the SCIM sync summary notice is rendered
+    Then its subtitle counts only what happened: added, updated, deactivated, failed
+    And its body names at most three added people and counts the rest
 
   @unit
   Scenario: A subscription notice names the organization, the plan and the subscription
@@ -105,16 +129,22 @@ Feature: The Slack notices LangWatch posts to its own team
     And the flow that raised the notice carries on
 
   @unit
-  Scenario: A sign-up posts the new-user notice to the signups channel
+  Scenario: A sign-up posts the new-organisation card to the signups channel
     Given the signups webhook is configured
     When somebody signs up and creates an organization
-    Then the new-user notice is posted to the signups channel
+    Then the new-organisation card is posted to the signups channel
 
   @unit
   Scenario: Joining through a domain or an SSO connection is announced too
     Given the signups webhook is configured
     When somebody joins an organization through its domain or its SSO connection
-    Then the new-user notice is posted to the signups channel
+    Then the join card is posted to the signups channel
+
+  @unit
+  Scenario: Joining through an invitation is announced with the join card
+    Given the signups webhook is configured
+    When somebody accepts an invitation to an organization
+    Then the join card is posted to the signups channel, naming the invitation
 
   @unit
   Scenario: Customer Slack never uses the internal notice templates

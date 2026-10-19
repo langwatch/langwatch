@@ -52,16 +52,8 @@ async function harness(options: { targetExists?: boolean } = {}) {
       return [{ id: "project-1", name: "Chat", departmentId: department.id }];
     },
   });
-  const reconciles: string[] = [];
-  const service = DepartmentService.create({
-    repository,
-    organizations,
-    projects,
-    onMemberDepartmentAssigned: async ({ userId }) => {
-      reconciles.push(userId);
-    },
-  });
-  return { service, department, writes, repository, reconciles, hiddenAsked };
+  const service = DepartmentService.create({ repository, organizations, projects });
+  return { service, department, writes, repository, hiddenAsked };
 }
 
 describe("DepartmentService", () => {
@@ -191,32 +183,5 @@ describe("DepartmentService", () => {
     });
 
     expect([...onDay]).toEqual([["user-1", department.id]]);
-  });
-});
-
-describe("given a member's department assigned from governance", () => {
-  describe("when the member exists", () => {
-    it("enqueues the aggregate reconcile once the write lands", async () => {
-      const { service, department, reconciles } = await harness();
-
-      await service.assignUser({
-        organizationId: ORG,
-        userId: "user-2",
-        departmentId: department.id,
-      });
-
-      expect(reconciles).toEqual(["user-2"]);
-    });
-  });
-
-  describe("when the member is not found", () => {
-    it("enqueues nothing, because nothing changed", async () => {
-      const { service, department, reconciles } = await harness({ targetExists: false });
-
-      await expect(
-        service.assignUser({ organizationId: ORG, userId: "user-9", departmentId: department.id }),
-      ).rejects.toBeInstanceOf(DepartmentAssignmentTargetNotFoundError);
-      expect(reconciles).toEqual([]);
-    });
   });
 });

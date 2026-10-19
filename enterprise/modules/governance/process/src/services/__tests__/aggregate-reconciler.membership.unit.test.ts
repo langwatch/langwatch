@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * ADR-177 block E end to end over stateful doubles: a fact or the sweep enqueues through the real
+ * ADR-177 block E end to end over stateful doubles: a fact enqueues through the real
  * outbox, the real reconcile intent runs, and the ledger double keeps revoked rows as main does.
  * @see specs/governance/aggregate-project.feature
  */
@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   OutboxAggregateReconcile,
   runAggregateReconcile,
-  runAggregateSweep,
 } from "../../eventing/aggregate-reconcile.intent.ts";
 import { aggregateReconcileIntentSchema } from "../../eventing/aggregate-reconcile.process.ts";
 import {
@@ -45,18 +44,13 @@ function world({ rule }: { rule: AggregateRule }) {
   };
   const projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   > = {
     findAggregate: async ({ aggregateProjectId }) =>
       aggregateProjectId === AGG
         ? [{ id: AGG, organizationId: ORG, archived: false, rule: state.rule }]
         : [],
     findLiveAggregateIds: async () => [AGG],
-    findAllLiveAggregates: async () => [{ id: AGG, organizationId: ORG }],
     findPersonalProjectIds: async ({ ownerUserIds }) =>
       [...state.personal]
         .filter(([, owner]) => ownerUserIds === undefined || ownerUserIds.includes(owner))
@@ -169,37 +163,6 @@ describe("the reconciler keeps an aggregate's members current", () => {
         await drain();
 
         expect(liveMembers()).toEqual(["p_ana", "p_newcomer"]);
-      });
-    });
-
-    describe("when the nightly sweep runs after a project was created while no trigger fired", () => {
-      /** @scenario "A nightly sweep catches a missed trigger" */
-      it("makes that personal project a member", async () => {
-        const { state, reconciler, outbox, drain, liveMembers } = world({
-          rule: { kind: "all-personal" },
-        });
-        state.personal.set("p_missed", "u_missed");
-        state.departments.set("u_missed", null);
-
-        await runAggregateSweep({
-          reconciler,
-          outbox,
-          deleteDispatchedBefore: async () => 0,
-          now: () => 1,
-        })(
-          { scheduledFor: 1 },
-          {
-            processName: "aggregateProjectReconcile",
-            projectId: ORG,
-            processKey: "sweep",
-            tenantId: ORG,
-            messageKey: "sweep:1",
-            attempt: 1,
-          },
-        );
-        await drain();
-
-        expect(liveMembers()).toEqual(["p_missed"]);
       });
     });
   });

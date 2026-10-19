@@ -151,7 +151,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals, whatever this says; one that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
     key: "release_lwql_workbench",
@@ -196,7 +196,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline, where the 256 KB per-value cap applies. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline and the same 256 KB cap applies.",
+      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline. Both routes keep attribute values up to 8 MiB whole.",
   },
   // Externalizes inline media to stored-objects store at ingestion edge;
   // currently opt-in (ADR pending).

@@ -2,6 +2,7 @@ import {
   datasetColumnsSchema,
   datasetSchema,
   datasetStorageEntrySchema,
+  datasetSummarySchema,
   type Dataset,
   type DatasetStorageEntry,
   type DatasetStoragePageInput,
@@ -12,20 +13,22 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import { type Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, toDate } from "@langwatch/time";
 
-import type {
-  DatasetCreateInput,
-  DatasetRepository,
-  DatasetUpdateInput,
+import {
+  datasetRecordCountColumnsSchema,
+  type DatasetCreateInput,
+  type DatasetRecordCountColumns,
+  type DatasetRepository,
+  type DatasetUpdateInput,
 } from "../dataset.repository.ts";
 
 /**
  * Only what this repository touches, so composition names the slice it needs
  * rather than the whole generated client.
  */
-type DatasetDatabase = Pick<PrismaClient, "dataset" | "datasetRecord">;
+type DatasetDatabase = Pick<PrismaClient, "dataset">;
 
 export class PrismaDatasetRepository
-  extends PrismaRepository.for("Dataset", "DatasetRecord")
+  extends PrismaRepository.for("Dataset")
   implements DatasetRepository
 {
   static readonly create = this.factory((prisma) => new PrismaDatasetRepository(prisma));
@@ -89,21 +92,34 @@ export class PrismaDatasetRepository
       orderBy: { createdAt: "desc" },
       skip: (input.page - 1) * input.limit,
       take: input.limit,
+      select: {
+        id: true,
+        name: true,
+        slug: true,
+        columnTypes: true,
+        status: true,
+        createdAt: true,
+        updatedAt: true,
+      },
     });
-    const datasetIds = rows.map((row) => row.id);
-    const counts =
-      datasetIds.length > 0
-        ? await this.database.datasetRecord.groupBy({
-            by: ["datasetId"],
-            where: { projectId: input.projectId, datasetId: { in: datasetIds } },
-            _count: { _all: true },
-          })
-        : [];
-    const recordCounts = new Map(counts.map((count) => [count.datasetId, count._count._all]));
-    return rows.map((row) => ({
-      ...toDataset(row),
-      recordCount: recordCounts.get(row.id) ?? 0,
-    }));
+    return rows.map((row) =>
+      datasetSummarySchema.parse({
+        ...row,
+        columnTypes: datasetColumnsSchema.parse(row.columnTypes),
+      }),
+    );
+  }
+
+  async findRecordCountColumns(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<DatasetRecordCountColumns[]> {
+    if (input.datasetIds.length === 0) return [];
+    const rows = await this.database.dataset.findMany({
+      where: { projectId: input.projectId, id: { in: [...input.datasetIds] }, archivedAt: null },
+      select: { id: true, contentLayout: true, useS3: true, rowCount: true, s3RecordCount: true },
+    });
+    return rows.map((row) => datasetRecordCountColumnsSchema.parse(row));
   }
 
   async create(input: DatasetCreateInput): Promise<Dataset> {

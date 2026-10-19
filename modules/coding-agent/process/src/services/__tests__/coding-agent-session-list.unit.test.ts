@@ -11,6 +11,8 @@ import {
   type TestProjects,
   TestSessions,
   TestTraceSessions,
+  aggregateProof,
+  ownProof,
   pullRequest,
   session,
 } from "../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -77,6 +79,7 @@ describe("Coding Agent sessions list", () => {
       }),
       session({
         sessionId: "session-b",
+        startedAtMs: TEST_NOW_MS - 6 * HOUR_MS,
         repositoryOwner: "",
         repositoryName: "",
         gitBranch: "",
@@ -85,11 +88,14 @@ describe("Coding Agent sessions list", () => {
     ];
     const service = serviceWith({ sessions });
 
-    const rows = await service.listForProject({ projectId: PROJECT });
+    const rows = await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
-    expect(sessions.recentInputs).toEqual([
+    expect(sessions.fencedInputs).toEqual([
       {
-        tenantId: PROJECT,
+        authorization: expect.anything(),
         fromMs: TEST_NOW_MS - SESSIONS_LIST_WINDOW_MS,
         toMs: TEST_NOW_MS,
         limit: SESSIONS_LIST_LIMIT,
@@ -171,7 +177,10 @@ describe("Coding Agent sessions list", () => {
     ];
     const service = serviceWith({ sessions, github });
 
-    const rows = await service.listForProject({ projectId: PROJECT });
+    const rows = await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
     expect(github.branchLookupInputs).toEqual([
       {
@@ -232,7 +241,10 @@ describe("Coding Agent sessions list", () => {
     ];
     const service = serviceWith({ sessions, github });
 
-    const [row] = await service.listForProject({ projectId: PROJECT });
+    const [row] = await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
     expect(row?.pullRequests.map((pr) => pr.number)).toEqual([9]);
   });
@@ -245,7 +257,10 @@ describe("Coding Agent sessions list", () => {
     projects.teamProject = null;
     const service = serviceWith({ sessions, projects });
 
-    const rows = await service.listForProject({ projectId: PROJECT });
+    const rows = await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.pullRequests).toEqual([]);
@@ -264,7 +279,10 @@ describe("Coding Agent sessions list", () => {
     github.mappingError = new Error("GitHub unavailable");
     const service = serviceWith({ sessions, github });
 
-    const rows = await service.listForProject({ projectId: PROJECT });
+    const rows = await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
     expect(rows).toHaveLength(1);
     expect(rows[0]?.pullRequests).toEqual([]);
@@ -276,7 +294,10 @@ describe("Coding Agent sessions list", () => {
     const github = new TestGithubService();
     const service = serviceWith({ sessions, github });
 
-    await service.listForProject({ projectId: PROJECT });
+    await service.listForProject({
+      projectId: PROJECT,
+      authorization: ownProof({ projectId: PROJECT }),
+    });
 
     expect(github.branchLookupInputs).toEqual([]);
   });
@@ -341,11 +362,14 @@ describe("Coding Agent sessions list", () => {
       sessions.rows = [session()];
       const service = serviceWith({ sessions });
 
-      await service.listForProject({ projectId: PROJECT });
+      await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
-      expect(sessions.recentInputs).toEqual([
+      expect(sessions.fencedInputs).toEqual([
         {
-          tenantId: PROJECT,
+          authorization: expect.anything(),
           fromMs: TEST_NOW_MS - SESSIONS_LIST_WINDOW_MS,
           toMs: TEST_NOW_MS,
           limit: SESSIONS_LIST_LIMIT,
@@ -378,7 +402,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions });
 
-      const [row] = await service.listForProject({ projectId: PROJECT });
+      const [row] = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(row).toMatchObject({
         agentVersion: "2.0.0",
@@ -408,7 +435,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions });
 
-      const rows = await service.listForProject({ projectId: PROJECT });
+      const rows = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(rows[0]?.title).toBe("Add the sessions screen");
       // Nothing to show reads as nothing, never as an empty string, so the
@@ -425,7 +455,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions });
 
-      const rows = await service.listForProject({ projectId: PROJECT });
+      const rows = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(rows[0]?.title).toBe("pr-reviewer");
       expect(rows[1]?.title).toBeNull();
@@ -451,7 +484,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions, github });
 
-      const [row] = await service.listForProject({ projectId: PROJECT });
+      const [row] = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(row?.pullRequests.map((pull) => pull.number)).toEqual([11, 42]);
     });
@@ -485,7 +521,10 @@ describe("Coding Agent sessions list", () => {
       const github = new TestGithubService();
       const service = serviceWith({ sessions, github });
 
-      await service.listForProject({ projectId: PROJECT });
+      await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(github.branchLookupInputs).toHaveLength(1);
       // Two sessions sharing a repository and branches ask once for each, and
@@ -542,7 +581,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions, github });
 
-      const [row] = await service.listForProject({ projectId: PROJECT });
+      const [row] = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(row?.pullRequests.map((pull) => pull.number)).toEqual([9]);
     });
@@ -564,7 +606,10 @@ describe("Coding Agent sessions list", () => {
       ];
       const service = serviceWith({ sessions, github });
 
-      const [row] = await service.listForProject({ projectId: PROJECT });
+      const [row] = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(github.branchLookupInputs[0]?.keys).toEqual([
         {
@@ -590,7 +635,10 @@ describe("Coding Agent sessions list", () => {
       const github = new TestGithubService();
       const service = serviceWith({ sessions, projects, github });
 
-      const rows = await service.listForProject({ projectId: PROJECT });
+      const rows = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(rows).toHaveLength(1);
       expect(rows[0]?.pullRequests).toEqual([]);
@@ -604,7 +652,10 @@ describe("Coding Agent sessions list", () => {
       github.mappingError = new Error("mapping unavailable");
       const service = serviceWith({ sessions, github });
 
-      const rows = await service.listForProject({ projectId: PROJECT });
+      const rows = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(rows).toHaveLength(1);
       expect(rows[0]?.pullRequests).toEqual([]);
@@ -618,10 +669,61 @@ describe("Coding Agent sessions list", () => {
       const github = new TestGithubService();
       const service = serviceWith({ sessions, github });
 
-      const rows = await service.listForProject({ projectId: PROJECT });
+      const rows = await service.listForProject({
+        projectId: PROJECT,
+        authorization: ownProof({ projectId: PROJECT }),
+      });
 
       expect(rows[0]?.pullRequests).toEqual([]);
       expect(github.branchLookupInputs).toEqual([]);
+    });
+  });
+
+  describe("given an aggregate reading two members through shared grants", () => {
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "The aggregate's Sessions page lists its members' sessions under their windows"
+     */
+    it("lists both members' sessions newest first, none before a grant's start", async () => {
+      const sessions = new TestSessions();
+      sessions.recentRowsByTenant.set("member-a", [
+        session({
+          tenantId: "member-a",
+          sessionId: "a-old",
+          startedAtMs: TEST_NOW_MS - 9 * HOUR_MS,
+        }),
+        session({
+          tenantId: "member-a",
+          sessionId: "a-new",
+          startedAtMs: TEST_NOW_MS - 1 * HOUR_MS,
+        }),
+      ]);
+      sessions.recentRowsByTenant.set("member-b", [
+        session({
+          tenantId: "member-b",
+          sessionId: "b-before",
+          startedAtMs: TEST_NOW_MS - 6 * HOUR_MS,
+        }),
+        session({
+          tenantId: "member-b",
+          sessionId: "b-after",
+          startedAtMs: TEST_NOW_MS - 2 * HOUR_MS,
+        }),
+      ]);
+      const service = serviceWith({ sessions });
+
+      const rows = await service.listForProject({
+        projectId: "aggregate",
+        authorization: aggregateProof({
+          projectId: "aggregate",
+          members: [
+            { projectId: "member-a", from: 0 },
+            { projectId: "member-b", from: TEST_NOW_MS - 4 * HOUR_MS },
+          ],
+        }),
+      });
+
+      expect(rows.map((row) => row.sessionId)).toEqual(["a-new", "b-after", "a-old"]);
     });
   });
 });

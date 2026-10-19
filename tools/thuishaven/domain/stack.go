@@ -213,6 +213,7 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{TelemetryService, "OTLP sender (telemetrysim)"},
 	{LambdaService, "NLP Lambda fleet (lambdasim)"},
 	{GithubService, "GitHub App, API and webhooks (githubsim)"},
+	{McpService, "MCP clients against hosted MCP (mcpsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 	{LangevalsService, "Evaluators (Python)"},

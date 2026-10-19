@@ -43,8 +43,6 @@ const DISPATCHED_PATHS = [
   "/mcp",
   "/mcp/health",
   "/sse",
-  "/messages",
-  "/sse/messages",
   "/.well-known/oauth-protected-resource",
   "/.well-known/oauth-protected-resource/mcp",
   "/.well-known/oauth-protected-resource/sse",
@@ -86,6 +84,7 @@ describe("given the hosted MCP route policy declarations", () => {
       expect(byVerb.get("GET /mcp/health")?.policy.kind).toBe("public");
       expect(byVerb.get("OPTIONS /mcp")?.policy.kind).toBe("public");
       expect(byVerb.get("POST /mcp")?.family).toBe(HOSTED_MCP_FAMILY);
+      expect(byVerb.get("POST /sse")?.policy).toEqual(byVerb.get("POST /mcp")?.policy);
     });
   });
 

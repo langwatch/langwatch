@@ -51,6 +51,11 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
+
+    <Frame>
+      <img src="/images/mcp/api-key-created-light.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="block dark:hidden" />
+      <img src="/images/mcp/api-key-created-dark.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="hidden dark:block" />
+    </Frame>
   </Step>
 </Steps>
 
@@ -160,7 +165,15 @@ A **Restricted** key holds read or write access per category. Read grants the `v
 
 ## Connect an AI assistant over MCP
 
-A personal key gives the [LangWatch MCP Server](/integration/mcp) access to traces, analytics, prompts and the other features your key allows. The MCP server needs both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`.
+The [LangWatch MCP Server](/integration/mcp) is hosted at `https://app.langwatch.ai/mcp`. Most AI clients connect to it with OAuth: you sign in and approve a project, and no key is involved. See the [MCP setup guide](/integration/mcp).
+
+A client that cannot sign in can send a personal key as a header instead. The key gives the MCP server access to traces, analytics, prompts and the other features your key allows:
+
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer sk-lw-..."
+```
+
+To run the MCP server on your machine instead, give it both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`:
 
 <Tabs>
 <Tab title="Claude Code">

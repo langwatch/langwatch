@@ -49,6 +49,7 @@ import { IdentityApi, type IdentityApi as IdentityApiContract } from "@langwatch
 import { InsightApi } from "@langwatch/insight-contract";
 import { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { LangyApi } from "@langwatch/langy-contract";
+import { ReactEmailMailRenderer } from "@langwatch/mail";
 import { ModelProviderApi } from "@langwatch/model-provider-contract";
 import { MonitorApi } from "@langwatch/monitor-contract";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
@@ -904,6 +905,10 @@ export class OpsModule implements OpsApi {
       authz: dependencies.authz,
       users: dependencies.users,
       organizations: dependencies.organizations,
+      deployment: {
+        cloud: config.isSaas || cloudOps,
+        isLocalDevelopment: config.nodeEnvironment === "development",
+      },
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,
@@ -921,6 +926,7 @@ export class OpsModule implements OpsApi {
         ledger: repositories.upgradeLedger,
         operators: platformOperators,
         mail: dependencies.notifications,
+        renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
       }),
     });
@@ -1293,14 +1299,6 @@ export class OpsModule implements OpsApi {
       });
     }
     if (resource.data === "subscription") this.#refuseWithoutCloudOps();
-    // A deactivation change is account lifecycle: refused when impersonating, as user's door does.
-    if (
-      input.actor?.impersonator &&
-      resource.data === "user" &&
-      "deactivatedAt" in (input.params.data ?? {})
-    ) {
-      throw new OpsImpersonatedOperatorRefusedError();
-    }
 
     return this.#dependencies.ops.adminOperation({
       resource: resource.data,
@@ -1527,8 +1525,8 @@ export class OpsModule implements OpsApi {
 
   /**
    * The acting operator, or nothing where the caller does not hold the grant. An
-   * impersonating operator is read as the operator: somebody debugging a
-   * customer account is still staff, and the grant is asked of the impersonator.
+   * impersonating operator is read by the impersonator's grant, for reads only:
+   * `ops:manage` waits until they are signed in as themselves (ADR-092).
    */
   async #operatorOf({
     operator,
@@ -1538,6 +1536,9 @@ export class OpsModule implements OpsApi {
     permission: OpsOperatorPermission;
   }): Promise<OpsOperator | null> {
     if (!operator) return null;
+    if (operator.impersonator && permission === "ops:manage") {
+      throw new OpsImpersonatedOperatorRefusedError();
+    }
 
     const held = await this.#dependencies.ops.holds({
       identity: operator.impersonator ?? operator,
@@ -1966,7 +1967,7 @@ export class OpsModule implements OpsApi {
   }
 
   async setUsageReportSwitches({
-    organizationId,
+    organizationId: _installWide,
     operator,
     ...switches
   }: {
@@ -1977,9 +1978,7 @@ export class OpsModule implements OpsApi {
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
-    if (!(await this.#readsCheckupDetails({ organizationId, operator }))) {
-      throw new OpsOperatorRequiredError("ops:manage");
-    }
+    await this.admitOperator(operator, "ops:manage");
     const report = await checkup.setUsageReportSwitches(switches);
     return { deployment: "self-hosted", ...report };
   }
@@ -2566,6 +2565,7 @@ export class OpsOperations {
         repository: repositories.instanceAdmin,
         users: this.options.users,
         accounts: this.options.accounts,
+        operators: access,
         audit: this.options.audit,
         projects: this.options.scheduler.projects,
         shares: this.options.shares,

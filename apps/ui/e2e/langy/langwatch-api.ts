@@ -316,11 +316,20 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   });
   await Promise.all(posts);
 
-  // Poll every seeded id, not a first/last bracket. The posts above go out
-  // concurrently, so the order they were generated in says nothing about the
-  // order they are indexed in: both ends can be queryable while a trace in the
-  // middle is still missing, and the data scenarios would then read a short
-  // batch as the ground truth.
+  await awaitTracesQueryable({ traceIds, what: "Seeded traces" });
+}
+
+/**
+ * Polls every id, not a first/last bracket: posts go out concurrently, so a
+ * middle trace can still be missing while both ends are queryable.
+ */
+async function awaitTracesQueryable({
+  traceIds,
+  what,
+}: {
+  traceIds: string[];
+  what: string;
+}): Promise<void> {
   const deadline = Date.now() + INGESTION_VISIBILITY_TIMEOUT_MS;
   while (Date.now() < deadline) {
     const visible = await Promise.all(traceIds.map(traceExists));
@@ -329,9 +338,51 @@ export async function seedApplicationTraces(count = 8): Promise<void> {
   }
 
   throw new Error(
-    `Seeded traces were still not queryable after ${
+    `${what} were still not queryable after ${
       INGESTION_VISIBILITY_TIMEOUT_MS / 1_000
-    }s. This is ingestion lag in the environment, NOT a Langy defect — the ` +
-      "data scenarios would have graded an empty index as a wrong answer.",
+    }s. This is ingestion lag in the environment, NOT a Langy defect: the ` +
+      "scenarios would have graded an empty index as a wrong answer.",
   );
+}
+
+/**
+ * Seeds traces carrying `label` whose `started_at` is `ageMs` in the past, so a
+ * time-bounded question over a recent window finds nothing while the data
+ * exists. Resolves once every trace is queryable.
+ */
+export async function seedStaleTraces({
+  label,
+  ageMs,
+  count = 3,
+}: {
+  label: string;
+  ageMs: number;
+  count?: number;
+}): Promise<void> {
+  const now = Date.now();
+  const traceIds = Array.from({ length: count }, (_, i) => `trace_e2e_stale_${label}_${i}`);
+  await Promise.all(
+    traceIds.map((traceId, i) => {
+      const startedAt = now - ageMs - i * 60_000;
+      return lwPost({
+        path: "/api/collector",
+        body: {
+          spans: [
+            {
+              trace_id: traceId,
+              span_id: `span_e2e_stale_${label}_${i}`,
+              type: "llm",
+              model: "gpt-5-mini",
+              input: { type: "text", value: `stale question #${i}` },
+              output: { type: "text", value: `stale answer #${i}` },
+              timestamps: { started_at: startedAt, finished_at: startedAt + 800 },
+            },
+          ],
+          metadata: { labels: [label] },
+        },
+      });
+    }),
+  );
+
+  await awaitTracesQueryable({ traceIds, what: `Stale traces labelled ${label}` });
 }

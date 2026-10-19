@@ -25,6 +25,7 @@ const {
     current: {
       NEXTAUTH_PROVIDER: "email",
       HAS_EMAIL_PROVIDER_KEY: true,
+      EMAIL_PASSWORD_ENABLED: true,
     } as Record<string, unknown>,
   },
   routeMock: vi.fn(),
@@ -132,6 +133,7 @@ describe("given the identifier-first screens", () => {
     publicEnvRef.current = {
       NEXTAUTH_PROVIDER: "auth0",
       HAS_EMAIL_PROVIDER_KEY: true,
+      EMAIL_PASSWORD_ENABLED: true,
     };
     routeMock.mockResolvedValue(federatedPicker);
     requestPasswordResetMock.mockResolvedValue({});
@@ -169,6 +171,7 @@ describe("given the identifier-first screens", () => {
       publicEnvRef.current = {
         ...publicEnvRef.current,
         IS_SAAS: true,
+        EMAIL_PASSWORD_ENABLED: false,
       };
 
       const { container } = renderPage(<ForgotPassword />);

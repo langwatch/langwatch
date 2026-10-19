@@ -2,12 +2,17 @@ import type {
   NormalizedAttributes,
   NormalizedSpan,
   BaseSpan,
+  LegacySpanInputOutput,
   Span,
   SpanMetrics,
   SpanTimestamps,
   SpanTypes,
 } from "@langwatch/trace-contract";
-import { safeUnflatten } from "@langwatch/trace-contract";
+import {
+  legacySpanInputOutputSchema,
+  safeUnflatten,
+  spanTypesSchema,
+} from "@langwatch/trace-contract";
 
 import { computeSpanCost } from "../../span/rules/trace-span-cost-matching.rules.ts";
 import {
@@ -103,6 +108,33 @@ export function unflattenDotNotation(flat: NormalizedAttributes): Record<string,
 }
 
 /**
+ * The span's type as the read shape declares it. Canonicalisers only overwrite an allowed
+ * `langwatch.span.type`, so a span sent with another one (`embedding`, `retriever`) is stored
+ * with it. Such a span reads as `span`; the stored value stays in `params`.
+ */
+function readableSpanType(value: unknown): SpanTypes {
+  const parsed = spanTypesSchema.safeParse(value);
+
+  return parsed.success ? parsed.data : "span";
+}
+
+/**
+ * Ingest stores span IO as sent, so chat values can carry what the strict shape refuses (AI SDK
+ * `step-start` parts, `tool_use` blocks, a `model` role). The previous release returned them
+ * unparsed; such a value now keeps its stored value under the `json` type.
+ */
+function toReadableSpanIo(io: LegacySpanInputOutput): LegacySpanInputOutput {
+  const stored: unknown = io;
+  if (legacySpanInputOutputSchema.validate(stored)) {
+    return io;
+  }
+
+  return { type: "json", value: (io.value as JsonValue | undefined) ?? null };
+}
+
+type JsonValue = Extract<LegacySpanInputOutput, { type: "json" }>["value"];
+
+/**
  * Maps a NormalizedSpan (from ClickHouse stored_spans) to the legacy Span type
  * used by the pre-ClickHouse trace system.
  */
@@ -121,16 +153,17 @@ export function mapNormalizedSpanToSpan(normalizedSpan: NormalizedSpan): Span {
     timestamps.first_token_at = firstTokenEvent.timeUnixMs;
   }
 
-  const spanType = normalizedSpan.spanAttributes["langwatch.span.type"] as SpanTypes;
+  const input = extractInput(normalizedSpan.spanAttributes);
+  const output = extractOutput(normalizedSpan.spanAttributes);
 
   const baseSpan: BaseSpan = {
     span_id: normalizedSpan.spanId,
     parent_id: normalizedSpan.parentSpanId,
     trace_id: normalizedSpan.traceId,
-    type: typeof spanType === "string" ? spanType : ("span" as const),
+    type: readableSpanType(normalizedSpan.spanAttributes["langwatch.span.type"]),
     name: normalizedSpan.name,
-    input: extractInput(normalizedSpan.spanAttributes),
-    output: extractOutput(normalizedSpan.spanAttributes),
+    input: input === null ? null : toReadableSpanIo(input),
+    output: output === null ? null : toReadableSpanIo(output),
     error: extractError({
       statusCode: normalizedSpan.statusCode,
       statusMessage: normalizedSpan.statusMessage,

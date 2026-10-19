@@ -1,3 +1,4 @@
+import { storesRowsInRecordsTable } from "@langwatch/dataset-contract";
 import { generate } from "@langwatch/ksuid";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { Prisma, PrismaClient } from "@langwatch/prisma-client/generated";
@@ -43,14 +44,6 @@ type CountableDataset = {
   contentLayout?: string | null;
   useS3?: boolean | null;
 };
-
-/**
- * Whether a dataset's entries still live in the `DatasetRecord` table. Mirrors
- * the fallback branch of `datasetDisplayRecordCount` — the two must agree, or
- * a dataset gets counted and then has its count discarded, or vice versa.
- */
-const storesRowsInRecordsTable = (dataset: CountableDataset): boolean =>
-  dataset.contentLayout !== "s3_jsonl" && !dataset.useS3;
 
 /** Private Prisma owner for Dataset rows and their object-storage counters. */
 export class PrismaDatasetContentRepository implements DatasetContentRepository {

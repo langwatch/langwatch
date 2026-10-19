@@ -3,13 +3,14 @@ import {
   OUTPUT_SOURCE,
   TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE,
   TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE,
+  RESERVED_INPUT_SPAN_START_MS,
   type TraceCanonicalisationService,
   type TraceSummaryData,
   type NormalizedSpan,
 } from "@langwatch/trace-contract";
 
 import type { TraceMediaReferenceResolver } from "../../media/services/trace-media-reference.service.ts";
-import type { TraceIoExtraction } from "./trace-io-extraction.service.ts";
+import type { TraceIoExtraction, TraceIoValue } from "./trace-io-extraction.service.ts";
 
 // Transitional: the summary projection still imports it from here.
 export { OUTPUT_SOURCE } from "@langwatch/trace-contract";
@@ -36,6 +37,8 @@ type TraceIOAccumulation = {
   blockedByGuardrail: boolean;
   inputIsFallback: boolean;
   outputIsFallback: boolean;
+  /** Start of the span that set the input; 0 for a root, null for a fallback or none. */
+  inputSpanStartTimeMs: number | null;
   /** Compact JSON media refs for the winning input/output, or null. */
   inputMediaRefs: string | null;
   outputMediaRefs: string | null;
@@ -140,13 +143,23 @@ export class TraceIOAccumulationService {
     carried: TraceIOAccumulation;
     span: NormalizedSpan;
     isRoot: boolean;
-  }): Pick<TraceIOAccumulation, "computedInput" | "inputIsFallback" | "inputMediaRefs"> {
+  }): Pick<
+    TraceIOAccumulation,
+    "computedInput" | "inputIsFallback" | "inputSpanStartTimeMs" | "inputMediaRefs"
+  > {
     const rich = this.traceIOExtractionService.extractRichIOFromSpan(span, "input");
 
-    // A root restates the whole trace's input, so it always wins. A child only
-    // fills a gap, or replaces a stringified fallback with a semantic match.
+    // A root restates the whole trace's input, so it always wins. With no null
+    // parent, the earliest-starting span present is the top-most and wins. A
+    // child otherwise only fills a gap or replaces a stringified fallback.
+    const startsAtOrBeforeCurrent =
+      carried.inputSpanStartTimeMs !== null && span.startTimeUnixMs <= carried.inputSpanStartTimeMs;
     const richWins =
-      rich !== null && (isRoot || carried.computedInput === null || carried.inputIsFallback);
+      rich !== null &&
+      (isRoot ||
+        carried.computedInput === null ||
+        carried.inputIsFallback ||
+        startsAtOrBeforeCurrent);
 
     // Only reached when nothing semantic has been found on any span so far: a
     // best-effort stringification beats leaving ComputedInput null, and the
@@ -167,6 +180,13 @@ export class TraceIOAccumulationService {
           ? carried.computedInput
           : TraceIOAccumulationService.preferText(winner.text, winner.raw),
       inputIsFallback: winner === null ? carried.inputIsFallback : winner === fallback,
+      inputSpanStartTimeMs: TraceIOAccumulationService.inputStartAfter({
+        carried,
+        winner,
+        isFallback: winner !== null && winner === fallback,
+        isRoot,
+        span,
+      }),
       inputMediaRefs: TraceIOAccumulationService.accumulateMediaRefs({
         serialized: carried.inputMediaRefs,
         span,
@@ -175,6 +195,24 @@ export class TraceIOAccumulationService {
         mediaReferences: this.mediaReferences,
       }),
     };
+  }
+
+  private static inputStartAfter({
+    carried,
+    winner,
+    isFallback,
+    isRoot,
+    span,
+  }: {
+    carried: TraceIOAccumulation;
+    winner: TraceIoValue | null;
+    isFallback: boolean;
+    isRoot: boolean;
+    span: NormalizedSpan;
+  }): number | null {
+    if (winner === null) return carried.inputSpanStartTimeMs;
+    if (isFallback) return null;
+    return isRoot ? 0 : span.startTimeUnixMs;
   }
 
   private accumulateOutput({
@@ -187,7 +225,11 @@ export class TraceIOAccumulationService {
     isRoot: boolean;
   }): Omit<
     TraceIOAccumulation,
-    "computedInput" | "inputIsFallback" | "inputMediaRefs" | "blockedByGuardrail"
+    | "computedInput"
+    | "inputIsFallback"
+    | "inputSpanStartTimeMs"
+    | "inputMediaRefs"
+    | "blockedByGuardrail"
   > {
     const rich = this.traceIOExtractionService.extractRichIOFromSpan(span, "output");
     const isExplicit = rich?.source === "langwatch";
@@ -343,9 +385,17 @@ export class TraceIOAccumulationService {
       blockedByGuardrail: state.blockedByGuardrail,
       inputIsFallback: state.attributes["langwatch.reserved.input_is_fallback"] === "true",
       outputIsFallback: state.attributes["langwatch.reserved.output_is_fallback"] === "true",
+      inputSpanStartTimeMs: TraceIOAccumulationService.storedInputStart(state),
       inputMediaRefs: state.attributes[TRACE_INPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null,
       outputMediaRefs: state.attributes[TRACE_OUTPUT_MEDIA_REFERENCE_ATTRIBUTE] ?? null,
     };
+  }
+
+  private static storedInputStart(state: TraceSummaryData): number | null {
+    const stored = state.attributes[RESERVED_INPUT_SPAN_START_MS];
+    if (stored === undefined) return null;
+    const parsed = Number(stored);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   /**

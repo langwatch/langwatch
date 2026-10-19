@@ -316,20 +316,25 @@ test_clickhouse_url_secret() {
 
 # ─────────────────────────────────────────────────────────────────────────────
 # SUITE: helm upgrade — ClickHouse password and URL preserved
+# Recorded after install, compared after the main release's three upgrades.
 # ─────────────────────────────────────────────────────────────────────────────
+CH_PW_BEFORE=""
+CH_URL_BEFORE=""
+
+record_clickhouse_credentials() {
+  CH_PW_BEFORE=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.password}' | base64 -d)
+  CH_URL_BEFORE=$(kc get secret "${RELEASE}-clickhouse" \
+    -o jsonpath='{.data.url}' | base64 -d)
+  [[ -n "$CH_PW_BEFORE" && -n "$CH_URL_BEFORE" ]] \
+    || fail "ClickHouse credentials could not be recorded before the upgrades"
+}
+
 test_upgrade() {
   sep; info "Suite: helm upgrade — ClickHouse credentials preserved"
 
-  local pw_before url_before
-  pw_before=$(kc get secret "${RELEASE}-clickhouse" \
-    -o jsonpath='{.data.password}' | base64 -d)
-  url_before=$(kc get secret "${RELEASE}-clickhouse" \
-    -o jsonpath='{.data.url}' | base64 -d)
-
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade"
+  local pw_before="$CH_PW_BEFORE" url_before="$CH_URL_BEFORE"
+  [[ -n "$pw_before" ]] || fail "record_clickhouse_credentials did not run before the upgrades"
 
   local pw_after url_after
   pw_after=$(kc get secret "${RELEASE}-clickhouse" \
@@ -391,18 +396,77 @@ test_external_clickhouse() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
-# SUITE: App health check
-# Upgrades the release to enable the app (1 replica) and verifies /api/health.
+# Upgrades of the main release. Each one is a full pod roll, so suites whose
+# values do not conflict share one and assert back to back afterwards. Values
+# are cumulative: every upgrade keeps the app and the workers Deployment on.
 # ─────────────────────────────────────────────────────────────────────────────
-test_app() {
-  sep; info "Suite: app health check"
+METRICS_KEY="e2e-metrics-key"
+METRICS_SECRET="lw-metrics-key"
 
-  # Upgrade to enable the app with 1 replica, skip only ES migration (no ES in chart)
+# Upgrade 1 of 3: app (1 replica) and the workers Deployment.
+# Asserted by test_app, test_workers and test_lwql.
+deploy_app_and_workers() {
+  sep; info "Deploy: app and workers enabled"
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
     --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade (app enabled)"
+  pass "helm upgrade (app enabled, workers deployed)"
+}
+
+# Upgrade 2 of 3: LWQL sql mode plus a metrics key as a plain chart value.
+# The two are independent, so test_lwql_sql_mode_single_node and
+# test_metrics_plain_key both assert on this one roll. The raised app memory
+# gives the sql-mode suite's second Node process headroom.
+deploy_sql_mode_and_metrics_key() {
+  sep; info "Deploy: LWQL_ACCESS_MODEL_MODE=sql and a plain metrics key"
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
+    --set app.extraEnvs[0].value=sql \
+    --set app.resources.requests.memory=512Mi \
+    --set app.resources.limits.memory=2Gi \
+    --set app.telemetry.metrics.enabled=true \
+    --set-string "app.telemetry.metrics.apiKey.value=${METRICS_KEY}" \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql, metrics key as plain value)"
+}
+
+# Upgrade 3 of 3: metrics key from a Secret, and the local-FS stored-objects
+# backend switched on for the first time (the Deployment-strategy boundary).
+# sql mode is dropped here. Asserted by test_metrics_secret_key and
+# test_upgrade_strategy_boundary.
+deploy_metrics_secret_and_local_fs() {
+  sep; info "Deploy: metrics key from a Secret, local-FS stored objects"
+  kc delete secret "$METRICS_SECRET" 2>/dev/null || true
+  kc create secret generic "$METRICS_SECRET" \
+    --from-literal="apiKey=${METRICS_KEY}"
+  pass "Metrics key Secret created"
+
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set workers.enabled=true \
+    --set workers.replicaCount=1 \
+    --set app.telemetry.metrics.enabled=true \
+    --set "app.telemetry.metrics.apiKey.secretKeyRef.name=${METRICS_SECRET}" \
+    --set app.telemetry.metrics.apiKey.secretKeyRef.key=apiKey \
+    --set app.storedObjects.localFilesystem.enabled=true \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade (metrics key from secretKeyRef, local-FS stored objects)"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: App health check
+# Runs after deploy_app_and_workers and verifies /api/health.
+# ─────────────────────────────────────────────────────────────────────────────
+test_app() {
+  sep; info "Suite: app health check"
 
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
   pass "App pod ready"
@@ -462,7 +526,6 @@ assert_render_job_complete() {
 }
 
 # @scenario "A single-replica deployment provisions LangWatchQL unchanged"
-# @scenario "On a single node, sql mode is permitted and provisions the access model"
 test_lwql() {
   sep; info "Suite: LangWatchQL access model (app self-provisioned)"
 
@@ -620,31 +683,30 @@ $provision_out"
     fail "lwql_postgres bridge failed to read through the named collection — lwql_ro is likely absent or its password diverged from the collection's reader key:
 $bridge_out"
   fi
+}
 
-  # ── AC9: `sql` mode is PERMITTED on a single node (issue #8258) ──────────────
-  # DoD (tasks#889): prove sql mode provisions on one node — the counterpart to
-  # test_lwql_replicas proving it is refused on a multi-host cluster. The chart
-  # default is rendered mode; flip THIS single-replica release to sql mode via
-  # app env and prove the AC9 cluster guard permits it (system.clusters shows no
-  # multi-host own-cluster here, so the guard returns rather than fail-closing).
-  #
-  # The rendered users_xml access model stays mounted, so sql-mode DDL for the
-  # user/profile/policies cannot create a second, SQL-store copy of a
-  # users_xml-owned entity: it yields to the read-only config store (tolerated
-  # 495 ACCESS_STORAGE_READONLY). That yield is exactly the non-vacuity signal
-  # that the sql-mode DDL path really ran, on a node the guard did NOT refuse —
-  # so this asserts the yield, not a "storage != users_xml" row, which is
-  # unreachable while rendered delivery owns the name.
-  info "AC9: enabling sql mode on the single-replica release"
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set app.replicaCount=1 \
-    --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
-    --set app.extraEnvs[0].value=sql \
-    --set app.resources.requests.memory=512Mi \
-    --set app.resources.limits.memory=2Gi \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade (app LWQL_ACCESS_MODEL_MODE=sql)"
+# ── AC9: `sql` mode is PERMITTED on a single node (issue #8258) ──────────────
+# DoD (tasks#889): prove sql mode provisions on one node — the counterpart to
+# test_lwql_replicas_sql_refused proving it is refused on a multi-host cluster.
+# The chart default is rendered mode; deploy_sql_mode_and_metrics_key flips
+# THIS single-replica release to sql mode via app env, and this proves the AC9
+# cluster guard permits it (system.clusters shows no multi-host own-cluster
+# here, so the guard returns rather than fail-closing).
+#
+# The rendered users_xml access model stays mounted, so sql-mode DDL for the
+# user/profile/policies cannot create a second, SQL-store copy of a
+# users_xml-owned entity: it yields to the read-only config store (tolerated
+# 495 ACCESS_STORAGE_READONLY). That yield is exactly the non-vacuity signal
+# that the sql-mode DDL path really ran, on a node the guard did NOT refuse —
+# so this asserts the yield, not a "storage != users_xml" row, which is
+# unreachable while rendered delivery owns the name.
+# @scenario "On a single node, sql mode is permitted and provisions the access model"
+test_lwql_sql_mode_single_node() {
+  sep; info "Suite: LangWatchQL sql mode on a single node (AC9)"
+
+  local app_pod lwql_pw svc_out
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
 
   # The env really applied, and the app booted Ready in sql mode — the guard
   # permitted it rather than fail-closing the boot.
@@ -654,13 +716,12 @@ $bridge_out"
     "sql"
   app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
 
-  # Run the converge and capture its output. The e2e profile runs no workers pod
-  # (values-e2e.yaml:49), which is what runs `lwql:provision` at boot in
-  # production, so this exec stands in for that boot converge (hence the raised
-  # app memory limit above — a second Node process beside the live server). On a
-  # single node the guard returns (own-cluster host count <= 1), so the run must
-  # NOT log the refusal, and it must show the config-store yield — proof the
-  # sql-mode DDL path executed against a permitted node.
+  # Run the converge in the app pod and capture its output, so the assertions
+  # read this run's log rather than whatever the workers pod logged at boot
+  # (hence the raised app memory limit: a second Node process beside the live
+  # server). On a single node the guard returns (own-cluster host count <= 1),
+  # so the run must NOT log the refusal, and it must show the config-store
+  # yield — proof the sql-mode DDL path executed against a permitted node.
   local sql_provision_out
   if sql_provision_out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1); then
     pass "sql-mode lwql:provision succeeds on a single node"
@@ -689,10 +750,9 @@ $sql_provision_out"
     "http://${RELEASE}-clickhouse:8123/" \
     --data-binary "SELECT count() FROM langwatch.lwql_api_key_tenant_map" 2>/dev/null | tr -d ' \r\n')
   assert_eq "tenant-filtered query still succeeds under sql mode" "$svc_out" "0"
-  # Left in sql mode on purpose: the next suite (test_workers) helm-upgrades this
-  # same release with values-e2e.yaml and no extraEnvs, which drops the env, and
-  # sql mode only yielded here (ClickHouse state is identical to rendered mode),
-  # so nothing downstream depends on reverting it.
+  # Left in sql mode on purpose: deploy_metrics_secret_and_local_fs drops the
+  # env, and sql mode only yielded here (ClickHouse state is identical to
+  # rendered mode), so nothing downstream depends on reverting it.
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -701,14 +761,12 @@ $sql_provision_out"
 # point of the epic — that every pod of a multi-replica deployment carries the
 # access set, and a pod added by scaling up gets it with no application action.
 #
-# Runs LAST and does its own clean install at replicas=3 (a StatefulSet cannot
-# transition MergeTree->ReplicatedMergeTree in place), so it does not disturb the
-# shared single-replica release the earlier suites use. The kind cluster is torn
-# down on exit by the EXIT trap.
+# Does its own clean install at replicas=3 (a StatefulSet cannot transition
+# MergeTree->ReplicatedMergeTree in place). test_lwql_upgrade_from_main and
+# test_lwql_replicas_sql_refused then run on this same release, in that order.
 # ─────────────────────────────────────────────────────────────────────────────
 # @scenario "Every replica of a three-replica deployment carries the whole access set"
 # @scenario "A pod added by scaling up carries the access set with no application action"
-# @scenario "On a multi-host cluster, sql mode is refused and provisions nothing"
 test_lwql_replicas() {
   sep; info "Suite: LangWatchQL access model across replicas (3, then scaled to 4)"
 
@@ -807,21 +865,31 @@ test_lwql_replicas() {
     fail "scaled-up pod $new_pod did not go away after scaling back to 3"
     return
   fi
+}
 
-  # ── AC9: `sql` mode is REFUSED on a multi-host cluster (issue #8258) ─────────
-  # The counterpart to the single-node case in test_lwql. This release is a
-  # 3-host ReplicatedMergeTree cluster: system.clusters carries an is_local=1
-  # cluster with three distinct hosts, and the chart-managed server writes no
-  # `replicated` user directory (its access store stays local). So sql mode must
-  # fail-closed — DDL would reach only the one host behind the Service. The
-  # refusal is inside the non-fatal boot boundary: the app stays Ready and logs
-  # the refusal (host count + replicated-directory count, never statement text),
-  # and NO SQL-store copy of the restricted user appears on any replica.
+# ── AC9: `sql` mode is REFUSED on a multi-host cluster (issue #8258) ─────────
+# The counterpart to test_lwql_sql_mode_single_node. This release is a
+# 3-host ReplicatedMergeTree cluster: system.clusters carries an is_local=1
+# cluster with three distinct hosts, and the chart-managed server writes no
+# `replicated` user directory (its access store stays local). So sql mode must
+# fail-closed — DDL would reach only the one host behind the Service. The
+# refusal is inside the non-fatal boot boundary: the app stays Ready and logs
+# the refusal (host count + replicated-directory count, never statement text),
+# and NO SQL-store copy of the restricted user appears on any replica.
+#
+# Runs on the release test_lwql_upgrade_from_main left behind; it keeps that
+# suite's catalog annotation so only the app rolls, as it did on a fresh one.
+# @scenario "On a multi-host cluster, sql mode is refused and provisions nothing"
+test_lwql_replicas_sql_refused() {
+  sep; info "Suite: LangWatchQL sql mode refused on a multi-host cluster (AC9)"
+
+  local app_pod pods p
   info "AC9: enabling sql mode on the 3-host cluster"
   hc upgrade "$RELEASE" "$CHART_DIR" \
     -f "$CHART_DIR/tests/values-e2e.yaml" \
     -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
     --set app.replicaCount=1 \
+    --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-upgrade' \
     --set app.extraEnvs[0].name=LWQL_ACCESS_MODEL_MODE \
     --set app.extraEnvs[0].value=sql \
     --set app.resources.requests.memory=512Mi \
@@ -885,15 +953,11 @@ $refuse_out"
 test_lwql_upgrade_from_main() {
   sep; info "Suite: first upgrade onto rendered LWQL from a pre-LWQL release (AC3 upgrade path)"
 
-  # Baseline: a normal install (chart-managed ClickHouse, 3 replicas).
-  helm_uninstall
-  helm_install \
-    --wait-for-jobs \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
-    --set app.replicaCount=1
-  pass "helm install (baseline, chart-managed ClickHouse, replicas=3)"
+  # Baseline: the install test_lwql_replicas made (chart-managed ClickHouse, 3
+  # replicas, same values as this upgrade), back at three pods. Reusing it saves
+  # an uninstall and an install; the strip below is what makes it pre-LWQL.
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  pass "baseline: three-replica release from test_lwql_replicas is Ready"
 
   # Strip the release back to a pre-LWQL state: delete the render RBAC and the
   # chart-owned LWQL password Secret. (The app Secret already carries no LWQL keys
@@ -971,22 +1035,189 @@ test_lwql_upgrade_from_main() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# SUITES: rendered-mode LWQL reconverges after a provisioning that failed
+# Prod: provisioning ran while ClickHouse was not ready (669, or a 30s timeout on
+# a terminating replica) and nothing retried, leaving the Postgres-backed views
+# over missing `<x>_pg` tables. Both suites end with NO further deploy.
+# ─────────────────────────────────────────────────────────────────────────────
+# The reconvergence check runs every 5 min with no end (LWQL_RECONVERGENCE_INTERVAL_MS);
+# one full interval plus 5 min for pod boots.
+LWQL_RECONVERGE_WAIT="${LWQL_RECONVERGE_WAIT:-600}"
+LWQL_PG_BASELINE=""
+
+# The PostgreSQL-engine `<x>_pg` tables in the LWQL database, space-separated.
+lwql_pg_tables() {
+  ch_query "$1" "SELECT name FROM system.tables WHERE database='langwatch' AND engine='PostgreSQL' AND endsWith(name, '_pg') ORDER BY name" \
+    | tr '\n' ' ' | sed 's/ *$//'
+}
+
+# Runs a Postgres-backed view as the restricted identity on one pod; echoes the answer or the error.
+lwql_view_answer() {
+  local pod="$1" view="$2" lwql_pw
+  lwql_pw=$(kc get secret "${RELEASE}-lwql-passwords" \
+    -o jsonpath='{.data.LWQL_CLICKHOUSE_PASSWORD}' | base64 -d)
+  kc exec "$pod" -- clickhouse-client --user langwatch_lwql --password "$lwql_pw" \
+    -q "SELECT count() FROM langwatch.${view}" 2>&1 | tr -d '\r' | head -3 || true
+}
+
+# A healthy baseline: provision synchronously, then record the `_pg` set every later check expects.
+record_lwql_pg_baseline() {
+  local app_pod ch_pod out
+  app_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-app")
+  ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+  if out=$(kc exec "$app_pod" -- sh -c 'cd /app/apps/tasks && pnpm run task lwql-provision' 2>&1); then
+    pass "baseline: lwql:provision succeeds on a healthy ClickHouse"
+  else
+    fail "baseline: lwql:provision failed on a healthy ClickHouse:
+$out"
+  fi
+  LWQL_PG_BASELINE=$(lwql_pg_tables "$ch_pod")
+  if grep -qw prompts_pg <<<"$LWQL_PG_BASELINE" && grep -qw topics_pg <<<"$LWQL_PG_BASELINE"; then
+    pass "baseline: _pg engine tables provisioned ($(wc -w <<<"$LWQL_PG_BASELINE") tables)"
+  else
+    fail "baseline: expected prompts_pg and topics_pg among the _pg tables, got '$LWQL_PG_BASELINE'"
+  fi
+  assert_lwql_postgres_views_answer "baseline"
+}
+
+# Every ClickHouse pod carries the whole baseline `_pg` set and answers prompts/topics as langwatch_lwql.
+assert_lwql_postgres_views_answer() {
+  local when="$1" pods p view answer
+  pods=$(kc get pods -l "app.kubernetes.io/name=${RELEASE}-clickhouse" -o name | sed 's|^pod/||')
+  for p in $pods; do
+    assert_eq "[$p] every _pg engine table exists ($when)" "$(lwql_pg_tables "$p")" "$LWQL_PG_BASELINE"
+    for view in prompts topics; do
+      answer=$(lwql_view_answer "$p" "$view")
+      if [[ "$answer" =~ ^[0-9]+$ ]]; then
+        pass "[$p] langwatch_lwql reads Postgres-backed view $view ($when, count=$answer)"
+      else
+        fail "[$p] langwatch_lwql cannot read Postgres-backed view $view ($when): $answer"
+      fi
+    done
+  done
+}
+
+# Drops every `_pg` table: the state a provisioning whose CREATEs never landed leaves behind.
+drop_lwql_pg_tables() {
+  local ch_pod t answer
+  ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+  for t in $LWQL_PG_BASELINE; do
+    ch_query "$ch_pod" "SET check_table_dependencies = 0; DROP TABLE IF EXISTS langwatch.${t} SYNC"
+  done
+  assert_eq "induced: no _pg engine table left" "$(lwql_pg_tables "$ch_pod")" ""
+  answer=$(lwql_view_answer "$ch_pod" prompts)
+  if grep -q 'prompts_pg' <<<"$answer"; then
+    pass "induced: the prompts view fails over its missing prompts_pg table, as in prod"
+  else
+    fail "induced: expected the prompts view to fail on prompts_pg, got: $answer"
+  fi
+}
+
+# Polls (no deploy, no exec into the app) until the `_pg` set is back or the budget runs out.
+wait_lwql_reconverged() {
+  local deadline=$((SECONDS + LWQL_RECONVERGE_WAIT)) ch_pod got=""
+  info "Waiting up to ${LWQL_RECONVERGE_WAIT}s for the app to reconverge LWQL on its own"
+  while [[ $SECONDS -lt $deadline ]]; do
+    ch_pod=$(ready_pod "app.kubernetes.io/name=${RELEASE}-clickhouse")
+    got=$( [[ -n "$ch_pod" ]] && lwql_pg_tables "$ch_pod" 2>/dev/null || true)
+    [[ "$got" == "$LWQL_PG_BASELINE" ]] && { pass "app reconverged LWQL after $((SECONDS + LWQL_RECONVERGE_WAIT - deadline))s"; return; }
+    sleep 10
+  done
+  fail "no reconvergence after ${LWQL_RECONVERGE_WAIT}s; _pg tables now: '${got}'"
+}
+
+# @scenario "A three-replica deployment reconverges LangWatchQL after provisioning failed during a ClickHouse outage"
+test_lwql_replicas_converge_after_failed_provision() {
+  sep; info "Suite: LWQL reconverges after a failed provisioning (3 replicas, rendered mode)"
+
+  helm_uninstall
+  helm_install --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    -f "$CHART_DIR/tests/values-e2e-replicas.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (chart-managed ClickHouse, replicas=3)"
+  assert_render_job_complete
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  record_lwql_pg_baseline
+
+  # Induction, deterministic: drop the `_pg` tables, then boot the app while
+  # every ClickHouse replica is gone, so whatever the boot provisions fails.
+  drop_lwql_pg_tables
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=0
+  kc wait --for=delete pod -l "app.kubernetes.io/name=${RELEASE}-clickhouse" --timeout=300s \
+    || fail "ClickHouse pods did not go away after scaling to 0"
+  pass "induced: ClickHouse unavailable (0 replicas)"
+  local restarted_at
+  restarted_at=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+  kc rollout restart "deployment/${RELEASE}-app"
+  local attempts=0
+  until kc get pod -l "app.kubernetes.io/name=${RELEASE}-app" -o json | jq -e --arg t "$restarted_at" \
+      '[.items[] | select(.metadata.creationTimestamp >= $t)
+        | select(any(.status.containerStatuses[]?; .state.running != null or .lastState.terminated != null))]
+       | length > 0' >/dev/null; do
+    sleep 5; attempts=$((attempts + 1))
+    [[ $attempts -ge 36 ]] && fail "restarted app pod never started a container while ClickHouse was down"
+  done
+  # A minute against no ClickHouse: the boot's converge fails, and any check in it fails too.
+  sleep 60
+  pass "induced: the app booted and provisioned against an unavailable ClickHouse"
+
+  kc scale statefulset "${RELEASE}-clickhouse" --replicas=3
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 600
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 300
+  pass "ClickHouse healthy again (3 replicas); no further deploy from here"
+
+  wait_lwql_reconverged
+  assert_lwql_postgres_views_answer "after reconvergence"
+}
+
+# @scenario "A single-node upgrade that restarts ClickHouse reconverges LangWatchQL"
+test_lwql_single_node_upgrade_converges() {
+  sep; info "Suite: LWQL reconverges after a single-node upgrade restarts ClickHouse (rendered mode)"
+
+  helm_uninstall
+  helm_install --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1
+  pass "helm install (chart-managed ClickHouse, 1 replica)"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 300
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-app" 180
+  record_lwql_pg_baseline
+
+  # The `_pg` tables an upgrade's image would newly create start out absent, and
+  # the app annotation stands in for that image bump, so the app boots during it.
+  drop_lwql_pg_tables
+  local ch_uid_before
+  ch_uid_before=$(kc get pod "${RELEASE}-clickhouse-0" -o jsonpath='{.metadata.uid}')
+  hc upgrade "$RELEASE" "$CHART_DIR" \
+    --wait-for-jobs \
+    -f "$CHART_DIR/tests/values-e2e.yaml" \
+    --set app.replicaCount=1 \
+    --set-string 'clickhouse.podAnnotations.langwatch\.com/lwql-access-catalog=e2e-single-node-upgrade' \
+    --set-string 'app.pod.annotations.langwatch\.com/e2e-upgrade=single-node' \
+    --wait --timeout "${TIMEOUT}s"
+  pass "helm upgrade with a catalog-annotation bump"
+  wait_pod_ready "app.kubernetes.io/name=${RELEASE}-clickhouse" 300
+  if [[ "$(kc get pod "${RELEASE}-clickhouse-0" -o jsonpath='{.metadata.uid}')" != "$ch_uid_before" ]]; then
+    pass "the upgrade fully restarted the only ClickHouse replica; no further deploy from here"
+  else
+    fail "the catalog-annotation bump did not restart ClickHouse"
+  fi
+
+  wait_lwql_reconverged
+  assert_lwql_postgres_views_answer "after the upgrade"
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # SUITE: Workers health check
-# Upgrades the release to enable workers and verifies the pod reaches Ready.
+# Runs after deploy_app_and_workers and verifies the pod reaches Ready.
 # The worker serves one HTTP listener (the metrics port, 2999): /metrics behind
 # the bearer gate, and the unauthenticated /healthz the kubelet probes. Reaching
 # Ready therefore proves the startupProbe passed, not merely that PID 1 exists.
 # ─────────────────────────────────────────────────────────────────────────────
 test_workers() {
   sep; info "Suite: workers health check"
-
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set app.replicaCount=1 \
-    --set workers.enabled=true \
-    --set workers.replicaCount=1 \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade (workers deployed)"
 
   # Workers pod should be ready. This is now a real assertion about the probe:
   # the pod only goes Ready once the startupProbe's HTTP GET succeeds.
@@ -1042,22 +1273,9 @@ test_workers() {
 #
 # See specs/server/metrics-collection.feature.
 # ─────────────────────────────────────────────────────────────────────────────
-METRICS_KEY="e2e-metrics-key"
-METRICS_SECRET="lw-metrics-key"
-
-test_metrics_collection() {
+# The key as a plain chart value: runs after deploy_sql_mode_and_metrics_key.
+test_metrics_plain_key() {
   sep; info "Suite: metrics collection (key configured)"
-
-  # ── the key as a plain chart value ──────────────────────────────────────
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set app.replicaCount=1 \
-    --set workers.enabled=true \
-    --set workers.replicaCount=1 \
-    --set app.telemetry.metrics.enabled=true \
-    --set-string "app.telemetry.metrics.apiKey.value=${METRICS_KEY}" \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade (metrics enabled, key as plain value)"
 
   # Both tiers must still converge. Turning the gate on must not cost the
   # workers their startupProbe — the whole point of a credential-free
@@ -1094,27 +1312,14 @@ test_metrics_collection() {
     "$(http_probe "deploy/${RELEASE}-app" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
-  # ── the same key delivered from a Secret ────────────────────────────────
-  # Rendering a secretKeyRef correctly is not the same as the value arriving
-  # in the process. e2e-overlays.sh proves the reference renders; only a live
-  # install proves the container can actually authenticate with it.
+}
+
+# The same key delivered from a Secret: runs after
+# deploy_metrics_secret_and_local_fs. Rendering a secretKeyRef correctly is not
+# the same as the value arriving in the process. e2e-overlays.sh proves the
+# reference renders; only a live install proves the container authenticates.
+test_metrics_secret_key() {
   sep; info "Suite: metrics collection (key from a Secret)"
-
-  kc delete secret "$METRICS_SECRET" 2>/dev/null || true
-  kc create secret generic "$METRICS_SECRET" \
-    --from-literal="apiKey=${METRICS_KEY}"
-  pass "Metrics key Secret created"
-
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set app.replicaCount=1 \
-    --set workers.enabled=true \
-    --set workers.replicaCount=1 \
-    --set app.telemetry.metrics.enabled=true \
-    --set "app.telemetry.metrics.apiKey.secretKeyRef.name=${METRICS_SECRET}" \
-    --set app.telemetry.metrics.apiKey.secretKeyRef.key=apiKey \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade (metrics enabled, key from secretKeyRef)"
 
   wait_pod_ready "app.kubernetes.io/name=${RELEASE}-workers" 180
   pass "Workers pod ready with the key delivered from a Secret"
@@ -1129,37 +1334,18 @@ test_metrics_collection() {
     "$(http_probe "deploy/${RELEASE}-workers" 9464 /metrics "$METRICS_KEY")" \
     "200 samples"
 
-  # The Secret is deliberately left in place. Deleting it here would leave the
-  # live release referencing a Secret that no longer exists, and any pod that
-  # restarted before the next suite's upgrade would wedge in
-  # CreateContainerConfigError. The next suite re-applies values-e2e.yaml
-  # (metrics off), which drops the reference; the namespace teardown reclaims
-  # the Secret itself.
+  # The Secret is deliberately left in place: the live release still
+  # references it, so deleting it would wedge any restarted pod in
+  # CreateContainerConfigError. The namespace teardown reclaims it.
 }
 
-# ─────────────────────────────────────────────────────────────────────────────
-# SUITE: upgrade across the Deployment-strategy boundary
-#
-# Reproduces the actual customer upgrade path: app/workers are already
-# running from test_app/test_workers with NO strategy key rendered (the
-# pre-#5083 chart never set one, so the live Deployments carry only the
-# k8s-API-server-defaulted RollingUpdate). This suite upgrades with the
-# local-FS stored-objects backend enabled for the FIRST time, which is
-# exactly when the Deployment strategy flips to the kill-then-start
-# RollingUpdate override. A regression here means `helm upgrade` breaks
-# for every existing self-hosted install.
-# ─────────────────────────────────────────────────────────────────────────────
+# SUITE: upgrade across the Deployment-strategy boundary. The earlier upgrades left app/workers
+# with no strategy key; deploy_metrics_secret_and_local_fs first enables local-FS stored objects,
+# which flips the strategy to kill-then-start. Its helm upgrade failing breaks every self-hosted
+# install that upgrades.
 test_upgrade_strategy_boundary() {
   sep; info "Suite: upgrade across the Deployment-strategy boundary"
-
-  hc upgrade "$RELEASE" "$CHART_DIR" \
-    -f "$CHART_DIR/tests/values-e2e.yaml" \
-    --set app.replicaCount=1 \
-    --set workers.enabled=true \
-    --set workers.replicaCount=1 \
-    --set app.storedObjects.localFilesystem.enabled=true \
-    --wait --timeout "${TIMEOUT}s"
-  pass "helm upgrade succeeds across the strategy boundary"
+  pass "helm upgrade succeeded across the strategy boundary (deploy_metrics_secret_and_local_fs)"
 
   local strategy
   strategy=$(kc get deploy "${RELEASE}-app" -o jsonpath='{.spec.strategy.rollingUpdate.maxSurge}')
@@ -1342,25 +1528,47 @@ main() {
   fi
   wait_api
 
+  # `tests/e2e.sh <suite>...` runs only those suites; each must install its own release.
+  if [[ $# -gt 0 ]]; then
+    local suite
+    for suite in "$@"; do
+      declare -F "$suite" >/dev/null || fail "unknown suite: $suite"
+      "$suite"
+    done
+    sep; pass "Selected langwatch chart suites passed: $*"
+    return
+  fi
+
+  # Install, then three upgrades of the main release; suites sharing a deploy
+  # run back to back after it. Order matters: values are cumulative.
   test_install
   test_clickhouse
   test_clickhouse_url_secret
   test_postgresql
   test_redis
   test_resources
+  record_clickhouse_credentials
+  deploy_app_and_workers
   test_app
-  test_lwql
   test_workers
-  test_metrics_collection
+  test_lwql
+  deploy_sql_mode_and_metrics_key
+  test_lwql_sql_mode_single_node
+  test_metrics_plain_key
+  deploy_metrics_secret_and_local_fs
+  test_metrics_secret_key
   test_upgrade_strategy_boundary
   test_upgrade
+  # Separate releases: each uninstalls what came before.
   test_external_clickhouse
   test_cold_storage_and_backup
-  # Reinstalls the release at replicas=3, then scales to 4 (AC3).
+  # One three-replica install, then two upgrades on it (AC3, AC9).
   test_lwql_replicas
-  # Runs last: the real first-upgrade-from-pre-LWQL path (AC3 upgrade), which
-  # does its own clean install first.
   test_lwql_upgrade_from_main
+  test_lwql_replicas_sql_refused
+  # Rendered-mode reconvergence after a failed provisioning; each installs afresh.
+  test_lwql_replicas_converge_after_failed_provision
+  test_lwql_single_node_upgrade_converges
 
   sep
   pass "All langwatch chart tests passed"

@@ -80,11 +80,8 @@ export const EvaluatorLLMConfigField = ({ prefix }: { prefix: string }) => {
   // Zero enabled providers shows the empty state shared with the prompt playground and
   // workflow pickers; a skeleton renders while the providers query is in flight.
   // Instant Evals needs no provider, so a released project keeps the picker.
-  const { project, organization } = useOrganizationTeamProject();
-  const instantEvals = useInstantEvalJudgeModels({
-    projectId: project?.id,
-    organizationId: organization?.id,
-  });
+  const { project } = useOrganizationTeamProject();
+  const instantEvals = useInstantEvalJudgeModels({ projectId: project?.id });
   const { builtInModels } = instantEvals;
   const { isEmpty, isLoading } = useModelSelection({
     options: allModelOptions,

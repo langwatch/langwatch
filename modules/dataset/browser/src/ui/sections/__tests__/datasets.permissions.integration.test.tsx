@@ -34,6 +34,7 @@ vi.mock("@langwatch/dataset-client", () => ({
     }),
     dataset: {
       getAll: { useQuery: () => datasetsQuery.current },
+      recordCounts: { useQuery: () => ({ data: [{ datasetId: "ds-1", recordCount: 5 }] }) },
       deleteById: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
     },
   },
@@ -62,26 +63,12 @@ const { default: DatasetsScreen } = await import("../datasets.screen.tsx");
 
 const dataset: DatasetSummary = {
   id: "ds-1",
-  projectId: "proj-1",
   name: "Test Dataset",
   slug: "test-dataset",
   columnTypes: [],
   createdAt: new Date("2026-01-01T10:00:00Z"),
   updatedAt: new Date("2026-01-01T10:00:00Z"),
-  archivedAt: null,
-  mapping: null,
-  useS3: false,
-  s3RecordCount: null,
-  contentLayout: "postgres",
   status: "ready",
-  statusError: null,
-  stagingKey: null,
-  uploadFilename: null,
-  rowCount: null,
-  sizeBytes: null,
-  chunkCount: null,
-  chunkOffsets: null,
-  recordCount: 5,
 };
 
 describe("Datasets row-menu visibility", () => {

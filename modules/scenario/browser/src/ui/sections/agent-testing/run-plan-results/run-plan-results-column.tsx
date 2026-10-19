@@ -12,7 +12,6 @@ import type {
 import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
 import type { PeriodControls } from "../results/period-controls.ts";
 import { RunSettingsBlock } from "../results/run-settings-block.tsx";
-import { RUNS_SIDEBAR_WIDTH } from "../results/runs-sidebar.tsx";
 import { RunPlanDetailHeader } from "./run-plan-detail-header.tsx";
 import type { RunPlanDetailProps } from "./run-plan-detail.tsx";
 import { RunPlanResultsDialogs } from "./run-plan-results-dialogs.tsx";
@@ -53,7 +52,7 @@ export function RunPlanResultsColumn({
 
   return (
     <>
-      <ContentColumn railWidth={RUNS_SIDEBAR_WIDTH}>
+      <ContentColumn>
         <RunPlanDetailHeader
           plan={plan}
           run={run}

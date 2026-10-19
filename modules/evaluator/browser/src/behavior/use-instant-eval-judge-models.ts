@@ -1,11 +1,8 @@
 /**
- * The built-in judge models a project may pick: Instant Evals, when the release
- * flag or the organization's own opt-in releases it (ADR-174 decision 11).
+ * The built-in judge models a project may pick: Instant Evals, when the server releases it. The
+ * server weighs the flag, the opt-in and a self-hosted license, so the flag is never read here.
  * @see modules/instant-eval/specs/instant-eval-judge-model.feature
  */
-import { useFeatureFlag } from "@langwatch/feature-flag-client";
-import { FrontendFlags } from "@langwatch/feature-flag-contract";
-import { INSTANT_EVALS_FLAG } from "@langwatch/instant-eval-contract";
 import { INSTANT_EVAL_JUDGE_MODEL_ID } from "@langwatch/instant-eval-judge-contract";
 import type { BuiltInModel } from "@langwatch/model-provider-contract";
 
@@ -20,26 +17,18 @@ export const INSTANT_EVALS_BUILT_IN_MODEL: BuiltInModel = {
 const RELEASED: readonly BuiltInModel[] = [INSTANT_EVALS_BUILT_IN_MODEL];
 const NONE: readonly BuiltInModel[] = [];
 
-export function useInstantEvalJudgeModels({
-  projectId,
-  organizationId,
-}: {
-  projectId: string | undefined;
-  organizationId: string | undefined;
-}): { builtInModels: readonly BuiltInModel[]; isLoading: boolean } {
-  const flag = useFeatureFlag(FrontendFlags[INSTANT_EVALS_FLAG], {
-    projectId,
-    organizationId,
-    enabled: !!projectId && !!organizationId,
-  });
+export function useInstantEvalJudgeModels({ projectId }: { projectId: string | undefined }): {
+  builtInModels: readonly BuiltInModel[];
+  isLoading: boolean;
+} {
   const access = evaluatorApi.instantEval.access.useQuery(
     { projectId: projectId ?? "" },
     { enabled: !!projectId, staleTime: 5 * 60 * 1000 },
   );
-  const released = flag.enabled || !!access.data?.released;
+  const released = !!access.data?.released;
 
   return {
     builtInModels: released ? RELEASED : NONE,
-    isLoading: !released && (flag.isLoading || access.isLoading),
+    isLoading: !released && access.isLoading,
   };
 }

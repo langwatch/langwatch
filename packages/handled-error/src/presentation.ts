@@ -3636,7 +3636,7 @@ const presentations = {
   platform_operator_user_not_found: {
     title: "No active user has that address",
     describe: () =>
-      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+      "Only an existing, active account with a verified address can be made a platform operator; on LangWatch Cloud, only a staff account.",
   },
   platform_permission_not_assignable: {
     title: "Operations permissions cannot be added to a role",
@@ -4951,6 +4951,57 @@ const presentations = {
   unsupported_media_type: {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
+  // ==========================================================================
+  // Hosted MCP. Read by an MCP client and the person who configured it, not on
+  // a LangWatch page, so the words say what to do in the client.
+  // ==========================================================================
+  mcp_authorization_required: {
+    title: "Sign in to use the LangWatch MCP server",
+    describe: () =>
+      "Connect your MCP client to LangWatch, or send a project API key as the bearer.",
+  },
+  mcp_invalid_token: {
+    title: "Your MCP sign-in has expired",
+    describe: () => "Sign in to LangWatch again from your MCP client.",
+  },
+  mcp_invalid_api_key: {
+    title: "That API key isn't valid",
+    describe: () => "Check the project API key your MCP client sends, or create a new one.",
+  },
+  mcp_grant_revoked: {
+    title: "Your access to this project has ended",
+    describe: () =>
+      "You no longer have access to the project this sign-in was for. Ask an admin, then sign in again.",
+  },
+  mcp_session_not_found: {
+    title: "This MCP session has ended",
+    describe: () => "Your MCP client opens a new session on its own. Reconnect if it does not.",
+  },
+  mcp_route_not_found: {
+    title: "Not found",
+    describe: () => "Check the MCP server URL your client is configured with.",
+  },
+  mcp_metadata_unpublished: {
+    title: "No document is published here",
+    describe: () => "LangWatch publishes its OAuth metadata at the protected-resource path.",
+  },
+  mcp_session_id_required: {
+    title: "That MCP request needs a session",
+    describe: () => "Send an initialize request first, then the session id it returns.",
+  },
+  mcp_method_not_allowed: {
+    title: "That method isn't supported here",
+    describe: () => "Check the MCP server URL and the request your client sends.",
+  },
+  mcp_session_limit_reached: {
+    title: "Too many open MCP sessions",
+    describe: (error) =>
+      `This key already has ${num(error, "maxSessions", 0) || "the most"} open sessions. Close some, then try again.`,
+  },
+  mcp_store_unavailable: {
+    title: "The MCP server is briefly unavailable",
+    describe: () => "Your MCP client retries on its own. Try again in a moment.",
   },
   upgrade_in_progress: {
     title: "LangWatch is upgrading",

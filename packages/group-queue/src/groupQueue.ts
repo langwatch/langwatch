@@ -252,10 +252,10 @@ function nonEmptyString(value: unknown): string | undefined {
  */
 export const GROUP_QUEUE_CONFIG = {
   /**
-   * Max parallel groups per consumer. Jobs mostly wait on flushed ClickHouse inserts (~200 ms),
-   * so slots set throughput; a listed run's bench reached 1,474 jobs/s at 1,000 (Alex, 2026-10-12).
+   * Max parallel groups per consumer: the previous release's 100 (Alex, 2026-10-13).
+   * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
    */
-  defaultGlobalConcurrency: 1_000,
+  defaultGlobalConcurrency: 100,
   /** TTL for the active key (safety net for crashes), in seconds */
   activeTtlSec: 300,
   /** BRPOP timeout in seconds (fallback polling interval) */
@@ -761,7 +761,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       gqJobsStagedTotal.inc({ queue_name: this.queueName });
       if (delay && delay > 0) {
         gqJobsDelayedTotal.inc({ queue_name: this.queueName });
-        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, delay);
+        gqJobDelayMilliseconds.observe(delay, { queue_name: this.queueName });
       }
       void Promise.resolve(
         this.activity?.staged({
@@ -815,7 +815,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     if (effectiveDelay && effectiveDelay > 0) {
       gqJobsDelayedTotal.inc({ queue_name: this.queueName }, newStagedCount);
       for (let i = 0; i < newStagedCount; i++) {
-        gqJobDelayMilliseconds.observe({ queue_name: this.queueName }, effectiveDelay);
+        gqJobDelayMilliseconds.observe(effectiveDelay, { queue_name: this.queueName });
       }
     }
     for (const [group, value] of countStagedPerGroup({ jobsToStage, payloads })) {
@@ -1112,7 +1112,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
       stopHeartbeat();
       this.activeJobCount--;
       const jobDurationMs = performance.now() - jobStartTime;
-      gqJobDurationMilliseconds.observe(routingLabels, jobDurationMs);
+      gqJobDurationMilliseconds.observe(jobDurationMs, routingLabels);
       this.recordJobLatency(jobDurationMs);
     }
   }
@@ -1754,8 +1754,8 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     // exponential backoff. A caller can lengthen but never shorten
     // the wait, so its policy cannot cause a retry storm.
     const backoffMs = Math.max(getBackoffMs(attempt), decision.retryAfterMs ?? 0);
-    gqRetryAttempt.observe(routingLabels, attempt);
-    gqRetryBackoffMilliseconds.observe(routingLabels, backoffMs);
+    gqRetryAttempt.observe(attempt, routingLabels);
+    gqRetryBackoffMilliseconds.observe(backoffMs, routingLabels);
     // The job keeps the id it was dispatched under (ADR-080). Its
     // staging member was removed at claim time, so re-staging under
     // the same id inserts one that is genuinely absent.

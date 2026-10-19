@@ -15,6 +15,7 @@ function foldedAfter(spanAttributes: Record<string, string | number>): Record<st
       outputSource: "span",
       inputIsFallback: false,
       outputIsFallback: false,
+      inputSpanStartTimeMs: null,
       inputMediaRefs: null,
       outputMediaRefs: null,
     },

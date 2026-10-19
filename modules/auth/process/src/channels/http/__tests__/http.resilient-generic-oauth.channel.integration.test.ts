@@ -60,6 +60,7 @@ const startIdentityProvider = async ({
   issuedAtOffsetSeconds = 0,
   expiresInSeconds = 300,
   notBeforeOffsetSeconds,
+  endSessionEndpoint,
 }: {
   port: number;
   publishJwks: boolean;
@@ -67,6 +68,7 @@ const startIdentityProvider = async ({
   issuedAtOffsetSeconds?: number;
   expiresInSeconds?: number;
   notBeforeOffsetSeconds?: number;
+  endSessionEndpoint?: string;
 }) => {
   const published = generateKeyPairSync("rsa", { modulusLength: 2048 });
   const unpublished: KeyObject = generateKeyPairSync("rsa", {
@@ -83,6 +85,7 @@ const startIdentityProvider = async ({
         authorization_endpoint: `${issuer}/authorize`,
         token_endpoint: `${issuer}/token`,
         userinfo_endpoint: `${issuer}/userinfo`,
+        ...(endSessionEndpoint ? { end_session_endpoint: endSessionEndpoint } : {}),
         ...(publishJwks ? { jwks_uri: `${issuer}/jwks` } : {}),
         id_token_signing_alg_values_supported: ["RS256"],
       });
@@ -268,41 +271,48 @@ describe("given Okta requires verified ID tokens", () => {
   });
 });
 
-describe("given Okta signs its ID tokens with the key its JWKS publishes", () => {
-  /** One sign-in through the callback, against a provider whose token times are offset from now. */
-  const signInWithIdToken = async (times: {
-    issuedAtOffsetSeconds?: number;
-    expiresInSeconds?: number;
-    notBeforeOffsetSeconds?: number;
-  }) => {
-    const port = await closedPort();
-    const idp = await startIdentityProvider({
-      port,
-      publishJwks: true,
-      signWithPublishedKey: true,
-      ...times,
-    });
-    const { auth, db } = buildAuth({ issuerPort: port });
-    const started = await startOktaSignIn(auth);
-    expect(started.status).toBe(200);
-    const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
-    const code = `code-${randomUUID()}`;
-    idp.nonces.set(code, authorizationUrl.searchParams.get("nonce") ?? "");
-    const callback = new URL(`${BASE_URL}/api/auth/callback/okta`);
-    callback.searchParams.set("code", code);
-    callback.searchParams.set("state", authorizationUrl.searchParams.get("state") ?? "");
-    const cookie = started.headers
-      .getSetCookie()
-      .map((value) => value.split(";", 1)[0])
-      .join("; ");
-    const response = await auth.handler(
-      new Request(callback, { headers: { cookie }, redirect: "manual" }),
-    );
-    expect(response.status).toBe(302);
-    const location = new URL(response.headers.get("location") ?? "", BASE_URL);
-    return { error: location.searchParams.get("error"), db };
-  };
+/** One sign-in through the callback, against a provider whose token times are offset from now. */
+const signInWithIdToken = async (times: {
+  issuedAtOffsetSeconds?: number;
+  expiresInSeconds?: number;
+  notBeforeOffsetSeconds?: number;
+  endSessionPath?: string;
+}) => {
+  const { endSessionPath, ...tokenTimes } = times;
+  const port = await closedPort();
+  const idp = await startIdentityProvider({
+    port,
+    publishJwks: true,
+    signWithPublishedKey: true,
+    ...(endSessionPath ? { endSessionEndpoint: `http://127.0.0.1:${port}${endSessionPath}` } : {}),
+    ...tokenTimes,
+  });
+  const { auth, db } = buildAuth({ issuerPort: port });
+  const started = await startOktaSignIn(auth);
+  expect(started.status).toBe(200);
+  const authorizationUrl = new URL(authorizationResponseSchema.parse(await started.json()).url);
+  const code = `code-${randomUUID()}`;
+  idp.nonces.set(code, authorizationUrl.searchParams.get("nonce") ?? "");
+  const callback = new URL(`${BASE_URL}/api/auth/callback/okta`);
+  callback.searchParams.set("code", code);
+  callback.searchParams.set("state", authorizationUrl.searchParams.get("state") ?? "");
+  const cookie = started.headers
+    .getSetCookie()
+    .map((value) => value.split(";", 1)[0])
+    .join("; ");
+  const response = await auth.handler(
+    new Request(callback, { headers: { cookie }, redirect: "manual" }),
+  );
+  expect(response.status).toBe(302);
+  const location = new URL(response.headers.get("location") ?? "", BASE_URL);
+  const sessionCookie = response.headers
+    .getSetCookie()
+    .map((value) => value.split(";", 1)[0])
+    .join("; ");
+  return { error: location.searchParams.get("error"), db, auth, sessionCookie };
+};
 
+describe("given Okta signs its ID tokens with the key its JWKS publishes", () => {
   /** @scenario "An ID token issued up to 120 seconds in the future is admitted" */
   it("admits a token issued one minute in the future", async () => {
     const { error, db } = await signInWithIdToken({ issuedAtOffsetSeconds: 60 });
@@ -334,5 +344,30 @@ describe("given Okta signs its ID tokens with the key its JWKS publishes", () =>
 
     expect(error).toBeNull();
     expect(db.session ?? []).toHaveLength(1);
+  });
+});
+
+describe("given Okta's discovery document advertises its own sign-out page", () => {
+  /** @scenario "Signing out of a single sign-on session ends only the LangWatch session" */
+  it("signs an Okta session out without a provider sign-out url, so sign-out stays on LangWatch", async () => {
+    const { error, db, auth, sessionCookie } = await signInWithIdToken({
+      endSessionPath: "/oidc/logout",
+    });
+    expect(error).toBeNull();
+    expect(db.account?.[0]?.idToken).toBeTruthy();
+
+    const response = await auth.handler(
+      new Request(`${BASE_URL}/api/auth/sign-out`, {
+        method: "POST",
+        headers: { "content-type": "application/json", cookie: sessionCookie },
+        body: JSON.stringify({ callbackURL: "/auth/signin" }),
+        redirect: "manual",
+      }),
+    );
+
+    expect(response.status).toBe(200);
+    expect(response.headers.get("location")).toBeNull();
+    expect(await response.json()).toEqual({ success: true });
+    expect(db.session ?? []).toHaveLength(0);
   });
 });

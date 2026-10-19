@@ -26,16 +26,12 @@ export default function ForgotPassword() {
 
 function ForgotPasswordScreen() {
   const publicEnv = usePublicEnv();
-  const isAuthProvider = publicEnv.data?.NEXTAUTH_PROVIDER;
 
   if (!publicEnv.data) {
     return null;
   }
 
-  // Reset follows account (has password?), not deployment provider.
-  const deploymentHoldsNoPasswords = Boolean(publicEnv.data.IS_SAAS) && isAuthProvider !== "email";
-
-  if (deploymentHoldsNoPasswords) {
+  if (!publicEnv.data.EMAIL_PASSWORD_ENABLED) {
     return (
       <AuthCard title="Forgot your password?">
         <Text>
