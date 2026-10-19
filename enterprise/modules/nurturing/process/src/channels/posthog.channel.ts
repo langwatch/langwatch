@@ -11,7 +11,7 @@ export interface PostHogEventInput {
   readonly properties?: Record<string, unknown>;
   /** PostHog keeps one event per uuid, so a redelivered source event is counted once. */
   readonly uuid?: string;
-  /** When it happened; PostHog dedupes on uuid only together with the timestamp. */
+  /** When it happened. With a fixed uuid, a replay then matches the first delivery exactly. */
   readonly timestamp?: Instant;
 }
 
