@@ -1,13 +1,24 @@
+import { createHash } from "node:crypto";
+
 /**
- * One identity per logical send: the same for a framework replay of that send,
- * new once the session nonce is renewed (see README.md "langy-agent.ts").
+ * One identity per logical send (README.md "langy-agent.ts"). The hash splits
+ * same-length sends with different content; the length splits identical
+ * queued answers sent at different points.
  */
 export const turnIdempotencyKey = ({
   threadId,
   sessionNonce,
   historyLength,
+  messages,
 }: {
   threadId: string;
   sessionNonce: string;
   historyLength: number;
-}): string => `${threadId}#${sessionNonce}#${historyLength}`;
+  messages: unknown[];
+}): string => {
+  const payloadHash = createHash("sha256")
+    .update(JSON.stringify(messages))
+    .digest("hex")
+    .slice(0, 16);
+  return `${threadId}#${sessionNonce}#${historyLength}#${payloadHash}`;
+};

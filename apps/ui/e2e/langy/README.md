@@ -1167,12 +1167,13 @@ cookie. Wire format is plain JSON (POST body `input`, response
   own documented 90s recovery window before it elapsed, turning a
   self-healing hiccup into a hard test failure; the current budget retries
   comfortably past it.
-- The `call` adapter's `idempotencyKey` is `${threadId}#${sessionNonce}#${historyLength}`
-  (`turn-idempotency-key.ts`), not `crypto.randomUUID()`: one identity per
-  logical send, stable on a framework replay of the same send (same history
-  length, same session), new after `resetSession` so a replayed scenario
-  cannot collide with the failed attempt. The unfiltered history is counted
-  because the filtered list can repeat a length across sends.
+- The `call` adapter's `idempotencyKey` is `${threadId}#${sessionNonce}#${historyLength}#${hash}`
+  (`turn-idempotency-key.ts`), not `crypto.randomUUID()`: stable on a framework
+  replay of the same send, new after `resetSession`. `hash` is the first 16 hex
+  chars of a SHA-256 of the exact `messages` sent, because two sends can share a
+  history length with different content (`langy_idempotency_mismatch`); the
+  length stays so identical queued answers at different points are not
+  replayed. Set `LANGY_E2E_DEBUG=1` to log each send's key and counts.
 - `LangyToolEvent`: one tool frame on a turn stream, `start` or `end`, in
   stream order. The stored message flattens a turn's calls into one list,
   so it cannot say which calls were batched into one step and which waited

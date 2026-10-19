@@ -586,6 +586,22 @@ export type LangyAdapter = AgentAdapter & {
   queueNextTurn: (input: { parts: Record<string, unknown>[] }) => void;
 };
 
+/** Opt-in (LANGY_E2E_DEBUG) trace of each send's key and sizes; never message content. */
+const debugLogSend = ({
+  idempotencyKey,
+  historyLength,
+  messageCount,
+}: {
+  idempotencyKey: string;
+  historyLength: number;
+  messageCount: number;
+}): void => {
+  if (!process.env.LANGY_E2E_DEBUG) return;
+  console.debug(
+    `[langy-agent] send key=${idempotencyKey} historyLength=${historyLength} messages=${messageCount}`,
+  );
+};
+
 export function makeLangyAdapter(
   options: {
     /** The resource chips a real composer would carry (README.md "langy-agent.ts"). */
@@ -625,14 +641,21 @@ export function makeLangyAdapter(
         : scriptedMessages;
       // The same wire shape the panel's transport sends. idempotencyKey is
       // derived, so a framework replay of the same send stays deduplicated.
-      // It counts the unfiltered history: the filtered list can repeat a
-      // length across sends (see README.md "langy-agent.ts").
+      // It counts the unfiltered history and hashes the sent messages: either
+      // alone can repeat across sends (see README.md "langy-agent.ts").
+      const idempotencyKey = turnIdempotencyKey({
+        threadId: input.threadId,
+        sessionNonce,
+        historyLength: input.messages.length,
+        messages,
+      });
+      debugLogSend({
+        idempotencyKey,
+        historyLength: input.messages.length,
+        messageCount: messages.length,
+      });
       const turnInput = {
-        idempotencyKey: turnIdempotencyKey({
-          threadId: input.threadId,
-          sessionNonce,
-          historyLength: input.messages.length,
-        }),
+        idempotencyKey,
         trigger: "submit-message" as const,
         messages,
         projectId: CONFIG.PROJECT_ID,

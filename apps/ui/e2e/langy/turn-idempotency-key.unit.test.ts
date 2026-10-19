@@ -2,7 +2,8 @@ import { describe, expect, it } from "vitest";
 
 import { turnIdempotencyKey } from "./turn-idempotency-key";
 
-const base = { threadId: "thread_1", sessionNonce: "nonce-a", historyLength: 3 };
+const messages = [{ role: "user", parts: [{ type: "text", text: "hello" }] }];
+const base = { threadId: "thread_1", sessionNonce: "nonce-a", historyLength: 3, messages };
 
 describe("turnIdempotencyKey()", () => {
   describe("when called twice with the same inputs", () => {
@@ -11,7 +12,21 @@ describe("turnIdempotencyKey()", () => {
     });
   });
 
-  describe("when the framework history is longer", () => {
+  describe("when the payload is deep-equal at the same length", () => {
+    it("returns the same key", () => {
+      const copy = JSON.parse(JSON.stringify(messages));
+      expect(turnIdempotencyKey({ ...base, messages: copy })).toBe(turnIdempotencyKey(base));
+    });
+  });
+
+  describe("when the history length is the same but the content differs", () => {
+    it("returns a different key, so the server sees two distinct sends", () => {
+      const other = [{ role: "user", parts: [{ type: "text", text: "goodbye" }] }];
+      expect(turnIdempotencyKey({ ...base, messages: other })).not.toBe(turnIdempotencyKey(base));
+    });
+  });
+
+  describe("when the content is the same but the framework history is longer", () => {
     it("returns a different key", () => {
       expect(turnIdempotencyKey({ ...base, historyLength: 4 })).not.toBe(turnIdempotencyKey(base));
     });
@@ -26,8 +41,8 @@ describe("turnIdempotencyKey()", () => {
   });
 
   describe("when composing the key", () => {
-    it("joins thread, nonce and history length with #", () => {
-      expect(turnIdempotencyKey(base)).toBe("thread_1#nonce-a#3");
+    it("joins thread, nonce, history length and a 16-char payload hash with #", () => {
+      expect(turnIdempotencyKey(base)).toMatch(/^thread_1#nonce-a#3#[0-9a-f]{16}$/);
     });
   });
 });
