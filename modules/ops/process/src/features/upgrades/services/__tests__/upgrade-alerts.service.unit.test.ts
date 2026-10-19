@@ -27,7 +27,12 @@ function operator(email: string | null): OpsPlatformOperator {
 function setup({
   failedAt = null,
   leaseExpiresAt = null,
-}: { failedAt?: string | null; leaseExpiresAt?: string | null } = {}) {
+  audience = "self-hosted",
+}: {
+  failedAt?: string | null;
+  leaseExpiresAt?: string | null;
+  audience?: UpgradeAlertEmailProps["audience"];
+} = {}) {
   const failed = failedAt
     ? [
         stepOf({
@@ -73,6 +78,7 @@ function setup({
       },
     }),
     upgradesUrl: "https://app.example.com/ops/upgrades",
+    audience,
   });
   return { service, sent, rendered };
 }
@@ -138,6 +144,7 @@ describe("UpgradeAlertsService", () => {
       {
         installation: "app.example.com",
         upgradesUrl: "https://app.example.com/ops/upgrades",
+        audience: "self-hosted",
         failedSteps: [
           {
             id: "ops:backfill",
@@ -152,5 +159,17 @@ describe("UpgradeAlertsService", () => {
         runnerStopped: { owner: "pod-a", host: "h" },
       },
     ]);
+  });
+
+  describe("when the installation is LangWatch Cloud", () => {
+    /** @scenario "The alert email is worded for who operates the installation" */
+    it("renders for LangWatch staff on Cloud and for the operator everywhere else", async () => {
+      const cloud = setup({ failedAt: ago(10), audience: "langwatch-cloud" });
+      const selfHosted = setup({ failedAt: ago(10) });
+      await cloud.service.check({ since: SINCE, until: UNTIL });
+      await selfHosted.service.check({ since: SINCE, until: UNTIL });
+      expect(cloud.rendered.map(({ audience }) => audience)).toEqual(["langwatch-cloud"]);
+      expect(selfHosted.rendered.map(({ audience }) => audience)).toEqual(["self-hosted"]);
+    });
   });
 });
