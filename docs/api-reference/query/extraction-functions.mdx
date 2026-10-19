@@ -88,7 +88,7 @@ Each row carries a conversation identifier and its transcript under roughly eigh
 
 ```json
 {
-  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM traces WHERE OccurredAt >= subtractDays(now(), 1) AND HasError ORDER BY OccurredAt DESC LIMIT 100"
+  "sql": "SELECT TraceId, llm_messages(TraceId) AS messages FROM traces WHERE OccurredAt >= subtractDays(now(), 1) AND ContainsErrorStatus ORDER BY OccurredAt DESC LIMIT 100"
 }
 ```
 

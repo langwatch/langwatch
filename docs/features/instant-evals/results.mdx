@@ -77,7 +77,7 @@ Every verdict is a row in the `judgments` view of [LangWatchQL](/api-reference/q
 
 ```sql
 SELECT
-  t.Attributes['user.id'] AS user,
+  t.Attributes['langwatch.user_id'] AS user,
   sum(j.Passed) AS annoyed,
   count() AS conversations
 FROM judgments AS j
