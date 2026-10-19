@@ -127,8 +127,7 @@ npm run sync                # write them
   without an install: `.github/workflows/langy-scenarios-sync.yml` (a draft)
   syncs when started by hand (`workflow_dispatch`, a dry run by default); a PR
   that touches `dev/dogfood/langy` runs only the connector tests. It skips with
-  a notice when the
-  `LANGY_DOGFOOD_API_KEY`, `LANGY_DOGFOOD_PROJECT_ID` or
+  a notice when the `LANGY_DOGFOOD_API_KEY`, `LANGY_DOGFOOD_PROJECT_ID` or
   `LANGY_DOGFOOD_ENDPOINT` secret is missing.
 
 ## Feature gaps

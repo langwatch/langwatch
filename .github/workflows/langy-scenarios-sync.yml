@@ -80,5 +80,5 @@ jobs:
       - name: Sync
         if: steps.secrets.outputs.ready == 'true'
         env:
-          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run && '--dry-run' || '' }}
+          DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
         run: node dev/dogfood/langy/sync.ts $DRY_RUN

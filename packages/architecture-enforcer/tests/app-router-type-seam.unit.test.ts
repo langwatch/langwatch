@@ -15,12 +15,9 @@ import { createWorkspaceModuleResolver, moduleImports } from "../src/workspace/m
 const REPO_ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..", "..");
 
 /**
- * Measured at 1,595 when the aggregated `AppRouter` gave way to per-module maps.
  * A ceiling, not a target. Lower it when earned; never raise it without saying why.
- * Raised to 1,710 for the scenario run hooks contract (ADR-180): main counts 1,690 files,
- * plus 9 built TypeScript SDK files once `pnpm ensure:built` has run (as CI does), so 1,699;
- * the hooks contract adds 1. The count depends on that build: see
- * https://github.com/langwatch/langwatch/issues/8795
+ * 1,710: main is 1,699 in CI (1,690 + 9 built SDK files), the hooks contract adds 1, 10 spare.
+ * The count depends on `pnpm ensure:built`: https://github.com/langwatch/langwatch/issues/8795
  */
 const CEILING = 1_710;
 
