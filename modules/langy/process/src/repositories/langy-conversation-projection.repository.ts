@@ -52,6 +52,12 @@ export abstract class LangyConversationRepository {
     since?: number;
   }): Promise<LangyUsageCount>;
 
+  /**
+   * `LangyApi.findRunConversationIds`: archived ones included, at most
+   * `LANGY_RUN_CONVERSATION_IDS_LIMIT`. No index covers `Origin`, so this scans the project's rows.
+   */
+  abstract findRunConversationIds(params: { projectId: string; since: number }): Promise<string[]>;
+
   /** Throws `LangyConversationNotFoundError` when missing, archived or not visible to the user. */
   abstract getVisibleById(params: {
     id: string;

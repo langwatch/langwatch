@@ -206,11 +206,13 @@ stays off when the person turned it off since. A pass changes no setting.
 
 **A project that took no trace costs no model call.** After the gate and before Langy,
 a run asks the analytics module once for the project's newest trace since the start of
-the run's window (`AnalyticsApi.findLastOccurredAt`). None ends the run as `nothing`
+the run's window (`AnalyticsApi.findLastOccurredAt`), leaving out its daily runs' own
+conversations ([ADR-005](./005-board-health-check.md)). The board check comes before it. None ends the run as `nothing`
 with the reason `no_new_traces`: Langy is never called. This is an assumption the owner
 may overrule. It is `nothing` and not `skipped`, because a skipped day counts towards
 turning the schedule off (below) and a quiet project is no fault of its person. The
-control's last run line says "no new traces, so Langy was not asked". The gate comes
+control's last run line says "no new traces, so Langy was not asked", and what the board
+check filed. The gate comes
 first, so a person without access is still skipped and the project's traces are not
 asked for them.
 

@@ -248,6 +248,42 @@ function contractCases(backend: Backend): void {
       expect(newest.map((entry) => entry.id)).toEqual([third, second]);
     });
   });
+
+  describe("when the owner's insights are read by their keys", () => {
+    /** @scenario "A card is found by its key, however many insights are newer" */
+    it("answers the owner's insights holding those keys, newest first, whatever their age", async () => {
+      const key = "board-health:widget-1:no_data";
+      const old = await file({ findingKey: key, filedAt: FILED_AT - 90 * 24 * HOUR_MS });
+      const newer = await file({ findingKey: key, filedAt: FILED_AT });
+      const done = await file({
+        findingKey: "board-health:widget-2:error",
+        filedAt: FILED_AT - HOUR_MS,
+      });
+      await act({ insightId: done, userId: OWNER, state: { archivedAt: FILED_AT } });
+      for (const hours of [1, 2, 3]) await file({ filedAt: FILED_AT + hours * HOUR_MS });
+      await file({ findingKey: key, ownerUserId: OTHER, filedByUserId: OTHER });
+      await file({ findingKey: key, projectId: backend.otherProjectId() });
+
+      const found = await backend.repositories().insights.findByFindingKeys({
+        projectId: backend.projectId(),
+        userId: OWNER,
+        findingKeys: [key, "board-health:widget-2:error"],
+      });
+
+      expect(found.map((entry) => [entry.id, entry.archivedAt])).toEqual([
+        [newer, null],
+        [done, FILED_AT],
+        [old, null],
+      ]);
+      await expect(
+        backend.repositories().insights.findByFindingKeys({
+          projectId: backend.projectId(),
+          userId: OWNER,
+          findingKeys: [],
+        }),
+      ).resolves.toEqual([]);
+    });
+  });
 }
 
 describe("given the memory insight repositories", () => {

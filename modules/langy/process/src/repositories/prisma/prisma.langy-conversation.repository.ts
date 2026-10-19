@@ -1,4 +1,9 @@
-import { LangyConversationNotFoundError, type LangyUsageCount } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_ORIGIN,
+  LANGY_RUN_CONVERSATION_IDS_LIMIT,
+  LangyConversationNotFoundError,
+  type LangyUsageCount,
+} from "@langwatch/langy-contract";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import { LangyConversationRepository } from "../langy-conversation-projection.repository.ts";
@@ -97,6 +102,31 @@ export class PrismaLangyConversationRepository extends LangyConversationReposito
       activeUsers: owners.length,
       ...(first ? { firstTurnAt: Number(first.CreatedAt) } : {}),
     };
+  }
+
+  async findRunConversationIds({
+    projectId,
+    since,
+  }: {
+    projectId: string;
+    since: number;
+  }): Promise<string[]> {
+    const rows = await this.prisma.langyConversationProjection.findMany({
+      where: {
+        projectId,
+        Origin: LANGY_CONVERSATION_ORIGIN.RUN,
+        OR: [{ LastActivityAt: { gte: since } }, { CreatedAt: { gte: since } }],
+      },
+      // A row with no activity yet opened inside the window, so it is the newest of all.
+      orderBy: [
+        { LastActivityAt: { sort: "desc", nulls: "first" } },
+        { CreatedAt: "desc" },
+        { ConversationId: "desc" },
+      ],
+      take: LANGY_RUN_CONVERSATION_IDS_LIMIT,
+      select: { ConversationId: true },
+    });
+    return rows.map((row: { ConversationId: string }) => row.ConversationId);
   }
 
   async getVisibleById({

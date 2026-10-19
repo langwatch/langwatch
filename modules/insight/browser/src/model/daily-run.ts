@@ -143,15 +143,23 @@ export const OFF_REASON_WORDS: Record<InsightScheduleOffReason, string> = {
   project_archived: "Turned off when this project was archived.",
 };
 
-/** "filed 2 new, seen again 1": what a run did, or why it had nothing to do. */
-function ranWords({ filedCount, renewedCount, reason }: InsightLastRun): string {
-  // The project took no trace, so the run ended before Langy was asked.
-  if (reason === "no_new_traces") return "no new traces, so Langy was not asked";
-  const parts = [
+/** "filed 2 new, seen again 1", or empty when the run wrote nothing. */
+function countWords({ filedCount, renewedCount }: InsightLastRun): string {
+  return [
     ...(filedCount > 0 ? [`filed ${filedCount} new`] : []),
     ...(renewedCount > 0 ? [`seen again ${renewedCount}`] : []),
-  ];
-  return parts.join(", ") || "nothing new";
+  ].join(", ");
+}
+
+/** What a run did, or why it had nothing to do; the board check's cards count too. */
+function ranWords(lastRun: InsightLastRun): string {
+  const counts = countWords(lastRun);
+  // The project took no trace, so the run ended before Langy was asked.
+  if (lastRun.reason === "no_new_traces") {
+    const quiet = "no new traces, so Langy was not asked";
+    return counts ? `${quiet} · ${counts}` : quiet;
+  }
+  return counts || "nothing new";
 }
 
 /**
@@ -174,7 +182,9 @@ export function lastRunWords({
     return `Ran ${when} · ${ranWords(lastRun)}`;
   }
   if (lastRun.outcome === "failed") {
-    return `Failed ${when} · nothing was filed, and the next run tries again`;
+    const counts = countWords(lastRun);
+    const written = counts ? `${counts} before it stopped` : "nothing was filed";
+    return `Failed ${when} · ${written}, and the next run tries again`;
   }
   const reason = INSIGHT_RUN_SKIP_REASONS.find((known) => known === lastRun.reason);
   return `Did not run ${when} · ${reason ? SKIP_REASON_WORDS[reason] : "nothing was filed"}`;

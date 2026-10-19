@@ -19,7 +19,6 @@ import type {
 import type { LangyApi } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant, Temporal } from "@langwatch/time";
-import { LANGY_TRACE_ORIGIN } from "@langwatch/trace-contract";
 
 import type {
   InsightDailyRunExecutor,
@@ -39,6 +38,11 @@ import {
   runInsightId,
 } from "../rules/insight-daily-run.rules.ts";
 import { isLastSkippedDay } from "../rules/insight-daily-skip-streak.rules.ts";
+import {
+  type BoardHealthReport,
+  type InsightBoardHealthService,
+  NO_BOARD_HEALTH,
+} from "./insight-board-health.service.ts";
 import type { InsightCommandsService } from "./insight-commands.service.ts";
 import type { InsightDailyRunCommandsService } from "./insight-daily-run-commands.service.ts";
 import type { InsightDailyRunMetricsService } from "./insight-daily-run-metrics.service.ts";
@@ -69,11 +73,14 @@ type RunEnd = Readonly<{
   board?: InsightRunBoard;
 }>;
 
-type ReadyRun = Readonly<{
+type AdmittedRun = Readonly<{
   gate: Extract<RunGateResult, { ok: true }>;
   board: InsightRunBoard;
   windows: DailyRunWindows;
 }>;
+
+/** A run Langy is asked for: admitted, its board checked, and the project took a new trace. */
+type ReadyRun = AdmittedRun & Readonly<{ health: BoardHealthReport }>;
 
 type StartedTurn = Readonly<{ conversationId: string; turnId: string }>;
 
@@ -105,6 +112,17 @@ function failed(reason: InsightRunFailureReason, conversationId: string | null):
 }
 
 /**
+ * An end with the board check's cards counted in. They are news like Langy's: a run that found
+ * nothing else but filed a card is `filed`. A skipped or failed run keeps its outcome.
+ */
+function withHealth(end: RunEnd, health: BoardHealthReport): RunEnd {
+  const filedCount = end.filedCount + health.filedCount;
+  const renewedCount = end.renewedCount + health.renewedCount;
+  const outcome = end.outcome === "nothing" && filedCount > 0 ? "filed" : end.outcome;
+  return { ...end, outcome, filedCount, renewedCount };
+}
+
+/**
  * Whether a run's end turns its schedule off: the board is gone for this person, or this
  * skipped day is one too many in a row. Only a scheduled run carries the days before it.
  */
@@ -122,7 +140,13 @@ function turnsScheduleOff({
 
 type InsightDailyRunMembers = Readonly<{
   gate: Pick<InsightRunGateService, "check">;
-  langy: Pick<LangyApi, "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn">;
+  /** Checks the board's widgets on every run, before the question of new traces. */
+  boardHealth: Pick<InsightBoardHealthService, "check">;
+  /** Also names the run conversations whose traces are no news to the next run. */
+  langy: Pick<
+    LangyApi,
+    "startUnattendedTurn" | "awaitTurnSettlement" | "stopTurn" | "findRunConversationIds"
+  >;
   insights: Pick<InsightRepository, "findForReader">;
   /** The one cheap read before Langy is asked: whether the project took any trace. */
   traces: Pick<AnalyticsApi, "findLastOccurredAt">;
@@ -150,12 +174,21 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
    */
   async run(input: RunInput): Promise<void> {
     const startedAt = nowInstant().epochMilliseconds;
-    const settle = (end: RunEnd) => this.settle({ input, end, startedAt });
+    // Every end after the board check counts its cards, a failure's too.
+    let health = NO_BOARD_HEALTH;
+    const settle = (end: RunEnd) => this.settle({ input, end: withHealth(end, health), startedAt });
     let conversationId: string | null = null;
     try {
       await this.settleSuperseded(input);
-      const ready = await this.prepare(input);
-      if ("outcome" in ready) return await settle(ready);
+      const admitted = await this.admit(input);
+      if ("outcome" in admitted) return await settle(admitted);
+      health = await this.checkBoard(input, admitted);
+      const ready = { ...admitted, health };
+      if (!(await this.hasNewTraces({ projectId: input.projectId, windows: ready.windows }))) {
+        // Nothing new to read is no skipped day: the person could have had the run.
+        const quiet = { outcome: "nothing", reason: "no_new_traces" } as const;
+        return await settle({ ...quiet, ...NOTHING_WRITTEN, conversationId, board: ready.board });
+      }
       const turn = await this.start(input, ready);
       if ("outcome" in turn) return await settle({ ...turn, board: ready.board });
       conversationId = turn.conversationId;
@@ -170,7 +203,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     }
   }
 
-  private async prepare(input: RunInput): Promise<ReadyRun | RunEnd> {
+  private async admit(input: RunInput): Promise<AdmittedRun | RunEnd> {
     const { projectId, userId, slot } = input;
     const gate = await this.members.gate.check({ projectId, userId, board: input.board });
     if (!gate.ok) {
@@ -178,18 +211,29 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     }
     // The pointer keeps the board's name as the run found it.
     const board = { ...input.board, name: gate.board.name };
-    const windows = dailyRunWindows({ slot, timezone: RUN_TIMEZONE });
-    if (!(await this.hasNewTraces({ projectId, windows }))) {
-      // Nothing new to read is no skipped day: the person could have had the run.
-      const quiet = { outcome: "nothing", reason: "no_new_traces" } as const;
-      return { ...quiet, ...NOTHING_WRITTEN, conversationId: null, board };
-    }
-    return { gate, board, windows };
+    return { gate, board, windows: dailyRunWindows({ slot, timezone: RUN_TIMEZONE }) };
+  }
+
+  /** On every run the gate admits, before the question of new traces, and with no model call. */
+  private checkBoard(input: RunInput, { gate, windows }: AdmittedRun): Promise<BoardHealthReport> {
+    const { projectId, userId, scheduleId, runId, slot } = input;
+    return this.members.boardHealth.check({
+      projectId,
+      userId,
+      scheduleId,
+      runId,
+      slot,
+      board: gate.board,
+      widgets: gate.widgets,
+      isPersonalProject: gate.isPersonalProject,
+      periodEnd: windows.window.end,
+    });
   }
 
   /**
-   * Asked after the gate and before Langy: a project that took no trace costs no model call.
-   * Langy's own traces are left out, so a run's own turn never makes the next day look busy.
+   * Asked after the board check and before Langy: a project that took no trace costs no model
+   * call. The daily runs' own conversations are left out, so a run's own turn never makes the
+   * next day look busy, while a person's own Langy chat is news.
    */
   private async hasNewTraces({
     projectId,
@@ -198,11 +242,16 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     projectId: string;
     windows: DailyRunWindows;
   }): Promise<boolean> {
+    const since = windows.window.start;
+    const excludeConversationIds = await this.members.langy.findRunConversationIds({
+      projectId,
+      since,
+    });
     const newest = await this.members.traces.findLastOccurredAt({
       projectId,
       source: "trace",
-      since: Temporal.Instant.fromEpochMilliseconds(windows.window.start),
-      excludeOrigins: [LANGY_TRACE_ORIGIN],
+      since: Temporal.Instant.fromEpochMilliseconds(since),
+      excludeConversationIds,
     });
     return newest.length > 0;
   }
@@ -224,7 +273,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
     return turn;
   }
 
-  private async askLangy(input: RunInput, { gate, windows }: ReadyRun) {
+  private async askLangy(input: RunInput, { gate, windows, health }: ReadyRun) {
     const { projectId, userId, scheduleId, runId, slot, maxInsights } = input;
     const entries = await this.insightsOf(input);
     try {
@@ -239,6 +288,7 @@ export class InsightDailyRunService implements InsightDailyRunExecutor {
           windows,
           maxInsights,
           openInsights: openInsightsOfBoard({ entries, boardId: gate.board.id, slot }),
+          reportedWidgets: health.reported,
         }),
         title: dailyRunConversationTitle({
           boardName: gate.board.name,

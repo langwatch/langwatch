@@ -20,7 +20,7 @@ export class RedisAnalyticsRateLimitRepository extends AnalyticsRateLimitReposit
 
   check(
     key: string,
-    limit: Readonly<{ requests: number; seconds: number }>,
+    limit: Readonly<{ requests: number; seconds: number; scope?: string }>,
   ): Promise<AnalyticsRateLimitDecision> {
     return this.#limiter.check(key, limit);
   }

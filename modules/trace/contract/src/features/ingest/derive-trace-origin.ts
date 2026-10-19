@@ -20,6 +20,18 @@ export function deriveTraceOrigin(attributes: Record<string, unknown> | undefine
 export const LANGY_TRACE_ORIGIN = "langy";
 
 /**
+ * The origins a board leaves out by default: Langy's turns, since a board shows the member's
+ * agent (ADR-061); none in a personal project, where Langy's conversations are the data.
+ */
+export function defaultBoardExcludedOrigins({
+  isPersonalProject,
+}: {
+  isPersonalProject: boolean;
+}): readonly string[] {
+  return isPersonalProject ? [] : [LANGY_TRACE_ORIGIN];
+}
+
+/**
  * The origins the Explorer leaves out unless the query names `origin`: Langy's
  * turns are not the customer's traffic, but the origin facet keeps the pick. A
  * personal project hides nothing: there they are the owner's own traffic.

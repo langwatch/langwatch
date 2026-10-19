@@ -10,6 +10,7 @@ import type { InsightRunBoard, InsightRunSkipReason } from "@langwatch/insight-c
 import { isAggregateProjectKind, type ProjectApi } from "@langwatch/project-contract";
 import type { UserApi } from "@langwatch/user-contract";
 
+import type { HealthStatement } from "../rules/insight-board-health.rules.ts";
 import { pointerName } from "../rules/insight-daily-run.rules.ts";
 import type { InsightRolloutService } from "./insight-rollout.service.ts";
 
@@ -23,7 +24,7 @@ type Viewer = Readonly<{ userId: string }>;
 type RunBoardWidget = Readonly<{
   id: string;
   name: string;
-  definition: Readonly<{ queries: readonly { sql: string }[] }>;
+  definition: Readonly<{ queries: readonly HealthStatement[] }>;
   dashboardId: string | null;
   gridColumn: number;
   gridRow: number;
@@ -46,13 +47,25 @@ type RunBoardReader = {
   }): Promise<readonly RunBoardWidget[]>;
 };
 
+export type RunGateWidget = Readonly<{
+  id: string;
+  name: string;
+  queries: readonly string[];
+  statements: readonly HealthStatement[];
+}>;
+
 export type RunGateResult =
   | Readonly<{
       ok: true;
       /** The board as it is now, its name as a pointer keeps it. */
       board: { id: string; name: string };
-      /** The widgets on it, in reading order, each with its stored queries. Never empty. */
-      widgets: readonly { id: string; name: string; queries: readonly string[] }[];
+      /**
+       * The widgets on it, in reading order, each with its stored queries, and those queries
+       * with the parameters they declare for the board check. Never empty.
+       */
+      widgets: readonly RunGateWidget[];
+      /** Whether the project is a person's own, where a board reads Langy's traces too. */
+      isPersonalProject: boolean;
     }>
   | Readonly<{ ok: false; reason: InsightRunSkipReason }>;
 
@@ -99,12 +112,17 @@ export class InsightRunGateService {
     userId: string;
     board: InsightRunBoard;
   }): Promise<RunGateResult> {
-    const refusal = await this.refusalOf({ projectId, userId });
-    if (refusal) return skipped(refusal);
+    const admission = await this.admissionOf({ projectId, userId });
+    if (!admission.ok) return skipped(admission.reason);
     // A From LangWatch board is defined in the browser alone: no server can read its widgets.
     if (board.kind === "template") return skipped("template_board");
     try {
-      return await this.readBoard({ projectId, dashboardId: board.id, viewer: { userId } });
+      return await this.readBoard({
+        projectId,
+        dashboardId: board.id,
+        viewer: { userId },
+        isPersonalProject: admission.isPersonalProject,
+      });
     } catch (error) {
       const reason = BOARD_REFUSALS[HandledError.isHandled(error) ? error.code : ""];
       if (!reason) throw error;
@@ -112,7 +130,26 @@ export class InsightRunGateService {
     }
   }
 
-  /** Why this person gets no run in this project now; undefined when they may have one. */
+  /** Whether this person may have a run in this project now, and what the project is. */
+  private async admissionOf({
+    projectId,
+    userId,
+  }: {
+    projectId: string;
+    userId: string;
+  }): Promise<
+    | Readonly<{ ok: true; isPersonalProject: boolean }>
+    | Readonly<{ ok: false; reason: InsightRunSkipReason }>
+  > {
+    const project = await this.members.projects.findById(projectId);
+    if (!project || project.archivedAt !== null || isAggregateProjectKind(project.kind)) {
+      return { ok: false, reason: "project_unavailable" };
+    }
+    const reason = await this.refusalOf({ projectId, userId });
+    return reason ? { ok: false, reason } : { ok: true, isPersonalProject: project.isPersonal };
+  }
+
+  /** Why this person gets no run in a project that takes runs; undefined when they may. */
   private async refusalOf({
     projectId,
     userId,
@@ -120,11 +157,7 @@ export class InsightRunGateService {
     projectId: string;
     userId: string;
   }): Promise<InsightRunSkipReason | undefined> {
-    const { rollout, projects, users, authz } = this.members;
-    const project = await projects.findById(projectId);
-    if (!project || project.archivedAt !== null || isAggregateProjectKind(project.kind)) {
-      return "project_unavailable";
-    }
+    const { rollout, users, authz } = this.members;
     if (!(await rollout.isEnabled({ projectId }))) return "flag_off";
     const user = await users.findById({ id: userId });
     if (!user) return "user_missing";
@@ -147,10 +180,12 @@ export class InsightRunGateService {
     projectId,
     dashboardId,
     viewer,
+    isPersonalProject,
   }: {
     projectId: string;
     dashboardId: string;
     viewer: Viewer;
+    isPersonalProject: boolean;
   }): Promise<RunGateResult> {
     const { dashboards } = this.members;
     const stored = await dashboards.getBoard({ projectId, dashboardId, viewer });
@@ -167,12 +202,14 @@ export class InsightRunGateService {
         id,
         name: pointerName({ name, fallback: id }),
         queries: definition.queries.map((query) => query.sql),
+        statements: definition.queries,
       }));
     if (widgets.length === 0) return skipped("board_empty");
     return {
       ok: true,
       board: { id: stored.id, name: pointerName({ name: stored.name, fallback: stored.id }) },
       widgets,
+      isPersonalProject,
     };
   }
 }

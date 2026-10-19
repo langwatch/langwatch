@@ -38,6 +38,7 @@ function makeConversationRepo(
 ): LangyConversationRepository {
   return {
     countUsage: vi.fn().mockResolvedValue({ turns: 0, activeUsers: 0 }),
+    findRunConversationIds: vi.fn().mockResolvedValue([]),
     getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn().mockResolvedValue("missing"),
     findAllForUser: vi.fn().mockResolvedValue([]),

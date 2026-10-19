@@ -3,6 +3,7 @@
  * fine for the range widens, up to a week. @see modules/dashboard/specs/dashboards-v1.feature
  */
 
+import { defaultBoardExcludedOrigins } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -10,7 +11,6 @@ import {
   boardGrainFits,
   boardPeriodBounds,
   boardPeriodGranularity,
-  defaultBoardExcludedOrigins,
 } from "../model/board-period.ts";
 
 const NOW = Date.UTC(2026, 8, 28);

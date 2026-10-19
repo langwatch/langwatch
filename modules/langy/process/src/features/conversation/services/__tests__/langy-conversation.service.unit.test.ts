@@ -33,6 +33,7 @@ function makeRepo(
 ): LangyConversationRepository {
   const defaults: LangyConversationRepository = {
     countUsage: vi.fn(async () => ({ turns: 0, activeUsers: 0 })),
+    findRunConversationIds: vi.fn(async () => []),
     getVisibleById: vi.fn().mockRejectedValue(new LangyConversationNotFoundError("c1")),
     findOwnership: vi.fn(async () => "missing" as const),
     findAllForUser: vi.fn(async () => []),

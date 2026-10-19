@@ -3,7 +3,7 @@ import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 
 import type { InsightRepository } from "../insight.repository.ts";
-import { insightEntryFromRows } from "./prisma.insight.mapper.ts";
+import { insightEntryFromRows, type InsightRow } from "./prisma.insight.mapper.ts";
 
 /**
  * The rows one person owns. A row folded before the owner column existed, or by an image that
@@ -38,14 +38,24 @@ export class PrismaInsightRepository
       orderBy: { filedAt: "desc" },
       take: limit,
     });
-    if (insights.length === 0) return [];
-    const readers = await this.prisma.insightReaderProjection.findMany({
-      where: { projectId, userId, insightId: { in: insights.map((insight) => insight.id) } },
+    return this.withReaders({ projectId, userId, insights });
+  }
+
+  async findByFindingKeys({
+    projectId,
+    userId,
+    findingKeys,
+  }: {
+    projectId: string;
+    userId: string;
+    findingKeys: readonly string[];
+  }): Promise<InsightEntry[]> {
+    if (findingKeys.length === 0) return [];
+    const insights = await this.prisma.insightProjection.findMany({
+      where: { projectId, ...ownedBy(userId), findingKey: { in: [...findingKeys] } },
+      orderBy: { filedAt: "desc" },
     });
-    const readerByInsight = new Map(readers.map((reader) => [reader.insightId, reader]));
-    return insights.map((insight) =>
-      insightEntryFromRows({ insight, reader: readerByInsight.get(insight.id) }),
-    );
+    return this.withReaders({ projectId, userId, insights });
   }
 
   async getForReader({
@@ -65,5 +75,24 @@ export class PrismaInsightRepository
       where: { projectId, insightId, userId },
     });
     return insightEntryFromRows({ insight, reader: reader ?? undefined });
+  }
+
+  private async withReaders({
+    projectId,
+    userId,
+    insights,
+  }: {
+    projectId: string;
+    userId: string;
+    insights: readonly InsightRow[];
+  }): Promise<InsightEntry[]> {
+    if (insights.length === 0) return [];
+    const readers = await this.prisma.insightReaderProjection.findMany({
+      where: { projectId, userId, insightId: { in: insights.map((insight) => insight.id) } },
+    });
+    const readerByInsight = new Map(readers.map((reader) => [reader.insightId, reader]));
+    return insights.map((insight) =>
+      insightEntryFromRows({ insight, reader: readerByInsight.get(insight.id) }),
+    );
   }
 }

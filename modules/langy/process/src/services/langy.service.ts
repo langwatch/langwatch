@@ -118,6 +118,10 @@ export class LangyService {
     return this.conversations.countUsage(input);
   }
 
+  findRunConversationIds(input: { projectId: string; since: number }): Promise<string[]> {
+    return this.conversations.findRunConversationIds(input);
+  }
+
   getPage(input: {
     projectId: string;
     userId: string;

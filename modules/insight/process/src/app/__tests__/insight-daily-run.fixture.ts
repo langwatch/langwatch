@@ -4,7 +4,12 @@
  * Who may open a board is not scripted: the dashboard module's own scope rules answer it.
  */
 
-import type { AnalyticsApi, LangWatchQLProtections } from "@langwatch/analytics-contract";
+import type {
+  AnalyticsApi,
+  LangWatchQLExecuteInput,
+  LangWatchQLJudgementCall,
+  LangWatchQLProtections,
+} from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   type Dashboard,
@@ -94,12 +99,37 @@ type Widget = Awaited<ReturnType<DashboardApi["listDashboardWidgets"]>>[number];
 export const COST_QUERY = "from traces | sum(cost)";
 export const ERRORS_QUERY = "from traces | count(errors)";
 
+type ScriptedParameter = { name: string; type: "string" | "number" | "boolean"; default?: string };
+
 type ScriptedWidget = {
   id: string;
   name: string;
   queries?: string[];
+  /** Parameters each of the widget's queries declares. */
+  parameters?: ScriptedParameter[];
   gridRow?: number;
   gridColumn?: number;
+};
+
+/**
+ * How the analytics module answers the board check for one statement. Left out, a statement
+ * returns one row of data.
+ */
+export type ScriptedStatement = {
+  rows?: Record<string, unknown>[];
+  completeness?: "complete" | "no_traffic";
+  /** Thrown by the execution, as the analytics module refuses or fails it. */
+  error?: Error;
+  /** Thrown by the validation. */
+  validationError?: Error;
+  /** The statement calls an eval function. */
+  judged?: boolean;
+};
+
+/** The caller the analytics module resolves for the run's person. */
+export const RUN_CALLER = {
+  project: { id: PROJECT, lwqlKey: "lwql-key" },
+  protections: PROTECTIONS,
 };
 
 /**
@@ -174,7 +204,15 @@ export function stampedParts(answer: string): LangyMessagePart[] {
   });
 }
 
-function project({ kind, archived }: { kind: string; archived: boolean }): Project {
+function project({
+  kind,
+  archived,
+  personal = false,
+}: {
+  kind: string;
+  archived: boolean;
+  personal?: boolean;
+}): Project {
   return {
     id: PROJECT,
     name: "Shop",
@@ -197,7 +235,7 @@ function project({ kind, archived }: { kind: string; archived: boolean }): Proje
     s3SecretAccessKey: null,
     s3Bucket: null,
     archivedAt: archived ? new Date(0) : null,
-    isPersonal: false,
+    isPersonal: personal,
     ownerUserId: null,
     personalFeatures: {},
     departmentId: null,
@@ -226,7 +264,11 @@ function widget({
     definition: {
       version: 1,
       code: "",
-      queries: (scripted.queries ?? []).map((sql, at) => ({ name: `query-${at}`, sql })),
+      queries: (scripted.queries ?? []).map((sql, at) => ({
+        name: `query-${at}`,
+        sql,
+        ...(scripted.parameters ? { parameters: scripted.parameters } : {}),
+      })),
     },
     createdAt: instant,
     updatedAt: instant,
@@ -252,7 +294,11 @@ export function refusal(code: string): Error {
 export function runWorld() {
   return {
     flagOn: true,
-    project: { kind: "application", archived: false } as { kind: string; archived: boolean } | null,
+    project: { kind: "application", archived: false } as {
+      kind: string;
+      archived: boolean;
+      personal?: boolean;
+    } | null,
     /** Who exists; `true` marks a deactivated account. */
     users: new Map<string, { deactivated: boolean }>([
       [MEMBER, { deactivated: false }],
@@ -278,10 +324,16 @@ export function runWorld() {
     boardReadError: null as Error | null,
     /** The queries the analytics module refuses, and its refusal to say what the person sees. */
     lwql: { refused: new Set<string>(), protectionsError: null as Error | null },
+    /** Whether the project's rollout admits it to the Workbench, where boards run their widgets. */
+    workbenchOn: true,
+    /** How the board check's statements answer, by their text. */
+    statements: new Map<string, ScriptedStatement>(),
     /** Whether the project took any trace since a run's window began. */
     hasNewTraces: true,
-    /** The origins of those traces; a read that leaves them all out finds none. */
-    newTraceOrigins: ["application"] as string[],
+    /** The conversation of each of those traces; a read that leaves them all out finds none. */
+    newTraceConversations: [null] as (string | null)[],
+    /** The project's daily-run conversations, as Langy names them. */
+    runConversationIds: [] as string[],
     /** The projects of the member's organisation, as the project module lists them. */
     organizationProjects: [PROJECT],
     langy: {
@@ -304,6 +356,7 @@ function scriptedLangy(world: RunWorld) {
   const stops: { conversationId: string; turnId: string; userId: string }[] = [];
   /** Langy's own idempotency: one turn per key, and a key reused for other words is refused. */
   const turns = new Map<string, { text: string; conversationId: string; turnId: string }>();
+  const runConversationAsks: { projectId: string; since: number }[] = [];
   const api = createApiFixture<LangyApi>({
     startUnattendedTurn: async (input) => {
       starts.push(input);
@@ -337,8 +390,12 @@ function scriptedLangy(world: RunWorld) {
     stopTurn: async ({ conversationId, turnId, userId }) => {
       stops.push({ conversationId, turnId, userId });
     },
+    findRunConversationIds: async (input) => {
+      runConversationAsks.push(input);
+      return world.runConversationIds;
+    },
   });
-  return { api, starts, waits, stops, turns };
+  return { api, starts, waits, stops, turns, runConversationAsks };
 }
 
 function storedBoard({ id, board }: { id: string; board: ScriptedBoard }): Dashboard {
@@ -407,19 +464,34 @@ function scriptedDashboard(world: RunWorld) {
   return { dashboard, boardReads };
 }
 
+/** The judged column a scripted eval statement asks for. */
+const JUDGEMENT: LangWatchQLJudgementCall = {
+  column: "is_helpful",
+  function: "llm_boolean",
+  reads: "passed",
+  kind: "boolean",
+  instructions: "Was the answer helpful?",
+};
+
 function scriptedAnalytics(world: RunWorld) {
   const validations: { sql: string; protections: unknown; timeWindow: unknown }[] = [];
+  /** What the board check validated: with the eval gate open, unlike a finding's query. */
+  const checkValidations: { sql: string; parameters: unknown; timeWindow: unknown }[] = [];
+  /** Every statement the board check ran as a background caller, oldest first. */
+  const backgroundExecutions: LangWatchQLExecuteInput[] = [];
   const protectionAsks: { userId: string; projectId: string }[] = [];
   const traceAsks: {
     projectId: string;
     source: string;
     since: number;
-    excludeOrigins: readonly string[];
+    excludeConversationIds: readonly string[];
   }[] = [];
   const analytics = createApiFixture<AnalyticsApi>({
-    findLastOccurredAt: async ({ projectId, source, since, excludeOrigins = [] }) => {
-      traceAsks.push({ projectId, source, since: since.epochMilliseconds, excludeOrigins });
-      const counted = world.newTraceOrigins.filter((origin) => !excludeOrigins.includes(origin));
+    findLastOccurredAt: async ({ projectId, source, since, excludeConversationIds = [] }) => {
+      traceAsks.push({ projectId, source, since: since.epochMilliseconds, excludeConversationIds });
+      const counted = world.newTraceConversations.filter(
+        (conversation) => conversation === null || !excludeConversationIds.includes(conversation),
+      );
       return world.hasNewTraces && counted.length > 0 ? [since.add({ hours: 1 })] : [];
     },
     resolveProtections: async (input) => {
@@ -427,13 +499,48 @@ function scriptedAnalytics(world: RunWorld) {
       if (world.lwql.protectionsError) throw world.lwql.protectionsError;
       return PROTECTIONS;
     },
-    validateLangWatchQL: ({ sql, protections, timeWindow }) => {
+    validateLangWatchQL: ({ sql, protections, parameters, timeWindow, isInstantEvalsEnabled }) => {
+      if (isInstantEvalsEnabled === true) {
+        checkValidations.push({ sql, parameters, timeWindow });
+        const scripted = world.statements.get(sql);
+        if (scripted?.validationError) throw scripted.validationError;
+        const appFunctions = scripted?.judged
+          ? [{ column: JUDGEMENT.column, function: JUDGEMENT.function, options: [] }]
+          : [];
+        return { parameters: [], appFunctions };
+      }
       validations.push({ sql, protections, timeWindow });
       if (world.lwql.refused.has(sql)) throw refusal("lwql_not_permitted");
       return { parameters: [], appFunctions: [] };
     },
+    describeLangWatchQLJudgements: ({ appFunctions }) => appFunctions.map(() => JUDGEMENT),
+    isWorkbenchEnabled: async () => world.workbenchOn,
+    resolveRunCaller: async () => RUN_CALLER,
+    executeBackgroundLangWatchQL: async (input) => {
+      backgroundExecutions.push(input);
+      const scripted = world.statements.get(input.sql);
+      if (scripted?.error) throw scripted.error;
+      return {
+        columns: [],
+        rows: scripted?.rows ?? [{ value: 1 }],
+        statistics: { rowsRead: 0, bytesRead: 0, elapsedMs: 0, rowsReturned: 0 },
+        diagnostics: [],
+        followsTimeWindow: true,
+        followsGranularity: true,
+        ...(scripted?.completeness
+          ? { completeness: { state: scripted.completeness, unit: "traces", total: 0, fields: [] } }
+          : {}),
+      };
+    },
   });
-  return { analytics, validations, protectionAsks, traceAsks };
+  return {
+    analytics,
+    validations,
+    checkValidations,
+    backgroundExecutions,
+    protectionAsks,
+    traceAsks,
+  };
 }
 
 function scriptedPeers(world: RunWorld) {
