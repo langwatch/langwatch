@@ -154,6 +154,7 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
 - `e2e-chat-surfaces` (5): `langy-current-surfaces.scenario.test.ts` 32, 63, 101, 223, 344.
 - `e2e-chat-quality` (4): `langy-quality.scenario.test.ts` 112-230; its code regex checks are criteria now.
 - `e2e-chat-boundary` (3): `langy-boundary.scenario.test.ts` 31, 72, 109.
+- The original e2e `it(` blocks for these 49 were removed from `apps/ui/e2e/langy/`, except the 8 in `langy-dogfood.scenario.test.ts` (they carry `@scenario` bindings) and 1544.
 - Stay, wave 1b (23): they need data a world does not make yet (a `resources` world).
 - Stay in code (53): red team, folder, CLI and code access, workbench, guided
   onboarding, navigate, PR, latency budget: they need the browser, a local

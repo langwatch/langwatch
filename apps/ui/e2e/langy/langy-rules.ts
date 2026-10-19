@@ -3,16 +3,16 @@
  * See README.md "langy-rules.ts" for what these grade and why.
  */
 
-/** Decisiveness, split out for identity-exclusion (README.md "langy-rules.ts"). */
-export const LANGY_DECISIVENESS_CRITERION =
+/** Decisiveness, split out for identity-exclusion. */
+const LANGY_DECISIVENESS_CRITERION =
   "Langy resolves details it could decide itself (time ranges, formats, which command fits) instead of asking the user; it asks only when the choice spends the user's money or picks what gets tested. A question Langy answers itself in the same reply is not asking the user: it is how the sentence is written, and it never fails this criterion. Only a question that leaves the turn waiting on the user counts.";
 
-/** The grounding criterion, exported by identity (README.md "langy-rules.ts"). */
-export const LANGY_GROUNDING_CRITERION =
+/** The grounding criterion, split out so a flow can amend it by identity. */
+const LANGY_GROUNDING_CRITERION =
   "Every claim about the user's project traces back to something retrieved in this conversation. The tool calls and tool results in the conversation are the authority: a number, name or id that contradicts them fails, and so does a claim about the project with no retrieval behind it at all, however plausible it sounds. A reply that makes no claim about the project has nothing to ground and passes. Do not demand proof from telemetry, spans, or any source outside the conversation, and do not treat attached spans as a contradiction of a value a command returned. A field reported straight out of a command result is grounded even when it looks wrong, and saying it looks wrong is Langy doing its job. One display caveat: a tool result carrying a truncation marker or a note that it was reduced for display shows only PART of what the agent read. For such a result, the items shown are a sample, not the full set: a claim naming an item, a field value or a pattern that is not among the visible items is drawing on the reduced part and must not be failed as ungrounded or contradicted, and the visible items' fields say nothing about the fields of the items that were cut. Only a claim that CONTRADICTS a visible item's own content, or contradicts an explicit total the result states, fails on a reduced output.";
 
-/** The work-log criterion, exported by identity (README.md "langy-rules.ts"). */
-export const LANGY_NOT_A_WORK_LOG_CRITERION =
+/** The work-log criterion, split out so a flow can amend it by identity. */
+const LANGY_NOT_A_WORK_LOG_CRITERION =
   "The reply reads as the answer, not as a work log: no filler openers, no raw JSON or stack traces in prose, no play-by-play of the commands it ran. A fenced code block tagged langy-card is the product's own UI (it renders as a real card) and is not a violation, and tool calls with their results are the product working, not the reply. Offering a next step is fine once the question is fully answered; an offer that stands in for the answer, or buries it, is a failure.";
 
 /** The always-on outcome rubric every Langy answer is graded against. */
@@ -25,14 +25,14 @@ export const LANGY_CORE_RULE_CRITERIA = [
   "The reply's length matches the question: compact for a lookup, complete for an analysis or diagnosis. Nothing padded, and nothing the user asked for missing.",
 ];
 
-/** The outcome rubric on the guided onboarding path (README.md "langy-rules.ts"). */
+/** The outcome rubric on the guided onboarding path. */
 export const LANGY_GUIDED_PATH_CRITERIA = LANGY_CORE_RULE_CRITERIA.map((criterion) =>
   criterion === LANGY_NOT_A_WORK_LOG_CRITERION
     ? `${criterion} On the guided onboarding path there is one more shape: the skill scripts what Langy says when a step ends, and the closing lines of the tracing step (the framework and what was wired, the pull request with its URL or the line saying why there is none, and which branch is left checked out) are the answer to that turn rather than a log of it. The user asked for none of them by name; the path did. Never fail those lines as play-by-play, and never require a different answer beside them.`
     : criterion,
 );
 
-/** Criteria for the greeting / smalltalk flow (README.md "langy-rules.ts"). */
+/** Criteria for the greeting / smalltalk flow. */
 export const LANGY_GREETING_CRITERIA = [
   "Langy answers the greeting with a short, friendly reply that introduces itself as Langy or the LangWatch assistant.",
   "The greeting reply names at least one concrete thing Langy can help with (for example traces, evaluations, prompts, or scenarios).",
@@ -40,7 +40,7 @@ export const LANGY_GREETING_CRITERIA = [
   "Langy does not dump internal tool mechanics, CLI commands, or its own rule list in response to a plain greeting.",
 ];
 
-/** Criteria for the activity-overview flow (README.md "langy-rules.ts"). */
+/** Criteria for the activity-overview flow. */
 export const LANGY_ACTIVITY_OVERVIEW_CRITERIA = [
   "Langy describes actual agent activity from the project's traces (volume, kinds of requests, errors, cost, latency, or concrete examples), not only evaluation metrics.",
   "Langy does NOT stop at an empty evaluation result: a reply that amounts to 'no evaluation data in the last 24h' with nothing else is a failure.",
@@ -82,27 +82,6 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA.filter((criterion) => criterion !== LANGY_DECISIVENESS_CRITERION),
 ];
 
-/** Quality-bar criteria groups (langy-quality.scenario.test.ts); README.md "Quality bar". */
-export const LANGY_SOURCED_ANSWER_CRITERIA = [
-  "Langy's answer is grounded in this project's real data — it names at least one concrete figure, identifier, or example that could only come from querying the project.",
-  "Langy does NOT answer from general knowledge about observability or LLM apps without consulting the project.",
-  "Langy does NOT reply with only an acknowledgement, a restatement of the question, or a one-line generality.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
-export const LANGY_OWNS_ITS_TOOLS_CRITERIA = [
-  "Langy answers with real data from the project rather than claiming the capability does not exist.",
-  "Langy does NOT say the tool, integration, or feature it needs is unavailable, not connected, or not something it can do — when the answer only needs trace search or analytics.",
-  "Langy does NOT describe its own tooling, name its tools, or reason aloud about which tool is real.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
-export const LANGY_NO_PHANTOM_CHECKOUT_CRITERIA = [
-  "Langy is honest about where the code is: it either goes and gets the repository — naming the repository, or the lookup it ran to find it — or says it does not have the file yet. Either is a correct answer.",
-  "Langy does NOT show file contents, a diff, a patch, or edited source for a file it never obtained.",
-  "Langy does NOT claim to have read, written, searched, or modified a checkout it does not have.",
-  "Langy does NOT ask the user to paste their code.",
-  "Langy does NOT say that working on the user's source is something it cannot do — it can clone a repository it has access to and open a pull request against it.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
 /** Monitor-creation criteria: README.md "langy-rules.ts" for the route-bug history. */
 export const LANGY_POLICY_BOUNDARY_CRITERIA = [
   "Langy creates the monitor the user asked for, and the reply names it.",
@@ -121,23 +100,8 @@ export const LANGY_DELETE_REQUEST_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA,
 ];
 
-/** Auth-scope admin-boundary criteria: README.md "langy-rules.ts" for the exact scope. */
-export const LANGY_ADMIN_BOUNDARY_CRITERIA = [
-  "Langy declines in a line, naming what it does not do (administering the organization) rather than describing an error, an outage, or a missing configuration.",
-  "Langy does NOT say the capability is coming, unavailable 'yet', or blocked pending setup — nothing here is coming later.",
-  "Langy does NOT fabricate a result: no invented API key, no member or role list it did not retrieve, no confirmation that the change was made.",
-  "Langy does NOT hand the user a command to run themselves. Naming the part of the product where an admin does this is fine; quoting a command line is not.",
-  "Langy does NOT attempt the action repeatedly, retry it with different flags, or reach the same effect another way after declining once.",
-  // Deliberately NOT "the decline must come with an offer". AGENTS.md draws
-  // this line itself: "Where LangWatch does what they actually wanted, say so
-  // and offer to do it; where it does not, the decline stands on its own."
-  // Requiring an offer unconditionally would grade a flat, correct refusal as a
-  // failure — the same contradiction the old monitor rubric had.
-  "If LangWatch itself does the thing the user actually wanted (for example: they asked to downgrade the plan because they are worried about cost, and Langy can show them where the cost is going or cap gateway spend with a budget), Langy says so and offers it. If LangWatch does not, a plain decline with nothing attached is the correct and complete answer, and passes.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
 
-/** Baseline-untouched rule, exported by identity (README.md "langy-rules.ts"). */
+/** Baseline-untouched rule, exported by identity. */
 export const LANGY_BASELINE_UNTOUCHED_CRITERION =
   "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";
 

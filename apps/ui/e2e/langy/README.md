@@ -570,16 +570,7 @@ half. Kept in one module so every scenario file shares the SAME rubric,
 and the same criteria can seed a saved `langevals/llm_boolean` Evaluator
 against Langy's own traces (see "Rule-adherence evaluator" above).
 
-- **`LANGY_DECISIVENESS_CRITERION`**: split out because eval creation
-  legitimately inverts it — the first turn MUST ask the
-  experiment-vs-evaluator question. Excluded by identity
-  (`c !== LANGY_DECISIVENESS_CRITERION`), never by matching wording.
-- **`LANGY_GROUNDING_CRITERION`**: exported by identity so a flow whose
-  evidence has a flow-specific shape (the GitHub gate's install prompt)
-  can amend THIS entry without matching on its wording.
-- **`LANGY_NOT_A_WORK_LOG_CRITERION`**: exported by identity so a flow
-  whose reply is a script rather than an answer (the guided onboarding
-  path) can amend THIS entry without matching on its wording.
+- Core rubric parts (decisiveness, grounding, work-log) are internal to `langy-rules.ts`; amend them by identity there. Rubrics for the flows moved to platform scenarios live in `dev/dogfood/langy/scenarios/`.
 - **`LANGY_GUIDED_PATH_CRITERIA`**: the path's reply is a script, not an
   answer to a question the user asked — the skill tells Langy what to say
   at the end of step 2, and a judge reading those lines against the plain
@@ -610,18 +601,7 @@ against Langy's own traces (see "Rule-adherence evaluator" above).
   intersects the caller's own permissions, so a user who cannot delete by
   hand still gets the platform's refusal — that is the permission-refusal
   shape in the core rules, not this group.
-- **`LANGY_ADMIN_BOUNDARY_CRITERIA`**: the AUTH SCOPE Langy holds no
-  write on and never will (owner decision, 2026-08-21: everything except
-  auth scope writes; reads are fine, secrets not at all) — members and
-  roles, API keys and credentials, the org's billing and contract. The
-  only question is whether the refusal is graceful. Deliberately NOT in
-  this group: spend limits and gateway budgets (operating the project's
-  gateway), gateway VIRTUAL keys (full-access, owner decision 2026-08-21
-  — minting one for a caller who could mint it by hand is driving the
-  gateway, not administering the org), deletion (an ordinary write now),
-  and reading the audit log (auth scope READS are allowed, though the
-  org-TIER ones do not resolve on a project-scoped key so are unreachable
-  rather than refused).
+- The admin-boundary rubric moved to the platform scenarios in `dev/dogfood/langy/scenarios/e2e-chat-boundary/`.
 - **`LANGY_BASELINE_UNTOUCHED_CRITERION`**: exported by identity so a
   scenario can amend it. The hard fact (baseline byte-identical
   before/after) is a Layer-2 REST assertion; this carries the
