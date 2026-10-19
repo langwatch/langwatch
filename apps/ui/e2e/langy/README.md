@@ -826,6 +826,9 @@ login --device` does, as the test's own user, and writes the config file
   else.
 - **`.toolEvents`**: every tool frame across every turn including the
   ones the panel started on its own; the ordering assertions read this.
+- **`.unreadTurns`**: turns whose stream could not be opened or broke.
+  Their frames are missing, so `deleteOrderFailure` fails on any of them
+  rather than reading the gap as "no delete there".
 - **`.cardAnsweredInsideTurn`**: the question tool returns inside the
   turn when the answer reaches it in time, and ends the turn when it does
   not, in which case the answer starts a turn of its own. A step waiting

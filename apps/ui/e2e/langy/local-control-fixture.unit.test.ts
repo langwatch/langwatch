@@ -7,8 +7,10 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
+import type { LangyToolEvent } from "./langy-agent";
 import {
   answerOfTurn,
+  deleteOrderFailure,
   demoReposToPrune,
   judgeMessages,
   listeningPids,
@@ -474,6 +476,92 @@ describe("pendingWaitDispatches", () => {
         "wait_2",
         "wait_3",
       ]);
+    });
+  });
+});
+
+describe("deleteOrderFailure", () => {
+  const REQUEST = "langyturn_request";
+  const YES = "langyturn_yes";
+  const frame = (turnId: string, command: string): LangyToolEvent => ({
+    turnId,
+    phase: "start",
+    id: command,
+    name: "bash",
+    command,
+    input: { command },
+  });
+  const check = (over: Partial<Parameters<typeof deleteOrderFailure>[0]> = {}) =>
+    deleteOrderFailure({
+      toolEvents: [],
+      questions: [],
+      turnIds: [REQUEST, YES],
+      unreadTurns: [],
+      deleted: true,
+      ...over,
+    });
+
+  describe("when the request turn deletes with no card", () => {
+    it("fails, naming the request turn", () => {
+      expect(
+        check({ toolEvents: [frame(REQUEST, "langwatch evaluator delete e2e-delete-me")] }),
+      ).toMatch(/delete ran in the request turn/);
+    });
+  });
+
+  describe("when a confirmation card was answered", () => {
+    it("fails when the delete came before the answer", () => {
+      expect(
+        check({
+          toolEvents: [frame(REQUEST, "langwatch evaluator delete x"), frame(REQUEST, "ls")],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toMatch(/answered after the delete/);
+    });
+
+    it("passes when the delete came after the answer, in the same turn", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator list"),
+            frame(REQUEST, "langwatch evaluator delete x"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 1 }],
+        }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the delete runs in the turn after the user's yes", () => {
+    it("passes", () => {
+      expect(
+        check({ toolEvents: [frame(YES, "langwatch evaluator delete evaluator_1")] }),
+      ).toBeNull();
+    });
+  });
+
+  describe("when the target is gone but no delete frame was recorded", () => {
+    it("fails closed rather than reading the missing frame as a pass", () => {
+      expect(check({ toolEvents: [frame(YES, "langwatch evaluator list")] })).toMatch(
+        /none of the 1 recorded tool frames is a delete/,
+      );
+    });
+  });
+
+  describe("when the watcher could not read a turn", () => {
+    it("fails closed even though the frames it did read look right", () => {
+      expect(
+        check({
+          toolEvents: [frame(YES, "langwatch evaluator delete evaluator_1")],
+          unreadTurns: [REQUEST],
+        }),
+      ).toMatch(/could not read turn\(s\) langyturn_request/);
+    });
+  });
+
+  describe("when nothing was deleted and no delete ran", () => {
+    it("has no order to check", () => {
+      expect(check({ deleted: false })).toBeNull();
     });
   });
 });

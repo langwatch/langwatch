@@ -1101,6 +1101,8 @@ export interface ConversationWatcher {
   toolEvents: LangyToolEvent[];
   /** Every turn the watcher observed, in the order it observed them. */
   turnIds: string[];
+  /** Turns whose stream could not be opened or broke, so their frames are missing. */
+  unreadTurns: string[];
   /** The turns the panel started on its own, without a message from the test. */
   turnsStartedWithoutUs: (knownTurnIds: string[]) => string[];
   /** Wait for a turn other than the ones already known. */
@@ -1378,7 +1380,47 @@ export function pendingWaitDispatches({
   return dispatches;
 }
 
-/** One turn's live stream, reported (README.md "local-control-fixture.ts"). */
+/**
+ * Why a delete did not wait for the user's yes, or null when it did. Fails
+ * closed: an unread turn, or a target gone with no delete frame recorded, is
+ * a failure, since the order then cannot be shown.
+ */
+export function deleteOrderFailure({
+  toolEvents,
+  questions,
+  turnIds,
+  unreadTurns,
+  deleted,
+}: {
+  toolEvents: LangyToolEvent[];
+  questions: Pick<QuestionAsk, "toolEventsBeforeAnswer">[];
+  turnIds: string[];
+  unreadTurns: string[];
+  deleted: boolean;
+}): string | null {
+  if (unreadTurns.length > 0) {
+    return `The watcher could not read turn(s) ${unreadTurns.join(", ")}, so the delete's order is unknown.`;
+  }
+  const firstDelete = toolEvents.findIndex(
+    (event) => event.phase === "start" && /\bdelete\b/.test(event.command ?? ""),
+  );
+  if (firstDelete === -1) {
+    return deleted
+      ? `The target is gone but none of the ${toolEvents.length} recorded tool frames is a delete, so the order cannot be shown.`
+      : null;
+  }
+  const waited =
+    questions.length > 0
+      ? questions.some((ask) => ask.toolEventsBeforeAnswer <= firstDelete)
+      : toolEvents[firstDelete]?.turnId !== turnIds[0];
+  if (waited) return null;
+  return `Langy issued the delete (tool frame ${firstDelete}) before the user's yes: ${
+    questions.length > 0
+      ? "a confirmation card was sent but answered after the delete"
+      : "no confirmation card; delete ran in the request turn"
+  }. It must ask first and delete on the user's yes.`;
+}
+
 /** One raw SSE frame's lines, dispatched to `onEntry` (README.md "local-control-fixture.ts"). */
 function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void): void {
   for (const line of frame.split("\n")) {
@@ -1396,6 +1438,7 @@ function dispatchTurnFrame(frame: string, onEntry: (entry: StreamEntry) => void)
   }
 }
 
+/** One turn's live stream, reported (README.md "local-control-fixture.ts"). */
 async function readTurnEntries({
   cookie,
   conversationId,
@@ -1417,7 +1460,9 @@ async function readTurnEntries({
     headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     signal,
   });
-  if (!response.ok || !response.body) return;
+  if (!response.ok || !response.body) {
+    throw new Error(`turn ${turnId} stream answered ${response.status}`);
+  }
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -1445,6 +1490,7 @@ interface ConversationWatchState {
   questions: QuestionAsk[];
   workspaceEvents: { state: string; name: string; root: string }[];
   turnIds: string[];
+  unreadTurns: string[];
   navigateHrefs: string[];
   toolEvents: LangyToolEvent[];
   answeredWaits: Set<string>;
@@ -1566,36 +1612,45 @@ async function answerLangyQuestion(
   });
 }
 
+/** One followed turn's stream entry, routed to what the watcher keeps of it. */
+function recordTurnEntry(state: ConversationWatchState, entry: StreamEntry, turnId: string): void {
+  if (entry.type === "local_permission") {
+    void answerLangyPermission(state, entry, turnId);
+  } else if (entry.type === "question") {
+    void answerLangyQuestion(state, entry, turnId);
+  } else if (entry.type === "navigate" && typeof entry.href === "string") {
+    state.navigateHrefs.push(entry.href);
+  } else if (entry.type === "tool") {
+    const event = toolEventOf({ entry, turnId });
+    if (event) state.toolEvents.push(event);
+  } else if (entry.type === "local_workspace") {
+    state.workspaceEvents.push({
+      state: stringField(entry.state),
+      name: stringField(entry.name),
+      root: stringField(entry.root),
+    });
+  }
+}
+
 function watchLangyTurn(state: ConversationWatchState, turnId: string): void {
   if (state.watchedTurns.has(turnId)) return;
   state.watchedTurns.add(turnId);
   state.turnIds.push(turnId);
   void (async () => {
-    const cookie = await getSessionCookie();
-    await readTurnEntries({
-      cookie,
-      conversationId: state.adapter.state.conversationId ?? "",
-      turnId,
-      signal: state.controller.signal,
-      onEntry: (entry) => {
-        if (entry.type === "local_permission") {
-          void answerLangyPermission(state, entry, turnId);
-        } else if (entry.type === "question") {
-          void answerLangyQuestion(state, entry, turnId);
-        } else if (entry.type === "navigate" && typeof entry.href === "string") {
-          state.navigateHrefs.push(entry.href);
-        } else if (entry.type === "tool") {
-          const event = toolEventOf({ entry, turnId });
-          if (event) state.toolEvents.push(event);
-        } else if (entry.type === "local_workspace") {
-          state.workspaceEvents.push({
-            state: stringField(entry.state),
-            name: stringField(entry.name),
-            root: stringField(entry.root),
-          });
-        }
-      },
-    }).catch(() => undefined);
+    try {
+      await readTurnEntries({
+        cookie: await getSessionCookie(),
+        conversationId: state.adapter.state.conversationId ?? "",
+        turnId,
+        signal: state.controller.signal,
+        onEntry: (entry) => recordTurnEntry(state, entry, turnId),
+      });
+    } catch (error) {
+      // A turn read short leaves its frames out; recorded, so order checks fail closed.
+      if (state.controller.signal.aborted) return;
+      state.unreadTurns.push(turnId);
+      console.log(`[fixture] turn ${turnId} not read: ${String(error)}`);
+    }
   })();
 }
 
@@ -1717,6 +1772,7 @@ export function watchLangyConversation({
     questions: [],
     workspaceEvents: [],
     turnIds: [],
+    unreadTurns: [],
     navigateHrefs: [],
     toolEvents: [],
     answeredWaits: new Set<string>(),
@@ -1744,6 +1800,7 @@ export function watchLangyConversation({
     navigateHrefs: state.navigateHrefs,
     toolEvents: state.toolEvents,
     turnIds: state.turnIds,
+    unreadTurns: state.unreadTurns,
     turnsStartedWithoutUs: (knownTurnIds) =>
       state.turnIds.filter((id) => !knownTurnIds.includes(id)),
     waitForNewTurn: async ({ knownTurnIds, timeoutMs = 240_000 }) =>
