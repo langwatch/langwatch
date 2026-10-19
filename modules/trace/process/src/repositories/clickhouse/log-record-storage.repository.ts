@@ -238,18 +238,30 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
 
     const client = await this.resolveClient(tenantId);
     const now = nowInstant().epochMilliseconds;
-    // The union of every trace's own window: ±2d around a hint, now-90d..now+2d without one.
-    const { fromMs, toMs } = spanningWindow({
+    // Each trace's own window: ±2d around a hint, now-90d..now+2d without one.
+    const windows = traceWindows({
       traces,
       before: DEFAULT_PARTITION_WINDOW_MS,
       after: DEFAULT_PARTITION_WINDOW_MS,
       unhinted: { fromMs: now - FALLBACK_LOOKBACK_MS, toMs: now + DEFAULT_PARTITION_WINDOW_MS },
     });
-    const timeFilter =
-      `AND ${TABLE_NAME}.TimeUnixMs >= fromUnixTimestamp64Milli({fromMs:Int64}) ` +
-      `AND ${TABLE_NAME}.TimeUnixMs <= fromUnixTimestamp64Milli({toMs:Int64})`;
-    const result = await client.query({
-      query: `
+    const perTrace = perTraceWindowFilter({
+      traceColumn: "TraceId",
+      timeColumn: `${TABLE_NAME}.TimeUnixMs`,
+    });
+
+    // The union window prunes partitions; each trace's own window bounds its rows. Only the
+    // light key columns are deduped and capped per trace; heavy ones load for the kept rows.
+    return queryWindowed<StoredLogRecordRow[]>({
+      table: TABLE_NAME,
+      hintMs: windows.centreMs,
+      windowMs: windows.halfWidthMs,
+      fallback: "none",
+      isEmpty: (rows) => rows.length === 0,
+      run: async (window) => {
+        const timeFilter = window ? window.sqlFor(`${TABLE_NAME}.TimeUnixMs`) : "";
+        const result = await client.query({
+          query: `
         SELECT
           TraceId,
           SpanId,
@@ -263,31 +275,44 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
         WHERE TenantId = {tenantId:String}
           AND TraceId IN {traceIds:Array(String)}
           ${timeFilter}
+          ${perTrace}
           AND (TenantId, TraceId, SpanId, ProjectionId, UpdatedAt) IN (
-            SELECT TenantId, TraceId, SpanId, ProjectionId, max(UpdatedAt)
-            FROM ${TABLE_NAME}
-            WHERE TenantId = {tenantId:String}
-              AND TraceId IN {traceIds:Array(String)}
-              ${timeFilter}
-            GROUP BY TenantId, TraceId, SpanId, ProjectionId
+            SELECT TenantId, TraceId, SpanId, ProjectionId, LatestUpdatedAt
+            FROM (
+              SELECT
+                TenantId,
+                TraceId,
+                SpanId,
+                ProjectionId,
+                max(UpdatedAt) AS LatestUpdatedAt,
+                argMax(${TABLE_NAME}.TimeUnixMs, UpdatedAt) AS LatestTimeUnixMs
+              FROM ${TABLE_NAME}
+              WHERE TenantId = {tenantId:String}
+                AND TraceId IN {traceIds:Array(String)}
+                ${timeFilter}
+                ${perTrace}
+              GROUP BY TenantId, TraceId, SpanId, ProjectionId
+            )
+            ORDER BY TraceId ASC, LatestTimeUnixMs ASC
+            LIMIT {limitPlusOne:UInt32} BY TraceId
           )
         ORDER BY TraceId ASC, TimeUnixMs ASC
-        LIMIT {limitPlusOne:UInt32} BY TraceId
       `,
-      query_params: {
-        tenantId,
-        traceIds: distinctTraceIds(traces),
-        limitPlusOne: limitPerTrace + 1,
-        fromMs,
-        toMs,
-      },
-      format: "JSONEachRow",
-    });
+          query_params: {
+            tenantId,
+            ...windows.params,
+            limitPlusOne: limitPerTrace + 1,
+            ...window?.params,
+          },
+          format: "JSONEachRow",
+        });
 
-    return capPerTrace({
-      rows: logRecordRowsSchema.parse(await result.json()).map(storedLogRecordRow),
-      limit: limitPerTrace,
-      tenantId,
+        return capPerTrace({
+          rows: logRecordRowsSchema.parse(await result.json()).map(storedLogRecordRow),
+          limit: limitPerTrace,
+          tenantId,
+        });
+      },
     });
   }
 
@@ -307,13 +332,24 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
     if (traces.length === 0) return [];
 
     const now = nowInstant().epochMilliseconds;
-    const { fromMs, toMs } = spanningWindow({
+    const windows = traceWindows({
       traces,
       before: LOG_RECORDS_LOOKBACK_MS,
       after: LOG_RECORDS_LOOKAHEAD_MS,
       unhinted: { fromMs: now - LOG_RECORDS_LOOKBACK_MS, toMs: now + LOG_RECORDS_LOOKAHEAD_MS },
     });
+    const perTrace = perTraceWindowFilter({
+      traceColumn: "CorrelationTraceId",
+      timeColumn: `${LOG_RECORDS_TABLE}.TimeUnixMs`,
+    });
+    const scope = `
+          TenantId = {tenantId:String}
+          AND CorrelationTraceId IN {traceIds:Array(String)}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {windowStart:DateTime64(3)}
+          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {windowEnd:DateTime64(3)}
+          ${perTrace}`;
     const client = await this.resolveClient(tenantId);
+    // The cap picks each trace's oldest record keys first; heavy columns load for those only.
     const result = await client.query({
       query: `
         SELECT
@@ -327,24 +363,31 @@ export class LogRecordStorageClickHouseRepository implements LogRecordStorageRep
           ScopeVersion,
           EventName
         FROM ${LOG_RECORDS_TABLE} FINAL
-        WHERE TenantId = {tenantId:String}
-          AND CorrelationTraceId IN {traceIds:Array(String)}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs >= {windowStart:DateTime64(3)}
-          AND ${LOG_RECORDS_TABLE}.TimeUnixMs <= {windowEnd:DateTime64(3)}
+        WHERE ${scope}
+          AND (CorrelationTraceId, ${LOG_RECORDS_TABLE}.TimeUnixMs, RecordId) IN (
+            SELECT CorrelationTraceId, ${LOG_RECORDS_TABLE}.TimeUnixMs, RecordId
+            FROM ${LOG_RECORDS_TABLE} FINAL
+            WHERE ${scope}
+            ORDER BY CorrelationTraceId ASC, TimeUnixNano ASC, RecordId ASC
+            LIMIT {limitPlusOne:UInt32} BY CorrelationTraceId
+          )
         ORDER BY CorrelationTraceId ASC, TimeUnixNano ASC, RecordId ASC
-        LIMIT {limit:UInt64} BY CorrelationTraceId
       `,
       query_params: {
         tenantId,
-        traceIds: distinctTraceIds(traces),
-        windowStart: clickHouseTimestamp(fromMs),
-        windowEnd: clickHouseTimestamp(toMs),
-        limit: limitPerTrace,
+        ...windows.params,
+        windowStart: clickHouseTimestamp(windows.fromMs),
+        windowEnd: clickHouseTimestamp(windows.toMs),
+        limitPlusOne: limitPerTrace + 1,
       },
       format: "JSONEachRow",
     });
 
-    return logRecordsRowsSchema.parse(await result.json()).map(logRecordsRow);
+    return capPerTrace({
+      rows: logRecordsRowsSchema.parse(await result.json()).map(logRecordsRow),
+      limit: limitPerTrace,
+      tenantId,
+    });
   }
 }
 
@@ -378,12 +421,8 @@ function logRecordsRow(row: z.infer<typeof logRecordsRowSchema>): StoredLogRecor
   };
 }
 
-function distinctTraceIds(traces: readonly TraceLogReadTarget[]): string[] {
-  return [...new Set(traces.map(({ traceId }) => traceId))];
-}
-
-/** The smallest window holding each trace's own: `before`/`after` its hint, `unhinted` without. */
-function spanningWindow({
+/** Each distinct trace's own window, and the union of them as a centre and half-width. */
+function traceWindows({
   traces,
   before,
   after,
@@ -393,15 +432,47 @@ function spanningWindow({
   before: number;
   after: number;
   unhinted: { fromMs: number; toMs: number };
-}): { fromMs: number; toMs: number } {
-  let fromMs = Number.POSITIVE_INFINITY;
-  let toMs = Number.NEGATIVE_INFINITY;
-  for (const { occurredAtMs } of traces) {
+}) {
+  const byTrace = new Map<string, { fromMs: number; toMs: number }>();
+  for (const { traceId, occurredAtMs } of traces) {
     const hinted = typeof occurredAtMs === "number" && occurredAtMs > 0;
-    fromMs = Math.min(fromMs, hinted ? occurredAtMs - before : unhinted.fromMs);
-    toMs = Math.max(toMs, hinted ? occurredAtMs + after : unhinted.toMs);
+    const own = hinted ? { fromMs: occurredAtMs - before, toMs: occurredAtMs + after } : unhinted;
+    const seen = byTrace.get(traceId);
+    byTrace.set(
+      traceId,
+      seen
+        ? { fromMs: Math.min(seen.fromMs, own.fromMs), toMs: Math.max(seen.toMs, own.toMs) }
+        : own,
+    );
   }
-  return { fromMs, toMs };
+  const windows = [...byTrace.values()];
+  const fromMs = Math.floor(Math.min(...windows.map((window) => window.fromMs)));
+  const toMs = Math.ceil(Math.max(...windows.map((window) => window.toMs)));
+  const centreMs = Math.floor((fromMs + toMs) / 2);
+  return {
+    fromMs,
+    toMs,
+    centreMs,
+    halfWidthMs: Math.max(centreMs - fromMs, toMs - centreMs),
+    params: {
+      traceIds: [...byTrace.keys()],
+      traceFromMs: windows.map((window) => Math.floor(window.fromMs)),
+      traceToMs: windows.map((window) => Math.ceil(window.toMs)),
+    },
+  };
+}
+
+/** Bounds each row by its own trace's window, read from arrays parallel to `traceIds`. */
+function perTraceWindowFilter({
+  traceColumn,
+  timeColumn,
+}: {
+  traceColumn: string;
+  timeColumn: string;
+}): string {
+  const at = (array: string) =>
+    `fromUnixTimestamp64Milli(arrayElement({${array}:Array(Int64)}, indexOf({traceIds:Array(String)}, ${traceColumn})))`;
+  return `AND ${timeColumn} >= ${at("traceFromMs")} AND ${timeColumn} <= ${at("traceToMs")}`;
 }
 
 /** The read asked one row past the cap per trace, so a trace holding that row was cut. */

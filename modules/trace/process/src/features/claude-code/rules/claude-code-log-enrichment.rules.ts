@@ -51,9 +51,7 @@ export type TraceLogRecordReader = Readonly<{
     }[]
   >;
 }>;
-export type TraceLogRecordReadRow = Awaited<
-  ReturnType<TraceLogRecordReader["getLogsByTraceId"]>
->[number];
+type TraceLogRecordReadRow = Awaited<ReturnType<TraceLogRecordReader["getLogsByTraceId"]>>[number];
 
 /** The same read for a batch of traces in one statement per store, keyed by trace id. */
 export type TraceLogRecordBatchReader = Readonly<{

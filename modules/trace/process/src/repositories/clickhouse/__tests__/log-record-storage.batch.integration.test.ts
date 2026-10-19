@@ -21,6 +21,9 @@ const baseMs = Date.now() - 60 * 60 * 1000;
 const BIG_TRACE = `${tag}-big`.padEnd(32, "0").slice(0, 32);
 const SMALL_TRACE = `${tag}-small`.padEnd(32, "1").slice(0, 32);
 const OTHER_TRACE = `${tag}-other`.padEnd(32, "2").slice(0, 32);
+const FAR_TRACE = `${tag}-far`.padEnd(32, "3").slice(0, 32);
+const DAY_MS = 24 * 60 * 60 * 1000;
+const farMs = baseMs - 30 * DAY_MS;
 
 let ch: ClickHouseClient;
 let repository: LogRecordStorageClickHouseRepository;
@@ -31,6 +34,37 @@ function hexId(): string {
     .replace(/[^a-f0-9]/g, "0")
     .padEnd(64, "0")
     .slice(0, 64);
+}
+
+function storedLogRow({
+  traceId,
+  spanId,
+  body,
+  timeMs,
+  updatedMs = timeMs,
+}: {
+  traceId: string;
+  spanId: string;
+  body: string;
+  timeMs: number;
+  updatedMs?: number;
+}) {
+  return {
+    ProjectionId: `${tag}-projection`,
+    TenantId: tenantId,
+    TraceId: traceId,
+    SpanId: spanId,
+    TimeUnixMs: new Date(timeMs),
+    SeverityNumber: 9,
+    SeverityText: "INFO",
+    Body: body,
+    Attributes: { "event.name": "user_prompt" },
+    ResourceAttributes: {},
+    ScopeName: "com.anthropic.claude_code.events",
+    ScopeVersion: "1.0.0",
+    CreatedAt: new Date(timeMs),
+    UpdatedAt: new Date(updatedMs),
+  };
 }
 
 function logRecordRow({
@@ -108,6 +142,49 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
         logRecordRow({ traceId: SMALL_TRACE, body: "small-1", timeMs: baseMs + 500 }),
         logRecordRow({ traceId: SMALL_TRACE, body: "small-0", timeMs: baseMs + 100 }),
         logRecordRow({ traceId: OTHER_TRACE, body: "other", timeMs: baseMs }),
+        logRecordRow({ traceId: FAR_TRACE, body: "far-own", timeMs: farMs }),
+        logRecordRow({ traceId: FAR_TRACE, body: "far-late", timeMs: baseMs }),
+      ],
+      format: "JSONEachRow",
+      clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
+    });
+    await ch.insert({
+      table: "stored_log_records",
+      values: [
+        ...Array.from({ length: 4 }, (_, index) =>
+          storedLogRow({
+            traceId: BIG_TRACE,
+            spanId: `span-${index}`,
+            body: `stored-big-${index}`,
+            timeMs: baseMs + index * 1_000,
+          }),
+        ),
+        storedLogRow({
+          traceId: SMALL_TRACE,
+          spanId: "span-0",
+          body: "stored-small-old-version",
+          timeMs: baseMs,
+          updatedMs: baseMs,
+        }),
+        storedLogRow({
+          traceId: SMALL_TRACE,
+          spanId: "span-0",
+          body: "stored-small-new-version",
+          timeMs: baseMs,
+          updatedMs: baseMs + 5_000,
+        }),
+        storedLogRow({
+          traceId: FAR_TRACE,
+          spanId: "span-0",
+          body: "stored-far-own",
+          timeMs: farMs,
+        }),
+        storedLogRow({
+          traceId: FAR_TRACE,
+          spanId: "span-1",
+          body: "stored-far-late",
+          timeMs: baseMs,
+        }),
       ],
       format: "JSONEachRow",
       clickhouse_settings: { async_insert: 0, wait_for_async_insert: 0 },
@@ -118,6 +195,10 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
     if (ch) {
       await ch.command({
         query: `ALTER TABLE log_records DELETE WHERE startsWith(TenantId, {tag:String})`,
+        query_params: { tag },
+      });
+      await ch.command({
+        query: `ALTER TABLE stored_log_records DELETE WHERE startsWith(TenantId, {tag:String})`,
         query_params: { tag },
       });
     }
@@ -158,14 +239,53 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
     });
   });
 
-  describe("when the legacy stored log records hold nothing for the batch", () => {
-    it("answers no rows from the one batched statement", async () => {
+  describe("when the legacy stored log records are read at once with a cap of two rows each", () => {
+    it("answers each trace's latest versions, oldest first, capped on its own", async () => {
       const rows = await repository.findLogsByTraceIds({
         tenantId,
-        traces: [{ traceId: BIG_TRACE, occurredAtMs: baseMs }, { traceId: SMALL_TRACE }],
+        traces: [
+          { traceId: BIG_TRACE, occurredAtMs: baseMs },
+          { traceId: SMALL_TRACE, occurredAtMs: baseMs },
+        ],
+        limitPerTrace: 2,
       });
 
-      expect(rows).toEqual([]);
+      const bodiesOf = (traceId: string) =>
+        rows.filter((row) => row.traceId === traceId).map((row) => row.body);
+      expect(bodiesOf(BIG_TRACE)).toEqual(["stored-big-0", "stored-big-1"]);
+      expect(bodiesOf(SMALL_TRACE)).toEqual(["stored-small-new-version"]);
+    });
+  });
+
+  describe("when a batch holds traces months apart", () => {
+    it("bounds each trace's stored records by its own window", async () => {
+      const rows = await repository.findLogsByTraceIds({
+        tenantId,
+        traces: [
+          { traceId: FAR_TRACE, occurredAtMs: farMs },
+          { traceId: SMALL_TRACE, occurredAtMs: baseMs },
+        ],
+      });
+
+      const bodiesOf = (traceId: string) =>
+        rows.filter((row) => row.traceId === traceId).map((row) => row.body);
+      expect(bodiesOf(FAR_TRACE)).toEqual(["stored-far-own"]);
+      expect(bodiesOf(SMALL_TRACE)).toEqual(["stored-small-new-version"]);
+    });
+
+    it("bounds each trace's log records by its own window", async () => {
+      const rows = await repository.findLogRecordsByTraceIds({
+        tenantId,
+        traces: [
+          { traceId: FAR_TRACE, occurredAtMs: farMs },
+          { traceId: SMALL_TRACE, occurredAtMs: baseMs },
+        ],
+      });
+
+      const bodiesOf = (traceId: string) =>
+        rows.filter((row) => row.traceId === traceId).map((row) => row.body);
+      expect(bodiesOf(FAR_TRACE)).toEqual(["far-own"]);
+      expect(bodiesOf(SMALL_TRACE)).toEqual(["small-0", "small-1"]);
     });
   });
 });

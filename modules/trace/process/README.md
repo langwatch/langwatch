@@ -300,7 +300,7 @@ readThreadTraces(input: { projectId: string; threadId: string; protections: unkn
 Every trace of the named threads. `maxTraces` is the ceiling across all of them together: a caller asking for many threads at once sizes it by the threads, because a ceiling below what they hold drops the rest silently.
 
 ```typescript
-readThreadsTraces(input: { projectId: string; threadIds: string[]; protections: unknown; withEditOverlay?: boolean; maxTraces?: number; }): Promise<Trace[]>;
+readThreadsTraces(input: { projectId: string; threadIds: string[]; protections: unknown; withEditOverlay?: boolean; maxTraces?: number; /** False reads the traces' summaries only: no spans, so no span content is resolved. */ withSpans?: boolean; }): Promise<Trace[]>;
 ```
 
 #### `readSampleTraces`

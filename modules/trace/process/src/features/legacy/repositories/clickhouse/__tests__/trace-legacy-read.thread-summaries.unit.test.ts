@@ -34,7 +34,9 @@ function harness() {
   });
   const spanReads = () =>
     query.mock.calls.filter(([statement]) => statement.query.includes("stored_spans"));
-  return { read, spanReads };
+  const summaryReads = () =>
+    query.mock.calls.filter(([statement]) => statement.query.includes("ts_SpanCount"));
+  return { read, spanReads, summaryReads };
 }
 
 describe("TraceLegacyReadClickHouseRepository thread reads", () => {
@@ -54,6 +56,24 @@ describe("TraceLegacyReadClickHouseRepository thread reads", () => {
       expect(traces).toHaveLength(1);
       expect(traces[0]?.spans).toEqual([]);
       expect(spanReads()).toHaveLength(0);
+    });
+
+    it("leaves the captured input and output out of the summary read", async () => {
+      const { read, summaryReads } = harness();
+
+      await read.findTracesWithSpansByThreadIds({
+        authorization: ownProof({ projectId: PROJECT_ID }),
+        projectId: PROJECT_ID,
+        threadIds: ["thread-1"],
+        protections: PROTECTIONS,
+        opts: { withSpans: false },
+      });
+
+      const statements = summaryReads().map(([statement]) => statement.query);
+      expect(statements).not.toHaveLength(0);
+      for (const statement of statements) {
+        expect(statement).not.toMatch(/\bComputedInput\b|\bComputedOutput\b/);
+      }
     });
   });
 

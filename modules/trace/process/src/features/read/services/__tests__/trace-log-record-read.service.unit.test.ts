@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Spec: modules/trace/specs/trace-log-record-read.feature
  */
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
 import {
@@ -29,12 +30,13 @@ const row: StoredLogRecordRow = {
 function makeService({ storedRows = [row] } = {}) {
   const getLogsByTraceId = vi.fn().mockResolvedValue(storedRows);
   const getLogRecordsByTraceId = vi.fn().mockResolvedValue([]);
-  const repository: LogRecordStorageRepository = {
-    findLogsByTraceId: getLogsByTraceId,
-    findLogRecordsByTraceId: getLogRecordsByTraceId,
-    findLogsByTraceIds: vi.fn().mockResolvedValue([]),
-    findLogRecordsByTraceIds: vi.fn().mockResolvedValue([]),
-  };
+  const repository = createApiFixture<LogRecordStorageRepository>(
+    {
+      findLogsByTraceId: getLogsByTraceId,
+      findLogRecordsByTraceId: getLogRecordsByTraceId,
+    },
+    "log record storage",
+  );
   return {
     service: LogRecordStorageService.create({ repository }),
     getLogsByTraceId,
