@@ -86,6 +86,13 @@ Feature: HTTP agent credentials
     And its progress moves past that agent's project
 
   @unit
+  Scenario: A config the credential step produced that fails validation holds the step
+    Given an HTTP agent whose stored config is valid
+    And the config the step produced for it fails the agent config schema
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and the step fails naming that agent and the error kind
+
+  @unit
   Scenario: A credential already stored as a project secret is referenced, not stored again
     Given an HTTP agent whose literal credential is already the value of its project secret
     When the agent credential upgrade step runs

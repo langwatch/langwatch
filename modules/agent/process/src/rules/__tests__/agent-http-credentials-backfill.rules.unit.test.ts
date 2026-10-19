@@ -14,9 +14,14 @@ describe("the agent credential step's failure reasons", () => {
     it("names the reason by code, whether or not the error crossed a boundary", () => {
       expect(keptReasonOf(new SecretNotFoundError())).toBe("project_not_found");
       expect(keptReasonOf({ code: "secret_limit_reached" })).toBe("secret_limit_reached");
-      expect(keptReasonOf(z.object({ url: z.string() }).safeParse({}).error)).toBe(
-        "config_invalid",
-      );
+    });
+
+    /** @scenario "A config the credential step produced that fails validation holds the step" */
+    it("does not treat a schema error as permanent, since where it happened decides", () => {
+      const schemaError = z.object({ url: z.string() }).safeParse({}).error;
+
+      expect(keptReasonOf(schemaError)).toBeUndefined();
+      expect(failureReasonOf(schemaError)).toBe("ZodError");
     });
   });
 

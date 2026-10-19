@@ -1,5 +1,3 @@
-import { isZodLikeError } from "@langwatch/handled-error";
-
 /** Why the credential step left an agent's literal where it is; a retry never changes these. */
 export type AgentCredentialKeptReason =
   | "project_not_found"
@@ -33,9 +31,12 @@ function codeOf(error: unknown): string | undefined {
   return typeof error.code === "string" ? error.code : undefined;
 }
 
-/** The permanent reason behind a failed move, or undefined when a retry may succeed. */
+/**
+ * The permanent reason behind a failed move, or undefined when a retry may succeed. A schema
+ * error is deliberately not here: where it happened decides, and the service classifies the
+ * agent's stored config (`config_invalid`) before the move; one thrown later is our own bug.
+ */
 export function keptReasonOf(error: unknown): AgentCredentialKeptReason | undefined {
-  if (isZodLikeError(error)) return "config_invalid";
   const code = codeOf(error);
 
   return code === undefined ? undefined : KEPT_REASON_BY_CODE[code];

@@ -28,6 +28,8 @@ async function build(
   options: {
     refused?: { projectId: string; error: unknown };
     savedDuringMove?: boolean;
+    storedConfig?: { config: unknown };
+    producedConfig?: unknown;
     stored?: Record<string, Record<string, string>>;
   } = {},
 ) {
@@ -56,11 +58,17 @@ async function build(
   await seed({ id: "agent_ref", projectId: "project_b", token: "{{ secrets.ALREADY }}" });
 
   const agents = AgentService.create(repository);
+  const realSecrets = AgentHttpSecretsService.create({ secrets, agents });
   const saved: AgentHttpCredentialsBackfillReport[] = [];
   const backfill = AgentHttpCredentialsBackfillService.create({
     agents: {
       findProjectIdsWithHttpAgents: () => repository.findProjectIdsWithHttpAgents(),
-      findAll: (input) => repository.findAll(input),
+      findAll: async (input) =>
+        (await repository.findAll(input)).map((agent) =>
+          agent.id === "agent_a" && options.storedConfig
+            ? ({ ...agent, config: options.storedConfig.config } as typeof agent)
+            : agent,
+        ),
       getByIdIncludingArchived: (input) => repository.getByIdIncludingArchived(input),
       updateConfigIfUnchanged: async (input) => {
         if (!options.savedDuringMove) return repository.updateConfigIfUnchanged(input);
@@ -75,7 +83,14 @@ async function build(
         return false;
       },
     },
-    httpSecrets: AgentHttpSecretsService.create({ secrets, agents }),
+    httpSecrets: options.producedConfig
+      ? {
+          forUpdate: async (input) => ({
+            ...(await realSecrets.forUpdate(input)),
+            config: options.producedConfig as ReturnType<typeof httpConfig>,
+          }),
+        }
+      : realSecrets,
   });
   const run = (input: { dryRun?: boolean; afterProjectId?: string } = {}) =>
     backfill.moveLiterals({
@@ -193,6 +208,31 @@ describe("the agent credential step moving inline HTTP agent credentials to proj
     expect(report.kept).toEqual([
       { agentId: "agent_a", projectId: "project_a", reason: "secret_limit_reached" },
     ]);
+    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+  });
+
+  /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
+  it("completes, keeping the literal as config_invalid, when the stored config is invalid", async () => {
+    const { run, configOf } = await build({
+      storedConfig: { config: { ...httpConfig(TOKEN), url: 42 } },
+    });
+
+    const report = await run();
+
+    expect(report).toMatchObject({
+      held: 0,
+      kept: [{ agentId: "agent_a", projectId: "project_a", reason: "config_invalid" }],
+      failed: [],
+    });
+    expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
+  });
+
+  /** @scenario "A config the credential step produced that fails validation holds the step" */
+  it("fails the step naming the agent when the config it produced is invalid", async () => {
+    const { run, configOf } = await build({ producedConfig: { ...httpConfig("x"), url: 42 } });
+
+    await expect(run()).rejects.toThrow(/agent agent_a in project project_a: ZodError/);
+
     expect(await configOf("agent_a", "project_a")).toContain(TOKEN);
   });
 

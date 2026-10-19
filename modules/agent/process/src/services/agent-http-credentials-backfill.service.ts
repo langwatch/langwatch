@@ -103,7 +103,18 @@ export class AgentHttpCredentialsBackfillService {
     report: AgentHttpCredentialsBackfillReport;
   }): Promise<void> {
     for (const agent of await this.deps.agents.findAll({ projectId })) {
-      if (agent.type !== "http" || !(await holdsLiteral(agent.config))) continue;
+      if (agent.type !== "http") continue;
+      // The stored config is validated before the move, so a schema error later is ours to fix.
+      if (!httpAgentConfigSchema.safeParse(agent.config).success) {
+        if (!dryRun)
+          this.record({
+            report,
+            agent: { agentId: agent.id, projectId },
+            outcome: { kind: "kept", reason: "config_invalid" },
+          });
+        continue;
+      }
+      if (!(await holdsLiteral(agent.config))) continue;
       if (dryRun) {
         report.moved += 1;
         continue;
