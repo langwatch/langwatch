@@ -121,7 +121,9 @@ describe("ProcessManagerService", () => {
 
       /** @scenario "A process manager redelivery stands down before reading its state" */
       it("neither reads nor evolves the state nor opens a commit", async () => {
-        const evolve = vi.fn(pilotDefinition.evolve);
+        const evolve = vi.fn<typeof pilotDefinition.evolve>((...args) =>
+          pilotDefinition.evolve(...args),
+        );
         const redelivered = new ProcessManagerService({
           definition: { ...pilotDefinition, evolve },
           store,
