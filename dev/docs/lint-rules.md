@@ -509,7 +509,7 @@ Messages:
   - fix: Add the subject to the filename. Read the `process-module` skill.
   - why: The subject names what the file is about, so readers find it and the catalogue can check its owner.
 - `contractProcessArtifact`
-  - what: `{{name}}` is a process artifact: contract source holds none of `.api`, `.channel`, `.composition`, `.intent`, `.mapper`, `.migration`, `.process`, `.projection`, `.repository`, `.rules`, `.store`, `.subscriber`, `.task`.
+  - what: `{{name}}` is a process artifact: contract source holds none of `.api`, `.channel`, `.composition`, `.intent`, `.mapper`, `.migration`, `.process`, `.projection`, `.repository`, `.rules`, `.script`, `.store`, `.subscriber`, `.task`.
   - fix: Move it into `modules/{{feature}}/process/src/`: `.repository`, `.store` and `.mapper` under `repositories/`, `.channel` under `channels/`, `.projection`, `.subscriber`, `.process` and `.intent` under `eventing/`, `.rules` under `rules/`, `.task` under `tasks/`, `.migration` under `migrations/`, and any `.api` other than `{{feature}}.api.ts` as `transport/{{feature}}.<rest|trpc|ws>.ts`.
   - why: A contract is the module's public, runtime-neutral surface; a process artifact there leaks internals.
 - `processManagerService`
