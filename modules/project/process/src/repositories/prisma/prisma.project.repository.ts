@@ -41,8 +41,7 @@ import {
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
-  ProjectBackfillPage,
-  ProjectBackfillRow,
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -415,7 +414,7 @@ export class PrismaProjectRepository
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillPage> {
+  }): Promise<ProjectBackfillEntry[]> {
     const rows = await this.prisma.project.findMany({
       where: afterId === null ? {} : { id: { gt: afterId } },
       orderBy: { id: "asc" },
@@ -445,28 +444,25 @@ export class PrismaProjectRepository
         },
       },
     });
-    const projects: ProjectBackfillRow[] = [];
-    const orphanIds: string[] = [];
-    for (const row of rows) {
+    return rows.map((row): ProjectBackfillEntry => {
       // relationMode "prisma" keeps no foreign keys: a deleted team or organization leaves this.
       const organization = row.team?.organization;
-      if (!organization) {
-        orphanIds.push(row.id);
-        continue;
-      }
-      projects.push({
-        id: row.id,
-        createdAt: fromDate(row.createdAt),
-        organizationId: row.team.organizationId,
-        teamId: row.teamId,
-        isPersonal: row.isPersonal,
-        departmentId: row.departmentId,
-        presenceEnabled: row.presenceEnabled,
-        isArchived: row.archivedAt !== null,
-        adminUserId: organization.members[0]?.userId ?? null,
-      });
-    }
-    return { projects, orphanIds, lastId: rows.at(-1)?.id ?? null };
+      if (!organization) return { kind: "orphan", id: row.id };
+      return {
+        kind: "whole",
+        project: {
+          id: row.id,
+          createdAt: fromDate(row.createdAt),
+          organizationId: row.team.organizationId,
+          teamId: row.teamId,
+          isPersonal: row.isPersonal,
+          departmentId: row.departmentId,
+          presenceEnabled: row.presenceEnabled,
+          isArchived: row.archivedAt !== null,
+          adminUserId: organization.members[0]?.userId ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {

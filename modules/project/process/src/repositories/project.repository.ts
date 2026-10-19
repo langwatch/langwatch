@@ -60,15 +60,12 @@ export type ProjectBackfillRow = Readonly<{
 }>;
 
 /**
- * A page of the projects table for the facts step. `orphanIds` are projects whose team or
- * organization is gone, so nothing can be recorded for them; `lastId` is the page's last id of
- * either kind, the cursor that continues it, and null once nothing is left.
+ * One row of the projects table for the facts step: a whole project, or an orphan whose team or
+ * organization is gone, so nothing can be recorded for it.
  */
-export type ProjectBackfillPage = Readonly<{
-  projects: ProjectBackfillRow[];
-  orphanIds: string[];
-  lastId: string | null;
-}>;
+export type ProjectBackfillEntry =
+  | Readonly<{ kind: "whole"; project: ProjectBackfillRow }>
+  | Readonly<{ kind: "orphan"; id: string }>;
 
 /** Persistence owned by the Project module. It never crosses into a caller. */
 export interface ProjectRepository {
@@ -108,8 +105,11 @@ export interface ProjectRepository {
   touchCodingAgentSessionSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
-  /** Every project, archived ones included, in id order after `afterId`. */
-  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillPage>;
+  /** Every project, archived ones included, in id order after `afterId`; empty at the end. */
+  findBackfillPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillEntry[]>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;

@@ -6,7 +6,10 @@ import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectBackfillRow } from "../../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectBackfillRow,
+} from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import {
   ProjectFactsBackfillService,
@@ -85,11 +88,10 @@ function stepOver(
         reads.push(afterId);
         const ids = [...projects.map((project) => project.id), ...orphanIds].toSorted();
         const page = ids.filter((id) => afterId === null || id > afterId).slice(0, 2);
-        return {
-          projects: projects.filter((project) => page.includes(project.id)),
-          orphanIds: orphanIds.filter((id) => page.includes(id)),
-          lastId: page.at(-1) ?? null,
-        };
+        return page.map((id): ProjectBackfillEntry => {
+          const project = projects.find((candidate) => candidate.id === id);
+          return project ? { kind: "whole", project } : { kind: "orphan", id };
+        });
       },
     },
     lifecycle,

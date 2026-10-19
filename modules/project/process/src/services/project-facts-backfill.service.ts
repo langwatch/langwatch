@@ -68,26 +68,33 @@ export class ProjectFactsBackfillService {
       // Taken before the read, so a change saved meanwhile is the newer fact.
       const occurredAt = nowInstant().epochMilliseconds;
       const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
-      if (page.lastId === null) break;
-      const live: ProjectBackfillRow[] = page.projects.filter((project) => !project.isArchived);
-      if (!dryRun && page.projects.length > 0) {
-        await this.deps.lifecycle.recordBackfillPage({ created: page.projects, live, occurredAt });
+      const last = page.at(-1);
+      if (!last) break;
+      const projects: ProjectBackfillRow[] = [];
+      const orphanIds: string[] = [];
+      for (const entry of page) {
+        if (entry.kind === "whole") projects.push(entry.project);
+        else orphanIds.push(entry.id);
       }
-      for (const projectId of page.orphanIds) {
+      const live: ProjectBackfillRow[] = projects.filter((project) => !project.isArchived);
+      if (!dryRun && projects.length > 0) {
+        await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
+      }
+      for (const projectId of orphanIds) {
         this.deps.logger.warn(
           { projectId },
           "the project facts step skipped a project whose team or organization no longer exists",
         );
       }
-      report.projects += page.projects.length;
+      report.projects += projects.length;
       report.departmentAssignments += live.length;
       report.presenceSettings += live.length;
-      report.skippedOrphans += page.orphanIds.length;
-      report.orphanProjectIds = [...report.orphanProjectIds, ...page.orphanIds].slice(
+      report.skippedOrphans += orphanIds.length;
+      report.orphanProjectIds = [...report.orphanProjectIds, ...orphanIds].slice(
         0,
         ORPHAN_IDS_REPORTED,
       );
-      cursor = page.lastId;
+      cursor = last.kind === "whole" ? last.project.id : last.id;
       if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
     }
     return report;

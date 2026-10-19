@@ -39,8 +39,7 @@ import {
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
-  ProjectBackfillPage,
-  ProjectBackfillRow,
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -245,33 +244,30 @@ export class MemoryProjectRepository implements ProjectRepository {
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillPage> {
+  }): Promise<ProjectBackfillEntry[]> {
     const page = this.#database
       .projects()
       .filter((project) => afterId === null || project.id > afterId)
       .toSorted((left, right) => (left.id < right.id ? -1 : 1))
       .slice(0, limit);
-    const projects: ProjectBackfillRow[] = [];
-    const orphanIds: string[] = [];
-    for (const project of page) {
+    return page.map((project): ProjectBackfillEntry => {
       const organization = this.#database.findOrganizationOf(project);
-      if (!organization) {
-        orphanIds.push(project.id);
-        continue;
-      }
-      projects.push({
-        id: project.id,
-        createdAt: fromDate(project.createdAt),
-        organizationId: organization.id,
-        teamId: project.teamId,
-        isPersonal: project.isPersonal,
-        departmentId: project.departmentId,
-        presenceEnabled: project.presenceEnabled,
-        isArchived: project.archivedAt !== null,
-        adminUserId: organization.adminUserIds[0] ?? null,
-      });
-    }
-    return { projects, orphanIds, lastId: page.at(-1)?.id ?? null };
+      if (!organization) return { kind: "orphan", id: project.id };
+      return {
+        kind: "whole",
+        project: {
+          id: project.id,
+          createdAt: fromDate(project.createdAt),
+          organizationId: organization.id,
+          teamId: project.teamId,
+          isPersonal: project.isPersonal,
+          departmentId: project.departmentId,
+          presenceEnabled: project.presenceEnabled,
+          isArchived: project.archivedAt !== null,
+          adminUserId: organization.adminUserIds[0] ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {

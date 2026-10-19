@@ -28,7 +28,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectRepository,
+} from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -158,7 +161,7 @@ class StubRepository implements ProjectRepository {
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
-  findBackfillPage = vi.fn(async () => ({ projects: [], orphanIds: [], lastId: null }));
+  findBackfillPage = vi.fn(async (): Promise<ProjectBackfillEntry[]> => []);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
