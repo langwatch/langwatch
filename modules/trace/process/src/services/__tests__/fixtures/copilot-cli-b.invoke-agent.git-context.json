@@ -1,0 +1,44 @@
+{
+	"scopeName": "github.copilot",
+	"spanName": "invoke_agent",
+	"vendorVersion": "1.0.79-2",
+	"resourceAttributes": {
+		"service.name": "github-copilot",
+		"service.version": "1.0.79-2"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "invoke_agent",
+		"gen_ai.provider.name": "github",
+		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000011",
+		"gen_ai.request.model": "auto",
+		"gen_ai.agent.id": "github.copilot.default",
+		"gen_ai.agent.version": "1.0.79-2",
+		"enduser.pseudo.id": "2bee93967305808e11093872671cc8be",
+		"github.copilot.git.repository": "example-org/repo-a",
+		"github.copilot.github.org": "example-org",
+		"github.copilot.git.branch": "feature/repo-a-work",
+		"github.copilot.git.commit_sha": "04788f3768a37851b7cd84e574d9a5121c0f9c4d",
+		"github.copilot.context.skills": "[\"skill-a\",\"skill-b\"]",
+		"github.copilot.context.custom_agent_names": "[]",
+		"github.copilot.agent.type": "builtin",
+		"gen_ai.response.finish_reasons": [
+			"stop"
+		],
+		"gen_ai.usage.input_tokens": 33303,
+		"gen_ai.usage.output_tokens": 1339,
+		"gen_ai.usage.cache_read.input_tokens": 17024,
+		"gen_ai.usage.reasoning.output_tokens": 1152,
+		"github.copilot.nano_aiu": 717335000.0,
+		"github.copilot.turn_count": 2,
+		"gen_ai.tool.definitions": "[{\"type\":\"function\",\"name\":\"bash\"},{\"type\":\"function\",\"name\":\"read_bash\"},{\"type\":\"function\",\"name\":\"stop_bash\"}]"
+	},
+	"events": [
+		{
+			"name": "github.copilot.user.message",
+			"attributes": {
+				"github.copilot.user.message.source": "user",
+				"github.copilot.user.message.interaction_id": "00000000-0000-4000-8000-000000000012"
+			}
+		}
+	]
+}

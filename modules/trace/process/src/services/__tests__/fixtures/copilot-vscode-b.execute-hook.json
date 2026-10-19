@@ -1,0 +1,23 @@
+{
+	"scopeName": "copilot-chat",
+	"spanName": "execute_hook SessionStart",
+	"vendorVersion": "0.67.0",
+	"resourceAttributes": {
+		"service.name": "copilot-chat",
+		"service.version": "0.67.0",
+		"session.id": "00000000-0000-4000-8000-0000000000131792414498335"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "execute_hook",
+		"copilot_chat.hook_type": "SessionStart",
+		"copilot_chat.hook_command": "<redacted>",
+		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.session_id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.chat_session_id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.hook_input": "{\"timestamp\":\"<redacted>\",\"hook_event_name\":\"SessionStart\",\"session_id\":\"<redacted>\",\"transcript_path\":\"<redacted>\",\"source\":\"new\",\"model\":\"<redacted>\",\"cwd\":\"<redacted>\"}",
+		"github.copilot.hook.duration": 0.09009504200000083,
+		"copilot_chat.hook_result_kind": "success",
+		"github.copilot.hook.decision": "pass"
+	},
+	"events": []
+}

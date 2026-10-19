@@ -1,0 +1,136 @@
+{
+	"vendorVersion": "1.0.100-1",
+	"invocations": [
+		{
+			"hook": "userPromptSubmitted",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414224521,
+				"cwd": "/home/dev/work/repo-a",
+				"prompt": "<redacted>"
+			}
+		},
+		{
+			"hook": "sessionStart",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR",
+				"COPILOT_TRACEPARENT"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414224551,
+				"cwd": "/home/dev/work/repo-a",
+				"source": "new",
+				"initialPrompt": "<redacted>",
+				"traceparent": "00-f46916ba5573f5172d9047c52197cf84-0803031ce5cd0521-01"
+			}
+		},
+		{
+			"hook": "preToolUse",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR",
+				"COPILOT_TRACEPARENT"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414226617,
+				"cwd": "/home/dev/work/repo-a",
+				"toolName": "rg",
+				"toolArgs": {
+					"pattern": "<redacted>",
+					"paths": [
+						"<redacted>"
+					],
+					"glob": "<redacted>",
+					"output_mode": "<redacted>",
+					"head_limit": 20
+				},
+				"traceparent": "00-f46916ba5573f5172d9047c52197cf84-0803031ce5cd0521-01"
+			}
+		},
+		{
+			"hook": "postToolUse",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR",
+				"COPILOT_TRACEPARENT"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414226769,
+				"cwd": "/home/dev/work/repo-a",
+				"toolName": "rg",
+				"toolArgs": {
+					"pattern": "<redacted>",
+					"paths": [
+						"<redacted>"
+					],
+					"glob": "<redacted>",
+					"output_mode": "<redacted>",
+					"head_limit": 20
+				},
+				"toolResult": {
+					"resultType": "<redacted>",
+					"textResultForLlm": "<redacted>"
+				},
+				"traceparent": "00-f46916ba5573f5172d9047c52197cf84-0803031ce5cd0521-01"
+			}
+		},
+		{
+			"hook": "agentStop",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR",
+				"COPILOT_TRACEPARENT"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414228821,
+				"cwd": "/home/dev/work/repo-a",
+				"transcriptPath": "/home/dev/.copilot/session-state/00000000-0000-4000-8000-000000000001/events.jsonl",
+				"stopReason": "<redacted>",
+				"stop_hook_active": false,
+				"traceparent": "00-f46916ba5573f5172d9047c52197cf84-0803031ce5cd0521-01"
+			}
+		},
+		{
+			"hook": "sessionEnd",
+			"envNames": [
+				"COPILOT_CLI",
+				"COPILOT_CLI_BINARY_VERSION",
+				"COPILOT_CLI_RESOLVED_DIST_DIR",
+				"COPILOT_HOOK_DIR",
+				"COPILOT_PROJECT_DIR",
+				"COPILOT_TRACEPARENT"
+			],
+			"payload": {
+				"sessionId": "00000000-0000-4000-8000-000000000001",
+				"timestamp": 1792414228842,
+				"cwd": "/home/dev/work/repo-a",
+				"reason": "<redacted>",
+				"traceparent": "00-f46916ba5573f5172d9047c52197cf84-0803031ce5cd0521-01"
+			}
+		}
+	]
+}

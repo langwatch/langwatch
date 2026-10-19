@@ -1,0 +1,42 @@
+{
+	"scopeName": "copilot-chat",
+	"spanName": "chat gpt-4o-mini-2024-07-18",
+	"vendorVersion": "0.67.0",
+	"resourceAttributes": {
+		"service.name": "copilot-chat",
+		"service.version": "0.67.0",
+		"session.id": "00000000-0000-4000-8000-0000000000131792414498335"
+	},
+	"attributes": {
+		"gen_ai.operation.name": "chat",
+		"gen_ai.provider.name": "github",
+		"gen_ai.request.model": "gpt-4o-mini-2024-07-18",
+		"gen_ai.request.max_tokens": 4096,
+		"gen_ai.request.temperature": 0.1,
+		"gen_ai.request.top_p": 1,
+		"copilot_chat.request.max_prompt_tokens": 12285,
+		"copilot_chat.parent_chat_session_id": "00000000-0000-4000-8000-000000000014",
+		"copilot_chat.debug_log_label": "<redacted>",
+		"gen_ai.agent.name": "title",
+		"copilot_chat.user_request": "<redacted>",
+		"gen_ai.system_instructions": "[{\"type\":\"text\",\"content\":\"<redacted>\"}]",
+		"gen_ai.input.messages": "[{\"role\":\"user\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]}]",
+		"copilot_chat.request.options": "{\"stream\":true}",
+		"copilot_chat.request.shape": "{\"api\":\"messages\",\"messageCount\":2}",
+		"gen_ai.usage.input_tokens": 270,
+		"gen_ai.usage.output_tokens": 4,
+		"gen_ai.response.model": "gpt-4o-mini-2024-07-18",
+		"gen_ai.response.id": "<id>",
+		"gen_ai.response.finish_reasons": [
+			"stop"
+		],
+		"gen_ai.usage.cache_read.input_tokens": 0,
+		"copilot_chat.time_to_first_token": 368,
+		"gen_ai.request.stream": true,
+		"gen_ai.response.time_to_first_chunk": 0.378,
+		"copilot_chat.server_request_id": "<server_request_id>",
+		"copilot_chat.copilot_usage_nano_aiu": 0,
+		"gen_ai.output.messages": "[{\"role\":\"assistant\",\"parts\":[{\"type\":\"text\",\"content\":\"<redacted>\"}]}]"
+	},
+	"events": []
+}
