@@ -13,7 +13,7 @@ const ENTRIES = {
 
 function surfaceOf(moduleExports: Record<string, unknown>): string[] {
   return Object.keys(moduleExports)
-    .sort()
+    .toSorted()
     .map((name) => {
       const value = moduleExports[name];
       if (
@@ -24,7 +24,7 @@ function surfaceOf(moduleExports: Record<string, unknown>): string[] {
       }
       const methods = Object.getOwnPropertyNames(value.prototype as object)
         .filter((method) => method !== "constructor")
-        .sort();
+        .toSorted();
       return `${name}: class [${methods.join(", ")}]`;
     });
 }

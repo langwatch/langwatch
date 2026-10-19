@@ -66,6 +66,37 @@ function contractVisitors(context, source) {
   return {};
 }
 
+function rulesVisitors(context, sourcePath) {
+  let reported = false;
+  const report = (node, found) => {
+    if (reported) return;
+    reported = true;
+    context.report({
+      node,
+      messageId: "rulesImpurity",
+      data: { path: sourcePath, found },
+    });
+  };
+  return {
+    ClassDeclaration(node) {
+      report(node, "a class");
+    },
+    ClassExpression(node) {
+      report(node, "a class");
+    },
+    NewExpression(node) {
+      const pureValue =
+        node.callee?.type === "Identifier" &&
+        PURE_VALUE_CONSTRUCTORS.has(node.callee.name) &&
+        !definitionOf(context, node.callee);
+      if (pureValue || isPureThrownError(context, node)) {
+        return;
+      }
+      report(node, "a `new` expression");
+    },
+  };
+}
+
 export const featureSourceLayoutRule = defineRule({
   name: "feature-source-layout",
   kind: "problem",
@@ -150,36 +181,7 @@ export const featureSourceLayoutRule = defineRule({
       };
     }
 
-    if (RULES_PATTERN.test(sourcePath)) {
-      let reported = false;
-      const report = (node, found) => {
-        if (reported) return;
-        reported = true;
-        context.report({
-          node,
-          messageId: "rulesImpurity",
-          data: { path: sourcePath, found },
-        });
-      };
-      return {
-        ClassDeclaration(node) {
-          report(node, "a class");
-        },
-        ClassExpression(node) {
-          report(node, "a class");
-        },
-        NewExpression(node) {
-          const pureValue =
-            node.callee?.type === "Identifier" &&
-            PURE_VALUE_CONSTRUCTORS.has(node.callee.name) &&
-            !definitionOf(context, node.callee);
-          if (pureValue || isPureThrownError(context, node)) {
-            return;
-          }
-          report(node, "a `new` expression");
-        },
-      };
-    }
+    if (RULES_PATTERN.test(sourcePath)) return rulesVisitors(context, sourcePath);
 
     const hasHome =
       role === "framework"

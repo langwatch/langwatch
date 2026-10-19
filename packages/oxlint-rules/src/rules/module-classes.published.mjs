@@ -33,22 +33,26 @@ function specifierNames(statement) {
   return statement.specifiers.map((item) => item.local?.name ?? item.local?.value);
 }
 
+function addStatementExports({ filename, statement, names, visited }) {
+  if (statement.type === "ExportAllDeclaration") {
+    const target = resolveRelative({ from: filename, specifier: statement.source.value });
+    if (target) collectExports({ filename: target, names, visited });
+    return;
+  }
+  if (statement.type !== "ExportNamedDeclaration") return;
+  const found = statement.declaration
+    ? declaredName(statement.declaration)
+    : specifierNames(statement);
+  for (const name of found) if (name) names.add(name);
+}
+
 /** Every name a file exports, following `export *` and leaving named re-exports as names. */
 function collectExports({ filename, names, visited }) {
   if (visited.has(filename)) return;
   visited.add(filename);
   const { program } = parseFile(filename);
   for (const statement of program.body) {
-    if (statement.type === "ExportAllDeclaration") {
-      const target = resolveRelative({ from: filename, specifier: statement.source.value });
-      if (target) collectExports({ filename: target, names, visited });
-      continue;
-    }
-    if (statement.type !== "ExportNamedDeclaration") continue;
-    const found = statement.declaration
-      ? declaredName(statement.declaration)
-      : specifierNames(statement);
-    for (const name of found) if (name) names.add(name);
+    addStatementExports({ filename, statement, names, visited });
   }
 }
 

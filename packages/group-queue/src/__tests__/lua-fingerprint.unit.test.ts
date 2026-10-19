@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import type * as NodeCrypto from "node:crypto";
 import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -8,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 const captured = vi.hoisted(() => ({ sources: [] as string[] }));
 
 vi.mock("node:crypto", async (importOriginal) => {
-  const real = await importOriginal<typeof import("node:crypto")>();
+  const real = await importOriginal<typeof NodeCrypto>();
   return {
     ...real,
     createHash: (algorithm: string, ...rest: unknown[]) => {
@@ -18,10 +19,12 @@ vi.mock("node:crypto", async (importOriginal) => {
       );
       if (algorithm !== "sha1") return hash;
       const update = hash.update.bind(hash) as (data: unknown, ...more: unknown[]) => unknown;
-      (hash as unknown as { update: unknown }).update = (data: unknown, ...more: unknown[]) => {
-        if (typeof data === "string") captured.sources.push(data);
-        return update(data, ...more);
-      };
+      Object.defineProperty(hash, "update", {
+        value: (data: unknown, ...more: unknown[]) => {
+          if (typeof data === "string") captured.sources.push(data);
+          return update(data, ...more);
+        },
+      });
       return hash;
     },
   };
@@ -53,15 +56,18 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
   "STAGE_LUA",
   "TAKE_LUA",
   "TRANSFER_LUA",
-].sort();
+].toSorted();
 
-/** Exported `*_LUA` constants not reachable from a package entry; hashed through their composers. */
+/**
+ * Exported `*_LUA` constants not reachable from a package entry;
+ * hashed through their composers.
+ */
 const EXPECTED_UNREACHABLE_EXPORTED_LUA = [
   "BLOB_LEASE_HELPER_LUA",
   "CLAIMED_RECORD_HELPER_LUA",
   "GQ_BLOB_GRACE_LUA",
   "ROUTING_META_HELPER_LUA",
-].sort();
+].toSorted();
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -75,7 +81,7 @@ function sourceFiles(dir: string): string[] {
 function scan(pattern: RegExp): string[] {
   return sourceFiles(srcDir)
     .flatMap((file) => [...readFileSync(file, "utf8").matchAll(pattern)].map((m) => m[1]!))
-    .sort();
+    .toSorted();
 }
 
 function sha1(text: string): string {
@@ -86,7 +92,7 @@ function exportedLuaConstants(): Record<string, string> {
   const found: Record<string, string> = {};
   for (const entry of [root, operational] as Record<string, unknown>[]) {
     for (const [name, value] of Object.entries(entry)) {
-      if (/_LUA$/.test(name) && typeof value === "string") found[name] = value;
+      if (name.endsWith("_LUA") && typeof value === "string") found[name] = value;
     }
   }
   return found;
@@ -106,7 +112,9 @@ describe("group-queue Lua fingerprint", () => {
         const head = source.split("\n").find((line) => line.trim() !== "") ?? "";
         map[`cached:${sha1(source)}`] = `${source.length}b ${head.trim().slice(0, 60)}`;
       }
-      const sorted = Object.fromEntries(Object.entries(map).sort(([a], [b]) => a.localeCompare(b)));
+      const sorted = Object.fromEntries(
+        Object.entries(map).toSorted(([a], [b]) => a.localeCompare(b)),
+      );
 
       expect(sorted).toMatchSnapshot();
     });
@@ -127,8 +135,8 @@ describe("group-queue Lua fingerprint", () => {
     it("names every exported Lua constant", () => {
       const reachable = Object.keys(exportedLuaConstants());
       const inSource = scan(/export const (\w+_LUA)\b/g);
-      expect([...new Set(inSource)].sort()).toEqual(
-        [...reachable, ...EXPECTED_UNREACHABLE_EXPORTED_LUA].sort(),
+      expect([...new Set(inSource)].toSorted()).toEqual(
+        [...reachable, ...EXPECTED_UNREACHABLE_EXPORTED_LUA].toSorted(),
       );
     });
   });
