@@ -387,6 +387,8 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		// Reason: left legacyInert when evaluator get gained name resolution; its
+		// scenarios are enforced. The other CLI scenarios stay untagged.
 		"specs/evaluators/evaluator-cli.feature",
 		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",

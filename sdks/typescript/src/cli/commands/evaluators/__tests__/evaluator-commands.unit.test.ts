@@ -444,6 +444,7 @@ describe("deleteEvaluatorCommand()", () => {
       expect(getAll).not.toHaveBeenCalled();
     });
 
+    /** @scenario Delete an evaluator by display name is refused */
     it("tells the user to pass the id or slug and how to find it", async () => {
       mockGet.mockRejectedValue(evaluatorNotFound());
 
@@ -452,6 +453,7 @@ describe("deleteEvaluatorCommand()", () => {
       expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
         exactLookupMissMessage("Test Evaluator"),
       );
+      expect(mockDelete).not.toHaveBeenCalled();
     });
 
     it("keeps the evaluator_not_found code", async () => {
@@ -577,6 +579,7 @@ describe("updateEvaluatorCommand()", () => {
   });
 
   describe("when the reference is a display name", () => {
+    /** @scenario Update an evaluator by display name is refused */
     it("tells the user to pass the id or slug and how to find it", async () => {
       mockGet.mockRejectedValue(evaluatorNotFound());
 
@@ -587,6 +590,7 @@ describe("updateEvaluatorCommand()", () => {
       expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
         exactLookupMissMessage("Test Evaluator"),
       );
+      expect(mockUpdate).not.toHaveBeenCalled();
     });
 
     it("keeps the evaluator_not_found code", async () => {

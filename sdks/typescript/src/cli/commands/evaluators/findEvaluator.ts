@@ -11,7 +11,6 @@ const evaluatorNotFoundError = (message: string): Error =>
     isLangWatchHandledError: true,
     code: "evaluator_not_found",
     kind: "evaluator_not_found",
-    message,
     httpStatus: 404,
     meta: {},
     isHandled: true,
@@ -21,12 +20,10 @@ const evaluatorNotFoundError = (message: string): Error =>
 const isEvaluatorNotFound = (error: unknown): boolean =>
   error instanceof LangWatchHandledError && error.code === "evaluator_not_found";
 
-// `get` uses findEvaluator (exact lookup, then name only; the id/slug re-checks in
-// pickByReference are harmless). `delete`/`update` take an id or slug and use exactLookupMissError.
-
 /**
- * The evaluator a reference names: the exact id or slug lookup first, then,
- * only when that finds nothing, the display name among every evaluator.
+ * The evaluator a reference names: exact id or slug first, then the display
+ * name. pickByReference's id/slug match is redundant here; the name matters.
+ * `delete`/`update` take an id or slug only (exactLookupMissError).
  */
 export const findEvaluator = async ({
   service,
