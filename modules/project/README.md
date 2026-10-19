@@ -21,7 +21,7 @@ Projects: finding them, their summaries and paths, and the departments they are 
 | Kind            | Name               | Declared at                                                                        |
 | --------------- | ------------------ | ---------------------------------------------------------------------------------- |
 | Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project-storage-settings.repository.ts:14` |
-| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:53`                  |
+| Postgres table  | `Project`          | `process/src/repositories/prisma/prisma.project.repository.ts:52`                  |
 | Stores required | prisma, encryption | `process/src/repositories/prisma/prisma.project.repositories.ts:13`                |
 
 Anything else project needs belongs to another module and is reached through its `*Api`.
