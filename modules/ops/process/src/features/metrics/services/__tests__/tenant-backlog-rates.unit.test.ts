@@ -66,13 +66,14 @@ function fleet(featureFlags?: Pick<FeatureFlagApi, "isEnabled">) {
 }
 
 describe("the queue-metrics writer feeding anomaly detection", () => {
-  describe("given a scan holding waiting jobs for two tenants", () => {
-    describe("when the writer's cycle runs", () => {
-      /** @scenario "The queue-metrics writer records each tenant's waiting jobs from its scan" */
-      it("makes both tenants active for the detector", async () => {
+  describe("given two tenants whose jobs arrive after the writer's first scan", () => {
+    describe("when the writer's next cycle runs", () => {
+      /** @scenario "The queue-metrics writer records each tenant's arrivals from its scans" */
+      it("makes both tenants active with their arrivals as this minute's count", async () => {
         const { writer, rateTracker, scanOnce } = fleet();
         await writer.discoverQueues();
 
+        await scanOnce({});
         await scanOnce({ proj_a: 4, proj_b: 9 });
 
         expect((await rateTracker.findActiveTenants()).toSorted()).toEqual(["proj_a", "proj_b"]);
@@ -82,33 +83,37 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
     });
   });
 
-  describe("given a job still waiting on the next cycle", () => {
-    describe("when the writer scans twice", () => {
-      /** @scenario "A job waiting across cycles is counted in every cycle, where main counted it once at enqueue" */
-      it("counts it in both cycles", async () => {
+  describe("given a tenant with a large backlog that neither grows nor drains", () => {
+    describe("when the writer scans a minute's worth of cycles", () => {
+      /** @scenario "A constant backlog with no arrivals records nothing" */
+      it("records nothing for that tenant", async () => {
         const { writer, rateTracker, scanOnce } = fleet();
         await writer.discoverQueues();
 
-        await scanOnce({ proj_a: 1 });
-        await scanOnce({ proj_a: 1 });
+        for (let cycle = 0; cycle < 30; cycle++) {
+          await scanOnce({ proj_parked: 5000 });
+        }
 
-        expect(await rateTracker.currentWindowCount("proj_a", 60)).toBe(2);
+        expect(await rateTracker.currentWindowCount("proj_parked", 60)).toBe(0);
+        expect(await rateTracker.findActiveTenants()).toEqual([]);
       });
     });
   });
 
-  describe("given two hours of steady backlog for one tenant and a quiet neighbour", () => {
-    describe("when the tenant's backlog jumps tenfold for five minutes", () => {
-      /** @scenario "A backlog spike the writer sees surfaces through the detector" */
+  describe("given two hours of steady arrivals for one tenant and a quiet neighbour", () => {
+    describe("when the tenant's arrivals jump tenfold for five minutes", () => {
+      /** @scenario "An arrival spike the writer sees surfaces through the detector" */
       it("surfaces a surface-tier anomaly for that tenant only", async () => {
         const { writer, detector, store, scanOnce, nextMinute } = fleet();
         await writer.discoverQueues();
         for (let minute = 0; minute < 120; minute++) {
+          await scanOnce({});
           await scanOnce({ proj_runaway: 10, proj_quiet: 10 });
           nextMinute();
         }
 
         for (let minute = 0; minute < 5; minute++) {
+          await scanOnce({});
           await scanOnce({ proj_runaway: 100, proj_quiet: 10 });
           if (minute < 4) nextMinute();
         }
@@ -135,6 +140,7 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
       );
       await writer.discoverQueues();
 
+      await scanOnce({});
       await scanOnce({ proj_killed: 4, proj_open: 9 });
 
       expect(await rateTracker.findActiveTenants()).toEqual(["proj_open"]);
@@ -154,6 +160,7 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
       );
       await writer.discoverQueues();
 
+      await scanOnce({});
       await scanOnce({ proj_open: 3 });
 
       expect(await rateTracker.findActiveTenants()).toEqual(["proj_open"]);

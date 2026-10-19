@@ -18,22 +18,28 @@ Feature: Per-tenant rate anomaly detection
   # Baseline = p95 of per-minute counts across a 7-day window.
   # Cached for 1h so the worker tick stays cheap on multi-tenant clusters.
 
-  # Where the rates come from on this branch (ruled 2026-09-23): main counted
-  # each tenant's jobs at enqueue, inside the GroupQueue. Here the queue-metrics
-  # writer, which already scans every queue each 2s cycle under its fleet
-  # lease, records each tenant's waiting jobs from that scan into the same
-  # rate tracker. Window, tier and baseline constants are main's, unchanged.
+  # Where the rates come from on this branch (ruled 2026-09-23, amended
+  # 2026-10-15): main counted each tenant's jobs at enqueue, inside the
+  # GroupQueue. Here the queue-metrics writer, which already scans every queue
+  # each 2s cycle under its fleet lease, records each tenant's arrivals into the
+  # same rate tracker: the growth of the tenant's waiting jobs since the
+  # previous scan, never the absolute. Ops reads no per-tenant enqueue counter
+  # without reaching into the GroupQueue, so growth is the arrival signal. The
+  # first version recorded the absolute backlog every cycle, so a parked tenant
+  # with a steady backlog read as ~30x its backlog per minute and looked like a
+  # surge. Window, tier and baseline constants are main's, unchanged.
 
   Background:
-    Given the queue-metrics writer is recording each tenant's waiting jobs
+    Given the queue-metrics writer is recording each tenant's arrivals
     And the AnomalyDetector worker is running
 
   @unit @anomaly-detection @rates
-  Scenario: The queue-metrics writer records each tenant's waiting jobs from its scan
-    Given the writer's scan holds waiting jobs for tenants "proj_a" and "proj_b"
-    When the writer's cycle runs
+  Scenario: The queue-metrics writer records each tenant's arrivals from its scans
+    Given the writer has scanned once with no waiting jobs
+    And jobs then arrive for tenants "proj_a" and "proj_b"
+    When the writer's next cycle runs
     Then both tenants are active for the detector
-    And each tenant's count for this minute is its waiting jobs
+    And each tenant's count for this minute is its arrivals
 
   @unit @anomaly-detection @rates
   Scenario: A group id names its tenant before its first slash
@@ -44,25 +50,34 @@ Feature: Per-tenant rate anomaly detection
     And the bare-id group counts toward no tenant
 
   @unit @anomaly-detection @rates
-  Scenario: A backlog spike the writer sees surfaces through the detector
-    Given two hours of steady backlog for "proj_runaway" and "proj_quiet"
-    When "proj_runaway"'s backlog jumps tenfold for five minutes
+  Scenario: A tenant's arrivals are the growth of its waiting jobs between scans
+    Given one tenant's waiting jobs grew, one held steady, one drained and one is new
+    When the writer compares the scan with the previous one
+    Then the growing tenant counts its growth and the new tenant its whole backlog
+    And the steady and draining tenants count nothing
+
+  @unit @anomaly-detection @rates
+  Scenario: A constant backlog with no arrivals records nothing
+    Given tenant "proj_parked" has 5000 jobs waiting that neither grow nor drain
+    When the writer scans a minute's worth of cycles
+    Then "proj_parked"'s count for this minute is zero
+    And "proj_parked" is not active for the detector
+
+  @unit @anomaly-detection @rates
+  Scenario: An arrival spike the writer sees surfaces through the detector
+    Given two hours of steady arrivals for "proj_runaway" and "proj_quiet"
+    When "proj_runaway"'s arrivals jump tenfold for five minutes
     Then the detector surfaces a surface-tier anomaly for "proj_runaway" only
 
   # The observed rate is not main's enqueue rate, and these differences are
-  # not hidden: a job waiting through N cycles counts N times (a minute is
-  # ~30 cycles, so a minute's count is ~30x the average backlog); a job that
-  # arrives and finishes between two scans counts zero; the scan samples 200
-  # groups from each end of a queue's ready set plus 200 blocked groups, so
-  # groups beyond the sample go unseen; and a tenant's parked groups are not
-  # in the scan. The tiers compare a tenant with its own baseline, so the
-  # constant factor cancels; MIN_BASELINE_RATE (5/min) now means an average
-  # backlog of about one sixth of a job.
-  @unit @anomaly-detection @rates
-  Scenario: A job waiting across cycles is counted in every cycle, where main counted it once at enqueue
-    Given tenant "proj_a" has one job waiting
-    When the writer scans twice before it is processed
-    Then "proj_a"'s count for this minute is two
+  # not hidden: jobs that arrive and finish between two scans count zero, so a
+  # tenant whose workers keep pace reads low and only a surge that outruns its
+  # workers registers; growth in one group offsets draining in another of the
+  # same tenant; the scan samples 200 groups from each end of a queue's ready
+  # set plus 200 blocked groups, so a group moving into the sample reads as
+  # arrivals; parked groups are not in the scan; and a pod's first scan after
+  # it takes the lease only sets the baseline, while a pod that retakes the
+  # lease compares with the scan it last made.
 
   @unit @anomaly-detection @kill-switch
   Scenario: Kill-switch FF disables anomaly detection for one tenant without a redeploy
@@ -81,7 +96,7 @@ Feature: Per-tenant rate anomaly detection
   @unit @anomaly-detection @kill-switch
   Scenario: Kill-switch FF keeps a killed tenant's backlog out of the rate tracker
     Given the PostHog flag is enabled for tenant "proj_killed"
-    When the rate tracker records waiting jobs for tenant "proj_killed"
+    When the rate tracker records arrivals for tenant "proj_killed"
     Then no Redis write is issued and the tenant does not appear in the active-tenants index
 
   @unit @anomaly-detection @baseline-cache
