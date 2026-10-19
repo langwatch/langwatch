@@ -30,8 +30,8 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
 
 const RUN_NOT_STARTED = "Couldn't start the run";
 
-/** A hint can reach the tab before the worker stored the row it names; this outlasts that gap. */
-export const REQUESTED_RUN_REREAD_MS = 2_000;
+/** A hint can reach the tab before the worker stored the row it names; these outlast that gap. */
+export const REQUESTED_RUN_REREAD_DELAYS_MS = [2_000, 4_000, 8_000, 16_000] as const;
 
 /** Langy's panel opens on `?langyConversation=` wherever a project page is. */
 function openInLangy({ host, conversationId }: { host: InsightHostApi; conversationId: string }) {
@@ -40,7 +40,8 @@ function openInLangy({ host, conversationId }: { host: InsightHostApi; conversat
 
 /**
  * A hint races the row it names (ADR-004): a read it brought back without the awaited run is
- * asked once more. Answers that re-read for Run now to ask with, as no own read is repeated.
+ * asked again after each delay in turn, until the run shows. Answers a read for Run now to ask
+ * with, which starts no re-reads.
  */
 function useRereadWhileAwaiting({
   scope: {
@@ -57,21 +58,26 @@ function useRereadWhileAwaiting({
 }): () => void {
   const utils = insightApi.useUtils();
   const seenAnswer = useRef(answeredAt);
-  const isOwnRead = useRef(false);
-  const readAgain = useCallback(() => {
-    isOwnRead.current = true;
-    void utils.insights.getBoardDailyRun.invalidate({ projectId, board: { kind, id } });
-  }, [utils, projectId, kind, id]);
+  /** How many re-reads came before the read in flight; null when a hint asked it. */
+  const rereadsBefore = useRef<number | null>(null);
+  const readAgain = useCallback(
+    (rereads: number) => {
+      rereadsBefore.current = rereads;
+      void utils.insights.getBoardDailyRun.invalidate({ projectId, board: { kind, id } });
+    },
+    [utils, projectId, kind, id],
+  );
   useEffect(() => {
     if (answeredAt === seenAnswer.current) return;
     seenAnswer.current = answeredAt;
-    const isOwn = isOwnRead.current;
-    isOwnRead.current = false;
-    if (!isAwaitingRun || isOwn) return;
-    const reread = setTimeout(readAgain, REQUESTED_RUN_REREAD_MS);
+    const rereads = rereadsBefore.current ?? 0;
+    rereadsBefore.current = null;
+    const delay = REQUESTED_RUN_REREAD_DELAYS_MS[rereads];
+    if (!isAwaitingRun || delay === undefined) return;
+    const reread = setTimeout(() => readAgain(rereads + 1), delay);
     return () => clearTimeout(reread);
   }, [answeredAt, isAwaitingRun, readAgain]);
-  return readAgain;
+  return () => readAgain(REQUESTED_RUN_REREAD_DELAYS_MS.length);
 }
 
 type Write = {
@@ -92,7 +98,7 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     host.isEnabled() === true &&
     host.hasPermission("analytics:view");
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
-  // The run's start and outcome reach the read as hints; no timer asks again, bar one re-read.
+  // The run's start and outcome reach the read as hints; no timer asks, bar re-reads after one.
   const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();

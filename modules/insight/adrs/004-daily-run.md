@@ -205,10 +205,12 @@ unless the caller's run on the board is on, its sentence in `meta.formErrors` fo
 caller to show; an operator's request asks no setting. The request answers its
 `requestId`, and the run it starts takes that id as its `runId`, so the board's read
 names `runId` on both `runInFlight` and `lastRun`. The browser then waits for the run
-with that id to show, with no poll: `run_started` and `run_settled` hint the board's
-read, which is read again. A hint is published off the committed event, not after the
-schedule row is folded, so it can outrun the row: a read a hint brought back without the
-run is read once more after `REQUESTED_RUN_REREAD_MS`, and that read repeats nothing. In flight, it opens Langy on the run's conversation; settled
+with that id to show, with no standing poll: `run_started` and `run_settled` hint the
+board's read, which is read again. A hint is published off the committed event, not after
+the schedule row is folded, so it can outrun the row: a read a hint brought back without
+the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2, 4, 8 and
+16 seconds, about 30 in all), and stops once the run shows or the request ends. In flight,
+it opens Langy on the run's conversation; settled
 first, it ends the wait. Any other run is not this request's: a scheduled run that
 settles after the click and before the next read is shown as the last run, and the wait
 goes on. While a run is in flight, `runNow` requests nothing and answers that run's id,

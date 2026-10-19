@@ -1181,7 +1181,8 @@ Feature: The daily insights run
       Given a board that is on, with no run in flight
       And the member chose Run now
       When the hint that the run started reaches the board before the run is stored
-      Then the board reads its run once more
+      Then the board reads its run again after 2, 4, 8 and 16 seconds, 4 times at most
+      And it stops reading as soon as the run shows
       And the Langy panel opens on the run's conversation without waiting for the run to end
 
     @integration
