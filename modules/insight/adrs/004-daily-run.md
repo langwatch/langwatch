@@ -369,7 +369,7 @@ contract; insight knows nothing of ops.
   index on the person; a project's rows that are on are few.
 - There is still no cap on how many boards a person turns on.
 - `InsightDailyScheduleProjection` gained `runInFlightId`, `runInFlightConversationId` and
-  `runInFlightStartedAt` (migration `20261014090000`), all nullable. A row folded before the
+  `runInFlightStartedAt` (migration `20261015120001`), all nullable. A row folded before the
   migration names no run in flight until its next run starts.
 - With no rate limit, a person can start Insights runs as fast as they choose Run now; one
   run in flight per board is the only bound. Revisit once what is worth running is known.
