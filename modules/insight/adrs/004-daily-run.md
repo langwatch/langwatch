@@ -223,12 +223,13 @@ conversation: per schedule the process takes events in order, so such a run held
 request, and the request started nothing. A settled run carries no start time, and a lost
 run is settled as `failed/timeout` with no conversation just before the run that replaces
 it starts, so a settled run without a conversation is never taken for the held one; a held
-run that never reached Langy leaves the wait to its deadline. Run now answers `requestedAt`, the time the server
-recorded the request on the clock that stamps a run's start, so the browser's clock never
-enters the comparison. A scheduled run that settled before the request is shown as the
-last run, and the wait goes on. A run that shows neither within
-`INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the run could not be
-started. While a run is in flight the dropdown offers to open it instead.
+run that never reached Langy leaves the wait to its deadline. Run now answers
+`requestedAt`, the time the server recorded the request on the clock that stamps a
+run's start, so the browser's clock never enters the comparison. A scheduled run that
+settled before the request is shown as the last run, and the wait goes on. A run that
+shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the
+run could not be started. While a run is in flight the dropdown offers to open it
+instead.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
