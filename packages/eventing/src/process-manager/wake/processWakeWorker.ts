@@ -4,6 +4,7 @@ import { observeEsProcessWakeLag } from "../../metrics.ts";
 import { ProcessStateUnreadableError, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { HandleResult } from "../processManagerService.ts";
 import type { DueWake, ProcessStore } from "../stores/processStore.types.ts";
+import { WAKE_CLAIM_LEASE_MS } from "./wakeClaim.ts";
 
 const DEFAULT_INTERVAL_MS = 5_000;
 const DEFAULT_BATCH_SIZE = 20;
@@ -14,11 +15,10 @@ export interface ProcessWakeHandler {
 }
 
 export interface ProcessWakeWorkerOptions {
-  store: Pick<ProcessStore, "findDueWakes">;
+  store: Pick<ProcessStore, "leaseDueWakes" | "releaseWakeClaim">;
   /**
-   * One handler per processName. A due wake whose processName has no
-   * registered handler is logged and skipped — its nextWakeAt stays put, so
-   * it surfaces on every scan until the owning process is composed in.
+   * One handler per processName. A scan claims only these names, so a wake of
+   * a process not composed here stays due, untouched, for a worker that is.
    */
   managers: Record<string, ProcessWakeHandler>;
   logger: Logger;
@@ -29,9 +29,9 @@ export interface ProcessWakeWorkerOptions {
   now?: () => number;
 }
 
-/** Polling loop for process wake-ups; no leader election needed with revision conflicts. */
+/** Polling loop for process wake-ups: each scan claims a batch no other worker is handed. */
 export class ProcessWakeWorker {
-  private readonly store: Pick<ProcessStore, "findDueWakes">;
+  private readonly store: Pick<ProcessStore, "leaseDueWakes" | "releaseWakeClaim">;
   private readonly managers: Record<string, ProcessWakeHandler>;
   private readonly logger: Logger;
   private readonly notifyOutbox: ((processName: string) => void) | undefined;
@@ -82,9 +82,8 @@ export class ProcessWakeWorker {
 
   private triggerScan(): void {
     if (!this.started) return;
-    // Do not overlap scans: due rows only leave the scan set when a commit
-    // moves nextWakeAt, so a slow scan re-finding the same wakes is wasted
-    // work the revision fence would reject anyway.
+    // Do not overlap scans: a second scan would claim another batch while
+    // this one is still working through the batch it holds a claim on.
     if (this.inFlight !== null) return;
     const scan = this.runScan();
     this.inFlight = scan;
@@ -95,14 +94,24 @@ export class ProcessWakeWorker {
 
   private async runScan(): Promise<void> {
     try {
-      const now = this.now();
-      const due = await this.store.findDueWakes({
-        now,
+      const claimedAt = this.now();
+      const claimedUntil = claimedAt + WAKE_CLAIM_LEASE_MS;
+      const due = await this.store.leaseDueWakes({
+        now: claimedAt,
         limit: this.batchSize,
+        leaseDurationMs: WAKE_CLAIM_LEASE_MS,
         processNames: Object.keys(this.managers),
       });
-      for (const wake of due) {
-        await this.handleOne(wake);
+      for (const [index, wake] of due.entries()) {
+        if (this.now() >= claimedUntil) {
+          this.logger.warn(
+            { unhandled: due.length - index, leaseMs: WAKE_CLAIM_LEASE_MS },
+            "Wake claim ran out before its batch was handled; releasing the rest for a later poll",
+          );
+          for (const unhandled of due.slice(index)) await this.release(unhandled, claimedUntil);
+          return;
+        }
+        await this.handleOne(wake, claimedUntil);
       }
     } catch (error) {
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
@@ -113,13 +122,14 @@ export class ProcessWakeWorker {
     }
   }
 
-  private async handleOne(wake: DueWake): Promise<void> {
+  private async handleOne(wake: DueWake, claimedUntil: number): Promise<void> {
     const manager = this.managers[wake.ref.processName];
     if (!manager) {
       this.logger.warn(
         { processName: wake.ref.processName, projectId: wake.ref.projectId },
         "Due wake has no registered process manager; skipping",
       );
+      await this.release(wake, claimedUntil);
       return;
     }
     try {
@@ -138,7 +148,7 @@ export class ProcessWakeWorker {
       // staleWake / revisionConflict: another commit advanced the process
       // since this wake was scheduled — it stands down silently.
     } catch (error) {
-      // The wake stays due; the next poll retries it.
+      // The claim goes back, so the next poll retries the wake from its due time.
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
       this.logger.warn(
         {
@@ -150,6 +160,29 @@ export class ProcessWakeWorker {
           ...(error instanceof ProcessStateUnreadableError ? { issuePaths: error.issuePaths } : {}),
         },
         "Wake handling failed; the next poll will retry",
+      );
+      await this.release(wake, claimedUntil);
+    }
+  }
+
+  /**
+   * Hands an unhandled claim back so the wake is due again at its own time: the overdue gauge
+   * and the wake-lag histogram keep seeing it. A failed release lets the claim lapse instead.
+   */
+  private async release(wake: DueWake, claimedUntil: number): Promise<void> {
+    try {
+      await this.store.releaseWakeClaim({ ref: wake.ref, wakeAt: wake.wakeAt, claimedUntil });
+    } catch (error) {
+      const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
+      this.logger.warn(
+        {
+          processName: wake.ref.processName,
+          projectId: wake.ref.projectId,
+          processKey: wake.ref.processKey,
+          errorType,
+          errorMessage,
+        },
+        "Wake claim release failed; the wake fires again when its claim lapses",
       );
     }
   }
