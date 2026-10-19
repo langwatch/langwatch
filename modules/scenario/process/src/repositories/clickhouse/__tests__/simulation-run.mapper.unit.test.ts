@@ -101,10 +101,37 @@ describe("mapClickHouseRowToScenarioRunData", () => {
       expect(data.metadata?.langwatch?.targetReferenceId).toBe("agent_1");
     });
 
-    /** @scenario "A run whose platform context does not otherwise read still reads, with no platform context" */
-    it("reads a run whose namespace has another unreadable field with no platform context", () => {
+    /** @scenario "A run whose platform context holds another unreadable field drops only that field" */
+    it("drops only the unreadable field and keeps the rest of its platform context", () => {
       const data = mapClickHouseRowToScenarioRunData(
-        stored({ targetReferenceId: "agent_1", targetType: "http", scenarioVersion: "three" }),
+        stored({
+          targetReferenceId: "agent_1",
+          targetType: "http",
+          simulationSuiteId: "suite_1",
+          scenarioVersion: "three",
+          judgeModel: "openai/gpt-5-mini",
+          actorId: "user-1",
+          agentInstance: { hostname: "box-1", label: null },
+        }),
+      );
+
+      expect(data.scenarioRunId).toBe("run-1");
+      expect(data.metadata?.name).toBe("Refund flow");
+      expect(data.metadata?.langwatch?.scenarioVersion).toBeUndefined();
+      expect(data.metadata?.langwatch).toMatchObject({
+        targetReferenceId: "agent_1",
+        targetType: "http",
+        simulationSuiteId: "suite_1",
+        judgeModel: "openai/gpt-5-mini",
+        actorId: "user-1",
+        agentInstance: { hostname: "box-1", label: null },
+      });
+    });
+
+    /** @scenario "A run whose platform context names no readable target still reads, with no platform context" */
+    it("reads a run with no readable target reference id with no platform context", () => {
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: 42, targetType: "http", simulationSuiteId: "suite_1" }),
       );
 
       expect(data.scenarioRunId).toBe("run-1");

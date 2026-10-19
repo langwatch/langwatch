@@ -112,8 +112,8 @@ function isRunTargetType(value: string): value is (typeof runTargetTypes)[number
 
 /**
  * A stored or SDK-sent namespace is read, never refused: the target type is matched case-blind,
- * a type this version does not know reads as absent while every other field is kept, and a
- * namespace that still does not read is an absent target, so one row cannot fail a read.
+ * and an optional field that does not read is dropped while every other field is kept. Only a
+ * namespace with no readable target reference id is absent, so one row cannot fail a read.
  * @see modules/scenario/specs/simulation-run.feature
  */
 function readRunLangwatchNamespace(value: unknown): unknown {
@@ -125,6 +125,9 @@ function readRunLangwatchNamespace(value: unknown): unknown {
     record.targetType = targetType;
   } else {
     delete record.targetType;
+  }
+  for (const [name, field] of Object.entries(runLangwatchNamespaceSchema.shape)) {
+    if (name in record && !field.safeParse(record[name]).success) delete record[name];
   }
   return runLangwatchNamespaceSchema.safeParse(record).success ? record : undefined;
 }

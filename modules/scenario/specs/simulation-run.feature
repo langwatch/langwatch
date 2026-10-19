@@ -62,8 +62,15 @@ Feature: A simulation run reports its true state and never leaks secrets
     And the rest of its platform context still reads: target, suite, scenario version, models and who started it
 
   @unit
-  Scenario: A run whose platform context does not otherwise read still reads, with no platform context
+  Scenario: A run whose platform context holds another unreadable field drops only that field
     Given a stored run whose platform namespace holds a field that does not read, other than the target type
+    When the run is read
+    Then the run reads without that field instead of failing the read
+    And the rest of its platform context still reads: target, suite, models, who started it and the agent instance
+
+  @unit
+  Scenario: A run whose platform context names no readable target still reads, with no platform context
+    Given a stored run whose platform namespace has no target reference id that reads
     When the run is read
     Then the run reads with no platform context instead of failing the read
 
@@ -72,3 +79,16 @@ Feature: A simulation run reports its true state and never leaks secrets
     Given a stored run whose platform namespace names a known target type in upper case
     When the run is read
     Then the run reads as that target
+
+  # The browser reads a run with no target type by its target alone.
+  @unit
+  Scenario: Running again a run with no target type offers the scenario's last chosen target
+    Given a run the platform started whose target type does not read
+    When the person runs that scenario again from the run's results
+    Then the run dialog preselects the target last chosen for the scenario, not the run's target
+
+  @unit
+  Scenario: A run with no target type still groups under its target
+    Given a batch holding a run whose target type does not read
+    When the run detail lists the targets of the batch
+    Then that run's target is listed under its reference id and name
