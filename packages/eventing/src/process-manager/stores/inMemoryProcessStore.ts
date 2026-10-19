@@ -457,12 +457,14 @@ export class InMemoryProcessStore implements ProcessStore {
 
   async releaseWakeClaim(params: {
     ref: ProcessRef;
+    revision: number;
     wakeAt: number;
     claimedUntil: number;
   }): Promise<{ applied: boolean }> {
     const key = refKey(params.ref);
     const instance = this.instances.get(key);
-    if (!instance || instance.nextWakeAt !== params.claimedUntil) return { applied: false };
+    if (!instance || instance.revision !== params.revision) return { applied: false };
+    if (instance.nextWakeAt !== params.claimedUntil) return { applied: false };
     this.instances.set(key, { ...instance, nextWakeAt: params.wakeAt });
     return { applied: true };
   }

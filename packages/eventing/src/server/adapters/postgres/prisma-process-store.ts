@@ -853,11 +853,16 @@ export class PrismaProcessStore implements ProcessStore {
 
   async releaseWakeClaim(params: {
     ref: ProcessRef;
+    revision: number;
     wakeAt: number;
     claimedUntil: number;
   }): Promise<{ applied: boolean }> {
     const result = await this.#prisma.processManagerInstance.updateMany({
-      where: { ...refWhere(params.ref), nextWakeAt: asDate(params.claimedUntil) },
+      where: {
+        ...refWhere(params.ref),
+        revision: params.revision,
+        nextWakeAt: asDate(params.claimedUntil),
+      },
       data: { nextWakeAt: asDate(params.wakeAt) },
     });
     return { applied: result.count === 1 };

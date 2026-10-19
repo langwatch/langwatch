@@ -4,7 +4,7 @@ import { observeEsProcessWakeLag } from "../../metrics.ts";
 import { ProcessStateUnreadableError, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { HandleResult } from "../processManagerService.ts";
 import type { DueWake, ProcessStore } from "../stores/processStore.types.ts";
-import { WAKE_CLAIM_LEASE_MS } from "./wakeClaim.ts";
+import { WAKE_CLAIM_LEASE_MS, WAKE_CLAIM_SAFETY_MARGIN_MS } from "./wakeClaim.ts";
 
 const DEFAULT_INTERVAL_MS = 5_000;
 const DEFAULT_BATCH_SIZE = 20;
@@ -103,7 +103,7 @@ export class ProcessWakeWorker {
         processNames: Object.keys(this.managers),
       });
       for (const [index, wake] of due.entries()) {
-        if (this.now() >= claimedUntil) {
+        if (this.now() >= claimedUntil - WAKE_CLAIM_SAFETY_MARGIN_MS) {
           this.logger.warn(
             { unhandled: due.length - index, leaseMs: WAKE_CLAIM_LEASE_MS },
             "Wake claim ran out before its batch was handled; releasing the rest for a later poll",
@@ -171,7 +171,12 @@ export class ProcessWakeWorker {
    */
   private async release(wake: DueWake, claimedUntil: number): Promise<void> {
     try {
-      await this.store.releaseWakeClaim({ ref: wake.ref, wakeAt: wake.wakeAt, claimedUntil });
+      await this.store.releaseWakeClaim({
+        ref: wake.ref,
+        revision: wake.revision,
+        wakeAt: wake.wakeAt,
+        claimedUntil,
+      });
     } catch (error) {
       const { errorType, errorMessage } = toSafeFailureDiagnostic(error);
       this.logger.warn(

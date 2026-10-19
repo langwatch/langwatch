@@ -164,6 +164,7 @@ describe("ProcessWakeWorker", () => {
       expect(release).toHaveBeenCalledTimes(1);
       expect(release).toHaveBeenCalledWith({
         ref: dueWake().ref,
+        revision: dueWake().revision,
         wakeAt: dueWake().wakeAt,
         claimedUntil: Date.now() + WAKE_CLAIM_LEASE_MS,
       });

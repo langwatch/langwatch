@@ -295,11 +295,13 @@ export interface ProcessStore {
   }): Promise<DueWake[]>;
 
   /**
-   * Hands a claimed wake back unhandled: nextWakeAt returns to `wakeAt` only while it still holds
-   * the claim's lease end, so a commit that already re-armed the wake is never overwritten.
+   * Hands a claimed wake back unhandled: nextWakeAt returns to `wakeAt` only while the row still
+   * holds the claim's lease end at the claimed revision. Every commit moves the revision, so one
+   * that re-armed the wake, even at the lease end, is never overwritten.
    */
   releaseWakeClaim(params: {
     ref: ProcessRef;
+    revision: number;
     wakeAt: number;
     claimedUntil: number;
   }): Promise<{ applied: boolean }>;

@@ -818,6 +818,7 @@ describe.skipIf(!databaseUrl)("PrismaProcessStore", () => {
     function release() {
       return store.releaseWakeClaim({
         ref: ref("sweep"),
+        revision: 1,
         wakeAt: 1_500,
         claimedUntil: claimedAt + leaseMs,
       });

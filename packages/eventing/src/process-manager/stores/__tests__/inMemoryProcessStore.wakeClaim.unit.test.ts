@@ -146,6 +146,7 @@ describe("InMemoryProcessStore wake claims", () => {
 
         const released = await store.releaseWakeClaim({
           ref: ref("sweep"),
+          revision: 1,
           wakeAt: DUE_AT,
           claimedUntil: NOW + LEASE_MS,
         });
@@ -168,12 +169,30 @@ describe("InMemoryProcessStore wake claims", () => {
 
         const released = await store.releaseWakeClaim({
           ref: ref("sweep"),
+          revision: 1,
           wakeAt: DUE_AT,
           claimedUntil: NOW + LEASE_MS,
         });
 
         expect(released).toEqual({ applied: false });
         expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(NOW + 5_000);
+      });
+
+      it("keeps a commit's wake even when the commit armed it at the lease end", async () => {
+        const store = InMemoryProcessStore.createForTesting();
+        await armWake(store, ref("sweep"), DUE_AT);
+        await claim(store);
+        await commitNextWake(store, 1, NOW + LEASE_MS);
+
+        const released = await store.releaseWakeClaim({
+          ref: ref("sweep"),
+          revision: 1,
+          wakeAt: DUE_AT,
+          claimedUntil: NOW + LEASE_MS,
+        });
+
+        expect(released).toEqual({ applied: false });
+        expect((await store.findByRef({ ref: ref("sweep") }))?.nextWakeAt).toBe(NOW + LEASE_MS);
       });
     });
   });

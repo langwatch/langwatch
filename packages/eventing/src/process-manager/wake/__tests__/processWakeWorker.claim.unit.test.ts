@@ -15,7 +15,7 @@ import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
 import type { DueWake } from "../../stores/processStore.types.ts";
 import { type ProcessWakeHandler, ProcessWakeWorker } from "../processWakeWorker.ts";
-import { WAKE_CLAIM_LEASE_MS } from "../wakeClaim.ts";
+import { WAKE_CLAIM_LEASE_MS, WAKE_CLAIM_SAFETY_MARGIN_MS } from "../wakeClaim.ts";
 
 const DUE_AT = T0 + LIVENESS_MS;
 
@@ -131,7 +131,7 @@ describe("ProcessWakeWorker claims", () => {
     });
   });
 
-  describe("given a worker claimed a batch and handling the first wake outlasted the claim", () => {
+  describe("given a worker claimed a batch and handling the first wake ate into the claim's safety margin", () => {
     describe("when the worker reaches the rest of the batch", () => {
       /** @scenario "A worker leaves the tail of a batch its claim has run out on" */
       it("releases the rest unhandled, back to the times they were due", async () => {
@@ -140,7 +140,7 @@ describe("ProcessWakeWorker claims", () => {
         const claimedAt = clock;
         const { logger, lines } = createTestLogger();
         const slow = recordingHandler(service, () => {
-          clock += WAKE_CLAIM_LEASE_MS;
+          clock += WAKE_CLAIM_LEASE_MS - WAKE_CLAIM_SAFETY_MARGIN_MS;
         });
         const tail = { ...pilotRef, processKey: "conv_b" };
         await pollOnce(wakeWorker({ store, handler: slow, now: () => clock, logger }));
