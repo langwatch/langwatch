@@ -86,6 +86,22 @@ func TestApplyGovernanceMessage_RewritesOnParsedQuotaCode(t *testing.T) {
 	}
 }
 
+// A provider outage that names a quota code is still an outage, not a spent account.
+func TestApplyGovernanceMessage_LeavesOutageWithQuotaCodeVerbatim(t *testing.T) {
+	ue := &domain.UpstreamError{
+		StatusCode: http.StatusServiceUnavailable,
+		Message:    "upstream unavailable",
+		ErrorType:  "insufficient_quota",
+		ErrorCode:  "insufficient_quota",
+	}
+	_, gotErr := applyGovernanceMessage(nil, ue)
+	var got *domain.UpstreamError
+	errors.As(gotErr, &got)
+	if got.Message != "upstream unavailable" {
+		t.Fatalf("a 5xx must keep its message, got %q", got.Message)
+	}
+}
+
 // A retryable rate-limit must NOT be re-messaged — it stays verbatim and
 // retryable (the bug-33 complement: only terminal account exhaustion is
 // re-messaged).

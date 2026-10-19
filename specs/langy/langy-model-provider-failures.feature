@@ -123,6 +123,13 @@ Feature: A turn that the model provider refused says so
       And it does not offer to try again
 
     @unit
+    Scenario: A plan or quota limit that resets reads as no allowance left
+      Given a turn that failed with a provider's quota, usage limit or plan limit code
+      When the customer reads the card
+      Then its headline says the provider account has no allowance left
+      And it does not say the account is out of credit
+
+    @unit
     Scenario: A key the provider refuses on a 400 reads as a credential to check
       Given a turn that failed with the proxy's "llm_provider_key_rejected" reason
       When the customer reads the card

@@ -2,6 +2,7 @@ package app
 
 import (
 	"errors"
+	"net/http"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
@@ -48,6 +49,9 @@ func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response,
 // parsed type/code must count too or a quota error's original billing
 // message would reach governed users on those lanes.
 func isAccountExhaustionError(ue *domain.UpstreamError) bool {
+	if ue.StatusCode >= http.StatusInternalServerError {
+		return false
+	}
 	if ue.ErrorType == "insufficient_quota" || ue.ErrorCode == "insufficient_quota" {
 		return true
 	}
