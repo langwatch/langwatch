@@ -26,7 +26,10 @@ export const traceMonthIdsReportSchema = z.object({
   events: z.number(),
   /** Projects no organisation owns (their team is gone), so their data has nowhere to route. */
   skippedOrphans: z.number().default(0),
+  /** Only the first few ids; `orphansCountedThrough` is what keeps the count exact. */
   orphanProjectIds: z.array(z.string()).default([]),
+  /** The highest orphan id already counted; ids list in ascending order, so later ones are new. */
+  orphansCountedThrough: z.string().nullable().default(null),
 });
 export type TraceMonthIdsReport = z.infer<typeof traceMonthIdsReportSchema>;
 
@@ -107,13 +110,15 @@ export class TraceMonthIdsMigrationService {
       events: 0,
       skippedOrphans: 0,
       orphanProjectIds: [],
+      orphansCountedThrough: null,
     };
   }
 
   /**
    * Counts and names a page's projects no organisation owns, before anything routes their data:
    * the ClickHouse router rightly refuses such a tenant. They never move the cursor, so a resumed
-   * run meets them again; one the report already names is not counted twice.
+   * run meets them again; ones at or below `orphansCountedThrough` are not counted twice, however
+   * many there are (the named list is capped, so it cannot tell).
    */
   private async skipOrphans({
     orphanIds,
@@ -126,8 +131,10 @@ export class TraceMonthIdsMigrationService {
     dryRun: boolean;
     onPage: (report: TraceMonthIdsReport) => Promise<void>;
   }): Promise<TraceMonthIdsReport> {
-    const fresh = orphanIds.filter((id) => !report.orphanProjectIds.includes(id));
-    if (fresh.length === 0) return report;
+    const through = report.orphansCountedThrough;
+    const fresh = orphanIds.filter((id) => through === null || id > through);
+    const newest = fresh.at(-1);
+    if (newest === undefined) return report;
     for (const projectId of fresh) {
       this.deps.logger.warn(
         { projectId },
@@ -138,6 +145,7 @@ export class TraceMonthIdsMigrationService {
       ...report,
       skippedOrphans: report.skippedOrphans + fresh.length,
       orphanProjectIds: [...report.orphanProjectIds, ...fresh].slice(0, ORPHAN_IDS_REPORTED),
+      orphansCountedThrough: newest,
     };
     if (!dryRun) await onPage(next);
     return next;

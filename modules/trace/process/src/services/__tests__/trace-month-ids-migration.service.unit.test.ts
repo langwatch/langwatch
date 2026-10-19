@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { MemoryTraceUsageCountRepository } from "../../repositories/memory/memory.trace-usage-count.repository.ts";
 import {
+  ORPHAN_IDS_REPORTED,
   TraceMonthIdsMigrationService,
   traceMonthIdsReportSchema,
   type TraceMonthIdsReport,
@@ -90,6 +91,7 @@ const REPORT_BASE = {
   toMs: STARTED_AT,
   skippedOrphans: 0,
   orphanProjectIds: [] as string[],
+  orphansCountedThrough: null,
 };
 
 describe("TraceMonthIdsMigrationService", () => {
@@ -180,6 +182,19 @@ describe("TraceMonthIdsMigrationService", () => {
 
       expect(countedOrphan).toBeDefined();
       expect(report).toMatchObject({ skippedOrphans: 1, orphanProjectIds: ["bb"] });
+    });
+
+    /** @scenario "The upgrade skips a project no organisation owns" */
+    it("does not recount orphans beyond the named list when resumed", async () => {
+      const orphans = Array.from({ length: 25 }, (_, i) => `b${String(i).padStart(2, "0")}`);
+      const { run, saved } = compose({ orphans, pageSize: 100 });
+      await run();
+      const counted = saved.find((report) => report.skippedOrphans === 25);
+
+      const report = await run({ resumeFrom: counted ?? null });
+
+      expect(counted?.orphanProjectIds).toHaveLength(ORPHAN_IDS_REPORTED);
+      expect(report.skippedOrphans).toBe(25);
     });
 
     /** @scenario "The upgrade skips a project no organisation owns" */
