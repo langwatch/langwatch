@@ -33,7 +33,9 @@ is its author's alone, and to anyone else it reads as a board that was deleted. 
 named by its template id, and its widgets are read from `@langwatch/analytics-catalogue`,
 the one copy of the catalogue the browser and the server both import. Each widget is named
 `template:<templateId>:<key>`, which the dashboard widget API answers read-only. A
-template id the catalogue no longer offers reads as `board_deleted`.
+template id the catalogue no longer offers reads as `board_unreadable`, not `board_deleted`:
+a renamed or retired template turns its schedules off only after the skipped days, so a
+release that brings it back finds them still on.
 
 **The run acts as the person, as they are when it runs.** Nothing about access is
 stored. A gate asks, in this order: the project exists and takes writes, the

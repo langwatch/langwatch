@@ -50,7 +50,10 @@ export const INSIGHT_RUN_OUTCOMES = ["filed", "nothing", "failed", "skipped"] as
 export const insightRunOutcomeSchema = z.enum(INSIGHT_RUN_OUTCOMES);
 export type InsightRunOutcome = z.infer<typeof insightRunOutcomeSchema>;
 
-/** Why a run never reached Langy. `board_unreadable`: dashboards or custom charts are off. */
+/**
+ * Why a run never reached Langy. `board_unreadable`: dashboards or custom charts are off, or
+ * the catalogue no longer offers the From LangWatch board.
+ */
 export const INSIGHT_RUN_SKIP_REASONS = [
   "flag_off",
   "project_unavailable",

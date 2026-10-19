@@ -41,7 +41,7 @@ import {
 } from "./insight-daily-run.fixture.ts";
 import { OTHER_PROJECT, PROJECT } from "./insight.fixture.ts";
 
-const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED } = INSIGHT_DAILY_RUN_EVENT_TYPES;
+const { RUN_REQUESTED, RUN_STARTED, RUN_SETTLED, TURNED_OFF } = INSIGHT_DAILY_RUN_EVENT_TYPES;
 const TWO_FINDINGS = answerWith([
   finding(),
   finding({ title: "Errors fell by half", tone: "good" }),
@@ -439,16 +439,17 @@ describe("given the board a run is asked for", () => {
     expect(installed.boardReads).toEqual([]);
   });
 
-  /** @scenario "A From LangWatch board no longer offered reads as deleted" */
-  it("skips a From LangWatch board the catalogue no longer offers as board_deleted", async () => {
+  /** @scenario "A From LangWatch board no longer offered reads as unreadable" */
+  it("skips a From LangWatch board the catalogue no longer offers as board_unreadable", async () => {
     const gone: InsightRunBoard = { kind: "template", id: "llm-costs", name: "LLM costs" };
 
     await run({ board: gone });
 
     expect(await lastRunOf({ board: gone })).toMatchObject({
       outcome: "skipped",
-      reason: "board_deleted",
+      reason: "board_unreadable",
     });
+    expect(await installed.runEventsOf({ board: gone })).not.toContain(TURNED_OFF);
     expect(installed.langy.starts).toEqual([]);
   });
 

@@ -4,16 +4,7 @@
  */
 
 export * from "./catalogue/index.ts";
-export { isCodingWidget } from "./catalogue/model/catalogue-widgets.ts";
 export * from "./templates/index.ts";
-export {
-  BUCKETS,
-  COMPLETENESS,
-  DATES,
-  GAP_BRIDGE,
-  NUMBERS,
-  SERIES_CHART,
-} from "./templates/model/widget-code-parts.ts";
 export { BOARD_LWQL_VIEWS } from "./model/board-lwql-views.ts";
 export {
   type CatalogueFilters,

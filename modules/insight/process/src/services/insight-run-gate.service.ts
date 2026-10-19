@@ -106,10 +106,13 @@ function readBoardWith({
   };
 }
 
-/** A From LangWatch board, read from the catalogue: one no longer offered reads as deleted. */
+/**
+ * A From LangWatch board, read from the catalogue. One no longer offered is unreadable, not
+ * deleted: a renamed or retired template turns the schedule off only after the skipped days.
+ */
 function templateBoardOf({ templateId }: { templateId: string }): RunGateResult {
   const curated = curatedBoardDefinitionById(templateId);
-  if (!curated) return skipped("board_deleted");
+  if (!curated) return skipped("board_unreadable");
   const onBoard = curated.widgets.map(({ key, name, definition, layout }) => ({
     id: templateWidgetId({ templateId, key }),
     name,
