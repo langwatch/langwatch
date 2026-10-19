@@ -11,7 +11,11 @@ import {
   TrpcRootDefinition,
   type TrpcRuntimeMembers,
 } from "@langwatch/api/trpc";
-import { INSIGHT_DAILY_RUN_EVENT_TYPES, type InsightRunBoard } from "@langwatch/insight-contract";
+import {
+  INSIGHT_DAILY_RUN_EVENT_TYPES,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
+  type InsightRunBoard,
+} from "@langwatch/insight-contract";
 import { extractLangyTextFromParts, type LangyTurnSettlementWait } from "@langwatch/langy-contract";
 import { testAuthorizeDefaults, trpcTestMembers } from "@langwatch/test-harness/trpc-members";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -26,7 +30,6 @@ import {
   stampedParts,
 } from "../../app/__tests__/insight-daily-run.fixture.ts";
 import { PROJECT } from "../../app/__tests__/insight.fixture.ts";
-import { INSIGHT_DAILY_RUN_EXPIRY_MS } from "../../eventing/insight-daily-run.intent.ts";
 import { insightTrpcTransport } from "../insight.trpc.ts";
 
 type TestContext = { actor: { id: string } };

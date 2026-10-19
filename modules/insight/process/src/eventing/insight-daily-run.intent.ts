@@ -13,13 +13,6 @@ import { z } from "zod";
 
 export const INSIGHT_DAILY_RUN_INTENT = "runBoard" as const;
 
-/** In the contract, so the browser follows a Run now for as long as a run can last. */
-export {
-  INSIGHT_DAILY_RUN_EXPIRY_MS,
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
-} from "@langwatch/insight-contract";
-
 export const runBoardIntentSchema = z.object({
   scheduleId: z.string().min(1),
   userId: z.string().min(1),

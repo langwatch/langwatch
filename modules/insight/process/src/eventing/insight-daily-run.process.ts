@@ -14,6 +14,7 @@ import type {
   WakeHandler,
 } from "@langwatch/eventing";
 import {
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   insightRunBoardSchema,
   insightRunHourSchema,
   insightRunMaxInsightsSchema,
@@ -32,11 +33,7 @@ import {
   restartSkipStreak,
   scheduledRunId,
 } from "../rules/insight-daily-skip-streak.rules.ts";
-import {
-  INSIGHT_DAILY_RUN_EXPIRY_MS,
-  INSIGHT_DAILY_RUN_INTENT,
-  type runBoardIntentSchema,
-} from "./insight-daily-run.intent.ts";
+import { INSIGHT_DAILY_RUN_INTENT, type runBoardIntentSchema } from "./insight-daily-run.intent.ts";
 
 export const INSIGHT_DAILY_RUN_PROCESS_NAME = "dailyInsightsSchedule" as const;
 

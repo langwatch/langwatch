@@ -14,7 +14,7 @@ import {
 import { LANGY_CONVERSATION_PARAM } from "@langwatch/langy-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { currentTimeZone } from "@langwatch/time";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 
 import { defaultRunSettings, requestedRunOf, runTimeWords } from "../model/daily-run.ts";
 import { type InsightHostApi, useInsightHost } from "../model/insight-host.ts";
@@ -27,9 +27,6 @@ const NEVER_DECIDED: InsightDailyRunSetting = {
   offReason: null,
   runInFlight: null,
 };
-
-/** How often Run now asks whether its run started. */
-const RUN_START_POLL_MS = 2_000;
 
 const RUN_NOT_STARTED = "Couldn't start the run";
 
@@ -56,40 +53,43 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     host.isEnabled() === true &&
     host.hasPermission("analytics:view");
   const scope = { projectId, board: { kind: board.kind, id: board.id } };
-  // Set from Run now until its run shows: the read is asked again until then.
-  const [awaitedRun, setAwaitedRun] = useState<{ lastRunAtBefore: number | null } | null>(null);
-  const query = insightApi.insights.getBoardDailyRun.useQuery(scope, {
-    enabled: available,
-    refetchInterval: awaitedRun ? RUN_START_POLL_MS : false,
-  });
+  // The run's start and outcome reach the read as hints, so nothing here asks again on a timer.
+  const query = insightApi.insights.getBoardDailyRun.useQuery(scope, { enabled: available });
   const utils = insightApi.useUtils();
   const configure = insightApi.insights.configureBoardDailyRun.useMutation();
   const turnOffRun = insightApi.insights.turnOffBoardDailyRun.useMutation();
-  const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation();
+  // The request keeps the last run the person saw, so a newer one is the run they asked for.
+  const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation({
+    onMutate: () => ({ lastRunAtBefore: query.data?.lastRun?.at ?? null }),
+  });
+  const { reset: endRunNow } = runNowRequest;
 
   const requested =
-    awaitedRun && query.data ? requestedRunOf({ setting: query.data, ...awaitedRun }) : undefined;
+    runNowRequest.isSuccess && runNowRequest.context && query.data
+      ? requestedRunOf({ setting: query.data, ...runNowRequest.context })
+      : undefined;
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;
+  const isAwaitingRun = runNowRequest.isSuccess && !hasRequestedRunShown;
   useEffect(() => {
     if (!hasRequestedRunShown) return;
-    setAwaitedRun(null);
+    endRunNow();
     if (requestedConversationId !== null) {
       openInLangy({ host, conversationId: requestedConversationId });
     }
-  }, [hasRequestedRunShown, requestedConversationId, host]);
-  // A run that showed neither start nor outcome within a run's expiry is lost, so say so.
+  }, [hasRequestedRunShown, requestedConversationId, endRunNow, host]);
+  // One deadline, not a poll: past a run's expiry the server holds the run as lost, so say so.
   useEffect(() => {
-    if (!awaitedRun) return;
+    if (!isAwaitingRun) return;
     const lost = setTimeout(() => {
-      setAwaitedRun(null);
+      endRunNow();
       host.failed({
         error: new Error("The requested run never showed"),
         fallbackTitle: RUN_NOT_STARTED,
       });
     }, INSIGHT_DAILY_RUN_EXPIRY_MS);
     return () => clearTimeout(lost);
-  }, [awaitedRun, host]);
+  }, [isAwaitingRun, endRunNow, host]);
 
   const write = ({ next, send, done, fallbackTitle }: Write) => {
     const before = utils.insights.getBoardDailyRun.getData(scope);
@@ -160,20 +160,15 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
     /** A run is a Langy turn, so Run now asks what turning the run on asks. */
     mayRunNow: host.hasPermission("langy:create"),
     /** True from Run now until its run shows, or a run's expiry passes without it. */
-    isStartingRun: awaitedRun !== null,
-    runNow: () => {
-      setAwaitedRun({ lastRunAtBefore: query.data?.lastRun?.at ?? null });
+    isStartingRun: runNowRequest.isPending || isAwaitingRun,
+    runNow: () =>
       runNowRequest.mutate(
         { projectId, board, maxInsights: settings.maxInsights },
         {
           onSuccess: () => void utils.insights.getBoardDailyRun.invalidate(scope),
-          onError: (error) => {
-            setAwaitedRun(null);
-            host.failed({ error, fallbackTitle: RUN_NOT_STARTED });
-          },
+          onError: (error) => host.failed({ error, fallbackTitle: RUN_NOT_STARTED }),
         },
-      );
-    },
+      ),
     openInLangy: (conversationId: string) => openInLangy({ host, conversationId }),
     /** "No thanks" on the offer: an off, so the board never asks again. */
     decline: () =>

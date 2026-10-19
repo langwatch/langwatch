@@ -200,8 +200,8 @@ schedule that is on and no other; a run on a template keeps ending `skipped` wit
 **Run now asks for the same run.** The board's dropdown offers Run now to a person who
 holds `analytics:view` and `langy:create`, on a board that is on with no run in flight.
 `runBoardDailyRunNow` sends the request an operator's task sends, for the caller alone, so
-the run files into the same inbox. The browser then reads the board until the run shows:
-in flight, it opens Langy on the run's conversation; settled first, it ends the wait. A run
+the run files into the same inbox. The browser then waits for the run to show, with no
+poll: `run_started` and `run_settled` hint the board's read, which is read again. In flight, it opens Langy on the run's conversation; settled first, it ends the wait. A run
 that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the
 run could not be started. While a run is in flight the dropdown offers to open it instead.
 

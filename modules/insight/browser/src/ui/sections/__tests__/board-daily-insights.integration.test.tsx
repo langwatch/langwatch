@@ -108,7 +108,7 @@ function openBoard({
   ...board
 }: {
   /** What the read answers; a function answers what holds when the read is asked. */
-  setting?: InsightDailyRunSetting | (() => InsightDailyRunSetting | Promise<never>);
+  setting?: InsightDailyRunSetting | (() => InsightDailyRunSetting);
   widgets?: number | "loading";
   entries?: InsightEntry[];
   /** How the server answers a write; it accepts unless a test says otherwise. */
@@ -118,7 +118,7 @@ function openBoard({
   id?: string;
 } = {}) {
   const calls: UiProcedureCall[] = [];
-  const { host } = renderWithInsightHost({
+  const { host, readHint } = renderWithInsightHost({
     element: <Board widgets={widgets} {...board} />,
     host: new StubInsightHost(options),
     answer: (call) => {
@@ -134,6 +134,7 @@ function openBoard({
   const sent = (path: string) => calls.filter((call) => call.path === path).map((c) => c.input);
   return {
     host,
+    readHint,
     calls,
     reads: () => sent(READ),
     writes: () => [...sent(CONFIGURE), ...sent(TURN_OFF), ...sent(RUN_NOW)],
@@ -536,13 +537,13 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
       await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
       await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
       // The read is asked again once the request is in; it names no run yet, so Langy waits.
-      await waitFor(() => expect(board.reads().length).toBeGreaterThan(1));
+      await waitFor(() => expect(board.reads()).toHaveLength(2));
       expect(board.host.queries).toEqual([]);
       hasStarted = true;
+      await board.readHint();
 
-      await waitFor(
-        () => expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
-        { timeout: 5_000 },
+      await waitFor(() =>
+        expect(board.host.queries).toEqual([{ langyConversation: "conversation-7" }]),
       );
       expect(board.sent(RUN_NOW)).toEqual([
         {
@@ -560,22 +561,19 @@ describe("given a member turned a board's daily run on, and may ask Langy", () =
     it("follows it for as long as a run can last, then says it could not be started", async () => {
       vi.useFakeTimers({ shouldAdvanceTime: true });
       try {
-        let isRequested = false;
         const board = openBoard({
-          // Once asked, the read never answers: the poll joins it and draws nothing for an hour.
-          setting: () => (isRequested ? new Promise<never>(() => {}) : ON),
+          setting: ON,
           host: ASKER,
-          write: () => {
-            isRequested = true;
-            return Promise.resolve({ requestId: "request-1" });
-          },
+          write: () => Promise.resolve({ requestId: "request-1" }),
         });
         const dropdown = await openDropdown(board.user);
         await board.user.click(dropdown.getByRole("button", { name: "Run now" }));
-        await waitFor(() => expect(board.sent(RUN_NOW)).toHaveLength(1));
+        await waitFor(() => expect(board.reads()).toHaveLength(2));
 
         await vi.advanceTimersByTimeAsync(INSIGHT_DAILY_RUN_EXPIRY_MS - 60_000);
         expect(board.host.failures).toEqual([]);
+        // No timer asks the read again while the run is awaited.
+        expect(board.reads()).toHaveLength(2);
         await vi.advanceTimersByTimeAsync(60_000);
 
         await waitFor(() => expect(board.host.failures).toHaveLength(1));

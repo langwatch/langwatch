@@ -6,19 +6,16 @@
  */
 
 import { buildIntentAccessor } from "@langwatch/eventing";
-import type {
-  InsightRunRequestedEventData,
-  InsightRunSettledEventData,
+import {
+  INSIGHT_DAILY_RUN_LEASE_MS,
+  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
+  type InsightRunRequestedEventData,
+  type InsightRunSettledEventData,
 } from "@langwatch/insight-contract";
 import { describe, expect, it } from "vitest";
 
 import { dailyScheduleId } from "../../rules/insight-daily-run.rules.ts";
-import {
-  INSIGHT_DAILY_RUN_LEASE_MS,
-  INSIGHT_DAILY_RUN_MAX_ATTEMPTS,
-  runBoardIntent,
-  runBoardIntentSchema,
-} from "../insight-daily-run.intent.ts";
+import { runBoardIntent, runBoardIntentSchema } from "../insight-daily-run.intent.ts";
 import {
   INITIAL_INSIGHT_DAILY_RUN_STATE,
   type InsightDailyRunState,

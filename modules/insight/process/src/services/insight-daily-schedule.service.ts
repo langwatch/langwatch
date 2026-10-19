@@ -2,6 +2,7 @@ import type { DashboardApi } from "@langwatch/dashboard-contract";
 import {
   type ConfigureInsightDailyRunInput,
   configureInsightDailyRunInputSchema,
+  INSIGHT_DAILY_RUN_EXPIRY_MS,
   type InsightBoardDailyRunScope,
   type InsightDailyRun,
   type InsightDailyRunSetting,
@@ -14,7 +15,6 @@ import {
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
-import { INSIGHT_DAILY_RUN_EXPIRY_MS } from "../eventing/insight-daily-run.intent.ts";
 import type { InsightDailyScheduleRepository } from "../repositories/insight-daily-schedule.repository.ts";
 import { dailyScheduleId, pointerName } from "../rules/insight-daily-run.rules.ts";
 import { UNDECIDED_DAILY_RUN_SETTING } from "../rules/insight-daily-schedule-row.rules.ts";
