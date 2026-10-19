@@ -56,7 +56,13 @@ describe("given the Postgres catalogue beside the derivation it replaced", () =>
   });
 
   it("asks analytics:view and a domain permission of every table but the dashboards'", () => {
-    const analyticsOnly = ["analytics", "custom_graphs", "dashboards"];
+    const analyticsOnly = [
+      "analytics",
+      "custom_graphs",
+      "dashboard_widgets",
+      "dashboards",
+      "dashboards_v2",
+    ];
     for (const [name, table] of Object.entries(tables)) {
       const permissions = "allOf" in table.access ? table.access.allOf : [];
       expect({ name, first: permissions[0] }).toEqual({ name, first: "analytics:view" });

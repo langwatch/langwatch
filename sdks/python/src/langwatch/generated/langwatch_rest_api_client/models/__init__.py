@@ -2033,6 +2033,129 @@ from .get_api_triggers_response_200_item_templates import GetApiTriggersResponse
 from .get_api_triggers_response_200_item_templates_slack_template_type_type_0 import (
     GetApiTriggersResponse200ItemTemplatesSlackTemplateTypeType0,
 )
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200_scope import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200_data_item import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_200_data_item_scope import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_400_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_401_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_403_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500 import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_fault import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_meta import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta,
+)
+from .get_api_v1_projects_by_project_id_analytics_boards_response_500_trace import (
+    GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace,
+)
 from .get_api_v1_projects_by_project_id_analytics_charts_by_chart_id_response_200 import (
     GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200,
 )
@@ -5433,6 +5556,12 @@ from .post_api_optimization_by_workflow_id_by_version_id_body import PostApiOpti
 from .post_api_optimization_by_workflow_id_by_version_id_response_200 import (
     PostApiOptimizationByWorkflowIdByVersionIdResponse200,
 )
+from .post_api_optimization_by_workflow_id_by_version_id_response_200_error import (
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200Error,
+)
+from .post_api_optimization_by_workflow_id_by_version_id_response_200_nodes import (
+    PostApiOptimizationByWorkflowIdByVersionIdResponse200Nodes,
+)
 from .post_api_optimization_by_workflow_id_by_version_id_response_200_result_type_0 import (
     PostApiOptimizationByWorkflowIdByVersionIdResponse200ResultType0,
 )
@@ -7207,6 +7336,12 @@ from .post_api_workflows_by_workflow_id_by_version_id_run_body import PostApiWor
 from .post_api_workflows_by_workflow_id_by_version_id_run_response_200 import (
     PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200,
 )
+from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_error import (
+    PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error,
+)
+from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_nodes import (
+    PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes,
+)
 from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_result_type_0 import (
     PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0,
 )
@@ -7215,6 +7350,8 @@ from .post_api_workflows_by_workflow_id_by_version_id_run_response_200_status im
 )
 from .post_api_workflows_by_workflow_id_run_body import PostApiWorkflowsByWorkflowIdRunBody
 from .post_api_workflows_by_workflow_id_run_response_200 import PostApiWorkflowsByWorkflowIdRunResponse200
+from .post_api_workflows_by_workflow_id_run_response_200_error import PostApiWorkflowsByWorkflowIdRunResponse200Error
+from .post_api_workflows_by_workflow_id_run_response_200_nodes import PostApiWorkflowsByWorkflowIdRunResponse200Nodes
 from .post_api_workflows_by_workflow_id_run_response_200_result_type_0 import (
     PostApiWorkflowsByWorkflowIdRunResponse200ResultType0,
 )
@@ -9610,6 +9747,47 @@ __all__ = (
     "GetApiTriggersResponse200ItemReportType0SourceType2Filters",
     "GetApiTriggersResponse200ItemTemplates",
     "GetApiTriggersResponse200ItemTemplatesSlackTemplateTypeType0",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItem",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse200DataItemScope",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta",
+    "GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200Definition",
     "GetApiV1ProjectsByProjectIdAnalyticsChartsByChartIdResponse200DefinitionParameters",
@@ -11320,6 +11498,8 @@ __all__ = (
     "PostApiMonitorsResponse201ExecutionMode",
     "PostApiOptimizationByWorkflowIdByVersionIdBody",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200",
+    "PostApiOptimizationByWorkflowIdByVersionIdResponse200Error",
+    "PostApiOptimizationByWorkflowIdByVersionIdResponse200Nodes",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200ResultType0",
     "PostApiOptimizationByWorkflowIdByVersionIdResponse200Status",
     "PostApiPromptsBody",
@@ -12140,10 +12320,14 @@ __all__ = (
     "PostApiWorkflowsByIdEvaluateResponse200",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunBody",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200",
+    "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Error",
+    "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Nodes",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200ResultType0",
     "PostApiWorkflowsByWorkflowIdByVersionIdRunResponse200Status",
     "PostApiWorkflowsByWorkflowIdRunBody",
     "PostApiWorkflowsByWorkflowIdRunResponse200",
+    "PostApiWorkflowsByWorkflowIdRunResponse200Error",
+    "PostApiWorkflowsByWorkflowIdRunResponse200Nodes",
     "PostApiWorkflowsByWorkflowIdRunResponse200ResultType0",
     "PostApiWorkflowsByWorkflowIdRunResponse200Status",
     "PostConnectedAgentFramesBody",

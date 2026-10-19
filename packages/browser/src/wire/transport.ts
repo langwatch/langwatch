@@ -6,6 +6,7 @@
 
 import type { ModuleApiClient, ModuleApiMap, RouterFromMap } from "@langwatch/api/web";
 import type { CacheDeclaringContract } from "@langwatch/browser-host/cache-tiers";
+import { readTimeoutFetch } from "@langwatch/browser-host/read-timeout";
 import type { QueryClient } from "@tanstack/react-query";
 import { createTRPCClient, getUntypedClient, httpLink, loggerLink, splitLink } from "@trpc/client";
 import type { ComponentType, ReactNode } from "react";
@@ -60,8 +61,10 @@ function uiFeatureApiLinks({
   eventSource,
   isDevelopment = false,
 }: UiFeatureApiClientOptions) {
+  // A read the network swallows gives up, so the retry policy gets its turn.
+  const send = readTimeoutFetch({ fetch });
   // One request per call: the server does not batch (Alex, 2026-10-01).
-  const plainRouting = httpLink({ url, ...(fetch ? { fetch } : {}) });
+  const plainRouting = httpLink({ url, fetch: send });
   // A write sent moments before the document goes away ("Not now" on a
   // dialog, then a navigation) opts in with `context: { keepalive: true }`:
   // the browser would otherwise cancel it and the answer is lost. Bodies are
@@ -74,7 +77,7 @@ function uiFeatureApiLinks({
   // rides on is judged against its idle window but not kept alive by it.
   const backgroundRouting = httpLink({
     url,
-    ...(fetch ? { fetch } : {}),
+    fetch: send,
     headers: { [UI_BACKGROUND_READ_HEADER]: "1" },
   });
   const httpRouting = splitLink({

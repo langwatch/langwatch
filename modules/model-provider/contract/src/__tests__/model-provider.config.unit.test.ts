@@ -10,6 +10,31 @@ const read = (environment: Record<string, string | undefined>) =>
   })["model-provider"];
 
 describe("model provider server configuration", () => {
+  describe("given install-wide provider settings", () => {
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("reads each by its provider field name, and a blank one as unset", () => {
+      const fallbacks = read({
+        OPENAI_BASE_URL: "https://proxy.example.com/v1",
+        VERTEXAI_PROJECT: "acme-project",
+        AWS_REGION_NAME: " ",
+      }).providerFallbacks;
+      expect(fallbacks).toMatchObject({
+        OPENAI_BASE_URL: "https://proxy.example.com/v1",
+        VERTEXAI_PROJECT: "acme-project",
+      });
+      expect(fallbacks.AWS_REGION_NAME).toBeUndefined();
+    });
+
+    /** @scenario "A provider row falls back to the install-wide provider settings" */
+    it("never reads a key or secret from the environment", () => {
+      const fallbacks = read({
+        OPENAI_API_KEY: "sk-env",
+        AWS_SECRET_ACCESS_KEY: "env-secret",
+      }).providerFallbacks;
+      expect(Object.keys(fallbacks).filter((name) => /KEY|SECRET/.test(name))).toEqual([]);
+    });
+  });
+
   describe("given the deployment sets no allowlist", () => {
     /** @scenario "An absent allowlist resolves to an empty one, never a wildcard" */
     it("resolves an empty allowlist rather than a wildcard", () => {

@@ -941,7 +941,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:manage`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -956,7 +956,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:59`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:60`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
@@ -1081,7 +1081,7 @@ Contract `../contract/src/features/checkup/checkup.trpc.ts:38`, router `src/tran
 | `checkup.status`                 | query    | Permission `organization:view`   | `organizationInput` | `checkupAnswer`     |
 | `checkup.run`                    | mutation | Permission `organization:manage` | inline              | `checkupAnswer`     |
 | `checkup.usageReport`            | query    | Permission `organization:view`   | `organizationInput` | `usageReportAnswer` |
-| `checkup.setUsageReportSwitches` | mutation | Permission `organization:manage` | inline              | `usageReportAnswer` |
+| `checkup.setUsageReportSwitches` | mutation | Platform permission `ops:manage` | inline              | `usageReportAnswer` |
 
 ```typescript
 // checkup.status
@@ -2547,11 +2547,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                             | Environment variable                | Declared at                        |
 | ------ | -------------------------------- | ----------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:810`           |
-| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:811`           |
-| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:813`           |
-| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:814`           |
-| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:815`           |
+| secret | `licensePrivateKey`              | `LANGWATCH_LICENSE_PRIVATE_KEY`     | `src/app/ops.app.ts:811`           |
+| secret | `slackBugReportsBotToken`        | `SLACK_BUG_REPORTS_BOT_TOKEN`       | `src/app/ops.app.ts:812`           |
+| secret | `credentials`                    | `CREDENTIALS_SECRET`                | `src/app/ops.app.ts:814`           |
+| secret | `credentialsFallback`            | `NEXTAUTH_SECRET`                   | `src/app/ops.app.ts:815`           |
+| secret | `credentialsPrevious`            | `CREDENTIALS_SECRET_PREVIOUS`       | `src/app/ops.app.ts:816`           |
 | config | `apiKey`                         | `LANGWATCH_OPS_API_KEY`             | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`               | `CLICKHOUSE_OPS_URL`                | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`            | `DISABLE_USAGE_STATS`               | `../contract/src/ops.config.ts:34` |

@@ -82,6 +82,7 @@ const recordScimUserPushCommandDataSchemaDefinition = commandDataSchema({
   userId: z.string().min(1),
   externalId: z.string().min(1),
   op: scimUserOpSchema,
+  changed: z.boolean().optional(),
 });
 export interface RecordScimUserPushCommandDataSchema extends Named<
   typeof recordScimUserPushCommandDataSchemaDefinition

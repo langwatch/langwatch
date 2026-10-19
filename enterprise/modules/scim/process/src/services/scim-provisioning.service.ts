@@ -43,7 +43,12 @@ import { ScimUserPatchService } from "./scim-user-patch.service.ts";
 export type ScimUserProvisioning = Pick<UserApi, "findById" | "findByEmail" | "create">;
 import { assertScimOrganizationId } from "../rules/scim-organization-scope.rules.ts";
 import { scimErrorDocument } from "../rules/scim-refusal.rules.ts";
-import { isUniqueViolation, nameFromScimRequest, scimUserOf } from "../rules/scim-user.rules.ts";
+import {
+  isResourceChange,
+  isUniqueViolation,
+  nameFromScimRequest,
+  scimUserOf,
+} from "../rules/scim-user.rules.ts";
 import type { ScimSyncLifecycle } from "./scim-sync-lifecycle.service.ts";
 
 /** The person this organization holds, and what it says about them. */
@@ -52,6 +57,9 @@ type ScimOrganizationUser = {
   resource: ScimUserResourceRecord | null;
   hasMembership: boolean;
 };
+
+/** A replaced or patched person, and whether the push changed anything we hold. */
+export type ScimUserWrite = { user: ScimUser; changed: boolean };
 
 export class ScimProvisioningService {
   private readonly prisma: ScimRepository;
@@ -333,7 +341,7 @@ export class ScimProvisioningService {
     organizationId: string;
     request: ScimCreateUserRequest;
     connectionId?: string | null;
-  }): Promise<ScimUser> {
+  }): Promise<ScimUserWrite> {
     assertScimOrganizationId(organizationId);
     const found = await this.findOrganizationUser(organizationId, id);
 
@@ -343,8 +351,9 @@ export class ScimProvisioningService {
 
     await this.assertUserNameIsFree({ organizationId, userId: id, userName: request.userName });
     const active = request.active !== false;
+    const removedAccess = !active && found.hasMembership;
 
-    if (!active && found.hasMembership) {
+    if (removedAccess) {
       await this.membershipAccess.removeOrganizationAccess({
         userId: id,
         organizationId,
@@ -367,7 +376,10 @@ export class ScimProvisioningService {
       active,
     });
 
-    return scimUserOf(found.user, resource);
+    return {
+      user: scimUserOf(found.user, resource),
+      changed: isResourceChange({ before: found.resource, after: resource, removedAccess }),
+    };
   }
 
   async updateUser({
@@ -380,7 +392,7 @@ export class ScimProvisioningService {
     organizationId: string;
     patchRequest: ScimPatchRequest;
     connectionId?: string | null;
-  }): Promise<ScimUser> {
+  }): Promise<ScimUserWrite> {
     assertScimOrganizationId(organizationId);
     const found = await this.findOrganizationUser(organizationId, id);
 
@@ -396,7 +408,8 @@ export class ScimProvisioningService {
     });
     await this.assertUserNameIsFree({ organizationId, userId: id, userName: patched.userName });
 
-    if (patched.deactivating && found.hasMembership) {
+    const removedAccess = patched.deactivating && found.hasMembership;
+    if (removedAccess) {
       await this.membershipAccess.removeOrganizationAccess({
         userId: id,
         organizationId,
@@ -417,7 +430,10 @@ export class ScimProvisioningService {
       active: patched.active,
     });
 
-    return scimUserOf(found.user, resource);
+    return {
+      user: scimUserOf(found.user, resource),
+      changed: isResourceChange({ before: found.resource, after: resource, removedAccess }),
+    };
   }
 
   async deleteUser({

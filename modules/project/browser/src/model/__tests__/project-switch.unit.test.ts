@@ -52,6 +52,21 @@ describe("projectSwitchHref", () => {
         }),
       ).toBe("/api?return_to=%2Fsettings%2Fsecrets");
     });
+
+    it("keeps the page's query, so a consent request survives the round trip", () => {
+      const href = projectSwitchHref({
+        pathname: "/mcp/authorize",
+        query: { client_id: "client-1", redirect_uri: "https://app.example/cb", state: "s" },
+        currentProjectSlug: "web",
+        targetSlug: "api",
+      });
+
+      const returnTo = new URL(href, "https://langwatch.test").searchParams.get("return_to");
+      expect(returnTo).toBe(
+        "/mcp/authorize?client_id=client-1&redirect_uri=https%3A%2F%2Fapp.example%2Fcb&state=s",
+      );
+      expect(safeReturnToPath(returnTo ?? void 0)).toBe(returnTo);
+    });
   });
 
   describe("when there is no page to return to", () => {

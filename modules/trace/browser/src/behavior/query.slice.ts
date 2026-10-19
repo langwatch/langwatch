@@ -252,6 +252,25 @@ function safeParseAndSerialize(text: string): ParseResult {
 }
 
 /**
+ * A fresh search on `lensFilter`, committed at once: nothing typed for another
+ * project or person survives, not even in the debounced text the queries read.
+ */
+export function freshSearchState(lensFilter: string): Partial<QuerySlice> {
+  const parsed = safeParseAndSerialize(lensFilter);
+  const search = parsed.parseError ? { ast: EMPTY_AST, queryText: "", parseError: null } : parsed;
+  return {
+    ...search,
+    debouncedQueryText: search.queryText,
+    aiError: null,
+    page: 1,
+    pageCursors: { 1: null },
+    lastAiTranslation: null,
+    searchNotice: null,
+    evalRuns: {},
+  };
+}
+
+/**
  * The state after the search bar's text is applied. An unchanged canonical
  * text keeps the previous state reference, so `ast` subscribers do not churn
  * on a round-trip-equivalent edit.

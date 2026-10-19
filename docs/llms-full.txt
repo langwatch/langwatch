@@ -438,6 +438,11 @@ An [ingestion template](/ai-governance/ingestion-templates) mints an ingestion k
 
   <Step title="Copy the key">
     Click **Create secret key**. The key is shown once, as `sk-lw-<id>_<secret>`, with ready-made `.env`, HTTP header, terminal and MCP snippets whose copy buttons carry the real key. Copy it now; the table never shows it again.
+
+    <Frame>
+      <img src="/images/mcp/api-key-created-light.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="block dark:hidden" />
+      <img src="/images/mcp/api-key-created-dark.png" alt="The Token created dialog with the new key, .env values and code assistant snippets" className="hidden dark:block" />
+    </Frame>
   </Step>
 </Steps>
 
@@ -547,7 +552,15 @@ A **Restricted** key holds read or write access per category. Read grants the `v
 
 ## Connect an AI assistant over MCP
 
-A personal key gives the [LangWatch MCP Server](/integration/mcp) access to traces, analytics, prompts and the other features your key allows. The MCP server needs both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`.
+The [LangWatch MCP Server](/integration/mcp) is hosted at `https://app.langwatch.ai/mcp`. Most AI clients connect to it with OAuth: you sign in and approve a project, and no key is involved. See the [MCP setup guide](/integration/mcp).
+
+A client that cannot sign in can send a personal key as a header instead. The key gives the MCP server access to traces, analytics, prompts and the other features your key allows:
+
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer sk-lw-..."
+```
+
+To run the MCP server on your machine instead, give it both `LANGWATCH_API_KEY` and `LANGWATCH_PROJECT_ID`:
 
 
 ### Claude Code
@@ -15273,10 +15286,10 @@ The pattern is `governance_<resource_with_underscores>_<verb_with_underscores>`,
 
 ## Authentication
 
-Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over HTTP using either streamable-HTTP at `/mcp` or SSE at `/sse`, and authenticate with one of:
+Governance MCP tools register inside LangWatch's existing MCP server (served on the same host that serves the dashboard), there is **no separate `langwatch mcp serve` binary**. Clients connect over the Streamable HTTP transport at `/mcp`, and authenticate with one of:
 
 - **Project API key as Bearer** (`Authorization: Bearer <projectApiKey>`), the plain read tools work immediately. Sufficient to call `governance_*_list` and `governance_*_get`. Admin reads (`governance_*_admin_list`, which expose `ottlRules`) and every write tool require a user-bound session and reject a project-key-only caller.
-- **OAuth (PKCE) flow** at `/api/v1/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
+- **OAuth (PKCE) flow** at `/mcp/authorize` → `/oauth/token`, required for write tools and admin reads. The OAuth flow captures the user's id at authorize time, threads it through the session token cache, and surfaces it to governance tools as `ctx.callerUserId`. Without it, a write tool returns an `AUTH_REQUIRED:` error pointing the client at the OAuth flow.
 
 ```jsonc
 // MCP client config, points at the LangWatch instance's MCP endpoint
@@ -15285,10 +15298,8 @@ Governance MCP tools register inside LangWatch's existing MCP server (served on 
   "mcpServers": {
     "langwatch-governance": {
       "url": "https://app.langwatch.ai/mcp",
-      // Clients that speak the older SSE transport use
-      // https://app.langwatch.ai/sse instead.
       // Read-only access: add Authorization: Bearer <projectApiKey>.
-      // Read+write access: complete the OAuth PKCE flow at /api/v1/mcp/authorize.
+      // Read+write access: complete the OAuth PKCE flow at /mcp/authorize.
     },
   },
 }
@@ -15298,13 +15309,13 @@ The 9 governance tools register via `registerGovernanceMcpTools(server, ctx)` fr
 
 <Note>
   **Dev-environment port routing**: in production, LangWatch listens on a single port and the `/mcp`
-  + `/sse` + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
+  + `/oauth/*` + `/.well-known/oauth-*` routes are all reachable on the same host. In dev
   (Vite), external MCP clients (e.g. Claude Code) hit `FRONTEND_PORT` (default `5560`) which proxies
-  the seven MCP route prefixes through to the API port.
+  the MCP routes through to the API port.
 
   Local Claude Code runbook: `claude mcp add
   langwatch http://localhost:5560/mcp` (or the OAuth flow at
-  `http://localhost:5560/api/v1/mcp/authorize` for write tools). All 9 tools register over that proxy,
+  `http://localhost:5560/mcp/authorize` for write tools). All 9 tools register over that proxy,
   read tools return the catalog with a project apiKey Bearer, and write tools return
   `AUTH_REQUIRED:` until the OAuth flow completes.
 </Note>
@@ -15321,7 +15332,7 @@ Governance tools enforce two distinct gates at the tool layer (`enterprise/modul
   "content": [
     {
       "type": "text",
-      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /api/v1/mcp/authorize and reconnect.",
+      "text": "AUTH_REQUIRED: this tool requires an OAuth-authenticated MCP session. Complete the OAuth flow at /mcp/authorize and reconnect.",
     },
   ],
 }
@@ -15348,7 +15359,7 @@ The Path B mechanics (per `fc6d54100` + `7639b6c2b`):
 - **RBAC check happens at the MCP tool layer**, BEFORE the service call, the tool asks the same permission probe the tRPC and REST surfaces ask, `AuthzService.hasPermission` (`modules/authz/contract/src/authz.service.ts`, resolved against the built-in role sets in `modules/authz/contract/src/roles.ts`), and returns `FORBIDDEN:` early if the required permission is missing. Services trust the surface, they do not gate on the MCP-resolved scope a second time.
 
   This split is intentional: the MCP tool owns the RBAC contract for its surface; the service owns the multitenancy + business-logic contract.
-- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/api/v1/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
+- **`callerUserId` flows from the OAuth session**, the OAuth PKCE flow at `/mcp/authorize` captures the user's id, threads it through the session token cache and `SessionState`, and surfaces it as `ctx.callerUserId`. For `IngestionKeyService.{install, rotate}` it's required (write tools reject with `AUTH_REQUIRED:` if absent). For `IngestionTemplateService` authoring methods (which take `callerUserId` for the audit trail), same plumbing.
 - **Snake_case ↔ camelCase boundary**: MCP tool inputs use snake_case (`source_template_id`, `template_id`) per public-surface convention; the tool maps to camelCase (`sourceTemplateId`, `templateId`) before calling the service, since service signatures are camelCase. The mapping is the tool's job, not the service's.
 
 ## Audit emission
@@ -19314,7 +19325,9 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -31739,7 +31752,7 @@ LangWatch provides a standard OpenTelemetry Protocol (OTLP) endpoint for receivi
 https://app.langwatch.ai/api/otel/v1/traces
 ```
 
-This endpoint accepts OTLP over HTTP and gRPC protocols, making it compatible with all OpenTelemetry SDKs.
+This endpoint accepts OTLP over HTTP, with protobuf or JSON bodies. OTLP over gRPC is not supported: set your exporter to `http/protobuf` or `http/json` (for example `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`), since some SDKs default to gRPC.
 
 ## General Setup Pattern
 
@@ -31852,9 +31865,13 @@ The setup follows this general pattern across all languages:
                 var builder = Sdk.CreateTracerProviderBuilder()
                     .SetResourceBuilder(ResourceBuilder.CreateDefault()
                         .AddService(serviceName: "my-service"))
-                    .AddOtlpExporter(opts => opts
-                        .Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces")
-                        .Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY"))
+                    .AddOtlpExporter(opts =>
+                    {
+                        // Most .NET targets default to gRPC, which LangWatch does not accept.
+                        opts.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                        opts.Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces");
+                        opts.Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY");
+                    })
                     .Build();
             }
         }
@@ -32851,25 +32868,25 @@ The [LangWatch MCP Server](https://www.npmjs.com/package/@langwatch/mcp-server) 
 
 Instead of manually reading docs and writing boilerplate code, just ask your AI assistant to instrument your codebase with LangWatch, and it will do it for you.
 
+<Note>
+**The server URL is `https://app.langwatch.ai/mcp`.** If you added LangWatch to your AI client before October 2026, update the connector's URL to this one. Self-hosted deployments use their own host followed by `/mcp`.
+</Note>
+
 ## Setup
 
-<Steps>
+Connect to the hosted server at `https://app.langwatch.ai/mcp`. Sign in with **OAuth** (recommended): your client opens a browser window, you sign in to LangWatch and approve a project, and the client refreshes its access on its own, with no key to manage. Clients that cannot sign in can send a [personal API key](/platform/api-keys#create-a-personal-key) as an `Authorization: Bearer <key>` header instead.
 
-<Step title="Get your API key">
-Go to [**Settings → API Keys**](https://app.langwatch.ai/settings/api-keys) and create a **personal API key**. This key connects your coding assistant to your LangWatch account for observability, prompts, and analytics tools. Documentation tools work without a key.
-
-See the [API Keys guide](/platform/api-keys#create-a-personal-key) for step-by-step instructions.
-</Step>
-
-<Step title="Configure your MCP">
+<Frame caption="The approval page your client opens after you sign in: pick the project it may use, then Allow.">
+  <img src="/images/mcp/mcp-authorize-light.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="block dark:hidden" />
+  <img src="/images/mcp/mcp-authorize-dark.png" alt="The Authorize MCP Connection page, asking to allow a client to use a LangWatch project" className="hidden dark:block" />
+</Frame>
 
 
 ### Claude Desktop
 
-1. Go to **Settings → Connectors**
-2. Click **Add custom connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Go to **Customize → Connectors**, click **+ Add**, then **Add custom connector**. On Team and Enterprise plans, an owner adds it under **Organization settings → Connectors → Add → Custom → Web**.
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
 The same steps work in Claude Cowork and in Claude chat on the web.
 
@@ -32878,99 +32895,97 @@ The same steps work in Claude Cowork and in Claude chat on the web.
 
 ### Claude Code
 
-Run this command to add the MCP server:
+Add the server, then sign in:
 
 ```bash
-claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here -- npx -y @langwatch/mcp-server
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp
 ```
 
-Or add it manually to your `~/.claude.json`. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
+In Claude Code, run `/mcp`, pick `langwatch` and choose **Authenticate**. Sign in to LangWatch in the browser window that opens and approve a project.
 
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+To use an API key instead of signing in, add the header when you add the server:
 
-See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp#plugin-provided-mcp-servers) for more details.
+```bash
+claude mcp add --transport http langwatch https://app.langwatch.ai/mcp --header "Authorization: Bearer your-api-key"
+```
 
-<Info>
-This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
-</Info>
+See the [Claude Code MCP documentation](https://code.claude.com/docs/en/mcp) for more details.
 
 
 ### Copilot
 
-Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette).
+Add to `.vscode/mcp.json` in your project (or use **MCP: Add Server** from the Command Palette). Under the `servers` object, add an entry named `langwatch` with these fields:
 
-Under the `servers` object, add an entry named `langwatch` with these fields:
+- `type`: `http`
+- `url`: `https://app.langwatch.ai/mcp`
 
-- `type`: `stdio`
-- `command`: `npx`
-- `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-- `env.LANGWATCH_API_KEY`: your LangWatch API key
+VS Code opens a browser window to sign in the first time it connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 
 
 ### Cursor
 
 1. Open Cursor Settings
 2. Navigate to the **Tools and MCP** section in the sidebar
-3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with these fields:
-   - `command`: `npx`
-   - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
-   - `env.LANGWATCH_API_KEY`: your LangWatch API key
+3. Add the LangWatch MCP server. Under the `mcpServers` object, add an entry named `langwatch` with the field `url` set to `https://app.langwatch.ai/mcp`
+
+Cursor signs you in through your browser when it first connects. To use an API key instead, add `headers.Authorization` set to `Bearer ` followed by your key.
 
 
 ### ChatGPT
 
-1. Go to **Settings → Connectors**
-2. Click **Add connector**
-3. Enter the server URL: `https://app.langwatch.ai/sse`
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
+1. Turn on developer mode, then add a custom MCP server in ChatGPT's apps settings
+2. Enter the server URL: `https://app.langwatch.ai/mcp`
+3. Choose **OAuth** as the authentication
+4. Click **Connect**: you'll be redirected to sign in and approve access to a project
 
-*Requires a Plus or Team plan.*
-
-
-### BoltAI, Other MCP Clients
-
-For any MCP client that supports remote servers with OAuth:
-
-1. Add a new remote MCP server
-2. Enter the endpoint URL: `https://app.langwatch.ai/sse`
-3. Select **OAuth (browser)** authentication
-4. Click **Connect**: you'll be redirected to sign in and authorize access to your project
-
-The server supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically. Clients that speak the Streamable HTTP transport can point at `https://app.langwatch.ai/mcp` instead.
+ChatGPT supports OAuth only, not API keys.
 
 
 ### Other
 
-For other MCP-compatible editors, add an entry named `langwatch` under the `mcpServers` object of your editor's MCP settings file with these fields:
+For any MCP client that supports remote servers:
+
+1. Add a new remote MCP server with the URL `https://app.langwatch.ai/mcp`
+2. Select **OAuth** authentication, or send a personal API key as an `Authorization: Bearer <key>` header
+3. Connect, then sign in and approve a project in the browser window that opens
+
+The server speaks the Streamable HTTP transport and supports OAuth Authorization Code + PKCE with Dynamic Client Registration, so any standards-compliant MCP client should work automatically.
+
+### Run it locally instead
+
+Coding assistants can also run the MCP server on your machine with your API key and the project to work in. For Claude Code:
+
+```bash
+claude mcp add langwatch --env LANGWATCH_API_KEY=your-api-key-here --env LANGWATCH_PROJECT_ID=your-project-id -- npx -y @langwatch/mcp-server
+```
+
+For other editors, add an entry named `langwatch` under your editor's MCP servers with these fields:
 
 - `command`: `npx`
 - `args`: `-y`, then the package name `@langwatch/mcp-server` on a separate token
 - `env.LANGWATCH_API_KEY`: your LangWatch API key
+- `env.LANGWATCH_PROJECT_ID`: your LangWatch project ID
 
-Refer to your editor's MCP documentation for the specific configuration file location.
+<Info>
+This page intentionally describes the config in prose rather than as a JSON snippet. Some CLI agents (notably Gemini CLI 0.36.0 and earlier) parse `@`-prefixed runs as file paths and can crash with `ENAMETOOLONG` when a multi-line JSON snippet wraps the scoped package name in double quotes. See [#3104](https://github.com/langwatch/langwatch/issues/3104) for details. The bash `claude mcp add` form above is safe: the package name is followed by a whitespace terminator.
+</Info>
 
-</Step>
+Once connected, open your AI assistant's chat and ask it to help with LangWatch tasks.
 
-<Step title="Start using it">
-Open your AI assistant chat (e.g., `Cmd/Ctrl + I` in Cursor, or `Cmd/Ctrl + Shift + P` > "Claude Code: Open Chat" in Claude Code) and ask it to help with LangWatch tasks.
-</Step>
-</Steps>
-
-### Configuration
+### Local server configuration
 
 | Environment Variable | CLI Argument | Description |
 |---------------------|-------------|-------------|
 | `LANGWATCH_API_KEY` | `--apiKey` | API key for authentication |
+| `LANGWATCH_PROJECT_ID` | `--projectId` | The project to work in; needed for a personal API key, which can reach several projects |
 | `LANGWATCH_ENDPOINT` | `--endpoint` | API endpoint (default: `https://app.langwatch.ai`) |
 
 ### Two Modes
 
 The MCP server runs in two modes:
 
-- **Local (stdio)**: Default. Runs as a subprocess of your coding assistant (Claude Code, Copilot, Cursor). API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
-- **Remote (HTTP/SSE)**: For chat assistants (Claude Desktop, ChatGPT, BoltAI, etc.). Hosted at `https://app.langwatch.ai`. Uses OAuth Authorization Code + PKCE, click Connect and sign in via your browser to authorize access to your project. Supports both SSE (`/sse`) and Streamable HTTP (`/mcp`) transports.
+- **Remote (Streamable HTTP)**: Recommended, for every client. Hosted at `https://app.langwatch.ai/mcp`. Sign in with OAuth (Authorization Code + PKCE) in your browser and approve a project, or send a personal API key as a Bearer token.
+- **Local (stdio)**: Runs as a subprocess of your coding assistant. API key set via `--apiKey` flag or `LANGWATCH_API_KEY` env var.
 
 ## Usage Examples
 
@@ -41720,17 +41735,17 @@ the server and set your API key.
 
 Once connected, your agent has these dashboard tools:
 
-- `platform_list_dashboards`: list every dashboard in the project.
-- `platform_get_dashboard`: read one dashboard, including its widgets.
-- `platform_create_dashboard`: create a new, empty dashboard.
-- `platform_rename_dashboard`: rename a dashboard.
-- `platform_delete_dashboard`: delete a dashboard and its widgets.
+- `list_dashboard_boards`: list the project's dashboards, with the id each
+  widget tool takes.
 - `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
   it returns. Use this to check a query before it goes into a widget.
 - `add_dashboard_widget`: create a custom widget and add it to a dashboard.
 - `update_dashboard_widget`: change a widget's name, code, queries or
   description. Pass the dashboard id, the widget id, and only the fields to
   change. Every field you leave out keeps its value.
+
+The `platform_*_dashboard` tools work on the dashboards in Analytics Reports,
+which hold charts, not widgets.
 
 ### The widget definition format
 
@@ -55826,7 +55841,9 @@ WHERE EventKind = 'model_call' AND TimeUnixMs >= now() - INTERVAL 30 DAY
 GROUP BY TenantId ORDER BY cost_usd DESC
 ```
 
-If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, pass `--project <id or slug>` to every query below; on a LangWatch server older than this flag's support, also add `AND TenantId = '<id>'`.
+If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
+
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
 
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
@@ -59890,12 +59907,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
@@ -74201,6 +74219,15 @@ openapi: "POST /api/v1/projects"
 
 ---
 
+# FILE: ./api-reference/projects/get-a-dashboards-board.mdx
+
+---
+title: "Get a Dashboards board"
+openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{boardId}"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-api-key.mdx
 
 ---
@@ -74215,6 +74242,15 @@ openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 title: "Get project"
 openapi: "GET /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-dashboards-boards.mdx
+
+---
+title: "List Dashboards boards"
+openapi: "GET /api/v1/projects/{projectId}/analytics/boards"
 ---
 
 ---
@@ -74851,9 +74887,11 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
 | `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
-| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
-| `dashboards` | Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
+| `dashboard_widgets` | One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable. | `output` | one row per DashboardWidgetId | `CreatedAt` |
+| `dashboards` | One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2. | None | one row per DashboardId | `CreatedAt` |
+| `dashboards_v2` | One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
 | `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |

@@ -35,8 +35,6 @@ const resolvedInputsSchema = z.record(z.string(), z.unknown());
 
 const logger = createLogger("langwatch:evaluation:inputs-offload");
 
-export const EVAL_INPUTS_INLINE_MAX_BYTES = 1024 * 1024;
-export const EVAL_INPUTS_HARD_CEILING_BYTES = 50 * 1024 * 1024;
 export const EVAL_INPUTS_PREVIEW_BYTES = 16 * 1024;
 const EVALUATION_RUNS_TABLE = "evaluation_runs";
 

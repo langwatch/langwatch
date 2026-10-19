@@ -401,6 +401,8 @@ export const TRANSIENT_REFUSAL_CODES = [
   // A dropped connection shows its code; the raw error stays a logged reason (Alex 2026-10-11).
   "clickhouse_unavailable",
   "connect_credential_pending",
+  // An MCP client must read "retry", never "sign in again" or "fatal" (Alex 2026-10-14).
+  "mcp_store_unavailable",
   // Kept through the mask so the refused organization reads why (T7-F3, Alex 2026-10-11).
   "private_dataplane_unavailable",
   "service_unavailable",

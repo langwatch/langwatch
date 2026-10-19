@@ -683,8 +683,8 @@ Declared at `src/eventing/agent-workflow-fields.pipeline.ts:43`.
 
 | Kind   | Leaf                | Environment variable                   | Declared at                          |
 | ------ | ------------------- | -------------------------------------- | ------------------------------------ |
-| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.config.ts:6`  |
-| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.config.ts:7`  |
-| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.config.ts:11` |
+| config | `replicaCount`      | `LANGWATCH_APP_REPLICAS`               | `../contract/src/agent.config.ts:10` |
+| config | `relayMaxPayloadMb` | `LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB` | `../contract/src/agent.config.ts:14` |
+| config | `publicBaseUrl`     | `BASE_HOST`                            | `../contract/src/agent.config.ts:18` |
 
 <!-- readme:generated:end -->

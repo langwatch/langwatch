@@ -85,7 +85,7 @@ function service(
     }),
     codeExecution: options.codeExecution ?? {
       async execute() {
-        return { ok: true, statusText: "OK", body: { status: "success", result: {} } };
+        return { status: "success", result: {} };
       },
     },
     generateId: () => "test",
@@ -94,11 +94,9 @@ function service(
 
 describe("EvaluatorService", () => {
   it("converts a successful code execution into processed scalar results", async () => {
-    const execute = vi.fn().mockResolvedValue({
-      ok: true,
-      statusText: "OK",
-      body: { status: "success", result: { passed: "true", score: "0.75" } },
-    });
+    const execute = vi
+      .fn()
+      .mockResolvedValue({ status: "success", result: { passed: "true", score: "0.75" } });
     const evaluators = service({
       repository: repository({
         findById: vi.fn().mockResolvedValue(
@@ -143,14 +141,11 @@ describe("EvaluatorService", () => {
       codeExecution: {
         async execute() {
           return {
-            ok: true,
-            statusText: "OK",
-            body: {
-              status: "error",
-              error: {
-                message: "intentional kaboom",
-                traceback: "Traceback: ...",
-              },
+            status: "error",
+            error: {
+              type: "python_error",
+              message: "intentional kaboom",
+              traceback: "Traceback: ...",
             },
           };
         },

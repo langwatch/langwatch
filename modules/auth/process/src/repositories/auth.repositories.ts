@@ -1,3 +1,4 @@
+import type { SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import type { BetterAuthOptions } from "better-auth";
 
 import type { AuthDirectoryRepository } from "./auth-directory.repository.ts";
@@ -19,6 +20,8 @@ import type { SignUpVerificationTokenRepository } from "./signup-verification.re
 export interface AuthRepositories {
   readonly sessions: AuthSessionRepository;
   readonly cliSessions: CliDeviceSessionRepository;
+  /** A refresh token's one rotation, claimed and its pair shared sealed for the replay window. */
+  readonly cliRotations: SharedCredentialStore;
   readonly signUpTokens: SignUpVerificationTokenRepository;
   /** The consecutive-failure counter behind account lock-out (GAC-09). */
   readonly signInLocks: SignInAttemptLockRepository;

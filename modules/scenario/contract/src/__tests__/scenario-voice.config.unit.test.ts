@@ -19,6 +19,20 @@ describe("scenario's voice configuration", () => {
     });
   });
 
+  describe("given VOICE_RUNS_MAX_CONCURRENT", () => {
+    /**
+     * @scenario "The voice run concurrency cap is VOICE_RUNS_MAX_CONCURRENT, 2 when unset"
+     * @scenario "A feature's defaults are the values a deployment already runs on"
+     */
+    it("caps a project's voice runs at 2 unless a positive whole number is written", () => {
+      expect(read({}).voiceRunsMaxConcurrent).toBe(2);
+      for (const unusable of ["", "0", "-1", "1.5", "two"]) {
+        expect(read({ VOICE_RUNS_MAX_CONCURRENT: unusable }).voiceRunsMaxConcurrent).toBe(2);
+      }
+      expect(read({ VOICE_RUNS_MAX_CONCURRENT: "4" }).voiceRunsMaxConcurrent).toBe(4);
+    });
+  });
+
   describe("given VOICE_WORKER_ONLY values", () => {
     /** @scenario "The voice worker reads its infrastructure environment variables" */
     it("turns on only for the literal true, case-insensitively", () => {

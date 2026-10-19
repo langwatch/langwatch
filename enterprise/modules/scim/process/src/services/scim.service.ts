@@ -266,13 +266,13 @@ export class ScimService {
             externalId,
           })
         : null;
-    const user = mappedUserId
+    const { user, changed } = mappedUserId
       ? await this.userOperations.replaceUser({
           id: mappedUserId,
           organizationId: input.organizationId,
           request: input.request,
         })
-      : await this.userOperations.createUser(input);
+      : { user: await this.userOperations.createUser(input), changed: true };
     if (input.connectionId) {
       await this.identities.remember({
         organizationId: input.organizationId,
@@ -287,6 +287,7 @@ export class ScimService {
       userId: user.id,
       externalId,
       op: "create",
+      changed,
     });
 
     return { ...user, ...(externalId ? { externalId } : {}) };
@@ -317,7 +318,7 @@ export class ScimService {
       connectionId: input.connectionId ?? null,
       userId: input.id,
     });
-    const user = await this.userOperations.replaceUser(input);
+    const { user, changed } = await this.userOperations.replaceUser(input);
     const externalId = input.request.externalId;
     if (input.connectionId) {
       await this.identities.remember({
@@ -333,6 +334,7 @@ export class ScimService {
       userId: input.id,
       externalId,
       op: input.request.active === false ? "deactivate" : "update",
+      changed,
     });
 
     return { ...user, ...(externalId ? { externalId } : {}) };
@@ -349,7 +351,7 @@ export class ScimService {
       connectionId: input.connectionId ?? null,
       userId: input.id,
     });
-    const user = await this.userOperations.updateUser(input);
+    const { user, changed } = await this.userOperations.updateUser(input);
     // Deactivation keeps ownership, so the same directory can bring them back.
     if (input.connectionId) {
       await this.identities.remember({
@@ -364,6 +366,7 @@ export class ScimService {
       userId: input.id,
       externalId: null,
       op: this.patchDeactivates(input.patchRequest) ? "deactivate" : "update",
+      changed,
     });
 
     return user;
@@ -391,6 +394,7 @@ export class ScimService {
       userId: input.id,
       externalId: null,
       op: "deactivate",
+      changed: true,
     });
   }
 
@@ -404,6 +408,7 @@ export class ScimService {
     userId: string;
     externalId: string | null | undefined;
     op: ScimUserPushOperation;
+    changed: boolean;
   }): Promise<void> {
     if (!input.connectionId) {
       return;
@@ -415,6 +420,7 @@ export class ScimService {
       userId: input.userId,
       externalId: input.externalId ?? input.userId,
       op: input.op,
+      changed: input.changed,
     });
   }
 

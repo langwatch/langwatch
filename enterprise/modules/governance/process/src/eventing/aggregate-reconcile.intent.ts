@@ -8,7 +8,6 @@ import {
   AGGREGATE_RECONCILE_PROCESS_NAME,
   AGGREGATE_RECONCILE_RETENTION_MS,
   type AggregateReconcileIntent,
-  type AggregateSweepIntent,
   aggregateReconcileProcessKey,
 } from "./aggregate-reconcile.process.ts";
 
@@ -52,35 +51,55 @@ export class OutboxAggregateReconcile {
   }
 }
 
-/** The reconcile intent: one aggregate, under its lock; a throw spends a rung of the outbox ladder. */
+/**
+ * One member's attach was refused while the rest went through — thrown to
+ * spend a rung of the outbox ladder; a quiet return would mark the reconcile
+ * finished with the aggregate short of a member, and no fact need ever come
+ * again. A plain `Error`, not `HandledError`: nothing here reaches a customer.
+ */
+export class AggregateReconcileIncompleteError extends Error {
+  readonly aggregateProjectId: string;
+  readonly failed: readonly string[];
+
+  constructor({
+    aggregateProjectId,
+    failed,
+  }: {
+    aggregateProjectId: string;
+    failed: readonly string[];
+  }) {
+    super(
+      `Aggregate ${aggregateProjectId} reconcile left ${failed.length} member(s) unattached: ${failed.join(", ")}; trying again`,
+    );
+    this.name = "AggregateReconcileIncompleteError";
+    this.aggregateProjectId = aggregateProjectId;
+    this.failed = failed;
+  }
+}
+
+/**
+ * The reconcile intent: one aggregate, under its lock; a throw spends a rung of the outbox
+ * ladder. A refused attach throws too: the grants already attached read as held next time.
+ */
 export function runAggregateReconcile(
   reconciler: Pick<AggregateReconcilerService, "reconcile">,
 ): IntentExecutor<AggregateReconcileIntent> {
   return async ({ aggregateProjectId }) => {
-    await reconciler.reconcile({ aggregateProjectId });
+    const { failed } = await reconciler.reconcile({ aggregateProjectId });
+    if (failed.length > 0)
+      throw new AggregateReconcileIncompleteError({ aggregateProjectId, failed });
   };
 }
 
-/** The sweep intent: a reconcile enqueued for every live aggregate, then old rows pruned. */
-export function runAggregateSweep({
-  reconciler,
-  outbox,
+/** The prune intent: dispatched reconciles older than two days go; it queues no reconcile. */
+export function runAggregatePrune({
   deleteDispatchedBefore,
   now,
 }: {
-  reconciler: Pick<AggregateReconcilerService, "liveAggregates">;
-  outbox: Pick<OutboxAggregateReconcile, "enqueue">;
   deleteDispatchedBefore: ProcessStore["deleteDispatchedBefore"];
   now: () => number;
-}): IntentExecutor<AggregateSweepIntent> {
-  return async ({ scheduledFor }) => {
-    for (const { id, organizationId } of await reconciler.liveAggregates()) {
-      await outbox.enqueue({
-        organizationId,
-        aggregateProjectIds: [id],
-        cause: `sweep:${scheduledFor}`,
-      });
-    }
+}): () => Promise<void> {
+  return async () => {
     await deleteDispatchedBefore({
       processName: AGGREGATE_RECONCILE_PROCESS_NAME,
       before: now() - AGGREGATE_RECONCILE_RETENTION_MS,

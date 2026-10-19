@@ -598,7 +598,9 @@ closed: a table is refused if any of its projects lacks it. Filtering per projec
 is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
 
 **Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
-with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+with no rows, never a partial answer. The hosted MCP endpoint answers a grant or credential re-check
+that could not run as a 503 with `Retry-After` (`mcp_store_unavailable`), because MCP clients read a
+401 as "sign in again" and a 500 as fatal (Alex, 2026-10-14). The LWQL editor still edits without a schema (grammar only), a
 failed validation clears its markers, and Run always asks the server. Its markers come from the
 `analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
 the browser never validates.
@@ -1789,6 +1791,9 @@ markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused o
 task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
+recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
+grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).

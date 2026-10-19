@@ -9,6 +9,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { type Output, OutputsSection } from "../outputs-section.tsx";
 
+vi.mock("../../../elements/workflow/code/workflow-code-editor.tsx", () => ({
+  WorkflowCodeEditor: ({ code }: { code: string }) => (
+    <textarea aria-label="JSON schema" readOnly value={code} />
+  ),
+}));
+
 const renderSection = (outputs: Output[], onChange = vi.fn()) => {
   renderWithDesignSystem(<OutputsSection outputs={outputs} onChange={onChange} />);
   return { onChange };
@@ -22,7 +28,7 @@ describe("OutputsSection", () => {
   describe("given the prompt has the default single output of type str", () => {
     describe("when I add an output from the section", () => {
       /** @scenario "Adding an output from the section enables structured outputs" */
-      it("appends the new output alongside the existing one", async () => {
+      it("appends the new output alongside the existing one, named after the outputs", async () => {
         const user = userEvent.setup();
         const { onChange } = renderSection([{ identifier: "output", type: "str" }]);
 
@@ -31,7 +37,7 @@ describe("OutputsSection", () => {
 
         expect(onChange).toHaveBeenCalledWith([
           { identifier: "output", type: "str" },
-          expect.objectContaining({ type: "str" }),
+          { identifier: "output_1", type: "str" },
         ]);
       });
     });
@@ -56,6 +62,35 @@ describe("OutputsSection", () => {
         await user.click(screen.getByTestId("field-type-option-float"));
 
         expect(onChange).toHaveBeenLastCalledWith([{ identifier: "output", type: "float" }]);
+      });
+    });
+  });
+
+  describe("given an editor that offers JSON schema outputs", () => {
+    describe("when I add a JSON Schema output", () => {
+      it("adds it with the default schema and opens the schema editor", async () => {
+        const user = userEvent.setup();
+        const onChange = vi.fn();
+        renderWithDesignSystem(
+          <OutputsSection
+            outputs={[{ identifier: "output", type: "str" }]}
+            onChange={onChange}
+            availableTypes={["str", "json_schema", "dict"]}
+          />,
+        );
+
+        await user.click(screen.getByTestId("add-output-button"));
+        await user.click(screen.getByRole("menuitem", { name: "JSON Schema" }));
+
+        expect(onChange).toHaveBeenCalledWith([
+          { identifier: "output", type: "str" },
+          {
+            identifier: "output_1",
+            type: "json_schema",
+            json_schema: expect.objectContaining({ type: "object" }),
+          },
+        ]);
+        expect(await screen.findByLabelText("JSON schema")).toBeInTheDocument();
       });
     });
   });

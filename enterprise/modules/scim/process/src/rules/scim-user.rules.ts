@@ -71,3 +71,26 @@ function splitName(fullName: string): {
     familyName: fullName.substring(spaceIndex + 1),
   };
 }
+
+/**
+ * Whether a push changed what this organization holds for a person: a new or restored resource,
+ * a different name or userName, a flipped active flag, or access removed. A directory's periodic
+ * re-send of the same person changes none of these.
+ */
+export function isResourceChange({
+  before,
+  after,
+  removedAccess,
+}: {
+  before: ScimUserResourceRecord | null;
+  after: ScimUserResourceRecord;
+  removedAccess: boolean;
+}): boolean {
+  if (removedAccess || before === null || before.deletedAt !== null) return true;
+
+  return (
+    before.userName !== after.userName ||
+    before.name !== after.name ||
+    before.active !== after.active
+  );
+}
