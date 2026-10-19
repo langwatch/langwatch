@@ -105,6 +105,7 @@ describe("PersistActionWriterService.addToDataset", () => {
 
       expect(appended).toEqual([]);
       expect(errors.isTerminal(refusal)).toBe(true);
+      expect((refusal as Error).message).toContain("none of the mapped columns");
       expect(warnings()).toEqual([
         expect.objectContaining({ droppedColumns: ["question", "input"] }),
       ]);
@@ -154,6 +155,9 @@ describe("PersistActionWriterService.addToDataset", () => {
     /** @scenario "A dataset that is gone or archived is not retried" */
     it("treats a dataset that is gone, before or during the write, as terminal", async () => {
       const gone = writerOver({ findBySlugOrId: async () => null });
+      const goneRefusal = await refusalOf(gone.writer.addToDataset(write));
+      expect((goneRefusal as Error).message).toContain("gone or archived");
+      expect(gone.warnings()).toEqual([expect.objectContaining({ datasetId: "dataset-1" })]);
       const raced = writerOver({
         findBySlugOrId: async () => datasetWith(["question"]),
         batchCreateRecords: async () => {

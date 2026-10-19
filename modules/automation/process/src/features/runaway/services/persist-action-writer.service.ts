@@ -63,7 +63,16 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       slugOrId: input.datasetId,
       projectId: input.projectId,
     });
-    if (!dataset) throw datasetRefusal({ datasetId: input.datasetId });
+    if (!dataset) {
+      this.logger.warn(
+        { triggerId: input.triggerId, datasetId: input.datasetId },
+        "ADD_TO_DATASET dataset is gone or archived; the match was dropped",
+      );
+      throw datasetRefusal({
+        datasetId: input.datasetId,
+        reason: "it is gone or archived",
+      });
+    }
 
     // A mapping saved before a column was removed still names it; the row is kept without it.
     const columns = new Set(dataset.columnTypes.map((column) => column.name));
@@ -82,7 +91,10 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
 
     // A record left with only its id would be stored as an all-empty row and reported as a success.
     if (entries.some((entry) => Object.keys(entry).every((key) => key === "id"))) {
-      throw datasetRefusal({ datasetId: input.datasetId });
+      throw datasetRefusal({
+        datasetId: input.datasetId,
+        reason: "none of the mapped columns exist in it any more",
+      });
     }
 
     try {
@@ -94,7 +106,14 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     } catch (error) {
       const code = readCode(error);
       if (typeof code !== "string" || !DATASET_REFUSALS.has(code)) throw error;
-      throw datasetRefusal({ datasetId: input.datasetId, cause: error });
+      throw datasetRefusal({
+        datasetId: input.datasetId,
+        reason:
+          code === "dataset_not_found"
+            ? "it is gone or archived"
+            : "it rejected a column the rows name",
+        cause: error,
+      });
     }
   }
 }
@@ -120,15 +139,17 @@ function keepDefined({
 /** The dataset refused the write for a reason a redelivery cannot change. */
 function datasetRefusal({
   datasetId,
+  reason,
   cause,
 }: {
   datasetId: string;
+  reason: string;
   cause?: unknown;
 }): DispatchError {
   return new DispatchError({
     message:
-      `The dataset "${datasetId}" this automation appends to refused the rows: it is gone, archived, or ` +
-      "no longer has the columns they name. Re-save the automation with a dataset and mapping that exist.",
+      `The dataset "${datasetId}" this automation appends to refused the rows: ${reason}. ` +
+      "Re-save the automation with a dataset and mapping that exist.",
     retryable: false,
     cause,
   });

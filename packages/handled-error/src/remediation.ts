@@ -54,6 +54,13 @@ const registry = {
     ],
   },
 
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "The message names the dataset's valid columns",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
@@ -61,12 +68,6 @@ const registry = {
       "If you just sent this trace, retry in a few seconds; ingestion is asynchronous",
     ],
     docsPath: "/platform/data-retention",
-  },
-  dataset_invalid_column: {
-    tips: [
-      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
-      "meta lists the dataset's valid columns in the message",
-    ],
   },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
