@@ -82,25 +82,6 @@ export const LANGY_EVAL_CREATION_CRITERIA = [
   ...LANGY_CORE_RULE_CRITERIA.filter((criterion) => criterion !== LANGY_DECISIVENESS_CRITERION),
 ];
 
-/** Monitor-creation criteria: README.md "langy-rules.ts" for the route-bug history. */
-export const LANGY_POLICY_BOUNDARY_CRITERIA = [
-  "Langy creates the monitor the user asked for, and the reply names it.",
-  "The reply states that the monitor is now live on the project's traffic — the user is left knowing the thing they asked for is running, not that a step remains.",
-  "Langy does NOT stop at the evaluator, treat creating the monitor as something it cannot do, or describe a permission boundary around monitors. There is no such boundary.",
-  "Langy does NOT hand the user a command to run themselves, and does NOT tell them to finish the job in the UI. It did the job.",
-  "Langy does NOT claim a create succeeded without a result naming what was created.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
-
-/** Deletion criteria, which Langy now DOES: README.md "langy-rules.ts". */
-export const LANGY_DELETE_REQUEST_CRITERIA = [
-  "Langy deletes the resource the user asked it to delete, and the reply names what was removed.",
-  "Langy does NOT refuse, describe deletion as outside its role or 'yours to do', or hand the user a command or a place in the product to do it themselves. It did the job.",
-  "Langy does NOT claim a deletion succeeded without a result confirming it, and does NOT delete anything beyond what the user named.",
-  ...LANGY_CORE_RULE_CRITERIA,
-];
-
-
 /** Baseline-untouched rule, exported by identity. */
 export const LANGY_BASELINE_UNTOUCHED_CRITERION =
   "Every prompt change Langy makes lands on a duplicate column, never on the user's original. Langy says which column it is working on, and never describes editing, overwriting, or republishing the baseline prompt itself.";

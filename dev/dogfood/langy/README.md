@@ -195,8 +195,10 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
   whose name holds the tag. `agents_since_setup` (not in the setup snapshot and
   created after setup) is shown for the reader but not graded: another run in
   the shared project can add an agent at any time.
-- Left for later slices: the workbench runs. The original `it(` blocks stay
-  until each plan passes live twice.
+- The original `it(` blocks for these runs are removed, except the ones bound
+  by an `@scenario` tag (`langy-quality` 216 and 246, `langy-dogfood` 361).
+  Left for later slices: the workbench runs; their originals stay until each
+  plan passes live twice.
 
 ### Wave 1b, slice 2: runs that change something setup made
 
@@ -229,8 +231,9 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
 
 The judge sees no tool calls over REST (gap 1), so the grounding criterion is
 dropped and criteria about tools, navigate commands or cards are reworded to
-what the reply says. The originals stay in `apps/ui/e2e/langy/` until each
-platform plan passes twice.
+what the reply says. The originals of the moved runs are removed from
+`apps/ui/e2e/langy/`, except the parked runs above and those bound by an
+`@scenario` tag.
 
 ## Feature gaps
 

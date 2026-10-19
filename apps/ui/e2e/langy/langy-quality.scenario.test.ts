@@ -4,31 +4,16 @@
  * separate from langy-dogfood/langy.scenario so the bar is watched alone.
  */
 
-/**
- * SIDE EFFECTS: creates a real monitor + evaluator (`e2e-quality-*`) against
- * the configured project. The monitor is deleted after — left running it'd
- * evaluate live traffic and cost money; the evaluator stays as evidence.
- */
-
 import { randomUUID } from "node:crypto";
 
 import { openai } from "@ai-sdk/openai";
 import type { AgentAdapter, AgentInput, AgentReturnTypes } from "@langwatch/scenario";
 import * as scenario from "@langwatch/scenario";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 
-import {
-  deleteMonitor,
-  listMonitors,
-  seedApplicationTraces,
-  seedStaleTraces,
-} from "./langwatch-api";
+import { seedApplicationTraces, seedStaleTraces } from "./langwatch-api";
 import { makeLangyAdapter } from "./langy-agent";
-import {
-  LANGY_EMPTY_WINDOW_CRITERIA,
-  LANGY_NEVER_RECEIVED_CRITERIA,
-  LANGY_POLICY_BOUNDARY_CRITERIA,
-} from "./langy-rules";
+import { LANGY_EMPTY_WINDOW_CRITERIA, LANGY_NEVER_RECEIVED_CRITERIA } from "./langy-rules";
 import { runScenarioAndLog } from "./scenario-logger";
 import { lastAssistantText } from "./scenario-transcript";
 
@@ -39,18 +24,6 @@ const SET_ID = "langy-quality";
 
 /** Wall-clock budget for a single-lookup question. Prod p90 is 380s. */
 const SIMPLE_QUESTION_BUDGET_MS = 120_000;
-
-/**
- * The name the monitor scenario asks for, and looks for afterwards.
- */
-const MONITOR_SCENARIO_NAME = `e2e-quality-offtopic-${randomUUID().slice(0, 8)}`;
-
-/**
- * Monitors created during the run, torn down in `afterAll`. A monitor left
- * behind keeps evaluating the project's live traffic on every ingested trace,
- * which spends real money for as long as nobody notices it.
- */
-const createdMonitorIds: string[] = [];
 
 /**
  * Wraps the Langy adapter so each turn's own wall-clock is recorded.
@@ -81,75 +54,6 @@ describe("Langy quality bar", () => {
   beforeAll(async () => {
     await seedApplicationTraces();
   }, 90_000);
-
-  afterAll(async () => {
-    // Discovered, not merely recorded. `createdMonitorIds` is appended to only
-    // after the scenario returns, so a run that creates the monitor and then
-    // throws — a judge failure, a timeout, a transient adapter error — leaves
-    // it live with nothing recorded to delete. Teardown therefore re-lists and
-    // also matches on the run-unique name.
-    const ids = new Set(createdMonitorIds);
-    try {
-      for (const monitor of await listMonitors()) {
-        if (monitor.name?.includes(MONITOR_SCENARIO_NAME)) ids.add(monitor.id);
-      }
-    } catch (error) {
-      // A list that fails must not also cost us the ids we did record.
-      console.error("Could not list monitors during teardown:", error);
-    }
-    await Promise.all([...ids].map((id) => deleteMonitor(id)));
-  }, 60_000);
-
-  /**
-   * #1101 — `langwatch.monitor.create` errored on 48% of Langy's calls.
-   */
-  describe("when the user asks for a monitor", () => {
-    it("creates the monitor, not just the evaluator", async () => {
-      const before = await listMonitors();
-      const beforeIds = new Set(before.map((m) => m.id));
-
-      const langy = makeLangyAdapter();
-      const result = await runScenarioAndLog({
-        config: {
-          setId: SET_ID,
-          name: "monitor create completes end to end",
-          description:
-            "The user wants to be alerted when their agent starts giving off-topic answers in production. They do not know the difference between an evaluator and a monitor and should not have to — they asked for the outcome, and Langy can deliver all of it.",
-          agents: [
-            langy,
-            scenario.userSimulatorAgent({ model }),
-            scenario.judgeAgent({
-              model,
-              criteria: LANGY_POLICY_BOUNDARY_CRITERIA,
-            }),
-          ],
-          script: [
-            scenario.user(
-              `set up a monitor called ${MONITOR_SCENARIO_NAME} that flags production answers that go off-topic`,
-            ),
-            scenario.agent(),
-            scenario.judge(),
-          ],
-        },
-      });
-
-      // `>= 1`, not `=== 1`: runScenarioAndLog retries once on a transient
-      // infrastructure failure and replays the whole script, so a legitimate pass can
-      // leave two monitors behind.
-      const after = await listMonitors();
-      const created = after.filter(
-        (m) => !beforeIds.has(m.id) && m.name?.includes(MONITOR_SCENARIO_NAME),
-      );
-      createdMonitorIds.push(...created.map((m) => m.id));
-      expect(
-        created.length,
-        `No monitor named ${MONITOR_SCENARIO_NAME} exists after the run, so whatever Langy said, the user's request was not carried out. Reply was: ${lastAssistantText(result)}`,
-      ).toBeGreaterThanOrEqual(1);
-
-      if (!result.success) console.log("JUDGE REASONING:", result.reasoning);
-      expect(result.success).toBe(true);
-    }, 600_000);
-  });
 
   /**
    * #1102 — completed turns run p50 24.6s, p90 380.5s, p99 1,868s; 15% take over five
