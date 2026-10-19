@@ -37,17 +37,21 @@ const SCALED_JOIN_BYTES = "30000000";
 
 /**
  * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
- * costs memory per part. At 100 MB spill (production: 500 MB) it peaks near 145 MiB on
- * ClickHouse 25.10 against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
+ * costs memory per part. At 100 MB spill (production: 500 MB) it peaks near 195 MiB on
+ * ClickHouse 26.9 against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
-  max_memory_usage: "200000000",
+  max_memory_usage: "300000000",
   max_bytes_before_external_group_by: "100000000",
 } as const;
 
+/**
+ * Spilling at 30 MB these panels peak near 146 MiB on CI; unspilled they pass 190 MiB, so the
+ * 167 MiB cap still fails a panel that stops spilling.
+ */
 const CAPPED_SETTINGS = {
   max_threads: 2,
-  max_memory_usage: "150000000",
+  max_memory_usage: "175000000",
   max_bytes_before_external_group_by: "30000000",
 } as const;
 
