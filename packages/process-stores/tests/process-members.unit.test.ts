@@ -256,10 +256,12 @@ describe("given the event read seat member", () => {
   describe("when the role's eventing reads the event log", () => {
     /** @scenario "A registry is handed the role's event read seat like any store" */
     it("hands eventing's own seat", () => {
+      const unexpected = (operation: string) => () =>
+        Promise.reject(new Error(`eventReadSeat.${operation} was not expected`));
       const eventReadSeat: EventReadSeat = {
-        getEvent: vi.fn(),
-        findAggregateEvents: vi.fn(),
-        findEventsOfAggregates: vi.fn(),
+        getEvent: unexpected("getEvent"),
+        findAggregateEvents: unexpected("findAggregateEvents"),
+        findEventsOfAggregates: unexpected("findEventsOfAggregates"),
       };
       const eventing = new EventSourcing({ enabled: false, eventReadSeat });
 

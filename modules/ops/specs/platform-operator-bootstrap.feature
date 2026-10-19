@@ -82,6 +82,7 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     And the ops:seed-platform-operators upgrade step grants the named user too
     And a deactivated named user is still skipped
     And an address nobody has signed up with still waits, since the seed never creates an account
+    And a mailer that is named but misconfigured counts as email configured, so the seed waits
 
   @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names

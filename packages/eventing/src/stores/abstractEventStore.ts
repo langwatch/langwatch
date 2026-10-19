@@ -13,6 +13,7 @@ import {
   deduplicateEvents,
   eventToRecord,
   recordToEvent,
+  streamEventsOfRecords,
   validateEventAggregateType,
   validateEventTenant,
 } from "./eventStoreUtils.ts";
@@ -188,16 +189,10 @@ export abstract class AbstractEventStore<
             aggregates: asked,
             aggregateType,
           });
-          const byAggregate = new Map<string, EventType[]>();
-          for (const record of records) {
-            const key = `${record.TenantId}\n${record.AggregateId}`;
-            const events = byAggregate.get(key) ?? [];
-            events.push(recordToEvent<EventType>(record, record.AggregateId));
-            byAggregate.set(key, events);
-          }
-          return [...byAggregate.values()].flatMap((events) =>
-            deduplicateEvents(this.postProcessEvents(events)),
-          );
+          return streamEventsOfRecords<EventType>({
+            records,
+            prepare: (events) => this.postProcessEvents(events),
+          });
         } catch (error) {
           this.logError(label, { aggregateType, aggregateCount: asked.length }, error);
           throw error;

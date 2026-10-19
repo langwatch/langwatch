@@ -328,6 +328,7 @@ import { OpsQueueMetricsSourceRepository } from "../repositories/ops-queue-metri
 import type { StorageFootprintRepository } from "../repositories/storage-footprint.repository.ts";
 import { decideCloudOps } from "../rules/cloud-ops.rules.ts";
 import { buildExplainQuery, redactQueryForAudit } from "../rules/ops-clickhouse-explain.rules.ts";
+import { isEmailUnconfigured } from "../rules/platform-operator-seed.rules.ts";
 import { MOVED_TO_OWNERS } from "../rules/system-migration-support.rules.ts";
 import {
   type AdminAccess,
@@ -947,10 +948,8 @@ export class OpsModule implements OpsApi {
         cloud: config.isSaas || cloudOps,
         isLocalDevelopment: config.nodeEnvironment === "development",
       },
-      emailIsUnconfigured: async () => {
-        const mail = await dependencies.notifications.getMailDelivery();
-        return mail.provider === undefined && !mail.misconfigured;
-      },
+      isEmailUnconfigured: async () =>
+        isEmailUnconfigured({ mail: await dependencies.notifications.getMailDelivery() }),
     });
     const app = OpsModule.fromInfrastructure({
       infrastructure,

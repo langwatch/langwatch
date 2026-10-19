@@ -61,7 +61,7 @@ type PlatformOperatorsServiceOptions = Readonly<{
   /** `cloud` is the seed's own: a deployment LangWatch runs. */
   deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
   /** No email at all: no account here can verify its address, so the seed cannot ask for it. */
-  emailIsUnconfigured: () => Promise<boolean>;
+  isEmailUnconfigured: () => Promise<boolean>;
 }>;
 
 /**
@@ -203,8 +203,8 @@ export class PlatformOperatorsService {
 
   /**
    * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
-   * verified active users a still-set ADMIN_EMAILS names, and answers how many. Anything else (no
-   * named user yet, no ADMIN_EMAILS, the hosted service) stays with the seed process's wait.
+   * seedable active users a still-set ADMIN_EMAILS names (verified, or any where no email is
+   * configured), and answers how many. Anything else stays with the seed process's wait.
    */
   async seedFromAdminEmails({
     settings,
@@ -222,9 +222,9 @@ export class PlatformOperatorsService {
   }
 
   /**
-   * Cloud never seeds; no user waits; existing holders decide nobody. A set ADMIN_EMAILS takes its
-   * verified active users or waits, never an org admin. An empty one takes the only organization's
-   * oldest active admin, waits with no organization, and decides nobody with several.
+   * Cloud never seeds; no user waits; holders decide nobody. A set ADMIN_EMAILS takes its seedable
+   * active users (unverified too with no email configured) or waits, never an org admin. An empty
+   * one takes the only organization's oldest active admin, or waits, or decides nobody.
    */
   async #decide({
     adminEmails,
@@ -261,7 +261,8 @@ export class PlatformOperatorsService {
 
   /** Waits for a named user; says so once per process, not on every wake. */
   #waitForNamedUser(): PlatformOperatorSeedOutcome {
-    const reason = "no user named by ADMIN_EMAILS is verified and active yet";
+    const reason =
+      "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
     if (!this.#namedUserWaitLogged) {
       this.#namedUserWaitLogged = true;
       logger.warn({ reason }, `the platform-operator seed is waiting: ${reason}`);
@@ -288,9 +289,9 @@ export class PlatformOperatorsService {
       const user = await this.options.users.findByEmail({ email });
       if (user && user.deactivatedAt === null) active.push(user);
     }
-    const unverifiedCounts =
-      active.some((user) => !user.emailVerified) && (await this.options.emailIsUnconfigured());
-    const seedable = active.filter((user) => user.emailVerified || unverifiedCounts);
+    const canSeedUnverified =
+      active.some((user) => !user.emailVerified) && (await this.options.isEmailUnconfigured());
+    const seedable = active.filter((user) => user.emailVerified || canSeedUnverified);
     return [...new Set(seedable.map((user) => user.id))];
   }
 

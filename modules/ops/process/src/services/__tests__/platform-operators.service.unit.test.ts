@@ -61,14 +61,14 @@ function world({
   organizations = [],
   administrators = [],
   deployment = SELF_HOSTED,
-  emailIsUnconfigured = false,
+  isEmailUnconfigured = false,
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
   organizations?: string[];
   administrators?: string[];
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
-  emailIsUnconfigured?: boolean;
+  isEmailUnconfigured?: boolean;
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -111,7 +111,7 @@ function world({
     users: directory,
     organizations: organizationDirectory,
     deployment,
-    emailIsUnconfigured: async () => emailIsUnconfigured,
+    isEmailUnconfigured: async () => isEmailUnconfigured,
   });
   return { service, granted, authz };
 }
@@ -248,7 +248,7 @@ describe("PlatformOperatorsService", () => {
         users: [user("stranger"), user("ana", { emailVerified: false })],
         organizations: ["org_1"],
         administrators: ["stranger"],
-        emailIsUnconfigured: true,
+        isEmailUnconfigured: true,
       };
 
       /** @scenario "An install with no email configured seeds the named user unverified" */
