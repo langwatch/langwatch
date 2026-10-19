@@ -49,9 +49,9 @@ export const insightTrpcTransport: TrpcRouterDeclaration<InsightApi, typeof insi
     .withPermission("analytics:view")
     .handle(({ app, input, actor }) => app.turnOffDailyRun({ ...input, userId: actor.id }))
 
-    // The same run the schedule asks for, so it files into the same inbox.
+    // The same run the schedule asks for, so it files into the same inbox; refused unless on.
     .procedure("runBoardDailyRunNow")
     .refusedOnAggregate()
     .withPermission(["analytics:view", "langy:create"])
-    .handle(({ app, input, actor }) => app.requestDailyRun({ ...input, userId: actor.id }))
+    .handle(({ app, input, actor }) => app.runDailyRunNow({ ...input, userId: actor.id }))
     .build();

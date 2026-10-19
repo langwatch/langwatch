@@ -64,6 +64,14 @@ Asks for one daily insights run now, for a person on a board. The answer names t
 requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
 ```
 
+#### `runDailyRunNow`
+
+The reader's own Run now: the same request, refused with `validation_error` unless their daily run on the board is on.
+
+```typescript
+runDailyRunNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
+```
+
 #### `findDailyRuns`
 
 The reader's own runs in the project, one per board, each with how its last run ended.

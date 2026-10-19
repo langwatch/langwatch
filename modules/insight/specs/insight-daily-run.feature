@@ -1210,6 +1210,13 @@ Feature: The daily insights run
       Then the request is refused and no run is requested
 
     @unit
+    Scenario: Run now is refused on a board that is not on
+      Given a member whose daily run on a board is off, or never decided
+      When they ask to run that board now
+      Then the request is refused with validation_error and no run is requested
+      And an operator's run of the same board is still requested
+
+    @unit
     Scenario: An Insights run is not held to the unattended window
       Given a project whose unattended turns reached their window
       When an Insights run asks Langy for its turn

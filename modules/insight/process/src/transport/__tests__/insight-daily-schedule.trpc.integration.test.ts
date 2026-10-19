@@ -445,6 +445,7 @@ describe("given a member with analytics:view and langy:create, and a board that 
     it("names no run in flight once it started longer ago than a run may take", async () => {
       const { as, daily } = await project();
       const member = as({ userId: MEMBER });
+      await member.configureBoardDailyRun({ ...ON, maxInsights: 3 });
       const { release } = heldTurn(daily);
       const { requestId } = await member.runBoardDailyRunNow(RUN_NOW);
       const running = carryOutRequest(daily, requestId);

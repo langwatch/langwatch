@@ -229,6 +229,11 @@ export class InsightModule implements InsightApiContract {
     return this.#dailySchedules.requestRun(input);
   }
 
+  async runDailyRunNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+    await this.#rollout.assertEnabled(input);
+    return this.#dailySchedules.runNow(input);
+  }
+
   async findDailyRuns(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {
     await this.#rollout.assertEnabled(input);
     return this.#dailySchedules.findForUser(input);

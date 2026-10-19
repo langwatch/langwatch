@@ -1,4 +1,5 @@
 import type { DashboardApi } from "@langwatch/dashboard-contract";
+import { ValidationError } from "@langwatch/handled-error";
 import {
   type ConfigureInsightDailyRunInput,
   configureInsightDailyRunInputSchema,
@@ -21,6 +22,8 @@ import { UNDECIDED_DAILY_RUN_SETTING } from "../rules/insight-daily-schedule-row
 import type { InsightDailyRunCommandsService } from "./insight-daily-run-commands.service.ts";
 
 type Reader = { userId: string };
+
+const DAILY_RUN_NOT_ON = "Turn this board's daily insights on before running them now.";
 
 type InsightDailyScheduleMembers = Readonly<{
   schedules: InsightDailyScheduleRepository;
@@ -58,6 +61,17 @@ export class InsightDailyScheduleService {
       maxInsights,
     });
     return { requestId };
+  }
+
+  /**
+   * Run now, as the person asks it: refused unless their run on the board is on, so the route
+   * cannot start Langy for a board they turned off or never decided on. An operator's run is
+   * asked through {@link requestRun}, which asks no setting.
+   */
+  async runNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+    const { state } = await this.getSetting(input);
+    if (state !== "on") throw new ValidationError(DAILY_RUN_NOT_ON);
+    return this.requestRun(input);
   }
 
   findForUser(input: { projectId: string; userId: string }): Promise<InsightDailyRun[]> {

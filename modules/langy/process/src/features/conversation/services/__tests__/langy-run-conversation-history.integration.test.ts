@@ -1,8 +1,7 @@
 /**
  * @vitest-environment node
- * A run conversation from the turn's own command to the person's history: the events an
- * unattended turn's accept writes, folded by the real fold, stored and listed by the read.
- * Spec: modules/langy/specs/langy-unattended-turn.feature
+ * A run conversation from its turn's command to the person's history: the accept's events,
+ * folded by the real fold, stored and listed (modules/langy/specs/langy-unattended-turn.feature).
  */
 import { createTenantId, type TenantId } from "@langwatch/eventing";
 import type { LangyConversationStateData } from "@langwatch/langy-contract";
