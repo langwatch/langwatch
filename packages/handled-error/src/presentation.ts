@@ -224,6 +224,14 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
       hasReasonCode(reason.reasons ?? [], codes),
   );
 
+/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
+const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
 /**
  * The provider discriminants meaning "this account has nothing left to spend"
  * — a plan allowance, a prepaid balance, a hard billing cap.
@@ -235,20 +243,9 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
  * we keep that meaning without carrying the sentence that came with it.
  */
 export const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
-  "usage_limit_reached",
-  "codex_plan_limit",
-  "insufficient_quota",
-  "billing_hard_limit_reached",
+  ...PROVIDER_LIMIT_CODES,
   // The proxy's own name for a spent balance a provider states only in prose.
   "llm_provider_out_of_credit",
-]);
-
-/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
-const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
-  "usage_limit_reached",
-  "codex_plan_limit",
-  "insufficient_quota",
-  "billing_hard_limit_reached",
 ]);
 
 /**
