@@ -90,7 +90,8 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     }
 
     // A record left with only its id would be stored as an all-empty row and reported as a success.
-    if (entries.some((entry) => Object.keys(entry).every((key) => key === "id"))) {
+    const leftEmpty = entries.some(holdsOnlyId);
+    if (leftEmpty) {
       throw datasetRefusal({
         datasetId: input.datasetId,
         reason: "none of the mapped columns exist in it any more",
@@ -157,4 +158,8 @@ function datasetRefusal({
 
 function readCode(error: unknown): unknown {
   return typeof error === "object" && error !== null && "code" in error ? error.code : undefined;
+}
+
+function holdsOnlyId(entry: Record<string, unknown>): boolean {
+  return Object.keys(entry).every((key) => key === "id");
 }
