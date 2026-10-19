@@ -1202,7 +1202,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:318
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:319
 
 // scenarios.getLastResultSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:305
@@ -1222,7 +1222,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:353
+// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:354
 interface Output {
   lastUpdatedAt: number;
 }
@@ -1237,7 +1237,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:345
+type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:346
 
 // scenarios.getAllScenarioSetRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:346
@@ -1255,7 +1255,7 @@ interface Input {
   projectId: string;
   scenarioRunId: string;
 }
-type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:184
+type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:185
 
 // scenarios.getScenarioSetBatchRunCount
 // Input: inline, ../contract/src/scenario.trpc.ts:354
@@ -1265,7 +1265,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:361
+// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:362
 interface Output {
   count: number;
 }
@@ -1280,7 +1280,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:284
+type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:285
 
 // scenarios.getBatchRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:373
@@ -1291,7 +1291,7 @@ interface Input {
   sinceTimestamp?: number;
   runTimestamps?: Record<string, number>;
 }
-type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:299
+type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:300
 
 // scenarios.getExternalSetSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:391
@@ -1318,7 +1318,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:318
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:319
 
 // scenarios.onSimulationUpdate
 // Input: inline, ../contract/src/scenario.trpc.ts:413
@@ -1327,7 +1327,7 @@ interface Input {
   tabKey?: string;
   tabId?: string;
 }
-// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:376
+// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:377
 interface Output {
   event: unknown;
   timestamp?: number;
