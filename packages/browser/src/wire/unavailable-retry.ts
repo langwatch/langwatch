@@ -1,6 +1,6 @@
 /**
  * An api process that is starting or draining answers with a plain-text 503 before any handler
- * runs (packages/process/src/server.ts), so the call is sent again on another attempt.
+ * runs (packages/process/src/server.ts) and marks it, so the call is sent again on another attempt.
  * Spec: specs/ui/api-unavailable-answer.feature
  */
 
@@ -8,11 +8,18 @@ export const UNAVAILABLE_MAX_ATTEMPTS = 5;
 const DEFAULT_WAIT_MS = 1_000;
 const MAX_WAIT_MS = 5_000;
 
-/** The process lifecycle answer: a 503 whose body is a sentence, not a handler's JSON. */
+/** Set by packages/process/src/server.ts only on refusals no handler saw, so a resend is safe. */
+export const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
+
+/** A 503 that says the request never reached a handler; any other 503 may have run a write. */
 function isLifecycleRefusal(response: Response): boolean {
+  return response.status === 503 && response.headers.get(NOT_HANDLED_HEADER) !== null;
+}
+
+/** A plain-text 503 the client would fail to parse as JSON: the sentence becomes a tRPC error. */
+function isPlainTextUnavailable(response: Response): boolean {
   if (response.status !== 503) return false;
-  const type = response.headers.get("content-type") ?? "";
-  return type.startsWith("text/plain");
+  return (response.headers.get("content-type") ?? "").startsWith("text/plain");
 }
 
 function waitMsOf(response: Response): number {
@@ -37,6 +44,13 @@ function asTrpcError({ sentence, response }: { sentence: string; response: Respo
   });
 }
 
+/** Hands a 503 tRPC cannot parse over as JSON; every other answer passes through untouched. */
+async function finalAnswer(response: Response): Promise<Response> {
+  if (!isLifecycleRefusal(response) && !isPlainTextUnavailable(response)) return response;
+  return asTrpcError({ sentence: (await response.text()).trim(), response });
+}
+
+/** Resends a call the api refused before any handler ran, then answers a JSON 503 tRPC can read. */
 export function unavailableRetryFetch({
   fetch,
   maxAttempts = UNAVAILABLE_MAX_ATTEMPTS,
@@ -52,10 +66,9 @@ export function unavailableRetryFetch({
     for (let attempt = 1; ; attempt++) {
       // A Request's body is read once, so each attempt sends its own copy.
       const response = await send(input instanceof Request ? input.clone() : input, init);
-      if (!isLifecycleRefusal(response)) return response;
-      if (attempt >= maxAttempts || init?.signal?.aborted) {
-        return asTrpcError({ sentence: (await response.text()).trim(), response });
-      }
+      const resend =
+        isLifecycleRefusal(response) && attempt < maxAttempts && !init?.signal?.aborted;
+      if (!resend) return finalAnswer(response);
       await response.body?.cancel();
       await sleep(waitMsOf(response));
     }

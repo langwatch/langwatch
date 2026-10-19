@@ -1,12 +1,16 @@
 import { createTRPCUntypedClient, httpLink, TRPCClientError } from "@trpc/client";
 import { describe, expect, it, vi } from "vitest";
 
-import { UNAVAILABLE_MAX_ATTEMPTS, unavailableRetryFetch } from "../src/wire/unavailable-retry.ts";
+import {
+  NOT_HANDLED_HEADER,
+  UNAVAILABLE_MAX_ATTEMPTS,
+  unavailableRetryFetch,
+} from "../src/wire/unavailable-retry.ts";
 
 const shuttingDown = (headers: Record<string, string> = {}) =>
   new Response("langwatch-api is shutting down", {
     status: 503,
-    headers: { "Content-Type": "text/plain", ...headers },
+    headers: { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining", ...headers },
   });
 const answer = () =>
   new Response(JSON.stringify({ result: { data: { ok: true } } }), {
@@ -86,6 +90,32 @@ describe("unavailableRetryFetch", () => {
 
       expect(send).toHaveBeenCalledTimes(1);
       expect(response).toBe(handlerAnswer);
+    });
+  });
+
+  describe("given a proxy answers a plain-text 503 with no marker", () => {
+    /** @scenario "A plain-text 503 that may have reached a handler is never resent" */
+    it("sends the call once and hands tRPC a 503 error", async () => {
+      const send = vi.fn<typeof globalThis.fetch>().mockResolvedValueOnce(
+        new Response("upstream timed out", {
+          status: 503,
+          headers: { "Content-Type": "text/plain" },
+        }),
+      );
+      const client = createTRPCUntypedClient({
+        links: [
+          httpLink({
+            url: "http://localhost/api/trpc",
+            fetch: unavailableRetryFetch({ fetch: send, sleep: noWait }),
+          }),
+        ],
+      });
+
+      const failure = await client.mutation("trace.update").catch((error: unknown) => error);
+
+      expect(send).toHaveBeenCalledTimes(1);
+      expect((failure as TRPCClientError<never>).data).toMatchObject({ httpStatus: 503 });
+      expect((failure as Error).message).toBe("upstream timed out");
     });
   });
 });
