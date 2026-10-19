@@ -173,10 +173,8 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
- * Single-span fetches (`fetchNormalizedSpanRow`, `findSpanEvents`) read eagerly: on ClickHouse
- * 25.10 a lazily deferred `Events.Attributes` read with `max_rows_to_read=1` raised
- * ATTEMPT_TO_READ_AFTER_EOF, which pages as corruption though the parts are intact. The eager
- * read costs one granule, already bounded by the key prefix and partition window.
+ * Single-span fetches read eagerly: ClickHouse 25.10's lazy `Events.Attributes` read with
+ * `max_rows_to_read=1` raised ATTEMPT_TO_READ_AFTER_EOF on intact parts. Eager costs one granule.
  */
 const SINGLE_SPAN_FETCH_SETTINGS = {
   ...SINGLE_TRACE_READ_SETTINGS,

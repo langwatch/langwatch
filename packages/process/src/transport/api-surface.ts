@@ -444,7 +444,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
   return app;
 }
 
-/** A failed answer's handled cause, not tRPC's wrapper, so the record carries its code and fault. */
+/** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */
 function recordTrpcFailure({
   context,
   failure,
