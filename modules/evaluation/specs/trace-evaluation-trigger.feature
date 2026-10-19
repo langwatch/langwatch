@@ -62,6 +62,15 @@ Feature: Triggering online evaluations from an ingested trace
     Then it is the same number
 
   @unit
+  Scenario: A trace whose summary never folds does not retry the trigger
+    Given a span or an origin resolution for a trace
+    And the trace's summary has not folded when the settle window ends
+    When the evaluation trigger runs
+    Then no evaluation is dispatched and the job completes with a warning
+    And no retry is scheduled, because retrying blocked a queue group per such trace
+    But a trace whose summary folded within the settle window is still evaluated
+
+  @unit
   Scenario: A synthetic event span never re-triggers evaluation
     Given a synthetic feedback span posted through the track-event route
     When the relevance guard runs

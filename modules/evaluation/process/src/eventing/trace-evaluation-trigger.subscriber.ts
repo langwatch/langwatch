@@ -71,7 +71,7 @@ export function isDispatchableTraceSpan(
 /**
  * Evaluation's peer reaction to trace's span_received and origin_resolved: reads the folded
  * summary, applies the origin, cap and loop guards, then queues one evaluation per enabled
- * on-message monitor. A summary not yet folded throws, so the job retries.
+ * on-message monitor. A summary still missing after the settle completes with a warning.
  */
 export function createTraceEvaluationTrigger(
   deps: TraceEvaluationTriggerDeps,
@@ -88,9 +88,12 @@ export function createTraceEvaluationTrigger(
       occurredAtMs: event.occurredAt,
     });
     if (!foldState) {
-      throw new Error(
-        `trace ${traceId} has no folded summary yet; retrying the evaluation trigger`,
+      // The settle window is the wait; a retry storm blocked a group per trace (no attempt count here).
+      logger.warn(
+        { tenantId, observedTraceId: traceId, eventType: event.type },
+        "Skipping evaluation dispatch: trace has no folded summary after the settle window",
       );
+      return;
     }
     if (!passesTraceOriginGuards(event, foldState)) return;
     if (hasReachedProcessingCap({ tenantId, traceId, foldState })) return;

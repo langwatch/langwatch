@@ -243,20 +243,18 @@ describe("createTraceEvaluationTrigger", () => {
       });
     });
 
-    describe("when the live trace's summary is not folded yet", () => {
+    describe("when the trace's summary has not folded by the end of the settle", () => {
       /** @scenario "The evaluation trigger's lookup is anchored on the span and widens" */
-      it("anchors on the span without narrowing the lookup, then throws so the job retries", async () => {
+      it("anchors on the span without narrowing the lookup", async () => {
         const { built, lookups } = subscriber({});
         const event = spanEvent();
         built.folded.state = null;
 
-        await expect(
-          built.trigger({
-            tenantId: "tenant-1",
-            traceId: "trace-1",
-            event: { type: event.type, occurredAt: event.occurredAt },
-          }),
-        ).rejects.toThrow(/no folded summary yet/);
+        await built.trigger({
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          event: { type: event.type, occurredAt: event.occurredAt },
+        });
 
         expect(lookups).toEqual([
           {
@@ -265,6 +263,43 @@ describe("createTraceEvaluationTrigger", () => {
             occurredAtMs: event.occurredAt,
           },
         ]);
+      });
+    });
+  });
+
+  describe("given a trace whose summary never folds", () => {
+    describe.each([
+      ["a span event", SPAN_RECEIVED_EVENT_TYPE],
+      ["an origin resolution", ORIGIN_RESOLVED_EVENT_TYPE],
+    ])("when the trigger handles %s", (_label, type) => {
+      /** @scenario "A trace whose summary never folds does not retry the trigger" */
+      it("completes without throwing and dispatches nothing", async () => {
+        const { built, dispatch, listMonitors } = subscriber({});
+        built.folded.state = null;
+
+        await expect(
+          built.trigger({
+            tenantId: "tenant-1",
+            traceId: "trace-1",
+            event: { type, occurredAt: 1 },
+          }),
+        ).resolves.toBeUndefined();
+
+        expect(dispatch.sent).toEqual([]);
+        expect(listMonitors).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe("given a trace whose summary folded within the settle", () => {
+    describe("when the trigger handles its span", () => {
+      /** @scenario "A trace whose summary never folds does not retry the trigger" */
+      it("dispatches the evaluation", async () => {
+        const { built, dispatch } = subscriber({});
+
+        await run(built, spanEvent(), foldState());
+
+        expect(dispatch.sent).toHaveLength(1);
       });
     });
   });
