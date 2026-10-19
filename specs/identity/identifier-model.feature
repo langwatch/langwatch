@@ -601,7 +601,7 @@ Feature: The identifier model - identity as an event-sourced pipeline
 
   @unit @regression
   Scenario: Adopting an arriving SSO user migrates that user alone
-    Given the identifier backfill is not enrolled automatically
+    Given the identifier backfill has not reached the arriving user yet
     When an SSO arrival adopts the user it admitted
     Then that user's migration runs without enrollment
     And no other user is migrated

@@ -6,7 +6,7 @@ import type { Event } from "../domain/types.ts";
 import { ValidationError } from "../services/errorHandling.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import type { EventStoreEventReadInput } from "./eventStore.types.ts";
-import { deduplicateEvents, recordToEvent } from "./eventStoreUtils.ts";
+import { deduplicateEvents, recordToEvent, streamEventsOfRecords } from "./eventStoreUtils.ts";
 import type {
   EventOccurredAtWindow,
   EventRepository,
@@ -106,14 +106,7 @@ export class EventLogReadSeat<EventType extends Event = Event> implements EventR
       aggregates,
       aggregateType,
     });
-    const byStream = new Map<string, EventType[]>();
-    for (const record of records) {
-      const key = `${record.TenantId}\n${record.AggregateId}`;
-      const events = byStream.get(key) ?? [];
-      events.push(recordToEvent<EventType>(record, record.AggregateId));
-      byStream.set(key, events);
-    }
-    return [...byStream.values()].flatMap((events) => deduplicateEvents(events));
+    return streamEventsOfRecords<EventType>({ records });
   }
 }
 

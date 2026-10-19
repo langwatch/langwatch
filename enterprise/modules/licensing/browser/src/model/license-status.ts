@@ -84,10 +84,7 @@ function formatLicenseDateWith({
  * Returns "Unlimited" for non-finite values (Infinity, NaN) or large numbers (1M+).
  */
 export function formatLimitOrUnlimited(value: number): string {
-  if (!Number.isFinite(value) || value >= 1_000_000) {
-    return "Unlimited";
-  }
-  return value.toLocaleString();
+  return isCappedLimit(value) ? value.toLocaleString() : "Unlimited";
 }
 
 /** Whether a limit is a real count: a license writes "unlimited" as a number of 1M or more. */

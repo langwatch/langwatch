@@ -1792,7 +1792,7 @@ task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted ins
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
 Where no email is configured no address can be verified, so a named active user is seeded unverified;
-the account must already exist, the seed never creates one.
+the account must already exist, the seed never creates one (Rogerio, 2026-10-18).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
 recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
 grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
