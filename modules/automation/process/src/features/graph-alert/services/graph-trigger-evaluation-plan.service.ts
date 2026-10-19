@@ -154,7 +154,6 @@ export class GraphTriggerEvaluationPlanService {
       timeseriesInput: this.timeseriesInput({
         projectId: request.projectId,
         filters: customGraph.filters,
-        graph,
         series,
         timeScale,
         startDate,
@@ -200,7 +199,6 @@ export class GraphTriggerEvaluationPlanService {
   private timeseriesInput({
     projectId,
     filters,
-    graph,
     series,
     timeScale,
     startDate,
@@ -208,7 +206,6 @@ export class GraphTriggerEvaluationPlanService {
   }: {
     projectId: string;
     filters: unknown;
-    graph: StoredGraphConfig;
     series: GraphSeries;
     timeScale: "full" | number;
     startDate: Instant;

@@ -134,8 +134,8 @@ export interface CustomGraphFormData {
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   groupByKey?: string;
   includePrevious: boolean;
-  /** The native select hands its value back as text ("60"), whatever was loaded into it. */
-  timeScale: "full" | number | string;
+  /** Minutes, or the native select's text: "full" or a number of minutes ("60"). */
+  timeScale: number | string;
   connected?: boolean;
   alert?: {
     enabled: boolean;

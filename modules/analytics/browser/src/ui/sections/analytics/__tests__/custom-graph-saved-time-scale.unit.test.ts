@@ -35,7 +35,7 @@ describe("customGraphFormToCustomGraphInput", () => {
       const saved = customGraphFormToCustomGraphInput(formWithTimeScale("60"));
 
       expect(saved?.timeScale).toBe(60);
-      expect(customGraphInputSchema.safeParse(saved).success).toBe(true);
+      expect(customGraphInputSchema.validate(saved)).toBe(true);
     });
   });
 

@@ -12,10 +12,9 @@ const DAY_SCALE_MINUTES = 1440;
 const FALLBACK_SCALE_MINUTES = 60;
 
 /**
- * A stored `timeScale` read back as the shape the query schema accepts. The chart builder's
- * select saved its value as text ("60") for years, so a whole number of minutes written as
- * text is read as that number. Anything else, absent included, is null: the caller decides
- * whether that degrades to a default or refuses the chart.
+ * A stored `timeScale` as the query schema accepts it. The chart builder saved text ("60") for
+ * years, so whole-number text reads as that number. Anything else, absent included, is null:
+ * the caller decides whether that degrades to a default or refuses the chart.
  */
 export function parseStoredTimeScale(value: unknown): "full" | number | null {
   if (value === "full") return "full";
