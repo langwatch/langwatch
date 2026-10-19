@@ -165,7 +165,7 @@ describe("PersistActionWriterService.addToDataset", () => {
         },
       });
 
-      expect(errors.isTerminal(await refusalOf(gone.writer.addToDataset(write)))).toBe(true);
+      expect(errors.isTerminal(goneRefusal)).toBe(true);
       expect(errors.isTerminal(await refusalOf(raced.writer.addToDataset(write)))).toBe(true);
     });
 
