@@ -1,5 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
+import { isSerializationConflict } from "@langwatch/prisma-client";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -20,7 +21,8 @@ const COMMITTED_ABANDON_MS = 10 * 60 * 1000;
 
 function isRetryableTransactionError(error: unknown): boolean {
   return (
-    error instanceof Error && "code" in error && (error.code === "P2002" || error.code === "P2034")
+    isSerializationConflict(error) ||
+    (error instanceof Error && "code" in error && error.code === "P2002")
   );
 }
 
