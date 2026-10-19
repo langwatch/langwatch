@@ -77,7 +77,11 @@ const runTargetTypes = ["prompt", "http", "code", "workflow", "connected", "voic
 /** The reserved namespace the queue path stamps on a run. */
 const runLangwatchNamespaceSchema = z.looseObject({
   targetReferenceId: z.string(),
-  targetType: z.enum(runTargetTypes),
+  /**
+   * Absent when the stored or SDK-sent type is not one this version knows, so a legacy run
+   * keeps the rest of its namespace rather than losing it to one unreadable field.
+   */
+  targetType: z.enum(runTargetTypes).optional(),
   /**
    * The key the target folds under: the reference id alone, or the
    * reference id and a hash of its parameter overrides. Absent on runs
@@ -102,16 +106,25 @@ const runLangwatchNamespaceSchema = z.looseObject({
   agentInstance: z.object({ hostname: z.string(), label: z.string().nullable() }).optional(),
 });
 
+function isRunTargetType(value: string): value is (typeof runTargetTypes)[number] {
+  return (runTargetTypes as readonly string[]).includes(value);
+}
+
 /**
  * A stored or SDK-sent namespace is read, never refused: the target type is matched case-blind,
- * and a namespace that still does not read is an absent target, so one row cannot fail a read.
+ * a type this version does not know reads as absent while every other field is kept, and a
+ * namespace that still does not read is an absent target, so one row cannot fail a read.
  * @see modules/scenario/specs/simulation-run.feature
  */
 function readRunLangwatchNamespace(value: unknown): unknown {
   if (value == null || typeof value !== "object" || Array.isArray(value)) return undefined;
   const record: Record<string, unknown> = { ...value };
-  if (typeof record.targetType === "string") {
-    record.targetType = record.targetType.trim().toLowerCase();
+  const targetType =
+    typeof record.targetType === "string" ? record.targetType.trim().toLowerCase() : undefined;
+  if (targetType !== undefined && isRunTargetType(targetType)) {
+    record.targetType = targetType;
+  } else {
+    delete record.targetType;
   }
   return runLangwatchNamespaceSchema.safeParse(record).success ? record : undefined;
 }

@@ -55,10 +55,17 @@ Feature: A simulation run reports its true state and never leaks secrets
 
   # The read schema tolerates what stored rows and SDK events hold; the event intake stays strict.
   @unit
-  Scenario: A run stamped with a target type outside today's set still reads, with no target
+  Scenario: A run stamped with a target type outside today's set still reads, with no target type
     Given a stored run whose platform namespace names a target type the platform does not know, or none
     When the run is read
-    Then the run reads with no target instead of failing the read
+    Then the run reads with no target type instead of failing the read
+    And the rest of its platform context still reads: target, suite, scenario version, models and who started it
+
+  @unit
+  Scenario: A run whose platform context does not otherwise read still reads, with no platform context
+    Given a stored run whose platform namespace holds a field that does not read, other than the target type
+    When the run is read
+    Then the run reads with no platform context instead of failing the read
 
   @unit
   Scenario: A run stamped with a target type in another case reads as that target

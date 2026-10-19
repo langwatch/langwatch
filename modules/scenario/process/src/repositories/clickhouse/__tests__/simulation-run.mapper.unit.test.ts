@@ -68,21 +68,47 @@ describe("mapClickHouseRowToScenarioRunData", () => {
     const stored = (langwatch: Record<string, unknown>) =>
       row({ Metadata: JSON.stringify({ name: "Refund flow", langwatch }) });
 
-    /** @scenario "A run stamped with a target type outside today's set still reads, with no target" */
-    it("reads the run with no target instead of refusing it", () => {
+    /** @scenario "A run stamped with a target type outside today's set still reads, with no target type" */
+    it("reads the run with no target type and keeps the rest of its platform context", () => {
       const data = mapClickHouseRowToScenarioRunData(
-        stored({ targetReferenceId: "agent_1", targetType: "agent", actorId: "user-1" }),
+        stored({
+          targetReferenceId: "agent_1",
+          targetType: "agent",
+          simulationSuiteId: "suite_1",
+          scenarioVersion: 3,
+          judgeModel: "openai/gpt-5-mini",
+          actorId: "user-1",
+        }),
       );
 
       expect(data.scenarioRunId).toBe("run-1");
       expect(data.metadata?.name).toBe("Refund flow");
-      expect(data.metadata?.langwatch).toBeUndefined();
+      expect(data.metadata?.langwatch?.targetType).toBeUndefined();
+      expect(data.metadata?.langwatch).toMatchObject({
+        targetReferenceId: "agent_1",
+        simulationSuiteId: "suite_1",
+        scenarioVersion: 3,
+        judgeModel: "openai/gpt-5-mini",
+        actorId: "user-1",
+      });
     });
 
-    /** @scenario "A run stamped with a target type outside today's set still reads, with no target" */
+    /** @scenario "A run stamped with a target type outside today's set still reads, with no target type" */
     it("reads a run whose namespace carries no target type at all", () => {
       const data = mapClickHouseRowToScenarioRunData(stored({ targetReferenceId: "agent_1" }));
 
+      expect(data.metadata?.langwatch?.targetType).toBeUndefined();
+      expect(data.metadata?.langwatch?.targetReferenceId).toBe("agent_1");
+    });
+
+    /** @scenario "A run whose platform context does not otherwise read still reads, with no platform context" */
+    it("reads a run whose namespace has another unreadable field with no platform context", () => {
+      const data = mapClickHouseRowToScenarioRunData(
+        stored({ targetReferenceId: "agent_1", targetType: "http", scenarioVersion: "three" }),
+      );
+
+      expect(data.scenarioRunId).toBe("run-1");
+      expect(data.metadata?.name).toBe("Refund flow");
       expect(data.metadata?.langwatch).toBeUndefined();
     });
 
