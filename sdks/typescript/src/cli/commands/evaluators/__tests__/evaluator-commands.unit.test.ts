@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { EvaluatorsApiError, EvaluatorsApiService } from "@/client-sdk/services/evaluators";
+import { LangWatchHandledError } from "@/internal/api/errors";
 
 // Mock dependencies before imports
 vi.mock("@/client-sdk/services/evaluators", async (importOriginal) => {
@@ -21,11 +22,13 @@ vi.mock("../../../utils/apiKey", () => ({
   })),
 }));
 
+const spinnerFail = vi.hoisted(() => vi.fn());
+
 vi.mock("ora", () => ({
   default: () => ({
     start: vi.fn().mockReturnThis(),
     succeed: vi.fn(),
-    fail: vi.fn(),
+    fail: spinnerFail,
   }),
 }));
 
@@ -69,6 +72,27 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
   platformUrl: "https://app.langwatch.ai/proj-1/evaluators/evaluator_abc123",
   ...overrides,
 });
+
+const evaluatorNotFound = () =>
+  new LangWatchHandledError({
+    handled: {
+      code: "evaluator_not_found",
+      kind: "evaluator_not_found",
+      message: "Evaluator not found",
+      httpStatus: 404,
+      meta: {},
+      isHandled: true,
+      retryable: false,
+      traceId: undefined,
+      traceUrl: undefined,
+      reasons: undefined,
+      suggestions: undefined,
+      docUrl: undefined,
+    },
+    body: { error: "evaluator_not_found" },
+    operation: "get evaluator",
+    message: "Evaluator not found",
+  });
 
 describe("listEvaluatorsCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
@@ -121,13 +145,15 @@ describe("listEvaluatorsCommand()", () => {
 
 describe("getEvaluatorCommand()", () => {
   let mockGet: ReturnType<typeof vi.fn>;
+  let mockGetAll: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
     vi.clearAllMocks();
     mockGet = vi.fn();
+    mockGetAll = vi.fn();
     vi.mocked(EvaluatorsApiService).mockImplementation(function () {
       return {
-        getAll: vi.fn(),
+        getAll: mockGetAll,
         get: mockGet,
         create: vi.fn(),
         delete: vi.fn(),
@@ -153,6 +179,18 @@ describe("getEvaluatorCommand()", () => {
       mockGet.mockRejectedValue(new EvaluatorsApiError("Not found", "fetch evaluator"));
 
       await expect(getEvaluatorCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when the reference is a display name, not an id or slug", () => {
+    /** @scenario Get evaluator details by display name */
+    it("returns the evaluator with that name", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+      mockGetAll.mockResolvedValue([makeEvaluator({ id: "evaluator_xyz", name: "Tone Check" })]);
+
+      const result = await getEvaluatorCommand("tone check");
+
+      expect((result as { data: EvaluatorResponse }).data.id).toBe("evaluator_xyz");
     });
   });
 });
@@ -377,6 +415,30 @@ describe("deleteEvaluatorCommand()", () => {
     });
   });
 
+  describe("when the reference is a display name", () => {
+    it("does not look it up by name", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+      const getAll = vi.fn();
+      vi.mocked(EvaluatorsApiService).mockImplementation(function () {
+        return { getAll, get: mockGet, delete: mockDelete } as unknown as EvaluatorsApiService;
+      });
+
+      await expect(deleteEvaluatorCommand("Test Evaluator")).rejects.toThrow(ProcessExitError);
+
+      expect(getAll).not.toHaveBeenCalled();
+    });
+
+    it("tells the user to pass the id or slug and how to find it", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+
+      await expect(deleteEvaluatorCommand("Test Evaluator")).rejects.toThrow(ProcessExitError);
+
+      expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
+        'No evaluator with the id or slug "Test Evaluator". Find its id with `langwatch evaluator get <name>` or `langwatch evaluator list`, then pass the id.',
+      );
+    });
+  });
+
   describe("when delete API call fails", () => {
     it("exits with code 1", async () => {
       mockGet.mockResolvedValue(makeEvaluator());
@@ -488,6 +550,20 @@ describe("updateEvaluatorCommand()", () => {
     vi.spyOn(console, "log").mockImplementation(noop);
     vi.spyOn(console, "error").mockImplementation(noop);
     mockProcessExit();
+  });
+
+  describe("when the reference is a display name", () => {
+    it("tells the user to pass the id or slug and how to find it", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+
+      await expect(
+        updateEvaluatorCommand("Test Evaluator", { name: "Renamed" }),
+      ).rejects.toThrow(ProcessExitError);
+
+      expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
+        'No evaluator with the id or slug "Test Evaluator". Find its id with `langwatch evaluator get <name>` or `langwatch evaluator list`, then pass the id.',
+      );
+    });
   });
 
   describe("when --settings JSON is provided", () => {

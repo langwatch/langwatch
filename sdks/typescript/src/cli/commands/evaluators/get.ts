@@ -7,6 +7,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { asCommandError, findEvaluator } from "./findEvaluator";
 
 const printEvaluatorSettings = (settings: Record<string, unknown> | undefined): void => {
   if (!settings || Object.keys(settings).length === 0) return;
@@ -83,12 +84,12 @@ export const getEvaluatorCommand = async (idOrSlug: string): Promise<CommandResu
 
   let evaluator: EvaluatorResponse;
   try {
-    evaluator = await service.get(idOrSlug);
+    evaluator = await findEvaluator({ service, reference: idOrSlug });
     spinner.succeed(`Found evaluator "${evaluator.name}"`);
   } catch (error) {
     // No explicit `format`: see traces/search.ts — the preAction hook covers
     // every spelling; the `-f` commander default must not override it.
-    failSpinner({ spinner, error, action: "fetch evaluator" });
+    failSpinner({ spinner, error: asCommandError(error), action: "fetch evaluator" });
     process.exit(1);
   }
 

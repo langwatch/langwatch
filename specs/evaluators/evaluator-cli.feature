@@ -26,6 +26,12 @@ Feature: Evaluator CLI Commands
     When I run "langwatch evaluator get evaluator_abc123"
     Then I see evaluator metadata and configuration
 
+  @unit
+  Scenario: Get evaluator details by display name
+    Given my project has an evaluator named "Tone Check" with slug "tone-check"
+    When I run "langwatch evaluator get 'tone check'"
+    Then I see that evaluator's metadata and configuration
+
   Scenario: Get evaluator that does not exist
     When I run "langwatch evaluator get nonexistent"
     Then I see an error that the evaluator was not found

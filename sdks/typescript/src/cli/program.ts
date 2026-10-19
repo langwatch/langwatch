@@ -1494,13 +1494,13 @@ function registerEvaluatorCommands(program: Command): void {
 
   emitsResult(
     evaluatorCmd
-      .command("get <idOrSlug>")
-      .description("Get evaluator details by ID or slug")
+      .command("get <idSlugOrName>")
+      .description("Get evaluator details by ID, slug or display name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (idOrSlug: string) => {
+    async (idSlugOrName: string) => {
       try {
         const { getEvaluatorCommand: impl } = await import("./commands/evaluators/get.js");
-        return await impl(idOrSlug);
+        return await impl(idSlugOrName);
       } catch (error) {
         const { reportCommandError } = await import("./utils/errorOutput.js");
         reportCommandError({ error });

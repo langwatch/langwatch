@@ -6,6 +6,7 @@ import { resolveCredentials } from "../../utils/apiKey";
 import type { CommandResult } from "../../utils/output";
 import { createSpinner } from "../../utils/spinner";
 import { failSpinner } from "../../utils/spinnerError";
+import { explainExactLookupMiss } from "./findEvaluator";
 
 /**
  * Returns the archival outcome rather than printing it: the output port renders
@@ -28,7 +29,7 @@ export const deleteEvaluatorCommand = async (idOrSlug: string): Promise<CommandR
   } catch (error) {
     failSpinner({
       spinner: resolveSpinner,
-      error,
+      error: explainExactLookupMiss({ error, reference: idOrSlug }),
       action: `find evaluator "${idOrSlug}"`,
     });
     process.exit(1);

@@ -1164,12 +1164,12 @@ cookie. Wire format is plain JSON (POST body `input`, response
   own documented 90s recovery window before it elapsed, turning a
   self-healing hiccup into a hard test failure; the current budget retries
   comfortably past it.
-- The `call` adapter's `idempotencyKey` is `${threadId}#${messages.length}`,
-  not `crypto.randomUUID()`: one identity per logical send, stable if the
-  framework replays a stream that closed without a terminal marker, since
-  `threadId` and the message count are fixed before the retrying transport
-  call (`trpcMutateWithTurnLockRetry`) runs, and change again only for the
-  next genuinely new send.
+- The `call` adapter's `idempotencyKey` is `${threadId}#${sessionNonce}#${historyLength}`
+  (`turn-idempotency-key.ts`), not `crypto.randomUUID()`: one identity per
+  logical send, stable on a framework replay of the same send (same history
+  length, same session), new after `resetSession` so a replayed scenario
+  cannot collide with the failed attempt. The unfiltered history is counted
+  because the filtered list can repeat a length across sends.
 - `LangyToolEvent`: one tool frame on a turn stream, `start` or `end`, in
   stream order. The stored message flattens a turn's calls into one list,
   so it cannot say which calls were batched into one step and which waited
