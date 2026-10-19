@@ -52,7 +52,7 @@ export function VirtualizedTableRows({
     if (shouldVirtualize && virtualizer.scrollElement !== scrollContainerRef.current) {
       attachScroller();
     }
-  });
+  }, [shouldVirtualize, virtualizer.scrollElement]);
 
   if (!shouldVirtualize) {
     const rows: ReactNode[] = [];

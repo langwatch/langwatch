@@ -88,6 +88,10 @@ afterAll(async () => {
   await redis.quit();
 });
 
+function requireSetup({ holds, what }: { holds: boolean; what: string }): void {
+  if (!holds) throw new Error(`setup failed: ${what}`);
+}
+
 describe("given a group parked at its tenant's in-flight cap", () => {
   const running = "project_A/fold/trace:1";
   const parked = "project_A/fold/trace:2";
@@ -96,9 +100,12 @@ describe("given a group parked at its tenant's in-flight cap", () => {
     scripts = new GroupStagingScripts(redis, QUEUE_NAME, { tenantConcurrencyCap: 1 });
     await stage({ groupId: running, stagedJobId: "running-1" });
     await stage({ groupId: parked, stagedJobId: "parked-1" });
-    expect((await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 }))?.groupId).toBe(running);
-    expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).toBeNull();
-    expect(await redis.zscore(`${keyPrefix()}parked:project_A`, parked)).not.toBeNull();
+    const first = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+    requireSetup({ holds: first?.groupId === running, what: "the running group dispatches" });
+    const second = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+    requireSetup({ holds: second === null, what: "the second group waits" });
+    const score = await redis.zscore(`${keyPrefix()}parked:project_A`, parked);
+    requireSetup({ holds: score !== null, what: "the second group parks at the cap" });
   });
 
   describe("when it waits", () => {
@@ -156,8 +163,10 @@ describe("given a group parked behind a paused lane", () => {
     await stage({ groupId: laneParked, stagedJobId: "lane-1", jobDataJson: pausedLaneJob });
     await stage({ groupId: laneParked, stagedJobId: "lane-2", jobDataJson: pausedLaneJob });
     await scripts.addPauseKey(PAUSE_KEY);
-    expect(await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 })).toBeNull();
-    expect(await redis.zscore(`${keyPrefix()}parked-lane:${PAUSE_KEY}`, laneParked)).not.toBeNull();
+    const dispatched = await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
+    requireSetup({ holds: dispatched === null, what: "the paused lane dispatches nothing" });
+    const score = await redis.zscore(`${keyPrefix()}parked-lane:${PAUSE_KEY}`, laneParked);
+    requireSetup({ holds: score !== null, what: "the group parks behind the paused lane" });
   });
 
   describe("when the reaper applies hours past its cutoff", () => {

@@ -6,6 +6,7 @@ import {
   GroupQueueError,
   GroupQueueProducer,
   HandBackGroupQueueError,
+  isProjectGone,
   NonRetryableGroupQueueError,
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
@@ -19,7 +20,6 @@ import {
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
-import { isProjectGone } from "./projectGone.ts";
 import type {
   EventSourcedQueueDefinition,
   EventSourcedQueueProcessor,
