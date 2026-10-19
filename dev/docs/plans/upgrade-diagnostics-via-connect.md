@@ -24,8 +24,8 @@ and an opt-in to send these automatically.
 
 ## What the install would send
 
-One bundle per step, built on the install and shown to the operator before it
-leaves:
+One bundle per step, built on the install. A manual send shows it in a preview first; an
+automatic send does not, and the step page shows exactly what was sent:
 
 | Field | Source |
 |---|---|
@@ -55,8 +55,8 @@ is left out. See open decision 3.
   (`packages/secrets/src/redact.ts`, the `redactOutput` approach in
   `stepping/prisma-tool.ts:56`).
 - Customer data can appear in a validation error (a zod issue quoting a value).
-  Cap each string (4 KB) and drop zod `received`/`input` fields; the operator
-  sees the exact bundle in a preview before sending.
+  Cap each string (4 KB) and drop zod `received`/`input` fields; a manual send
+  previews the exact bundle, and every sent bundle stays viewable on the step page.
 
 ## Install end (licensing)
 
@@ -68,8 +68,8 @@ is left out. See open decision 3.
   `*Api` to send a bundle. Ops never holds the channel.
 - Step page: a "Send to LangWatch" action next to Retry, for `ops:manage`,
   with a preview of the bundle. Shown only when Connect is available.
-- Setting (Ops, Upgrades): "Always send upgrade diagnostics to LangWatch", off by
-  default. When on, the hourly alert check sends a bundle for each newly failed
+- Setting (Ops, Upgrades): "Always send upgrade diagnostics to LangWatch", on by
+  default for installs with Connect (decision 4), opt-out by the setting or an env var. When on, the hourly alert check sends a bundle for each newly failed
   step, keyed by step id and `updatedAt` so it is sent once.
 
 ## Hosted end (licensing's Connect host door)
