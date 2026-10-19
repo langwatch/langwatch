@@ -158,7 +158,7 @@ class StubRepository implements ProjectRepository {
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
-  listBackfillPage = vi.fn(async () => ({ projects: [], orphanIds: [], lastId: null }));
+  findBackfillPage = vi.fn(async () => ({ projects: [], orphanIds: [], lastId: null }));
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);

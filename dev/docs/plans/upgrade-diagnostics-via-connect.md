@@ -27,15 +27,15 @@ and an opt-in to send these automatically.
 One bundle per step, built on the install. A manual send shows it in a preview first; an
 automatic send does not, and the step page shows exactly what was sent:
 
-| Field | Source |
-|---|---|
-| step id, kind, mode, release, status, attempt, updated at | ledger step row |
-| `lastError` | step `last_error` (`packages/upgrade/src/ledger-tables.ts`) |
-| step `report` | step `report` JSONB (its targets and counts) |
-| target errors | target rows' `last_error` |
-| run log tail | the latest run's `report.logTail` (50 info/warn lines, already redacted by `RunLog`, `runner/run-log.ts:10,42`) |
-| image release, chart version, install method | ops config facts already in the usage report |
-| instance id | `InstanceIdentityService` (licensing) |
+| Field                                                     | Source                                                                                                          |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| step id, kind, mode, release, status, attempt, updated at | ledger step row                                                                                                 |
+| `lastError`                                               | step `last_error` (`packages/upgrade/src/ledger-tables.ts`)                                                     |
+| step `report`                                             | step `report` JSONB (its targets and counts)                                                                    |
+| target errors                                             | target rows' `last_error`                                                                                       |
+| run log tail                                              | the latest run's `report.logTail` (50 info/warn lines, already redacted by `RunLog`, `runner/run-log.ts:10,42`) |
+| image release, chart version, install method              | ops config facts already in the usage report                                                                    |
+| instance id                                               | `InstanceIdentityService` (licensing)                                                                           |
 
 Not sent: organisation, project or user names, row contents, environment
 variables, anything outside the ledger.

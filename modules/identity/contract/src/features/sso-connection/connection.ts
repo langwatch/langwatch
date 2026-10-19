@@ -265,9 +265,9 @@ const connectionRegisteredFieldsSchema = z.object({
 });
 
 /**
- * Registrations stored before the arrival policy (2026-08-25 to 2026-09-21) carry a boolean
- * `allowsJit` and no `arrivalPolicy`; the log is immutable, so every read upcasts them: `true`
- * admits, anything else is the default. Spec: modules/identity/specs/sso-connection-legacy-registration.feature
+ * Registrations stored 2026-08-25 to 2026-09-21 carry a boolean `allowsJit` and no
+ * `arrivalPolicy`; the log is immutable, so reads upcast them: `true` admits, else the default.
+ * Spec: modules/identity/specs/sso-connection-legacy-registration.feature
  */
 function upcastLegacyRegistration(data: unknown): unknown {
   if (typeof data !== "object" || data === null || Array.isArray(data)) return data;

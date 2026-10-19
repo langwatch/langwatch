@@ -239,7 +239,7 @@ export class MemoryProjectRepository implements ProjectRepository {
     };
   }
 
-  async listBackfillPage({
+  async findBackfillPage({
     afterId,
     limit,
   }: {

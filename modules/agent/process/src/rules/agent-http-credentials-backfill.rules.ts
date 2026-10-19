@@ -5,7 +5,7 @@ export type AgentCredentialKeptReason =
   | "secret_name_reserved"
   | "config_invalid";
 
-/** A refusal an operator can fix (free a slot, add a member, rotate a secret); it fails the step. */
+/** A refusal an operator can fix (free a slot, add a member, rotate a secret): fails the step. */
 type AgentCredentialHeldReason =
   | "project_has_no_member"
   | "secret_limit_reached"
@@ -31,30 +31,37 @@ const HELD_REASON_BY_CODE: Readonly<Record<string, AgentCredentialHeldReason>> =
   secret_already_exists: "secret_name_taken",
 };
 
-/** The handled code an error carries, or nothing for an unhandled one. */
-function codeOf(error: unknown): string | undefined {
-  if (typeof error !== "object" || error === null || !("code" in error)) return undefined;
+/** The handled code an error carries; an unhandled one carries none. */
+type HandledCode = { kind: "handled"; code: string } | { kind: "unhandled" };
 
-  return typeof error.code === "string" ? error.code : undefined;
+function handledCodeOf(error: unknown): HandledCode {
+  if (typeof error !== "object" || error === null || !("code" in error)) {
+    return { kind: "unhandled" };
+  }
+
+  return typeof error.code === "string"
+    ? { kind: "handled", code: error.code }
+    : { kind: "unhandled" };
 }
+
+/** A failed move: kept for good, or held with its code or kind (never its message). */
+export type MoveFailure =
+  | { kind: "kept"; reason: AgentCredentialKeptReason }
+  | { kind: "held"; reason: string };
 
 /**
- * The permanent reason behind a failed move, or undefined when a retry or a fix may succeed. A schema
- * error is deliberately not here: where it happened decides, and the service classifies the
- * agent's stored config (`config_invalid`) before the move; one thrown later is our own bug.
+ * A schema error is never kept here: the service checks the stored config (`config_invalid`)
+ * before the move, so one thrown later is our own bug and holds the step.
  */
-export function keptReasonOf(error: unknown): AgentCredentialKeptReason | undefined {
-  const code = codeOf(error);
+export function moveFailureOf(error: unknown): MoveFailure {
+  const handled = handledCodeOf(error);
+  if (handled.kind === "unhandled") {
+    return { kind: "held", reason: error instanceof Error ? error.name : typeof error };
+  }
+  const kept = KEPT_REASON_BY_CODE[handled.code];
+  if (kept !== undefined) return { kind: "kept", reason: kept };
 
-  return code === undefined ? undefined : KEPT_REASON_BY_CODE[code];
-}
-
-/** The error's reason, code or kind only: a message may echo the value being stored. */
-export function failureReasonOf(error: unknown): string {
-  const code = codeOf(error);
-  if (code !== undefined) return HELD_REASON_BY_CODE[code] ?? code;
-
-  return error instanceof Error ? error.name : typeof error;
+  return { kind: "held", reason: HELD_REASON_BY_CODE[handled.code] ?? handled.code };
 }
 
 const NAMED_IN_MESSAGE = 5;

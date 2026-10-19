@@ -8,9 +8,8 @@ import { fromDate, type Instant } from "@langwatch/time";
 
 import type { AgentRepository } from "../repositories/agent.repository.ts";
 import {
-  failureReasonOf,
   heldMessageOf,
-  keptReasonOf,
+  moveFailureOf,
   type AgentCredentialOutcome,
 } from "../rules/agent-http-credentials-backfill.rules.ts";
 import type { AgentHttpSecretsService } from "./agent-http-secrets.service.ts";
@@ -42,10 +41,9 @@ type MoveOutcome =
   | { kind: "kept"; reason: string };
 
 /**
- * Stores credentials typed inline into HTTP agents as project secrets
- * (modules/agent/specs/http-credentials.feature). An agent counts as moved only when a re-read
- * holds no literal. A refusal no action can fix is kept and reported; anything else is held and
- * fails the pass for a retry.
+ * Stores inline HTTP agent credentials as project secrets; moved only when a re-read holds no
+ * literal. A refusal no action can fix is kept, anything else is held and fails the pass.
+ * Spec: modules/agent/specs/http-credentials.feature
  */
 export class AgentHttpCredentialsBackfillService {
   static create(deps: {
@@ -113,7 +111,7 @@ export class AgentHttpCredentialsBackfillService {
     for (const agent of await this.deps.agents.findAll({ projectId })) {
       if (agent.type !== "http") continue;
       // The stored config is validated before the move, so a schema error later is ours to fix.
-      if (!httpAgentConfigSchema.safeParse(agent.config).success) {
+      if (!httpAgentConfigSchema.validate(agent.config)) {
         if (!dryRun)
           this.record({
             report,
@@ -156,10 +154,10 @@ export class AgentHttpCredentialsBackfillService {
         return { kind: "written" };
       }
     } catch (error) {
-      const reason = keptReasonOf(error);
-      if (reason === undefined) throw error;
+      const failure = moveFailureOf(error);
+      if (failure.kind === "held") throw error;
 
-      return { kind: "kept", reason };
+      return failure;
     }
 
     return outcome.kind === "held" ? outcome : { kind: "held", reason: "saved_during_move" };
@@ -211,11 +209,7 @@ export class AgentHttpCredentialsBackfillService {
 
       return written ? { kind: "written" } : { kind: "held", reason: "saved_during_move" };
     } catch (error) {
-      const kept = keptReasonOf(error);
-
-      return kept === undefined
-        ? { kind: "held", reason: failureReasonOf(error) }
-        : { kind: "kept", reason: kept };
+      return moveFailureOf(error);
     }
   }
 }

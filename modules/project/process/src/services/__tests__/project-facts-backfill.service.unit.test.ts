@@ -81,7 +81,7 @@ function stepOver(
   });
   const service = ProjectFactsBackfillService.create({
     projects: {
-      listBackfillPage: async ({ afterId }) => {
+      findBackfillPage: async ({ afterId }) => {
         reads.push(afterId);
         const ids = [...projects.map((project) => project.id), ...orphanIds].toSorted();
         const page = ids.filter((id) => afterId === null || id > afterId).slice(0, 2);

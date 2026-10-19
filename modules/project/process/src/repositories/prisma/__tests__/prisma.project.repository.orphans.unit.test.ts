@@ -50,7 +50,7 @@ describe("PrismaProjectRepository over projects whose team or organization is go
   describe("when the facts step reads a page", () => {
     /** @scenario "The project facts step skips a project whose team or organization is gone" */
     it("names both orphans and maps the whole project, with the last id as the cursor", async () => {
-      const page = await repositoryOver(ROWS).listBackfillPage({ afterId: null, limit: 10 });
+      const page = await repositoryOver(ROWS).findBackfillPage({ afterId: null, limit: 10 });
 
       expect(page.orphanIds).toEqual(["project-a", "project-b"]);
       expect(page.projects.map((project) => [project.id, project.organizationId])).toEqual([

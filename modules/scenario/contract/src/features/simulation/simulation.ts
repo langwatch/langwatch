@@ -125,11 +125,11 @@ function readRunLangwatchNamespace(value: unknown): unknown {
   } else {
     delete record.targetType;
   }
-  if (runLangwatchNamespaceSchema.safeParse(record).success) return record;
+  if (runLangwatchNamespaceSchema.validate(record)) return record;
   for (const [name, field] of Object.entries(runLangwatchNamespaceSchema.shape)) {
-    if (name in record && !field.safeParse(record[name]).success) delete record[name];
+    if (name in record && !field.validate(record[name])) delete record[name];
   }
-  return runLangwatchNamespaceSchema.safeParse(record).success ? record : undefined;
+  return runLangwatchNamespaceSchema.validate(record) ? record : undefined;
 }
 
 /** Platform metadata carried with runs started by a simulation suite. */

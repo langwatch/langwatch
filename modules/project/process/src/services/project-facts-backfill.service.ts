@@ -35,7 +35,7 @@ export type ProjectFactsBackfillRun = Readonly<{
 }>;
 
 type Dependencies = Readonly<{
-  projects: Pick<ProjectRepository, "listBackfillPage">;
+  projects: Pick<ProjectRepository, "findBackfillPage">;
   lifecycle: Pick<ProjectCreatedNoticeService, "recordBackfillPage">;
   logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
 }>;
@@ -67,7 +67,7 @@ export class ProjectFactsBackfillService {
     while (!signal.aborted) {
       // Taken before the read, so a change saved meanwhile is the newer fact.
       const occurredAt = nowInstant().epochMilliseconds;
-      const page = await this.deps.projects.listBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
+      const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
       if (page.lastId === null) break;
       const live: ProjectBackfillRow[] = page.projects.filter((project) => !project.isArchived);
       if (!dryRun && page.projects.length > 0) {

@@ -109,7 +109,7 @@ export interface ProjectRepository {
   touchCodingAgentPullRequestSeen(input: TouchCodingAgentActivityInput): Promise<void>;
   findWithOrgAdmin(id: string): Promise<ProjectWithOrgAdmin | null>;
   /** Every project, archived ones included, in id order after `afterId`. */
-  listBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillPage>;
+  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<ProjectBackfillPage>;
   findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null>;
   searchByQuery(input: {
     query: string;

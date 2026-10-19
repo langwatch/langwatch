@@ -2,39 +2,48 @@ import { SecretLimitReachedError, SecretNotFoundError } from "@langwatch/secret-
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
-import {
-  failureReasonOf,
-  heldMessageOf,
-  keptReasonOf,
-} from "../agent-http-credentials-backfill.rules.ts";
+import { heldMessageOf, moveFailureOf } from "../agent-http-credentials-backfill.rules.ts";
 
 describe("the agent credential step's failure reasons", () => {
   describe("when a refusal is permanent", () => {
     /** @scenario "An agent credential that can never be moved is left in place and the step completes" */
     it("names the reason by code, whether or not the error crossed a boundary", () => {
-      expect(keptReasonOf(new SecretNotFoundError())).toBe("project_not_found");
-      expect(keptReasonOf({ code: "agent_not_found" })).toBe("agent_not_found");
+      expect(moveFailureOf(new SecretNotFoundError())).toEqual({
+        kind: "kept",
+        reason: "project_not_found",
+      });
+      expect(moveFailureOf({ code: "agent_not_found" })).toEqual({
+        kind: "kept",
+        reason: "agent_not_found",
+      });
     });
 
     /** @scenario "A config the credential step produced that fails validation holds the step" */
     it("does not treat a schema error as permanent, since where it happened decides", () => {
       const schemaError = z.object({ url: z.string() }).safeParse({}).error;
-
-      expect(keptReasonOf(schemaError)).toBeUndefined();
-      expect(failureReasonOf(schemaError)).toBe("ZodError");
+      expect(moveFailureOf(schemaError)).toEqual({ kind: "held", reason: "ZodError" });
     });
   });
 
   describe("when an operator can fix the refusal", () => {
     /** @scenario "An agent credential an operator can unblock holds the step, naming the agent and why" */
     it("holds it under a stable reason code instead of keeping it for good", () => {
-      expect(keptReasonOf(new SecretLimitReachedError())).toBeUndefined();
-      expect(failureReasonOf(new SecretLimitReachedError())).toBe("secret_limit_reached");
-      expect(failureReasonOf({ code: "authenticated_actor_required" })).toBe(
-        "project_has_no_member",
-      );
-      expect(failureReasonOf({ code: "secret_already_exists" })).toBe("secret_name_taken");
-      expect(failureReasonOf({ code: "secret_unreadable" })).toBe("secret_unreadable");
+      expect(moveFailureOf(new SecretLimitReachedError())).toEqual({
+        kind: "held",
+        reason: "secret_limit_reached",
+      });
+      expect(moveFailureOf({ code: "authenticated_actor_required" })).toEqual({
+        kind: "held",
+        reason: "project_has_no_member",
+      });
+      expect(moveFailureOf({ code: "secret_already_exists" })).toEqual({
+        kind: "held",
+        reason: "secret_name_taken",
+      });
+      expect(moveFailureOf({ code: "secret_unreadable" })).toEqual({
+        kind: "held",
+        reason: "secret_unreadable",
+      });
     });
   });
 
@@ -42,10 +51,11 @@ describe("the agent credential step's failure reasons", () => {
     /** @scenario "An agent credential that cannot be moved holds the agent credential step" */
     it("holds it, naming a database code or the error kind, never the message", () => {
       const dropped = Object.assign(new Error("tok_live_secret"), { code: "P1001" });
-
-      expect(keptReasonOf(dropped)).toBeUndefined();
-      expect(failureReasonOf(dropped)).toBe("P1001");
-      expect(failureReasonOf(new TypeError("tok_live_secret"))).toBe("TypeError");
+      expect(moveFailureOf(dropped)).toEqual({ kind: "held", reason: "P1001" });
+      expect(moveFailureOf(new TypeError("tok_live_secret"))).toEqual({
+        kind: "held",
+        reason: "TypeError",
+      });
     });
 
     /** @scenario "An agent credential that cannot be moved holds the agent credential step" */

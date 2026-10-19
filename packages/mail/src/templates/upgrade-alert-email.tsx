@@ -26,7 +26,8 @@ const failedStepSchema = z.object({
 
 /**
  * Who reads the alert: LangWatch staff on LangWatch Cloud get step ids and errors; a self-hosted
- * operator gets plain language and the way to reach us. Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
+ * operator gets plain language and the way to reach us.
+ * Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
  */
 const audienceSchema = z.enum(["self-hosted", "langwatch-cloud"]);
 
@@ -157,7 +158,7 @@ const TechnicalBody = (props: UpgradeAlertEmailProps) => {
   );
 };
 
-/** What the operator is told about serving: the upgrade gate refuses only on a failed blocking step. */
+/** What the operator is told about serving: the gate refuses only on a failed blocking step. */
 const servingSentence = ({
   installation,
   failedSteps,

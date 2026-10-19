@@ -88,7 +88,7 @@ function factsStep() {
   });
   const step = ProjectFactsBackfillService.create({
     projects: {
-      listBackfillPage: async ({ afterId, limit }) => {
+      findBackfillPage: async ({ afterId, limit }) => {
         const projects = rows.filter((row) => afterId === null || row.id > afterId).slice(0, limit);
         return { projects, orphanIds: [], lastId: projects.at(-1)?.id ?? null };
       },
