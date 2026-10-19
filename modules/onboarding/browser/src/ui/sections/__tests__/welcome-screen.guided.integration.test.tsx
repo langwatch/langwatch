@@ -603,4 +603,18 @@ describe("WelcomeScreen terms agreement", () => {
 
     expect(screen.getByRole("checkbox")).not.toBeChecked();
   });
+
+  /** @scenario "Opening the privacy link leaves the agreement as it was" */
+  it("does not tick the agreement when the privacy link is opened", async () => {
+    await user.click(screen.getByRole("link", { name: /Privacy/ }));
+
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  });
+
+  /** @scenario "The agreement box names both documents to a screen reader" */
+  it("gives the box an accessible name naming the terms and the privacy policy", () => {
+    expect(
+      screen.getByRole("checkbox", { name: /I agree to the LangWatch .*Terms.* and .*Privacy/ }),
+    ).toBeInTheDocument();
+  });
 });

@@ -18,3 +18,14 @@ Feature: The terms agreement on the organization step
     Given a new user on the organization step
     When they open the terms of service link
     Then the agreement is still not ticked
+
+  @integration
+  Scenario: Opening the privacy link leaves the agreement as it was
+    Given a new user on the organization step
+    When they open the privacy policy link
+    Then the agreement is still not ticked
+
+  @integration
+  Scenario: The agreement box names both documents to a screen reader
+    Given a new user on the organization step
+    Then the agreement box's accessible name names the terms of service and the privacy policy
