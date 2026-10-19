@@ -56,18 +56,27 @@ export function createLangWatchHttp({ config }: { config: LangWatchConfig }): La
       headers?: Record<string, string>;
       timeoutMs?: number;
     }): Promise<HttpAnswer<T>> {
-      const response = await fetch(`${config.endpoint}${path}`, {
-        method,
-        headers: {
-          Authorization: `Bearer ${config.apiKey}`,
-          "X-Project-Id": config.projectId,
-          ...(body === undefined ? {} : { "Content-Type": "application/json" }),
-          ...headers,
-        },
-        ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-        signal: AbortSignal.timeout(timeoutMs),
-      });
-      const text = await response.text();
+      let response: Response;
+      let text: string;
+      try {
+        response = await fetch(`${config.endpoint}${path}`, {
+          method,
+          headers: {
+            Authorization: `Bearer ${config.apiKey}`,
+            "X-Project-Id": config.projectId,
+            ...(body === undefined ? {} : { "Content-Type": "application/json" }),
+            ...headers,
+          },
+          ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+          signal: AbortSignal.timeout(timeoutMs),
+        });
+        text = await response.text();
+      } catch (error) {
+        if (error instanceof Error && error.name === "TimeoutError") {
+          throw new Error(`${method} ${path} timed out after ${timeoutMs}ms`, { cause: error });
+        }
+        throw error;
+      }
       let parsed: unknown = text;
       try {
         parsed = text ? JSON.parse(text) : null;
