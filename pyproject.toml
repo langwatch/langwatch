@@ -32,10 +32,10 @@ constraint-dependencies = [
   "accelerate>=1.15.0", # security: accelerate advisory covers <=1.14.0 (#2787)
   "pyjwt>=2.15.0", # security: PyJWT advisories covering <=2.14.0 (#2788-#2798, #2802, #2806, #2819)
   "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2799-#2801)
-  "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0
-  "langgraph-sdk>=0.4.4", # security: langgraph-sdk advisory covering <=0.4.3
+  "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0 (#2751)
+  "langgraph-sdk>=0.4.4", # security: langgraph-sdk advisory covering <=0.4.3 (#2750)
   "jupyterlab>=4.6.4", # security: jupyterlab advisories covering 4.6.0-4.6.3 (#2814, #2816, #2817)
   "notebook>=7.6.3", # security: notebook advisory covering 7.5.0-7.6.2 (#2815)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2818)
-  "mcp>=1.30.0", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 (#2829)
+  "mcp>=1.30.0,!=2.0.*,!=2.1.*", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 1.30.0 and 2.2.0 (#2829)
 ]
