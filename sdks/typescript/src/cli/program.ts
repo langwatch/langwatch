@@ -4524,12 +4524,12 @@ function registerMonitorCommands(program: Command): void {
 
   emitsResult(
     monitorCmd
-      .command("get <id>")
-      .description("Get monitor details by ID")
+      .command("get <idOrSlugOrName>")
+      .description("Get monitor details by id, slug or name")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (id: string) => {
+    async (idOrSlugOrName: string) => {
       const { getMonitorCommand: impl } = await import("./commands/monitors/get.js");
-      return impl(id);
+      return impl(idOrSlugOrName);
     },
   );
 
@@ -4573,7 +4573,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("update <id>")
-      .description("Update a monitor")
+      .description("Update a monitor by id (find the id with `monitor get <name>`)")
       .option("--name <name>", "New monitor name")
       .option("--enabled <boolean>", "Enable or disable the monitor (true/false)")
       .option("--execution-mode <mode>", "Execution mode: ON_MESSAGE, AS_GUARDRAIL, MANUALLY")
@@ -4598,7 +4598,7 @@ function registerMonitorCommands(program: Command): void {
   emitsResult(
     monitorCmd
       .command("delete <id>")
-      .description("Delete a monitor")
+      .description("Delete a monitor by id (find the id with `monitor get <name>`)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (id: string) => {
       const { deleteMonitorCommand: impl } = await import("./commands/monitors/delete.js");
