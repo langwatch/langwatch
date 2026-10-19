@@ -91,6 +91,25 @@ describe("awaitTurnSettlement", () => {
     expect(mockDisconnect).toHaveBeenCalled();
   });
 
+  it("gives a card-only turn the code access line instead of an empty reply", async () => {
+    const parts = [{ type: "tool-code_access" }];
+    mockFindTurn.mockResolvedValue([{ ...completedTurn, AnswerParts: parts }]);
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
+    });
+
+    expect(settlement).toMatchObject({
+      kind: "settled",
+      settlement: {
+        text: "I'm waiting for you to say how I should reach your code, on the card above.",
+        parts,
+      },
+    });
+  });
+
   /** @scenario "A settled turn answers its message id and parts" */
   it("hands back the answer's message id and its parts beside its text", async () => {
     mockFindTurn.mockResolvedValue([completedTurn]);
