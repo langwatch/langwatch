@@ -37,6 +37,7 @@ on:
       # died on its first import.
       - "infra/docker/Dockerfile"
       - "infra/docker/Dockerfile.go_service"
+      - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -72,6 +73,7 @@ on:
       # died on its first import.
       - "infra/docker/Dockerfile"
       - "infra/docker/Dockerfile.go_service"
+      - "infra/clickhouse-serverless/**"
       - ".dockerignore"
       - "pnpm-workspace.yaml"
       - "pnpm-lock.yaml"
@@ -114,11 +116,36 @@ jobs:
     permissions:
       contents: read
       actions: write
+    outputs:
+      e2e: ${{ steps.e2e-paths.outputs.e2e }}
     defaults:
       run:
         working-directory: charts/langwatch
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The kind legs below run only when a pull request changes what they
+      # deploy: the charts, the images, or how the workspace installs. A
+      # lockfile, package.json or config-declaration change still runs every
+      # render assertion here, and main runs the kind legs on every merge.
+      - uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3
+        if: github.event_name == 'pull_request'
+        id: e2e-paths
+        with:
+          # Empty: diff with git, never the files API (specs/ci/path-filters.feature).
+          token: ""
+          filters: |
+            e2e:
+              - "charts/langwatch/**"
+              - "charts/clickhouse-serverless/**"
+              - "charts/gateway/**"
+              - "charts/langyagent/**"
+              - "charts/lib/**"
+              - ".github/workflows/langwatch-chart.yml"
+              - "infra/docker/Dockerfile"
+              - "infra/docker/Dockerfile.go_service"
+              - "infra/clickhouse-serverless/**"
+              - ".dockerignore"
+              - "pnpm-workspace.yaml"
       - uses: azure/setup-helm@9bc31f4ebc9c6b171d7bfbaa5d006ae7abdb4310 # v5
         with:
           version: v3.12.0
@@ -397,6 +424,7 @@ jobs:
       (github.event_name != 'pull_request' || github.event.pull_request.draft == false
        || contains(github.event.pull_request.labels.*.name, 'ci:full'))
       && (github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full')
+      && (github.event_name != 'pull_request' || needs.render.outputs.e2e == 'true' || contains(github.event.pull_request.labels.*.name, 'ci:full'))
     runs-on: ubuntu-latest
     needs: render
     strategy:
@@ -433,9 +461,20 @@ jobs:
           APP_REPO=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'repository:' | awk '{print $2}')
           APP_TAG=$(helm show values . | grep -A20 '^images:' | grep -A2 '^  app:' | grep 'tag:' | head -1 | awk '{print $2}')
           echo "APP_IMAGE=${APP_REPO}:${APP_TAG}" >> "$GITHUB_ENV"
+      - uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        if: matrix.build_app
+      # Reuses unchanged layers, the dependency install above all, from the
+      # Actions cache. Main writes it; a pull request only reads.
       - name: Build app image
         if: matrix.build_app
-        run: docker build -t "$APP_IMAGE" -f ../../infra/docker/Dockerfile ../..
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a # v6
+        with:
+          context: .
+          file: infra/docker/Dockerfile
+          load: true
+          tags: ${{ env.APP_IMAGE }}
+          cache-from: type=gha,scope=chart-e2e-app
+          cache-to: ${{ github.event_name != 'pull_request' && 'type=gha,scope=chart-e2e-app,mode=max,ignore-error=true' || '' }}
       # The gateway image isn't published to ghcr yet — build it locally so
       # the chart e2e can install. values-e2e.yaml overrides
       # gateway.image.{repository,tag,pullPolicy} to match.

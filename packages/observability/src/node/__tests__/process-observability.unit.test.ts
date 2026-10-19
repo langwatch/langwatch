@@ -12,6 +12,12 @@ vi.mock("langwatch", () => ({
   getLangWatchTracer: () => ({}),
 }));
 
+const startProfiling = vi.fn((_options: Record<string, unknown>) => undefined);
+
+vi.mock("../profiling.ts", () => ({
+  startProfiling: (options: Record<string, unknown>) => startProfiling(options),
+}));
+
 import { createProcessObservability, UnexportedSpanProcessor } from "../process-observability.ts";
 import { processTelemetry } from "../process-telemetry.ts";
 import type { TelemetrySecret, TelemetrySettings } from "../telemetry-settings.ts";
@@ -29,6 +35,7 @@ function sdkOptions(): {
 
 beforeEach(() => {
   setupObservability.mockClear();
+  startProfiling.mockClear();
 });
 
 afterEach(() => {
@@ -192,6 +199,21 @@ describe("given a process composing telemetry from its declared slice", () => {
       expect(typeof telemetry.logger.info).toBe("function");
       expect(telemetry.component.name).toBe("process telemetry");
       await expect(telemetry.component.stop()).resolves.not.toThrow();
+    });
+  });
+});
+
+describe("given a process that profiles itself", () => {
+  describe("when OTEL_SERVICE_NAME renames the service", () => {
+    /** @scenario "Profiles carry the service identity" */
+    it("labels profiles with the name it reports to OpenTelemetry", async () => {
+      await processTelemetry("langwatch-api")(
+        contextWith({ serviceName: "langwatch-app", environment: "production" }).context,
+      );
+
+      expect(startProfiling).toHaveBeenCalledWith(
+        expect.objectContaining({ appName: "langwatch-app", environment: "production" }),
+      );
     });
   });
 });

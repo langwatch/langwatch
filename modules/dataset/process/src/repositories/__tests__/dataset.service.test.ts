@@ -43,6 +43,7 @@ class Repo implements DatasetRepository {
   findById = async () => this.value;
   findBySlug = async () => null;
   findAll = async () => [];
+  findRecordCountColumns = async () => [];
   create = async () => this.value;
   update = async () => this.value;
   archive = async () => this.value;
@@ -54,6 +55,7 @@ class Repo implements DatasetRepository {
   }
 }
 class Records implements DatasetRecordRepository {
+  countByDataset = async () => [];
   async count(): Promise<number> {
     return 0;
   }

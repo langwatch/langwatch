@@ -276,6 +276,9 @@ export class Server {
         listener.on("clientError", (error: ClientError, socket: Duplex) =>
           this.refuseUnparsed(error, socket),
         );
+        // Outlives any proxy's idle reuse, as the liveness thread's public listener does.
+        listener.keepAliveTimeout = PUBLIC_KEEP_ALIVE_MS;
+        listener.headersTimeout = PUBLIC_KEEP_ALIVE_MS + 1_000;
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
         }
@@ -359,7 +362,7 @@ export class Server {
     // door stops last — but it takes no new work, and says so by name.
     if (this.draining) {
       response
-        .writeHead(503, { "Content-Type": "text/plain" })
+        .writeHead(503, { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining" })
         .end(`${this.name} is shutting down`);
       return;
     }
@@ -369,7 +372,11 @@ export class Server {
       if (response.headersSent) return;
       if (this.applicationExpected) {
         response
-          .writeHead(503, { "Content-Type": "text/plain", "Retry-After": "5" })
+          .writeHead(503, {
+            "Content-Type": "text/plain",
+            "Retry-After": "5",
+            [NOT_HANDLED_HEADER]: "starting",
+          })
           .end(`${this.name} is starting`);
         return;
       }
@@ -655,7 +662,11 @@ function installFatalHandlers(options: {
  * handover: the outgoing process drains in-flight work before it lets go.
  */
 const BIND_HANDOVER_MS = 10_000;
+/** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
+const PUBLIC_KEEP_ALIVE_MS = 65_000;
 const BIND_RETRY_MS = 250;
+/** Marks a 503 answered before any handler ran, so a client may resend it (browser wire). */
+const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
 
 function isAddressInUse(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "EADDRINUSE";

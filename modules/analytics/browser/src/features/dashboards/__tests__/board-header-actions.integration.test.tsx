@@ -90,8 +90,8 @@ function openScreen({
     ),
     host,
     answer: (call: UiProcedureCall) => {
-      if (call.path === "dashboards.getAll") return Promise.resolve([{ ...BOARD }]);
-      if (call.path === "dashboards.listStarred") return Promise.resolve([]);
+      if (call.path === "boards.getAll") return Promise.resolve([{ ...BOARD }]);
+      if (call.path === "boards.listStarred") return Promise.resolve([]);
       if (call.path === "dashboardWidgets.list") return Promise.resolve(WIDGETS);
       return NO_PROCEDURES(call);
     },

@@ -30,7 +30,7 @@ import type {
   SignedIssuedLicense,
 } from "./issued-license.ts";
 import type { PlanInfo } from "./license-constants.ts";
-import type { IssueLicenseInput } from "./license-registry.ts";
+import type { IssuedLicenseFilters, IssueLicenseInput } from "./license-registry.ts";
 import type {
   ConnectCredentialResolution,
   ConnectActivationCaller,
@@ -54,7 +54,9 @@ import type {
 import type {
   IncomingUsageReport,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
   SelfHostedSignal,
 } from "./self-hosted-instance.ts";
 
@@ -140,11 +142,13 @@ export interface LicensingApi {
     operatorId: string;
   }): Promise<IssuedLicenseView>;
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage>;
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage>;
 
   /** Who a presented `lwl_` bearer is, for a hosted route on LangWatch Cloud. */
   resolveConnectCredential(input: {
@@ -275,12 +279,15 @@ export interface LicensingApi {
    * license bound to that instance and never from the report.
    */
   recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]>;
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage>;
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage>;
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+  summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
 }
 
 /** Re-exported so a peer naming a service does not reach past the api file. */

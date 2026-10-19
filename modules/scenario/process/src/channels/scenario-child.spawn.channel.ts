@@ -16,7 +16,7 @@ interface SpawnConfig {
 }
 
 /**
- * Spawn command resolver: production uses bundle or tsx fallback, dev uses bundle if
+ * Spawn command resolver: production requires the bundle (throws if missing), dev uses bundle if
  * current else tsx (edit child -> next spawn uses tsx, no rebuild needed).
  */
 export class ScenarioChildSpawn {
@@ -38,7 +38,7 @@ export class ScenarioChildSpawn {
     sourceRoots: string[];
   }): SpawnConfig {
     if (nodeEnv === "production") {
-      return resolveProductionSpawn(packageRoot, sourcePath);
+      return resolveProductionSpawn(packageRoot);
     }
 
     // Bundle is optimisation, used if current; tsx costs 4-6s per spawn.
@@ -101,7 +101,7 @@ function hasFileNewerThan(dir: string, thresholdMs: number): boolean {
   return false;
 }
 
-function resolveProductionSpawn(packageRoot: string, sourcePath: string): SpawnConfig {
+function resolveProductionSpawn(packageRoot: string): SpawnConfig {
   const bundlePath = path.join(packageRoot, "dist", "server", "scenario-child-process.mjs");
 
   if (fs.existsSync(bundlePath)) {
@@ -112,16 +112,14 @@ function resolveProductionSpawn(packageRoot: string, sourcePath: string): SpawnC
     };
   }
 
-  logger.error(
-    { bundlePath },
-    "Pre-compiled scenario child process bundle NOT FOUND. " +
-      "Falling back to tsx — this costs ~4 min cold-starts, and it only works " +
-      "where dev dependencies are installed. The Docker image and the npx " +
-      "install prune tsx, so there this spawn fails outright. " +
-      'Run "pnpm run build:server" to fix this.',
-  );
-
-  return resolveDevelopmentSpawn(sourcePath);
+  // No tsx fallback here: production images prune dev dependencies, so `pnpm exec tsx`
+  // would try `pnpm install` and fail minutes later with an unrelated error. Fail now.
+  const message =
+    "Pre-compiled scenario child process bundle NOT FOUND at " +
+    `${bundlePath}. The image must build @langwatch/scenario-child ` +
+    '(run "pnpm run build:server", or the Dockerfile build step).';
+  logger.error({ bundlePath }, message);
+  throw new Error(message);
 }
 
 function resolveDevelopmentSpawn(sourcePath: string): SpawnConfig {

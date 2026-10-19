@@ -1371,7 +1371,7 @@ Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trac
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:212
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:213
 ```
 
 ### `spans`
@@ -1910,7 +1910,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:227
+type Output = z.infer<typeof spanDetailSchema>; // ../contract/src/trace-view.contract.ts:246
 
 // traces.resourceInfo
 // Input: inline, ../contract/src/traces.trpc.ts:593
@@ -1920,7 +1920,7 @@ interface Input {
   occurredAtMs?: number;
   tenantId?: string;
 }
-type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:286
+type Output = z.infer<typeof traceResourceInfoSchema>; // ../contract/src/trace-view.contract.ts:305
 
 // traces.traceEvents
 // Input: inline, ../contract/src/traces.trpc.ts:607
@@ -1996,14 +1996,16 @@ Declared at `src/features/ingestion/eventing/trace-ingest-source-billing.pipelin
 
 ## Configuration
 
-| Kind   | Leaf                           | Environment variable                         | Declared at                          |
-| ------ | ------------------------------ | -------------------------------------------- | ------------------------------------ |
-| config | `spanProcessingShards`         | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:9`  |
-| config | `tokenizer.bpeDirectory`       | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:11` |
-| config | `tokenizer.fetchTimeoutMs`     | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:12` |
-| config | `tokenizer.disabled`           | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:16` |
-| config | `disableCodingAgentSpanFilter` | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:24` |
-| config | `foldCacheTtlSeconds`          | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:31` |
-| config | `publicBaseUrl`                | `BASE_HOST`                                  | `../contract/src/trace.config.ts:32` |
+| Kind   | Leaf                            | Environment variable                         | Declared at                          |
+| ------ | ------------------------------- | -------------------------------------------- | ------------------------------------ |
+| config | `spanProcessingShards`          | `TRACE_SPAN_PROCESSING_SHARDS`               | `../contract/src/trace.config.ts:13` |
+| config | `tokenizer.bpeDirectory`        | `TIKTOKENS_PATH`                             | `../contract/src/trace.config.ts:15` |
+| config | `tokenizer.fetchTimeoutMs`      | `TIKTOKEN_FETCH_TIMEOUT_MS`                  | `../contract/src/trace.config.ts:16` |
+| config | `tokenizer.disabled`            | `DISABLE_TOKENIZATION`                       | `../contract/src/trace.config.ts:20` |
+| config | `disableCodingAgentSpanFilter`  | `LANGWATCH_DISABLE_CODING_AGENT_SPAN_FILTER` | `../contract/src/trace.config.ts:28` |
+| config | `foldCacheTtlSeconds`           | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`           | `../contract/src/trace.config.ts:35` |
+| config | `publicBaseUrl`                 | `BASE_HOST`                                  | `../contract/src/trace.config.ts:36` |
+| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`                 | `../contract/src/trace.config.ts:38` |
+| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED`       | `../contract/src/trace.config.ts:39` |
 
 <!-- readme:generated:end -->

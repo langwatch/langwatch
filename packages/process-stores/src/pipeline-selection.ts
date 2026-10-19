@@ -10,7 +10,7 @@ export interface PipelineSettings {
   readonly defaultRetentionDays: number;
   /** How long the queue waits for in-flight jobs on shutdown. Absent keeps the queue's own. */
   readonly queueDrainTimeoutMs?: number | undefined;
-  /** GLOBAL_QUEUE_CONCURRENCY as written; absent or invalid keeps the queue's 1,000. */
+  /** GLOBAL_QUEUE_CONCURRENCY as written; absent or invalid keeps the queue's 100. */
   readonly queueConcurrency?: string | undefined;
   /** LANGWATCH_DISPATCH_TENANT_CAP as written; absent keeps 50, "0" turns it off. */
   readonly queueTenantCap?: string | undefined;

@@ -1,6 +1,7 @@
 import type { AgentInputBinding, CodeAgentConfig, Field } from "@langwatch/agent-contract";
 import {
   buildCodeConfig,
+  codeConfigKeepingStored,
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
@@ -124,7 +125,10 @@ export function useAgentCodeEditor(props: AgentCodeEditorOptions) {
     const input = {
       projectId: props.projectId,
       name: draft.name.trim(),
-      config: buildCodeConfig(draft),
+      config: codeConfigKeepingStored({
+        stored: props.agent?.type === "code" ? props.agent.config : void 0,
+        edited: buildCodeConfig(draft),
+      }),
     };
 
     try {

@@ -112,10 +112,24 @@ describe("Dataset contract", () => {
 
     describe("when the browser lists the project's datasets", () => {
       /** @scenario "A dataset prepared from an uploaded file opens in the browser" */
-      it("answers a size the JSON response can carry", () => {
-        const answer = datasetTrpc.members.getAll.output.parse([{ ...prepared, recordCount: 10 }]);
+      it("answers the listed fields as JSON, with no size or count to carry", () => {
+        const { id, name, slug, columnTypes, status, createdAt, updatedAt } = prepared;
+        const answer = datasetTrpc.members.getAll.output.parse([
+          { id, name, slug, columnTypes, status, createdAt, updatedAt },
+        ]);
 
-        expect(JSON.parse(JSON.stringify(answer))).toMatchObject([{ sizeBytes: 2080 }]);
+        // The list shows these fields only; entry counts come from a second read.
+        expect(JSON.parse(JSON.stringify(answer))).toEqual([
+          {
+            id,
+            name,
+            slug,
+            columnTypes,
+            status,
+            createdAt: createdAt.toISOString(),
+            updatedAt: updatedAt.toISOString(),
+          },
+        ]);
       });
     });
 

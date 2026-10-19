@@ -94,7 +94,7 @@ export function RunPlanDetailSkeleton({ testId }: { testId?: string }) {
         <Skeleton height="28px" width="88px" marginBottom={1} />
         <RunEntriesSkeleton />
       </VStack>
-      <ContentColumn railWidth={RUNS_SIDEBAR_WIDTH}>
+      <ContentColumn>
         <VStack align="stretch" gap={4}>
           <Skeleton height="24px" width="220px" />
           <RunsLoadingSkeleton />

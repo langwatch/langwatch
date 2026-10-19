@@ -6,7 +6,15 @@ import { z } from "zod";
 
 import { licenseCustomerSchema, licenseTermsInputSchema } from "./issued-license.ts";
 
+/** Absent keeps every row: the console asks for active, non-internal rows by default. */
+const issuedLicenseFiltersSchemaDefinition = z.object({
+  onlyActive: z.boolean().optional(),
+  hideInternal: z.boolean().optional(),
+});
+export type IssuedLicenseFilters = z.infer<typeof issuedLicenseFiltersSchemaDefinition>;
+
 const listIssuedLicensesInputSchemaDefinition = z.object({
+  ...issuedLicenseFiltersSchemaDefinition.shape,
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),

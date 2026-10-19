@@ -4,11 +4,13 @@
  * @see modules/auth/specs/cli-device-flow.feature
  */
 
-import { randomBytes } from "node:crypto";
+import { createHash, randomBytes } from "node:crypto";
 
 import type { CliKeySelection } from "@langwatch/api-key-contract";
 import type { CliTokenRecordEntry } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
+import type { SharedCredentialAddress } from "@langwatch/secrets/shared-credential";
+import { z } from "zod";
 
 /** Redis key prefix for device-code records. */
 const DEVICE_CODE_PREFIX = "lwcli:device:";
@@ -29,6 +31,11 @@ export const POLL_RATE_LIMIT_SECONDS = 4;
  * redemption, but short enough to free the code early if release is skipped.
  */
 export const EXCHANGE_CLAIM_SECONDS = 30;
+/**
+ * How long a rotated refresh token still answers the pair its rotation minted: a retry after a
+ * lost response, or a second window of the same client, gets that pair rather than a sign-in.
+ */
+export const ROTATION_REPLAY_SECONDS = 60;
 /**
  * Default refresh-token lifetime.
  */
@@ -151,6 +158,16 @@ export type CliMintedSession = Readonly<{
   refreshTtlSeconds: number;
 }>;
 
+/** A rotation's pair as its old refresh token can replay it, with the project it is capped at. */
+export const cliRememberedRotationSchema = z.object({
+  accessToken: z.string(),
+  refreshToken: z.string(),
+  accessTtlSeconds: z.number(),
+  refreshTtlSeconds: z.number(),
+  project: z.object({ id: z.string(), slug: z.string(), name: z.string() }).optional(),
+});
+export type CliRememberedRotation = z.infer<typeof cliRememberedRotationSchema>;
+
 /**
  * The one grammar for a CLI bearer access token.
  */
@@ -192,6 +209,14 @@ export function pollRateKey(deviceCode: string): string {
  */
 export function exchangeClaimKey(deviceCode: string): string {
   return `${DEVICE_CODE_PREFIX}claim:${deviceCode}`;
+}
+
+/**
+ * Where one refresh token's rotation is minted once and its pair shared: a spent token names no
+ * person or organization, so the token is its own tenant, under a digest, never the token itself.
+ */
+export function rotationReplayAddress(refreshToken: string): SharedCredentialAddress {
+  return { tenantId: createHash("sha256").update(refreshToken).digest("hex") };
 }
 
 /** The token keys of the children forked from one session family. */

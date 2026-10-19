@@ -24,12 +24,15 @@ const DEFAULT_RETRY_DELAYS_MS = [5_000, 10_000, 30_000, 60_000, 120_000, 300_000
  * by the real plugin alone, with the same ID-token verification (mfa-and-session-shape.feature).
  */
 export function resilientGenericOAuth({
-  config,
+  config: declaredConfig,
   retryDelaysMs = DEFAULT_RETRY_DELAYS_MS,
 }: {
   config: GenericOAuthConfig[];
   retryDelaysMs?: readonly number[];
 }): GenericOAuthPlugin {
+  // Signing out ends our session only; the identity provider keeps its own
+  // (specs/auth/auth-rest-family-mounted.feature).
+  const config = declaredConfig.map((entry) => ({ ...entry, disableProviderLogout: true }));
   const plugin = genericOAuth({ config });
 
   return {

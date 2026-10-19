@@ -374,12 +374,13 @@ export class CodingAgentModule implements CodingAgentApi {
    * follows content visibility, and the cost follows `cost:view`.
    */
   async listForProject(
-    input: CodingAgentSessionsListInput,
+    input: CodingAgentSessionsListInput & { authorization: Authorization },
     by: CodingAgentViewer,
   ): Promise<CodingAgentSessionListRow[]> {
     const visibility = await this.#visibility.readVisibility({
       userId: by.id,
       projectId: input.projectId,
+      authorization: input.authorization,
     });
     const rows = await this.#codingAgents.listForProject(input);
 

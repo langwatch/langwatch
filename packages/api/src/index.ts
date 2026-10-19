@@ -31,6 +31,8 @@ export {
   PayloadTooLargeError,
   PlatformPermissionDeniedError,
   PlatformSurfaceHiddenError,
+  RateLimitedError,
+  retryAfterOf,
   ScopeInputMismatchError,
   setLedgerCurrent,
   setOrganizationsCatchingUp,

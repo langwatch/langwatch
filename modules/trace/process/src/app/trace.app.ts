@@ -43,7 +43,7 @@ import { PresenceApi } from "@langwatch/presence-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { ProjectApi } from "@langwatch/project-contract";
 import { type ShareViewer, ShareApi } from "@langwatch/share-contract";
-import { StoredObjectApi } from "@langwatch/stored-object-contract";
+import { isObjectRetentionConfirmed, StoredObjectApi } from "@langwatch/stored-object-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import {
   TraceCapabilityUnavailableError,
@@ -432,6 +432,7 @@ import {
   hiddenAttributeKeyMatcher,
   readDroppedFromParams,
   readPiiIncompleteFromParams,
+  findTruncatedAttributesInParams,
   redactV2Content,
   toConversationContextTurn,
 } from "../rules/trace-read-mappers.rules.ts";
@@ -923,10 +924,10 @@ export class TraceModule implements TraceApi, CollectorApp {
     const resolveClickHouseClient: TraceClickHouseResolver = (tenantId) =>
       repositories.clickhouseClients.resolve(tenantId);
     const canonicalisation = TraceCanonicalisation.create();
-    const blobStore = TraceBlobStoreService.create({
-      legacySpool: setup.channels.legacySpool,
-      payloads: repositories.eventPayloads,
-      logger: createLogger("langwatch:trace:blob-store"),
+    const blobStore = TraceModule.composeBlobStore({
+      repositories,
+      channels: setup.channels,
+      config: setup.config,
     });
     const { publicBaseUrl, disableCodingAgentSpanFilter } = setup.config;
     const app = new TraceModule({
@@ -995,6 +996,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       }),
       canonicalisation,
       commands,
+      spool: blobStore,
       findSummary: (lookup) => app.findSummary(lookup),
       recordTrackedEvent: ({ tenantId, body, eventId }) =>
         app.recordTrackedEvent({ project: { id: tenantId }, body, eventId }),
@@ -1002,6 +1004,34 @@ export class TraceModule implements TraceApi, CollectorApp {
       milestones,
     });
     return app;
+  }
+
+  /**
+   * ADR-022: the one blob store both halves of the spool share. The ingestion door writes an
+   * over-threshold command through it and the worker's record-span command reads it back, so it
+   * is built with its spool storage or the worker refuses every spooled span (langwatch-saas#1316).
+   */
+  static composeBlobStore({
+    repositories,
+    channels,
+    config,
+  }: {
+    repositories: Pick<TraceRepositories, "eventPayloads" | "spoolObjects">;
+    channels: Pick<TraceSetup["channels"], "legacySpool">;
+    config: Pick<
+      TraceSetup["config"],
+      "objectRetentionConfirmed" | "legacySpoolRetentionConfirmed"
+    >;
+  }): TraceBlobStoreService {
+    return TraceBlobStoreService.create({
+      legacySpool: channels.legacySpool,
+      payloads: repositories.eventPayloads,
+      spoolStorage: {
+        objects: repositories.spoolObjects,
+        azureRetentionConfirmed: isObjectRetentionConfirmed({ config }),
+      },
+      logger: createLogger("langwatch:trace:blob-store"),
+    });
   }
 
   /** Builds over an already-composed read graph, as a unit test hands one in. */
@@ -1883,6 +1913,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       detailParams,
       traceReadMapperPorts.contentPrivacy,
     );
+    redactedDetail.truncatedAttributes = findTruncatedAttributesInParams(detailParams);
     redactedDetail.restrictedAttributes = protections.restrictedAttributes ?? null;
 
     return redactedDetail;

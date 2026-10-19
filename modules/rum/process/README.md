@@ -67,9 +67,9 @@ None: rum declares no pipeline, process manager, subscriber or task.
 | Kind   | Leaf                | Environment variable          | Declared at                        |
 | ------ | ------------------- | ----------------------------- | ---------------------------------- |
 | secret | `–`                 | `RUM_COLLECTOR_HEADERS`       | `src/app/rum.app.ts:29`            |
-| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:15` |
-| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:22` |
-| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:26` |
-| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:30` |
+| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:19` |
+| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:26` |
+| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:30` |
+| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:34` |
 
 <!-- readme:generated:end -->

@@ -5,7 +5,6 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   AggregateRule,
-  LiveAggregate,
   ProjectApi,
   StoredAggregateProject,
 } from "@langwatch/project-contract";
@@ -31,7 +30,7 @@ export const AGGREGATE_READ_WINDOW_CHANGED = "aggregate_read_window_changed";
 /** The revocation reason every shared read of an archived aggregate carries. */
 export const AGGREGATE_ARCHIVED = "aggregate_archived";
 
-/** Member project ids, each in one list; a `failed` attach is tried again by the next reconcile. */
+/** Member project ids, each in one list; a non-empty `failed` makes the intent throw, so the outbox tries again. */
 type AggregateReconcileResult = {
   attached: string[];
   /** Revoked and attached again because the read started at the wrong moment for the rule. */
@@ -55,11 +54,7 @@ type AggregateReconcilerDependencies = {
   lock: AggregateReconcileLockRepository;
   projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   >;
   organizations: Pick<OrganizationApi, "findMembersWithDepartments">;
   grants: Pick<
@@ -75,7 +70,7 @@ type AggregateReconcilerDependencies = {
 /**
  * ADR-177 decision 3 (main's AggregateReconciler): one live shared trace read per member the
  * aggregate's rule selects, and a revoke for each that stopped matching. Each run holds the
- * aggregate's lock, so a trigger and the sweep never both attach one member. Logs ids and counts.
+ * aggregate's lock, so two triggers never both attach one member. Logs ids and counts.
  */
 export class AggregateReconcilerService {
   static create(deps: AggregateReconcilerDependencies): AggregateReconcilerService {
@@ -111,11 +106,6 @@ export class AggregateReconcilerService {
     ]);
     const retiring = own.filter((aggregate) => aggregate.archived).map((aggregate) => aggregate.id);
     return [...live, ...retiring];
-  }
-
-  /** Every live aggregate of every organisation, for the daily sweep. */
-  liveAggregates(): Promise<LiveAggregate[]> {
-    return this.deps.projects.findAllLiveAggregates();
   }
 
   private async reconcileHoldingLock({

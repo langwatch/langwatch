@@ -139,7 +139,7 @@ function serviceOver({
     );
   const findOrganization = vi.fn().mockResolvedValue(ORG);
   const joinedAutomatically = vi.fn<() => Promise<void>>().mockResolvedValue();
-  const announceSignup = vi.fn<SsoArrivalSignupAnnouncement["announce"]>().mockResolvedValue();
+  const announceSignup = vi.fn<SsoArrivalSignupAnnouncement["announceJoin"]>().mockResolvedValue();
   const startNurturing = vi.fn();
   const adopt = vi.fn<() => Promise<void>>().mockResolvedValue();
 
@@ -158,7 +158,7 @@ function serviceOver({
       memberships: { isMember, createMembership, applyPendingInvite, findOrganization },
       joinRequests: { requestFromSsoArrival, recordSsoArrival },
       notifications: { joinedAutomatically, startNurturing },
-      signups: { announce: announceSignup },
+      signups: { announceJoin: announceSignup },
       adoption: { adopt },
     }),
     isMember,
@@ -413,8 +413,10 @@ describe("given a domain-matched organization to join", () => {
     expect(parts.attachBindings).not.toHaveBeenCalled();
     expect(parts.joinedAutomatically).not.toHaveBeenCalled();
     expect(parts.announceSignup).toHaveBeenCalledWith({
+      userId: USER.id,
       userName: USER.name,
       userEmail: USER.email,
+      organizationId: ORG.id,
       organizationName: ORG.name,
     });
   });
@@ -431,8 +433,10 @@ describe("given a domain-matched organization to join", () => {
     });
 
     expect(parts.announceSignup).toHaveBeenCalledWith({
+      userId: USER.id,
       userName: USER.name,
       userEmail: USER.email,
+      organizationId: ORG.id,
       organizationName: ORG.name,
     });
 
@@ -509,8 +513,10 @@ describe("given an organization whose joiner seat is Developer (ADR-171)", () =>
       domain: "acme.com",
     });
     expect(parts.announceSignup).toHaveBeenCalledWith({
+      userId: USER.id,
       userName: USER.name,
       userEmail: USER.email,
+      organizationId: ORG.id,
       organizationName: ORG.name,
     });
     expect(parts.startNurturing).toHaveBeenCalledTimes(1);

@@ -10,6 +10,7 @@ import {
   reconcileSort,
 } from "../model/lens-capabilities.ts";
 import type { ExplorerStore } from "./explorer.store.ts";
+import { freshSearchState } from "./query.slice.ts";
 
 export type GroupingMode = "flat" | "by-conversation" | "by-service" | "by-user" | "by-model";
 
@@ -90,6 +91,8 @@ export interface ViewSlice {
   grouping: GroupingMode;
   columnOrder: string[];
   draftState: Map<string, DraftLensState>;
+  /** The project the search in the bar was typed for; null until the page names one. */
+  projectId: string | null;
 
   selectLens: (id: string, opts?: { persist?: boolean }) => void;
   setSort: (sort: SortConfig) => void;
@@ -122,6 +125,8 @@ export interface ViewSlice {
    * when this module loads, which can be before the shell installs device storage.
    */
   restoreRememberedView: () => void;
+  /** Name the page's project; a different one than before forgets the search. */
+  setProject: (projectId: string) => void;
 }
 
 /**
@@ -229,7 +234,7 @@ function readDraft(value: unknown): DraftLensState | null {
   if (Array.isArray(v.columns)) {
     draft.columns = v.columns.filter((c): c is string => typeof c === "string");
   }
-  if (typeof v.filter === "string") draft.filter = v.filter;
+  // A stored filter, written before searches stopped being kept, is not restored.
   return Object.keys(draft).length > 0 ? draft : null;
 }
 
@@ -254,8 +259,9 @@ function loadDrafts(): Map<string, DraftLensState> {
 function persistDrafts(drafts: Map<string, DraftLensState>): void {
   if (typeof window === "undefined") return;
   try {
-    const obj: Record<string, DraftLensState> = {};
-    for (const [k, v] of drafts) obj[k] = v;
+    // The search stays in the session: a device-wide key would carry it into
+    // every project (specs/traces-v2/search-scope.feature).
+    const obj = Object.fromEntries(draftsWithoutFilters(drafts));
     writeUiStorage(DRAFTS_KEY, JSON.stringify(obj));
   } catch {
     // storage may be full / disabled
@@ -544,8 +550,20 @@ export const createViewSlice: StateCreator<ExplorerStore, [], [], ViewSlice> = (
   grouping: initialActiveDraft?.grouping ?? initialActiveLens?.grouping ?? "flat",
   columnOrder: initialActiveDraft?.columns ?? initialActiveLens?.columns ?? defaultColumnOrder,
   draftState: initialDrafts,
+  projectId: null,
 
-  restoreRememberedView: () => set((s) => rememberedViewState(s)),
+  // Another reader is another person, as impersonation makes: their search starts empty.
+  restoreRememberedView: () =>
+    set((s) => {
+      const remembered = rememberedViewState(s);
+      return { ...remembered, ...forgottenSearchState({ ...s, ...remembered }) };
+    }),
+  setProject: (projectId) =>
+    set((s) => {
+      if (s.projectId === projectId) return s;
+      if (s.projectId === null) return { projectId };
+      return { projectId, ...forgottenSearchState(s) };
+    }),
   ...viewShapeActions(set, get),
   ...lensLibraryActions(set, get),
   ...lensLifecycleActions(set, get),
@@ -806,6 +824,24 @@ function filterDraftState(s: ViewSlice, text: string): Partial<ViewSlice> {
   else next.set(s.activeLensId, rest);
   persistDrafts(next);
   return { draftState: next };
+}
+
+/**
+ * The bar back on the active lens's own filter, with every draft filter, Instant
+ * Eval run and AI note dropped: a search belongs to one project and one person.
+ */
+function forgottenSearchState(s: ExplorerStore): Partial<ExplorerStore> {
+  const lensFilter = s.allLenses.find((l) => l.id === s.activeLensId)?.filterText ?? "";
+  return { ...freshSearchState(lensFilter), draftState: draftsWithoutFilters(s.draftState) };
+}
+
+function draftsWithoutFilters(drafts: Map<string, DraftLensState>): Map<string, DraftLensState> {
+  const kept = new Map<string, DraftLensState>();
+  for (const [lensId, draft] of drafts) {
+    const rest = draftWithoutFilter(draft);
+    if (Object.keys(rest).length > 0) kept.set(lensId, rest);
+  }
+  return kept;
 }
 
 /** The state that adopting a lens puts on screen. */

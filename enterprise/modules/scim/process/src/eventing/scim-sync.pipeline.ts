@@ -27,6 +27,16 @@ import {
   scimTokenRevokedEventSchema,
 } from "./scim-sync-state.projection.ts";
 import {
+  SCIM_SYNC_SUMMARY_INITIAL_STATE,
+  SCIM_SYNC_SUMMARY_PROCESS_NAME,
+  type ScimSyncSummary,
+  scimSyncSummaryApplyFailed,
+  scimSyncSummaryIntentSchema,
+  scimSyncSummaryStateSchema,
+  scimSyncSummaryUserPushed,
+  scimSyncSummaryWake,
+} from "./scim-sync-summary.process.ts";
+import {
   IssueScimTokenCommand,
   RecordScimApplyFailureCommand,
   RecordScimGroupMappingCommand,
@@ -39,12 +49,14 @@ interface ScimSyncPipelineDeps {
   scimSyncProjectionStore: StateProjectionStore<ScimSyncFoldState>;
   /** The guards every command handler runs, over the same head the calling path reads. */
   scimSyncGuards: ScimSyncGuardsService;
+  /** Posts one push's summary card; the worker's outbox runs it. */
+  postSyncSummary: (summary: ScimSyncSummary) => Promise<void>;
 }
 
 /**
  * The directory-sync pipeline (D08). One aggregate per connection's sync; the organization is the
  * tenant. Commands append (waited) and the operational projection folds into the Postgres
- * `ScimSyncState` head in per-sync FIFO. NO PROCESS MANAGER, deliberately.
+ * `ScimSyncState` head in per-sync FIFO. Its one process manager only summarises pushes.
  */
 function scimSyncCommands(deps: ScimSyncPipelineDeps) {
   return definePipeline({
@@ -97,7 +109,19 @@ function scimSyncCommands(deps: ScimSyncPipelineDeps) {
       name: "revokeScimSync",
       handlerClass: RevokeScimSyncCommand,
       instance: new RevokeScimSyncCommand(deps.scimSyncGuards),
-    });
+    })
+    .withProcessManager(SCIM_SYNC_SUMMARY_PROCESS_NAME, (pm) =>
+      pm
+        .state(scimSyncSummaryStateSchema, SCIM_SYNC_SUMMARY_INITIAL_STATE)
+        // A push is one organization's, whichever of its connections sent it.
+        .keyBy((event) => event.data.organizationId)
+        .intent("post", scimSyncSummaryIntentSchema, (summary) => deps.postSyncSummary(summary))
+        .on(scimUserPushedEventSchema, scimSyncSummaryUserPushed)
+        .on(scimApplyFailedEventSchema, scimSyncSummaryApplyFailed)
+        .onWake(scimSyncSummaryWake)
+        // A failed post is logged, not thrown; retries cover only the name reads.
+        .outbox({ maxAttempts: 3, leaseDurationMs: 60 * 1000 }),
+    );
 }
 
 /** The directory-sync pipeline as a TYPE, derived from the builder above. */
@@ -108,18 +132,23 @@ export function defineScimSyncPipeline(deps: ScimSyncPipelineDeps): ScimSyncPipe
 }
 
 /** The directory-sync pipeline over its ONE row, in both roles. */
-export function composeScimSyncPipeline(
-  repositories: Pick<ScimRepositories, "scimSyncs">,
-): ScimSyncPipeline {
+export function composeScimSyncPipeline({
+  repositories,
+  app,
+}: {
+  repositories: Pick<ScimRepositories, "scimSyncs">;
+  app: Pick<ScimModule, "postSyncSummary">;
+}): ScimSyncPipeline {
   return defineScimSyncPipeline({
     scimSyncProjectionStore: repositories.scimSyncs,
     scimSyncGuards: ScimSyncGuardsService.create({ syncs: repositories.scimSyncs }),
+    postSyncSummary: (summary) => app.postSyncSummary(summary),
   });
 }
 
 export const scimSyncEventing = defineEventingModule({
   pipeline: SCIM_SYNC_PIPELINE_NAME,
-  build: ({ repositories }: EventingSetup<ScimRepositories, ScimModule>) =>
-    composeScimSyncPipeline(repositories),
+  build: ({ repositories, app }: EventingSetup<ScimRepositories, ScimModule>) =>
+    composeScimSyncPipeline({ repositories, app }),
   connect: ({ app, commands }) => app.connectScimSync(commands),
 });
