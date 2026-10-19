@@ -2,7 +2,7 @@
  * Custom error types for dataset domain.
  * These are framework-agnostic and can be mapped to tRPC/HTTP errors in the router layer.
  */
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 import { REFUSED_ATTACHMENT_MEDIA_TYPES } from "@langwatch/stored-object-contract";
 
 import { formatDatasetByteLimit, formatDatasetRowLimit } from "./dataset-limits.ts";
@@ -180,7 +180,7 @@ export class InvalidColumnError extends HandledError {
     super(
       "dataset_invalid_column",
       `Column "${columnName}" is not defined in the "${datasetName}" dataset schema. Valid columns: ${validColumnsList}`,
-      { httpStatus: 422, fault: "customer" },
+      { ...remediation("dataset_invalid_column"), httpStatus: 422, fault: "customer" },
     );
     this.name = "InvalidColumnError";
     this.columnName = columnName;

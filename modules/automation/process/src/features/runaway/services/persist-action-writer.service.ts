@@ -80,6 +80,11 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       );
     }
 
+    // A record left with only its id would be stored as an all-empty row and reported as a success.
+    if (entries.some((entry) => Object.keys(entry).every((key) => key === "id"))) {
+      throw datasetRefusal({ datasetId: input.datasetId });
+    }
+
     try {
       await this.peers.datasets.batchCreateRecords({
         slugOrId: input.datasetId,
@@ -109,7 +114,7 @@ function keepDefined({
     else dropped.add(key);
   }
 
-  return { ...kept, id: record.id };
+  return kept as DatasetRecordEntry;
 }
 
 /** The dataset refused the write for a reason a redelivery cannot change. */

@@ -62,6 +62,12 @@ const registry = {
     ],
     docsPath: "/platform/data-retention",
   },
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "meta lists the dataset's valid columns in the message",
+    ],
+  },
   span_not_found: {
     tips: ["Check the span id; spans are deleted with their trace after the retention window"],
     docsPath: "/platform/data-retention",

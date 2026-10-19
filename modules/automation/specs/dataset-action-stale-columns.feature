@@ -19,6 +19,19 @@ Feature: An automation's dataset action against a dataset whose columns changed
   Scenario: A dataset refusal of an automation's rows is not retried
     Given an automation that appends matched traces to a dataset
     When the dataset refuses the rows for a column it does not define
-    Or the dataset is gone or archived
     Then the dispatch fails as terminal and is not redelivered
     And a failure the dataset did not name stays retryable
+
+  @unit
+  Scenario: A dataset that is gone or archived is not retried
+    Given an automation that appends matched traces to a dataset
+    When the dataset is gone or archived
+    Then the dispatch fails as terminal and is not redelivered
+
+  @unit
+  Scenario: A row left with no dataset column is not written
+    Given an automation whose mapping names only columns the dataset no longer has
+    When a confirmed match is written to the dataset
+    Then no row is written
+    And the dropped columns are warned about
+    And the dispatch fails as terminal and is not redelivered

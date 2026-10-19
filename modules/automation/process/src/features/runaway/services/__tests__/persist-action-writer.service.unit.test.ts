@@ -89,6 +89,48 @@ describe("PersistActionWriterService.addToDataset", () => {
     });
   });
 
+  describe("given a mapping whose every column is gone", () => {
+    /** @scenario "A row left with no dataset column is not written" */
+    it("writes nothing, warns, and ends the dispatch as terminal", async () => {
+      const appended: unknown[] = [];
+      const { writer, warnings } = writerOver({
+        findBySlugOrId: async () => datasetWith(["trace_id"]),
+        batchCreateRecords: async (input) => {
+          appended.push(input);
+          return [];
+        },
+      });
+
+      const refusal = await refusalOf(writer.addToDataset(write));
+
+      expect(appended).toEqual([]);
+      expect(errors.isTerminal(refusal)).toBe(true);
+      expect(warnings()).toEqual([
+        expect.objectContaining({ droppedColumns: ["question", "input"] }),
+      ]);
+    });
+
+    it("still writes when the mapping also names the dataset's only column", async () => {
+      const appended: Parameters<DatasetApi["batchCreateRecords"]>[0][] = [];
+      const { writer } = writerOver({
+        findBySlugOrId: async () => datasetWith(["trace_id"]),
+        batchCreateRecords: async (input) => {
+          appended.push(input);
+          return [];
+        },
+      });
+
+      await writer.addToDataset({
+        ...write,
+        datasetRecords: [{ id: "r-0", trace_id: "trace-1", question: "why" }],
+      });
+
+      expect(appended.map(({ entries }) => entries)).toEqual([
+        [{ id: "r-0", trace_id: "trace-1" }],
+      ]);
+    });
+  });
+
   describe("given the dataset refuses the write", () => {
     /** @scenario "A dataset refusal of an automation's rows is not retried" */
     it("turns a column refusal into a terminal dispatch failure", async () => {
@@ -109,6 +151,7 @@ describe("PersistActionWriterService.addToDataset", () => {
       expect(errors.isTerminal(refusal)).toBe(true);
     });
 
+    /** @scenario "A dataset that is gone or archived is not retried" */
     it("treats a dataset that is gone, before or during the write, as terminal", async () => {
       const gone = writerOver({ findBySlugOrId: async () => null });
       const raced = writerOver({
