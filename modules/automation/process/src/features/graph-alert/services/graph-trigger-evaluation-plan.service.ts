@@ -126,7 +126,7 @@ export class GraphTriggerEvaluationPlanService {
 
     // A chart saved without a time scale queries hourly; one whose stored scale cannot be
     // read is the author's configuration to fix, not a failure to redeliver.
-    const timeScale = graph.timeScale === void 0 ? 60 : parseStoredTimeScale(graph.timeScale);
+    const timeScale = graph.timeScale == null ? 60 : parseStoredTimeScale(graph.timeScale);
     if (timeScale === null) {
       return this.skip({
         request,

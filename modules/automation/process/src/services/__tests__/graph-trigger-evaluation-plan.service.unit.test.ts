@@ -109,6 +109,17 @@ describe("GraphTriggerEvaluationPlanService.createPlan", () => {
     });
   });
 
+  describe("given a saved chart whose stored time scale is null", () => {
+    /** @scenario "A graph alert on a chart saved without a time scale queries hourly" */
+    it("queries with a 60-minute bucket", async () => {
+      const plan = await GraphTriggerEvaluationPlanService.create().createPlan(
+        requestFor({ timeScale: null }),
+      );
+
+      expect((plan as { timeseriesInput: TimeseriesInputType }).timeseriesInput.timeScale).toBe(60);
+    });
+  });
+
   describe("given a saved chart whose time scale is unreadable", () => {
     /** @scenario "A graph alert on a chart with an unreadable time scale is skipped as incomplete" */
     it("skips the evaluation as an incomplete configuration", async () => {

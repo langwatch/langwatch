@@ -134,7 +134,8 @@ export interface CustomGraphFormData {
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   groupByKey?: string;
   includePrevious: boolean;
-  timeScale: "full" | number;
+  /** The native select hands its value back as text ("60"), whatever was loaded into it. */
+  timeScale: "full" | number | string;
   connected?: boolean;
   alert?: {
     enabled: boolean;
@@ -360,9 +361,6 @@ function AnalyticsCustomGraphContent({
 
     const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
     const apiJson = customAPIinput(parsedFormData, filterParams);
-    if (typeof apiJson?.timeScale === "string" && apiJson.timeScale !== "full") {
-      apiJson.timeScale = parseInt(apiJson.timeScale);
-    }
     setDebouncedCustomAPIInput(apiJson);
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
@@ -604,7 +602,7 @@ const customAPIinput = (
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
-    timeScale: formData.timeScale,
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
   };
 };
 

@@ -25,8 +25,9 @@ export function parseStoredTimeScale(value: unknown): "full" | number | null {
 }
 
 function normalizeNumericTimeScale(value: unknown): number {
-  const parsed = parseStoredTimeScale(value);
-  return typeof parsed === "number" ? parsed : FALLBACK_SCALE_MINUTES;
+  const parsed = typeof value === "string" ? parseInt(value, 10) : value;
+  const isUsable = typeof parsed === "number" && Number.isFinite(parsed) && parsed > 0;
+  return isUsable ? parsed : FALLBACK_SCALE_MINUTES;
 }
 
 function storedGraphTimeScale({

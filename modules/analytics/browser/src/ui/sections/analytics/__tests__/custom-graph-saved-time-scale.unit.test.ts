@@ -4,13 +4,16 @@
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 import { describe, expect, it } from "vitest";
 
-import { customGraphFormToCustomGraphInput } from "../custom-graph.screen.tsx";
+import {
+  type CustomGraphFormData,
+  customGraphFormToCustomGraphInput,
+} from "../custom-graph.screen.tsx";
 
-/** The form value exactly as the native select hands it back: text, whatever the type says. */
-function formWithTimeScale(timeScale: string) {
+/** The form value exactly as the native select hands it back: text. */
+function formWithTimeScale(timeScale: string): CustomGraphFormData {
   return {
     title: "Completion time",
-    graphType: { label: "Line Chart", value: "line" },
+    graphType: { label: "Line Chart", value: "line", icon: null },
     series: [
       {
         name: "Average completion time",
@@ -22,7 +25,7 @@ function formWithTimeScale(timeScale: string) {
     ],
     includePrevious: false,
     timeScale,
-  } as unknown as Parameters<typeof customGraphFormToCustomGraphInput>[0];
+  };
 }
 
 describe("customGraphFormToCustomGraphInput", () => {

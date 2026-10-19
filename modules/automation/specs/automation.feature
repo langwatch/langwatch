@@ -474,6 +474,12 @@ Feature: Automation ownership
     Then analytics is asked with a 60-minute bucket, which its input schema accepts
 
   @unit
+  Scenario: A graph alert on a chart saved without a time scale queries hourly
+    Given a graph alert on a saved chart whose stored time scale is empty
+    When the alert is evaluated
+    Then analytics is asked with a 60-minute bucket, as every other chart reader does
+
+  @unit
   Scenario: A graph alert on a chart with an unreadable time scale is skipped as incomplete
     Given a graph alert on a saved chart whose time scale is neither "full" nor a number of minutes
     When the alert is evaluated

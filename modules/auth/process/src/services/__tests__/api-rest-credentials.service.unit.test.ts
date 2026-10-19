@@ -11,7 +11,7 @@ import type {
 } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import {
   ApiRestCredentialsService,
@@ -620,11 +620,13 @@ describe("given a credential for an aggregate project", () => {
 });
 
 describe("given an API key whose ceiling does not hold the route's permission", () => {
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  function refusingDoor(logger: { error: () => void; warn: () => void }) {
+  function refusingDoor({
+    logger,
+    now,
+  }: {
+    logger: { error: () => void; warn: () => void };
+    now: () => number;
+  }) {
     return ApiRestCredentialsService.create({
       apiKeys: store,
       authz: {
@@ -639,15 +641,16 @@ describe("given an API key whose ceiling does not hold the route's permission", 
       },
       organizations: { getSettings: () => Promise.reject(new Error("no organization is read")) },
       logger,
+      now,
     });
   }
 
   describe("when the key is refused again and again", () => {
     /** @scenario "Repeated ceiling refusals for one key log one warning per window" */
     it("logs one warning per window, carrying the refusals held back", async () => {
-      vi.useFakeTimers();
+      let clockMs = 0;
       const logger = { error: vi.fn(), warn: vi.fn() };
-      const door = refusingDoor(logger);
+      const door = refusingDoor({ logger, now: () => clockMs });
       const refuse = () =>
         door
           .authenticate({
@@ -657,7 +660,7 @@ describe("given an API key whose ceiling does not hold the route's permission", 
           .catch((refusal: unknown) => refusal);
 
       for (let attempt = 0; attempt < 3; attempt++) await refuse();
-      vi.advanceTimersByTime(5 * 60_000);
+      clockMs += 5 * 60_000;
       await refuse();
 
       expect(logger.error).not.toHaveBeenCalled();

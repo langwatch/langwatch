@@ -85,6 +85,8 @@ export type ApiRestCredentialPeers = Readonly<{
   }>;
   organizations: Pick<OrganizationApi, "getSettings">;
   logger?: Pick<Logger, "error" | "warn">;
+  /** Epoch milliseconds the ceiling-refusal window is read against. */
+  now?: () => number;
 }>;
 
 /** How long a refused key stays quiet after its ceiling-refusal line. */
@@ -96,6 +98,7 @@ export class ApiRestCredentialsService {
     return new ApiRestCredentialsService({
       ...peers,
       logger: peers.logger ?? createLogger("langwatch:api:rest:credential"),
+      now: peers.now ?? Date.now,
     });
   }
 
@@ -104,6 +107,7 @@ export class ApiRestCredentialsService {
   private readonly organizations: ApiRestCredentialPeers["organizations"];
   private readonly cliProjects: ApiRestCredentialPeers["cliProjects"];
   private readonly logger: Pick<Logger, "error" | "warn">;
+  private readonly now: () => number;
   /** One ceiling-refusal line per key per window: a refused client retries the same fact. */
   private readonly ceilingRefusalLog = createWarnThrottle(CEILING_REFUSAL_LOG_WINDOW_MS);
   private readonly keyHolds: ApiKeyHoldsService;
@@ -117,6 +121,7 @@ export class ApiRestCredentialsService {
     this.organizations = peers.organizations;
     this.cliProjects = peers.cliProjects;
     this.logger = peers.logger;
+    this.now = peers.now;
   }
 
   /** Every permission the route asks, in order, after one resolve; the first missing refuses. */
@@ -195,7 +200,7 @@ export class ApiRestCredentialsService {
         logger: this.logger,
         suppressedRefusals: this.ceilingRefusalLog.claim({
           key: credential.resolved.apiKeyId,
-          now: Date.now(),
+          now: this.now(),
         }),
       });
     }
