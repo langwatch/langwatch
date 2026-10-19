@@ -240,6 +240,12 @@ func endLLMSpan(span trace.Span, resp *app.LLMResponse, callErr error) {
 	if resp.Usage.PromptTokens > 0 {
 		span.SetAttributes(attribute.Int("gen_ai.usage.input_tokens", resp.Usage.PromptTokens))
 	}
+	if resp.Usage.CacheReadInputTokens > 0 {
+		span.SetAttributes(attribute.Int("gen_ai.usage.cache_read.input_tokens", resp.Usage.CacheReadInputTokens))
+	}
+	if resp.Usage.CacheCreationInputTokens > 0 {
+		span.SetAttributes(attribute.Int("gen_ai.usage.cache_creation.input_tokens", resp.Usage.CacheCreationInputTokens))
+	}
 	if resp.Usage.CompletionTokens > 0 {
 		span.SetAttributes(attribute.Int("gen_ai.usage.output_tokens", resp.Usage.CompletionTokens))
 	}

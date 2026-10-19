@@ -11,6 +11,10 @@ import {
 } from "../../../rules/experiment-model-cost.rules.ts";
 const logger = createLogger("langwatch:experiment:run-model-cost");
 
+/** The span attributes estimateCost reads cache counts from (model-cost.ts keeps them private). */
+const CACHE_READ_TOKENS_ATTR = "gen_ai.usage.cache_read.input_tokens";
+const CACHE_CREATION_TOKENS_ATTR = "gen_ai.usage.cache_creation.input_tokens";
+
 /**
  * What a cell's tokens cost, in the deployment's own rate table: never Experiment's data nor
  * portable, since self-hosting prices the same model differently. `undefined`: no known rate.
@@ -19,8 +23,11 @@ export abstract class ExperimentModelCost {
   abstract findTokenPrice(input: {
     projectId: string;
     model: string;
+    /** The provider's prompt total, cached tokens included. */
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
   }): Promise<number | undefined>;
 }
 
@@ -45,16 +52,27 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
     model,
     inputTokens,
     outputTokens,
+    cacheReadTokens,
+    cacheCreationTokens,
   }: {
     projectId: string;
     model: string;
     inputTokens: number;
     outputTokens: number;
+    cacheReadTokens: number;
+    cacheCreationTokens: number;
   }): Promise<number | undefined> {
+    const customRates = await this.customRateAttributes({ projectId, model });
+    // The cost cascade prices fresh input and cache counts as disjoint, but the
+    // gateway's prompt total includes the cached tokens: take them out here, once.
     const priced = this.modelProviders.estimateCost({
-      attrs: await this.customRateAttributes({ projectId, model }),
+      attrs: {
+        ...customRates,
+        [CACHE_READ_TOKENS_ATTR]: cacheReadTokens,
+        [CACHE_CREATION_TOKENS_ATTR]: cacheCreationTokens,
+      },
       model,
-      promptTokens: inputTokens,
+      promptTokens: Math.max(0, inputTokens - cacheReadTokens - cacheCreationTokens),
       completionTokens: outputTokens,
     });
 

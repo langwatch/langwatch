@@ -206,11 +206,14 @@ type NodeHTTP struct {
 // cost figure; the consumer multiplies tokens by the model rate (the same path
 // the trace-ingest collector uses), keeping a single source of truth for cost.
 type NodeMetrics struct {
-	PromptTokens     int    `json:"prompt_tokens,omitempty"`
-	CompletionTokens int    `json:"completion_tokens,omitempty"`
-	TotalTokens      int    `json:"total_tokens,omitempty"`
-	ReasoningTokens  int    `json:"reasoning_tokens,omitempty"`
-	Model            string `json:"model,omitempty"`
+	PromptTokens     int `json:"prompt_tokens,omitempty"`
+	CompletionTokens int `json:"completion_tokens,omitempty"`
+	TotalTokens      int `json:"total_tokens,omitempty"`
+	ReasoningTokens  int `json:"reasoning_tokens,omitempty"`
+	// Subsets of PromptTokens; the consumer prices them at the cache rates.
+	CacheReadInputTokens     int    `json:"cache_read_input_tokens,omitempty"`
+	CacheCreationInputTokens int    `json:"cache_creation_input_tokens,omitempty"`
+	Model                    string `json:"model,omitempty"`
 }
 
 // NodeError is the structured error attached to a failed node.
@@ -835,7 +838,10 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 			CompletionTokens: u.CompletionTokens,
 			TotalTokens:      u.TotalTokens,
 			ReasoningTokens:  u.ReasoningTokens,
-			Model:            metricsModel,
+
+			CacheReadInputTokens:     u.CacheReadInputTokens,
+			CacheCreationInputTokens: u.CacheCreationInputTokens,
+			Model:                    metricsModel,
 		}
 	}
 	if useStructured {

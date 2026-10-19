@@ -1219,3 +1219,32 @@ func TestExecute_PropagatesProviderMessageOnNon2xx(t *testing.T) {
 		t.Errorf("error message still wraps with 'non-2xx status' when provider message is present: %q", err.Error())
 	}
 }
+
+func TestParseChatCompletionResponse_CachedTokens(t *testing.T) {
+	tests := []struct {
+		name      string
+		usage     string
+		wantRead  int
+		wantWrite int
+	}{
+		{"gateway read and write", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"prompt_tokens_details":{"cached_read_tokens":9000,"cached_write_tokens":500,"cached_tokens":9500}}`, 9000, 500},
+		{"openai cached_tokens only", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"prompt_tokens_details":{"cached_tokens":9000}}`, 9000, 0},
+		{"anthropic top-level counts", `{"prompt_tokens":10000,"completion_tokens":5,"total_tokens":10005,"cache_read_input_tokens":7000,"cache_creation_input_tokens":300}`, 7000, 300},
+		{"no cache", `{"prompt_tokens":10,"completion_tokens":5,"total_tokens":15}`, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			body := []byte(`{"choices":[{"message":{"role":"assistant","content":"ok"},"finish_reason":"stop"}],"usage":` + tc.usage + `}`)
+			resp, err := parseChatCompletionResponse(body, 1)
+			if err != nil {
+				t.Fatalf("parse: %v", err)
+			}
+			if resp.Usage.CacheReadInputTokens != tc.wantRead || resp.Usage.CacheCreationInputTokens != tc.wantWrite {
+				t.Errorf("cache read/write = %d/%d, want %d/%d", resp.Usage.CacheReadInputTokens, resp.Usage.CacheCreationInputTokens, tc.wantRead, tc.wantWrite)
+			}
+			if resp.Usage.PromptTokens == 0 {
+				t.Errorf("prompt tokens must stay the gateway's inclusive count")
+			}
+		})
+	}
+}
