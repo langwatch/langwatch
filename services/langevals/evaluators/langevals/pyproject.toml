@@ -20,7 +20,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-test = ["pytest>=7.4.2", "python-dotenv==1.2.2"]
+test = ["pytest>=7.4.2", "python-dotenv==1.2.4"]
 
 [build-system]
 requires = ["hatchling"]

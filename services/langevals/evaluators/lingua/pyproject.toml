@@ -8,7 +8,7 @@ requires-python = ">=3.11"
 dependencies = ["langevals-core>=0.1.0", "lingua-language-detector>=2.0.2"]
 
 [dependency-groups]
-test = ["pytest>=7.4.2", "python-dotenv==1.2.2"]
+test = ["pytest>=7.4.2", "python-dotenv==1.2.4"]
 
 [build-system]
 requires = ["hatchling"]
