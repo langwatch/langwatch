@@ -8587,6 +8587,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/span-normalisation':
+        specifier: workspace:*
+        version: link:../../../packages/span-normalisation
       '@langwatch/stored-object-contract':
         specifier: workspace:*
         version: link:../../stored-object/contract

@@ -4,16 +4,13 @@ import {
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
+import { ATTR_KEYS } from "@langwatch/span-normalisation";
 
 import {
   customRateAttributesOf,
   modelCostRatesOf,
 } from "../../../rules/experiment-model-cost.rules.ts";
 const logger = createLogger("langwatch:experiment:run-model-cost");
-
-/** The span attributes estimateCost reads cache counts from (model-cost.ts keeps them private). */
-const CACHE_READ_TOKENS_ATTR = "gen_ai.usage.cache_read.input_tokens";
-const CACHE_CREATION_TOKENS_ATTR = "gen_ai.usage.cache_creation.input_tokens";
 
 /**
  * What a cell's tokens cost, in the deployment's own rate table: never Experiment's data nor
@@ -65,14 +62,20 @@ export class ExperimentRunModelCostService extends ExperimentModelCost {
     const customRates = await this.customRateAttributes({ projectId, model });
     // The cost cascade prices fresh input and cache counts as disjoint, but the
     // gateway's prompt total includes the cached tokens: take them out here, once.
+    // A negative remainder means the counts disagree: keep the full prompt total.
+    const fresh = inputTokens - cacheReadTokens - cacheCreationTokens;
     const priced = this.modelProviders.estimateCost({
       attrs: {
         ...customRates,
-        ...(cacheReadTokens > 0 ? { [CACHE_READ_TOKENS_ATTR]: cacheReadTokens } : {}),
-        ...(cacheCreationTokens > 0 ? { [CACHE_CREATION_TOKENS_ATTR]: cacheCreationTokens } : {}),
+        ...(cacheReadTokens > 0
+          ? { [ATTR_KEYS.GEN_AI_USAGE_CACHE_READ_INPUT_TOKENS]: cacheReadTokens }
+          : {}),
+        ...(cacheCreationTokens > 0
+          ? { [ATTR_KEYS.GEN_AI_USAGE_CACHE_CREATION_INPUT_TOKENS]: cacheCreationTokens }
+          : {}),
       },
       model,
-      promptTokens: Math.max(0, inputTokens - cacheReadTokens - cacheCreationTokens),
+      promptTokens: fresh < 0 ? inputTokens : fresh,
       completionTokens: outputTokens,
     });
 

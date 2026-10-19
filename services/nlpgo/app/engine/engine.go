@@ -831,7 +831,8 @@ func (e *Engine) runSignature(ctx context.Context, node *dsl.Node, inputs map[st
 	// consumer apply the model rate (the gateway returns no cost on this path).
 	// Use the provider/model form (matching the cost table keys + the LLM span
 	// name) so the consumer's model-cost lookup hits the right entry.
-	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 {
+	if u := resp.Usage; u.TotalTokens > 0 || u.PromptTokens > 0 || u.CompletionTokens > 0 ||
+		u.CacheReadInputTokens > 0 || u.CacheCreationInputTokens > 0 {
 		metricsModel := modelID(model, provider)
 		ns.Metrics = &NodeMetrics{
 			PromptTokens:     u.PromptTokens,

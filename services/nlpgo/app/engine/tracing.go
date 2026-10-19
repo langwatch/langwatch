@@ -215,6 +215,7 @@ func modelID(model, provider string) string {
 
 // endLLMSpan stamps the LLM response shape onto the span and closes it.
 // Sets `gen_ai.response.model`, `gen_ai.usage.{input,output}_tokens`,
+// `gen_ai.usage.cache_{read,creation}.input_tokens` (only when non-zero),
 // `langwatch.cost`, and `langwatch.output` (JSON-encoded response message
 // for output_source=explicit rendering in the Studio drawer).
 func endLLMSpan(span trace.Span, resp *app.LLMResponse, callErr error) {

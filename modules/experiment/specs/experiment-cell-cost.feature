@@ -18,6 +18,12 @@ Feature: A cell's cost prices cached prompt tokens at the cache rates
     Then its cost is 1000 input, 8000 cache-read and 1000 cache-write tokens at their own rates
 
   @unit
+  Scenario: A prompt total smaller than its cache counts is kept whole
+    Given a model with distinct input and cache-read rates
+    When a cell reports 500 prompt tokens and 800 cache-read tokens
+    Then its cost is 500 input tokens plus 800 cache-read tokens at their own rates
+
+  @unit
   Scenario: A cell with only cached tokens is still priced
     Given a cell that reports no prompt or completion tokens and some cached tokens
     When the cell is priced

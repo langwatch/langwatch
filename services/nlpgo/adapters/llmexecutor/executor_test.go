@@ -1220,6 +1220,7 @@ func TestExecute_PropagatesProviderMessageOnNon2xx(t *testing.T) {
 	}
 }
 
+// @scenario "The runner reads cache-read and cache-write counts from every gateway usage shape"
 func TestParseChatCompletionResponse_CachedTokens(t *testing.T) {
 	tests := []struct {
 		name      string

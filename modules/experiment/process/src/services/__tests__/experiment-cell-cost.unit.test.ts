@@ -65,6 +65,23 @@ describe("ExperimentRunModelCostService.findTokenPrice with cached tokens", () =
       expect(price).toBeCloseTo(expected, 12);
     });
   });
+
+  describe("when the cache counts exceed the prompt total", () => {
+    /** @scenario "A prompt total smaller than its cache counts is kept whole" */
+    it("keeps the full prompt total as fresh input", async () => {
+      const price = await pricing().findTokenPrice({
+        projectId: "project_1",
+        model: MODEL,
+        inputTokens: 500,
+        outputTokens: 0,
+        cacheReadTokens: 800,
+        cacheCreationTokens: 0,
+      });
+
+      const expected = 500 * 0.000001 + 800 * 0.0000001;
+      expect(price).toBeCloseTo(expected, 12);
+    });
+  });
 });
 
 describe("ExperimentCellExecutionService.findPriceMetrics", () => {
