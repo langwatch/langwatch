@@ -537,7 +537,7 @@ export const incrementEventSourcingEventsStored = ({
   pipelineName: string;
   count: number;
 }) => eventsStoredTotal.labels(pipelineName).inc(count);
-/** Times one `storeEvents` call, store plus dispatch, on `event_sourcing_store_duration_milliseconds`. */
+/** Times one `storeEvents` call on `event_sourcing_store_duration_milliseconds`. */
 export const observeEventSourcingStoreDuration = ({
   pipelineName,
   durationMs,
