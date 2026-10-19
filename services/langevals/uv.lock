@@ -35,7 +35,7 @@ constraints = [
     { name = "fsspec", specifier = ">=2026.6.0" },
     { name = "langgraph-sdk", specifier = ">=0.4.4" },
     { name = "mako", specifier = ">=1.4.2" },
-    { name = "mcp", specifier = ">=1.30.0" },
+    { name = "mcp", specifier = ">=1.30.0,!=2.0.*,!=2.1.*" },
     { name = "multidict", specifier = ">=6.9.1" },
     { name = "pydantic-ai-slim", specifier = ">=2.30.0" },
 ]
