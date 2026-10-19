@@ -30,7 +30,7 @@ const accountExhaustionMessage = "Your organization's AI gateway access is exhau
 // exhaustion: a transient rate-limit 429, a 5xx, or a user's own bad request
 // all pass through unchanged.
 func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response, error) {
-	if resp != nil && isAccountExhaustion(resp.StatusCode, resp.Body) {
+	if resp != nil && providererr.AccountExhausted(resp.StatusCode, resp.Body) {
 		resp.Body = rewriteErrorMessage(resp.Body, accountExhaustionMessage)
 		return resp, err
 	}
@@ -43,7 +43,7 @@ func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response,
 }
 
 // isAccountExhaustionError is the UpstreamError-shaped twin of
-// isAccountExhaustion. Translated lanes carry the provider's error
+// providererr.AccountExhausted. Translated lanes carry the provider's error
 // discriminants on the error itself rather than in a captured body, so the
 // parsed type/code must count too or a quota error's original billing
 // message would reach governed users on those lanes.
@@ -51,13 +51,7 @@ func isAccountExhaustionError(ue *domain.UpstreamError) bool {
 	if ue.ErrorType == "insufficient_quota" || ue.ErrorCode == "insufficient_quota" {
 		return true
 	}
-	return isAccountExhaustion(ue.StatusCode, ue.Body)
-}
-
-// isAccountExhaustion is a terminal account-level exhaustion a governed end
-// user cannot resolve themselves; a rate limit or a 5xx stays verbatim.
-func isAccountExhaustion(status int, body []byte) bool {
-	return providererr.AccountExhausted(status, body)
+	return providererr.AccountExhausted(ue.StatusCode, ue.Body)
 }
 
 // rewriteErrorMessage replaces only the error.message field of a provider

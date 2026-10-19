@@ -16,6 +16,9 @@ import (
 // rate_limit 429 is retryable and excluded, while a 429 carrying
 // code/type=insufficient_quota is terminal and included.
 func AccountExhausted(status int, body []byte) bool {
+	if status >= http.StatusInternalServerError {
+		return false
+	}
 	if gjson.GetBytes(body, "error.code").String() == "insufficient_quota" ||
 		gjson.GetBytes(body, "error.type").String() == "insufficient_quota" {
 		return true

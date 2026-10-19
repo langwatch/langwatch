@@ -17,6 +17,7 @@ func TestAccountExhausted(t *testing.T) {
 		{"plain 400 bad request", 400, `{"error":{"message":"messages: field required","type":"invalid_request_error"}}`, false},
 		{"provider 503", 503, `{"error":{"message":"overloaded"}}`, false},
 		{"500 internal", 500, `{"error":{"message":"oops"}}`, false},
+		{"5xx naming insufficient_quota", 503, `{"error":{"code":"insufficient_quota"}}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {

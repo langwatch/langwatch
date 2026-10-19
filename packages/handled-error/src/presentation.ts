@@ -5786,8 +5786,11 @@ const presentations = {
     title: "The model provider rejected that",
     // A refused key has one fix, so the headline names it like the body does.
     titleFor: (error) => {
-      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+      if (hasReasonCode(error.reasons, new Set(["llm_provider_out_of_credit"]))) {
         return "This provider account is out of credit";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "This provider account has no allowance left";
       }
       return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"

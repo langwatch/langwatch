@@ -11,32 +11,6 @@ import (
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
-func TestIsAccountExhaustion(t *testing.T) {
-	cases := []struct {
-		name   string
-		status int
-		body   string
-		want   bool
-	}{
-		{"anthropic credit-balance 400", 400, `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}`, true},
-		{"openai insufficient_quota code", 429, `{"error":{"message":"You exceeded your current quota","type":"insufficient_quota","code":"insufficient_quota"}}`, true},
-		{"openai insufficient_quota type only", 403, `{"error":{"message":"quota","type":"insufficient_quota"}}`, true},
-		{"generic 402 payment required", 402, `{"error":{"message":"payment required"}}`, true},
-		// Must NOT match — these stay verbatim + retryable.
-		{"transient rate_limit 429", 429, `{"error":{"message":"Rate limit reached","type":"rate_limit_error"}}`, false},
-		{"plain 400 bad request", 400, `{"error":{"message":"messages: field required","type":"invalid_request_error"}}`, false},
-		{"provider 503", 503, `{"error":{"message":"overloaded"}}`, false},
-		{"500 internal", 500, `{"error":{"message":"oops"}}`, false},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			if got := isAccountExhaustion(c.status, []byte(c.body)); got != c.want {
-				t.Fatalf("isAccountExhaustion(%d, %s) = %v, want %v", c.status, c.body, got, c.want)
-			}
-		})
-	}
-}
-
 // rewriteErrorMessage swaps only the human message, preserving the rest of the
 // envelope, and is a no-op on bodies without an error.message field.
 func TestRewriteErrorMessage(t *testing.T) {
