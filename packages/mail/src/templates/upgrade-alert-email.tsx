@@ -157,22 +157,36 @@ const TechnicalBody = (props: UpgradeAlertEmailProps) => {
   );
 };
 
-/** A failed background step never stops serving: the upgrade gate refuses only on blocking ones. */
+/** What the operator is told about serving: the upgrade gate refuses only on a failed blocking step. */
+const servingSentence = ({
+  installation,
+  failedSteps,
+  isSingleStep,
+}: {
+  installation: string;
+  failedSteps: FailedStep[];
+  isSingleStep: boolean;
+}) => {
+  const count = isSingleStep ? "One" : `${failedSteps.length}`;
+  if (failedSteps.some((step) => step.mode === "blocking")) {
+    return `${count} ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch can't start serving the new version until ${isSingleStep ? "it finishes" : "they finish"}.`;
+  }
+  return `${count} background ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${isSingleStep ? "this step does is" : "these steps do is"} not complete until ${isSingleStep ? "it finishes" : "they finish"}.`;
+};
+
 const PlainBody = (props: UpgradeAlertEmailProps) => {
   const { installation, upgradesUrl, failedSteps, runnerStopped } = props;
-  const one = failedSteps.length === 1;
+  const isSingleStep = failedSteps.length === 1;
   return (
     <>
       {failedSteps.length > 0 && (
         <>
-          <Paragraph>
-            {`${one ? "One background step" : `${failedSteps.length} background steps`} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${one ? "this step does is" : "these steps do is"} not complete until ${one ? "it finishes" : "they finish"}.`}
-          </Paragraph>
+          <Paragraph>{servingSentence({ installation, failedSteps, isSingleStep })}</Paragraph>
           {failedSteps.map((step) => (
             <PlainStep key={step.id} step={step} />
           ))}
           <Paragraph style={{ margin: "24px 0 16px" }}>
-            {`You can retry ${one ? "the step" : "each step"} from its page. If it fails again, it is most likely a problem on our side: copy the details shown on the step page and send them to `}
+            {`You can retry ${isSingleStep ? "the step" : "each step"} from its page. If it fails again, it is most likely a problem on our side: copy the details shown on the step page and send them to `}
             <InlineLink href={`mailto:${SUPPORT_EMAIL}`}>{SUPPORT_EMAIL}</InlineLink>
             {", and the LangWatch team will look into it."}
           </Paragraph>
@@ -197,7 +211,8 @@ const previewOf = ({ installation, audience, failedSteps }: UpgradeAlertEmailPro
       : `On ${installation}: the upgrade stopped before it finished`;
   }
   if (audience === "self-hosted") {
-    return `On ${installation}: ${plural(failedSteps.length, "background step")} didn't finish`;
+    const noun = failedSteps.some((step) => step.mode === "blocking") ? "step" : "background step";
+    return `On ${installation}: ${plural(failedSteps.length, noun)} didn't finish`;
   }
   return `On ${installation}: ${failedSteps
     .map((step) => step.id)
@@ -206,14 +221,14 @@ const previewOf = ({ installation, audience, failedSteps }: UpgradeAlertEmailPro
 };
 
 export const UpgradeAlertEmail = (props: UpgradeAlertEmailProps) => {
-  const technical = props.audience === "langwatch-cloud";
+  const isCloudAudience = props.audience === "langwatch-cloud";
   return (
     <EmailLayout
       preview={previewOf(props)}
-      heading={technical ? technicalHeading(props) : plainHeading(props)}
+      heading={isCloudAudience ? technicalHeading(props) : plainHeading(props)}
       footNote={`You get this because you are a platform operator of LangWatch at ${props.installation}.`}
     >
-      {technical ? <TechnicalBody {...props} /> : <PlainBody {...props} />}
+      {isCloudAudience ? <TechnicalBody {...props} /> : <PlainBody {...props} />}
       <FinePrint>One email per problem: a step that keeps failing is not mailed again.</FinePrint>
     </EmailLayout>
   );

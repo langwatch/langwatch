@@ -120,7 +120,14 @@ Feature: The transactional messages LangWatch sends
     Then the subject says part of the upgrade didn't finish and names the installation
     And it counts the steps and says LangWatch keeps running
     And each step is named by what it does, with a link that opens that step
-    And no step id, error text or attempt count is shown
+    And a step with a description shows no id, and no step shows error text or an attempt count
+
+  @unit
+  Scenario: A self-hosted upgrade alert for a failed blocking step does not say LangWatch keeps running
+    Given a blocking upgrade step failed on a self-hosted installation
+    When the upgrade alert is rendered
+    Then it says LangWatch can't start serving the new version until the step finishes
+    And it does not say LangWatch keeps running
 
   @unit
   Scenario: A self-hosted upgrade alert falls back to the step id when a step has no description

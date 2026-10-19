@@ -53,6 +53,25 @@ describe("renderUpgradeAlertEmail", () => {
       });
     });
 
+    describe("when a blocking step failed", () => {
+      /** @scenario "A self-hosted upgrade alert for a failed blocking step does not say LangWatch keeps running" */
+      it("says the new version can't serve until the step finishes", async () => {
+        const { props } = await renderFixture("one step failed");
+        const blocking = upgradeAlertEmailProps.parse({
+          ...props,
+          failedSteps: props.failedSteps.map((step) => ({ ...step, mode: "blocking" })),
+        });
+        const { html } = await renderUpgradeAlertEmail(blocking);
+
+        expect(html).toContain(
+          "LangWatch can&#x27;t start serving the new version until it finishes",
+        );
+        expect(html).toContain("One step of the LangWatch upgrade");
+        expect(html).not.toContain("LangWatch keeps running");
+        expect(html).not.toContain("background step");
+      });
+    });
+
     describe("when the upgrade runner stopped", () => {
       /** @scenario "A self-hosted alert for a stopped runner asks for a running worker without internals" */
       it("asks for a running worker and leaves the lease and the process name out", async () => {
