@@ -162,13 +162,19 @@ describe("UpgradeAlertsService", () => {
   });
 
   describe("when the installation is LangWatch Cloud", () => {
-    /** @scenario "The alert email is worded for who operates the installation" */
-    it("renders for LangWatch staff on Cloud and for the operator everywhere else", async () => {
+    /** @scenario "On LangWatch Cloud the alert email is worded for LangWatch staff" */
+    it("renders the email for LangWatch staff", async () => {
       const cloud = setup({ failedAt: ago(10), audience: "langwatch-cloud" });
-      const selfHosted = setup({ failedAt: ago(10) });
       await cloud.service.check({ since: SINCE, until: UNTIL });
-      await selfHosted.service.check({ since: SINCE, until: UNTIL });
       expect(cloud.rendered.map(({ audience }) => audience)).toEqual(["langwatch-cloud"]);
+    });
+  });
+
+  describe("when the installation is self-hosted", () => {
+    /** @scenario "On a self-hosted installation the alert email is worded for its operator" */
+    it("renders the email for the installation's operator", async () => {
+      const selfHosted = setup({ failedAt: ago(10) });
+      await selfHosted.service.check({ since: SINCE, until: UNTIL });
       expect(selfHosted.rendered.map(({ audience }) => audience)).toEqual(["self-hosted"]);
     });
   });

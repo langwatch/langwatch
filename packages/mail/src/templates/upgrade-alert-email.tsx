@@ -166,7 +166,7 @@ const PlainBody = (props: UpgradeAlertEmailProps) => {
       {failedSteps.length > 0 && (
         <>
           <Paragraph>
-            {`${one ? "One background step" : `${failedSteps.length} background steps`} of the upgrade to LangWatch at ${installation} didn't finish. LangWatch keeps running, but the work ${one ? "this step does is" : "these steps do is"} not complete until ${one ? "it finishes" : "they finish"}.`}
+            {`${one ? "One background step" : `${failedSteps.length} background steps`} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${one ? "this step does is" : "these steps do is"} not complete until ${one ? "it finishes" : "they finish"}.`}
           </Paragraph>
           {failedSteps.map((step) => (
             <PlainStep key={step.id} step={step} />
@@ -266,7 +266,7 @@ export const upgradeAlertEmailTemplate = defineTemplate({
           mode: "background",
           attempt: 1,
           error:
-            "1 HTTP agent credential(s) could not be stored as project secrets; the worker log names each agent. Retry the step once the cause is fixed.",
+            "1 HTTP agent credential(s) could not be stored as project secrets (agent agent_7Qx in project project_4Hk: secret_unreadable). Retry the step once the cause is fixed.",
           url: stepUrl({ id: "agent:move-http-credentials-to-secrets", host: FIXTURE_HOST }),
         },
       ],

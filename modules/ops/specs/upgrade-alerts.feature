@@ -57,11 +57,15 @@ Feature: Upgrade alerts reach platform operators
     # A self-hosted operator cannot fix an upgrade step: plain words and a way to reach us.
     # LangWatch staff on Cloud keep the ids and errors. Plan: dev/docs/plans/upgrade-diagnostics-via-connect.md
     @unit
-    Scenario: The alert email is worded for who operates the installation
+    Scenario: On LangWatch Cloud the alert email is worded for LangWatch staff
       Given a step failed since the last wake
       When the upgrade alert check runs on LangWatch Cloud
       Then the email is worded for LangWatch staff, with each step's id and error
-      When it runs on a self-hosted installation
+
+    @unit
+    Scenario: On a self-hosted installation the alert email is worded for its operator
+      Given a step failed since the last wake
+      When the upgrade alert check runs on a self-hosted installation
       Then the email is worded for the installation's operator, in plain words
 
     @unit

@@ -24,7 +24,7 @@ describe("renderUpgradeAlertEmail", () => {
           "Part of your LangWatch upgrade didn't finish on langwatch.acme.example",
         );
         expect(html).toContain("Part of your LangWatch upgrade didn&#x27;t finish");
-        expect(html).toContain("2 background steps of the upgrade");
+        expect(html).toContain("2 background steps of the LangWatch upgrade");
         expect(html).toContain("LangWatch keeps running");
         expect(html).toContain("Replays scenario events for runs still open.");
         for (const step of props.failedSteps) expect(html).toContain(step.url);
