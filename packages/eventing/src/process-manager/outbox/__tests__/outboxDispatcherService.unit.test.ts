@@ -426,6 +426,38 @@ describe("OutboxDispatcherService", () => {
       });
     });
 
+    describe("when the handler is refused because its project no longer exists", () => {
+      /** Shaped as project's contract refusal: a handled error recognised by its code. */
+      class ProjectNotFound extends HandledError {
+        constructor() {
+          super("project_not_found", "Project not found", { httpStatus: 404 });
+        }
+      }
+
+      /** @scenario "A process-manager outbox message whose project no longer exists is retired as completed" */
+      it("retires the message as dispatched with a warning, neither dead nor retried", async () => {
+        const { logger, lines } = createTestLogger();
+        const handler = vi
+          .fn()
+          .mockRejectedValue(new Error("lookup failed", { cause: new ProjectNotFound() }));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+          logger,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first).toMatchObject({ dispatched: ["dispatch:turn_1:1"], dead: [], retried: [] });
+        expect(lines.findLine("warn", "no longer exists")).toBeDefined();
+
+        const second = await dispatcher.runOnce({ now: T0 + 60_000 });
+        expect(second.dispatched).toEqual([]);
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+    });
+
     describe("when the handler throws a retryable-true error", () => {
       it("classifies it as retried and re-dispatches after the delay", async () => {
         const transient = Object.assign(new Error("HTTP 503"), {

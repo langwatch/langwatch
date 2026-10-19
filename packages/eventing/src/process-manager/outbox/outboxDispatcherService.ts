@@ -16,6 +16,7 @@ import {
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "../../metrics.ts";
+import { isProjectGone } from "../../queues/projectGone.ts";
 import { classifyClickHouseError, ErrorCategory } from "../../services/errorHandling.ts";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
@@ -578,6 +579,10 @@ export class OutboxDispatcherService {
         status: "dispatched",
       });
     } catch (error) {
+      if (isProjectGone(error)) {
+        await this.completeProjectGone({ message, now, report, attempt, identity, startedAt });
+        return;
+      }
       await this.handleDispatchFailure({
         message,
         now,
@@ -591,6 +596,61 @@ export class OutboxDispatcherService {
     } finally {
       this.finishDispatchSpan({ message, attempt, span, startedAt });
     }
+  }
+
+  /**
+   * A message whose project was deleted after it was written can never be delivered: it is
+   * retired as dispatched with a warning, not retried and not dead-lettered
+   * (specs/eventing/deleted-project-jobs.feature).
+   */
+  private async completeProjectGone({
+    message,
+    now,
+    report,
+    attempt,
+    identity,
+    startedAt,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    report: DispatchReport;
+    attempt: number;
+    identity: OutboxMessageIdentity;
+    startedAt: number;
+  }): Promise<void> {
+    const { applied } = await this.store.markDispatched({
+      identity,
+      leaseToken: message.leaseToken,
+      now,
+    });
+    if (!applied) {
+      this.countFenced({
+        message,
+        report,
+        phase: "dispatched",
+        durationMs: performance.now() - startedAt,
+      });
+      return;
+    }
+    report.dispatched.push(message.messageKey);
+    incrementEsProcessOutboxTotal({
+      processName: message.processName,
+      intentType: message.intentType,
+      status: "dispatched",
+    });
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    this.logger.warn(
+      {
+        processName: message.processName,
+        processKey: message.processKey,
+        projectId: message.projectId,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        attempt,
+      },
+      "Outbox message's project no longer exists; retiring it as completed",
+    );
   }
 
   /**
