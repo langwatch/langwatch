@@ -39,7 +39,7 @@ beforeEach(() => {
         requestedAtTimes.push(occurredAt);
       },
     }),
-    dashboards: createApiFixture<Pick<DashboardApi, "getById">>({}),
+    dashboards: createApiFixture<Pick<DashboardApi, "getBoard">>({}),
   });
 });
 
