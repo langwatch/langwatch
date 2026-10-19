@@ -4,9 +4,11 @@
  * whose relation reads back null. The fleet scans name them instead of crashing on them.
  * Spec: modules/project/specs/project-service.feature, project-organization-paging.feature
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it, vi } from "vitest";
 
+import { ProjectCreatedNoticeService } from "../../../services/project-created-notice.service.ts";
 import { ProjectFactsBackfillService } from "../../../services/project-facts-backfill.service.ts";
 import { PrismaProjectRepository } from "../prisma.project.repository.ts";
 
@@ -62,12 +64,34 @@ describe("PrismaProjectRepository over projects whose team or organization is go
   describe("when the project:record-created-facts step runs over them", () => {
     /** @scenario "The project facts step skips a project whose team or organization is gone" */
     it("completes instead of throwing, recording the whole project and counting the orphans", async () => {
-      const recordBackfillPage = vi.fn(async () => undefined);
-      const warn = vi.fn();
+      const { logger, lines } = createTestLogger();
+      const createdBatches: Record<string, unknown>[][] = [];
+      const lifecycle = ProjectCreatedNoticeService.create({
+        logger,
+        projects: { findWithOrgAdmin: async () => null, findWithTeam: async () => null },
+      });
+      const quiet = { send: async () => undefined };
+      const batching = {
+        send: async () => {
+          throw new Error("the facts step sends a page as one batch");
+        },
+        sendBatch: async (data: Record<string, unknown>[]) => void createdBatches.push(data),
+      };
+      lifecycle.connect({
+        recordProjectCreated: batching,
+        recordProjectLegacyKeyRevoked: quiet,
+        recordPresenceSettingChanged: batching,
+        recordProjectMoved: quiet,
+        recordProjectArchived: quiet,
+        recordProjectDepartmentAssigned: batching,
+        recordProjectTraceSharingDisabled: quiet,
+        recordProjectAggregateRuleChanged: quiet,
+        recordProjectRevived: quiet,
+      });
       const step = ProjectFactsBackfillService.create({
         projects: repositoryOver(ROWS),
-        lifecycle: { recordBackfillPage },
-        logger: { warn },
+        lifecycle,
+        logger,
       });
 
       const report = await step.recordExisting({
@@ -91,8 +115,11 @@ describe("PrismaProjectRepository over projects whose team or organization is go
         skippedOrphans: 2,
         orphanProjectIds: ["project-a", "project-b"],
       });
-      expect(recordBackfillPage).toHaveBeenCalledTimes(1);
-      expect(warn).toHaveBeenCalledTimes(2);
+      expect(createdBatches).toHaveLength(3);
+      expect(lines.filter((line) => line.level === 40).map((line) => line.projectId)).toEqual([
+        "project-a",
+        "project-b",
+      ]);
     });
   });
 

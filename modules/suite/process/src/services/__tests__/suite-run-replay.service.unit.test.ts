@@ -2,6 +2,7 @@ import { createTenantId } from "@langwatch/eventing";
 import {
   SimulationRunStatus,
   simulationRunDataSchema,
+  type ScenarioApi,
   type SimulationRunData,
 } from "@langwatch/scenario-contract";
 import {
@@ -11,6 +12,7 @@ import {
   type RecordSuiteRunItemStartedCommandData,
   type SuiteRunStateData,
 } from "@langwatch/suite-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { SuiteRunStateFoldProjection } from "../../eventing/suite-run-state.projection.ts";
@@ -305,14 +307,14 @@ describe("SuiteRunReplayService", () => {
       const service = SuiteRunReplayService.create({
         suites: { findProjectIdsHoldingSuites: async () => [TENANT] },
         runs: { findOpenRuns: async () => [unreadable, await suite.current()] },
-        scenarios: {
+        scenarios: createApiFixture<ScenarioApi>({
           getRunDataForBatchRun: async ({ batchRunId }) => {
             if (batchRunId === "batch-unreadable") {
               simulationRunDataSchema.parse({ ...scenarioRun({}), status: "NOT_A_STATUS" });
             }
             return { changed: true, lastUpdatedAt: 3000, runs: inFlight };
           },
-        },
+        }),
         runItems: suite.runItems,
       });
 
@@ -331,11 +333,11 @@ describe("SuiteRunReplayService", () => {
       const service = SuiteRunReplayService.create({
         suites: { findProjectIdsHoldingSuites: async () => [TENANT] },
         runs: { findOpenRuns: async () => [openRun()] },
-        scenarios: {
+        scenarios: createApiFixture<ScenarioApi>({
           getRunDataForBatchRun: async () => {
-            throw new Error("store unavailable");
+            throw Object.assign(new Error("read failed"), { code: "store_unavailable" });
           },
-        },
+        }),
         runItems: suiteOverMemory(openRun()).runItems,
       });
 
@@ -346,7 +348,7 @@ describe("SuiteRunReplayService", () => {
           afterTenantId: null,
           onTenantDone: async () => {},
         }),
-      ).rejects.toThrow("store unavailable");
+      ).rejects.toMatchObject({ code: "store_unavailable" });
     });
   });
 });

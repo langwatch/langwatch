@@ -2,6 +2,7 @@
  * @vitest-environment node
  * Spec: modules/project/specs/project-service.feature
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -55,7 +56,7 @@ function stepOver(
   const batches: Sent[] = [];
   const saves: unknown[] = [];
   const reads: (string | null)[] = [];
-  const logger = { warn: vi.fn() };
+  const { logger, lines } = createTestLogger();
   const lifecycle = ProjectCreatedNoticeService.create({
     logger: { error: vi.fn() },
     projects: { findWithOrgAdmin: async () => null, findWithTeam: async () => null },
@@ -112,7 +113,7 @@ function stepOver(
       countedBefore,
       onPageDone: async (page) => void saves.push(page),
     });
-  return { batches, saves, reads, run, logger };
+  return { batches, saves, reads, run, warnings: lines };
 }
 
 const withoutMoment = (data: Record<string, unknown>[]) =>
@@ -232,7 +233,7 @@ describe("given a live project between two whose team or organization is gone", 
   describe("when it runs", () => {
     /** @scenario "The project facts step skips a project whose team or organization is gone" */
     it("records the live project only, counts and names both orphans, and saves past them", async () => {
-      const { batches, saves, reads, run, logger } = stepOver(live, orphans);
+      const { batches, saves, reads, run, warnings } = stepOver(live, orphans);
 
       const report = await run();
 
@@ -253,9 +254,9 @@ describe("given a live project between two whose team or organization is gone", 
         skippedOrphans: 2,
         orphanProjectIds: ["project-0", "project-2"],
       });
-      expect(logger.warn.mock.calls.map(([payload]) => payload)).toEqual([
-        { projectId: "project-0" },
-        { projectId: "project-2" },
+      expect(warnings.map((line) => [line.level, line.projectId])).toEqual([
+        [40, "project-0"],
+        [40, "project-2"],
       ]);
     });
   });

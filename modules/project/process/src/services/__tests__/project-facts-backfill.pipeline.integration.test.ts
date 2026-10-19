@@ -6,6 +6,7 @@
  */
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -93,7 +94,7 @@ function factsStep() {
       },
     },
     lifecycle: notice,
-    logger: { warn: vi.fn() },
+    logger: createTestLogger().logger,
   });
   const runStep = () =>
     step.recordExisting({
