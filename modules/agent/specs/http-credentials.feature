@@ -73,7 +73,7 @@ Feature: HTTP agent credentials
     Given an HTTP agent whose credential cannot be stored as a project secret for a reason a retry may clear
     When the agent credential upgrade step runs
     Then that agent keeps its credential and every other agent is moved
-    And the step fails saying how many agents were held, naming each held agent and why
+    And the step fails saying how many agents were held, naming the first five agents with project and reason and counting the rest
     And its progress is kept before that agent's project
 
   @unit

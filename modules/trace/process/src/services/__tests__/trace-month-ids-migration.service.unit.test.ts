@@ -199,7 +199,12 @@ describe("TraceMonthIdsMigrationService", () => {
 
     /** @scenario "The upgrade skips a project no organisation owns" */
     it("reads an old checkpoint without the orphan fields as none skipped yet", () => {
-      const { skippedOrphans: _count, orphanProjectIds: _ids, ...old } = REPORT_BASE;
+      const {
+        skippedOrphans: _count,
+        orphanProjectIds: _ids,
+        orphansCountedThrough: _through,
+        ...old
+      } = REPORT_BASE;
 
       const parsed = traceMonthIdsReportSchema.parse({
         ...old,
@@ -210,7 +215,11 @@ describe("TraceMonthIdsMigrationService", () => {
         events: 2,
       });
 
-      expect(parsed).toMatchObject({ skippedOrphans: 0, orphanProjectIds: [] });
+      expect(parsed).toMatchObject({
+        skippedOrphans: 0,
+        orphanProjectIds: [],
+        orphansCountedThrough: null,
+      });
     });
 
     /** @scenario "A dry run of the upgrade sends and saves nothing" */

@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * relationMode "prisma" keeps no foreign keys, so a deleted team or organization leaves projects
- * whose relation reads back null. The fleet scans name them instead of crashing on them.
+ * No foreign keys: a deleted team or organization leaves projects whose relation reads null.
  * Spec: modules/project/specs/project-service.feature, project-organization-paging.feature
  */
 import { createTestLogger } from "@langwatch/test-harness";

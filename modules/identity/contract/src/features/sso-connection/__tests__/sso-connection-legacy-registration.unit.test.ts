@@ -65,6 +65,13 @@ describe("given a connection registration that states an arrival policy", () => 
   /** @scenario "A registration that states an arrival policy reads as written" */
   it("reads as written and still refuses a policy outside the three answers", () => {
     expect(read({ arrivalPolicy: "request", allowsJit: true }).state.arrivalPolicy).toBe("request");
-    expect(() => read({ arrivalPolicy: "auto" })).toThrow(/arrivalPolicy|Invalid option/);
+    const refused = connectionRegisteredPayloadSchema.safeParse(
+      storedRegistration({ arrivalPolicy: "auto" }),
+    );
+    expect(refused.success).toBe(false);
+    expect(refused.error?.issues[0]).toMatchObject({
+      code: "invalid_value",
+      path: ["arrivalPolicy"],
+    });
   });
 });

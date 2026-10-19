@@ -43,9 +43,9 @@ type MoveOutcome =
 
 /**
  * Stores credentials typed inline into HTTP agents as project secrets
- * (modules/agent/specs/http-credentials.feature). Level-triggered: an agent counts as moved only
- * when a re-read holds no literal. A refusal no action can fix keeps the literal and is reported;
- * anything else, operator-fixable refusals included, is held and fails the pass for a retry.
+ * (modules/agent/specs/http-credentials.feature). An agent counts as moved only when a re-read
+ * holds no literal. A refusal no action can fix is kept and reported; anything else is held and
+ * fails the pass for a retry.
  */
 export class AgentHttpCredentialsBackfillService {
   static create(deps: {

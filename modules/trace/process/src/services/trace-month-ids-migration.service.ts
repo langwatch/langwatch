@@ -115,10 +115,9 @@ export class TraceMonthIdsMigrationService {
   }
 
   /**
-   * Counts and names a page's projects no organisation owns, before anything routes their data:
-   * the ClickHouse router rightly refuses such a tenant. They never move the cursor, so a resumed
-   * run meets them again; ones at or below `orphansCountedThrough` are not counted twice, however
-   * many there are (the named list is capped, so it cannot tell).
+   * Counts and names a page's projects no organisation owns, before anything routes their data.
+   * They never move the cursor, so a resumed run meets them again; ones at or below
+   * `orphansCountedThrough` are not recounted (the capped named list cannot tell).
    */
   private async skipOrphans({
     orphanIds,
