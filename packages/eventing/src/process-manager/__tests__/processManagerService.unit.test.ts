@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { JsonSafetyError } from "../json.ts";
 import type { ProcessDefinition, ProcessRef } from "../processManager.types.ts";
@@ -117,6 +117,42 @@ describe("ProcessManagerService", () => {
         });
         const messages = await store.findMessagesByRef({ ref: pilotRef });
         expect(messages).toHaveLength(1);
+      });
+
+      /** @scenario "A process manager redelivery stands down before reading its state" */
+      it("neither reads nor evolves the state nor opens a commit", async () => {
+        const evolve = vi.fn(pilotDefinition.evolve);
+        const redelivered = new ProcessManagerService({
+          definition: { ...pilotDefinition, evolve },
+          store,
+        });
+        const findByRef = vi.spyOn(store, "findByRef");
+        const commit = vi.spyOn(store, "commit");
+
+        const result = await redelivered.handleEvent({
+          envelope: pilotEvent({ eventId: "evt_start" }),
+          now: T0 + 5,
+        });
+
+        expect(result.outcome).toBe("duplicateEvent");
+        expect(findByRef).not.toHaveBeenCalled();
+        expect(evolve).not.toHaveBeenCalled();
+        expect(commit).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when a redelivery races past the inbox read", () => {
+      /** @scenario "A process manager redelivery stands down before reading its state" */
+      it("is still refused by the commit's own inbox check", async () => {
+        vi.spyOn(store, "hasConsumedSource").mockResolvedValueOnce(false);
+
+        const result = await service.handleEvent({
+          envelope: pilotEvent({ eventId: "evt_start" }),
+          now: T0 + 5,
+        });
+
+        expect(result.outcome).toBe("duplicateEvent");
+        expect((await store.findByRef({ ref: pilotRef }))?.revision).toBe(1);
       });
     });
   });
