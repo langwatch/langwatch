@@ -11,6 +11,7 @@ import type { LangyToolEvent } from "./langy-agent";
 import {
   answerOfTurn,
   deleteOrderFailure,
+  isDeleteCommand,
   demoReposToPrune,
   judgeMessages,
   listeningPids,
@@ -501,6 +502,32 @@ describe("deleteOrderFailure", () => {
       ...over,
     });
 
+  describe("when a lookup names the item with delete in its name", () => {
+    it("is not taken as the delete (r13)", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator get e2e-delete-me-x"),
+            frame(REQUEST, "langwatch evaluator delete evaluator_1"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 1 }],
+        }),
+      ).toBeNull();
+    });
+
+    it("still fails a real delete before the answer", () => {
+      expect(
+        check({
+          toolEvents: [
+            frame(REQUEST, "langwatch evaluator get e2e-delete-me-x"),
+            frame(REQUEST, "langwatch evaluator delete evaluator_1"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toMatch(/tool frame 1\).*answered after the delete/);
+    });
+  });
+
   describe("when the request turn deletes with no card", () => {
     it("fails, naming the request turn", () => {
       expect(
@@ -563,5 +590,22 @@ describe("deleteOrderFailure", () => {
     it("has no order to check", () => {
       expect(check({ deleted: false })).toBeNull();
     });
+  });
+});
+
+describe("isDeleteCommand", () => {
+  it.each([
+    ["langwatch evaluator delete evaluator_1", true],
+    ["langwatch monitor delete mon_1", true],
+    ["langwatch --json evaluator delete x", true],
+    ["langwatch evaluator delete x --yes", true],
+    ["langwatch evaluator archive x", true],
+    ["ls && langwatch evaluator delete x", true],
+    ["langwatch evaluator get e2e-delete-me-x", false],
+    ['langwatch evaluator create "delete me"', false],
+    ["langwatch evaluator list", false],
+    ["rm delete", false],
+  ])("%s -> %s", (command, expected) => {
+    expect(isDeleteCommand(command)).toBe(expected);
   });
 });

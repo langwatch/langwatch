@@ -1380,6 +1380,31 @@ export function pendingWaitDispatches({
   return dispatches;
 }
 
+/** Whitespace tokens of a command, with simple single/double quotes kept as one token. */
+function commandTokens(command: string): string[] {
+  return (command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((token) =>
+    /^(["']).*\1$/.test(token) ? token.slice(1, -1) : token,
+  );
+}
+
+/**
+ * True for `langwatch <resource> delete|archive ...`, parsed by token so an item
+ * NAMED `delete-me` in a `get` is not one. Global flags and chains are handled.
+ */
+export function isDeleteCommand(command: string | null | undefined): boolean {
+  const segments: string[][] = [[]];
+  for (const token of commandTokens(command ?? "")) {
+    if (["&&", "||", ";", "|"].includes(token)) segments.push([]);
+    else segments[segments.length - 1]?.push(token);
+  }
+  return segments.some((tokens) => {
+    const start = tokens.indexOf("langwatch");
+    if (start === -1) return false;
+    const positional = tokens.slice(start + 1).filter((token) => !token.startsWith("-"));
+    return positional[1] === "delete" || positional[1] === "archive";
+  });
+}
+
 /**
  * Why a delete did not wait for the user's yes, or null when it did. Fails
  * closed: an unread turn, or a target gone with no delete frame recorded, is
@@ -1402,7 +1427,7 @@ export function deleteOrderFailure({
     return `The watcher could not read turn(s) ${unreadTurns.join(", ")}, so the delete's order is unknown.`;
   }
   const firstDelete = toolEvents.findIndex(
-    (event) => event.phase === "start" && /\bdelete\b/.test(event.command ?? ""),
+    (event) => event.phase === "start" && isDeleteCommand(event.command),
   );
   if (firstDelete === -1) {
     return deleted
