@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it } from "vitest";
 
 import type { ProcessRef } from "../../processManager.types.ts";
 import { InMemoryProcessStore } from "../inMemoryProcessStore.ts";
@@ -160,11 +160,16 @@ describe("InMemoryProcessStore wake claims", () => {
     });
 
     describe("when the claim is released after a commit re-armed the wake", () => {
-      /** @scenario "Releasing a claim after a commit re-armed the wake changes nothing" */
-      it("reports the release as not applied and keeps the commit's wake", async () => {
-        const store = InMemoryProcessStore.createForTesting();
+      let store: InMemoryProcessStore;
+
+      beforeEach(async () => {
+        store = InMemoryProcessStore.createForTesting();
         await armWake(store, ref("sweep"), DUE_AT);
         await claim(store);
+      });
+
+      /** @scenario "Releasing a claim after a commit re-armed the wake changes nothing" */
+      it("reports the release as not applied and keeps the commit's wake", async () => {
         await commitNextWake(store, 1, NOW + 5_000);
 
         const released = await store.releaseWakeClaim({
@@ -179,9 +184,6 @@ describe("InMemoryProcessStore wake claims", () => {
       });
 
       it("keeps a commit's wake even when the commit armed it at the lease end", async () => {
-        const store = InMemoryProcessStore.createForTesting();
-        await armWake(store, ref("sweep"), DUE_AT);
-        await claim(store);
         await commitNextWake(store, 1, NOW + LEASE_MS);
 
         const released = await store.releaseWakeClaim({

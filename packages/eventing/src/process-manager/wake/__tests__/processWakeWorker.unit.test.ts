@@ -2,8 +2,7 @@ import { createTestLogger, type TestLogLine, type TestLogLines } from "@langwatc
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { DueWake } from "../../stores/processStore.types.ts";
-import { ProcessWakeWorker } from "../processWakeWorker.ts";
-import { WAKE_CLAIM_LEASE_MS } from "../wakeClaim.ts";
+import { ProcessWakeWorker, WAKE_CLAIM_LEASE_MS } from "../processWakeWorker.ts";
 
 function linesAt(lines: TestLogLines, level: "warn" | "error"): TestLogLine[] {
   const wanted = level === "warn" ? 40 : 50;

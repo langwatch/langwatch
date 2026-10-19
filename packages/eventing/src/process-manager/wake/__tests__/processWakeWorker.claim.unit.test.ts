@@ -14,8 +14,12 @@ import type { HandleResult } from "../../processManagerService.ts";
 import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
 import type { DueWake } from "../../stores/processStore.types.ts";
-import { type ProcessWakeHandler, ProcessWakeWorker } from "../processWakeWorker.ts";
-import { WAKE_CLAIM_LEASE_MS, WAKE_CLAIM_SAFETY_MARGIN_MS } from "../wakeClaim.ts";
+import {
+  type ProcessWakeHandler,
+  ProcessWakeWorker,
+  WAKE_CLAIM_LEASE_MS,
+  WAKE_CLAIM_SAFETY_MARGIN_MS,
+} from "../processWakeWorker.ts";
 
 const DUE_AT = T0 + LIVENESS_MS;
 
