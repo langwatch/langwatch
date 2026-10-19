@@ -11,7 +11,8 @@ import type {
 } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { PROJECT_KIND } from "@langwatch/project-contract";
-import { describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { describe, expect, it } from "vitest";
 
 import {
   ApiRestCredentialsService,
@@ -624,7 +625,7 @@ describe("given an API key whose ceiling does not hold the route's permission", 
     logger,
     now,
   }: {
-    logger: { error: () => void; warn: () => void };
+    logger: ReturnType<typeof createTestLogger>["logger"];
     now: () => number;
   }) {
     return ApiRestCredentialsService.create({
@@ -649,7 +650,7 @@ describe("given an API key whose ceiling does not hold the route's permission", 
     /** @scenario "Repeated ceiling refusals for one key log one warning per window" */
     it("logs one warning per window, carrying the refusals held back", async () => {
       let clockMs = 0;
-      const logger = { error: vi.fn(), warn: vi.fn() };
+      const { logger, lines } = createTestLogger();
       const door = refusingDoor({ logger, now: () => clockMs });
       const refuse = () =>
         door
@@ -663,12 +664,11 @@ describe("given an API key whose ceiling does not hold the route's permission", 
       clockMs += 5 * 60_000;
       await refuse();
 
-      expect(logger.error).not.toHaveBeenCalled();
-      expect(logger.warn).toHaveBeenCalledTimes(2);
-      expect(logger.warn).toHaveBeenLastCalledWith(
-        expect.objectContaining({ apiKeyId: "key-project", suppressedRefusals: 2 }),
-        "API key ceiling denial",
-      );
+      const warnings = lines.filter((line) => line.msg === "API key ceiling denial");
+      expect(lines.filter((line) => line.level >= 50)).toEqual([]);
+      expect(warnings).toHaveLength(2);
+      expect(warnings.every((line) => line.level === 40)).toBe(true);
+      expect(warnings[1]).toMatchObject({ apiKeyId: "key-project", suppressedRefusals: 2 });
     });
   });
 });
