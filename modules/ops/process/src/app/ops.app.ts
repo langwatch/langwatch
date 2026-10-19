@@ -2080,7 +2080,10 @@ export class OpsModule implements OpsApi {
     return this.#platformOperators().seedOnce(operatorSeed);
   }
 
-  /** Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it. */
+  /**
+   * Step `ops:seed-platform-operators`: ADMIN_EMAILS's verified users, while nobody holds it; with
+   * no email configured an unverified one only as the install's first-created account.
+   */
   seedPlatformOperatorsFromAdminEmails({ dryRun }: { dryRun: boolean }): Promise<number> {
     const { operatorSeed } = this.#dependencies;
     if (!operatorSeed) throw new OpsCapabilityUnavailableError("the platform-operator seed");

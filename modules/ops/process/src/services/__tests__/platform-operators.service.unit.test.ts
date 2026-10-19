@@ -85,7 +85,7 @@ function world({
     revokePlatformOperator: vi.fn(async () => undefined),
   };
   const directory = createApiFixture<
-    Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isOldestActiveAccount">
+    Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">
   >({
     countUsage: async () => {
       const emailDomains: Record<string, number> =
@@ -95,10 +95,8 @@ function world({
     findByEmail: async ({ email }) =>
       users.find((candidate) => candidate.email === email.toLowerCase()) ?? null,
     findById: async ({ id }) => users.find((candidate) => candidate.id === id) ?? null,
-    isOldestActiveAccount: async ({ userId }) =>
-      users
-        .filter((candidate) => candidate.deactivatedAt === null)
-        .toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id === userId,
+    isFirstCreatedAccount: async ({ userId }) =>
+      users.toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id === userId,
   });
   const mail = createApiFixture<Pick<NotificationApi, "getMailDelivery">>({
     getMailDelivery: async () => ({
@@ -271,7 +269,7 @@ describe("PlatformOperatorsService", () => {
       };
 
       /** @scenario "With no email configured a named unverified account that signed up later waits" */
-      it("waits unlatched and says the account is not the install's oldest", async () => {
+      it("waits unlatched and says the account is not the install's first-created", async () => {
         const { service, granted, record } = seeding(squatted);
         warn.mockClear();
 
@@ -279,11 +277,11 @@ describe("PlatformOperatorsService", () => {
 
         expect(outcome).toMatchObject({
           via: "waiting",
-          reason: expect.stringMatching(/not the install's oldest active account/),
+          reason: expect.stringMatching(/not the install's first-created account/),
         });
         expect(record).not.toHaveBeenCalled();
         expect(granted).toEqual([]);
-        expect(warn.mock.calls[0]?.[1]).toMatch(/oldest active account/);
+        expect(warn.mock.calls[0]?.[1]).toMatch(/first-created account/);
       });
 
       /** @scenario "With no email configured a named unverified account that signed up later waits" */
@@ -309,6 +307,52 @@ describe("PlatformOperatorsService", () => {
         await service.seedOnce({ adminEmails: ["ana@acme.com", "bo@acme.com"], cloud: false });
 
         expect(record).toHaveBeenCalledWith({ via: "admin-emails", userIds: ["bo"] });
+      });
+    });
+
+    describe("given no email is configured, the first account deactivated and a later sign-up on the named address", () => {
+      const takenOver = {
+        users: [
+          user("first", {
+            createdAt: new Date("2024-01-01T00:00:00Z"),
+            deactivatedAt: new Date("2024-06-01T00:00:00Z"),
+          }),
+          user("ana", { emailVerified: false }),
+        ],
+        organizations: ["org_1"],
+        administrators: ["ana"],
+        isEmailUnconfigured: true,
+      };
+
+      /** @scenario "With no email configured a deactivated first account seeds no later unverified sign-up" */
+      it("waits unlatched, and says the named account is not the first-created one", async () => {
+        const { service, granted, record } = seeding(takenOver);
+        warn.mockClear();
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome).toMatchObject({
+          via: "waiting",
+          reason: expect.stringMatching(
+            /not the install's first-created account.*even once the first is deactivated/,
+          ),
+        });
+        expect(record).not.toHaveBeenCalled();
+        expect(granted).toEqual([]);
+        expect(warn).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "With no email configured a deactivated first account seeds no later unverified sign-up" */
+      it("grants nobody through the upgrade step", async () => {
+        const { service, granted } = world(takenOver);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(0);
+        expect(granted).toEqual([]);
       });
     });
 

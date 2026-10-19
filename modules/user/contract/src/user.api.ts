@@ -152,8 +152,8 @@ export interface UserApi {
   hasAccountOnDomain(input: { domain: string }): Promise<boolean>;
   /** Whether the installation holds any account at all; false only on a fresh install. */
   hasAnyAccount(): Promise<boolean>;
-  /** Whether this account is the install's first-created one among those still active. */
-  isOldestActiveAccount(input: { userId: string }): Promise<boolean>;
+  /** Whether this account is the install's first-created one, deactivated or not. */
+  isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
 }
 
 export const UserApi = moduleApi<UserApi>()("user");

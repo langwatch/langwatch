@@ -1795,8 +1795,9 @@ A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
 Where no email is configured no address can be verified, so a named active user is seeded unverified;
 the account must already exist, the seed never creates one (Rogerio, 2026-10-18). An unverified one is
-seeded only as the install's oldest active account, as the first user is, since anyone can register a
-named address first on an install that cannot verify it (Rogerio, 2026-10-19). There the recovery task
+seeded only as the install's first-created account, as the first user is, since anyone can register a
+named address first on an install that cannot verify it; a deactivated first account never passes that
+place to a later sign-up, so the seed waits (Rogerio, 2026-10-19). There the recovery task
 also grants an unverified active account, since shell access naming it is the check, so a seed that
 waits stays recoverable; the page still grants verified accounts only (Rogerio, 2026-10-19).
 On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the

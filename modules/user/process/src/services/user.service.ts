@@ -150,8 +150,8 @@ export class UserService {
     return this.repository.hasAnyAccount();
   }
 
-  async isOldestActiveAccount({ userId }: { userId: string }): Promise<boolean> {
-    return (await this.repository.findOldestActiveId()) === userId;
+  async isFirstCreatedAccount({ userId }: { userId: string }): Promise<boolean> {
+    return (await this.repository.findFirstCreatedId()) === userId;
   }
 
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {

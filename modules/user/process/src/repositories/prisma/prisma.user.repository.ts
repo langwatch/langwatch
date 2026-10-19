@@ -193,9 +193,8 @@ export class PrismaUserRepository
     return row !== null;
   }
 
-  async findOldestActiveId(): Promise<string | null> {
+  async findFirstCreatedId(): Promise<string | null> {
     const row = await this.prisma.user.findFirst({
-      where: { deactivatedAt: null },
       orderBy: [{ createdAt: "asc" }, { id: "asc" }],
       select: { id: true },
     });

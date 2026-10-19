@@ -78,10 +78,9 @@ export class MemoryUserRepository implements UserRepository {
     return this.#database.rows().length > 0;
   }
 
-  async findOldestActiveId(): Promise<string | null> {
+  async findFirstCreatedId(): Promise<string | null> {
     const [oldest] = this.#database
       .rows()
-      .filter((row) => !row.deactivatedAt)
       .toSorted(
         (a, b) =>
           a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds ||

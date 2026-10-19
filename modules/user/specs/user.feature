@@ -29,12 +29,12 @@ Feature: Canonical user lifecycle
     And one active operator remains
 
   # ops's platform-operator seed asks this before granting an unverified account (Rogerio, 2026-10-19).
-  @unit
-  Scenario: The install's oldest active account is answered by id
+  @unit @integration
+  Scenario: The install's first-created account is answered by id
     Given accounts created one after another, some since deactivated
-    When asked whether an account is the install's oldest active one
-    Then only the earliest-created account still active answers yes
-    And with every account deactivated none does
+    When asked whether an account is the install's first-created one
+    Then only the earliest-created account answers yes, deactivated or not
+    And with no account at all none does
 
   # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
   # unique index first; only a miss asks again case aside, for rows not lower-cased yet.

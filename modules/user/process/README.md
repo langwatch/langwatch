@@ -362,12 +362,12 @@ Whether the installation holds any account at all; false only on a fresh install
 hasAnyAccount(): Promise<boolean>;
 ```
 
-#### `isOldestActiveAccount`
+#### `isFirstCreatedAccount`
 
-Whether this account is the install's first-created one among those still active.
+Whether this account is the install's first-created one, deactivated or not.
 
 ```typescript
-isOldestActiveAccount(input: { userId: string }): Promise<boolean>;
+isFirstCreatedAccount(input: { userId: string }): Promise<boolean>;
 ```
 
 ## REST transport

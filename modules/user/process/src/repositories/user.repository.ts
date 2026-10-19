@@ -129,8 +129,8 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
-  /** The id of the earliest-created account not deactivated, or null when none is active. */
-  findOldestActiveId(): Promise<string | null>;
+  /** The id of the earliest-created account, deactivated or not, or null when there is none. */
+  findFirstCreatedId(): Promise<string | null>;
   /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
   findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
   /** One page of accounts whose stored address is not lower-case, in id order after `afterId`. */
