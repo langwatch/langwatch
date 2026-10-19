@@ -8,11 +8,11 @@ the story is `skills/README.md` at the repo root.
 
 ## What lives here
 
-| Path                           | What it is                                                                                                                     |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------ |
-| `AGENTS.md`                    | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay). |
+| Path                           | What it is                                                                                                                                                                                                      |
+| ------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AGENTS.md`                    | Langy's system-prompt rules doc, rendered into each worker's `$HOME/AGENTS.md`. Identical in dev and prod (no Docker overlay).                                                                                  |
 | `skills/`                      | The compiled skill set, synced from `skills/_compiled/native/` by `skills/_compiled/generate.sh`. Generated — never hand-edit; edit the authored source under the repo-root `skills/` workspace and regenerate. |
-| `assets.go` / `assets_test.go` | The embed + materialization code and its pins.                                                                                 |
+| `assets.go` / `assets_test.go` | The embed + materialization code and its pins.                                                                                                                                                                  |
 
 ## Two kinds of skills, one directory at build time
 
@@ -61,7 +61,7 @@ cannot drift out of date again.
   appear in it, not even as an example of what not to say. `assets_test.go`
   pins that.
 - **The byte budget has almost no room left.** `assets_test.go` caps the
-  template at 16,384 bytes and it currently sits at 16,384, so no bytes
+  template at 16,384 bytes and the prompt is at that cap, so no bytes
   are free. Any new sentence has to pay for itself out of an old one. The
   budget test logs the live figure on every run, so read that rather than this
   line if the two disagree. A
@@ -70,8 +70,7 @@ cannot drift out of date again.
 - **Cite rules by their words, never by a number.** AGENTS.md was once a
   numbered list and callers pinned themselves to "rule 14", "rule 27". The
   numbering is gone — the prompt is prose under headings — so every such
-  reference now points at nothing, and the ones that survive in the e2e suite
-  are stale comments, not live contracts. Quote the phrase you mean, or name
+  reference now points at nothing. Quote the phrase you mean, or name
   the section; a number will rot the next time a line moves.
 - **The routing table must stay true.** Every skill it names must exist in
   `skills/_compiled/native/` or in this directory, and every CLI invocation it
