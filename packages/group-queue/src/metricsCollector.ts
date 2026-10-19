@@ -112,7 +112,7 @@ export class GroupQueueMetricsCollector {
   private blockedSeries = new Map<string, GroupLabels>();
   /** The oldest-pending series published last cycle, zeroed when another group takes over. */
   private oldestPendingSeries: GroupLabels | null = null;
-  /** Parked group count per tenant last cycle, to log when a tenant starts or stops being parked. */
+  /** Parked group count per tenant last cycle, to log when a tenant starts or stops parking. */
   private parkedTenantCounts: Map<string, number> | null = null;
 
   constructor(

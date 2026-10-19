@@ -105,11 +105,9 @@ function makeRedis(
     // group that is parked, blocked or claimed is in pending-groups and in
     // no ready set at all.
     const key = String(args[0]);
-    const members = key.endsWith("pending-groups")
-      ? (opts.pendingGroups ?? readyMembers)
-      : key.endsWith("blocked")
-        ? (opts.blocked ?? [])
-        : readyMembers;
+    let members = readyMembers;
+    if (key.endsWith("pending-groups")) members = opts.pendingGroups ?? readyMembers;
+    else if (key.endsWith("blocked")) members = opts.blocked ?? [];
     const cursor = Number(args[1]);
     const countIdx = args.indexOf("COUNT");
     const pageSize = opts.scanPageSize ?? (countIdx >= 0 ? Number(args[countIdx + 1]) : 10);
@@ -117,6 +115,10 @@ function makeRedis(
     const nextCursor = cursor + pageSize >= members.length ? "0" : String(cursor + pageSize);
     return [nextCursor, page];
   });
+  const evalsha = vi.fn(
+    async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) =>
+      ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]),
+  );
   const redis = redisDouble({
     zcard: vi.fn(async (key: string) => {
       if (opts.gateFirstCall && !gateUsed) {
@@ -132,10 +134,7 @@ function makeRedis(
       key.endsWith("blocked") ? (opts.blockedTotal ?? opts.blocked?.length ?? 0) : 0,
     ),
     smembers: vi.fn(async () => Object.keys(opts.parked ?? {})),
-    evalsha: vi.fn(
-      async (_sha: string, _numKeys: number, _key: string, _prefix: string, ...ids: string[]) =>
-        ids.flatMap((id) => opts.routing?.[id] ?? ["", "", ""]),
-    ),
+    evalsha,
     zrangebyscore,
     sscan,
     pipeline: vi.fn(() => {
@@ -164,7 +163,7 @@ function makeRedis(
       return chain;
     }),
   });
-  return { redis, zrangebyscore, sscan };
+  return { redis, zrangebyscore, sscan, evalsha };
 }
 
 /** A logger stub whose calls a test can read. */
@@ -831,17 +830,17 @@ describe("GroupQueueMetricsCollector — blocked groups by pipeline and job", ()
   describe("given a group that stays blocked across cycles", () => {
     describe("when a later cycle runs", () => {
       it("resolves its labels once rather than every cycle", async () => {
-        const { redis } = makeRedis({
+        const { redis, evalsha } = makeRedis({
           blocked: ["t1/a"],
           routing: { "t1/a": ["trace_processing", "projection", "traceSummary"] },
         });
         const collector = makeCollector({ redis });
         await collector.collect();
-        const callsAfterFirst = vi.mocked(redis.evalsha).mock.calls.length;
+        const callsAfterFirst = evalsha.mock.calls.length;
 
         await collector.collect();
 
-        expect(vi.mocked(redis.evalsha).mock.calls.length).toBe(callsAfterFirst);
+        expect(evalsha.mock.calls.length).toBe(callsAfterFirst);
         expect(blockedFor(traceFold)).toBe(1);
       });
     });
