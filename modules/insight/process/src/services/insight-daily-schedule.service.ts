@@ -6,6 +6,7 @@ import {
   INSIGHT_DAILY_RUN_EXPIRY_MS,
   type InsightBoardDailyRunScope,
   type InsightDailyRun,
+  type InsightDailyRunRequested,
   type InsightDailyRunSetting,
   type InsightRunBoard,
   type RequestInsightDailyRunInput,
@@ -44,23 +45,24 @@ export class InsightDailyScheduleService {
   }
 
   /**
-   * Records the request and answers its id. The id names no run: the schedule's process starts
-   * one for it only when none is in flight for the board, and the worker decides that later.
+   * Records the request and answers its id and time. The id names no run: the schedule's process
+   * starts one for it only when none is in flight for the board, and the worker decides that later.
    */
-  async requestRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+  async requestRun(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
     const { projectId, userId, board, maxInsights } =
       requestInsightDailyRunInputSchema.parse(input);
     const requestId = generate(KSUID_RESOURCES.INSIGHT_RUN).toString();
+    const requestedAt = nowInstant().epochMilliseconds;
     await this.members.commands.requestRun({
       tenantId: projectId,
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt: requestedAt,
       scheduleId: dailyScheduleId({ projectId, userId, board }),
       userId,
       board,
       requestId,
       maxInsights,
     });
-    return { requestId };
+    return { requestId, requestedAt };
   }
 
   /**
@@ -68,13 +70,15 @@ export class InsightDailyScheduleService {
    * in flight answers its own id and requests nothing, since the process would start none; the
    * caller follows that run. An operator's run is asked through {@link requestRun}.
    */
-  async runNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+  async runNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
     const { state, runInFlight } = await this.getSetting(input);
     // The presentation reads `formErrors`, so the caller is told what to do, not only the code.
     if (state !== "on") {
       throw new ValidationError(DAILY_RUN_NOT_ON, { meta: { formErrors: [DAILY_RUN_NOT_ON] } });
     }
-    if (runInFlight !== null) return { requestId: runInFlight.runId };
+    if (runInFlight !== null) {
+      return { requestId: runInFlight.runId, requestedAt: nowInstant().epochMilliseconds };
+    }
     return this.requestRun(input);
   }
 

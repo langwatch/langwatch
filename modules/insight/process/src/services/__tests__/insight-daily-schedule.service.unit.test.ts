@@ -24,15 +24,20 @@ const RUN_NOW = { projectId: PROJECT, userId: USER, board: BOARD, maxInsights: 3
 
 let repositories: InsightRepositories;
 let requested: string[];
+let requestedAtTimes: number[];
 let service: InsightDailyScheduleService;
 
 beforeEach(() => {
   repositories = MemoryInsightRepositories.create();
   requested = [];
+  requestedAtTimes = [];
   service = InsightDailyScheduleService.create({
     schedules: repositories.dailySchedules,
     commands: createApiFixture<InsightDailyRunCommandsService>({
-      requestRun: async ({ requestId }) => void requested.push(requestId),
+      requestRun: async ({ requestId, occurredAt }) => {
+        requested.push(requestId);
+        requestedAtTimes.push(occurredAt);
+      },
     }),
     dashboards: createApiFixture<Pick<DashboardApi, "getById">>({}),
   });
@@ -86,7 +91,10 @@ describe("given a member's board that is on, with a run in flight", () => {
   describe("when they choose Run now", () => {
     /** @scenario "Run now on a board whose run is already going follows that run" */
     it("answers the id of the run in flight, and requests no run", async () => {
-      expect(await service.runNow(RUN_NOW)).toEqual({ requestId: "slot:1" });
+      expect(await service.runNow(RUN_NOW)).toEqual({
+        requestId: "slot:1",
+        requestedAt: expect.any(Number),
+      });
       expect(requested).toEqual([]);
     });
   });
@@ -98,10 +106,11 @@ describe("given a member's board that is on, whose run in flight is lost", () =>
   });
 
   describe("when they choose Run now", () => {
-    it("requests a run, and answers its request's id", async () => {
-      const { requestId } = await service.runNow(RUN_NOW);
+    it("requests a run, and answers its request's id and the time it was recorded at", async () => {
+      const { requestId, requestedAt } = await service.runNow(RUN_NOW);
 
       expect(requested).toEqual([requestId]);
+      expect(requestedAtTimes).toEqual([requestedAt]);
       expect(requestId).not.toBe("slot:1");
     });
   });

@@ -15,6 +15,7 @@ import {
   type FileInsightInput,
   type InsightBoardDailyRunScope,
   type InsightDailyRun,
+  type InsightDailyRunRequested,
   type InsightDailyRunSetting,
   type InsightEntry,
   type InsightApi as InsightApiContract,
@@ -229,7 +230,7 @@ export class InsightModule implements InsightApiContract {
     return this.#dailySchedules.requestRun(input);
   }
 
-  async runDailyRunNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }> {
+  async runDailyRunNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested> {
     await this.#rollout.assertEnabled(input);
     return this.#dailySchedules.runNow(input);
   }

@@ -304,14 +304,19 @@ export const runInsightDailyRunNowInputSchema: RunInsightDailyRunNowInputSchema 
 
 /**
  * The id of the run to follow: the request's, which the run it starts carries as its `runId`,
- * or the run already in flight on the board, when Run now requested nothing.
+ * or the run already in flight on the board, when Run now requested nothing. `requestedAt` is
+ * epoch milliseconds on the clock that stamps a run's start, to follow a run that held it.
  */
-const insightDailyRunRequestedSchemaDefinition = z.object({ requestId: z.string() });
+const insightDailyRunRequestedSchemaDefinition = z.object({
+  requestId: z.string(),
+  requestedAt: z.number(),
+});
 export interface InsightDailyRunRequestedSchema extends Named<
   typeof insightDailyRunRequestedSchemaDefinition
 > {}
 export const insightDailyRunRequestedSchema: InsightDailyRunRequestedSchema =
   insightDailyRunRequestedSchemaDefinition;
+export type InsightDailyRunRequested = z.infer<typeof insightDailyRunRequestedSchema>;
 
 /** The fence tag of the block an answer ended with before the card; read for one release. */
 export const INSIGHT_RUN_FINDINGS_FENCE_TAG = "langwatch-insights";

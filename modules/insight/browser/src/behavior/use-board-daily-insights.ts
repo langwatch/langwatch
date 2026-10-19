@@ -40,8 +40,8 @@ function openInLangy({ host, conversationId }: { host: InsightHostApi; conversat
 
 /**
  * A hint races the row it names (ADR-004): a read it brought back without the awaited run is
- * asked again after each delay in turn, until the run shows. Answers a read for Run now to ask
- * with, which starts no re-reads.
+ * asked again after each delay in turn, until the run shows. Answers the read Run now asks, which
+ * starts the same re-reads, so a hint merged into it loses none.
  */
 function useRereadWhileAwaiting({
   scope: {
@@ -58,8 +58,8 @@ function useRereadWhileAwaiting({
 }): () => void {
   const utils = insightApi.useUtils();
   const seenAnswer = useRef(answeredAt);
-  /** How many re-reads came before the read in flight; null when a hint asked it. */
-  const rereadsBefore = useRef<number | null>(null);
+  /** How many re-reads came before the read in flight; 0 when a hint or Run now asked it. */
+  const rereadsBefore = useRef(0);
   const readAgain = useCallback(
     (rereads: number) => {
       rereadsBefore.current = rereads;
@@ -70,14 +70,14 @@ function useRereadWhileAwaiting({
   useEffect(() => {
     if (answeredAt === seenAnswer.current) return;
     seenAnswer.current = answeredAt;
-    const rereads = rereadsBefore.current ?? 0;
-    rereadsBefore.current = null;
+    const rereads = rereadsBefore.current;
+    rereadsBefore.current = 0;
     const delay = REQUESTED_RUN_REREAD_DELAYS_MS[rereads];
     if (!isAwaitingRun || delay === undefined) return;
     const reread = setTimeout(() => readAgain(rereads + 1), delay);
     return () => clearTimeout(reread);
   }, [answeredAt, isAwaitingRun, readAgain]);
-  return () => readAgain(REQUESTED_RUN_REREAD_DELAYS_MS.length);
+  return () => readAgain(0);
 }
 
 type Write = {
@@ -106,10 +106,10 @@ export function useBoardDailyInsights({ board }: { board: InsightRunBoard }) {
   const runNowRequest = insightApi.insights.runBoardDailyRunNow.useMutation();
   const { reset: endRunNow } = runNowRequest;
 
-  // Matched by the request's id: a run settling meanwhile is not the one asked for (ADR-004).
+  // The request's id, or a run that started or settled after the request (ADR-004).
   const requested =
     runNowRequest.data && query.data
-      ? requestedRunOf({ setting: query.data, requestId: runNowRequest.data.requestId })
+      ? requestedRunOf({ setting: query.data, ...runNowRequest.data })
       : undefined;
   const hasRequestedRunShown = requested !== undefined;
   const requestedConversationId = requested?.conversationId ?? null;

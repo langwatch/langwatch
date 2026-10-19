@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Each person's own insights in a project. Every operation refuses with `insights_not_enabled` while `release_insights` is off for the project, and an insight another person owns answers `insight_not_found`, exactly as an id no insight has.
 
-Peers call these through the token, declared at `../contract/src/insight.api.ts:22`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/insight.api.ts:23`; nothing else in this package is public.
 
 #### `findInsights`
 
@@ -69,7 +69,7 @@ requestDailyRun(input: RequestInsightDailyRunInput): Promise<{ requestId: string
 The reader's own Run now: the same request, refused with `validation_error` unless their daily run on the board is on.
 
 ```typescript
-runDailyRunNow(input: RequestInsightDailyRunInput): Promise<{ requestId: string }>;
+runDailyRunNow(input: RequestInsightDailyRunInput): Promise<InsightDailyRunRequested>;
 ```
 
 #### `findDailyRuns`
@@ -192,9 +192,10 @@ type Output = unknown;
 
 // insights.runBoardDailyRunNow
 type Input = z.infer<typeof runInsightDailyRunNowInputSchema>; // ../contract/src/insight-daily-run.ts:303
-// Output: insightDailyRunRequestedSchema, ../contract/src/insight-daily-run.ts:314
+// Output: insightDailyRunRequestedSchema, ../contract/src/insight-daily-run.ts:318
 interface Output {
   requestId: string;
+  requestedAt: number;
 }
 ```
 

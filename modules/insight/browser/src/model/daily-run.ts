@@ -204,20 +204,27 @@ export const TEMPLATE_BOARD_NOTE =
   "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";
 
 /**
- * What a Run now waits for: the run its request named, in flight or already settled. A run is
- * named by the request that asked for it, so a scheduled run that settled meanwhile is not it.
- * Undefined while neither shows; a run that never reached Langy has no conversation.
+ * What a Run now waits for: the run its request named, or any run that started or settled at or
+ * after the request. The process drops a request while it holds a run, so that run is the one to
+ * follow (ADR-004). Undefined while none shows; a run that never reached Langy has no conversation.
  */
 export function requestedRunOf({
   setting,
   requestId,
+  requestedAt,
 }: {
   setting: InsightDailyRunSetting;
   /** What the server answered Run now with. */
   requestId: string;
+  /** When the server recorded the request, on the clock that stamps a run's start. */
+  requestedAt: number;
 }): { conversationId: string | null } | undefined {
   const { runInFlight, lastRun } = setting;
-  if (runInFlight?.runId === requestId) return { conversationId: runInFlight.conversationId };
-  if (lastRun?.runId === requestId) return { conversationId: lastRun.conversationId };
+  if (runInFlight && (runInFlight.runId === requestId || runInFlight.startedAt >= requestedAt)) {
+    return { conversationId: runInFlight.conversationId };
+  }
+  if (lastRun && (lastRun.runId === requestId || lastRun.at >= requestedAt)) {
+    return { conversationId: lastRun.conversationId };
+  }
   return undefined;
 }

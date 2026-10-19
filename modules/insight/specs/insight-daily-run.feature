@@ -1182,16 +1182,26 @@ Feature: The daily insights run
       And the member chose Run now
       When the hint that the run started reaches the board before the run is stored
       Then the board reads its run again after 2, 4, 8 and 16 seconds, 4 times at most
+      And it does so also when the hint lands while the read Run now asked is unanswered
       And it stops reading as soon as the run shows
       And the Langy panel opens on the run's conversation without waiting for the run to end
 
     @integration
-    Scenario: Run now waits for the run it asked for, not one that settled meanwhile
+    Scenario: Run now waits for the run it asked for, not one that settled before the click
       Given a board that is on, with no run in flight
-      And the member chooses Run now
-      When a scheduled run settles before the board reads its run again
+      And a scheduled run settled before the board read it
+      When the member chooses Run now
       Then the board shows that run as the last run and keeps waiting
       And the Langy panel opens only once the run that Run now asked for has started
+
+    @integration
+    Scenario: Run now follows a run that started after the click
+      Given a board that is on, with no run in flight
+      And the member chose Run now
+      When another run starts first, from another tab or the schedule, so the request starts none
+      Then the board follows that run instead of waiting for a run that never comes
+      And it compares the run's start with the time the server recorded the request
+      And the Langy panel opens on that run's conversation
 
     @unit
     Scenario: Run now on a board whose run is already going follows that run

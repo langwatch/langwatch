@@ -208,16 +208,24 @@ with that id to show, with no standing poll: `run_started` and `run_settled` hin
 board's read, which is read again. A hint is published off the committed event, not after
 the schedule row is folded, so it can outrun the row: a read a hint brought back without
 the run is read again after each of `REQUESTED_RUN_REREAD_DELAYS_MS` in turn (2, 4, 8 and
-16 seconds, about 30 in all), and stops once the run shows or the request ends. In flight,
-it opens Langy on the run's conversation; settled
-first, it ends the wait. Any other run is not this request's: a scheduled run that
-settles after the click and before the next read is shown as the last run, and the wait
-goes on. While a run is in flight, `runNow` requests nothing and answers that run's id,
-so the browser follows it. A run that starts between that read and the request is a
-narrow window we accept: the request starts nothing, and the wait ends at the deadline.
-A run that shows neither within `INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser
-says the run could not be started. While a run is in flight the dropdown offers to open
-it instead.
+16 seconds, about 30 in all), and stops once the run shows or the request ends. The read
+Run now asks once the request is in starts the same re-reads, since a hint that lands
+while it is unanswered merges into it and could not start them itself. In flight, it
+opens Langy on the run's conversation; settled first, it ends the wait.
+
+While a run is in flight, `runNow` requests nothing and answers that run's id, so the
+browser follows it. The read cannot see a run the process holds before `run_started`
+(a scheduled wake that fired, or a second tab that asked first), and the process drops a
+request while it holds one, so that request's id never runs. The server cannot answer
+the held run's id, as the service reads the row and not the process. So the browser also
+follows any run that started, or settled, at or after the request: per schedule the
+process takes events in order, so a run that settles after the request was recorded held
+it, and the request started nothing. Run now answers `requestedAt`, the time the server
+recorded the request on the clock that stamps a run's start, so the browser's clock never
+enters the comparison. A scheduled run that settled before the request is shown as the
+last run, and the wait goes on. A run that shows neither within
+`INSIGHT_DAILY_RUN_EXPIRY_MS` is lost, and the browser says the run could not be
+started. While a run is in flight the dropdown offers to open it instead.
 
 **The row names the run in flight.** `run_started` writes `runInFlightId`,
 `runInFlightConversationId` and `runInFlightStartedAt`, and the `run_settled` of that run
