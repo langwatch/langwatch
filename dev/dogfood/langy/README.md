@@ -143,13 +143,13 @@ parser. A scenario file may carry a `source` field; the sync ignores it.
 
 ### Wave 1a: pure-chat e2e runs moved here
 
-50 judge-only runs from `apps/ui/e2e/langy/` now run as platform scenarios in
+49 judge-only runs from `apps/ui/e2e/langy/` now run as platform scenarios in
 the default world. Names are `E2E <group> <line>: ...`, the line being the
 `it(` in the source file. Each gets label `e2e-migrated` and its file stem.
 
 - `e2e-chat-core-analytics` (9): `langy.scenario.test.ts` 91-304, metrics and trace questions.
 - `e2e-chat-core-listings` (10): same file 339-553, listings and the setup audit.
-- `e2e-chat-core-conversation` (11): same file 1066-1544, surface location, session, multi-turn, out of scope, GitHub connect.
+- `e2e-chat-core-conversation` (10): same file 1066-1511, surface location, session, multi-turn, out of scope.
 - `e2e-chat-dogfood` (8): `langy-dogfood.scenario.test.ts` 154-527.
 - `e2e-chat-surfaces` (5): `langy-current-surfaces.scenario.test.ts` 32, 63, 101, 223, 344.
 - `e2e-chat-quality` (4): `langy-quality.scenario.test.ts` 112-230; its code regex checks are criteria now.
@@ -158,6 +158,12 @@ the default world. Names are `E2E <group> <line>: ...`, the line being the
 - Stay in code (53): red team, folder, CLI and code access, workbench, guided
   onboarding, navigate, PR, latency budget: they need the browser, a local
   agent or a code check the judge cannot do.
+
+### Not moved yet
+
+- `E2E core 1544: asks to connect GitHub` stays in code. Langy sometimes answers
+  with a question card ("on your machine or through GitHub?") before the connect
+  prompt, and the REST connector cannot answer cards yet. It waits for question-card support in the connector.
 
 The judge sees no tool calls over REST (gap 1), so the grounding criterion is
 dropped and criteria about tools, navigate commands or cards are reworded to

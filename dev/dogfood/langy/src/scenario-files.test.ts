@@ -26,9 +26,9 @@ describe("the checked-in scenarios", () => {
     expect(new Set(names).size).toBe(names.length);
   });
 
-  it("runs the 50 wave 1a scenarios in the default world, one turn past their messages", () => {
+  it("runs the 49 wave 1a scenarios in the default world, one turn past their messages", () => {
     const migrated = specs.filter((spec) => spec.labels.includes("e2e-migrated"));
-    expect(migrated).toHaveLength(50);
+    expect(migrated).toHaveLength(49);
     for (const spec of migrated) {
       expect(spec.parameters, spec.name).toEqual([
         expect.objectContaining({ name: "world", defaultValue: PROMPT_WORLD }),

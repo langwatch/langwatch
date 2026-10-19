@@ -1,6 +1,6 @@
 {
   "name": "Langy e2e chat: core conversation",
-  "description": "Wave 1a: 11 pure-chat runs (surface location, session, multi-turn, out-of-scope and GitHub connect) moved from apps/ui/e2e/langy/langy.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "description": "Wave 1a: 10 pure-chat runs (surface location, session, multi-turn and out-of-scope) moved from apps/ui/e2e/langy/langy.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
   "agent": "langy",
   "repeatCount": 1
 }
