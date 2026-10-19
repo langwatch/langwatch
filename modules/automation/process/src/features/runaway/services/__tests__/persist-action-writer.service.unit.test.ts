@@ -5,7 +5,6 @@ import {
   DatasetNotFoundError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
-import { DispatchError } from "@langwatch/eventing";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
