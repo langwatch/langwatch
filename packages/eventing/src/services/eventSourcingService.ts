@@ -8,7 +8,7 @@ import { getLangWatchTracer } from "langwatch";
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
 import type { Event, Projection } from "../domain/types.ts";
-import { incrementEsHandoffTotal } from "../metrics.ts";
+import { EVENT_SOURCING_STORE_METRICS, incrementEsHandoffTotal } from "../metrics.ts";
 import type { DispatchableMessage } from "../process-manager/outbox/outboxDispatcherService.ts";
 import type {
   NewOutboxMessage,
@@ -61,7 +61,9 @@ export class EventSourcingService<
   private readonly globalRegistry?: ProjectionRegistry<Event>;
   private readonly handoffStore?: ProcessStore;
   private readonly prepareEventForProjection: (event: EventType) => EventType;
-  private readonly metrics?: EventSourcingServiceOptions<EventType, ProjectionTypes>["metrics"];
+  private readonly metrics: NonNullable<
+    EventSourcingServiceOptions<EventType, ProjectionTypes>["metrics"]
+  >;
 
   constructor({
     pipelineName,
@@ -98,7 +100,7 @@ export class EventSourcingService<
     this.globalRegistry = globalRegistry;
     this.handoffStore = handoffStore;
     this.prepareEventForProjection = prepareEventForProjection ?? ((event) => event);
-    this.metrics = metrics;
+    this.metrics = metrics ?? EVENT_SOURCING_STORE_METRICS;
 
     // Process composition opts into this production-safety warning. Eventing
     // deliberately does not inspect the host environment itself.
@@ -377,8 +379,8 @@ export class EventSourcingService<
     await this.recordFailedHandoffs({ failures, context });
 
     // Record throughput and duration metrics
-    this.metrics?.eventsStored(this.pipelineName, enrichedEvents.length);
-    this.metrics?.storeDuration(this.pipelineName, performance.now() - storeStart);
+    this.metrics.eventsStored(this.pipelineName, enrichedEvents.length);
+    this.metrics.storeDuration(this.pipelineName, performance.now() - storeStart);
   }
 
   /** Throws if any event was mis-routed to this pipeline. */

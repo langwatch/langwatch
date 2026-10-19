@@ -70,7 +70,7 @@ export interface EventSourcingServiceOptions<
   logger?: ReturnType<typeof createLogger>;
   /** Optional application-owned transform used to keep projection queue payloads lean. */
   prepareEventForProjection?: (event: EventType) => EventType;
-  /** Optional metrics sink. The framework never imports application metrics. */
+  /** Store-side metrics sink; absent records through the metrics facade. */
   metrics?: {
     eventsStored(pipelineName: string, count: number): void;
     storeDuration(pipelineName: string, durationMs: number): void;

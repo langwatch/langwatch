@@ -198,8 +198,8 @@ export * from "./deferred.ts";
 export * from "./disabledPipeline.ts";
 export * from "./mapCommands.ts";
 export {
+  EVENT_SOURCING_STORE_METRICS,
   NOOP_EVENT_SOURCING_METRICS,
-  PROMETHEUS_EVENT_SOURCING_METRICS,
   type EventSourcingStoreMetrics,
 } from "./metrics.ts";
 export * from "./parseErrorText.ts";
