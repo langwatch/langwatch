@@ -575,3 +575,46 @@ describe("WelcomeScreen going back from the intent step", () => {
     expect(screen.getByRole("checkbox")).toBeChecked();
   });
 });
+
+describe("WelcomeScreen terms agreement", () => {
+  let user: ReturnType<typeof userEvent.setup>;
+
+  beforeEach(async () => {
+    flags.experiment_onboarding_langy_guided = false;
+    organizations = [];
+    routerState.query = {};
+    user = userEvent.setup();
+    renderWelcome();
+    await screen.findByLabelText("Organization name");
+  });
+
+  /** @scenario "Clicking the terms sentence or its box ticks the agreement" */
+  it("ticks and unticks from the sentence and from the box, once per click", async () => {
+    await user.click(screen.getByText(/I agree to the LangWatch/));
+    expect(screen.getByRole("checkbox")).toBeChecked();
+
+    await user.click(screen.getByTestId("terms-agreement-box"));
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  });
+
+  /** @scenario "Opening the terms link leaves the agreement as it was" */
+  it("does not tick the agreement when the terms link is opened", async () => {
+    await user.click(screen.getByRole("link", { name: /Terms/ }));
+
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  });
+
+  /** @scenario "Opening the privacy link leaves the agreement as it was" */
+  it("does not tick the agreement when the privacy link is opened", async () => {
+    await user.click(screen.getByRole("link", { name: /Privacy/ }));
+
+    expect(screen.getByRole("checkbox")).not.toBeChecked();
+  });
+
+  /** @scenario "The agreement box names both documents to a screen reader" */
+  it("gives the box an accessible name naming the terms and the privacy policy", () => {
+    expect(
+      screen.getByRole("checkbox", { name: /I agree to the LangWatch .*Terms.* and .*Privacy/ }),
+    ).toBeInTheDocument();
+  });
+});

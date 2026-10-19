@@ -236,6 +236,14 @@ const nurturingSignalSchemaDefinition = z.discriminatedUnion("kind", [
     state: guidedOnboardingStateSchema,
   }),
   z.object({
+    kind: z.literal("onboarding_variant_assigned"),
+    ...signalSource,
+    /** The person who created the organization. */
+    userId: id,
+    organizationId: id,
+    variant: onboardingVariantSchema,
+  }),
+  z.object({
     kind: z.literal("subscription_changed"),
     ...signalSource,
     organizationId: id,
