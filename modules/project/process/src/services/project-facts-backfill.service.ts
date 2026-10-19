@@ -11,7 +11,7 @@ import type { ProjectCreatedNoticeService } from "./project-created-notice.servi
 const PAGE_SIZE = 2000;
 
 /** How many skipped project ids the report names; the count covers the rest. */
-export const ORPHAN_IDS_REPORTED = 20;
+const ORPHAN_IDS_REPORTED = 20;
 
 export type ProjectFactsBackfillReport = {
   projects: number;

@@ -269,7 +269,7 @@ const connectionRegisteredFieldsSchema = z.object({
  * `allowsJit` and no `arrivalPolicy`; the log is immutable, so every read upcasts them: `true`
  * admits, anything else is the default. Spec: modules/identity/specs/sso-connection-legacy-registration.feature
  */
-export function upcastLegacyRegistration(data: unknown): unknown {
+function upcastLegacyRegistration(data: unknown): unknown {
   if (typeof data !== "object" || data === null || Array.isArray(data)) return data;
   const { allowsJit, ...rest } = data as Record<string, unknown>;
   if (rest.arrivalPolicy !== undefined && rest.arrivalPolicy !== null) return rest;
