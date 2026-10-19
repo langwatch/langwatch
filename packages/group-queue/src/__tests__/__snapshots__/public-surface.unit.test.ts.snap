@@ -13,7 +13,6 @@ exports[`group-queue public surface > given the package exports map > keeps the 
   "NonRetryableGroupQueueError": "function",
   "RunningGroupQueueConsumer": "function [close, pause, resume, setConcurrency, waitUntilReady]",
   "defineGroupQueue": "function",
-  "isProjectGone": "function",
   "refusesRetry": "function",
   "resolveGroupQueuePolicyFromEnv": "function",
 }

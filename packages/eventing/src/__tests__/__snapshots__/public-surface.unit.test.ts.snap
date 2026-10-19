@@ -139,6 +139,7 @@ exports[`the @langwatch/eventing public surface > given the . entry > exports ex
   "isAtOrBeforeCutoff: function",
   "isAtOrBeforeCutoffMarker: function",
   "isDispatchError: function",
+  "isProjectGone: function",
   "isRetryableHttpStatus: function",
   "mapCommands: function",
   "markCompletedBatch: function",
