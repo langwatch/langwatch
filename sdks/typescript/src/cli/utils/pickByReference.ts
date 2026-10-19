@@ -1,5 +1,13 @@
 /** Thrown when a name the user typed matches nothing, or more than one thing. */
-export class ReferenceNotResolvedError extends Error {}
+export class ReferenceNotResolvedError extends Error {
+  constructor(
+    message: string,
+    /** "none" is a missing thing; "ambiguous" is an input the caller must sharpen. */
+    readonly reason: "none" | "ambiguous",
+  ) {
+    super(message);
+  }
+}
 
 /**
  * The one row a reference names: its id, then its slug, then its name, case
@@ -31,9 +39,11 @@ export const pickByReference = <Row extends { id: string; slug: string; name: st
   if (byName.length > 1) {
     throw new ReferenceNotResolvedError(
       `More than one ${what} is named "${reference}" (${byName.map((row) => row.id).join(", ")}). Pass the id instead.`,
+      "ambiguous",
     );
   }
   throw new ReferenceNotResolvedError(
     `No ${what} with the id, slug or name "${reference}" in this ${scope}. List them with \`${listCommand}\`.`,
+    "none",
   );
 };

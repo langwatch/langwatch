@@ -3,7 +3,6 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
 import { EvaluatorsApiError, EvaluatorsApiService } from "@/client-sdk/services/evaluators";
-import { LangWatchHandledError } from "@/internal/api/errors";
 
 // Mock dependencies before imports
 vi.mock("@/client-sdk/services/evaluators", async (importOriginal) => {
@@ -37,9 +36,11 @@ import type * as evaluatorsModule from "@/client-sdk/services/evaluators";
 import { applyOutputContext, resolveOutputOptions } from "../../../utils/output";
 import { createEvaluatorCommand } from "../create";
 import { deleteEvaluatorCommand } from "../delete";
+import { exactLookupMissMessage } from "../findEvaluator";
 import { getEvaluatorCommand } from "../get";
 import { listEvaluatorsCommand } from "../list";
 import { updateEvaluatorCommand } from "../update";
+import { handledError } from "./handledErrorFixture";
 
 class ProcessExitError extends Error {
   constructor(public code: number) {
@@ -73,26 +74,20 @@ const makeEvaluator = (overrides: Partial<EvaluatorResponse> = {}): EvaluatorRes
   ...overrides,
 });
 
-const evaluatorNotFound = () =>
-  new LangWatchHandledError({
-    handled: {
-      code: "evaluator_not_found",
-      kind: "evaluator_not_found",
-      message: "Evaluator not found",
-      httpStatus: 404,
-      meta: {},
-      isHandled: true,
-      retryable: false,
-      traceId: undefined,
-      traceUrl: undefined,
-      reasons: undefined,
-      suggestions: undefined,
-      docUrl: undefined,
-    },
-    body: { error: "evaluator_not_found" },
-    operation: "get evaluator",
-    message: "Evaluator not found",
-  });
+const evaluatorNotFound = () => handledError("evaluator_not_found");
+
+const jsonErrorCode = async (run: () => Promise<unknown>): Promise<string> => {
+  await applyOutputContext(resolveOutputOptions({ output: "json" }, {}));
+  await expect(run()).rejects.toThrow(ProcessExitError);
+  const doc = JSON.parse(
+    vi
+      .mocked(console.log)
+      .mock.calls.map((call) => String(call[0]))
+      .join("\n"),
+  ) as { error: { code: string } };
+  await applyOutputContext(resolveOutputOptions({}, {}));
+  return doc.error.code;
+};
 
 describe("listEvaluatorsCommand()", () => {
   let mockGetAll: ReturnType<typeof vi.fn>;
@@ -179,6 +174,27 @@ describe("getEvaluatorCommand()", () => {
       mockGet.mockRejectedValue(new EvaluatorsApiError("Not found", "fetch evaluator"));
 
       await expect(getEvaluatorCommand("nonexistent")).rejects.toThrow(ProcessExitError);
+    });
+  });
+
+  describe("when two evaluators share the display name", () => {
+    it("fails with a validation_error", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+      mockGetAll.mockResolvedValue([
+        makeEvaluator({ id: "ev_1", slug: "a", name: "Twin" }),
+        makeEvaluator({ id: "ev_2", slug: "b", name: "Twin" }),
+      ]);
+
+      expect(await jsonErrorCode(() => getEvaluatorCommand("Twin"))).toBe("validation_error");
+    });
+  });
+
+  describe("when nothing matches the reference", () => {
+    it("fails with the evaluator_not_found code", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+      mockGetAll.mockResolvedValue([makeEvaluator()]);
+
+      expect(await jsonErrorCode(() => getEvaluatorCommand("ghost"))).toBe("evaluator_not_found");
     });
   });
 
@@ -434,7 +450,15 @@ describe("deleteEvaluatorCommand()", () => {
       await expect(deleteEvaluatorCommand("Test Evaluator")).rejects.toThrow(ProcessExitError);
 
       expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
-        'No evaluator with the id or slug "Test Evaluator". Find its id with `langwatch evaluator get <name>` or `langwatch evaluator list`, then pass the id.',
+        exactLookupMissMessage("Test Evaluator"),
+      );
+    });
+
+    it("keeps the evaluator_not_found code", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+
+      expect(await jsonErrorCode(() => deleteEvaluatorCommand("Test Evaluator"))).toBe(
+        "evaluator_not_found",
       );
     });
   });
@@ -556,13 +580,21 @@ describe("updateEvaluatorCommand()", () => {
     it("tells the user to pass the id or slug and how to find it", async () => {
       mockGet.mockRejectedValue(evaluatorNotFound());
 
-      await expect(
-        updateEvaluatorCommand("Test Evaluator", { name: "Renamed" }),
-      ).rejects.toThrow(ProcessExitError);
+      await expect(updateEvaluatorCommand("Test Evaluator", { name: "Renamed" })).rejects.toThrow(
+        ProcessExitError,
+      );
 
       expect(spinnerFail.mock.calls.map((call) => String(call[0])).join("\n")).toContain(
-        'No evaluator with the id or slug "Test Evaluator". Find its id with `langwatch evaluator get <name>` or `langwatch evaluator list`, then pass the id.',
+        exactLookupMissMessage("Test Evaluator"),
       );
+    });
+
+    it("keeps the evaluator_not_found code", async () => {
+      mockGet.mockRejectedValue(evaluatorNotFound());
+
+      expect(
+        await jsonErrorCode(() => updateEvaluatorCommand("Test Evaluator", { name: "Renamed" })),
+      ).toBe("evaluator_not_found");
     });
   });
 

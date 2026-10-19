@@ -1550,7 +1550,7 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("update <idOrSlug>")
-      .description("Update an evaluator name or settings")
+      .description("Update an evaluator by id or slug (find the id with `evaluator get <name>`)")
       .option("--name <name>", "New evaluator name")
       .option("--settings <json>", "Evaluator config settings as JSON")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
@@ -1569,7 +1569,9 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("delete <idOrSlug>")
-      .description("Archive (soft-delete) an evaluator")
+      .description(
+        "Archive (soft-delete) an evaluator by id or slug (find the id with `evaluator get <name>`)",
+      )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (idOrSlug: string) => {
       try {

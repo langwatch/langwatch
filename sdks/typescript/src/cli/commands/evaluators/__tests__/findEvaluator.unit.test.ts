@@ -2,30 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import { EvaluatorsApiError } from "@/client-sdk/services/evaluators";
 import type { EvaluatorResponse } from "@/client-sdk/services/evaluators";
-import { LangWatchHandledError } from "@/internal/api/errors";
 
-import { findEvaluator } from "../findEvaluator";
-
-const handled = (code: string) =>
-  new LangWatchHandledError({
-    handled: {
-      code,
-      kind: code,
-      message: "boom",
-      httpStatus: 404,
-      meta: {},
-      isHandled: true,
-      retryable: false,
-      traceId: undefined,
-      traceUrl: undefined,
-      reasons: undefined,
-      suggestions: undefined,
-      docUrl: undefined,
-    },
-    body: { error: code },
-    operation: "get evaluator",
-    message: "boom",
-  });
+import { findEvaluator, refusalFromReference } from "../findEvaluator";
+import { handledError as handled } from "./handledErrorFixture";
 
 const evaluator = (overrides: Partial<EvaluatorResponse>) =>
   ({ id: "ev_1", slug: "tone-check", name: "Tone Check", ...overrides }) as EvaluatorResponse;
@@ -74,6 +53,7 @@ describe("findEvaluator()", () => {
     });
 
     describe("and two evaluators share that display name", () => {
+      /** @scenario Get evaluator by a display name two evaluators share */
       it("fails asking for the id", async () => {
         const { service } = makeService({
           get: notFound,
@@ -83,19 +63,31 @@ describe("findEvaluator()", () => {
           ],
         });
 
-        await expect(findEvaluator({ service, reference: "Twin" })).rejects.toThrow(
-          'More than one evaluator is named "Twin" (ev_1, ev_2). Pass the id instead.',
+        const refusal = await findEvaluator({ service, reference: "Twin" }).catch(
+          refusalFromReference,
         );
+
+        expect(refusal).toMatchObject({
+          code: "validation_error",
+          message: expect.stringContaining("(ev_1, ev_2). Pass the id instead."),
+        });
       });
     });
 
     describe("and nothing matches", () => {
+      /** @scenario Get evaluator by a name nothing matches */
       it("fails pointing at the list command", async () => {
         const { service } = makeService({ get: notFound, rows: [evaluator({})] });
 
-        await expect(findEvaluator({ service, reference: "ghost" })).rejects.toThrow(
-          'No evaluator with the id, slug or name "ghost" in this project. List them with `langwatch evaluator list`.',
+        const refusal = await findEvaluator({ service, reference: "ghost" }).catch(
+          refusalFromReference,
         );
+
+        expect(refusal).toMatchObject({
+          code: "evaluator_not_found",
+          httpStatus: 404,
+          message: expect.stringContaining("List them with `langwatch evaluator list`"),
+        });
       });
     });
   });
