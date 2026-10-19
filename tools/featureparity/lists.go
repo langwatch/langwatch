@@ -84,7 +84,6 @@ var (
 		"specs/langy/langy-projection-independent-reactions.feature",
 	}
 	legacyInert = []string{
-		"modules/scenario/specs/scenario-inline-params.feature",
 		"specs/clickhouse/id-index-reads.feature",
 		"modules/authz/specs/access-reviews.feature",
 		"modules/authz/specs/agent-principals.feature",

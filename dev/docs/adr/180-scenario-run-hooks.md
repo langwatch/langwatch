@@ -62,7 +62,7 @@ The child's result line carries each hook's result to the parent, which records 
 
 ### Inline run parameters in situation text (decided by the owner)
 
-In this series, `{ key: value }` (single braces) in a scenario's situation text creates a run parameter inline: it declares the parameter `key` with the default `value`, and the run shows the value it used. Liquid (`{{ params.x }}`, `{{ variable }}`) keeps working as today. The platform handles the single-brace form before Liquid, since liquidjs throws `TokenizationError` on `{{ key: value }}` and must never see it. A `{` that is not a `{ key: value }` declaration stays as text. Mixing the inline form with Liquid `{{ variable }}` is a later upgrade, out of this series. This needs its own PR slice, apart from the hooks. Spec: `modules/scenario/specs/scenario-inline-params.feature`.
+In this series, `{ key: value }` (single braces) in a scenario's situation text creates a run parameter inline: it declares the parameter `key` with the default `value`, and the run shows the value it used. Liquid (`{{ params.x }}`, `{{ variable }}`) keeps working as today. The platform handles the single-brace form before Liquid, since liquidjs throws `TokenizationError` on `{{ key: value }}` and must never see it. A `{` that is not a `{ key: value }` declaration stays as text. Mixing the inline form with Liquid `{{ variable }}` is a later upgrade, out of this series. This needs its own PR slice, apart from the hooks. Its spec ships with that slice.
 
 ## Rationale / Trade-offs
 
@@ -75,4 +75,4 @@ The register frame, call envelope and result frame change (additively; `protocol
 ## References
 
 - Related ADRs: ADR-128 (connected agents)
-- Specs: `modules/scenario/specs/scenario-inline-params.feature`, `modules/agent/specs/scenario-hooks-protocol.feature`, `modules/scenario/specs/scenario-run-hooks.feature`, `specs/scenarios/served-agent-instance-on-runs.feature`, `specs/scenarios/scenario-run-parameters.feature`, `specs/scenarios/go-scenario-runner.feature`
+- Specs: `modules/agent/specs/scenario-hooks-protocol.feature`, `modules/scenario/specs/scenario-run-hooks.feature`, `specs/scenarios/served-agent-instance-on-runs.feature`, `specs/scenarios/scenario-run-parameters.feature`, `specs/scenarios/go-scenario-runner.feature`

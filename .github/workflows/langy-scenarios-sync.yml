@@ -1,18 +1,9 @@
 # Draft: makes the Langy dogfood project's scenarios and run plan match
-# dev/dogfood/langy/scenarios on every merge to main. Without the three
-# secrets it skips with a notice, so forks and unconfigured repos stay green.
+# dev/dogfood/langy/scenarios when run by hand (workflow_dispatch). Without the
+# three secrets it skips with a notice, so forks and unconfigured repos stay green.
 name: Langy scenarios sync
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "dev/dogfood/langy/scenarios/**"
-      - "dev/dogfood/langy/run-plan.json"
-      - "dev/dogfood/langy/sync.ts"
-      - "dev/dogfood/langy/src/**"
-      - "dev/dogfood/langy/package*.json"
-      - ".github/workflows/langy-scenarios-sync.yml"
   pull_request:
     paths:
       - "dev/dogfood/langy/**"
