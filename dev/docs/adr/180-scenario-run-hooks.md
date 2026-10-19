@@ -59,7 +59,7 @@ The child's result line carries each hook's result to the parent, which records 
 ### Decided items
 
 - **Decided 2026-10-19 by Drew's assistant under delegation (reversible):** hooks run on the Node child only in v1. A project with `release_scenario_go_runner_enabled` routes runs of agents that declare hooks to the Node child, since the Go runner cannot call hooks yet. Revisit: remove this routing when the Go runner gains hooks.
-- **Decided 2026-10-19 by Drew's assistant under delegation (reversible):** the run record keeps the first 1,000 characters of a hook error, since the text comes from the agent with no size limit. Revisit: raise the cap if users report cut errors (see https://github.com/langwatch/langwatch/issues/8779). Spec: `modules/scenario/specs/scenario-run-hooks.feature`.
+- **Decided 2026-10-19 by Drew's assistant under delegation (reversible):** the run record keeps the first 1,000 characters of a hook error, since the text comes from the agent with no size limit. Revisit: raise the cap if users report cut errors. Spec: `modules/scenario/specs/scenario-run-hooks.feature`.
 
 ### Inline run parameters in situation text (decided by the owner)
 
