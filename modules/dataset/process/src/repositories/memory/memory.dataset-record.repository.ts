@@ -9,9 +9,15 @@ import { toDate } from "@langwatch/time";
 import type { DatasetRecordRepository } from "../dataset-record.repository.ts";
 import type { MemoryDatasetDatabase } from "./memory.dataset.database.ts";
 
+/** Code-unit order: ksuid ids are base62 over `0-9A-Za-z`, so only this order is creation order. */
+function byCodeUnit(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
+
 /** `[createdAt asc, id asc]`, the canonical order every read path uses. */
 function canonical(left: DatasetRecord, right: DatasetRecord): number {
-  return left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id);
+  return left.createdAt.getTime() - right.createdAt.getTime() || byCodeUnit(left.id, right.id);
 }
 
 export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
