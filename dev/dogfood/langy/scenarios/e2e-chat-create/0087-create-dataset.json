@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 87: creates a dataset",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:87",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a dataset called \"langy-dataset-<tag>\" with 2 example rows'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy's reply reports the dataset as created and names it.",
+    "Langy did NOT ask 'should I go ahead?' — it executed the mutation directly.",
+    "Langy ran the create rather than describing what it would do.",
+    "Code check: facts_now.new_dataset has at least one entry (a dataset whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

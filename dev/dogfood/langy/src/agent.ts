@@ -22,6 +22,12 @@ import {
   teardownQuietWorld,
 } from "./quiet-world.ts";
 import {
+  isResourcesWorldState,
+  readResourceFacts,
+  setupResourcesWorld,
+  teardownResourcesWorld,
+} from "./resources-world.ts";
+import {
   isTopicWorldState,
   readTopicFacts,
   setupTopicWorld,
@@ -34,6 +40,7 @@ import {
   parseWorld,
   PROMPT_WORLD,
   QUIET_WORLD,
+  RESOURCES_WORLD,
   TOPIC_WORLD,
   WORLD_NAMES,
 } from "./world-names.ts";
@@ -59,6 +66,7 @@ async function factsOf(state: ScenarioState | null, reply: string): Promise<obje
   if (world) return readFacts({ http, state: world });
   if (isTopicWorldState(state)) return readTopicFacts({ http, state });
   if (isQuietWorldState(state)) return readQuietFacts({ http, state });
+  if (isResourcesWorldState(state)) return readResourceFacts({ http, state });
   if (isLoginWorldState(state)) return { login_advice: loginAdviceIn({ text: reply }) };
   return null;
 }
@@ -127,6 +135,7 @@ langy.scenario.setup(async (run, params) => {
   if (world === TOPIC_WORLD) return toState(await setupTopicWorld({ http }));
   if (world === QUIET_WORLD) return toState(await setupQuietWorld({ http }));
   if (world === LOGIN_WORLD) return toState(setupLoginWorld());
+  if (world === RESOURCES_WORLD) return toState(await setupResourcesWorld({ http }));
   return toState(await setupPromptWorld({ http, scenarioRunId: run.scenarioRunId ?? "unknown" }));
 });
 
@@ -136,6 +145,7 @@ langy.scenario.teardown(async (_run, state) => {
   if (isTopicWorldState(state)) return toState(await teardownTopicWorld({ http, state }));
   if (isQuietWorldState(state)) return toState(await teardownQuietWorld({ http, state }));
   if (isLoginWorldState(state)) return toState(teardownLoginWorld({ state }));
+  if (isResourcesWorldState(state)) return toState(await teardownResourcesWorld({ http, state }));
   if (isPromptWorldState(state)) return toState(await teardownPromptWorld({ http, state }));
   return { deleted: {}, left_behind: {} };
 });

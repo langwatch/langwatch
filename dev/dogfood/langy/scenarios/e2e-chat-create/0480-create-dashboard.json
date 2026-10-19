@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 480: creates a dashboard",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:480",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a new dashboard called \"langy-dash-<tag>\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports successfully creating the dashboard (id/name returned).",
+    "Langy did not ask for confirmation.",
+    "Code check: facts_now.new_dashboard has at least one entry (a dashboard whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

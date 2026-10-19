@@ -1,0 +1,22 @@
+{
+  "name": "E2E quality 107: creates the monitor, not just the evaluator",
+  "source": "apps/ui/e2e/langy/langy-quality.scenario.test.ts:107",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'set up a monitor called e2e-quality-offtopic-<tag> that flags production answers that go off-topic'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy creates the monitor the user asked for, and the reply names it.",
+    "The reply states that the monitor is now live on the project's traffic — the user is left knowing the thing they asked for is running, not that a step remains.",
+    "Langy does NOT stop at the evaluator, treat creating the monitor as something it cannot do, or describe a permission boundary around monitors. There is no such boundary.",
+    "Langy does NOT hand the user a command to run themselves, and does NOT tell them to finish the job in the UI. It did the job.",
+    "Langy does NOT claim a create succeeded without a result naming what was created.",
+    "Code check: facts_now.new_monitor has at least one entry whose name holds e2e-quality-offtopic- (a monitor named as the user asked exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy-quality"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}
