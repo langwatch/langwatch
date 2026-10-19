@@ -51,6 +51,7 @@ export class MemoryUserDatabase {
   #users = new Map<string, MemoryUserRow>();
   #accounts = new Map<string, MemoryUserAccountRow>();
   #passkeys = new Map<string, MemoryUserPasskeyRow>();
+  #erasedAccountsCreatedAt: Instant[] = [];
 
   private constructor(private readonly processStore: InMemoryProcessStore) {}
 
@@ -96,6 +97,15 @@ export class MemoryUserDatabase {
     this.#users.delete(id);
     for (const account of this.accountsOf(id)) this.#accounts.delete(account.id);
     this.deletePasskeysOf(id);
+  }
+
+  /** An erased account's creation time, all the erasure keeps of it, as `UserErasure` does. */
+  recordErasure({ accountCreatedAt }: Readonly<{ accountCreatedAt: Instant }>): void {
+    this.#erasedAccountsCreatedAt.push(accountCreatedAt);
+  }
+
+  erasedAccountsCreatedAt(): readonly Instant[] {
+    return this.#erasedAccountsCreatedAt;
   }
 
   accountsOf(userId: string): MemoryUserAccountRow[] {

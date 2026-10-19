@@ -105,6 +105,16 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
     Then nobody is granted and nothing is recorded
     And the wait reason says the named account is not the install's first-created account, even once that one is deactivated
 
+  # Erasure deletes the first account's row; user's erasure record keeps it first (Rogerio, 2026-10-19).
+  @unit @operator-seed
+  Scenario: With no email configured an erased first account seeds no later unverified sign-up
+    Given the installation has no email configured
+    And the install's first-created account has been erased
+    And ADMIN_EMAILS names an unverified active account that signed up after it
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded
+    And the wait reason says the named account is not the install's first-created account, even once that one is erased
+
   @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names
     Given the installation has email configured

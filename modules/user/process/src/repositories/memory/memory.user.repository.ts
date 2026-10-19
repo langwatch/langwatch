@@ -86,7 +86,11 @@ export class MemoryUserRepository implements UserRepository {
           a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds ||
           Number(a.id > b.id) - Number(a.id < b.id),
       );
-    return oldest?.id ?? null;
+    if (!oldest) return null;
+    const erasedFirst = this.#database
+      .erasedAccountsCreatedAt()
+      .some((createdAt) => createdAt.epochMilliseconds <= oldest.createdAt.epochMilliseconds);
+    return erasedFirst ? null : oldest.id;
   }
 
   async findBackfillPage({

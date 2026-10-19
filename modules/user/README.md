@@ -11,7 +11,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Classification | core (`modules/catalogue.json`)                                                            |
 | Subjects       | user, user-avatar                                                                          |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                   |
-| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:159` (50 operations) |
+| Api token      | `UserApi` = `moduleApi<UserApi>()("user")`, `contract/src/user.api.ts:162` (50 operations) |
 | Other token    | `UserAvatarFileApi`, `process/src/transport/user-avatar.rest.ts:23`                        |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                 |
 
@@ -23,6 +23,7 @@ Users: profiles and avatars, account and single sign-on status, and the sign-in 
 | Postgres table                 | `User`                                                                                                                                                   | `process/src/repositories/prisma/prisma.user.repository.ts:103`                      |
 | Postgres table                 | `Account`                                                                                                                                                | `process/src/repositories/prisma/prisma.user.repository.ts:103`                      |
 | Postgres table                 | `Passkey`                                                                                                                                                | `process/src/repositories/prisma/prisma.user.repository.ts:103`                      |
+| Postgres table                 | `UserErasure`                                                                                                                                            | `process/src/repositories/prisma/prisma.user.repository.ts:103`                      |
 | Postgres, accessed not claimed | `Organization`, `OrganizationUser`, `Project`                                                                                                            | `process/src/repositories/prisma/prisma.user-organization-directory.repository.ts:9` |
 | Stores required                |                                                                                                                                                          | `process/src/channels/user.channels.ts:25`                                           |
 | Stores required                | prisma, redis, eventReadSeat                                                                                                                             | `process/src/repositories/live/live.user.repositories.ts:13`                         |

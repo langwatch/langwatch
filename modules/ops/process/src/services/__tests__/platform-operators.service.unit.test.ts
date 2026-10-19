@@ -64,6 +64,7 @@ function world({
   administrators = [],
   deployment = SELF_HOSTED,
   isEmailUnconfigured = false,
+  erasedAccountsCreatedAt = [],
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
@@ -71,6 +72,8 @@ function world({
   administrators?: string[];
   deployment?: { cloud: boolean; isLocalDevelopment: boolean };
   isEmailUnconfigured?: boolean;
+  /** The creation times user's erasure records keep of accounts whose rows are gone. */
+  erasedAccountsCreatedAt?: Date[];
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -95,8 +98,11 @@ function world({
     findByEmail: async ({ email }) =>
       users.find((candidate) => candidate.email === email.toLowerCase()) ?? null,
     findById: async ({ id }) => users.find((candidate) => candidate.id === id) ?? null,
-    isFirstCreatedAccount: async ({ userId }) =>
-      users.toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0]?.id === userId,
+    isFirstCreatedAccount: async ({ userId }) => {
+      const first = users.toSorted((a, b) => a.createdAt.getTime() - b.createdAt.getTime())[0];
+      if (!first || first.id !== userId) return false;
+      return erasedAccountsCreatedAt.every((at) => at.getTime() > first.createdAt.getTime());
+    },
   });
   const mail = createApiFixture<Pick<NotificationApi, "getMailDelivery">>({
     getMailDelivery: async () => ({
@@ -345,6 +351,47 @@ describe("PlatformOperatorsService", () => {
       /** @scenario "With no email configured a deactivated first account seeds no later unverified sign-up" */
       it("grants nobody through the upgrade step", async () => {
         const { service, granted } = world(takenOver);
+
+        await expect(
+          service.seedFromAdminEmails({
+            settings: { adminEmails: ["ana@acme.com"], cloud: false },
+            dryRun: false,
+          }),
+        ).resolves.toBe(0);
+        expect(granted).toEqual([]);
+      });
+    });
+
+    describe("given no email is configured, the first account erased and a later sign-up on the named address", () => {
+      const erased = {
+        users: [user("ana", { emailVerified: false })],
+        organizations: ["org_1"],
+        administrators: ["ana"],
+        isEmailUnconfigured: true,
+        erasedAccountsCreatedAt: [new Date("2024-01-01T00:00:00Z")],
+      };
+
+      /** @scenario "With no email configured an erased first account seeds no later unverified sign-up" */
+      it("waits unlatched, and says the named account is not the first-created one", async () => {
+        const { service, granted, record } = seeding(erased);
+        warn.mockClear();
+
+        const outcome = await service.seedOnce({ adminEmails: ["ana@acme.com"], cloud: false });
+
+        expect(outcome).toMatchObject({
+          via: "waiting",
+          reason: expect.stringMatching(
+            /not the install's first-created account.*deactivated or erased/,
+          ),
+        });
+        expect(record).not.toHaveBeenCalled();
+        expect(granted).toEqual([]);
+        expect(warn).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "With no email configured an erased first account seeds no later unverified sign-up" */
+      it("grants nobody through the upgrade step", async () => {
+        const { service, granted } = world(erased);
 
         await expect(
           service.seedFromAdminEmails({

@@ -68,6 +68,8 @@ const GLOBAL_MODELS = [
   "Account",
   "Session",
   "User",
+  // An erased account's creation time alone, read install-wide as `User` is.
+  "UserErasure",
   "VerificationToken",
   // Identity pipeline projection tables (ADR-101, D01): per-user, not
   // per-project/org, and the D03 router's lookup is by identifier VALUE
