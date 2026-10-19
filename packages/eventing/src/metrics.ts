@@ -529,6 +529,7 @@ const storeDurationMs = histogram({
   labelNames: ["pipeline_name"],
 });
 
+/** Counts the events a pipeline stored, on `event_sourcing_events_stored_total`. */
 export const incrementEventSourcingEventsStored = ({
   pipelineName,
   count,
@@ -536,6 +537,7 @@ export const incrementEventSourcingEventsStored = ({
   pipelineName: string;
   count: number;
 }) => eventsStoredTotal.labels(pipelineName).inc(count);
+/** Times one `storeEvents` call, store plus dispatch, on `event_sourcing_store_duration_milliseconds`. */
 export const observeEventSourcingStoreDuration = ({
   pipelineName,
   durationMs,
