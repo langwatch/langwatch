@@ -14,7 +14,7 @@ export class ReferenceNotResolvedError extends Error {
  * insensitive. Two rows sharing a name is a refusal that lists their ids,
  * never a guess.
  */
-export const pickByReference = <Row extends { id: string; slug: string; name: string }>({
+export const pickByReference = <Row extends { id: string; slug?: string | null; name: string }>({
   rows,
   reference,
   what,

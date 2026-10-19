@@ -181,7 +181,6 @@ var (
 		"specs/dependencies/supply-chain-age-gates.feature",
 		"specs/evaluations/experiments-online-evaluations-separation.feature",
 		"specs/evaluators/create-workflow-evaluator.feature",
-		"specs/evaluators/evaluator-cli.feature",
 		"specs/evaluators/evaluator-error-propagation.feature",
 		"specs/evaluators/satisfaction-score-migration.feature",
 		"specs/evaluators/thread-eval-skips-without-thread-id.feature",
@@ -388,6 +387,7 @@ var (
 		"specs/workflows/studio-usage-limits.feature",
 	}
 	legacyPartial = []string{
+		"specs/evaluators/evaluator-cli.feature",
 		"specs/langy/langy-peek-dock.feature",
 		"specs/traces-v2/grouping-engine.feature",
 		"specs/traces-v2/metrics.feature",
