@@ -240,6 +240,7 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
   });
 
   describe("when the legacy stored log records are read at once with a cap of two rows each", () => {
+    /** @scenario "A batch read of the legacy stored records answers each record's latest version" */
     it("answers each trace's latest versions, oldest first, capped on its own", async () => {
       const rows = await repository.findLogsByTraceIds({
         tenantId,
@@ -258,6 +259,7 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
   });
 
   describe("when a batch holds traces months apart", () => {
+    /** @scenario "A batch read bounds each trace by its own time window" */
     it("bounds each trace's stored records by its own window", async () => {
       const rows = await repository.findLogsByTraceIds({
         tenantId,
@@ -273,6 +275,7 @@ describe.skipIf(!clickHouseConfigured)("LogRecordStorageClickHouseRepository bat
       expect(bodiesOf(SMALL_TRACE)).toEqual(["stored-small-new-version"]);
     });
 
+    /** @scenario "A batch read bounds each trace by its own time window" */
     it("bounds each trace's log records by its own window", async () => {
       const rows = await repository.findLogRecordsByTraceIds({
         tenantId,

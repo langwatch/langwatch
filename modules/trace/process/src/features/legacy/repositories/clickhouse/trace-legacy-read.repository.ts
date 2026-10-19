@@ -2564,7 +2564,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
       reader,
       effectiveOccurredAt: await this.resolveOccurredAtOrNone({ reader, projectId, traceIds }),
       batchTraceIds: traceIds,
-      withComputedIO: false,
+      shouldReadComputedIO: false,
     });
     return summaryRows.map((row) => ({ summary: this.rowToTraceSummaryData(row), spans: [] }));
   }
@@ -2752,13 +2752,13 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader,
     effectiveOccurredAt,
     batchTraceIds,
-    withComputedIO = true,
+    shouldReadComputedIO = true,
   }: {
     reader: TenantScopedReader;
     effectiveOccurredAt: OccurredAtRange | undefined;
     batchTraceIds: string[];
     /** False leaves the captured input and output out, for a caller that reads no content. */
-    withComputedIO?: boolean;
+    shouldReadComputedIO?: boolean;
   }): Promise<{ summaryRows: TraceSummaryRow[]; hasSummaryWindow: boolean }> {
     // When the caller knows the traces' approximate time, bound the summary read to those
     // weekly partitions with a ±2-day safety margin; without a hint keep the unbounded read.
@@ -2796,8 +2796,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           SpanCount AS ts_SpanCount,
           TotalDurationMs AS ts_TotalDurationMs,
           ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ${withComputedIO ? "ComputedInput" : "''"} AS ts_ComputedInput,
-          ${withComputedIO ? "ComputedOutput" : "''"} AS ts_ComputedOutput,
+          ${shouldReadComputedIO ? "ComputedInput" : "''"} AS ts_ComputedInput,
+          ${shouldReadComputedIO ? "ComputedOutput" : "''"} AS ts_ComputedOutput,
           TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           TokensPerSecond AS ts_TokensPerSecond,

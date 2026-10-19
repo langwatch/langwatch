@@ -446,6 +446,7 @@ describe("enrichManyCodingAgentSpansFromLogs", () => {
   }
 
   describe("given two traces holding different log rows", () => {
+    /** @scenario "A batch of coding-agent traces joins each trace to its own logs" */
     it("joins each trace's spans to its own rows from one batch read", async () => {
       const getLogsByTraceIds = vi.fn().mockResolvedValue(
         new Map([
@@ -475,6 +476,7 @@ describe("enrichManyCodingAgentSpansFromLogs", () => {
   });
 
   describe("when the batch read fails", () => {
+    /** @scenario "A failed batch log read keeps the traces' attribute-only inputs" */
     it("keeps each trace's attribute-only inputs", async () => {
       const [interaction, plain] = await enrichMany({
         logRecords: batchStore(vi.fn().mockRejectedValue(new Error("clickhouse down"))),
