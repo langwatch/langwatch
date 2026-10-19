@@ -45,6 +45,23 @@ function catalogEntryFor(model: LangyWorkerModelConfig): CatalogModelEntry | und
   return entry;
 }
 
+const CLAUDE_VERSION_PATTERN = /^claude-(?:opus|sonnet|haiku|fable)-(\d+)(?:-(\d{1,2}))?(?:-|$)/;
+
+/** Claude 4.6 and later answer the legacy `thinking.type: "enabled"` shape with a 400. */
+function isAdaptiveThinkingClaude(modelId: string): boolean {
+  const match = CLAUDE_VERSION_PATTERN.exec(modelId.slice(modelId.indexOf("/") + 1));
+  if (!match) return false;
+  const major = Number(match[1]);
+  const minor = match[2] === undefined ? 0 : Number(match[2]);
+  return major > 4 || (major === 4 && minor >= 6);
+}
+
+/** A Claude newer than pi's catalog gets the request shape its catalog siblings carry. */
+function uncataloguedCompat(model: LangyWorkerModelConfig): Record<string, unknown> | undefined {
+  if (model.api !== "anthropic-messages" || !isAdaptiveThinkingClaude(model.id)) return undefined;
+  return { forceAdaptiveThinking: true, ...model.compat };
+}
+
 function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown> {
   const {
     baseUrlEnv: _baseUrlEnv,
@@ -63,7 +80,10 @@ function buildModelEntry(model: LangyWorkerModelConfig): Record<string, unknown>
     apiKey?: unknown;
   };
   const catalog = catalogEntryFor(model);
-  if (!catalog) return configEntry;
+  if (!catalog) {
+    const compat = uncataloguedCompat(model);
+    return compat ? { ...configEntry, compat } : configEntry;
+  }
   const {
     // Ours stay authoritative: the provider-prefixed id is what the gateway
     // routes on, and the catalog's endpoint/provider identity would point pi
