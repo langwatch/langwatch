@@ -150,6 +150,10 @@ export class UserService {
     return this.repository.hasAnyAccount();
   }
 
+  async isOldestActiveAccount({ userId }: { userId: string }): Promise<boolean> {
+    return (await this.repository.findOldestActiveId()) === userId;
+  }
+
   getProfiles(input: UserProfilesInput): Promise<UserFullProfile[]> {
     const parsed = userProfilesInputSchema.parse(input);
 

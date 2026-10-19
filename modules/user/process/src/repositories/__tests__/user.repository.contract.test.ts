@@ -375,6 +375,25 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when accounts are created one after another and deactivated", () => {
+    /** @scenario "The install's oldest active account is answered by id" */
+    it("answers the earliest-created account still active, and none once all are retired", async () => {
+      const { users } = create();
+      const at = fromDate(new Date(42));
+      await expect(users.findOldestActiveId()).resolves.toBeNull();
+
+      const first = await users.create({ name: "First", email: "first@example.com" });
+      await expect(users.findOldestActiveId()).resolves.toBe(first.id);
+
+      await users.setDeactivatedAt({ id: first.id, deactivatedAt: at });
+      const second = await users.create({ name: "Second", email: "second@example.com" });
+      await expect(users.findOldestActiveId()).resolves.toBe(second.id);
+
+      await users.setDeactivatedAt({ id: second.id, deactivatedAt: at });
+      await expect(users.findOldestActiveId()).resolves.toBeNull();
+    });
+  });
+
   describe("when the avatar column is written", () => {
     it("reads the stored URL back on the profile, and clears it again", async () => {
       const { users } = create();

@@ -671,6 +671,10 @@ export class UserModule implements UserApi {
     return this.#users.hasAnyAccount();
   }
 
+  isOldestActiveAccount(input: { userId: string }): Promise<boolean> {
+    return this.#users.isOldestActiveAccount(input);
+  }
+
   /**
    * `GET /api/user-avatar/...`: a missing row, a foreign object and lost bytes
    * earn one refusal, so the route never confirms an id exists.

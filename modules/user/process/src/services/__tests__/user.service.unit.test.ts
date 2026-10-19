@@ -55,6 +55,7 @@ class StubRepository implements UserRepository {
   countUsageAmong = vi.fn(async () => ({ emailDomains: {} }));
   hasAccountOnDomain = vi.fn(async () => false);
   hasAnyAccount = vi.fn(async () => true);
+  findOldestActiveId = vi.fn(async (): Promise<string | null> => user.id);
   findBackfillPage = vi.fn(async () => []);
   findMixedCaseAddressPage = vi.fn(async () => []);
   replaceAddress = vi.fn(async () => "replaced" as const);
@@ -397,6 +398,18 @@ describe("given a company domain a self-hosted install reported", () => {
     await expect(service.hasAccountOnDomain({ domain: "%" })).resolves.toBe(false);
     await expect(service.hasAccountOnDomain({ domain: "  " })).resolves.toBe(false);
     expect(repository.hasAccountOnDomain).not.toHaveBeenCalled();
+  });
+});
+
+describe("given the install's oldest active account", () => {
+  /** @scenario "The install's oldest active account is answered by id" */
+  it("answers yes for that account only, and no when none is active", async () => {
+    const { service, repository } = createService();
+
+    await expect(service.isOldestActiveAccount({ userId: user.id })).resolves.toBe(true);
+    await expect(service.isOldestActiveAccount({ userId: "user-later" })).resolves.toBe(false);
+    repository.findOldestActiveId.mockResolvedValue(null);
+    await expect(service.isOldestActiveAccount({ userId: user.id })).resolves.toBe(false);
   });
 });
 

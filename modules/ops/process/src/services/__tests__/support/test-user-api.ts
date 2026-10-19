@@ -21,6 +21,9 @@ export class TestUserApi implements UserApi {
   hasAnyAccount: UserApi["hasAnyAccount"] = () =>
     this.overrides.hasAnyAccount?.() ?? this.unimplemented("hasAnyAccount");
 
+  isOldestActiveAccount: UserApi["isOldestActiveAccount"] = (input) =>
+    this.overrides.isOldestActiveAccount?.(input) ?? this.unimplemented("isOldestActiveAccount");
+
   findById: UserApi["findById"] = (input) =>
     this.overrides.findById?.(input) ?? this.unimplemented("findById");
 

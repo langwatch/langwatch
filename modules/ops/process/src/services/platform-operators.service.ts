@@ -1,5 +1,6 @@
 import type { LedgerActor } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import { createLogger } from "@langwatch/observability";
 import {
   OpsImpersonatedOperatorRefusedError,
@@ -11,6 +12,7 @@ import {
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { UserApi, UserProfile } from "@langwatch/user-contract";
 
+import { isEmailUnconfigured } from "../rules/platform-operator-seed.rules.ts";
 import { grantsAreStaffOnly, isStaffAccount } from "../rules/platform-operator-staff.rules.ts";
 
 const logger = createLogger("langwatch:ops:platform-operators");
@@ -56,13 +58,16 @@ type PlatformOperatorsServiceOptions = Readonly<{
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
   >;
-  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage">;
+  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isOldestActiveAccount">;
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
+  /** Whether the install has email at all: without it no account can verify its address. */
+  mail: Pick<NotificationApi, "getMailDelivery">;
   /** `cloud` is the seed's own: a deployment LangWatch runs. */
   deployment: Readonly<{ cloud: boolean; isLocalDevelopment: boolean }>;
-  /** No email at all: no account here can verify its address, so the seed cannot ask for it. */
-  isEmailUnconfigured: () => Promise<boolean>;
 }>;
+
+/** Who ADMIN_EMAILS names that the seed may take, and whether an unverified one was passed over. */
+type NamedSeedables = Readonly<{ userIds: string[]; isLaterUnverifiedSkipped: boolean }>;
 
 /**
  * ops's side of the platform-operator grant (ARCHITECTURE.md, "Platform operators are a grant"
@@ -77,7 +82,7 @@ export class PlatformOperatorsService {
   }
 
   #recorder: PlatformOperatorSeedRecorder | undefined;
-  #namedUserWaitLogged = false;
+  #loggedWaitReason: string | undefined;
 
   /** Bound once ops's pipeline registers, as the system-migration kick is. */
   connectSeedRecorder(recorder: PlatformOperatorSeedRecorder): void {
@@ -203,8 +208,8 @@ export class PlatformOperatorsService {
 
   /**
    * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
-   * seedable active users a still-set ADMIN_EMAILS names (verified, or any where no email is
-   * configured), and answers how many. Anything else stays with the seed process's wait.
+   * seedable active users a still-set ADMIN_EMAILS names (verified, or with no email configured
+   * the install's oldest active account), and answers how many. The rest stays with the seed.
    */
   async seedFromAdminEmails({
     settings,
@@ -215,16 +220,15 @@ export class PlatformOperatorsService {
   }): Promise<number> {
     if (settings.cloud || settings.adminEmails.length === 0) return 0;
     if ((await this.options.authz.listPlatformOperators()).length > 0) return 0;
-    const named = await this.#seedableUsersNamed(settings.adminEmails);
-    if (!dryRun && named.length > 0)
-      await this.grantSeeded({ via: "admin-emails", userIds: named });
-    return named.length;
+    const { userIds } = await this.#seedableUsersNamed(settings.adminEmails);
+    if (!dryRun && userIds.length > 0) await this.grantSeeded({ via: "admin-emails", userIds });
+    return userIds.length;
   }
 
   /**
    * Cloud never seeds; no user waits; holders decide nobody. A set ADMIN_EMAILS takes its seedable
-   * active users (unverified too with no email configured) or waits, never an org admin. An empty
-   * one takes the only organization's oldest active admin, or waits, or decides nobody.
+   * active users (with no email configured, an unverified one only as the oldest active account)
+   * or waits, never an org admin. An empty one takes the only organization's oldest active admin.
    */
   async #decide({
     adminEmails,
@@ -237,11 +241,11 @@ export class PlatformOperatorsService {
     }
 
     if (adminEmails.length > 0) {
-      const named = await this.#seedableUsersNamed(adminEmails);
-      if (named.length > 0) {
-        return { via: "admin-emails", userIds: named, reason: "the users ADMIN_EMAILS names" };
+      const { userIds, isLaterUnverifiedSkipped } = await this.#seedableUsersNamed(adminEmails);
+      if (userIds.length > 0) {
+        return { via: "admin-emails", userIds, reason: "the users ADMIN_EMAILS names" };
       }
-      return this.#waitForNamedUser();
+      return this.#waitForNamedUser({ isLaterUnverifiedSkipped });
     }
 
     const organizations = await this.options.organizations.listProvisioningSummaries();
@@ -259,12 +263,18 @@ export class PlatformOperatorsService {
     };
   }
 
-  /** Waits for a named user; says so once per process, not on every wake. */
-  #waitForNamedUser(): PlatformOperatorSeedOutcome {
-    const reason =
-      "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
-    if (!this.#namedUserWaitLogged) {
-      this.#namedUserWaitLogged = true;
+  /** Waits for a named user; says each reason once per process, not on every wake. */
+  #waitForNamedUser({
+    isLaterUnverifiedSkipped,
+  }: {
+    isLaterUnverifiedSkipped: boolean;
+  }): PlatformOperatorSeedOutcome {
+    const reason = isLaterUnverifiedSkipped
+      ? "the unverified account ADMIN_EMAILS names is not the install's oldest active account, " +
+        "and with no email configured only that first account is seeded unverified"
+      : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
+    if (this.#loggedWaitReason !== reason) {
+      this.#loggedWaitReason = reason;
       logger.warn({ reason }, `the platform-operator seed is waiting: ${reason}`);
     }
     return waiting(reason);
@@ -280,19 +290,27 @@ export class PlatformOperatorsService {
   }
 
   /**
-   * The active users the list names whose address is verified. Where no email is configured an
-   * unverified one counts too: sign-up could never have proved it. The account must exist.
+   * The active users the list names whose address is verified. With no email configured an
+   * unverified one counts only as the install's oldest active account, as the first user does:
+   * a later sign-up on a named address proves nothing. The account must already exist.
    */
-  async #seedableUsersNamed(adminEmails: readonly string[]): Promise<string[]> {
+  async #seedableUsersNamed(adminEmails: readonly string[]): Promise<NamedSeedables> {
     const active: UserProfile[] = [];
     for (const email of adminEmails) {
       const user = await this.options.users.findByEmail({ email });
       if (user && user.deactivatedAt === null) active.push(user);
     }
+    const unverified = active.filter((user) => !user.emailVerified);
     const canSeedUnverified =
-      active.some((user) => !user.emailVerified) && (await this.options.isEmailUnconfigured());
-    const seedable = active.filter((user) => user.emailVerified || canSeedUnverified);
-    return [...new Set(seedable.map((user) => user.id))];
+      unverified.length > 0 &&
+      isEmailUnconfigured({ mail: await this.options.mail.getMailDelivery() });
+    const seedable = active.filter((user) => user.emailVerified);
+    let isLaterUnverifiedSkipped = false;
+    for (const user of canSeedUnverified ? unverified : []) {
+      if (await this.options.users.isOldestActiveAccount({ userId: user.id })) seedable.push(user);
+      else isLaterUnverifiedSkipped = true;
+    }
+    return { userIds: [...new Set(seedable.map((user) => user.id))], isLaterUnverifiedSkipped };
   }
 
   async #oldestActiveAdministrator({
