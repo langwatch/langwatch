@@ -83,7 +83,7 @@ export function createTraceEvaluationTrigger(deps: TraceEvaluationTriggerDeps): 
   tenantId: string;
   traceId: string;
   event: TraceEvaluationTriggerEvent;
-  /** The queue's 1-based delivery attempt; absent means one attempt, as before it was carried. */
+  /** The queue's 1-based delivery attempt; absent counts as the first, so the job still retries. */
   deliveryAttempt?: number;
 }) => Promise<void> {
   return async ({ tenantId, traceId, event, deliveryAttempt }) => {
@@ -95,12 +95,10 @@ export function createTraceEvaluationTrigger(deps: TraceEvaluationTriggerDeps): 
     });
     if (!foldState) {
       // Bounded: unbounded retries once blocked a queue group per trace whose summary never folds.
-      if (
-        deliveryAttempt !== undefined &&
-        deliveryAttempt < TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS
-      ) {
+      const attempt = deliveryAttempt ?? 1;
+      if (attempt < TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS) {
         throw new Error(
-          `Trace has no folded summary yet (attempt ${deliveryAttempt}); retrying the evaluation trigger`,
+          `Trace has no folded summary yet (attempt ${attempt}); retrying the evaluation trigger`,
         );
       }
       logger.warn(

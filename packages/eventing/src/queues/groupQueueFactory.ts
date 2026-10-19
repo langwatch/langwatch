@@ -6,17 +6,17 @@ import {
   GroupQueueError,
   GroupQueueProducer,
   HandBackGroupQueueError,
-  isProjectGone,
   NonRetryableGroupQueueError,
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
-import { createLogger } from "@langwatch/observability";
+import { createLogger, type Logger } from "@langwatch/observability";
 
 import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
+  isProjectGone,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
@@ -78,10 +78,12 @@ export async function completeWhenProjectGone({
   queueName,
   payloads,
   run,
+  log = logger,
 }: {
   queueName: string;
   payloads: readonly Record<string, unknown>[];
   run: () => Promise<void>;
+  log?: Logger;
 }): Promise<void> {
   try {
     await run();
@@ -93,7 +95,7 @@ export async function completeWhenProjectGone({
       jobType: typeof first?.__jobType === "string" ? first.__jobType : "unknown",
       count: payloads.length,
     });
-    logger.warn(
+    log.warn(
       {
         tenantId: first?.tenantId ?? null,
         queueName,

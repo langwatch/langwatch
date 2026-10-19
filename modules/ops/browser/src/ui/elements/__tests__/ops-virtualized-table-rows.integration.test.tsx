@@ -14,6 +14,9 @@ const wrapper = ({ children }: { children: React.ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">{children}</DesignSystemProvider>
 );
 
+const VIEWPORT_ROWS = 400 / 40;
+const OVERSCAN = 6;
+
 /** The cards' shape: the scroller and the rows mount in the same commit. */
 function ScrollingTable({ count }: { count: number }) {
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -25,6 +28,7 @@ function ScrollingTable({ count }: { count: number }) {
             count={count}
             rowHeight={40}
             columnCount={1}
+            overscan={OVERSCAN}
             scrollContainerRef={scrollContainerRef}
             renderRow={(index) => (
               <ListTable.Row>
@@ -50,12 +54,14 @@ describe("VirtualizedTableRows", () => {
 
   describe("given 424 rows, above the virtualization threshold", () => {
     describe("when the scroller and the rows mount in the same commit", () => {
-      /** @scenario "The blocked table shows its rows on first open" */
-      it("renders data rows on first mount", async () => {
+      /** @scenario "A virtualized ops table shows its rows on first open" */
+      it("renders the first rows, bounded by the viewport and its overscan", async () => {
         render(<ScrollingTable count={424} />, { wrapper });
 
         expect(await screen.findByText("row 0")).not.toBeNull();
-        expect(screen.queryByText("row 423")).toBeNull();
+        const rendered = screen.getAllByText(/^row \d+$/);
+        expect(rendered.length).toBeLessThanOrEqual(VIEWPORT_ROWS + 2 * OVERSCAN);
+        expect(screen.queryByText(`row ${VIEWPORT_ROWS + 2 * OVERSCAN}`)).toBeNull();
       });
     });
   });

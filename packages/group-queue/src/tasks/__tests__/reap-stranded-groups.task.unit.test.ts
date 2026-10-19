@@ -58,13 +58,12 @@ function fakeRedis(state: {
       const groupId = key.slice(`${PREFIX}group:`.length, -":jobs".length);
       return jobs[groupId]?.length ?? 0;
     }),
-    del: vi.fn(async (...keys: string[]) => {
-      deleted.push(...keys);
-      for (const key of keys) {
-        if (!key.endsWith(":jobs")) continue;
-        delete jobs[key.slice(`${PREFIX}group:`.length, -":jobs".length)];
-      }
-      return keys.length;
+    // The delete's own re-check is Lua, proven against Redis in
+    // parked-group-retention.integration.test.ts; here it deletes what discovery chose.
+    evalsha: vi.fn(async (_sha: string, _numKeys: number, jobsKey: string, dataKey: string) => {
+      deleted.push(jobsKey, dataKey);
+      delete jobs[jobsKey.slice(`${PREFIX}group:`.length, -":jobs".length)];
+      return 1;
     }),
     set: vi.fn(async (key: string, value: string) => {
       written[key] = value;

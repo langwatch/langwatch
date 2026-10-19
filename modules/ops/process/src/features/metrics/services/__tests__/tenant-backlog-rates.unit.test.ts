@@ -100,6 +100,30 @@ describe("the queue-metrics writer feeding anomaly detection", () => {
     });
   });
 
+  describe("given one tenant's arrivals fail to record", () => {
+    describe("when the writer's next cycle runs with no further arrivals", () => {
+      /** @scenario "A tenant whose arrivals fail to record counts them on the next scan" */
+      it("records them then, without recording the other tenant's twice", async () => {
+        const { writer, rateTracker, scanOnce } = fleet();
+        const recordArrivals = rateTracker.record.bind(rateTracker);
+        let failures = 1;
+        vi.spyOn(rateTracker, "record").mockImplementation(async (tenantId, count) => {
+          if (tenantId === "proj_a" && failures-- > 0) throw new Error("tracker down");
+          await recordArrivals(tenantId, count);
+        });
+        await writer.discoverQueues();
+
+        await scanOnce({});
+        await scanOnce({ proj_a: 4, proj_b: 9 });
+        expect(await rateTracker.currentWindowCount("proj_a", 60)).toBe(0);
+        await scanOnce({ proj_a: 4, proj_b: 9 });
+
+        expect(await rateTracker.currentWindowCount("proj_a", 60)).toBe(4);
+        expect(await rateTracker.currentWindowCount("proj_b", 60)).toBe(9);
+      });
+    });
+  });
+
   describe("given two hours of steady arrivals for one tenant and a quiet neighbour", () => {
     describe("when the tenant's arrivals jump tenfold for five minutes", () => {
       /** @scenario "An arrival spike the writer sees surfaces through the detector" */

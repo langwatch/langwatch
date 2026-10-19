@@ -1,18 +1,8 @@
 import { ProjectNotFoundError } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
-import type * as observabilityModule from "@langwatch/observability";
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-// Capture the factory's own logger so the no-op can be asserted to warn.
-const { warnSpy } = vi.hoisted(() => ({ warnSpy: vi.fn() }));
-vi.mock("@langwatch/observability", async (importOriginal) => {
-  const actual = await importOriginal<typeof observabilityModule>();
-  return {
-    ...actual,
-    createLogger: () => ({ warn: warnSpy, error: vi.fn(), info: vi.fn(), debug: vi.fn() }),
-  };
-});
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
 import { completeWhenProjectGone } from "../groupQueueFactory.ts";
 
@@ -38,14 +28,17 @@ const projectContractRefusal = () => new ProjectContractNotFound();
 
 describe("completeWhenProjectGone", () => {
   let meter = createRecordingMeterProvider();
+  let testLog = createTestLogger();
   beforeEach(() => {
     meter = createRecordingMeterProvider();
     meter.install();
+    testLog = createTestLogger();
   });
   afterEach(() => {
     meter.uninstall();
-    vi.clearAllMocks();
   });
+
+  const warnings = () => testLog.lines.filter((line) => line.level === 40);
 
   const goneCount = (jobType: string) =>
     meter.valueOf("es_jobs_project_gone_total", { queue: QUEUE, job_type: jobType });
@@ -72,13 +65,13 @@ describe("completeWhenProjectGone", () => {
           queueName: QUEUE,
           payloads: [job(jobType)],
           run: () => Promise.reject(error()),
+          log: testLog.logger,
         }),
       ).resolves.toBeUndefined();
 
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
+      expect(warnings()).toHaveLength(1);
+      expect(testLog.lines.findLine("warn", "no longer exists")).toEqual(
         expect.objectContaining({ tenantId: TENANT, queueName: QUEUE, jobType }),
-        expect.stringContaining("no longer exists"),
       );
     });
   });
@@ -91,14 +84,12 @@ describe("completeWhenProjectGone", () => {
           queueName: QUEUE,
           payloads: [job("projection"), job("projection"), job("projection")],
           run: () => Promise.reject(new ProjectNotFoundError(TENANT)),
+          log: testLog.logger,
         }),
       ).resolves.toBeUndefined();
 
-      expect(warnSpy).toHaveBeenCalledTimes(1);
-      expect(warnSpy).toHaveBeenCalledWith(
-        expect.objectContaining({ tenantId: TENANT, jobs: 3 }),
-        expect.any(String),
-      );
+      expect(warnings()).toHaveLength(1);
+      expect(warnings()[0]).toEqual(expect.objectContaining({ tenantId: TENANT, jobs: 3 }));
     });
 
     /** @scenario "A job or outbox message completed because its project is gone is counted" */
@@ -107,6 +98,7 @@ describe("completeWhenProjectGone", () => {
         queueName: QUEUE,
         payloads: [job("projection"), job("projection"), job("projection")],
         run: () => Promise.reject(new ProjectNotFoundError(TENANT)),
+        log: testLog.logger,
       });
 
       expect(goneCount("projection")).toBe(3);
@@ -123,9 +115,10 @@ describe("completeWhenProjectGone", () => {
           queueName: QUEUE,
           payloads: [job("projection")],
           run: () => Promise.reject(transient),
+          log: testLog.logger,
         }),
       ).rejects.toBe(transient);
-      expect(warnSpy).not.toHaveBeenCalled();
+      expect(warnings()).toEqual([]);
       expect(goneCount("projection")).toBe(0);
     });
   });

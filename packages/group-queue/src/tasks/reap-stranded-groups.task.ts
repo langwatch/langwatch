@@ -2,6 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { GroupQueueRedis } from "../dependencies-adapter.ts";
+import { deleteStrandedGroup } from "../scripts.ts";
+import { tenantIdFromGroupId } from "../storage.ts";
 
 const logger = createLogger("langwatch:task:group-queue-reap-stranded-groups");
 
@@ -99,11 +101,18 @@ export async function reapStrandedGroups({
 
   let deletedGroups = 0;
   let failedDeletes = 0;
+  let keptGroups = 0;
   for (const group of groups) {
     if (signal?.aborted) break;
     try {
-      await redis.del(group.jobsKey, group.dataKey);
-      deletedGroups += 1;
+      const deleted = await deleteStrandedGroup({
+        redis,
+        keyPrefix,
+        groupId: group.groupId,
+        cutoffMs,
+      });
+      if (deleted) deletedGroups += 1;
+      else keptGroups += 1;
     } catch (error) {
       // One transient failure must not abort the sweep: the reaper is safe to
       // re-run, but finishing in a single pass keeps the recount below honest.
@@ -122,7 +131,7 @@ export async function reapStrandedGroups({
   await redis.set(totalPendingKey, String(totalPendingNow));
 
   logger.info(
-    { deletedGroups, failedDeletes, totalPendingNow },
+    { deletedGroups, failedDeletes, keptGroups, totalPendingNow },
     "reaped stranded groups and recomputed the pending counter",
   );
   return {
@@ -158,19 +167,14 @@ async function isStranded({
   if ((await redis.zscore(readyKey, groupId)) !== null) return false;
   if ((await redis.exists(`${keyPrefix}group:${groupId}:active`)) === 1) return false;
   if ((await redis.sismember(blockedKey, groupId)) === 1) return false;
-  if ((await redis.zscore(`${keyPrefix}parked:${tenantOf(groupId)}`, groupId)) !== null) {
+  const tenantId = tenantIdFromGroupId(groupId) ?? groupId;
+  if ((await redis.zscore(`${keyPrefix}parked:${tenantId}`, groupId)) !== null) {
     return false;
   }
   const newest = await redis.zrange(jobsKey, -1, -1, "WITHSCORES");
   const score = Number(newest[1]);
   if (!Number.isFinite(score) || score >= cutoffMs) return false;
   return !(await isLaneParked({ redis, keyPrefix, groupId }));
-}
-
-/** The tenant segment the dispatcher parks under: everything before the first '/'. */
-function tenantOf(groupId: string): string {
-  const slash = groupId.indexOf("/");
-  return slash > 0 ? groupId.slice(0, slash) : groupId;
 }
 
 /** Asked last, of stale candidates only: a paused lane's set is keyed by the

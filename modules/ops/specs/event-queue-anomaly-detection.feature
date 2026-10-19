@@ -5,6 +5,27 @@ Feature: Per-tenant rate anomaly detection
   So that a noisy neighbour (e.g. evaluator-recursion loop, accidental
   fan-out) can be caught within minutes rather than hours.
 
+  Where the rates come from on this branch (ruled 2026-09-23, amended
+  2026-10-15): main counted each tenant's jobs at enqueue, inside the
+  GroupQueue. Here the queue-metrics writer, which already scans every queue
+  each 2s cycle under its fleet lease, records each tenant's arrivals into the
+  same rate tracker: the growth of the tenant's waiting jobs since the
+  previous scan, never the absolute. Ops reads no per-tenant enqueue counter
+  without reaching into the GroupQueue, so growth is the arrival signal. The
+  first version recorded the absolute backlog every cycle, so a parked tenant
+  with a steady backlog read as ~30x its backlog per minute and looked like a
+  surge. Window, tier and baseline constants are main's, unchanged.
+
+  The observed rate is not main's enqueue rate, and these differences are
+  not hidden: jobs that arrive and finish between two scans count zero, so a
+  tenant whose workers keep pace reads low and only a surge that outruns its
+  workers registers; growth in one group offsets draining in another of the
+  same tenant; the scan samples 200 groups from each end of a queue's ready
+  set plus 200 blocked groups, so a group moving into the sample reads as
+  arrivals; parked groups are not in the scan; and a pod's first scan after
+  it takes the lease only sets the baseline, while a pod that retakes the
+  lease compares with the scan it last made.
+
   # Why this exists — incident 2026-05-11
   #
   # The 2026-05-11 outage was caused by one tenant producing ~95% of
@@ -17,17 +38,6 @@ Feature: Per-tenant rate anomaly detection
   #
   # Baseline = p95 of per-minute counts across a 7-day window.
   # Cached for 1h so the worker tick stays cheap on multi-tenant clusters.
-
-  # Where the rates come from on this branch (ruled 2026-09-23, amended
-  # 2026-10-15): main counted each tenant's jobs at enqueue, inside the
-  # GroupQueue. Here the queue-metrics writer, which already scans every queue
-  # each 2s cycle under its fleet lease, records each tenant's arrivals into the
-  # same rate tracker: the growth of the tenant's waiting jobs since the
-  # previous scan, never the absolute. Ops reads no per-tenant enqueue counter
-  # without reaching into the GroupQueue, so growth is the arrival signal. The
-  # first version recorded the absolute backlog every cycle, so a parked tenant
-  # with a steady backlog read as ~30x its backlog per minute and looked like a
-  # surge. Window, tier and baseline constants are main's, unchanged.
 
   Background:
     Given the queue-metrics writer is recording each tenant's arrivals
@@ -64,20 +74,19 @@ Feature: Per-tenant rate anomaly detection
     And "proj_parked" is not active for the detector
 
   @unit @anomaly-detection @rates
+  Scenario: A tenant whose arrivals fail to record counts them on the next scan
+    Given the writer has scanned once with no waiting jobs
+    And jobs then arrive for tenants "proj_a" and "proj_b"
+    And recording "proj_a"'s arrivals fails on the writer's next cycle
+    When the cycle after it runs with no further arrivals
+    Then "proj_a"'s count for this minute is its arrivals
+    And "proj_b"'s arrivals are counted once
+
+  @unit @anomaly-detection @rates
   Scenario: An arrival spike the writer sees surfaces through the detector
     Given two hours of steady arrivals for "proj_runaway" and "proj_quiet"
     When "proj_runaway"'s arrivals jump tenfold for five minutes
     Then the detector surfaces a surface-tier anomaly for "proj_runaway" only
-
-  # The observed rate is not main's enqueue rate, and these differences are
-  # not hidden: jobs that arrive and finish between two scans count zero, so a
-  # tenant whose workers keep pace reads low and only a surge that outruns its
-  # workers registers; growth in one group offsets draining in another of the
-  # same tenant; the scan samples 200 groups from each end of a queue's ready
-  # set plus 200 blocked groups, so a group moving into the sample reads as
-  # arrivals; parked groups are not in the scan; and a pod's first scan after
-  # it takes the lease only sets the baseline, while a pod that retakes the
-  # lease compares with the scan it last made.
 
   @unit @anomaly-detection @kill-switch
   Scenario: Kill-switch FF disables anomaly detection for one tenant without a redeploy

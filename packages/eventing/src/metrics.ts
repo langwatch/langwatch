@@ -518,6 +518,11 @@ export const incrementEsProcessIntentsSuppressed = ({
   processName: string;
   count: number;
 }) => processIntentsSuppressed.labels(processName).inc(count);
+
+/**
+ * Counts jobs and outbox messages completed as no-ops because their project no longer
+ * exists. `count` is the number of payloads, not batches: a coalesced batch adds its size.
+ */
 export const incrementEsJobsProjectGone = ({
   queue,
   jobType,

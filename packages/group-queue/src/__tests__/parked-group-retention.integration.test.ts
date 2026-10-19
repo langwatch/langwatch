@@ -6,7 +6,7 @@
 import IORedis, { type Redis } from "ioredis";
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
-import { GroupStagingScripts } from "../scripts.ts";
+import { deleteStrandedGroup, GroupStagingScripts } from "../scripts.ts";
 import { reapStrandedGroups } from "../tasks/reap-stranded-groups.task.ts";
 
 const QUEUE_NAME = "{test/parked-group-retention}";
@@ -109,12 +109,12 @@ describe("given a group parked at its tenant's in-flight cap", () => {
   });
 
   describe("when it waits", () => {
-    /** @scenario A parked group's keys carry no expiry while it waits */
+    /** @scenario "A parked group's keys carry no expiry while it waits" */
     it("holds its jobs and data keys without a TTL", async () => {
       expect(await keyTtls(parked)).toEqual([-1, -1]);
     });
 
-    /** @scenario A stage into a parked group does not re-arm the expiry */
+    /** @scenario "A stage into a parked group does not re-arm the expiry" */
     it("keeps them without a TTL when another job is staged into it", async () => {
       await stage({ groupId: parked, stagedJobId: "parked-2" });
 
@@ -124,7 +124,7 @@ describe("given a group parked at its tenant's in-flight cap", () => {
   });
 
   describe("when the reaper applies hours past its cutoff", () => {
-    /** @scenario A group parked at its tenant's cap survives a reap past the cutoff */
+    /** @scenario "A group parked at its tenant's cap survives a reap past the cutoff" */
     it("deletes the stranded group and leaves the parked one whole", async () => {
       await stageStrandedGroup("project_Z/fold/trace:9");
 
@@ -138,7 +138,7 @@ describe("given a group parked at its tenant's in-flight cap", () => {
   });
 
   describe("when the running group completes and frees the slot", () => {
-    /** @scenario An unparked group gets its safety-net expiry back */
+    /** @scenario "An unparked group gets its safety-net expiry back" */
     it("moves it back to ready with a TTL on its keys", async () => {
       await scripts.complete({ groupId: running, stagedJobId: "running-1" });
 
@@ -170,7 +170,7 @@ describe("given a group parked behind a paused lane", () => {
   });
 
   describe("when the reaper applies hours past its cutoff", () => {
-    /** @scenario A group parked behind a paused lane keeps its keys */
+    /** @scenario "A group parked behind a paused lane keeps its keys" */
     it("holds them without a TTL and does not delete them", async () => {
       expect(await keyTtls(laneParked)).toEqual([-1, -1]);
 
@@ -181,8 +181,18 @@ describe("given a group parked behind a paused lane", () => {
     });
   });
 
+  describe("when another job is staged into it", () => {
+    /** @scenario "A stage into a group parked behind a paused lane does not re-arm the expiry" */
+    it("keeps its jobs and data keys without a TTL", async () => {
+      await stage({ groupId: laneParked, stagedJobId: "lane-3", jobDataJson: pausedLaneJob });
+
+      expect(await redis.zcard(jobsKey(laneParked))).toBe(3);
+      expect(await keyTtls(laneParked)).toEqual([-1, -1]);
+    });
+  });
+
   describe("when the lane is unpaused", () => {
-    /** @scenario An unpaused lane's group gets its safety-net expiry back */
+    /** @scenario "An unpaused lane's group gets its safety-net expiry back" */
     it("restores the group with a TTL on its keys", async () => {
       await scripts.removePauseKey(PAUSE_KEY);
       await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
@@ -191,6 +201,66 @@ describe("given a group parked behind a paused lane", () => {
       const [jobsTtl, dataTtl] = await keyTtls(laneParked);
       expect(jobsTtl).toBeGreaterThan(0);
       expect(dataTtl).toBeGreaterThan(0);
+    });
+  });
+});
+
+describe("given a group the reaper discovered as stranded", () => {
+  const stranded = "project_Z/fold/trace:9";
+  const deleteAtCutoff = () =>
+    deleteStrandedGroup({
+      redis,
+      keyPrefix: keyPrefix(),
+      groupId: stranded,
+      cutoffMs: 1000 + 60 * 60 * 1000,
+    });
+
+  beforeEach(async () => {
+    scripts = new GroupStagingScripts(redis, QUEUE_NAME);
+    await stageStrandedGroup(stranded);
+  });
+
+  describe.each([
+    { membership: "ready", enter: () => redis.zadd(`${keyPrefix()}ready`, 1000, stranded) },
+    { membership: "active", enter: () => redis.set(`${keyPrefix()}group:${stranded}:active`, "w") },
+    { membership: "blocked", enter: () => redis.sadd(`${keyPrefix()}blocked`, stranded) },
+    {
+      membership: "its tenant's parked set",
+      enter: () => redis.zadd(`${keyPrefix()}parked:project_Z`, 1000, stranded),
+    },
+    {
+      membership: "a paused lane's parked set",
+      enter: async () => {
+        await redis.zadd(`${keyPrefix()}parked-lane:${PAUSE_KEY}`, 1000, stranded);
+        await redis.sadd(`${keyPrefix()}parked-lanes`, PAUSE_KEY);
+      },
+    },
+  ])("when it enters $membership before the delete", ({ enter }) => {
+    /** @scenario "The stranded-group reaper deletes a group only if it is still stranded" */
+    it("leaves its jobs and data whole", async () => {
+      await enter();
+
+      expect(await deleteAtCutoff()).toBe(false);
+      expect(await redis.zrange(jobsKey(stranded), 0, -1)).toEqual(["stranded-1"]);
+      expect(await redis.hkeys(dataKey(stranded))).toEqual(["stranded-1"]);
+    });
+  });
+
+  describe("when a job newer than the cutoff is staged into it before the delete", () => {
+    /** @scenario "The stranded-group reaper deletes a group only if it is still stranded" */
+    it("leaves its jobs and data whole", async () => {
+      await redis.zadd(jobsKey(stranded), 1000 + 2 * 60 * 60 * 1000, "fresh-1");
+
+      expect(await deleteAtCutoff()).toBe(false);
+      expect(await redis.zcard(jobsKey(stranded))).toBe(2);
+    });
+  });
+
+  describe("when it is still stranded at the delete", () => {
+    /** @scenario "The stranded-group reaper deletes a group only if it is still stranded" */
+    it("deletes its jobs and data keys", async () => {
+      expect(await deleteAtCutoff()).toBe(true);
+      expect(await redis.exists(jobsKey(stranded), dataKey(stranded))).toBe(0);
     });
   });
 });

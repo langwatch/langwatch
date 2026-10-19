@@ -32,16 +32,28 @@ export class OpsTenantBacklogService {
   async record(queues: QueueInfo[]): Promise<void> {
     const backlogs = countWaitingJobsByTenant({ queues });
     const previous = this.previousBacklogs;
-    this.previousBacklogs = backlogs;
-    if (!previous) return;
+    if (!previous) {
+      this.previousBacklogs = backlogs;
+      return;
+    }
 
     const arrivals = countArrivalsByTenant({ previous, current: backlogs });
+    const baseline = new Map(backlogs);
+    const failures: unknown[] = [];
     await Promise.all(
       [...arrivals].map(async ([tenantId, count]) => {
-        if (await this.isKilledForTenant(tenantId)) return;
-        await this.options.rateTracker.record(tenantId, count);
+        try {
+          if (await this.isKilledForTenant(tenantId)) return;
+          await this.options.rateTracker.record(tenantId, count);
+        } catch (error) {
+          // Unrecorded, so this tenant's baseline stays put and the next scan counts them again.
+          keepPreviousBaseline({ baseline, previous, tenantId });
+          failures.push(error);
+        }
       }),
     );
+    this.previousBacklogs = baseline;
+    if (failures.length > 0) throw failures[0];
   }
 
   /** The detector's per-tenant kill switch; a failed lookup counts the tenant. */
@@ -56,4 +68,18 @@ export class OpsTenantBacklogService {
       return false;
     }
   }
+}
+
+function keepPreviousBaseline({
+  baseline,
+  previous,
+  tenantId,
+}: {
+  baseline: Map<string, number>;
+  previous: ReadonlyMap<string, number>;
+  tenantId: string;
+}): void {
+  const before = previous.get(tenantId);
+  if (before === undefined) baseline.delete(tenantId);
+  else baseline.set(tenantId, before);
 }

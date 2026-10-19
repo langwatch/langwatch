@@ -1,7 +1,8 @@
 import { ProjectNotFoundError } from "@langwatch/authorization";
-import { isProjectGone } from "@langwatch/group-queue";
 import { HandledError } from "@langwatch/handled-error";
 import { describe, expect, it } from "vitest";
+
+import { isProjectGone } from "../../services/errorHandling.ts";
 
 /** Spec: specs/eventing/deleted-project-jobs.feature */
 

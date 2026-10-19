@@ -57,19 +57,30 @@ local function holdGroupKeys(jobsKey, dataKey)
   redis.call("PERSIST", dataKey)
 end
 
--- Whether the group behind jobsKey (<prefix>:gq:group:<id>:jobs) sits in its
--- tenant's parked set. One ZSCORE; an unrecognised key reads as not parked.
-local function isTenantParkedGroup(jobsKey)
-  local kp, groupId = string.match(jobsKey, "^(.-:gq:)group:(.+):jobs$")
-  if not kp then return false end
+-- Whether the group sits in its tenant's parked set or in a paused lane's. A lane's
+-- set is keyed by its pause entry, which the group id does not name, so each paused
+-- lane costs one ZSCORE (restoreUnpausedLanes walks the same set on every dispatch).
+local function isParkedGroupAt(kp, groupId)
   local tenantId = groupId
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then tenantId = string.sub(groupId, 1, slashPos - 1) end
-  return redis.call("ZSCORE", kp .. "parked:" .. tenantId, groupId) ~= false
+  if redis.call("ZSCORE", kp .. "parked:" .. tenantId, groupId) then return true end
+  for _, pauseKey in ipairs(redis.call("SMEMBERS", kp .. "parked-lanes")) do
+    if redis.call("ZSCORE", kp .. "parked-lane:" .. pauseKey, groupId) then return true end
+  end
+  return false
+end
+
+-- The same, for the group behind jobsKey (<prefix>:gq:group:<id>:jobs); an
+-- unrecognised key reads as not parked.
+local function isParkedGroup(jobsKey)
+  local kp, groupId = string.match(jobsKey, "^(.-:gq:)group:(.+):jobs$")
+  if not kp then return false end
+  return isParkedGroupAt(kp, groupId)
 end
 
 local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
-  if isTenantParkedGroup(jobsKey) then
+  if isParkedGroup(jobsKey) then
     holdGroupKeys(jobsKey, dataKey)
     return
   end
@@ -1332,6 +1343,32 @@ end
 return results
 `;
 
+// The stranded-group reaper's delete. Its discovery reads memberships one call at a time,
+// so this eval asks them all again and deletes only a group that is still in no dispatch
+// set and still stale: one staged or parked since discovery keeps its jobs.
+const DELETE_STRANDED_GROUP_LUA =
+  TTL_HELPER_LUA +
+  `
+local jobsKey    = KEYS[1]
+local dataKey    = KEYS[2]
+local readyKey   = KEYS[3]
+local blockedKey = KEYS[4]
+local activeKey  = KEYS[5]
+
+local keyPrefix = ARGV[1]
+local groupId   = ARGV[2]
+local cutoffMs  = tonumber(ARGV[3])
+
+if redis.call("ZSCORE", readyKey, groupId) then return 0 end
+if redis.call("EXISTS", activeKey) == 1 then return 0 end
+if redis.call("SISMEMBER", blockedKey, groupId) == 1 then return 0 end
+if isParkedGroupAt(keyPrefix, groupId) then return 0 end
+local newest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
+if not newest[2] or tonumber(newest[2]) >= cutoffMs then return 0 end
+redis.call("DEL", jobsKey, dataKey)
+return 1
+`;
+
 const COMPLETE_LUA =
   TTL_HELPER_LUA +
   PARK_HELPER_LUA +
@@ -2097,6 +2134,39 @@ const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
 const claimGuardScript = new CachedLuaScript(CLAIM_GUARD_LUA);
 const releaseClaimScript = new CachedLuaScript(RELEASE_CLAIM_LUA);
+const deleteStrandedGroupScript = new CachedLuaScript(DELETE_STRANDED_GROUP_LUA);
+
+/**
+ * Deletes a stranded group's jobs and data keys in one eval that first re-checks it is
+ * still in none of ready, active, blocked, its tenant's parked set or a paused lane's,
+ * and its newest job still predates `cutoffMs`. Returns whether it deleted them.
+ */
+export async function deleteStrandedGroup({
+  redis,
+  keyPrefix,
+  groupId,
+  cutoffMs,
+}: {
+  redis: IORedis | Cluster;
+  keyPrefix: string;
+  groupId: string;
+  cutoffMs: number;
+}): Promise<boolean> {
+  const groupBase = `${keyPrefix}group:${groupId}`;
+  const deleted = await deleteStrandedGroupScript.run(
+    redis,
+    5,
+    `${groupBase}:jobs`,
+    `${groupBase}:data`,
+    `${keyPrefix}ready`,
+    `${keyPrefix}blocked`,
+    `${groupBase}:active`,
+    keyPrefix,
+    groupId,
+    cutoffMs,
+  );
+  return deleted === 1;
+}
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;

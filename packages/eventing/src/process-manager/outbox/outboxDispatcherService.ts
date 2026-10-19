@@ -1,6 +1,6 @@
 import { performance } from "node:perf_hooks";
 
-import { isProjectGone, refusesRetry } from "@langwatch/group-queue";
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
@@ -18,7 +18,11 @@ import {
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "../../metrics.ts";
-import { classifyClickHouseError, ErrorCategory } from "../../services/errorHandling.ts";
+import {
+  classifyClickHouseError,
+  ErrorCategory,
+  isProjectGone,
+} from "../../services/errorHandling.ts";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {

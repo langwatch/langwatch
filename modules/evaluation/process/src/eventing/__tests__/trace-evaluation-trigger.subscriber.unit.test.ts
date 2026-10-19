@@ -251,11 +251,13 @@ describe("createTraceEvaluationTrigger", () => {
         const event = spanEvent();
         built.folded.state = null;
 
-        await built.trigger({
-          tenantId: "tenant-1",
-          traceId: "trace-1",
-          event: { type: event.type, occurredAt: event.occurredAt },
-        });
+        await expect(
+          built.trigger({
+            tenantId: "tenant-1",
+            traceId: "trace-1",
+            event: { type: event.type, occurredAt: event.occurredAt },
+          }),
+        ).rejects.toBeInstanceOf(Error);
 
         expect(lookups).toEqual([
           {
@@ -305,12 +307,12 @@ describe("createTraceEvaluationTrigger", () => {
         expect(listMonitors).not.toHaveBeenCalled();
       });
 
-      /** @scenario "A trace whose summary never folds completes at the retry bound" */
-      it("completes at once when the delivery carries no attempt", async () => {
+      /** @scenario "A trace whose summary has not folded retries the trigger a bounded number of times" */
+      it("throws to be retried when the delivery carries no attempt", async () => {
         const { built, dispatch } = subscriber({});
         built.folded.state = null;
 
-        await expect(deliver(built)).resolves.toBeUndefined();
+        await expect(deliver(built)).rejects.toBeInstanceOf(Error);
         expect(dispatch.sent).toEqual([]);
       });
     });
@@ -323,6 +325,26 @@ describe("createTraceEvaluationTrigger", () => {
         const { built, dispatch } = subscriber({});
 
         await run(built, spanEvent(), foldState());
+
+        expect(dispatch.sent).toHaveLength(1);
+      });
+
+      /** @scenario "A trace whose summary has folded is evaluated on any attempt" */
+      it("dispatches the evaluation on the bounding attempt", async () => {
+        const { built, dispatch } = subscriber({});
+        const event = spanEvent();
+        built.folded.state = foldState();
+
+        await built.trigger({
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          event: {
+            type: event.type,
+            occurredAt: event.occurredAt,
+            spanAttributes: isSpanReceivedEvent(event) ? event.data.span.attributes : undefined,
+          },
+          deliveryAttempt: TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS,
+        });
 
         expect(dispatch.sent).toHaveLength(1);
       });
