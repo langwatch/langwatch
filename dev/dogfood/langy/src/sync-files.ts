@@ -1,8 +1,8 @@
 /**
- * Reads the scenario files and the run plan file. A malformed file stops the sync before any
- * write, naming the file and the field.
+ * Reads the scenario files and the run plan files, one plan per group. A malformed file stops the
+ * sync before any write, naming the file and the field.
  */
-import { readdirSync, readFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 import type { RunPlanSpec, ScenarioParameter, ScenarioSpec } from "./sync-diff.ts";
@@ -95,14 +95,97 @@ export function parseRunPlanSpec({ raw, source }: { raw: string; source: string 
   };
 }
 
+/** The file in a group's folder that names its run plan; it is not a scenario. */
+export const GROUP_PLAN_FILE = "run-plan.json";
+
+/** One run plan and the scenario files it picks. */
+export interface ScenarioGroup {
+  plan: RunPlanSpec;
+  specs: ScenarioSpec[];
+}
+
+interface SourcedSpec {
+  source: string;
+  spec: ScenarioSpec;
+}
+
+function readSourcedSpecs({ dir, group }: { dir: string; group?: string }): SourcedSpec[] {
+  return readdirSync(dir)
+    .filter((file) => file.endsWith(".json") && file !== GROUP_PLAN_FILE)
+    .toSorted()
+    .map((file) => {
+      const source = group ? `${group}/${file}` : file;
+      return {
+        source,
+        spec: parseScenarioSpec({ raw: readFileSync(join(dir, file), "utf8"), source }),
+      };
+    });
+}
+
 /** Every `*.json` in the directory, by file name, so the plan's order follows the files. */
 export function readScenarioSpecs({ dir }: { dir: string }): ScenarioSpec[] {
-  return readdirSync(dir)
-    .filter((file) => file.endsWith(".json"))
-    .toSorted()
-    .map((file) => parseScenarioSpec({ raw: readFileSync(join(dir, file), "utf8"), source: file }));
+  return readSourcedSpecs({ dir }).map(({ spec }) => spec);
 }
 
 export function readRunPlanSpec({ file }: { file: string }): RunPlanSpec {
   return parseRunPlanSpec({ raw: readFileSync(file, "utf8"), source: file });
+}
+
+function refuseRepeats({ owners, what }: { owners: Map<string, string[]>; what: string }): void {
+  const repeated = [...owners].filter(([, sources]) => sources.length > 1);
+  if (repeated.length === 0) return;
+  const list = repeated.map(([name, sources]) => `"${name}" (${sources.join(", ")})`).join("; ");
+  throw new Error(`${what} must be unique across all groups: ${list}`);
+}
+
+/**
+ * The top-level files with the top-level plan, then one group per subfolder of `dir`, each with
+ * its own `run-plan.json`. A subfolder without one, or a scenario or plan name used twice in any
+ * groups, stops the sync before any write.
+ */
+export function readScenarioGroups({
+  dir,
+  planFile,
+}: {
+  dir: string;
+  planFile: string;
+}): ScenarioGroup[] {
+  const folders = readdirSync(dir, { withFileTypes: true })
+    .filter((entry) => entry.isDirectory())
+    .map((entry) => entry.name)
+    .toSorted();
+  const read = [
+    {
+      planSource: planFile,
+      plan: readRunPlanSpec({ file: planFile }),
+      specs: readSourcedSpecs({ dir }),
+    },
+    ...folders.map((group) => {
+      const planPath = join(dir, group, GROUP_PLAN_FILE);
+      if (!existsSync(planPath)) {
+        fail({
+          source: `${group}/`,
+          message: `has no ${GROUP_PLAN_FILE}; every group needs its own run plan`,
+        });
+      }
+      return {
+        planSource: `${group}/${GROUP_PLAN_FILE}`,
+        plan: readRunPlanSpec({ file: planPath }),
+        specs: readSourcedSpecs({ dir: join(dir, group), group }),
+      };
+    }),
+  ];
+
+  const scenarioOwners = new Map<string, string[]>();
+  const planOwners = new Map<string, string[]>();
+  for (const group of read) {
+    planOwners.set(group.plan.name, [...(planOwners.get(group.plan.name) ?? []), group.planSource]);
+    for (const { source, spec } of group.specs) {
+      scenarioOwners.set(spec.name, [...(scenarioOwners.get(spec.name) ?? []), source]);
+    }
+  }
+  refuseRepeats({ owners: scenarioOwners, what: "Scenario names" });
+  refuseRepeats({ owners: planOwners, what: "Run plan names" });
+
+  return read.map(({ plan, specs }) => ({ plan, specs: specs.map(({ spec }) => spec) }));
 }

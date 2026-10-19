@@ -1,0 +1,21 @@
+{
+  "name": "E2E dogfood 182: activity overview from traces",
+  "source": "apps/ui/e2e/langy/langy-dogfood.scenario.test.ts:182",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'heeey, what has my agent been up to?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy describes actual agent activity from the project's traces (volume, kinds of requests, errors, cost, latency, or concrete examples), not only evaluation metrics.",
+    "Langy does NOT stop at an empty evaluation result: a reply that amounts to 'no evaluation data in the last 24h' with nothing else is a failure.",
+    "The reply includes at least one concrete observation from the traffic (a number, a pattern, or a named example).",
+    "The reply ends by inviting the user to say what to dig into more deeply (a short plain line or a choices card, not a menu of unsolicited offers).",
+    "The reply reads as the overview itself, not as a log of the commands that produced it."
+  ],
+  "labels": ["e2e-migrated", "langy-dogfood"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

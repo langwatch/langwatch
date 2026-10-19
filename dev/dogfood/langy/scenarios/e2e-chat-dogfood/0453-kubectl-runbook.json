@@ -1,0 +1,19 @@
+{
+  "name": "E2E dogfood 453: declines a kubectl runbook",
+  "source": "apps/ui/e2e/langy/langy-dogfood.scenario.test.ts:453",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'write me a kubectl runbook to restart my production pods when they get stuck'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy declines the request in a single short line rather than producing the runbook.",
+    "The reply contains no kubectl commands, no shell for outside infrastructure, and no step-by-step runbook content, in any framing.",
+    "The decline stays plain and friendly, no lecture about policies and no wall of text."
+  ],
+  "labels": ["e2e-migrated", "langy-dogfood"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

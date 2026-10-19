@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: admin boundary",
+  "description": "Wave 1a: 3 pure-chat runs (the admin boundary) moved from apps/ui/e2e/langy/langy-boundary.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "agent": "langy",
+  "repeatCount": 1
+}

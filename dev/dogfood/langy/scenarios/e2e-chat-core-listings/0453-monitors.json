@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 453: lists monitors",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:453",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what monitors do I have set up?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports monitor count or a clear 'no monitors' message.",
+    "Langy doesn't pivot to evaluators or scenarios — it matched 'monitor'.",
+    "Langy doesn't ask the user to clarify what they mean by monitor."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

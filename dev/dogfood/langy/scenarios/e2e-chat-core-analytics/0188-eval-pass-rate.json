@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 188: reports the eval pass rate",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:188",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what's my eval pass rate?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returns an eval pass rate (% or fraction) or 'no data'.",
+    "Langy does not pivot to cost or latency."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

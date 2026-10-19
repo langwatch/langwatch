@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: dogfood",
+  "description": "Wave 1a: 8 pure-chat runs (the named dogfood flows) moved from apps/ui/e2e/langy/langy-dogfood.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "agent": "langy",
+  "repeatCount": 1
+}

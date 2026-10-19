@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 1415: no pagination offer",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:1415",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'show me my recent traces'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy returned trace data and stopped.",
+    "Langy did NOT offer to fetch more pages ('use this scrollId', 'want me to paginate', 'next page', etc.).",
+    "Langy did NOT ask the user how many traces they want."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

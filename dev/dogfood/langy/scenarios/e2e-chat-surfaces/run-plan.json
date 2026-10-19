@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: current surfaces",
+  "description": "Wave 1a: 5 pure-chat runs (AI Gateway, instrumentation, annotations and scenario runs) moved from apps/ui/e2e/langy/langy-current-surfaces.scenario.test.ts, against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "agent": "langy",
+  "repeatCount": 1
+}

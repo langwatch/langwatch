@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 383: lists scenarios",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:383",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. Write short, plain messages and never mention the test state. In your first message, write exactly: 'what scenario tests do I have?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports scenario count or a clear empty state.",
+    "Langy doesn't ask the user to clarify what 'scenarios' means."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which matrix world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}
