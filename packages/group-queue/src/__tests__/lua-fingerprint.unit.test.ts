@@ -57,7 +57,7 @@ const EXPECTED_CACHED_SCRIPT_SOURCES = [
   "STAGE_LUA",
   "TAKE_LUA",
   "TRANSFER_LUA",
-].toSorted();
+].toSorted((a, b) => a.localeCompare(b));
 
 /**
  * Exported `*_LUA` constants not reachable from a package entry;
@@ -68,7 +68,7 @@ const EXPECTED_UNREACHABLE_EXPORTED_LUA = [
   "CLAIMED_RECORD_HELPER_LUA",
   "GQ_BLOB_GRACE_LUA",
   "ROUTING_META_HELPER_LUA",
-].toSorted();
+].toSorted((a, b) => a.localeCompare(b));
 
 function sourceFiles(dir: string): string[] {
   return readdirSync(dir, { withFileTypes: true }).flatMap((entry) => {
@@ -82,7 +82,7 @@ function sourceFiles(dir: string): string[] {
 function scan(pattern: RegExp): string[] {
   return sourceFiles(srcDir)
     .flatMap((file) => [...readFileSync(file, "utf8").matchAll(pattern)].map((m) => m[1]!))
-    .toSorted();
+    .toSorted((a, b) => a.localeCompare(b));
 }
 
 function sha1(text: string): string {
@@ -136,8 +136,8 @@ describe("group-queue Lua fingerprint", () => {
     it("names every exported Lua constant", () => {
       const reachable = Object.keys(exportedLuaConstants());
       const inSource = scan(/export const (\w+_LUA)\b/g);
-      expect([...new Set(inSource)].toSorted()).toEqual(
-        [...reachable, ...EXPECTED_UNREACHABLE_EXPORTED_LUA].toSorted(),
+      expect([...new Set(inSource)].toSorted((a, b) => a.localeCompare(b))).toEqual(
+        [...reachable, ...EXPECTED_UNREACHABLE_EXPORTED_LUA].toSorted((a, b) => a.localeCompare(b)),
       );
     });
   });
