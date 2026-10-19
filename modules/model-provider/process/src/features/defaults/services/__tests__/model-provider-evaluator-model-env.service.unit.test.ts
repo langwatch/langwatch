@@ -133,6 +133,34 @@ describe("ModelProviderEvaluatorModelEnvService", () => {
     });
   });
 
+  describe("given a Vertex AI row serving a catalogued Gemini model and a tuned endpoint", () => {
+    const vertex = provider({
+      id: "mp_vertex",
+      provider: "vertex_ai",
+      name: "Vertex AI",
+      models: ["gemini-2.5-pro", "my-tuned-endpoint"],
+    });
+    const prepare = (model: string, maxTokens: number) =>
+      service({ vertex_ai: vertex }).prepare({
+        ...base,
+        model,
+        settings: { max_tokens: maxTokens },
+      });
+
+    /** @scenario "An evaluator's max tokens fits the model it runs on, Vertex AI included" */
+    it("sends the model's output limit, or nothing for an unknown model unless the user set it", async () => {
+      expect(await prepare("vertex_ai/gemini-2.5-pro", 128000)).toMatchObject({
+        X_LITELLM_max_tokens: "65536",
+      });
+      expect(await prepare("vertex_ai/my-tuned-endpoint", 128000)).not.toHaveProperty(
+        "X_LITELLM_max_tokens",
+      );
+      expect(await prepare("vertex_ai/my-tuned-endpoint", 4000)).toMatchObject({
+        X_LITELLM_max_tokens: "4000",
+      });
+    });
+  });
+
   describe("given an embeddings model", () => {
     it("prefixes with the embeddings namespace", async () => {
       const env = await service({ openai: provider({}) }).prepare({

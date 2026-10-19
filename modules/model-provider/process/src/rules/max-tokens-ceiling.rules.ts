@@ -7,6 +7,20 @@ type ProviderWithCustomModels = {
 /** Vertex AI serves Google's and Anthropic's models; the catalogue lists them under those names. */
 const VERTEX_AI_PUBLISHERS = ["gemini", "anthropic"] as const;
 
+/** LLM evaluators' max_tokens default (langevals `DEFAULT_MAX_TOKENS`), above most limits. */
+export const EVALUATOR_DEFAULT_MAX_TOKENS = 128_000;
+
+/** Whether to leave max_tokens out: the evaluator default, on a model whose limit is unknown. */
+export function isUnboundedEvaluatorDefault({
+  value,
+  ceiling,
+}: {
+  value: number;
+  ceiling: number | undefined;
+}): boolean {
+  return ceiling === undefined && value === EVALUATOR_DEFAULT_MAX_TOKENS;
+}
+
 /**
  * The completion-token ceiling a model may be called with: a custom model's own limit where the
  * project declared one, and the catalogue's otherwise.

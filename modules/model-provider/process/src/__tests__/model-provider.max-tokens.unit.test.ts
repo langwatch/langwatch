@@ -27,7 +27,6 @@ describe("pickMaxTokensCeiling", () => {
     );
   });
 
-  /** @scenario "An evaluator's max tokens is held to the model's output limit on Vertex AI too" */
   it("reads a Vertex AI model's limit from its Gemini or Claude catalogue entry", () => {
     const gemini = findModelById("gemini/gemini-2.5-pro")[0]?.maxCompletionTokens;
     const claude = findModelById("anthropic/claude-sonnet-4-5")[0]?.maxCompletionTokens;

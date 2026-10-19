@@ -8,7 +8,10 @@ import {
   getProjectModelProviders,
   prepareEnvKeys,
 } from "../../../rules/legacy-model-provider.rules.ts";
-import { pickMaxTokensCeiling } from "../../../rules/max-tokens-ceiling.rules.ts";
+import {
+  isUnboundedEvaluatorDefault,
+  pickMaxTokensCeiling,
+} from "../../../rules/max-tokens-ceiling.rules.ts";
 
 const GENERATION_PARAMS = [
   "temperature",
@@ -139,6 +142,8 @@ function generationParamsEnv({
     const value = settings?.[param];
     if (value === undefined || value === null) continue;
     if (param === "max_tokens" && typeof value === "number") {
+      // The provider's own default beats a 128000 budget no model may accept.
+      if (isUnboundedEvaluatorDefault({ value, ceiling: maxTokensCeiling })) continue;
       env[`${prefix}${param}`] = String(computeClampedMaxTokens(value, maxTokensCeiling));
     } else if (
       typeof value === "string" ||

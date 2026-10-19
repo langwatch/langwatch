@@ -59,11 +59,12 @@ Feature: Model Provider service
     And the service account is never sent as api_key
 
   @unit
-  Scenario: An evaluator's max tokens is held to the model's output limit on Vertex AI too
+  Scenario: An evaluator's max tokens fits the model it runs on, Vertex AI included
     Given an LLM evaluator whose max tokens is the default 128000
-    When it is prepared to run on a Gemini or Claude model served by Vertex AI
+    When it is prepared to run on a Gemini model served by Vertex AI
     Then the max tokens sent is the catalogue's output limit for that model
-    And a model the catalogue does not know keeps the value as set
+    And on a model whose limit is unknown no max tokens is sent, so the provider's default applies
+    And a max tokens the user set is still sent on that model
 
   @unit
   Scenario: The platform chain borrows the Google credential from data privacy
