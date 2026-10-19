@@ -134,7 +134,8 @@ describe("Server", () => {
         expect(Date.now() - startedAt).toBeLessThan(HTTP_DRAIN_GRACE_MS);
         expect(events).toEqual(["stores stopping", "runtime stopped", "stores stopped"]);
         expect(lines.findLine("info", "outlived the drain grace")).toBeUndefined();
-        await expect(stream.text()).rejects.toThrow();
+        // The client sees its stream cut, so it reconnects to a pod still serving.
+        await expect(stream.text()).rejects.toThrow(TypeError);
       });
     });
   });

@@ -116,7 +116,8 @@ const CALLER_STATE_CODES: ReadonlySet<string> = new Set([
 
 function isCallerStateRefusal({ message, args }: { message: string; args: readonly unknown[] }) {
   if (!/^Failed to parse state\b/.test(message)) return false;
-  const code: unknown = typeof args[0] === "object" ? Reflect.get(args[0] ?? {}, "code") : void 0;
+  const first = args[0];
+  const code = typeof first === "object" && first !== null && "code" in first ? first.code : void 0;
   return typeof code === "string" && CALLER_STATE_CODES.has(code);
 }
 
