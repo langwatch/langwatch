@@ -529,23 +529,20 @@ const storeDurationMs = histogram({
   labelNames: ["pipeline_name"],
 });
 
-export type EventSourcingStoreMetrics = {
-  eventsStored(pipelineName: string, count: number): void;
-  storeDuration(pipelineName: string, durationMs: number): void;
-};
-
-/** The two store-side series through the metrics facade: every pipeline's default sink. */
-export const EVENT_SOURCING_STORE_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: (pipelineName, count) => eventsStoredTotal.labels(pipelineName).inc(count),
-  storeDuration: (pipelineName, durationMs) =>
-    storeDurationMs.labels(pipelineName).observe(durationMs),
-};
-
-/** Records nothing, for a test that wants the store silent. */
-export const NOOP_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: () => undefined,
-  storeDuration: () => undefined,
-};
+export const incrementEventSourcingEventsStored = ({
+  pipelineName,
+  count,
+}: {
+  pipelineName: string;
+  count: number;
+}) => eventsStoredTotal.labels(pipelineName).inc(count);
+export const observeEventSourcingStoreDuration = ({
+  pipelineName,
+  durationMs,
+}: {
+  pipelineName: string;
+  durationMs: number;
+}) => storeDurationMs.labels(pipelineName).observe(durationMs);
 
 export async function withMetrics<T>({
   fn,

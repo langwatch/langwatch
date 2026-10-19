@@ -34,7 +34,7 @@ describe("EventSourcingService - Store Events Flow", () => {
     vi.restoreAllMocks();
   });
 
-  describe("when no metrics sink is configured", () => {
+  describe("when events are stored", () => {
     let meter: RecordingMeterProvider;
 
     beforeEach(() => {

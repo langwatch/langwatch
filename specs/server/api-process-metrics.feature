@@ -93,7 +93,6 @@ Feature: The standalone API process serves its own metrics
     @unit
     Scenario: Every pipeline records the events it stores and how long storing took
       Given the process metrics provider is installed
-      And a pipeline composed with no metrics sink of its own
-      When it stores a batch of events
+      When a pipeline stores a batch of events
       Then event_sourcing_events_stored_total counts the batch under the pipeline's name
       And event_sourcing_store_duration_milliseconds records one store
