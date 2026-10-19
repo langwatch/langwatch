@@ -24,6 +24,11 @@ Feature: PostHog guided onboarding events
     Then onboarding records a variant-assigned fact for that user and organization with variant "guided"
 
   @unit
+  Scenario: the welcome screen's variant inside the sign-up data is recorded too
+    When a user initializes an organization whose sign-up data carries the classic variant
+    Then onboarding records a variant-assigned fact for that user and organization with variant "classic"
+
+  @unit
   Scenario: initializing a coding-agent organization records the assigned onboarding variant too
     When a user initializes an organization with the classic variant and the coding-agent intent
     Then onboarding records a variant-assigned fact for that user and organization with variant "classic"
@@ -44,6 +49,7 @@ Feature: PostHog guided onboarding events
     Given onboarding recorded a variant-assigned fact for a user with variant "guided"
     When nurturing receives the fact twice
     Then exactly one "onboarding_variant_assigned" event is tracked for that user with variant "guided" and the organization id
+    And it carries a uuid derived from the organization, so PostHog keeps one even after the delivery claim expires
     And the person property onboarding_variant is set to "guided"
     And Customer.io receives nothing
 

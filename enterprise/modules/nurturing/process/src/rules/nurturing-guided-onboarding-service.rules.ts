@@ -292,10 +292,12 @@ export function fireOnboardingVariantAssignedPostHog({
   userId: string;
   organizationId: string;
   variant: OnboardingVariant;
-}): { userId: string; event: string; properties: Record<string, unknown> } {
+}): { userId: string; event: string; properties: Record<string, unknown>; uuid: string } {
   return {
     userId,
     event: "onboarding_variant_assigned",
+    // One per organization, so a replay after the delivery claim expires is still one event.
+    uuid: postHogUuidFor(`onboarding-variant-assigned:${organizationId}`),
     properties: {
       variant,
       ...onboardingExperimentProperties(variant),

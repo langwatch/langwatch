@@ -9,6 +9,8 @@ import userEvent from "@testing-library/user-event";
 import { type ReactNode, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GUIDED_MODEL_PROMPT_LINE } from "../panel/langy-panel-guided-model-prompt.tsx";
+
 const PROJECT_ID = "project-demo";
 
 if (typeof window !== "undefined" && !window.ResizeObserver) {
@@ -462,8 +464,7 @@ describe("given the project's model resolver fails to answer", () => {
 });
 
 const KICKOFF_BRIEF = "Guided onboarding kickoff.\nPath: llmops";
-const GUIDED_LINE =
-  "Now connect me to a model provider so I can integrate your app and start creating evals for you.";
+const GUIDED_LINE = GUIDED_MODEL_PROMPT_LINE;
 
 /** The tour has ended: the host queues the kickoff, which waits on a model. */
 function queueKickoff() {

@@ -45,6 +45,7 @@ import { describe, expect, it, vi } from "vitest";
  */
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { postHogUuidFor } from "../../rules/nurturing-guided-onboarding-service.rules.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { NurturingService } from "../../services/nurturing.service.ts";
 import { RecordNurturingSignalCommand } from "../nurturing-signal.commands.ts";
@@ -426,6 +427,7 @@ describe("nurturing's onboardingVariantAssigned peer subscriber", () => {
         {
           userId: "user-1",
           event: "onboarding_variant_assigned",
+          uuid: postHogUuidFor("onboarding-variant-assigned:org-1"),
           properties: {
             variant: "guided",
             "$feature/experiment_onboarding_langy_guided": "guided",

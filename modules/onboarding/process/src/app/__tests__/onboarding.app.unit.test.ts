@@ -425,6 +425,24 @@ describe("OnboardingModule records the onboarding variant an organization is cre
     ]);
   });
 
+  /** @scenario "the welcome screen's variant inside the sign-up data is recorded too" */
+  it("records the variant the welcome screen sends inside the sign-up data", async () => {
+    const { app } = buildApp();
+    const { variants } = connectLifecycleFacts(app);
+
+    await app.initializeOrganization(
+      {
+        orgName: "ACME",
+        signUpData: { onboardingVariant: "classic" },
+        language: "other",
+        framework: "other",
+      },
+      caller,
+    );
+
+    expect(variants).toEqual([expect.objectContaining({ userId: USER_ID, variant: "classic" })]);
+  });
+
   /** @scenario "initializing a coding-agent organization records the assigned onboarding variant too" */
   it("records the classic variant on the coding-agent track, which creates no project", async () => {
     const { app } = buildApp();

@@ -93,7 +93,7 @@ describe("landingNeedsKickoff", () => {
   });
 
   /** @scenario a landing after the model prompt was put off does nothing */
-  it("is false once the model prompt was put off, until a provider is recorded", () => {
+  it("is false once the model prompt was put off, for good", () => {
     const putOff = {
       paths: ["coding" as const],
       currentPath: "coding" as const,
@@ -102,7 +102,7 @@ describe("landingNeedsKickoff", () => {
       providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
     };
     expect(landingNeedsKickoff(putOff)).toBe(false);
-    expect(landingNeedsKickoff({ ...putOff, provider: "openai" })).toBe(true);
+    expect(landingNeedsKickoff({ ...putOff, provider: "openai" })).toBe(false);
   });
 });
 

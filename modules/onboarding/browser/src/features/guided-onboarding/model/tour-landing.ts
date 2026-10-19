@@ -51,9 +51,9 @@ export function buildKickoff({
   };
 }
 
-/** "Later" on Langy's model prompt, with no provider since: the landing leaves the panel alone. */
+/** "Later" on Langy's model prompt puts it away for good: the landing leaves the panel alone. */
 function modelPromptPutOff(state: GuidedOnboardingState): boolean {
-  return !!state.providerPromptDismissedAt && !state.provider;
+  return !!state.providerPromptDismissedAt;
 }
 
 /** The landing has a tour to run when the path has one and none ended yet. */

@@ -387,7 +387,6 @@ Feature: Guided onboarding tour
   @unit @integration
   Scenario: a landing after the model prompt was put off does nothing
     Given the user skipped the provider and pressed "Later" on Langy's model prompt
-    And no provider was recorded since
     When the host mounts on a later landing
     Then no tour runs
     And the panel is not opened and nothing is queued

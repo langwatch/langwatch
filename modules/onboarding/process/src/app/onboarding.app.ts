@@ -265,11 +265,13 @@ export class OnboardingModule implements OnboardingApiContract, IntegrationsChec
         : { ...rest, signUpData: { ...rest.signUpData, onboardingVariant } },
       by,
     );
-    if (onboardingVariant) {
+    // The welcome screen sends the variant inside the sign-up data; other callers name it on top.
+    const assignedVariant = onboardingVariant ?? rest.signUpData?.onboardingVariant;
+    if (assignedVariant) {
       await this.#variants.recordAssigned({
         organizationId: initialized.organizationId,
         userId: by.id,
-        variant: onboardingVariant,
+        variant: assignedVariant,
       });
     }
     // A null slug lands the coding-agent track on its personal portal (ADR-038 v6).
