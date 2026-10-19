@@ -13,13 +13,13 @@ import {
   type PickerQuestion,
   QUESTION_BRANCHES,
   TRUNKS,
-} from "../catalogue/index.ts";
+} from "../../catalogue/index.ts";
 import {
   type CatalogueFilters,
   filterCatalogue,
   NO_CATALOGUE_FILTERS,
   trunkCounts,
-} from "../model/catalogue-filter.ts";
+} from "../catalogue-filter.ts";
 
 const shown = (filters: Partial<CatalogueFilters>) =>
   filterCatalogue({ items: PICKER_QUESTIONS, filters: { ...NO_CATALOGUE_FILTERS, ...filters } });

@@ -28,8 +28,8 @@ export const NO_SKIP_STREAK: SkipStreak = { count: 0, slot: null };
 
 /**
  * The streak after one run's outcome. A skipped scheduled run adds a day; filed, nothing or
- * failed starts over; an operator's run and a run on a From LangWatch board are no skipped
- * day. A run for a slot no newer than the last one counted is a repeat, and is ignored.
+ * failed starts over; an operator's run, and one recorded with the retired `template_board`,
+ * are no skipped day. A run for a slot no newer than the last one counted is a repeat.
  */
 export function foldSkipStreak({
   streak,

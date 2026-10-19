@@ -6,7 +6,7 @@
 
 import type { DashboardWidgetDefinition } from "@langwatch/analytics-contract/dashboard-widget-definition";
 
-/** One widget a template places, as the chart grid in `model/chart-grid.ts` measures it. */
+/** One widget a template places, as the contract's chart grid (`chart-grid.ts`) measures it. */
 export interface BoardTemplateWidget {
   readonly key: string;
   readonly name: string;

@@ -20,7 +20,6 @@ import {
   OFF_REASON_WORDS,
   scheduleWords,
   shouldOfferDailyInsights,
-  TEMPLATE_BOARD_NOTE,
 } from "../../model/daily-run.ts";
 import { useInsightHost } from "../../model/insight-host.ts";
 import { DailyInsightsDialog } from "./daily-insights-dialog.tsx";
@@ -46,7 +45,6 @@ function DailyInsightsControl({
   }
 
   const { setting, settings } = daily;
-  const note = boardKind === "template" ? TEMPLATE_BOARD_NOTE : undefined;
   if (!daily.available || !setting) return null;
   const isOn = setting.state === "on";
   // Turning it on here would promise a run that has nothing to read.
@@ -90,7 +88,6 @@ function DailyInsightsControl({
           boardName={boardName}
           settings={settings}
           ownTimezone={daily.ownTimezone}
-          note={note}
           offer={{ onDecline: daily.decline }}
           onSubmit={daily.turnOn}
           onClose={() => setOfferClosed(true)}
@@ -101,7 +98,6 @@ function DailyInsightsControl({
           boardName={boardName}
           settings={settings}
           ownTimezone={daily.ownTimezone}
-          note={note}
           onSubmit={(next) => {
             setSettingsOpen(false);
             daily.save(next);

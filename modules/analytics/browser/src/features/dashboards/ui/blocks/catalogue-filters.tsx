@@ -4,19 +4,18 @@
  * picked chip again clears it. With them, the finder's plain search; the picker has the ask bar.
  */
 
-import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
-import { SearchInput } from "@langwatch/design-system/search-input";
-import { Activity, BadgeCheck, DollarSign, type LucideIcon, ShieldCheck } from "lucide-react";
-import type { ReactNode } from "react";
-
 import {
   AGENT_KIND_CHIP_LABELS,
   AGENT_KINDS,
   type AgentKind,
-  TRUNKS,
   type Trunk,
-} from "../../catalogue/index.ts";
-import type { TrunkCounts } from "../../model/catalogue-filter.ts";
+  type TrunkCounts,
+  TRUNKS,
+} from "@langwatch/analytics-catalogue";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { Activity, BadgeCheck, DollarSign, type LucideIcon, ShieldCheck } from "lucide-react";
+import type { ReactNode } from "react";
 
 /** One design-system palette per trunk: its chip, its icon and its section headings. */
 export const TRUNK_PALETTES: Readonly<Record<Trunk, string>> = {

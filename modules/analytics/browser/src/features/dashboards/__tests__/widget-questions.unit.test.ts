@@ -3,12 +3,11 @@
  * @see modules/dashboard/specs/dashboards-v1.feature
  */
 
+import { BOARD_LWQL_VIEWS, PICKER_SECTIONS } from "@langwatch/analytics-catalogue";
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
-import { PICKER_SECTIONS } from "../catalogue/index.ts";
 import { boardPromptDraft, boardSubject } from "../langy/model/board-langy.ts";
-import { BOARD_LWQL_VIEWS } from "../model/board-lwql-views.ts";
 import { addedWidgetSlots, boardWidgetsOf, duplicateSlot } from "../model/board-widgets.ts";
 
 const every = PICKER_SECTIONS.flatMap(({ questions }) => questions);

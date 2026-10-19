@@ -121,7 +121,6 @@ export const SKIP_REASON_WORDS: Record<InsightRunSkipReason, string> = {
   board_deleted: "this board could not be found",
   board_unreadable: "this board cannot be read in this project",
   board_empty: "this board had no widgets Langy can read",
-  template_board: "Langy cannot read From LangWatch boards yet",
 };
 
 /** "09:12" for a run today, "Oct 3" for an earlier one, read in the run's own zone. */
@@ -198,7 +197,3 @@ export function shouldOfferDailyInsights({
 }): boolean {
   return state === "undecided" && (widgetCountAtOpen ?? 0) > 0 && !closedThisVisit;
 }
-
-/** Said before a person turns a From LangWatch board on: no run can read one yet. */
-export const TEMPLATE_BOARD_NOTE =
-  "Langy cannot read From LangWatch boards yet. Until it can, a run on this board files nothing.";

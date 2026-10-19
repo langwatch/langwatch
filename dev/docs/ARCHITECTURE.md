@@ -160,6 +160,9 @@ open item of 2026-09-29).
 Analytics' filter field registry (`availableFilters` and its field types) is `modules/analytics/filters`
 (`@langwatch/analytics-filters`), an analytics-owned package, portable and framework-free on the same
 terms; analytics' browser and automation's process import it (Alex, 2026-09-30).
+The dashboards catalogue (every widget with its code, every template, the From LangWatch boards) is
+`modules/analytics/catalogue` (`@langwatch/analytics-catalogue`), analytics-owned on the same terms;
+analytics' browser, dashboard's process and insight's process import it (issue #8798).
 The unkeyed-filter detector (`findUnkeyedFilterFields`) moves to the contract that owns the filter grammar,
 and both trace search and automation triggers import it (Alex, 2026-10-05): that is
 `@langwatch/analytics-filters`, which owns `requiresKey` and which automation already imports, so trace's
