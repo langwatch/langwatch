@@ -35,7 +35,8 @@ the one copy of the catalogue the browser and the server both import. Each widge
 `template:<templateId>:<key>`, which the dashboard widget API answers read-only. A
 template id the catalogue no longer offers reads as `board_unreadable`, not `board_deleted`:
 a renamed or retired template turns its schedules off only after the skipped days, so a
-release that brings it back finds them still on.
+release that brings it back before `INSIGHT_SCHEDULE_SKIPPED_DAYS_BEFORE_OFF` (7) days finds
+them still on. After that, the person must turn each schedule on again.
 
 **The run acts as the person, as they are when it runs.** Nothing about access is
 stored. A gate asks, in this order: the project exists and takes writes, the
