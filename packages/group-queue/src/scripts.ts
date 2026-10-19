@@ -70,29 +70,27 @@ local function releaseLaneParked(kp, groupId)
   end
 end
 
--- Groups lane-parked before lane-parked-groups existed carry no count. Once per queue,
--- recount every lane set from scratch (HSET, so a park counted meanwhile is not doubled).
-local function countLaneParksOnce(kp)
-  if redis.call("SET", kp .. "lane-parked-groups:counted", "1", "NX") == false then return end
-  local counts = {}
-  for _, pauseKey in ipairs(redis.call("SMEMBERS", kp .. "parked-lanes")) do
-    for _, groupId in ipairs(redis.call("ZRANGE", kp .. "parked-lane:" .. pauseKey, 0, -1)) do
-      counts[groupId] = (counts[groupId] or 0) + 1
-    end
+-- Groups lane-parked before lane-parked-groups existed carry no count. Once per queue, the
+-- lanes paused then are remembered (SUNIONSTORE: one entry per lane, not per group), and
+-- only those are walked, until restoreUnpausedLanes drains each of them.
+local function inLaneParkedBeforeCounting(kp, groupId)
+  if redis.call("SET", kp .. "lane-parked-groups:counted", "1", "NX") then
+    redis.call("SUNIONSTORE", kp .. "uncounted-parked-lanes", kp .. "parked-lanes")
   end
-  for groupId, count in pairs(counts) do
-    redis.call("HSET", kp .. "lane-parked-groups", groupId, count)
+  for _, pauseKey in ipairs(redis.call("SMEMBERS", kp .. "uncounted-parked-lanes")) do
+    if redis.call("ZSCORE", kp .. "parked-lane:" .. pauseKey, groupId) then return true end
   end
+  return false
 end
 
 -- Whether the group sits in its tenant's parked set or in a paused lane's.
 local function isParkedGroupAt(kp, groupId)
-  countLaneParksOnce(kp)
   local tenantId = groupId
   local slashPos = string.find(groupId, "/", 1, true)
   if slashPos and slashPos > 1 then tenantId = string.sub(groupId, 1, slashPos - 1) end
   if redis.call("ZSCORE", kp .. "parked:" .. tenantId, groupId) then return true end
-  return redis.call("HEXISTS", kp .. "lane-parked-groups", groupId) == 1
+  if redis.call("HEXISTS", kp .. "lane-parked-groups", groupId) == 1 then return true end
+  return inLaneParkedBeforeCounting(kp, groupId)
 end
 
 -- The same, for the group behind jobsKey (<prefix>:gq:group:<id>:jobs); an
@@ -288,6 +286,7 @@ local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey, nowMs)
       end
       if redis.call("ZCARD", parkedKey) == 0 then
         redis.call("SREM", keyPrefix .. "parked-lanes", pauseKey)
+        redis.call("SREM", keyPrefix .. "uncounted-parked-lanes", pauseKey)
       end
     end
   end
@@ -1389,10 +1388,6 @@ if redis.call("ZSCORE", readyKey, groupId) then return 0 end
 if redis.call("EXISTS", activeKey) == 1 then return 0 end
 if redis.call("SISMEMBER", blockedKey, groupId) == 1 then return 0 end
 if isParkedGroupAt(keyPrefix, groupId) then return 0 end
--- Walked too: a group lane-parked before lane-parked-groups existed carries no count.
-for _, pauseKey in ipairs(redis.call("SMEMBERS", keyPrefix .. "parked-lanes")) do
-  if redis.call("ZSCORE", keyPrefix .. "parked-lane:" .. pauseKey, groupId) then return 0 end
-end
 local newest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
 if not newest[2] or tonumber(newest[2]) >= cutoffMs then return 0 end
 redis.call("DEL", jobsKey, dataKey)

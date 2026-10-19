@@ -208,6 +208,7 @@ describe("given a group parked behind a paused lane", () => {
       await scripts.dispatch({ nowMs: 2000, activeTtlSec: 60 });
 
       expect(await redis.hexists(`${keyPrefix()}lane-parked-groups`, laneParked)).toBe(0);
+      expect(await redis.scard(`${keyPrefix()}uncounted-parked-lanes`)).toBe(0);
       const [jobsTtl, dataTtl] = await keyTtls(laneParked);
       expect(jobsTtl).toBeGreaterThan(0);
       expect(dataTtl).toBeGreaterThan(0);
@@ -256,6 +257,7 @@ describe("given a group the reaper discovered as stranded", () => {
       enter: async () => {
         await redis.zadd(`${keyPrefix()}parked-lane:${PAUSE_KEY}`, 1000, stranded);
         await redis.sadd(`${keyPrefix()}parked-lanes`, PAUSE_KEY);
+        await redis.hincrby(`${keyPrefix()}lane-parked-groups`, stranded, 1);
       },
     },
   ])("when it enters $membership before the delete", ({ enter }) => {
