@@ -15489,6 +15489,9 @@ importers:
       '@langwatch/span-normalisation':
         specifier: workspace:*
         version: link:../../../packages/span-normalisation
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
