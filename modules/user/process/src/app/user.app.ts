@@ -687,8 +687,8 @@ export class UserModule implements UserApi {
     return this.#users.hasAnyAccount();
   }
 
-  isOldestActiveAccount(input: { userId: string }): Promise<boolean> {
-    return this.#users.isOldestActiveAccount(input);
+  isFirstCreatedAccount(input: { userId: string }): Promise<boolean> {
+    return this.#users.isFirstCreatedAccount(input);
   }
 
   /**

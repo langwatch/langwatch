@@ -376,21 +376,20 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   });
 
   describe("when accounts are created one after another and deactivated", () => {
-    /** @scenario "The install's oldest active account is answered by id" */
-    it("answers the earliest-created account still active, and none once all are retired", async () => {
+    /** @scenario "The install's first-created account is answered by id" */
+    it("answers the earliest-created account, deactivated or not, and none before any exists", async () => {
       const { users } = create();
       const at = fromDate(new Date(42));
-      await expect(users.findOldestActiveId()).resolves.toBeNull();
+      await expect(users.findFirstCreatedId()).resolves.toBeNull();
 
       const first = await users.create({ name: "First", email: "first@example.com" });
-      await expect(users.findOldestActiveId()).resolves.toBe(first.id);
+      await expect(users.findFirstCreatedId()).resolves.toBe(first.id);
 
       await users.setDeactivatedAt({ id: first.id, deactivatedAt: at });
-      const second = await users.create({ name: "Second", email: "second@example.com" });
-      await expect(users.findOldestActiveId()).resolves.toBe(second.id);
-
-      await users.setDeactivatedAt({ id: second.id, deactivatedAt: at });
-      await expect(users.findOldestActiveId()).resolves.toBeNull();
+      // A later millisecond, so creation order does not fall back to the random id order.
+      await new Promise((resolve) => setTimeout(resolve, 5));
+      await users.create({ name: "Second", email: "second@example.com" });
+      await expect(users.findFirstCreatedId()).resolves.toBe(first.id);
     });
   });
 

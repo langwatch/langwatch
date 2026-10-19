@@ -77,7 +77,7 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
   Scenario: An install with no email configured seeds the named user unverified
     Given the installation has no email configured, so no account can verify its address
     And ADMIN_EMAILS names an active user whose address was never verified
-    And that user is the install's oldest active account, the first one created
+    And that user is the install's first-created account
     And the installation has exactly one organization whose administrator is somebody else
     When the seed runs
     Then the named user is decided and recorded, and the administrator is not
@@ -89,11 +89,21 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
   @unit @operator-seed
   Scenario: With no email configured a named unverified account that signed up later waits
     Given the installation has no email configured
-    And ADMIN_EMAILS names an unverified active account that is not the install's oldest active account
+    And ADMIN_EMAILS names an unverified active account that is not the install's first-created account
     When the seed runs, or the ops:seed-platform-operators upgrade step runs
     Then nobody is granted and nothing is recorded, since anyone could have registered that address
-    And the wait reason says the named account is not the install's oldest active account
+    And the wait reason says the named account is not the install's first-created account
     And a verified user ADMIN_EMAILS also names is still seeded
+
+  # A deactivated first account never hands its place to the next sign-up (Rogerio, 2026-10-19).
+  @unit @operator-seed
+  Scenario: With no email configured a deactivated first account seeds no later unverified sign-up
+    Given the installation has no email configured
+    And the install's first-created account has been deactivated
+    And ADMIN_EMAILS names an unverified active account that signed up after it
+    When the seed runs, or the ops:seed-platform-operators upgrade step runs
+    Then nobody is granted and nothing is recorded
+    And the wait reason says the named account is not the install's first-created account, even once that one is deactivated
 
   @unit @operator-seed
   Scenario: The upgrade step grants the verified users a still-set ADMIN_EMAILS names
@@ -206,7 +216,7 @@ Feature: Platform operators are seeded once, recovered by a task and managed on 
   @unit @operator-recovery
   Scenario: With no email configured the recovery task grants an unverified account
     Given the installation has no email configured, so no account can verify its address
-    And the seed waits because the named unverified account is not the install's oldest active account
+    And the seed waits because the named unverified account is not the install's first-created account
     When grant-platform-operator runs with that account's address
     Then the account is granted by the system, since shell access naming it is the check
     And the seed's wait reason names the grant-platform-operator task

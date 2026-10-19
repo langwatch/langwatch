@@ -58,7 +58,7 @@ type PlatformOperatorsServiceOptions = Readonly<{
     AuthzApi,
     "grantPlatformOperator" | "revokePlatformOperator" | "listPlatformOperators"
   >;
-  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isOldestActiveAccount">;
+  users: Pick<UserApi, "findByEmail" | "findById" | "countUsage" | "isFirstCreatedAccount">;
   organizations: Pick<OrganizationApi, "listProvisioningSummaries" | "findAdministrators">;
   /** Whether the install has email at all: without it no account can verify its address. */
   mail: Pick<NotificationApi, "getMailDelivery">;
@@ -214,7 +214,7 @@ export class PlatformOperatorsService {
   /**
    * The `ops:seed-platform-operators` upgrade step: while nobody holds the grant, grants the
    * seedable active users a still-set ADMIN_EMAILS names (verified, or with no email configured
-   * the install's oldest active account), and answers how many. The rest stays with the seed.
+   * the install's first-created account), and answers how many. The rest stays with the seed.
    */
   async seedFromAdminEmails({
     settings,
@@ -232,7 +232,7 @@ export class PlatformOperatorsService {
 
   /**
    * Cloud never seeds; no user waits; holders decide nobody. A set ADMIN_EMAILS takes its seedable
-   * active users (with no email configured, an unverified one only as the oldest active account)
+   * active users (with no email configured, an unverified one only as the first-created account)
    * or waits, never an org admin. An empty one takes the only organization's oldest active admin.
    */
   async #decide({
@@ -275,8 +275,9 @@ export class PlatformOperatorsService {
     isLaterUnverifiedSkipped: boolean;
   }): PlatformOperatorSeedOutcome {
     const reason = isLaterUnverifiedSkipped
-      ? "the unverified account ADMIN_EMAILS names is not the install's oldest active account, " +
-        `and with no email configured only that first account is seeded unverified; ${RECOVERY_HINT}`
+      ? "the unverified account ADMIN_EMAILS names is not the install's first-created account, " +
+        "and with no email configured only that first account is seeded unverified, never a later " +
+        `one, even once the first is deactivated; ${RECOVERY_HINT}`
       : "no user named by ADMIN_EMAILS has an active account yet, verified where email is configured";
     if (this.#loggedWaitReason !== reason) {
       this.#loggedWaitReason = reason;
@@ -296,8 +297,8 @@ export class PlatformOperatorsService {
 
   /**
    * The active users the list names whose address is verified. With no email configured an
-   * unverified one counts only as the install's oldest active account, as the first user does:
-   * a later sign-up on a named address proves nothing. The account must already exist.
+   * unverified one counts only as the install's first-created account, as the first user does:
+   * a later sign-up on a named address proves nothing, even once the first one is deactivated.
    */
   async #seedableUsersNamed(adminEmails: readonly string[]): Promise<NamedSeedables> {
     const active: UserProfile[] = [];
@@ -313,7 +314,7 @@ export class PlatformOperatorsService {
     const seedable = [...verifiedIds];
     let isLaterUnverifiedSkipped = false;
     for (const user of unverified) {
-      if (await this.options.users.isOldestActiveAccount({ userId: user.id }))
+      if (await this.options.users.isFirstCreatedAccount({ userId: user.id }))
         seedable.push(user.id);
       else isLaterUnverifiedSkipped = true;
     }
