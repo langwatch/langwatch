@@ -81,10 +81,9 @@ const spooledRecordSpanSchema = z.object({
 });
 
 /**
- * Error names the spool's storage raises for an address that holds nothing: the
- * stored-object byte layer (`StoredObjectNotFoundError`, `ObjectNotFoundError`)
- * and S3's own `NoSuchKey` on the v1 path. Matched by name, since the spool is a
- * port and the error crosses the adapter that implements it.
+ * Error names the spool's storage raises for an empty address: the stored-object byte layer
+ * (`StoredObjectNotFoundError`, `ObjectNotFoundError`) and S3's `NoSuchKey` on the v1 path.
+ * Matched by name, since the error crosses the adapter that implements the spool port.
  */
 const MISSING_SPOOL_OBJECT_ERROR_NAMES: ReadonlySet<string> = new Set([
   "StoredObjectNotFoundError",
@@ -279,12 +278,9 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   }
 
   /**
-   * The command with its spooled span read back, or null when the spool object
-   * is gone. The object is deleted right after the event is stored, so a
-   * redelivered command always finds it missing; one that never was stored
-   * (expired past its lifecycle rule) cannot be rebuilt by any retry either.
-   * Either way the command completes with nothing to record, rather than
-   * spending every retry and landing in the dead letters.
+   * The command with its spooled span read back, or null when the spool object is gone
+   * (deleted once the event is stored, or expired). No retry can rebuild it, so the command
+   * completes with nothing to record instead of landing in the dead letters.
    */
   private async resolveCommandData(
     command: Command<RecordSpanCommandData>,

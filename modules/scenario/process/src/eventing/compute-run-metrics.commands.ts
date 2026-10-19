@@ -156,15 +156,10 @@ class ComputeRunMetricsAdapter implements CommandHandler<
           foldVersion: traceSummary.spanCount,
         });
 
-      // Summary exists with nothing to aggregate: no span carries a scenario
-      // role and the trace has no cost. That is the trace's settled shape, not
-      // a summary still filling in, so retrying only repeats the same read. A
-      // trace whose spans are still arriving settles later, and the
-      // span-settle reaction (`createTraceSpanMetricsSyncHandler`) computes
-      // again then. No zero-metrics event either: it would take this run's
-      // idempotency key, and the event log would drop the real metrics if a
-      // later settle found any. Role latency alone is enough to emit: a
-      // scenario trace can have role-bearing spans with latency but no cost.
+      // No role-bearing span and no cost is the trace's settled shape, so a retry repeats the
+      // read; spans still arriving settle later and `createTraceSpanMetricsSyncHandler` computes
+      // then. No zero-metrics event: it would take this run's idempotency key and the log would
+      // drop real metrics a later settle found. Role latency alone is enough to emit.
       if (
         Object.keys(roleCosts).length === 0 &&
         Object.keys(roleLatencies).length === 0 &&

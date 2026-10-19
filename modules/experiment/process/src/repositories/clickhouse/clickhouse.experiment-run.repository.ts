@@ -142,11 +142,9 @@ const parseRecord = (value: string | null): Record<string, unknown> | undefined 
 const runKey = (experimentId: string, runId: string): string => `${experimentId}:${runId}`;
 
 /**
- * Runs per enrichment query. The `(experiment, run)` pairs travel as one query
- * parameter, which `@clickhouse/client` sends in the request URL, and
- * ClickHouse refuses a form field over 128 KiB ("HTML Form Exception: Field
- * value too long"). A list read can hold 10,000 runs; 500 pairs of typical ids
- * stay well under the limit.
+ * Runs per enrichment query. The `(experiment, run)` pairs travel as one URL query parameter,
+ * and ClickHouse refuses a form field over 128 KiB ("Field value too long"). A list read can
+ * hold 10,000 runs; 500 pairs of typical ids stay well under the limit.
  */
 export const RUN_PAIRS_PER_ENRICHMENT_QUERY = 500;
 
@@ -508,10 +506,9 @@ export class ClickHouseExperimentRunRepository extends ExperimentRunRepository {
   }
 
   /**
-   * The per-evaluator breakdown and cost rows for these runs, read
-   * `RUN_PAIRS_PER_ENRICHMENT_QUERY` runs at a time so no request carries more
-   * pairs than ClickHouse accepts in one parameter. Chunks run one after the
-   * other, so a large list read holds two queries open, not forty.
+   * The per-evaluator breakdown and cost rows, read `RUN_PAIRS_PER_ENRICHMENT_QUERY` runs at a
+   * time so no parameter exceeds ClickHouse's limit. Chunks run one after the other, so a
+   * large list read holds two queries open, not forty.
    */
   private async enrichmentRowsInChunks({
     client,

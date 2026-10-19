@@ -10,15 +10,23 @@ afterEach(async () => {
   await Promise.all(activeServers.splice(0).map((server) => server.close()));
 });
 
-/** The handler this server installed: the newest listener, called directly so vitest's own never runs. */
-function newestListener(event: "unhandledRejection" | "uncaughtException") {
-  const listeners = process.listeners(event);
-  return listeners[listeners.length - 1] as unknown as (reason: unknown) => void;
+/** The rejection handler this server installed, called directly so vitest's own never runs. */
+function newestRejectionListener(): (reason: unknown) => void {
+  const listener = process.listeners("unhandledRejection").at(-1);
+  if (!listener) throw new Error("no unhandledRejection listener is installed");
+  return (reason) => listener(reason, Promise.resolve());
+}
+
+/** The exception handler this server installed, called directly so vitest's own never runs. */
+function newestExceptionListener(): (error: Error) => void {
+  const listener = process.listeners("uncaughtException").at(-1);
+  if (!listener) throw new Error("no uncaughtException listener is installed");
+  return (error) => listener(error, "uncaughtException");
 }
 
 function ownedServer() {
   const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
-  const exit = vi.fn() as unknown as (code: number) => never;
+  const exit = vi.fn<(code: number) => never>();
   const server = Server.create({ name: "fatal-test", logger, exit });
   activeServers.push(server);
   return { logger, exit };
@@ -32,7 +40,7 @@ describe("Server", () => {
         const { logger, exit } = ownedServer();
         const reason = new Error("redis blip");
 
-        newestListener("unhandledRejection")(reason);
+        newestRejectionListener()(reason);
 
         expect(logger.fatal).toHaveBeenCalledWith(
           { error: reason, event: "unhandled rejection" },
@@ -49,7 +57,7 @@ describe("Server", () => {
         const { logger, exit } = ownedServer();
         const error = new Error("boom");
 
-        newestListener("uncaughtException")(error);
+        newestExceptionListener()(error);
 
         expect(logger.fatal).toHaveBeenCalledWith(
           { error, event: "uncaught exception" },

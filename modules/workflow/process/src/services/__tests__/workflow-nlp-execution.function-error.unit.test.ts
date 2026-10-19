@@ -58,7 +58,7 @@ const executeAnswering = (answer: WorkflowNlpDispatchResponse) =>
       enrich: async (event: { event: StudioClientEvent }) => event.event,
       prepare: async (event: { event: StudioClientEvent }) => event.event,
     },
-  } as unknown as Parameters<typeof WorkflowNlpExecutionService.create>[0]).execute(input);
+  }).execute(input);
 
 const failedWith = (body: string): WorkflowNlpDispatchResponse => ({
   ok: false,
@@ -79,7 +79,9 @@ describe("WorkflowNlpExecutionService", () => {
         trace: ["line one", "line two"],
       });
 
-      await expect(executeAnswering(failedWith(body))).rejects.toThrow();
+      await expect(executeAnswering(failedWith(body))).rejects.toMatchObject({
+        code: "workflow_execution_failed",
+      });
 
       const [fields] = logger.error.mock.calls[0] ?? [];
       expect(fields).toMatchObject({
@@ -98,7 +100,9 @@ describe("WorkflowNlpExecutionService", () => {
     it("logs the status alone", async () => {
       logger.error.mockClear();
 
-      await expect(executeAnswering(failedWith("<html>bad gateway</html>"))).rejects.toThrow();
+      await expect(executeAnswering(failedWith("<html>bad gateway</html>"))).rejects.toMatchObject({
+        code: "workflow_execution_failed",
+      });
 
       const [fields] = logger.error.mock.calls[0] ?? [];
       expect(fields).toMatchObject({ status: 502 });

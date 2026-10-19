@@ -45,7 +45,7 @@ import type { Logger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -420,11 +420,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       },
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
-    if (failure !== undefined && response.status >= 400) {
-      // The handled cause, not tRPC's wrapper, so the record carries its code and fault.
-      const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
-      recordAnsweredCause(context, { error: cause, status: response.status });
-    }
+    recordTrpcFailure({ context, failure, status: response.status });
 
     return response;
   });
@@ -446,6 +442,17 @@ function trpcLanes(trpc: TrpcHost): Hono {
   app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
 
   return app;
+}
+
+/** A failed answer's handled cause, not tRPC's wrapper, so the record carries its code and fault. */
+function recordTrpcFailure({
+  context,
+  failure,
+  status,
+}: Readonly<{ context: Context; failure: unknown; status: number }>): void {
+  if (failure === undefined || status < 400) return;
+  const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
+  recordAnsweredCause(context, { error: cause, status });
 }
 
 /** httpLink posts a no-input mutation with no body; tRPC would parse it as JSON and refuse. */

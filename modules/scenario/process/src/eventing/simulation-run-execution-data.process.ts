@@ -163,11 +163,9 @@ export const finishRunIntentSchema = z.object({
   status: z.string(),
   error: z.string().optional(),
   /**
-   * When the outcome became true, in business time: the stall deadline, the
-   * cancel grace deadline, or the event that made the run unexecutable. The
-   * finished event carries it, so a run caught up long after it died is not
-   * finished "today" with trace lookups anchored months past its traces.
-   * Optional so intents already in the outbox still parse; those finish now.
+   * When the outcome became true, in business time (stall deadline, cancel grace deadline, or
+   * the event that made the run unexecutable), so a run caught up long after it died is not
+   * finished "today". Optional so intents already in the outbox parse; those finish now.
    */
   outcomeAtMs: z.number().optional(),
 });

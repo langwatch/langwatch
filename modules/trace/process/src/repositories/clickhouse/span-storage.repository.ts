@@ -173,15 +173,10 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
- * Settings for the single-span fetch paths (`fetchNormalizedSpanRow`,
- * `findSpanEvents`). Turns `query_plan_optimize_lazy_materialization` OFF
- * per-query. These reads used to force it on, so the `LIMIT 1` would defer the
- * nested `Events.*` columns past the pick. On ClickHouse 25.10 that deferred
- * read fails: `MergeTreeLazilyReader` reading `Events.Attributes` with
- * `max_rows_to_read=1` raised ATTEMPT_TO_READ_AFTER_EOF on two replicas, which
- * pages as data corruption though the parts are intact. The eager read costs
- * one granule of these columns, which the primary-key prefix (tenant, trace,
- * span) and the partition window already bound; the memory ceiling stays.
+ * Single-span fetches (`fetchNormalizedSpanRow`, `findSpanEvents`) read eagerly: on ClickHouse
+ * 25.10 a lazily deferred `Events.Attributes` read with `max_rows_to_read=1` raised
+ * ATTEMPT_TO_READ_AFTER_EOF, which pages as corruption though the parts are intact. The eager
+ * read costs one granule, already bounded by the key prefix and partition window.
  */
 const SINGLE_SPAN_FETCH_SETTINGS = {
   ...SINGLE_TRACE_READ_SETTINGS,

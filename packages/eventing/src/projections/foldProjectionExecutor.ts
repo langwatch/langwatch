@@ -131,14 +131,9 @@ function withAppliedEventIds(
 }
 
 /**
- * The token an applied set records for an event: its idempotency key, or its id
- * when it has none. The event log is keyed by idempotency key and its read keeps
- * one event per key, so two accepted events under one key (a client retry, two
- * snapshots stamped with the same client time) come back as one. An applied set
- * of ids would then hold an id no history read can ever return, and every
- * re-fold of that aggregate would report an incomplete history forever. Sets
- * committed before this recorded event ids; both are matched, see
- * `appliedTokensOf`.
+ * An event's applied-set token: its idempotency key, else its id. The log reads one event per
+ * key, so a set of ids could hold one no history read returns, and every re-fold would report
+ * an incomplete history forever. Older sets hold ids; `appliedTokensOf` matches both.
  */
 function appliedTokenOf(event: Event): string {
   return event.idempotencyKey || event.id;

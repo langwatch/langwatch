@@ -229,11 +229,9 @@ export class ClickHouseQueryClient {
   }
 
   /**
-   * Writes one batch under every policy this client was given, same order as
-   * {@link query}: the guard refuses a multi-tenant batch before it costs a
-   * slot or socket. An insert is retried in place only when the connection was refused
-   * before anything was sent; every other failure goes to the caller, whose job retries
-   * the whole write. Spec: specs/background/worker-graceful-shutdown.feature
+   * Writes one batch under every policy, in {@link query}'s order. Retried in place only when
+   * the connection was refused before anything was sent; other failures go to the caller.
+   * Spec: specs/background/worker-graceful-shutdown.feature
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);

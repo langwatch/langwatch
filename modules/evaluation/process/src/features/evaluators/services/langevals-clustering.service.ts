@@ -29,15 +29,16 @@ function excerptOf(body: string): string {
   }
 }
 
-/** The `detail.code` of a FastAPI error body, when it is one langevals is known to send. */
-function failureCodeOf(body: string): LangevalsClusteringFailureCode | undefined {
+/** `failureCode` set to a FastAPI error body's `detail.code` when langevals is known to send it. */
+function recognisedFailureCode(body: string): { failureCode?: LangevalsClusteringFailureCode } {
   let code: unknown;
   try {
     code = (JSON.parse(body) as { detail?: { code?: unknown } } | null)?.detail?.code;
   } catch {
-    return undefined;
+    return {};
   }
-  return LANGEVALS_CLUSTERING_FAILURE_CODES.find((known) => known === code);
+  const failureCode = LANGEVALS_CLUSTERING_FAILURE_CODES.find((known) => known === code);
+  return failureCode === undefined ? {} : { failureCode };
 }
 
 /** Topic clustering's langevals exchange: main's `fetchTopics*Clustering` post and read. */
@@ -82,7 +83,7 @@ export class LangevalsClusteringService {
         status: response.status,
         statusText: response.statusText,
         body: excerptOf(body),
-        failureCode: failureCodeOf(body),
+        ...recognisedFailureCode(body),
       });
     }
 

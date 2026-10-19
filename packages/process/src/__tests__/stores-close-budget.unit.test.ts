@@ -13,8 +13,13 @@ afterEach(() => {
 
 /** Stores whose close takes `closeMs`, as eventing's queue drain does. */
 function slowStores(closeMs: number): ProcessMemberSource & { closed: boolean } {
-  const source = {
+  const source: ProcessMemberSource & { closed: boolean } = {
     closed: false,
+    order: [],
+    read: () => {
+      throw new Error("these stores open no client");
+    },
+    [Symbol.asyncDispose]: () => source.close(),
     close: () =>
       new Promise<void>((resolve) => {
         setTimeout(() => {
@@ -23,7 +28,7 @@ function slowStores(closeMs: number): ProcessMemberSource & { closed: boolean } 
         }, closeMs);
       }),
   };
-  return source as unknown as ProcessMemberSource & { closed: boolean };
+  return source;
 }
 
 async function closeThroughRunner(component: ReturnType<typeof hostedStores>) {
