@@ -1,8 +1,8 @@
+import { isZodLikeError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import type { ScenarioApi, SimulationRunData } from "@langwatch/scenario-contract";
 import { TERMINAL_STATUSES } from "@langwatch/scenario-contract";
 import type { SuiteRunStateData } from "@langwatch/suite-contract";
-import { z } from "zod";
 
 import type { SuiteRepository } from "../repositories/suite.repository.ts";
 import type { SuiteRunItemCommandsService } from "./suite-run-item-commands.service.ts";
@@ -115,9 +115,11 @@ export class SuiteRunReplayService {
       });
       return data.changed ? data.runs : [];
     } catch (error) {
-      if (!(error instanceof z.ZodError)) throw error;
+      if (!isZodLikeError(error)) throw error;
+      // Issue paths only: a Zod issue can quote the stored value.
+      const unreadablePaths = error.issues.map((issue) => issue.path.map(String).join("."));
       logger.warn(
-        { error, tenantId, batchRunId: run.BatchRunId },
+        { unreadablePaths, tenantId, batchRunId: run.BatchRunId },
         "Skipped an open suite run whose scenario runs did not read",
       );
       return "unreadable";
