@@ -50,7 +50,29 @@ export const MAX_DEMANDING_TENANTS = 1000;
 // monitor thread-idle timeout hours out) is never reaped before it is due. The
 // expiry is the later of (now + window) and (latest scheduled dispatch + window).
 export const TTL_HELPER_LUA = `
+-- A parked group is live work that may wait for hours: its keys carry no TTL
+-- (specs/parked-group-retention.feature), like a blocked group's.
+local function holdGroupKeys(jobsKey, dataKey)
+  redis.call("PERSIST", jobsKey)
+  redis.call("PERSIST", dataKey)
+end
+
+-- Whether the group behind jobsKey (<prefix>:gq:group:<id>:jobs) sits in its
+-- tenant's parked set. One ZSCORE; an unrecognised key reads as not parked.
+local function isTenantParkedGroup(jobsKey)
+  local kp, groupId = string.match(jobsKey, "^(.-:gq:)group:(.+):jobs$")
+  if not kp then return false end
+  local tenantId = groupId
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then tenantId = string.sub(groupId, 1, slashPos - 1) end
+  return redis.call("ZSCORE", kp .. "parked:" .. tenantId, groupId) ~= false
+end
+
 local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+  if isTenantParkedGroup(jobsKey) then
+    holdGroupKeys(jobsKey, dataKey)
+    return
+  end
   local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
   if not latest[2] then return end
   local ttl = ${GROUP_KEY_TTL_MS}
@@ -129,6 +151,7 @@ local function parkGroup(readyKey, groupId)
   redis.call("ZREM", readyKey, groupId)
   redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
   redis.call("SADD", kp .. "parked-tenants", tenantId)
+  holdGroupKeys(kp .. "group:" .. groupId .. ":jobs", kp .. "group:" .. groupId .. ":data")
   return 1
 end
 
@@ -136,7 +159,7 @@ end
 -- due first) back into ready. Self-limiting: callers pass slots = cap - active
 -- so COMPLETE-unpark and the dispatch-tail reconcile can never over-unpark into
 -- a re-park churn (TRAP 3). Returns how many were moved.
-local function unparkUpTo(readyKey, tenantId, slots)
+local function unparkUpTo(readyKey, tenantId, slots, nowMs)
   local kp = parkKeyPrefixOf(readyKey)
   -- A paused tenant's groups stay parked OUT of the ready scan regardless of cap
   -- headroom or the cap=0 drain: pause is an explicit operator hold and must win.
@@ -158,6 +181,7 @@ local function unparkUpTo(readyKey, tenantId, slots)
   for i = 1, #members, 2 do
     redis.call("ZREM", parkedKey, members[i])
     redis.call("ZADD", readyKey, tonumber(members[i + 1]), members[i])
+    refreshGroupKeyTtl(kp .. "group:" .. members[i] .. ":jobs", kp .. "group:" .. members[i] .. ":data", nowMs)
     moved = moved + 1
   end
   if redis.call("ZCARD", parkedKey) == 0 then
@@ -190,7 +214,7 @@ local function reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
       -- backlog can't block Redis in one eval.
       slots = ${PARK_RECONCILE_MAX_DRAIN}
     end
-    unparkUpTo(readyKey, tenantId, slots)
+    unparkUpTo(readyKey, tenantId, slots, nowMs)
   end
 end
 
@@ -204,13 +228,14 @@ local function parkLaneGroup(readyKey, groupId, pauseKey)
   redis.call("ZREM", readyKey, groupId)
   redis.call("ZADD", kp .. "parked-lane:" .. pauseKey, score, groupId)
   redis.call("SADD", kp .. "parked-lanes", pauseKey)
+  holdGroupKeys(kp .. "group:" .. groupId .. ":jobs", kp .. "group:" .. groupId .. ":data")
   return 1
 end
 
 -- Restores, at their parked scores, the groups of every lane whose pause entry is
 -- gone, whoever removed it; bounded per key per eval like unparkUpTo. LT keeps an
 -- earlier score a stage wrote meanwhile; an active group's score is COMPLETE's.
-local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey, nowMs)
   for _, pauseKey in ipairs(redis.call("SMEMBERS", keyPrefix .. "parked-lanes")) do
     if redis.call("SISMEMBER", pausedJobKey, pauseKey) == 0 then
       local parkedKey = keyPrefix .. "parked-lane:" .. pauseKey
@@ -221,6 +246,8 @@ local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
         if redis.call("EXISTS", keyPrefix .. "group:" .. groupId .. ":active") == 0 then
           addToReadyOrParked(readyKey, groupId, tonumber(members[i + 1]), true)
         end
+        local groupBase = keyPrefix .. "group:" .. groupId
+        refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
       end
       if redis.call("ZCARD", parkedKey) == 0 then
         redis.call("SREM", keyPrefix .. "parked-lanes", pauseKey)
@@ -347,7 +374,7 @@ local function unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs,
       end
     end
   end
-  if best then unparkUpTo(readyKey, best, slots) end
+  if best then unparkUpTo(readyKey, best, slots, nowMs) end
 end
 `;
 
@@ -963,7 +990,7 @@ end
 
 -- Not on the reconcile cadence: an unpause restores its lane on the next dispatch.
 if redis.call("SCARD", keyPrefix .. "parked-lanes") > 0 then
-  restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+  restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey, nowMs)
 end
 
 -- Effective per-tenant cap: dynamic water-level when a budget is configured,
@@ -1306,6 +1333,7 @@ return results
 `;
 
 const COMPLETE_LUA =
+  TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
@@ -1379,7 +1407,7 @@ if staticCap > 0 then
   local tenantCap = effectiveCap(parkKeyPrefixOf(readyKey), staticCap)
   local tenantId = parkTenantOf(groupId)
   local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
-  unparkUpTo(readyKey, tenantId, tenantCap - active)
+  unparkUpTo(readyKey, tenantId, tenantCap - active, nowMs)
 end
 
 local pendingCount = redis.call("ZCARD", jobsKey)
@@ -1733,7 +1761,7 @@ if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local tenantCap = effectiveCap(parkKeyPrefixOf(readyKey), staticCap)
     local tenantId = parkTenantOf(groupId)
     local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
-    unparkUpTo(readyKey, tenantId, tenantCap - active)
+    unparkUpTo(readyKey, tenantId, tenantCap - active, nowMs)
   end
 end
 

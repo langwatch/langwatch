@@ -12,8 +12,8 @@ export const DEFAULT_GROUP_QUEUE_KEY_PREFIX = "{event-sourcing/jobs}:gq:";
 
 /**
  * A group whose jobs nothing will ever dispatch: its job zset exists but the
- * group is in none of the ready, active or blocked sets, so the dispatcher
- * never picks it up and never reclaims it.
+ * group is in none of the ready, active, blocked or parked sets, so the
+ * dispatcher never picks it up and never reclaims it.
  */
 export type StrandedGroup = Readonly<{
   groupId: string;
@@ -136,7 +136,8 @@ export async function reapStrandedGroups({
   };
 }
 
-/** All three dispatch-graph memberships absent, and the newest job stale. */
+/** Every dispatch-graph membership absent, and the newest job stale. A parked
+ *  group is live work held back by its tenant's cap or a pause, however old. */
 async function isStranded({
   redis,
   keyPrefix,
@@ -157,10 +158,36 @@ async function isStranded({
   if ((await redis.zscore(readyKey, groupId)) !== null) return false;
   if ((await redis.exists(`${keyPrefix}group:${groupId}:active`)) === 1) return false;
   if ((await redis.sismember(blockedKey, groupId)) === 1) return false;
+  if ((await redis.zscore(`${keyPrefix}parked:${tenantOf(groupId)}`, groupId)) !== null) {
+    return false;
+  }
   const newest = await redis.zrange(jobsKey, -1, -1, "WITHSCORES");
   const score = Number(newest[1]);
-  if (!Number.isFinite(score)) return false;
-  return score < cutoffMs;
+  if (!Number.isFinite(score) || score >= cutoffMs) return false;
+  return !(await isLaneParked({ redis, keyPrefix, groupId }));
+}
+
+/** The tenant segment the dispatcher parks under: everything before the first '/'. */
+function tenantOf(groupId: string): string {
+  const slash = groupId.indexOf("/");
+  return slash > 0 ? groupId.slice(0, slash) : groupId;
+}
+
+/** Asked last, of stale candidates only: a paused lane's set is keyed by the
+ *  pause entry, which the group id alone does not name. */
+async function isLaneParked({
+  redis,
+  keyPrefix,
+  groupId,
+}: {
+  redis: GroupQueueRedis;
+  keyPrefix: string;
+  groupId: string;
+}): Promise<boolean> {
+  for (const pauseKey of await redis.smembers(`${keyPrefix}parked-lanes`)) {
+    if ((await redis.zscore(`${keyPrefix}parked-lane:${pauseKey}`, groupId)) !== null) return true;
+  }
+  return false;
 }
 
 /** `SCAN`, never `KEYS`: this runs against a production Redis holding tens of

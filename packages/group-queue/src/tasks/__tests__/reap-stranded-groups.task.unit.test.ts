@@ -8,13 +8,16 @@ const NOW = 1_800_000_000_000;
 
 /**
  * A Redis double holding only what the reaper reads: the job zsets, the ready
- * zset, the blocked set, the active keys and the pending counter.
+ * zset, the blocked set, the active keys, the tenant and lane parked sets and
+ * the pending counter.
  */
 function fakeRedis(state: {
   jobs: Record<string, number[]>;
   ready?: string[];
   blocked?: string[];
   active?: string[];
+  parked?: Record<string, string[]>;
+  laneParked?: Record<string, string[]>;
 }) {
   const deleted: string[] = [];
   const written: Record<string, string> = {};
@@ -24,8 +27,19 @@ function fakeRedis(state: {
       "0",
       Object.keys(jobs).map((groupId) => `${PREFIX}group:${groupId}:jobs`),
     ]),
-    zscore: vi.fn(async (_key: string, groupId: string) =>
-      state.ready?.includes(groupId) ? "1" : null,
+    zscore: vi.fn(async (key: string, groupId: string) => {
+      const members =
+        key === `${PREFIX}ready`
+          ? state.ready
+          : key.startsWith(`${PREFIX}parked:`)
+            ? state.parked?.[key.slice(`${PREFIX}parked:`.length)]
+            : key.startsWith(`${PREFIX}parked-lane:`)
+              ? state.laneParked?.[key.slice(`${PREFIX}parked-lane:`.length)]
+              : undefined;
+      return members?.includes(groupId) ? "1" : null;
+    }),
+    smembers: vi.fn(async (key: string) =>
+      key === `${PREFIX}parked-lanes` ? Object.keys(state.laneParked ?? {}) : [],
     ),
     exists: vi.fn(async (key: string) =>
       state.active?.some((groupId) => key === `${PREFIX}group:${groupId}:active`) ? 1 : 0,
@@ -105,6 +119,34 @@ describe("reapStrandedGroups", () => {
 
       expect(report.groups).toEqual([]);
       expect(deleted).toEqual([]);
+    });
+  });
+
+  describe("when stale groups are parked at their tenant's cap or behind a paused lane", () => {
+    /** @scenario "The stranded-group reaper never deletes a parked group" */
+    it("lists neither and deletes none of their keys", async () => {
+      const { redis, deleted } = fakeRedis({
+        jobs: {
+          "project_A/fold/trace:1": [hoursAgo(30)],
+          "project_B/fold/trace:2": [hoursAgo(30)],
+          "project_C/fold/trace:3": [hoursAgo(30)],
+        },
+        parked: { project_A: ["project_A/fold/trace:1"] },
+        laneParked: { "trace_processing/projection": ["project_B/fold/trace:2"] },
+      });
+
+      const report = await reapStrandedGroups({
+        redis,
+        keyPrefix: PREFIX,
+        apply: true,
+        now: () => NOW,
+      });
+
+      expect(report.groups.map((group) => group.groupId)).toEqual(["project_C/fold/trace:3"]);
+      expect(deleted).toEqual([
+        `${PREFIX}group:project_C/fold/trace:3:jobs`,
+        `${PREFIX}group:project_C/fold/trace:3:data`,
+      ]);
     });
   });
 
