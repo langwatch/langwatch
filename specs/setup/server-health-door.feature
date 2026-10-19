@@ -96,6 +96,13 @@ Feature: The process boundary's built-in health door
       Then the response is 503 saying the process is shutting down
       And "/healthz" still answers 200
 
+    @unit
+    Scenario: An open event stream is closed at shutdown rather than waited on
+      Given a client holds an event stream open when the server closes
+      When the application drains
+      Then the stream is closed straight away
+      And the components stop without waiting out the drain grace
+
   Rule: The health door outlives every drain
 
     @unit

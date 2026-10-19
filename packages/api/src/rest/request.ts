@@ -638,9 +638,7 @@ export class RequestBodyUnreadableError extends HandledError {
       httpStatus: 400,
       fault: "customer",
       reasons: cause instanceof Error ? [cause] : [],
-      tips: [
-        "This usually means the connection closed before the body finished uploading. Send the request again.",
-      ],
+      ...remediation("request_body_unreadable"),
     });
     this.name = "RequestBodyUnreadableError";
   }

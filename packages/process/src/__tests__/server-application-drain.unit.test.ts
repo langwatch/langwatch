@@ -1,15 +1,18 @@
 import type http from "node:http";
 import type { AddressInfo } from "node:net";
 
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterEach, describe, expect, it } from "vitest";
 
+import { HTTP_DRAIN_GRACE_MS } from "../lifecycle/shutdown-deadline.ts";
 import { Server } from "../server.ts";
 
-const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn() };
+const { logger, lines } = createTestLogger();
 const activeServers: Server[] = [];
 
 afterEach(async () => {
   await Promise.all(activeServers.splice(0).map((server) => server.close()));
+  lines.length = 0;
 });
 
 function portOf(server: Server): number {
@@ -44,6 +47,12 @@ async function serverWithHeldRequest(events: string[]) {
       events.push("runtime stopped");
     },
     handler: async (request: http.IncomingMessage, response: http.ServerResponse) => {
+      if (request.url === "/stream") {
+        response.writeHead(200, { "Content-Type": "text/event-stream" });
+        response.write(": open\n\n");
+        entered();
+        return;
+      }
       if (request.url !== "/slow") {
         response.writeHead(200).end("fast");
         return;
@@ -103,6 +112,29 @@ describe("Server", () => {
         expect(late.status).toBe(503);
         await expect(late.text()).resolves.toContain("shutting down");
         expect(probe.status).toBe(200);
+      });
+    });
+  });
+
+  describe("given a client holds an event stream open when the server closes", () => {
+    describe("when the application drains", () => {
+      /** @scenario "An open event stream is closed at shutdown rather than waited on" */
+      it("closes the stream and stops the components without waiting out the grace", async () => {
+        const events: string[] = [];
+        const { server, handlerEntered } = await serverWithHeldRequest(events);
+        const port = portOf(server);
+
+        const stream = await fetch(`http://127.0.0.1:${port}/stream`, {
+          headers: { Accept: "text/event-stream" },
+        });
+        await handlerEntered;
+        const startedAt = Date.now();
+        await server.close();
+
+        expect(Date.now() - startedAt).toBeLessThan(HTTP_DRAIN_GRACE_MS);
+        expect(events).toEqual(["stores stopping", "runtime stopped", "stores stopped"]);
+        expect(lines.findLine("info", "outlived the drain grace")).toBeUndefined();
+        await expect(stream.text()).rejects.toThrow();
       });
     });
   });

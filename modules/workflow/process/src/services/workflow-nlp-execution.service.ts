@@ -73,6 +73,13 @@ const ENGINE_ERROR_TYPE_MAX = 200;
 const ENGINE_ERROR_MESSAGE_MAX = 1000;
 
 /**
+ * Error types the Lambda runtime raises itself (exit, timeout, out of memory), whose message
+ * is the runtime's own text. Any other type is the workflow's code raising, whose message can
+ * quote customer input or a credential, so only its type is logged.
+ */
+const RUNTIME_ERROR_TYPE = /^(Runtime|Sandbox)\./;
+
+/**
  * Dispatches a version that WorkflowService already resolved through injected
  * process members. The executor never owns persistence or nlpgo setup.
  */
@@ -149,7 +156,7 @@ export class WorkflowNlpExecutionService {
   /**
    * What the engine's runtime said when it raised: a Lambda FunctionError's payload names the
    * error's type and message, and without them a 502 "Unhandled" says nothing about the cause.
-   * Only those two fields are read, capped, and never the rest of the body.
+   * Only those two fields are read, capped; the message only for a runtime error type.
    */
   private static async engineFailureOf(response: {
     text(): Promise<string>;
@@ -165,7 +172,7 @@ export class WorkflowNlpExecutionService {
     const { errorType, errorMessage } = failure.data;
     return {
       ...(errorType === undefined ? {} : { errorType: errorType.slice(0, ENGINE_ERROR_TYPE_MAX) }),
-      ...(errorMessage === undefined
+      ...(errorMessage === undefined || !RUNTIME_ERROR_TYPE.test(errorType ?? "")
         ? {}
         : { errorMessage: errorMessage.slice(0, ENGINE_ERROR_MESSAGE_MAX) }),
     };

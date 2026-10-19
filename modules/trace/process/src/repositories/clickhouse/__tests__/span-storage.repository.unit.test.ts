@@ -554,6 +554,28 @@ describe("SpanStorageClickHouseRepository.findNormalizedSpanById", () => {
       });
     });
 
+    /** @scenario "A single-span read never defers its columns to the lazy reader" */
+    it("reads the span's events with lazy materialization off too", async () => {
+      const { clickhouse, repo } = readRepository();
+      clickhouse.rows = [];
+
+      await repo.findSpanEvents({
+        authorization,
+        traceId: "trace-1",
+        spanId: "span-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+
+      expect(clickhouse.queries.length).toBeGreaterThan(0);
+      for (const read of clickhouse.queries) {
+        expect(read.query).toContain('"Events.Attributes"');
+        expect(read.settings).toMatchObject({
+          query_plan_optimize_lazy_materialization: "0",
+          max_memory_usage: expect.any(String),
+        });
+      }
+    });
+
     /** @scenario "The referenced span is read back inside its own partition window" */
     it("maps the row onto the canonical span the derivation consumer expects", async () => {
       const { clickhouse, repo } = readRepository();

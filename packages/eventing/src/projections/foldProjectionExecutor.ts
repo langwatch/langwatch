@@ -139,6 +139,17 @@ function appliedTokenOf(event: Event): string {
   return event.idempotencyKey || event.id;
 }
 
+/** The events with one kept per applied token: two ids under one key are one event. */
+function uniqueByAppliedToken<E extends Event>(events: readonly E[]): E[] {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const token = appliedTokenOf(event);
+    if (seen.has(token)) return false;
+    seen.add(token);
+    return true;
+  });
+}
+
 /** Every token an applied set may hold for an event: its id and its key. */
 function appliedTokensOf(event: Event): string[] {
   const token = appliedTokenOf(event);
@@ -667,13 +678,15 @@ export class FoldProjectionExecutor {
     // Most folds follow business time. Lifecycle folds may instead select the
     // canonical accepted cursor so a backdated transition cannot jump ahead of
     // an event the log accepted first.
-    const ordered = [...matching].toSorted((a, b) => compareFoldEvents(projection, a, b));
+    const ordered = uniqueByAppliedToken(
+      [...matching].toSorted((a, b) => compareFoldEvents(projection, a, b)),
+    );
 
     const key = context.key ?? context.aggregateId;
     // Anchor the read to the batch's earliest event (any event in the batch is
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
-    // The empty/single-event batches returned above, so ordered has at least two events.
+    // The empty batch returned above, so ordered has at least one event.
     const loadContext = withReadHints({
       context,
       event: ordered[0]!,
@@ -872,12 +885,11 @@ export class FoldProjectionExecutor {
     });
     if (gap) {
       incrementEsFoldRefoldTotal(projection.name, "incomplete");
-      // A warning, not an error: the fallback below is the designed answer
-      // and nothing already folded is lost. The residual cause is a set
-      // committed before applied sets recorded idempotency keys, holding the id
-      // of an event the log collapsed into another under the same key; it ages
-      // out as the aggregate commits again.
-      logger.warn(
+      // An error: no later retry re-folds this delivery, so the state may stay
+      // out of order. Applied sets now record idempotency keys, so a set from
+      // before that, naming an id the log collapsed into its twin, is the
+      // expected residual; it ages out as the aggregate commits again.
+      logger.error(
         {
           projection: projection.name,
           aggregateId: context.aggregateId,

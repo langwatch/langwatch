@@ -153,7 +153,7 @@ describe("topic clustering langevals requests", () => {
   });
 
   describe("given langevals named the failure with a code in its error detail", () => {
-    const refusedWith = async (failureCode: LangevalsClusteringFailureCode) => {
+    const refusedWith = async (failureCode: LangevalsClusteringFailureCode | undefined) => {
       const deps = fakeRunnerDeps();
       deps.evaluations.requestTopicClustering.mockRejectedValue(
         new LangevalsClusteringError({
@@ -179,17 +179,21 @@ describe("topic clustering langevals requests", () => {
       });
     });
 
-    describe("when the provider called the request malformed", () => {
+    describe("when the refusal names no provider code, or a request the provider called malformed", () => {
       /** @scenario "A clustering service failure without a provider code stays ours" */
-      it("fails the page as a clustering-service fault", async () => {
-        expect(classifyClusteringError(await refusedWith("model_provider_bad_request"))).toEqual({
-          code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
-          isUserActionable: false,
-        });
-      });
+      it.each([undefined, "model_provider_bad_request" as const])(
+        "fails the page as a clustering-service fault (code %s)",
+        async (failureCode) => {
+          expect(classifyClusteringError(await refusedWith(failureCode))).toEqual({
+            code: CLUSTERING_ERROR_CODES.CLUSTERING_SERVICE,
+            isUserActionable: false,
+          });
+        },
+      );
     });
 
     describe("when the provider rate limited the project", () => {
+      /** @scenario "A model provider rate limit named by the clustering service is the customer's to fix" */
       it("fails the page as a provider-quota failure the customer can fix", async () => {
         expect(classifyClusteringError(await refusedWith("model_provider_rate_limited"))).toEqual({
           code: CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,

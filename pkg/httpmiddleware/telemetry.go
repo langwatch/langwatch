@@ -81,7 +81,8 @@ func Telemetry() func(http.Handler) http.Handler {
 				}
 				// A request whose context was canceled is the caller going
 				// away, not a failure of ours: nobody's fault, nothing to page.
-				if errors.Is(rec.err, context.Canceled) {
+				// Both must hold: a handler can surface a Canceled of its own.
+				if errors.Is(r.Context().Err(), context.Canceled) && errors.Is(rec.err, context.Canceled) {
 					level = zapcore.InfoLevel
 					fields = append(fields, zap.Bool("client_aborted", true))
 				}

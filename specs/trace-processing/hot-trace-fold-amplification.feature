@@ -86,6 +86,13 @@ Feature: Hot-trace fold amplification is bounded
     Then the committed applied set holds the event's idempotency key
 
   @unit
+  Scenario: A batch folds two events under one idempotency key once
+    Given a batch holding two events with different ids and one idempotency key
+    When the batch is folded
+    Then the key is folded once
+    And the committed applied set holds the key once
+
+  @unit
   Scenario: A redelivered event is recognised under its id or its idempotency key
     Given a fold whose loaded state was committed with an event's id
     When that event is delivered again

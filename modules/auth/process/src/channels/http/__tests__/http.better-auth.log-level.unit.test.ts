@@ -11,9 +11,36 @@ describe("betterAuthLogLevel", () => {
       "Invalid errorCallbackURL: https://evil.example",
       "Invalid newUserCallbackURL: /a:b",
       "Invalid redirectURL: /a~b",
-      "Failed to parse state",
     ])("writes %s down as a warning", (message) => {
       expect(betterAuthLogLevel({ level: "error", message })).toBe("warn");
+    });
+
+    /** @scenario "A return address better-auth refuses is written down as a warning, not an error" */
+    it.each(["state_not_found", "state_mismatch", "state_invalid", "state_security_mismatch"])(
+      "writes a state it could not read back with %s down as a warning",
+      (code) => {
+        const args = [Object.assign(new Error("state refused"), { code })];
+
+        expect(betterAuthLogLevel({ level: "error", message: "Failed to parse state", args })).toBe(
+          "warn",
+        );
+      },
+    );
+  });
+
+  describe("when reading a sign-in's state back fails for a reason of ours", () => {
+    /** @scenario "A return address better-auth refuses is written down as a warning, not an error" */
+    it.each([
+      [
+        "a state that could not be stored",
+        [Object.assign(new Error("db"), { code: "state_generation_error" })],
+      ],
+      ["an error that is not a state refusal", [new Error("connection refused")]],
+      ["no error at all", []],
+    ])("keeps %s at error", (_label, args) => {
+      expect(betterAuthLogLevel({ level: "error", message: "Failed to parse state", args })).toBe(
+        "error",
+      );
     });
   });
 

@@ -216,7 +216,7 @@ func TestSpendOutcomeDuration(t *testing.T) {
 	assert.GreaterOrEqual(t, rec.confirms[0].Duration, 15*time.Millisecond)
 }
 
-/** @scenario A request that names no model opens no spend record */
+/** @scenario "A request that names no model opens no spend record" */
 func TestSpendSkipsARequestThatNamesNoModel(t *testing.T) {
 	missing := errors.New("missing model")
 
@@ -224,6 +224,7 @@ func TestSpendSkipsARequestThatNamesNoModel(t *testing.T) {
 		rec := &recordingEmitter{}
 		call := spendTestCall()
 		call.Request.Model = ""
+		call.Request.Body = []byte(`{"user":"end-user-9"}`)
 		next := func(ctx context.Context, call *Call) (*domain.Response, error) {
 			return nil, missing
 		}
@@ -237,6 +238,7 @@ func TestSpendSkipsARequestThatNamesNoModel(t *testing.T) {
 		rec := &recordingEmitter{}
 		call := spendTestCall()
 		call.Request.Model = ""
+		call.Request.Body = []byte(`{"user":"end-user-9"}`)
 		next := func(ctx context.Context, call *Call) (domain.StreamIterator, error) {
 			return nil, missing
 		}

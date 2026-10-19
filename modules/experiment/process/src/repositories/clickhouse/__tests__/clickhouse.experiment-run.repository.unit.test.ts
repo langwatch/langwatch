@@ -170,7 +170,15 @@ describe("ClickHouseExperimentRunRepository", () => {
                       evaluationsAverageCost: null,
                       evaluationsAverageDuration: null,
                     }))
-                  : []) as T[],
+                  : pairs.map(([experimentId, runId]) => ({
+                      ExperimentId: experimentId,
+                      RunId: runId,
+                      EvaluatorId: "evaluator_1",
+                      EvaluatorName: "Faithfulness",
+                      avgScore: Number(runId!.slice("run_".length)) / runCount,
+                      passRate: null,
+                      hasPassedCount: 0,
+                    }))) as T[],
             };
           },
         }),
@@ -185,8 +193,12 @@ describe("ClickHouseExperimentRunRepository", () => {
       expect(pairCounts.reduce((sum, count) => sum + count, 0)).toBe(runCount * 2);
       const runs = grouped.experiment_1 ?? [];
       expect(runs).toHaveLength(runCount);
-      const last = runs.find((run) => run.runId === `run_${runCount - 1}`);
-      expect(last?.summary.datasetCost).toBe(runCount - 1);
+      // One run from each batch, each joined to its own cost and score.
+      for (const index of [0, RUN_PAIRS_PER_ENRICHMENT_QUERY, runCount - 1]) {
+        const run = runs.find((candidate) => candidate.runId === `run_${index}`);
+        expect(run?.summary.datasetCost).toBe(index);
+        expect(run?.summary.evaluations.evaluator_1?.averageScore).toBe(index / runCount);
+      }
     });
   });
 });

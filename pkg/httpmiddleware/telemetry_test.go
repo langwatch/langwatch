@@ -20,14 +20,22 @@ import (
 	"github.com/langwatch/langwatch/pkg/herr"
 )
 
-func completedLevel(t *testing.T, failure error) zapcore.Level {
+// completedLevel serves one request that fails with failure and answers the
+// level its completion line was logged at. clientGone cancels the request's
+// own context first, as a caller that disconnected does.
+func completedLevel(t *testing.T, failure error, clientGone bool) zapcore.Level {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
 	handler := Telemetry()(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		herr.WriteHTTP(w, failure)
 	}))
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	if clientGone {
+		cancel()
+	}
 	req := httptest.NewRequest(http.MethodPost, "/v1/chat/completions", nil)
-	req = req.WithContext(clog.Set(req.Context(), zap.New(core)))
+	req = req.WithContext(clog.Set(ctx, zap.New(core)))
 	handler.ServeHTTP(httptest.NewRecorder(), req)
 
 	entries := logs.FilterMessage("request_completed").All()
@@ -35,12 +43,18 @@ func completedLevel(t *testing.T, failure error) zapcore.Level {
 	return entries[0].Level
 }
 
-/** @scenario A request the client abandoned is logged at info, not as a platform fault */
+/** @scenario "A request the client abandoned is logged at info, not as a platform fault" */
 func TestTelemetry_ClientCancelLogsAtInfo(t *testing.T) {
-	assert.Equal(t, zapcore.InfoLevel, completedLevel(t, context.Canceled))
-	assert.Equal(t, zapcore.InfoLevel, completedLevel(t, fmt.Errorf("reading body: %w", context.Canceled)))
+	assert.Equal(t, zapcore.InfoLevel, completedLevel(t, context.Canceled, true))
+	wrapped := fmt.Errorf("reading body: %w", context.Canceled)
+	assert.Equal(t, zapcore.InfoLevel, completedLevel(t, wrapped, true))
+}
+
+/** @scenario "A request the client abandoned is logged at info, not as a platform fault" */
+func TestTelemetry_HandlerCancelWithTheClientStillThereLogsAtError(t *testing.T) {
+	assert.Equal(t, zapcore.ErrorLevel, completedLevel(t, context.Canceled, false))
 }
 
 func TestTelemetry_UnhandledErrorStillLogsAtError(t *testing.T) {
-	assert.Equal(t, zapcore.ErrorLevel, completedLevel(t, errors.New("boom")))
+	assert.Equal(t, zapcore.ErrorLevel, completedLevel(t, errors.New("boom"), false))
 }

@@ -196,7 +196,7 @@ describe("EventingRecordSpanAdapter", () => {
   });
 
   describe("when the spool object a command names is gone", () => {
-    /** @scenario A spooled command whose spool object is gone completes without retrying */
+    /** @scenario "A spooled command whose spool object is gone completes without retrying" */
     it.each(["StoredObjectNotFoundError", "ObjectNotFoundError", "NoSuchKey"])(
       "records nothing and completes on %s",
       async (errorName) => {
@@ -214,15 +214,16 @@ describe("EventingRecordSpanAdapter", () => {
   });
 
   describe("when reading the spool object fails for another reason", () => {
-    /** @scenario A spool read that fails for another reason is retried */
+    /** @scenario "A spool read that fails for another reason is retried" */
     it("rethrows so the queue retries the command", async () => {
       const spool = new SpoolFake();
-      spool.read.mockRejectedValueOnce(new Error("connection reset"));
+      const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET" });
+      spool.read.mockRejectedValueOnce(reset);
       const test = harness(spool);
 
       await expect(
         test.handler.handle(command(commandData({ spoolRef: "spool:v2" }))),
-      ).rejects.toThrow("connection reset");
+      ).rejects.toMatchObject({ code: "ECONNRESET" });
     });
   });
 

@@ -1,5 +1,6 @@
 import process from "node:process";
 
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { Server } from "../server.ts";
@@ -24,12 +25,15 @@ function newestExceptionListener(): (error: Error) => void {
   return (error) => listener(error, "uncaughtException");
 }
 
+/** pino's numeric error level. */
+const ERROR_LEVEL = 50;
+
 function ownedServer() {
-  const logger = { info: vi.fn(), warn: vi.fn(), error: vi.fn(), fatal: vi.fn() };
+  const { logger, lines } = createTestLogger();
   const exit = vi.fn<(code: number) => never>();
   const server = Server.create({ name: "fatal-test", logger, exit });
   activeServers.push(server);
-  return { logger, exit };
+  return { lines, exit };
 }
 
 describe("Server", () => {
@@ -37,16 +41,14 @@ describe("Server", () => {
     describe("when a promise rejection goes unhandled", () => {
       /** @scenario "An unhandled rejection is logged at fatal before the process exits" */
       it("logs it at fatal and exits 1", () => {
-        const { logger, exit } = ownedServer();
-        const reason = new Error("redis blip");
+        const { lines, exit } = ownedServer();
 
-        newestRejectionListener()(reason);
+        newestRejectionListener()(new Error("redis blip"));
 
-        expect(logger.fatal).toHaveBeenCalledWith(
-          { error: reason, event: "unhandled rejection" },
-          "fatal-test: unhandled rejection",
-        );
-        expect(logger.error).not.toHaveBeenCalled();
+        expect(lines.findLine("fatal", "fatal-test: unhandled rejection")).toMatchObject({
+          event: "unhandled rejection",
+        });
+        expect(lines.filter((line) => line.level === ERROR_LEVEL)).toEqual([]);
         expect(exit).toHaveBeenCalledWith(1);
       });
     });
@@ -54,15 +56,13 @@ describe("Server", () => {
     describe("when an exception goes uncaught", () => {
       /** @scenario "An uncaught exception is logged at fatal before the process exits" */
       it("logs it at fatal and exits 1", () => {
-        const { logger, exit } = ownedServer();
-        const error = new Error("boom");
+        const { lines, exit } = ownedServer();
 
-        newestExceptionListener()(error);
+        newestExceptionListener()(new Error("boom"));
 
-        expect(logger.fatal).toHaveBeenCalledWith(
-          { error, event: "uncaught exception" },
-          "fatal-test: uncaught exception",
-        );
+        expect(lines.findLine("fatal", "fatal-test: uncaught exception")).toMatchObject({
+          event: "uncaught exception",
+        });
         expect(exit).toHaveBeenCalledWith(1);
       });
     });

@@ -1,4 +1,5 @@
 import { hostedStores, type ProcessMemberSource } from "@langwatch/process-stores";
+import { createTestLogger } from "@langwatch/test-harness";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { GracefulShutdown } from "../lifecycle/graceful-shutdown.ts";
@@ -31,8 +32,11 @@ function slowStores(closeMs: number): ProcessMemberSource & { closed: boolean } 
   return source;
 }
 
+/** pino's numeric error level. */
+const ERROR_LEVEL = 50;
+
 async function closeThroughRunner(component: ReturnType<typeof hostedStores>) {
-  const logger = { info: vi.fn(), error: vi.fn() };
+  const { logger, lines } = createTestLogger();
   const shutdown = GracefulShutdown.create({ logger, terminating: true });
   shutdown.phase({
     name: component.name,
@@ -42,7 +46,8 @@ async function closeThroughRunner(component: ReturnType<typeof hostedStores>) {
   });
   const running = shutdown.run();
   await vi.advanceTimersByTimeAsync(40_000);
-  return { firstError: await running, logger };
+  const firstError = await running;
+  return { firstError, errorLines: lines.filter((line) => line.level === ERROR_LEVEL) };
 }
 
 describe("hostedStores", () => {
@@ -52,13 +57,13 @@ describe("hostedStores", () => {
       it("lets them finish closing instead of abandoning the phase", async () => {
         const source = slowStores(20_000);
 
-        const { firstError, logger } = await closeThroughRunner(
+        const { firstError, errorLines } = await closeThroughRunner(
           hostedStores({ source, drainTimeoutMs: 25_000 }),
         );
 
         expect(firstError).toBeUndefined();
         expect(source.closed).toBe(true);
-        expect(logger.error).not.toHaveBeenCalled();
+        expect(errorLines).toEqual([]);
       });
     });
   });
@@ -68,10 +73,12 @@ describe("hostedStores", () => {
       it("still outwaits it", async () => {
         const source = slowStores(25_000);
 
-        const { firstError } = await closeThroughRunner(hostedStores({ source }));
+        const { firstError, errorLines } = await closeThroughRunner(hostedStores({ source }));
 
         expect(firstError).toBeUndefined();
         expect(source.closed).toBe(true);
+        // A phase the runner abandoned still closes the stores late; only its error line tells.
+        expect(errorLines).toEqual([]);
       });
     });
   });

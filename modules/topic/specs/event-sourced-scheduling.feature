@@ -88,8 +88,15 @@ Feature: Event-sourced topic clustering scheduling
     And it is marked as something the customer can resolve
 
   @unit
+  Scenario: A model provider rate limit named by the clustering service is the customer's to fix
+    Given the clustering service refused a page because the model provider rate limited the key
+    When the page fails
+    Then the failure carries the provider-quota code
+    And it is marked as something the customer can resolve
+
+  @unit
   Scenario: A clustering service failure without a provider code stays ours
-    Given the clustering service refused a page with a request the provider called malformed
+    Given the clustering service refused a page with no provider code, or with a request the provider called malformed
     When the page fails
     Then the failure carries the clustering-service code
     And it is not marked as something the customer can resolve

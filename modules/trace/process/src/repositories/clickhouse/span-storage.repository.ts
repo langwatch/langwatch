@@ -174,7 +174,8 @@ const SINGLE_TRACE_READ_SETTINGS = {
 
 /**
  * Single-span fetches read eagerly: ClickHouse 25.10's lazy `Events.Attributes` read with
- * `max_rows_to_read=1` raised ATTEMPT_TO_READ_AFTER_EOF on intact parts. Eager costs one granule.
+ * `max_rows_to_read=1` raised ATTEMPT_TO_READ_AFTER_EOF on intact parts, and an eager read never
+ * enters that reader. The tenant, trace and span key prefix keeps the eager read small.
  */
 const SINGLE_SPAN_FETCH_SETTINGS = {
   ...SINGLE_TRACE_READ_SETTINGS,
@@ -1465,11 +1466,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS event_type,
                 event_attrs AS attributes
               FROM (
-                -- Single-span fetch, read eagerly: lazy materialization is
-                -- off for this read (see SINGLE_SPAN_FETCH_SETTINGS comment).
-                -- The primary-key prefix and partition window bound the
-                -- inner read to the span's granule; ARRAY JOIN unrolls the
-                -- events from the single picked row.
+                -- Single-span fetch, read eagerly so the lazy reader that
+                -- raised ATTEMPT_TO_READ_AFTER_EOF is never entered (see
+                -- SINGLE_SPAN_FETCH_SETTINGS). ARRAY JOIN unrolls the events
+                -- from the latest version of the span.
                 SELECT
                   TenantId, TraceId, SpanId,
                   "Events.Timestamp" AS Events_Timestamp,

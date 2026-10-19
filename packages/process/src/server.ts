@@ -156,6 +156,8 @@ export class Server {
   private draining = false;
   /** Application responses not yet closed; shutdown waits on them before anything stops. */
   private readonly inFlight = new Set<ServerResponse>();
+  /** Event streams: they end only when closed, so the drain closes them rather than waits. */
+  private readonly streams = new Set<ServerResponse>();
   private onIdle: (() => void) | undefined;
   /** 1 once every component started and answered ready; shared with the liveness thread. */
   private readonly readiness = new Int32Array(new SharedArrayBuffer(4));
@@ -381,7 +383,7 @@ export class Server {
       return;
     }
 
-    this.track(response);
+    this.track(request, response);
     void this.answer(
       "application",
       () => this.whenStarted(application, request, response),
@@ -389,7 +391,12 @@ export class Server {
     );
   }
 
-  private track(response: ServerResponse): void {
+  private track(request: IncomingMessage, response: ServerResponse): void {
+    if (request.headers.accept?.includes("text/event-stream")) {
+      this.streams.add(response);
+      response.once("close", () => this.streams.delete(response));
+      return;
+    }
     this.inFlight.add(response);
     response.once("close", () => {
       this.inFlight.delete(response);
@@ -414,6 +421,8 @@ export class Server {
     const sessions = upgrades?.close().catch((error: unknown) => {
       this.logger.error({ error }, `${this.name}: upgrade session teardown failed during shutdown`);
     });
+    // An event stream never finishes on its own; its client reconnects to a pod still serving.
+    for (const stream of this.streams) stream.destroy();
     const graceExpired = delay(HTTP_DRAIN_GRACE_MS, false as const, { ref: false });
     const drained = await Promise.race([this.whenIdle().then(() => true as const), graceExpired]);
     if (!drained) {

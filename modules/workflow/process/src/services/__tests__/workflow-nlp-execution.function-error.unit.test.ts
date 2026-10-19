@@ -1,18 +1,18 @@
 /** @see modules/workflow/specs/studio-lambda-stream.feature */
+import type * as TestHarness from "@langwatch/test-harness";
 import type { StudioClientEvent } from "@langwatch/workflow-contract";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const logger = vi.hoisted(() => ({
-  debug: vi.fn(),
-  info: vi.fn(),
-  warn: vi.fn(),
-  error: vi.fn(),
+const captured = vi.hoisted(() => ({
+  lines: [] as { level: number; msg?: string; [field: string]: unknown }[],
 }));
 
-vi.mock("@langwatch/observability", async (importOriginal) => ({
-  ...(await importOriginal<object>()),
-  createLogger: () => logger,
-}));
+vi.mock("@langwatch/observability", async (importOriginal) => {
+  const harness = await vi.importActual<typeof TestHarness>("@langwatch/test-harness");
+  const { logger, lines } = harness.createTestLogger();
+  captured.lines = lines;
+  return { ...(await importOriginal<object>()), createLogger: () => logger };
+});
 
 import type { WorkflowNlpDispatchResponse } from "../../app/workflow.app.ts";
 import { WorkflowNlpExecutionService } from "../workflow-nlp-execution.service.ts";
@@ -68,11 +68,19 @@ const failedWith = (body: string): WorkflowNlpDispatchResponse => ({
   text: async () => body,
 });
 
+/** pino's numeric error level. */
+const ERROR_LEVEL = 50;
+
+const errorLine = () => captured.lines.find((line) => line.level === ERROR_LEVEL);
+
 describe("WorkflowNlpExecutionService", () => {
-  describe("when the engine's function raised", () => {
+  beforeEach(() => {
+    captured.lines.length = 0;
+  });
+
+  describe("when the engine's runtime raised", () => {
     /** @scenario "A run the engine's function raised on names the cause in the log" */
     it("logs the raised error's type and capped message, and nothing else", async () => {
-      logger.error.mockClear();
       const body = JSON.stringify({
         errorType: "Runtime.ExitError",
         errorMessage: `RequestId: abc Error: Runtime exited ${"x".repeat(5000)}`,
@@ -83,31 +91,48 @@ describe("WorkflowNlpExecutionService", () => {
         code: "workflow_execution_failed",
       });
 
-      const [fields] = logger.error.mock.calls[0] ?? [];
-      expect(fields).toMatchObject({
+      const line = errorLine();
+      expect(line).toMatchObject({
         status: 502,
         statusText: "Unhandled",
         errorType: "Runtime.ExitError",
+        errorMessage: expect.stringMatching(/^RequestId: abc Error/),
       });
-      expect((fields as { errorMessage: string }).errorMessage).toMatch(/^RequestId: abc Error/);
-      expect((fields as { errorMessage: string }).errorMessage.length).toBe(1000);
-      expect(fields).not.toHaveProperty("trace");
+      expect(String(line?.errorMessage)).toHaveLength(1000);
+      expect(line).not.toHaveProperty("trace");
+    });
+  });
+
+  describe("when the workflow's own code raised", () => {
+    /** @scenario "A run whose workflow code raised logs the error type but not its message" */
+    it("logs the error type and leaves the message out", async () => {
+      const body = JSON.stringify({
+        errorType: "ValueError",
+        errorMessage: "bad input: sk-live-secret",
+      });
+
+      await expect(executeAnswering(failedWith(body))).rejects.toMatchObject({
+        code: "workflow_execution_failed",
+      });
+
+      const line = errorLine();
+      expect(line).toMatchObject({ status: 502, errorType: "ValueError" });
+      expect(line).not.toHaveProperty("errorMessage");
+      expect(JSON.stringify(captured.lines)).not.toContain("sk-live-secret");
     });
   });
 
   describe("when the failed answer is not a function error payload", () => {
     /** @scenario "A run the engine's function raised on names the cause in the log" */
     it("logs the status alone", async () => {
-      logger.error.mockClear();
-
       await expect(executeAnswering(failedWith("<html>bad gateway</html>"))).rejects.toMatchObject({
         code: "workflow_execution_failed",
       });
 
-      const [fields] = logger.error.mock.calls[0] ?? [];
-      expect(fields).toMatchObject({ status: 502 });
-      expect(fields).not.toHaveProperty("errorType");
-      expect(fields).not.toHaveProperty("errorMessage");
+      const line = errorLine();
+      expect(line).toMatchObject({ status: 502 });
+      expect(line).not.toHaveProperty("errorType");
+      expect(line).not.toHaveProperty("errorMessage");
     });
   });
 });

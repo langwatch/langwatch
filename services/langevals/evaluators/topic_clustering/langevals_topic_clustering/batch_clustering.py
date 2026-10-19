@@ -1,5 +1,5 @@
 from typing import Any, Optional
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from pydantic import BaseModel
 from langevals_topic_clustering.build_response import build_response
 from langevals_topic_clustering.topic_naming import (
@@ -21,7 +21,7 @@ from langevals_topic_clustering.types import (
     TraceWithEmbeddings,
 )
 from scipy.cluster.hierarchy import linkage, fcluster
-import litellm
+from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.batch")
@@ -92,39 +92,6 @@ class BatchClusteringParams(BaseModel):
     embeddings_litellm_params: dict[str, Any]
 
 
-def customer_failure(error: Exception) -> Optional[HTTPException]:
-    """The 4xx a failure the customer fixes answers with, or None when it is ours.
-
-    The detail carries a stable code and fixed copy, never the provider's own
-    words: those can quote part of the key that was refused.
-    """
-    if isinstance(error, litellm.exceptions.AuthenticationError):
-        return HTTPException(
-            status_code=422,
-            detail={
-                "code": "model_provider_auth_failed",
-                "message": "The model provider refused the configured API key.",
-            },
-        )
-    if isinstance(error, litellm.exceptions.RateLimitError):
-        return HTTPException(
-            status_code=429,
-            detail={
-                "code": "model_provider_rate_limited",
-                "message": "The model provider is rate limiting or out of quota for the configured key.",
-            },
-        )
-    if isinstance(error, litellm.exceptions.BadRequestError):
-        return HTTPException(
-            status_code=422,
-            detail={
-                "code": "model_provider_bad_request",
-                "message": "The model provider rejected the request for the configured model.",
-            },
-        )
-    return None
-
-
 def setup_endpoints(app: FastAPI):
     @app.post("/topics/batch_clustering")
     def topics_batch_clustering(
@@ -134,17 +101,7 @@ def setup_endpoints(app: FastAPI):
             set_log_context(project_id=params.project_id)
             logger.info("Starting batch clustering", trace_count=len(params.traces))
 
-            model = params.litellm_params.get("model")
-            if not model:
-                raise HTTPException(
-                    status_code=422,
-                    detail={
-                        "code": "model_not_configured",
-                        "message": "No model is configured for topic clustering.",
-                    },
-                )
-            if model.startswith("azure/") and params.deployment_name:
-                model = f"azure/{params.deployment_name}"
+            model = configured_model(params.litellm_params, params.deployment_name)
 
             logger.info("Generating embeddings for traces", step="1/4")
             traces_with_embeddings = fill_embeddings(
@@ -188,19 +145,10 @@ def setup_endpoints(app: FastAPI):
                 "traces": traces_to_assign,
                 "cost": cost,
             }
-        except HTTPException as e:
-            logger.warning("Batch clustering refused", status_code=e.status_code, detail=e.detail)
-            raise
         except Exception as e:
-            refusal = customer_failure(e)
-            if refusal is not None:
-                logger.warning(
-                    "Batch clustering refused by the model provider",
-                    status_code=refusal.status_code,
-                    error_type=type(e).__name__,
-                )
-                raise refusal from e
-            logger.error("Batch clustering failed", error=str(e), error_type=type(e).__name__)
-            raise HTTPException(status_code=500, detail="Batch clustering failed") from e
+            answer = failure_answer(e, logger, "Batch")
+            if answer is e:
+                raise
+            raise answer from e
         finally:
             clear_log_context()

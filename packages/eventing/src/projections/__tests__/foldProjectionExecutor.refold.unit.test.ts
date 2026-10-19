@@ -542,5 +542,22 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
       expect(eventLoader).not.toHaveBeenCalled();
       expect(result.count).toBe(3);
     });
+
+    describe("when two events in the batch share an idempotency key", () => {
+      /** @scenario "A batch folds two events under one idempotency key once" */
+      it("folds the key once", async () => {
+        const { fold, store } = makeFold({
+          storedState: { count: 1, LastEventOccurredAt: 1_000 },
+        });
+        const original = { ...eventAt(2_000), id: "evt-original", idempotencyKey: "span-key" };
+        const twin = { ...eventAt(3_000), id: "evt-twin", idempotencyKey: "span-key" };
+
+        const result = await executor.executeBatch(fold, [original, twin], context);
+
+        expect(result.count).toBe(2);
+        const committed = vi.mocked(store.store).mock.calls[0]![1];
+        expect(committed.appliedEventIds).toEqual(["span-key"]);
+      });
+    });
   });
 });
