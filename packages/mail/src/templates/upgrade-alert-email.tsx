@@ -114,12 +114,13 @@ const TechnicalStep = ({ step }: { step: FailedStep }) => {
 };
 
 /** A self-hosted operator reads what the step does; the id, error and attempts live on its page. */
-const PlainStep = ({ step }: { step: FailedStep }) => (
+const PlainStep = ({ step, isHolding }: { step: FailedStep; isHolding: boolean }) => (
   <>
     <Paragraph style={{ margin: "20px 0 2px" }}>
       <strong>{step.description ?? step.id}</strong>
     </Paragraph>
     <Muted>
+      {isHolding && "The new version waits on this step. "}
       <InlineLink href={step.url}>Open this step</InlineLink>
     </Muted>
   </>
@@ -175,7 +176,8 @@ const servingSentence = ({
   }
   if (blocking > 0) {
     const isSingleBlocking = blocking === 1;
-    return `${count} steps of the LangWatch upgrade at ${installation} didn't finish. LangWatch can't start serving the new version until the ${isSingleBlocking ? "step it waits on finishes" : `${blocking} steps it waits on finish`}; the others run in the background.`;
+    const isSingleBackground = failedSteps.length - blocking === 1;
+    return `${count} steps of the LangWatch upgrade at ${installation} didn't finish. LangWatch can't start serving the new version until the ${isSingleBlocking ? "step marked below finishes" : `${blocking} steps marked below finish`}; ${isSingleBackground ? "the other runs" : "the others run"} in the background.`;
   }
   return `${count} background ${isSingleStep ? "step" : "steps"} of the LangWatch upgrade at ${installation} didn't finish. LangWatch keeps running, but the work ${isSingleStep ? "this step does is" : "these steps do is"} not complete until ${isSingleStep ? "it finishes" : "they finish"}.`;
 };
@@ -183,13 +185,15 @@ const servingSentence = ({
 const PlainBody = (props: UpgradeAlertEmailProps) => {
   const { installation, upgradesUrl, failedSteps, runnerStopped } = props;
   const isSingleStep = failedSteps.length === 1;
+  const blocking = failedSteps.filter((step) => step.mode === "blocking").length;
+  const isMixed = blocking > 0 && blocking < failedSteps.length;
   return (
     <>
       {failedSteps.length > 0 && (
         <>
           <Paragraph>{servingSentence({ installation, failedSteps, isSingleStep })}</Paragraph>
           {failedSteps.map((step) => (
-            <PlainStep key={step.id} step={step} />
+            <PlainStep key={step.id} step={step} isHolding={isMixed && step.mode === "blocking"} />
           ))}
           <Paragraph style={{ margin: "24px 0 16px" }}>
             {`You can retry ${isSingleStep ? "the step" : "each step"} from its page. If it fails again, it is most likely a problem on our side: copy the details shown on the step page and send them to `}

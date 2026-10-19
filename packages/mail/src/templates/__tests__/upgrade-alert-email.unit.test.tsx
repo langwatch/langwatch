@@ -85,9 +85,17 @@ describe("renderUpgradeAlertEmail", () => {
         const { html } = await renderUpgradeAlertEmail(mixed);
 
         expect(html).toContain("2 steps of the LangWatch upgrade");
-        expect(html).toContain("until the step it waits on finishes");
-        expect(html).toContain("the others run in the background");
+        expect(html).toContain("until the step marked below finishes");
+        expect(html).toContain("the other runs in the background");
         expect(html).not.toContain("until they finish");
+        const marked = html.split("The new version waits on this step.");
+        expect(marked).toHaveLength(2);
+        expect(marked[0]).toContain(
+          `<strong>${mixed.failedSteps[0]?.description ?? mixed.failedSteps[0]?.id}</strong>`,
+        );
+        expect(marked[1]).toContain(
+          `<strong>${mixed.failedSteps[1]?.description ?? mixed.failedSteps[1]?.id}</strong>`,
+        );
       });
     });
 

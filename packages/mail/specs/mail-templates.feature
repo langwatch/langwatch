@@ -133,7 +133,8 @@ Feature: The transactional messages LangWatch sends
   Scenario: A self-hosted upgrade alert for mixed failures names only the blocking step as holding the new version
     Given a blocking and a background upgrade step failed on a self-hosted installation
     When the upgrade alert is rendered
-    Then it says the new version waits on the blocking step
+    Then it says the new version waits on the step marked below
+    And only the blocking step is marked as the one the new version waits on
     And it says the other step runs in the background
 
   @unit
