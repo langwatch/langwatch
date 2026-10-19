@@ -6,7 +6,7 @@ export type AgentCredentialKeptReason =
   | "config_invalid";
 
 /** A refusal an operator can fix (free a slot, add a member, rotate a secret); it fails the step. */
-export type AgentCredentialHeldReason =
+type AgentCredentialHeldReason =
   | "project_has_no_member"
   | "secret_limit_reached"
   | "secret_unreadable"

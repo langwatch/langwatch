@@ -125,6 +125,7 @@ function readRunLangwatchNamespace(value: unknown): unknown {
   } else {
     delete record.targetType;
   }
+  if (runLangwatchNamespaceSchema.safeParse(record).success) return record;
   for (const [name, field] of Object.entries(runLangwatchNamespaceSchema.shape)) {
     if (name in record && !field.safeParse(record[name]).success) delete record[name];
   }
