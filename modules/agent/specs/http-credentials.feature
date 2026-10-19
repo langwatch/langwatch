@@ -97,7 +97,8 @@ Feature: HTTP agent credentials
   Scenario: The agent credential step's report names a bounded number of agents
     Given 25 HTTP agents the step leaves in place, or 25 it holds
     When the agent credential upgrade step runs
-    Then its report and its failure name the first 20 agents and count all 25
+    Then its report names the first 20 agents and counts all 25
+    And a failure message names the first five and counts all 25
 
   @unit
   Scenario: A config the credential step produced that fails validation holds the step
