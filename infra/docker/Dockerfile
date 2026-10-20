@@ -247,6 +247,9 @@ RUN if echo "$LANGWATCH_BUILD_COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then \
 # and this stage copies neither nx.json nor the dev/nx plugins (here nx stopped at
 # "Failed to process project graph"), so each step runs its package script directly.
 # Keep this list in step with those three root scripts.
+# The application build's `!` filters exclude the 28 projects the first build already
+# built (the four dist-resolving packages and their dependencies); the `...` filters
+# reach them too, and rebuilding them cost 11s of every image build.
 RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/prisma-client run prisma:generate \
  && pnpm --filter @langwatch/evaluator-contract run generate:evaluators \
@@ -255,7 +258,7 @@ RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/langy-process run generate:setup-skill-bodies \
  && pnpm --filter "langwatch..." --filter "@langwatch/mcp-server..." --filter "@langwatch/ksuid..." --filter "@langwatch/mail..." run build \
  && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json \
- && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." run build
+ && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." --filter "@langwatch/scenario-child..." --filter "!langwatch..." --filter "!@langwatch/mcp-server..." --filter "!@langwatch/ksuid..." --filter "!@langwatch/mail..." run build
 
 # The built trees leave without node_modules: the runtime stage takes every node_modules directory
 # from prod-deps and lays these trees over them, and a link left here would replace a production one

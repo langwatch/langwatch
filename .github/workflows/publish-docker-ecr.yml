@@ -316,8 +316,12 @@ jobs:
         with:
           persist-credentials: false
 
+      # No teardown: the runner is discarded after the job, and `docker buildx
+      # rm` on a builder holding the app's layers took 79s of every app run.
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@bb05f3f5519dd87d3ba754cc423b652a5edd6d2c # v4.2.0
+        with:
+          cleanup: false
 
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -429,6 +433,9 @@ jobs:
         run: |
           set -euo pipefail
           test -n "$(ls -A "${RUNNER_TEMP}/cdn/assets")"
+          # ~1,100 small files: at the CLI's default of 10 in flight the sync
+          # took 35s, almost all of it request latency.
+          aws configure set default.s3.max_concurrent_requests 64
           aws s3 sync "${RUNNER_TEMP}/cdn/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
             --size-only --no-progress --exclude "*.map" \
             --cache-control "public, max-age=31536000, immutable"
@@ -444,6 +451,11 @@ jobs:
   # for the other three. A skipped image is re-tagged from the manifest it
   # already has, which costs a manifest PUT and no build.
   #
+  # One job looping over the four images rather than a four-way matrix: each
+  # image is a few seconds of manifest writes, and four runners queued and booted
+  # one after another added over a minute to the end of every run. A failure on
+  # one image still lets the others publish; the job fails at the end.
+  #
   # `!cancelled()` because build-and-push reports `skipped` when nothing needed
   # rebuilding, and this job still has four tags to write in that case. It brings
   # the implicit "all needs succeeded" check with it, hence the explicit results.
@@ -458,14 +470,6 @@ jobs:
     permissions:
       contents: read
       id-token: write # OIDC assume-role into the artifacts account
-    strategy:
-      fail-fast: false
-      matrix:
-        image:
-          - langwatch-app
-          - langwatch-nlp-service
-          - langwatch-langevals
-          - langwatch-gateway
     steps:
       - name: Configure AWS credentials (OIDC)
         uses: aws-actions/configure-aws-credentials@e6de054238d6b7531b4efff3b6587d9aade6a06c # v6.2.3
@@ -491,87 +495,113 @@ jobs:
       # No `:latest` here, on purpose — see the header. The SaaS pipeline owns
       # that tag on these repositories.
       - name: Publish this commit's tag
-        id: publish
         env:
-          IMAGE: ${{ matrix.image }}
-          REPO: ${{ steps.ecr.outputs.registry }}/${{ matrix.image }}
+          REGISTRY: ${{ steps.ecr.outputs.registry }}
           BUILT: ${{ needs.changes.outputs.built }}
           IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
           IS_RELEASE: ${{ needs.meta.outputs.is_release }}
           VERSION: ${{ needs.meta.outputs.version }}
-        run: |
-          set -euo pipefail
-
-          if printf '%s' "${BUILT}" | jq -e --arg i "${IMAGE}" 'index($i)' >/dev/null; then
-            # Rebuilt this run: wrap the per-arch tag in an index. Single-source
-            # `imagetools create` still writes a proper image index, so the
-            # consumer-facing tag has the same shape whether the image was
-            # rebuilt this run or re-tagged below.
-            SOURCES=("${REPO}:${IMAGE_TAG}-arm64")
-          else
-            # Not rebuilt: point this commit's tag at the index already published
-            # for the last commit that did change this image. `imagetools create`
-            # from a single index copies it, so this writes a manifest and moves
-            # no layers.
-            #
-            # Newest first, bare `git-<sha>` only. The `-arm64` tag is pushed
-            # just before its index and is a bare manifest rather than an index;
-            # matching one here would hand consumers a different media type than
-            # the tag normally carries.
-            # The lookup and the match are separate statements on purpose. With
-            # both in one pipeline, the `|| true` that keeps a no-match from
-            # tripping `set -e` also swallows a failed `describe-images` — and
-            # the job would then report success having written no tag at all.
-            # awk exits 0 on no match, so only a genuine AWS failure stops here.
-            CANDIDATES=$(aws ecr describe-images --repository-name "${IMAGE}" \
-              --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
-              --output text)
-            PREVIOUS=$(printf '%s' "${CANDIDATES}" | tr '\t' '\n' \
-              | awk '/^git-[0-9a-f]+$/ { print; exit }')
-
-            if [ -z "${PREVIOUS}" ]; then
-              # Expected until every image has been published once. A dispatch
-              # run builds all four and seeds them.
-              echo "::warning::${IMAGE} has no previous git-* manifest to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
-              exit 0
-            fi
-            echo "Re-tagging ${IMAGE} ${PREVIOUS} -> ${IMAGE_TAG} (unchanged by this commit)"
-            echo "previous=${PREVIOUS}" >> "$GITHUB_OUTPUT"
-            SOURCES=("${REPO}:${PREVIOUS}")
-          fi
-
-          docker buildx imagetools create -t "${REPO}:${IMAGE_TAG}" "${SOURCES[@]}"
-
-          TAGS="${IMAGE_TAG}"
-          if [ "${IS_RELEASE}" = "true" ]; then
-            docker buildx imagetools create -t "${REPO}:${VERSION}" "${SOURCES[@]}"
-            TAGS="${TAGS}, ${VERSION}"
-          fi
-
-          echo "Published \`${IMAGE}\` to ECR with tags: ${TAGS}" >> "$GITHUB_STEP_SUMMARY"
-
-      # A re-tagged app image needs its frontend assets under the new tag too:
-      # the deployment points LANGWATCH_ASSET_BASE at this tag. Copied inside S3
-      # from the tag it was re-tagged from; `.complete` last, as on a build.
-      - name: Copy the CDN assets to the re-tagged app image
-        if: matrix.image == 'langwatch-app' && steps.publish.outputs.previous != '' && vars.FRONTEND_ASSETS_BUCKET != ''
-        env:
           BUCKET: ${{ vars.FRONTEND_ASSETS_BUCKET }}
-          PREVIOUS: ${{ steps.publish.outputs.previous }}
-          IMAGE_TAG: ${{ needs.meta.outputs.image_tag }}
         run: |
           set -euo pipefail
-          if aws s3api head-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" >/dev/null 2>&1; then
-            echo "Assets for ${IMAGE_TAG} already on the CDN."
-            exit 0
-          fi
-          if ! aws s3api head-object --bucket "${BUCKET}" --key "${PREVIOUS}/.complete" >/dev/null; then
-            echo "::error::${PREVIOUS} has no complete CDN upload, so ${IMAGE_TAG} cannot reuse it; dispatch this workflow to rebuild langwatch-app"
+
+          # A re-tagged app image needs its frontend assets under the new tag too:
+          # the deployment points LANGWATCH_ASSET_BASE at this tag. Copied inside S3
+          # from the tag it was re-tagged from; `.complete` last, as on a build.
+          copy_cdn_assets() {
+            local previous="$1"
+            if aws s3api head-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" >/dev/null 2>&1; then
+              echo "Assets for ${IMAGE_TAG} already on the CDN."
+              return 0
+            fi
+            if ! aws s3api head-object --bucket "${BUCKET}" --key "${previous}/.complete" >/dev/null; then
+              echo "::error::${previous} has no complete CDN upload, so ${IMAGE_TAG} cannot reuse it; dispatch this workflow to rebuild langwatch-app"
+              return 1
+            fi
+            aws configure set default.s3.max_concurrent_requests 64
+            aws s3 sync "s3://${BUCKET}/${previous}/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
+              --size-only --no-progress --exclude "*.map" \
+              --cache-control "public, max-age=31536000, immutable" --metadata-directive REPLACE
+            aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
+              --cache-control "no-cache" --content-length 0 >/dev/null
+            echo "Copied CDN assets ${previous} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
+          }
+
+          # Runs in a subshell per image (see the loop), so `set -e` stops only
+          # that image.
+          publish() {
+            local image="$1" repo="${REGISTRY}/$1" previous="" sources
+
+            if printf '%s' "${BUILT}" | jq -e --arg i "${image}" 'index($i)' >/dev/null; then
+              # Rebuilt this run: wrap the per-arch tag in an index. Single-source
+              # `imagetools create` still writes a proper image index, so the
+              # consumer-facing tag has the same shape whether the image was
+              # rebuilt this run or re-tagged below.
+              sources=("${repo}:${IMAGE_TAG}-arm64")
+            else
+              # Not rebuilt: point this commit's tag at the index already published
+              # for the last commit that did change this image. `imagetools create`
+              # from a single index copies it, so this writes a manifest and moves
+              # no layers.
+              #
+              # Newest first, bare `git-<sha>` only. The `-arm64` tag is pushed
+              # just before its index and is a bare manifest rather than an index;
+              # matching one here would hand consumers a different media type than
+              # the tag normally carries.
+              # The lookup and the match are separate statements on purpose. With
+              # both in one pipeline, the `|| true` that keeps a no-match from
+              # tripping `set -e` also swallows a failed `describe-images` — and
+              # the job would then report success having written no tag at all.
+              # awk exits 0 on no match, so only a genuine AWS failure stops here.
+              local candidates
+              candidates=$(aws ecr describe-images --repository-name "${image}" \
+                --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
+                --output text)
+              previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
+                | awk '/^git-[0-9a-f]+$/ { print; exit }')
+
+              if [ -z "${previous}" ]; then
+                # Expected until every image has been published once. A dispatch
+                # run builds all four and seeds them.
+                echo "::warning::${image} has no previous git-* manifest to re-tag as ${IMAGE_TAG}; run this workflow via workflow_dispatch to seed it"
+                return 0
+              fi
+              echo "Re-tagging ${image} ${previous} -> ${IMAGE_TAG} (unchanged by this commit)"
+              sources=("${repo}:${previous}")
+            fi
+
+            docker buildx imagetools create -t "${repo}:${IMAGE_TAG}" "${sources[@]}"
+
+            local tags="${IMAGE_TAG}"
+            if [ "${IS_RELEASE}" = "true" ]; then
+              docker buildx imagetools create -t "${repo}:${VERSION}" "${sources[@]}"
+              tags="${tags}, ${VERSION}"
+            fi
+
+            echo "Published \`${image}\` to ECR with tags: ${tags}" >> "$GITHUB_STEP_SUMMARY"
+
+            if [ "${image}" = "langwatch-app" ] && [ -n "${previous}" ] && [ -n "${BUCKET}" ]; then
+              copy_cdn_assets "${previous}"
+            fi
+          }
+
+          FAILED=()
+          for IMAGE in langwatch-app langwatch-nlp-service langwatch-langevals langwatch-gateway; do
+            echo "::group::${IMAGE}"
+            # Not `if ! ( ... )`: bash ignores `set -e` inside a subshell whose
+            # status a condition tests, so a failed command would not stop it.
+            set +e
+            ( set -euo pipefail; publish "${IMAGE}" )
+            STATUS=$?
+            set -e
+            if [ "${STATUS}" -ne 0 ]; then
+              echo "::error::publishing ${IMAGE}:${IMAGE_TAG} failed"
+              FAILED+=("${IMAGE}")
+            fi
+            echo "::endgroup::"
+          done
+
+          if [ "${#FAILED[@]}" -gt 0 ]; then
+            echo "::error::not published: ${FAILED[*]}"
             exit 1
           fi
-          aws s3 sync "s3://${BUCKET}/${PREVIOUS}/assets" "s3://${BUCKET}/${IMAGE_TAG}/assets" \
-            --size-only --no-progress --exclude "*.map" \
-            --cache-control "public, max-age=31536000, immutable" --metadata-directive REPLACE
-          aws s3api put-object --bucket "${BUCKET}" --key "${IMAGE_TAG}/.complete" \
-            --cache-control "no-cache" --content-length 0 >/dev/null
-          echo "Copied CDN assets ${PREVIOUS} -> ${IMAGE_TAG}" >> "$GITHUB_STEP_SUMMARY"
