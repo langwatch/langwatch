@@ -1148,7 +1148,7 @@ describe("the agent client, given a fake platform", () => {
     /** @scenario "A setup that returns nothing sends an empty state" */
     it("sends an empty state when setup returns nothing", async () => {
       const { connection } = await connectShop((agent) => {
-        agent.scenario.setup(async () => {});
+        agent.scenario.setup(async () => undefined);
       });
 
       expect(
