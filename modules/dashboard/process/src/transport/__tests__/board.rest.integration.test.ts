@@ -163,7 +163,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
   });
 
   describe("when an API key creates a Dashboards board", () => {
-    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
     it("answers 201 with the board, lists it and takes a widget on it", async () => {
       const { widget, send } = await projectWithBothBoards();
 
@@ -190,7 +190,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
       });
     });
 
-    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    /** @scenario "AC199n Split: the public API creates and deletes Dashboards boards" */
     it("deletes it, then answers it as not found", async () => {
       const { send } = await projectWithBothBoards();
       const created = await send("boards", BOARDS, { method: "POST", body: { name: "Gone" } });
@@ -207,7 +207,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
   });
 
   describe("when a member creates their own My dashboard", () => {
-    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    /** @scenario "AC199o Split: a member's REST create follows the board scope rules" */
     it("records them as its author, at Only me, starred for them", async () => {
       const { app, send } = await projectWithBothBoards({ actor: MEMBER });
 
