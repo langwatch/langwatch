@@ -408,11 +408,12 @@ export class AnalyticsModule
     const resolveClient = (tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> =>
       sessions.resolve(tenantId);
     // Data retention owns the default retention days; a second claim refuses the process.
+    const evaluationRepository = evaluations.open({
+      defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
+    });
     const analytics = AnalyticsServiceClass.create({
       repository: setup.repositories.analytics,
-      evaluationRepository: evaluations.open({
-        defaultRetentionDays: () => setup.dependencies.retention.getPlatformDefaultRetentionDays(),
-      }),
+      evaluationRepository,
       tenantLimiter: new InProcessTenantStatementLimiter({
         maxConcurrent: setup.config.tenantAnalyticsConcurrency,
         maxQueued: TENANT_ANALYTICS_MAX_QUEUED,

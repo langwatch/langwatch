@@ -19,12 +19,7 @@ import {
   STAGING_DEPTH_REPORT_FLOOR,
 } from "./metrics.ts";
 import { isPlausibleReadyScore, MIN_PLAUSIBLE_EPOCH_MS } from "./readyScore.ts";
-import {
-  type DispatchResult,
-  type GroupStagingScripts,
-  pendingGroupsKey,
-  ROUTING_META_HELPER_LUA,
-} from "./scripts.ts";
+import { type GroupStagingScripts, pendingGroupsKey, ROUTING_META_HELPER_LUA } from "./scripts.ts";
 
 /**
  * Sample size for backlog-age gauge; samples nearest deferred groups. Bounded
@@ -118,7 +113,7 @@ export class GroupQueueMetricsCollector {
   constructor(
     private readonly params: {
       scripts: GroupStagingScripts;
-      processingQueue: fastq.queueAsPromised<DispatchResult, void>;
+      processingQueue: Pick<fastq.queueAsPromised<unknown, void>, "length">;
       redisConnection: IORedis | Cluster;
       queueName: string;
       activeJobCountFn: () => number;

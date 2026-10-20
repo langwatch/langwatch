@@ -1,6 +1,7 @@
 import {
   CachedLuaScript,
   DISCARD_FROM_DLQ_LUA,
+  DLQ_INDEX_PRUNE_LUA,
   DLQ_TTL_SECONDS,
   dlqGroupKeys,
   dlqIndexKey,
@@ -226,6 +227,7 @@ const drainGroupScript = new CachedLuaScript(DRAIN_GROUP_LUA);
 const moveToDlqScript = new CachedLuaScript(MOVE_TO_DLQ_LUA);
 const replayFromDlqScript = new CachedLuaScript(REPLAY_FROM_DLQ_LUA);
 const discardFromDlqScript = new CachedLuaScript(DISCARD_FROM_DLQ_LUA);
+const dlqIndexPruneScript = new CachedLuaScript(DLQ_INDEX_PRUNE_LUA);
 const reconcileMarkerTtlScript = new CachedLuaScript(RECONCILE_MARKER_TTL_LUA);
 const reconcileWriteScript = new CachedLuaScript(RECONCILE_WRITE_LUA);
 const pendingIndexPruneScript = new CachedLuaScript(PENDING_INDEX_PRUNE_LUA);
@@ -1228,7 +1230,7 @@ export class QueueRedisRepository extends QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await moveToDlqScript.run(
       this.redis,
-      14,
+      15,
       `${prefix}group:${params.groupId}:jobs`,
       `${prefix}group:${params.groupId}:data`,
       `${prefix}group:${params.groupId}:active`,
@@ -1243,6 +1245,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}group:${params.groupId}:strikes`,
       `${prefix}group:${params.groupId}:attempt`,
       `${prefix}group:${params.groupId}:failstreak`,
+      `${prefix}stats:total-pending`,
       params.groupId,
       String(DLQ_TTL_SECONDS),
     );
@@ -1275,15 +1278,16 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}group:${groupId}:strikes`,
       `${prefix}group:${groupId}:attempt`,
       `${prefix}group:${groupId}:failstreak`,
+      `${prefix}stats:total-pending`,
       groupId,
       String(DLQ_TTL_SECONDS),
     ]);
     for (const args of argsByIndex) {
-      moveToDlqScript.queue(pipeline, 14, ...args);
+      moveToDlqScript.queue(pipeline, 15, ...args);
     }
     const results = await QueueRedisRepository.execWithNoScriptRecovery({
       pipeline,
-      rerun: (index) => moveToDlqScript.run(this.redis, 14, ...argsByIndex[index]!),
+      rerun: (index) => moveToDlqScript.run(this.redis, 15, ...argsByIndex[index]!),
     });
     for (const [err, result] of results ?? []) {
       const moved = err ? -1 : Number(result);
@@ -1339,7 +1343,7 @@ export class QueueRedisRepository extends QueueRepository {
     const prefix = `${params.queueName}:gq:`;
     const result = await replayFromDlqScript.run(
       this.redis,
-      8,
+      9,
       dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).jobs,
       dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).data,
       dlqGroupKeys({ keyPrefix: prefix, groupId: params.groupId }).error,
@@ -1348,6 +1352,7 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}ready`,
       `${prefix}signal`,
       dlqIndexKey(prefix),
+      `${prefix}stats:total-pending`,
       params.groupId,
       String(nowInstant().epochMilliseconds),
     );
@@ -1374,15 +1379,16 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}ready`,
       `${prefix}signal`,
       dlqIndexKey(prefix),
+      `${prefix}stats:total-pending`,
       groupId,
       String(nowInstant().epochMilliseconds),
     ]);
     for (const args of argsByIndex) {
-      replayFromDlqScript.queue(pipeline, 8, ...args);
+      replayFromDlqScript.queue(pipeline, 9, ...args);
     }
     const results = await QueueRedisRepository.execWithNoScriptRecovery({
       pipeline,
-      rerun: (index) => replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+      rerun: (index) => replayFromDlqScript.run(this.redis, 9, ...argsByIndex[index]!),
     });
     for (const [err, result] of results ?? []) {
       const replayed = err ? 0 : Number(result);
@@ -1441,7 +1447,7 @@ export class QueueRedisRepository extends QueueRepository {
     await this.runOverDlqGroups({
       groupIds: params.groupIds,
       script: replayFromDlqScript,
-      keyCount: 8,
+      keyCount: 9,
       argsFor: (groupId) => [
         dlqGroupKeys({ keyPrefix: prefix, groupId }).jobs,
         dlqGroupKeys({ keyPrefix: prefix, groupId }).data,
@@ -1451,6 +1457,7 @@ export class QueueRedisRepository extends QueueRepository {
         `${prefix}ready`,
         `${prefix}signal`,
         dlqIndexKey(prefix),
+        `${prefix}stats:total-pending`,
         groupId,
         String(nowInstant().epochMilliseconds),
       ],
@@ -1575,15 +1582,16 @@ export class QueueRedisRepository extends QueueRepository {
       `${prefix}ready`,
       `${prefix}signal`,
       dlqIndexKey(prefix),
+      `${prefix}stats:total-pending`,
       groupId,
       String(nowInstant().epochMilliseconds),
     ]);
     for (const args of argsByIndex) {
-      replayFromDlqScript.queue(pipeline, 8, ...args);
+      replayFromDlqScript.queue(pipeline, 9, ...args);
     }
     const results = await QueueRedisRepository.execWithNoScriptRecovery({
       pipeline,
-      rerun: (index) => replayFromDlqScript.run(this.redis, 8, ...argsByIndex[index]!),
+      rerun: (index) => replayFromDlqScript.run(this.redis, 9, ...argsByIndex[index]!),
     });
 
     let redrivenCount = 0;
@@ -1708,18 +1716,62 @@ export class QueueRedisRepository extends QueueRepository {
       headJobIds,
     });
 
-    return members.map((groupId, i) => {
-      const errorHash = results?.[i * 3]?.[1] as Record<string, string> | null;
-      const jobCount = (results?.[i * 3 + 1]?.[1] as number) ?? 0;
-      return {
-        groupId,
-        error: errorHash?.message ?? null,
-        errorStack: errorHash?.stack ?? null,
-        pipelineName: groupPipelines.get(groupId) ?? null,
-        jobCount,
-        movedAt: errorHash?.timestamp ? parseFloat(errorHash.timestamp) : null,
-      };
+    const errorHashOf = (i: number) => results?.[i * 3]?.[1] as Record<string, string> | null;
+    const jobCountOf = (i: number) => (results?.[i * 3 + 1]?.[1] as number) ?? 0;
+    // No jobs and no error read back: a candidate the prune script confirms before removing.
+    const pruned = await this.pruneExpiredDlqGroups({
+      prefix,
+      groupIds: members.filter(
+        (_, i) => jobCountOf(i) === 0 && Object.keys(errorHashOf(i) ?? {}).length === 0,
+      ),
     });
+
+    return members.flatMap((groupId, i) => {
+      if (pruned.has(groupId)) return [];
+      const errorHash = errorHashOf(i);
+      return [
+        {
+          groupId,
+          error: errorHash?.message ?? null,
+          errorStack: errorHash?.stack ?? null,
+          pipelineName: groupPipelines.get(groupId) ?? null,
+          jobCount: jobCountOf(i),
+          movedAt: errorHash?.timestamp ? parseFloat(errorHash.timestamp) : null,
+        },
+      ];
+    });
+  }
+
+  /**
+   * Drop index members whose dead-letter entries have all expired. The script re-checks every
+   * key of each group before removing it, so an entry written since the page was read keeps
+   * its group indexed. Housekeeping only: a failure leaves the members listed.
+   */
+  private async pruneExpiredDlqGroups({
+    prefix,
+    groupIds,
+  }: {
+    prefix: string;
+    groupIds: string[];
+  }): Promise<Set<string>> {
+    if (groupIds.length === 0) return new Set();
+    const keys = groupIds.flatMap((groupId) => {
+      const { jobs, data, error } = dlqGroupKeys({ keyPrefix: prefix, groupId });
+      return [jobs, data, error];
+    });
+    try {
+      const pruned = await dlqIndexPruneScript.run(
+        this.redis,
+        1 + keys.length,
+        dlqIndexKey(prefix),
+        ...keys,
+        ...groupIds,
+      );
+      return new Set(Array.isArray(pruned) ? pruned.map(String) : []);
+    } catch (err) {
+      logger.warn({ error: err }, "Failed to prune expired groups from the dead-letter index");
+      return new Set();
+    }
   }
 
   /** The pipeline each group's head job was routed to, read from its stored envelope. */

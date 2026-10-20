@@ -1,6 +1,7 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, QueryRequest } from "@langwatch/clickhouse-client";
+import { idIndexedClientDouble } from "@langwatch/clickhouse-client/testing";
 /**
  * @vitest-environment node
  */
@@ -25,6 +26,10 @@ import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import {
+  EVALUATION_ID_INDEXES,
+  EVALUATION_SECOND_ID_INDEXES,
+} from "../../repositories/clickhouse/clickhouse.evaluation-id-indexes.database.ts";
 import { LiveEvaluationRepositories } from "../../repositories/live/live.evaluation.repositories.ts";
 import { EvaluationRetentionDaysService } from "../../services/evaluation-retention-days.service.ts";
 import { EVALUATION_TEST_CONFIG, installableEvaluation } from "./evaluation.fixture.ts";
@@ -171,11 +176,14 @@ describe("given the live run read over a tenant's retention from data retention"
     const probes: number[] = [];
     const repositories = LiveEvaluationRepositories.create({
       prisma: createApiFixture<PrismaClient>(),
-      clickhouse: createApiFixture<ClickHouseQueryClient>({
-        query: async (request) => {
-          const sinceMs = request.params?.sinceMs;
-          if (typeof sinceMs === "number") probes.push(sinceMs);
-          return { rows: [] };
+      clickhouse: idIndexedClientDouble({
+        indexes: [...EVALUATION_ID_INDEXES, ...EVALUATION_SECOND_ID_INDEXES],
+        driver: {
+          execute: async (request: QueryRequest) => {
+            const sinceMs = request.params?.sinceMs;
+            if (typeof sinceMs === "number") probes.push(sinceMs);
+            return { rows: [] };
+          },
         },
       }),
       redis: createApiFixture<RedisConnection>(),
