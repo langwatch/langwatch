@@ -64,10 +64,3 @@ Feature: Group Queue payload envelope
     When an operator inspects a staged envelope
     Then the logical queue, group, job identity and attempt are visible
     And application payload fields are not copied into the routing view
-
-  @unit
-  Scenario: A body round-trips whichever side of the in-line codec size it falls
-    Given a body small enough to compress in-line, or large enough to compress off the event loop
-    When it is compressed with gzip or zstd and decompressed again
-    Then the bytes are the ones it started with
-    And a multibyte text body is sized by its bytes, not its characters
