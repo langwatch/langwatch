@@ -3,8 +3,9 @@
 // seventeen of a hundred and sixty before this replaced it.
 // Spec: specs/ci/package-suite-integration-lane.feature, specs/ci/browser-test-lane.feature
 
-import { execFileSync, spawnSync } from "node:child_process";
+import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
+import { availableParallelism } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -215,37 +216,101 @@ export const formatMeasured = (measured: { name: string; seconds: number }[]): s
     .toSorted((a, b) => b.seconds - a.seconds || (a.name < b.name ? -1 : 1))
     .map((entry) => `${entry.name}  ${Math.round(entry.seconds)}`);
 
-/** Runs one package's scripts and reports the package's single verdict. */
-export const runPackage = (
+/** One script of one package: the unit the pool schedules. */
+export interface SuiteJob {
+  pkg: DiscoveredPackage;
+  script: string;
+}
+
+/**
+ * The lanes that may not overlap across packages. Integration files run
+ * serially against one shared datastore; a browser lane installs Chromium
+ * through apt, which holds a machine-wide lock. Everything else is `shared`.
+ */
+export const laneOf = (script: string): "integration" | "browser" | "shared" =>
+  script === "test:integration" ? "integration" : script === "test:browser" ? "browser" : "shared";
+
+/**
+ * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
+ * malformed value is an error, never a silent guess.
+ */
+export const parseConcurrency = (value: string | undefined): number => {
+  if (value === undefined || value.trim() === "") return 1;
+  const parsed = /^\d+$/.test(value.trim()) ? Number(value.trim()) : Number.NaN;
+  if (!(parsed >= 1)) {
+    throw new Error(`PACKAGE_SUITES_CONCURRENCY='${value}' is not a positive whole number.`);
+  }
+  return parsed;
+};
+
+/** Every script the gate runs, package by package; an excluded package has none. */
+export const jobsFor = (
+  packages: readonly DiscoveredPackage[],
+  excluded: Map<string, string>,
+): SuiteJob[] =>
+  packages
+    .filter((pkg) => !excluded.has(pkg.name))
+    .flatMap((pkg) => pkg.scripts.map((script) => ({ pkg, script })));
+
+/**
+ * Runs every job, at most `concurrency` at once, in the given order where it
+ * can. A package runs one script at a time, so its lanes keep their order and
+ * never share its transform cache; `integration` and `browser` hold one slot
+ * each across the whole shard. Every job runs even after one fails.
+ */
+export const runJobs = async ({
+  jobs,
+  concurrency,
+  run,
+}: {
+  jobs: readonly SuiteJob[];
+  concurrency: number;
+  run: (job: SuiteJob) => Promise<number>;
+}): Promise<Map<SuiteJob, number>> => {
+  const statuses = new Map<SuiteJob, number>();
+  const queue = [...jobs];
+  const busy = new Set<string>();
+  const running = new Set<Promise<void>>();
+  const holds = (job: SuiteJob) => {
+    const lane = laneOf(job.script);
+    return lane === "shared" ? [`package:${job.pkg.name}`] : [`package:${job.pkg.name}`, lane];
+  };
+  const nextStartable = () => queue.findIndex((job) => holds(job).every((key) => !busy.has(key)));
+  while (queue.length > 0 || running.size > 0) {
+    for (
+      let index = nextStartable();
+      running.size < concurrency && index !== -1;
+      index = nextStartable()
+    ) {
+      const [job] = queue.splice(index, 1);
+      for (const key of holds(job!)) busy.add(key);
+      const settled: Promise<void> = run(job!)
+        .catch(() => 1)
+        .then((status) => {
+          statuses.set(job!, status);
+          for (const key of holds(job!)) busy.delete(key);
+          running.delete(settled);
+        });
+      running.add(settled);
+    }
+    await Promise.race(running);
+  }
+  return statuses;
+};
+
+/** A package's single verdict from its scripts' exit codes. */
+export const outcomeOf = (
   pkg: DiscoveredPackage,
   excluded: Map<string, string>,
-  run: (name: string, script: string) => number,
-  log: (line: string) => void,
+  statusOf: (script: string) => number,
 ): SuiteOutcome => {
   const reason = excluded.get(pkg.name);
-  if (reason !== undefined) {
-    // Named out loud, never silently: an exclusion nobody can see in the log is
-    // indistinguishable from a package discovery never found.
-    log(`not run: ${pkg.name} — ${reason}`);
-    return { name: pkg.name, outcome: "skipped", reason };
-  }
-
-  // Every script runs even after one fails, so a pull request sees all of its
-  // failures at once rather than one per push. The first is what it is blamed on.
-  let failedScript: string | undefined;
-  for (const script of pkg.scripts) {
-    log(`::group::${pkg.name} (${pkg.dir}) — pnpm run ${script}`);
-    const status = run(pkg.name, script);
-    log("::endgroup::");
-    if (status !== 0 && failedScript === undefined) failedScript = script;
-  }
-
-  if (failedScript === undefined) return { name: pkg.name, outcome: "passed" };
-  log(
-    `::error::${pkg.name} failed (pnpm run ${failedScript}). Fix it, or add it to ` +
-      `.github/package-suites.excluded with a reason.`,
-  );
-  return { name: pkg.name, outcome: "failed", failedScript };
+  if (reason !== undefined) return { name: pkg.name, outcome: "skipped", reason };
+  // The first failing script in declared order is what the package is blamed on.
+  const failedScript = pkg.scripts.find((script) => statusOf(script) !== 0);
+  return failedScript === undefined
+    ? { name: pkg.name, outcome: "passed" }
+    : { name: pkg.name, outcome: "failed", failedScript };
 };
 
 export const summarise = (outcomes: SuiteOutcome[]): string[] => {
@@ -359,25 +424,97 @@ if (isEntrypoint()) {
     `Shard ${shard.index}/${shard.total}: ${assigned.length} of ${reached.length} packages, ` +
       `about ${Math.round(expected)}s of suites.`,
   );
-  // Serial on purpose. Each suite is its own vitest with its own worker pool,
-  // so several at once oversubscribe a 4-core runner and turn real results into
-  // "[vitest-pool]: Worker forks emitted error" — which looks like a broken
-  // test and is not one.
-  const measured: { name: string; seconds: number }[] = [];
-  const outcomes = assigned.map((pkg) => {
-    const startedAt = Date.now();
-    const outcome = runPackage(
-      pkg,
-      excluded,
-      (name, script) =>
-        spawnSync("pnpm", ["--filter", name, "run", script], { stdio: "inherit" }).status ?? 1,
-      (line) => console.log(line),
-    );
-    if (outcome.outcome === "passed") {
-      measured.push({ name: pkg.name, seconds: (Date.now() - startedAt) / 1000 });
-    }
-    return outcome;
+  let concurrency: number;
+  try {
+    concurrency = parseConcurrency(process.env.PACKAGE_SUITES_CONCURRENCY);
+  } catch (error) {
+    console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
+    process.exit(1);
+  }
+  for (const pkg of assigned) {
+    // Named out loud: an exclusion nobody can see reads as a package never found.
+    const reason = excluded.get(pkg.name);
+    if (reason !== undefined) console.log(`not run: ${pkg.name} — ${reason}`);
+  }
+  // Each suite is its own vitest with its own pool; several at full width
+  // oversubscribe the runner and read as "Worker forks emitted error". So the
+  // cores are shared out, unless the job already chose a worker count.
+  const env =
+    concurrency > 1 && process.env.VITEST_MAX_WORKERS === undefined
+      ? {
+          ...process.env,
+          VITEST_MAX_WORKERS: String(Math.max(1, Math.floor(availableParallelism() / concurrency))),
+        }
+      : process.env;
+  const live = concurrency === 1;
+  console.log(`Running up to ${concurrency} suite(s) at once.`);
+
+  // Buffered while running and printed whole, so two suites never interleave.
+  const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
+  for (const signal of ["SIGINT", "SIGTERM"] as const) {
+    process.once(signal, () => {
+      for (const { title, chunks } of unfinished.values()) {
+        console.log(`::group::${title} (unfinished)`);
+        process.stdout.write(Buffer.concat(chunks));
+        console.log("::endgroup::");
+      }
+      process.exit(1);
+    });
+  }
+  const secondsOf = new Map<string, number>();
+  const runScript = (job: SuiteJob): Promise<number> =>
+    new Promise((settle) => {
+      const startedAt = Date.now();
+      const title = `${job.pkg.name} (${job.pkg.dir}) — pnpm run ${job.script}`;
+      console.log(live ? `::group::${title}` : `started: ${title}`);
+      const chunks: Buffer[] = [];
+      unfinished.set(job, { title, chunks });
+      const child = spawn("pnpm", ["--filter", job.pkg.name, "run", job.script], {
+        env,
+        stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+      });
+      child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      let finished = false;
+      const finish = (status: number) => {
+        if (finished) return;
+        finished = true;
+        unfinished.delete(job);
+        const seconds = (Date.now() - startedAt) / 1000;
+        secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
+        if (!live) {
+          console.log(`::group::${title} (${Math.round(seconds)}s)`);
+          process.stdout.write(Buffer.concat(chunks));
+        }
+        console.log("::endgroup::");
+        settle(status);
+      };
+      child.on("error", () => finish(1));
+      child.on("close", (code) => finish(code ?? 1));
+    });
+
+  // Heaviest first, so the long suites are not the last ones left running alone.
+  const heaviestFirst = assigned.toSorted(
+    (a, b) => weightOf(b) - weightOf(a) || a.name.localeCompare(b.name),
+  );
+  const statuses = await runJobs({
+    jobs: jobsFor(heaviestFirst, excluded),
+    concurrency,
+    run: runScript,
   });
+  const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
+    [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
+  const outcomes = assigned.map((pkg) => outcomeOf(pkg, excluded, statusOf(pkg)));
+  const measured = outcomes
+    .filter((outcome) => outcome.outcome === "passed")
+    .map((outcome) => ({ name: outcome.name, seconds: secondsOf.get(outcome.name) ?? 0 }));
+  for (const outcome of outcomes) {
+    if (outcome.outcome !== "failed") continue;
+    console.log(
+      `::error::${outcome.name} failed (pnpm run ${outcome.failedScript}). Fix it, or add it to ` +
+        `.github/package-suites.excluded with a reason.`,
+    );
+  }
 
   const summary = summarise(outcomes);
   for (const line of summary) console.log(line);

@@ -113,3 +113,48 @@ Feature: A package's integration suite runs in CI when it declares one
       Given a push to main, a merge group, a global input change or a failed affected step
       When the package suites job runs
       Then every discovered package is sharded and run
+
+  Rule: A shard runs several suites at once without letting them collide
+
+    # Most suites run on a single vitest worker, so a shard that ran them one
+    # after another kept three of a runner's four cores idle. Integration suites
+    # stay one at a time because their files share one datastore and run serially
+    # for that reason. Browser suites stay one at a time because each installs its
+    # browser through apt, which holds a machine-wide lock. Each suite's output is
+    # held back and printed as one group when it ends, so two never interleave.
+
+    @unit
+    Scenario: A shard runs several suites at once
+      Given a shard with more suites than its concurrency
+      When the package suites job runs
+      Then up to that many suites run at the same time
+
+    @unit
+    Scenario: Only one integration suite runs at a time
+      Given two packages that each declare an integration suite
+      When the package suites job runs them concurrently
+      Then their integration suites never overlap
+
+    @unit
+    Scenario: Only one browser suite runs at a time
+      Given two packages that each declare a browser suite
+      When the package suites job runs them concurrently
+      Then their browser suites never overlap
+
+    @unit
+    Scenario: A package's own suites run one after another, in order
+      Given a package with a unit suite and an integration suite
+      When the package suites job runs concurrently
+      Then its integration suite starts only after its unit suite finished
+
+    @unit
+    Scenario: Without a concurrency setting the suites run one at a time
+      Given PACKAGE_SUITES_CONCURRENCY is not set
+      When the package suites job runs
+      Then each suite runs alone, as before
+
+    @unit
+    Scenario: A malformed concurrency value is refused
+      Given PACKAGE_SUITES_CONCURRENCY is not a positive whole number
+      When the package suites job starts
+      Then it fails instead of guessing how many suites to run at once

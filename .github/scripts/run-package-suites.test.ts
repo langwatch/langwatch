@@ -6,33 +6,23 @@ import {
   balanceShards,
   discover,
   formatMeasured,
+  jobsFor,
+  laneOf,
+  outcomeOf,
+  parseConcurrency,
   parseOnly,
   parseRegister,
   parseShard,
   parseWeights,
-  runPackage,
+  runJobs,
   scriptsFor,
   shardOf,
   staleEntries,
   summarise,
   type DiscoveredPackage,
+  type SuiteJob,
   type SuiteOutcome,
 } from "./run-package-suites.ts";
-
-/** Records what was run, so a test can assert on what was NOT. */
-const recorder = (failing: string[] = []) => {
-  const ran: string[] = [];
-  const lines: string[] = [];
-  return {
-    ran,
-    lines,
-    run: (name: string, script: string) => {
-      ran.push(`${name} ${script}`);
-      return failing.includes(`${name} ${script}`) || failing.includes(name) ? 1 : 0;
-    },
-    log: (line: string) => void lines.push(line),
-  };
-};
 
 const pkg = (name: string, scripts: string[]): DiscoveredPackage => ({
   name,
@@ -158,49 +148,49 @@ void describe("given the workspace listing pnpm returns", () => {
 
 void describe("given a package the gate runs", () => {
   void describe("when every script passes", () => {
-    void it("passes, having run each script once", () => {
-      const rec = recorder();
-      const outcome = runPackage(
+    void it("passes", () => {
+      const outcome = outcomeOf(
         pkg("@fix/two-lane", ["test", "test:integration"]),
         new Map(),
-        rec.run,
-        rec.log,
+        () => 0,
       );
       assert.equal(outcome.outcome, "passed");
-      assert.deepEqual(rec.ran, ["@fix/two-lane test", "@fix/two-lane test:integration"]);
     });
   });
 
   void describe("when a later lane fails", () => {
     /** @scenario "A failing integration suite fails the package and names the script" */
     void it("fails the package and names the lane that failed, not the first one", () => {
-      const rec = recorder(["@fix/two-lane test:integration"]);
-      const outcome = runPackage(
+      const outcome = outcomeOf(
         pkg("@fix/two-lane", ["test", "test:integration"]),
         new Map(),
-        rec.run,
-        rec.log,
+        (script) => (script === "test:integration" ? 1 : 0),
       );
       assert.equal(outcome.outcome, "failed");
       assert.equal(outcome.failedScript, "test:integration");
-      assert.ok(rec.lines.some((l) => l.includes("pnpm run test:integration")));
     });
 
-    void it("still runs the remaining lanes, so one push shows every failure", () => {
-      const rec = recorder(["@fix/two-lane test"]);
-      runPackage(pkg("@fix/two-lane", ["test", "test:integration"]), new Map(), rec.run, rec.log);
-      assert.deepEqual(rec.ran, ["@fix/two-lane test", "@fix/two-lane test:integration"]);
+    void it("still runs the remaining lanes, so one push shows every failure", async () => {
+      const two = pkg("@fix/two-lane", ["test", "test:integration"]);
+      const ran: string[] = [];
+      await runJobs({
+        jobs: jobsFor([two], new Map()),
+        concurrency: 1,
+        run: async (job) => {
+          ran.push(job.script);
+          return job.script === "test" ? 1 : 0;
+        },
+      });
+      assert.deepEqual(ran, ["test", "test:integration"]);
     });
   });
 
   void describe("when the browser lane fails", () => {
     void it("names the browser script rather than the jsdom one", () => {
-      const rec = recorder(["@fix/browser test:browser"]);
-      const outcome = runPackage(
+      const outcome = outcomeOf(
         pkg("@fix/browser", ["test", "test:browser"]),
         new Map(),
-        rec.run,
-        rec.log,
+        (script) => (script === "test:browser" ? 1 : 0),
       );
       assert.equal(outcome.failedScript, "test:browser");
     });
@@ -208,29 +198,142 @@ void describe("given a package the gate runs", () => {
 
   void describe("when the package is in the excluded register", () => {
     /** @scenario "An excluded package runs neither of its suites" */
-    void it("runs none of its scripts", () => {
-      const rec = recorder();
-      const outcome = runPackage(
-        pkg("@fix/elsewhere", ["test", "test:integration"]),
-        new Map([["@fix/elsewhere", "runs in its own workflow"]]),
-        rec.run,
-        rec.log,
+    void it("runs none of its scripts and is reported as skipped", () => {
+      const register = new Map([["@fix/elsewhere", "runs in its own workflow"]]);
+      const elsewhere = pkg("@fix/elsewhere", ["test", "test:integration"]);
+      assert.deepEqual(jobsFor([elsewhere], register), []);
+      assert.deepEqual(
+        outcomeOf(elsewhere, register, () => 1),
+        {
+          name: "@fix/elsewhere",
+          outcome: "skipped",
+          reason: "runs in its own workflow",
+        },
       );
-      assert.equal(outcome.outcome, "skipped");
-      assert.deepEqual(rec.ran, []);
     });
+  });
+});
 
-    void it("says so in the log, because a silent skip reads as never discovered", () => {
-      const rec = recorder();
-      runPackage(
-        pkg("@fix/elsewhere", ["test"]),
-        new Map([["@fix/elsewhere", "runs in its own workflow"]]),
-        rec.run,
-        rec.log,
+/** Runs `jobs` through the pool with controllable finishes, recording what overlapped. */
+const pool = async (jobs: SuiteJob[], concurrency: number) => {
+  const events: string[] = [];
+  let running: string[] = [];
+  let peak = 0;
+  const overlaps: string[][] = [];
+  const statuses = await runJobs({
+    jobs,
+    concurrency,
+    run: async (job) => {
+      const id = `${job.pkg.name} ${job.script}`;
+      running = [...running, id];
+      peak = Math.max(peak, running.length);
+      overlaps.push(running);
+      events.push(`start ${id}`);
+      await new Promise((settle) => setTimeout(settle, 5));
+      running = running.filter((other) => other !== id);
+      events.push(`end ${id}`);
+      return 0;
+    },
+  });
+  return { events, peak, overlaps, statuses };
+};
+
+void describe("given a shard that runs several suites at once", () => {
+  void describe("when it has more suites than its concurrency", () => {
+    /** @scenario "A shard runs several suites at once" */
+    void it("runs up to that many at the same time, and every one of them", async () => {
+      const packages = ["a", "b", "c", "d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const { peak, statuses } = await pool(jobsFor(packages, new Map()), 3);
+      assert.equal(peak, 3);
+      assert.equal(statuses.size, 5);
+    });
+  });
+
+  void describe("when two packages each declare an integration suite", () => {
+    /** @scenario "Only one integration suite runs at a time" */
+    void it("never overlaps them, while the unit suites still run alongside", async () => {
+      const packages = ["a", "b", "c"].map((name) => pkg(`@fix/${name}`, ["test:integration"]));
+      const units = ["d", "e"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const { overlaps, peak } = await pool(jobsFor([...packages, ...units], new Map()), 3);
+      for (const running of overlaps) {
+        assert.ok(
+          running.filter((id) => id.endsWith("test:integration")).length <= 1,
+          running.join(),
+        );
+      }
+      assert.ok(peak > 1);
+    });
+  });
+
+  void describe("when two packages each declare a browser suite", () => {
+    /** @scenario "Only one browser suite runs at a time" */
+    void it("never overlaps them", async () => {
+      const packages = ["a", "b"].map((name) => pkg(`@fix/${name}`, ["test:browser"]));
+      const { overlaps } = await pool(jobsFor(packages, new Map()), 3);
+      for (const running of overlaps) assert.equal(running.length, 1);
+    });
+  });
+
+  void describe("when a package has a unit suite and an integration suite", () => {
+    /** @scenario "A package's own suites run one after another, in order" */
+    void it("starts its integration suite only after its unit suite finished", async () => {
+      const both = pkg("@fix/two-lane", ["test", "test:integration"]);
+      const { events } = await pool(jobsFor([both, pkg("@fix/other", ["test"])], new Map()), 3);
+      const ended = events.indexOf("end @fix/two-lane test");
+      const started = events.indexOf("start @fix/two-lane test:integration");
+      assert.ok(ended !== -1 && started > ended, events.join("\n"));
+    });
+  });
+
+  void describe("when a suite cannot be started at all", () => {
+    void it("counts it as failed and runs the rest", async () => {
+      const packages = ["a", "b"].map((name) => pkg(`@fix/${name}`, ["test"]));
+      const statuses = await runJobs({
+        jobs: jobsFor(packages, new Map()),
+        concurrency: 2,
+        run: async (job) => {
+          if (job.pkg.name === "@fix/a") throw new Error("spawn ENOENT");
+          return 0;
+        },
+      });
+      assert.deepEqual(
+        [...statuses].map(([job, status]) => `${job.pkg.name} ${status}`).toSorted(),
+        ["@fix/a 1", "@fix/b 0"],
       );
-      assert.ok(
-        rec.lines.some((l) => l.includes("not run: @fix/elsewhere — runs in its own workflow")),
-      );
+    });
+  });
+});
+
+void describe("given the scripts a package declares", () => {
+  void it("puts integration and browser scripts in lanes of their own", () => {
+    assert.equal(laneOf("test:integration"), "integration");
+    assert.equal(laneOf("test:browser"), "browser");
+    assert.equal(laneOf("test"), "shared");
+    assert.equal(laneOf("test:unit"), "shared");
+  });
+});
+
+void describe("given PACKAGE_SUITES_CONCURRENCY", () => {
+  void describe("when it is not set", () => {
+    /** @scenario "Without a concurrency setting the suites run one at a time" */
+    void it("runs one suite at a time", () => {
+      assert.equal(parseConcurrency(undefined), 1);
+      assert.equal(parseConcurrency(""), 1);
+    });
+  });
+
+  void describe("when it is a positive whole number", () => {
+    void it("uses it", () => {
+      assert.equal(parseConcurrency("3"), 3);
+    });
+  });
+
+  void describe("when it is malformed", () => {
+    /** @scenario "A malformed concurrency value is refused" */
+    void it("refuses it", () => {
+      for (const value of ["0", "-1", "2.5", "three"]) {
+        assert.throws(() => parseConcurrency(value), /PACKAGE_SUITES_CONCURRENCY/);
+      }
     });
   });
 });

@@ -886,6 +886,10 @@ jobs:
         env:
           REQUIRE_HELM_TESTS: "1"
           PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8
+          # Most suites use one vitest worker, so one at a time left cores idle. The
+          # runner shares its cores between them and keeps integration and browser
+          # suites one at a time.
+          PACKAGE_SUITES_CONCURRENCY: "2"
           # A pull request runs the suites its change reaches; main runs all.
           PACKAGE_SUITES_ONLY: ${{ needs.affected.outputs.projects }}
           # The hook records what each cached suite reads outside its package (ADR-150).
