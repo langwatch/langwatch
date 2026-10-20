@@ -38,6 +38,46 @@ function withoutCredentials(target: string): string {
 /** Redis 7 introduced script flags; Valkey 7.2 and later report a compatible `redis_version`. */
 const MINIMUM_REDIS_MAJOR = 7;
 
+/** A server older than Redis 7 refused at boot; `code` is what callers and tests match on. */
+export class UnsupportedRedisVersionError extends Error {
+  readonly code = "redis_version_unsupported";
+  readonly version: string;
+
+  constructor({ version, target }: { version: string; target: string }) {
+    super(
+      `Redis ${version} is older than the minimum, Redis ${MINIMUM_REDIS_MAJOR}.0 ` +
+        `(or Valkey 7.2): the queue's Lua scripts need Redis 7 script flags. Upgrade the server at ${target}.`,
+    );
+    this.name = "UnsupportedRedisVersionError";
+    this.version = version;
+  }
+}
+
+/** Rejects with `timeoutMessage` once `timeoutMs` passes; the timer never outlives the race. */
+async function withinTimeout<T>({
+  work,
+  timeoutMs,
+  timeoutMessage,
+}: {
+  work: Promise<T>;
+  timeoutMs: number;
+  timeoutMessage: string;
+}): Promise<T> {
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  try {
+    return await Promise.race([
+      work,
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new Error(timeoutMessage)), timeoutMs);
+      }),
+    ]);
+  } finally {
+    // Without this the pending timer keeps the event loop alive for the full
+    // timeout after a successful call, delaying every short-lived process.
+    if (timer) clearTimeout(timer);
+  }
+}
+
 export class RedisReadinessService {
   private readonly logger: RedisLogger | undefined;
 
@@ -59,18 +99,12 @@ export class RedisReadinessService {
 
     const safeTarget = withoutCredentials(target);
 
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let serverInfo: string;
     try {
-      serverInfo = await Promise.race([
-        connection.ping().then(() => connection.info("server")),
-        new Promise<never>((_, reject) => {
-          timer = setTimeout(
-            () => reject(new Error(`PING timeout after ${timeoutMs}ms`)),
-            timeoutMs,
-          );
-        }),
-      ]);
+      await withinTimeout({
+        work: connection.ping(),
+        timeoutMs,
+        timeoutMessage: `PING timeout after ${timeoutMs}ms`,
+      });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       this.logger?.error(
@@ -81,34 +115,48 @@ export class RedisReadinessService {
           `  Otherwise bring the stack up with 'make haven up' or 'make quickstart'.`,
       );
       throw error instanceof Error ? error : new Error(message);
-    } finally {
-      // Without this the pending timer keeps the event loop alive for the full
-      // timeout after a successful ping, delaying every short-lived process.
-      if (timer) clearTimeout(timer);
     }
-    this.refuseUnsupportedVersion({ serverInfo, target: safeTarget });
+    await this.refuseUnsupportedVersion({ connection, timeoutMs, target: safeTarget });
     this.logger?.info({ target: safeTarget }, "redis ready");
   }
 
-  /** Queue scripts declare Redis 7 script flags, which older servers reject (record §9). */
-  private refuseUnsupportedVersion({
-    serverInfo,
+  /**
+   * Queue scripts declare Redis 7 script flags, which older servers reject (record §9). A server
+   * that answers PING but will not say its version (an ACL user denied `INFO`, a managed provider
+   * that strips it) is let through with a warning: only a version known to be too old is refused.
+   */
+  private async refuseUnsupportedVersion({
+    connection,
+    timeoutMs,
     target,
   }: {
-    serverInfo: string;
+    connection: RedisConnection;
+    timeoutMs: number;
     target: string;
-  }): void {
-    const found = /^redis_version:(\d+)\.(\d+)\S*/m.exec(serverInfo);
-    if (!found) {
+  }): Promise<void> {
+    let serverInfo: string;
+    try {
+      serverInfo = await withinTimeout({
+        work: connection.info("server"),
+        timeoutMs,
+        timeoutMessage: `INFO timeout after ${timeoutMs}ms`,
+      });
+    } catch (error) {
+      this.logger?.warn(
+        { error, target },
+        "redis did not answer INFO, so its version is unknown; 7.0 or later is required",
+      );
+      return;
+    }
+    const version = /^redis_version:(\S+)/m.exec(serverInfo)?.[1];
+    const major = version === undefined ? Number.NaN : Number.parseInt(version, 10);
+    if (version === undefined || Number.isNaN(major)) {
       this.logger?.warn({ target }, "redis did not report its version; 7.0 or later is required");
       return;
     }
-    if (Number(found[1]) >= MINIMUM_REDIS_MAJOR) return;
-    const version = found[0].slice("redis_version:".length);
-    const message =
-      `Redis ${version} is older than the minimum, Redis ${MINIMUM_REDIS_MAJOR}.0 ` +
-      `(or Valkey 7.2): the queue's Lua scripts need Redis 7 script flags. Upgrade the server at ${target}.`;
-    this.logger?.error({ target, version }, message);
-    throw new Error(message);
+    if (major >= MINIMUM_REDIS_MAJOR) return;
+    const error = new UnsupportedRedisVersionError({ version, target });
+    this.logger?.error({ target, version }, error.message);
+    throw error;
   }
 }
