@@ -20,6 +20,8 @@ class EvaluationTimestamps:
         started_at (float | None | Unset):
         finished_at (float | None | Unset):
         updated_at (float | None | Unset):
+        last_attempt_at (float | None | Unset):
+        next_attempt_at (float | None | Unset):
     """
 
     ignore_timestamps_on_write: bool | None | Unset = UNSET
@@ -27,6 +29,8 @@ class EvaluationTimestamps:
     started_at: float | None | Unset = UNSET
     finished_at: float | None | Unset = UNSET
     updated_at: float | None | Unset = UNSET
+    last_attempt_at: float | None | Unset = UNSET
+    next_attempt_at: float | None | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -60,6 +64,18 @@ class EvaluationTimestamps:
         else:
             updated_at = self.updated_at
 
+        last_attempt_at: float | None | Unset
+        if isinstance(self.last_attempt_at, Unset):
+            last_attempt_at = UNSET
+        else:
+            last_attempt_at = self.last_attempt_at
+
+        next_attempt_at: float | None | Unset
+        if isinstance(self.next_attempt_at, Unset):
+            next_attempt_at = UNSET
+        else:
+            next_attempt_at = self.next_attempt_at
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update({})
@@ -73,6 +89,10 @@ class EvaluationTimestamps:
             field_dict["finished_at"] = finished_at
         if updated_at is not UNSET:
             field_dict["updated_at"] = updated_at
+        if last_attempt_at is not UNSET:
+            field_dict["last_attempt_at"] = last_attempt_at
+        if next_attempt_at is not UNSET:
+            field_dict["next_attempt_at"] = next_attempt_at
 
         return field_dict
 
@@ -125,12 +145,32 @@ class EvaluationTimestamps:
 
         updated_at = _parse_updated_at(d.pop("updated_at", UNSET))
 
+        def _parse_last_attempt_at(data: object) -> float | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(float | None | Unset, data)
+
+        last_attempt_at = _parse_last_attempt_at(d.pop("last_attempt_at", UNSET))
+
+        def _parse_next_attempt_at(data: object) -> float | None | Unset:
+            if data is None:
+                return data
+            if isinstance(data, Unset):
+                return data
+            return cast(float | None | Unset, data)
+
+        next_attempt_at = _parse_next_attempt_at(d.pop("next_attempt_at", UNSET))
+
         evaluation_timestamps = cls(
             ignore_timestamps_on_write=ignore_timestamps_on_write,
             inserted_at=inserted_at,
             started_at=started_at,
             finished_at=finished_at,
             updated_at=updated_at,
+            last_attempt_at=last_attempt_at,
+            next_attempt_at=next_attempt_at,
         )
 
         evaluation_timestamps.additional_properties = d
