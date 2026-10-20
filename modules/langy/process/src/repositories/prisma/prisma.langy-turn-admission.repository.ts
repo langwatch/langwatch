@@ -1,6 +1,6 @@
 import { generate } from "@langwatch/ksuid";
 import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
-import { isSerializationConflict, type SerializationRetryDeps } from "@langwatch/prisma-client";
+import { isSerializationConflict } from "@langwatch/prisma-client";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -13,13 +13,6 @@ const COMMITTED = "committed";
 const PREPARATION_LEASE_MS = 2 * 60 * 1000;
 const COMMITTED_LEASE = new Date("9999-12-31T23:59:59.999Z");
 const MAX_SERIALIZATION_ATTEMPTS = 4;
-// Mirrors withSerializationRetry's doubling window. That helper cannot be reused
-// as is: it does not retry the P2002 receipt race this claim also absorbs.
-const RETRY_WAIT_BASE_MS = 10;
-const REAL_RETRY_DEPS: SerializationRetryDeps = {
-  wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
-  random: Math.random,
-};
 // Backstop only: a COMMITTED row has no lease-expiry escape hatch like
 // PREPARING's `leaseExpiresAt`, so a worker that dies skipping every terminal
 // event leaves it permanently 409ing. 10 minutes safely exceeds observed real
@@ -205,18 +198,12 @@ async function leaseActiveTurn({
  * admission. The event projection remains a cheap rejection hint only.
  */
 export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionRepository {
-  constructor(
-    private readonly prisma: LangyDatabase,
-    private readonly retry: SerializationRetryDeps = REAL_RETRY_DEPS,
-  ) {
+  constructor(private readonly prisma: LangyDatabase) {
     super();
   }
 
-  static create(
-    database: LangyDatabase,
-    retry?: SerializationRetryDeps,
-  ): PrismaLangyTurnAdmissionRepository {
-    return new PrismaLangyTurnAdmissionRepository(database, retry);
+  static create(database: LangyDatabase): PrismaLangyTurnAdmissionRepository {
+    return new PrismaLangyTurnAdmissionRepository(database);
   }
 
   async claim(input: ClaimInput): Promise<LangyTurnAdmissionClaim> {
@@ -230,10 +217,7 @@ export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionReposi
         );
       } catch (error) {
         if (!isRetryableTransactionError(error)) throw error;
-        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS) {
-          await this.retry.wait(this.retry.random() * RETRY_WAIT_BASE_MS * 2 ** attempt);
-          continue;
-        }
+        if (attempt + 1 < MAX_SERIALIZATION_ATTEMPTS) continue;
         throw new LangyAgentUnavailableError(
           "Too many turns are starting at once. Please retry shortly.",
         );
