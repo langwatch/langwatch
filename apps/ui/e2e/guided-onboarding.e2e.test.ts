@@ -296,22 +296,23 @@ test.describe("guided onboarding", () => {
     await expect(dialog.getByRole("button", { name: "Keep the guide" })).toBeVisible();
     await dialog.getByRole("button", { name: "Skip anyway" }).click();
 
-    // The personal home, with the panel open and asking for the model the
-    // provider step would have connected; the coding path is the one being
-    // guided, so its space shows no offer.
+    // The personal home, with the panel open and Langy asking for the model the
+    // provider step would have connected, below the tour card; the coding path
+    // is the one being guided, so its space shows no offer.
     await page.waitForURL(/\/me(\/|\?|$)/, { timeout: 90_000 });
     const panel = page.locator('[data-tour="langy-panel"]');
     await expect(panel).toBeVisible({ timeout: 60_000 });
-    await expect(panel).toContainText("Langy needs a model to get started", {
-      timeout: 60_000,
-    });
+    await expect(panel.getByTestId("guided-tour-card")).toBeVisible({ timeout: 60_000 });
+    await expect(panel.getByTestId("langy-guided-model-prompt")).toContainText(
+      "Now connect me to a model provider",
+      { timeout: 60_000 },
+    );
+    await expect(panel).not.toContainText("Langy needs a model to get started");
     await expect(page.getByTestId("guided-onboarding-offer")).toHaveCount(0);
     const state = await readGuidedState({ page, organizationName });
     expect(state.providerSkippedAt).toBeTruthy();
-    // Skip anyway skips the guide as a whole: the tour is recorded as skipped
-    // too, which is what makes Langy open with the no-worries line.
-    expect(state.tourSkippedAt).toBeTruthy();
-    expect(state.tourCompletedAt).toBeFalsy();
+    // Skip anyway skips the provider step only; the tour is never recorded as skipped.
+    expect(state.tourSkippedAt).toBeFalsy();
     expect(state.currentPath).toBe("coding");
   });
 

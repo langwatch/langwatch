@@ -170,3 +170,21 @@ export const LANGY_EVALUATOR_INFERENCE_CRITERIA = [
   "Before trusting a newly added evaluator, Langy checks it scores sensibly (a subset run, or reading a few scored rows) rather than optimizing against unverified scores. A conversation that ends before any run satisfies this criterion.",
   ...LANGY_CORE_RULE_CRITERIA,
 ];
+
+/** Empty-window rubric: specs/langy/langy-empty-results-data-age.feature. */
+export const LANGY_EMPTY_WINDOW_CRITERIA = [
+  "Langy says there were no matching traces in the last hour.",
+  'Langy states how long ago the newest matching trace arrived, about 7 to 9 hours, from a follow-up lookup not limited to the last hour. A clock time is fine alongside the age, but a clock time or "this morning" alone fails, and so does a bare "none in the last hour".',
+  "Langy names one likely cause of the gap, such as export having stopped, a wrong project or API key, or the app not being instrumented yet.",
+  "The likely cause comes after the stated age of the newest trace and is about how data reaches the project, not a problem with the query.",
+  "Langy never says or implies that it cannot see or access the data. The query succeeded and found nothing; that is an answer, not an access problem.",
+];
+
+/** Never-received rubric: specs/langy/langy-empty-results-data-age.feature. */
+export const LANGY_NEVER_RECEIVED_CRITERIA = [
+  "Langy says there were no matching traces in the last hour.",
+  "Langy says the project has never received traces with that label, or that it found none in any window.",
+  "Langy does not invent a time for a newest matching trace.",
+  "Langy names one likely cause, such as the app not being instrumented to send that label, a wrong project or API key, or export never set up.",
+  "Langy never says or implies that it cannot see or access the data.",
+];

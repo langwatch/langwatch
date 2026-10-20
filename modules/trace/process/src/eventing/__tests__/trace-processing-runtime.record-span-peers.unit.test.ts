@@ -8,8 +8,10 @@ import { createTenantId, type Command } from "@langwatch/eventing";
 import type { ModelCost } from "@langwatch/model-provider-contract";
 import { type OtlpSpan } from "@langwatch/otlp/trace-request";
 import type { Project } from "@langwatch/project-contract";
+import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
+  COMMAND_INLINE_THRESHOLD,
   RECORD_SPAN_COMMAND_TYPE,
   spanReceivedEventSchema,
   type RecordSpanCommandData,
@@ -17,7 +19,11 @@ import {
 import { describe, expect, it, vi } from "vitest";
 
 import { ownProofAuthorizer } from "../../__tests__/support/authorization-proofs.fixture.ts";
+import { TraceModule } from "../../app/trace.app.ts";
+import { MemoryTraceLegacySpoolChannel } from "../../channels/memory/memory.trace-legacy-spool.channel.ts";
 import { TraceCanonicalisationService } from "../../features/derivation/services/trace-canonicalisation.service.ts";
+import { SPOOL_REF_V2 } from "../../features/ingestion/rules/trace-spool-location.rules.ts";
+import { TraceEdgeSpoolService } from "../../features/ingestion/services/trace-edge-spool.service.ts";
 import { MemoryTraceRepositories } from "../../repositories/memory/memory.trace.repositories.ts";
 import {
   type TraceProcessingPipelineInput,
@@ -103,7 +109,19 @@ function project(): Project {
   };
 }
 
+function composeBlobStore(repositories: ReturnType<typeof MemoryTraceRepositories.create>) {
+  return TraceModule.composeBlobStore({
+    repositories,
+    channels: { legacySpool: MemoryTraceLegacySpoolChannel.create() },
+    config: { objectRetentionConfirmed: undefined, legacySpoolRetentionConfirmed: undefined },
+  });
+}
+
 function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
+  const repositories = MemoryTraceRepositories.create();
+  // The one blob store the module composes for both halves: the door writes through it, the
+  // worker's record-span command reads back through it.
+  const blobStore = composeBlobStore(repositories);
   const listCosts = vi.fn<Peers["modelProviders"]["listCosts"]>(async () => [ownRateFor(MODEL)]);
   const dropSpanContent = vi.fn<Peers["dataPrivacy"]["dropSpanContent"]>(async ({ span }) => {
     if (!dropsInput) return { droppedCount: 0, droppedCategories: [], droppedAttributeKeys: [] };
@@ -144,9 +162,10 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
         }),
       }),
     }),
-    repositories: MemoryTraceRepositories.create(),
+    repositories,
     canonicalisation: TraceCanonicalisationService.create(),
     commands: createApiFixture<TraceProcessingPipelineInput["commands"]>(),
+    spool: blobStore,
     findSummary: async () => null,
     recordTrackedEvent: async () => undefined,
     broadcast: createApiFixture<TraceProcessingPipelineInput["broadcast"]>(),
@@ -157,6 +176,8 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
   }).build({ participation: "consume" });
   return {
     pipeline,
+    blobStore,
+    repositories,
     listCosts,
     dropSpanContent,
     redactSpan,
@@ -166,28 +187,50 @@ function compose({ dropsInput = false }: { dropsInput?: boolean } = {}) {
   };
 }
 
-async function foldSpanThroughRecordCommand(pipeline: ReturnType<typeof compose>["pipeline"]) {
-  const sealed = pipeline.commands.find((command) => command.definition.name === "recordSpan");
-  if (!sealed) throw new Error("the pipeline registered no recordSpan command");
-  const data: RecordSpanCommandData = {
+function recordSpanData(span: OtlpSpan = modelSpan()): RecordSpanCommandData {
+  return {
     tenantId: TENANT,
-    span: modelSpan(),
+    span,
     resource: null,
     instrumentationScope: null,
     occurredAt: 1,
   };
+}
+
+async function foldSpanThroughRecordCommand(
+  pipeline: ReturnType<typeof compose>["pipeline"],
+  data: RecordSpanCommandData = recordSpanData(),
+) {
+  const sealed = pipeline.commands.find((command) => command.definition.name === "recordSpan");
+  if (!sealed) throw new Error("the pipeline registered no recordSpan command");
   const command: Command<RecordSpanCommandData> = {
     tenantId: createTenantId(TENANT),
     aggregateId: "trace-1",
     type: RECORD_SPAN_COMMAND_TYPE,
     data,
   };
-  // The registration is typed over an unknown payload, so the call goes through apply.
+  // The registration is typed over an unknown payload, so the calls go through apply.
   const emitted: unknown[] = await sealed.open(async (registration) => {
     const handler = registration.createHandler();
-    return Reflect.apply(handler.handle, handler, [command]);
+    const events: unknown[] = await Reflect.apply(handler.handle, handler, [command]);
+    // The spool object's best-effort delete. The queue runs it after storing the event; that
+    // ordering is the queue's, and is not exercised here.
+    const cleanup: unknown = Reflect.get(handler, "cleanupAfterStore");
+    if (typeof cleanup === "function") await Reflect.apply(cleanup, handler, [command]);
+    return events;
   });
   return spanReceivedEventSchema.parse(emitted[0]).data.span.attributes;
+}
+
+/** A span whose captured input alone puts its command over the inline threshold. */
+function oversizedSpan(): OtlpSpan {
+  const span = modelSpan();
+  span.attributes = span.attributes.map((attribute) =>
+    attribute.key === "langwatch.input"
+      ? { key: attribute.key, value: { stringValue: "x".repeat(COMMAND_INLINE_THRESHOLD) } }
+      : attribute,
+  );
+  return span;
 }
 
 describe("the consumer pipeline composed over the installed peers", () => {
@@ -342,6 +385,69 @@ describe("the consumer pipeline composed over the installed peers", () => {
         expect(redactSpan.mock.calls.map(([input]) => input.tenantId)).toEqual([TENANT]);
         expect(dropSpanContent.mock.calls.map(([input]) => input.projectId)).toEqual([TENANT]);
         expect(listCosts.mock.calls.map(([input]) => input.projectId)).toEqual([TENANT]);
+      });
+    });
+  });
+
+  describe("given the ingestion door spooled an over-threshold span through the module's blob store", () => {
+    describe("when the worker folds the spooled command", () => {
+      /** @scenario A spooled span is read back from the spool the door wrote it to */
+      it("records the span with the attributes the door spooled, then removes the object", async () => {
+        const { pipeline, blobStore, repositories } = compose();
+        const { logger, lines } = createTestLogger();
+        const door = TraceEdgeSpoolService.create({ spool: blobStore, logger });
+
+        const queued = await door.prepare(recordSpanData(oversizedSpan()));
+
+        expect(
+          lines.findLine("warn", "oversize protection skipped; queue carries full payload"),
+        ).toBeUndefined();
+        expect(queued.spoolRef).toBe(SPOOL_REF_V2);
+        expect(queued.span.attributes).toEqual([]);
+
+        const attributes = await foldSpanThroughRecordCommand(pipeline, queued);
+
+        const byKey = new Map(attributes.map((attribute) => [attribute.key, attribute.value]));
+        expect(byKey.get("langwatch.input")?.stringValue).toHaveLength(COMMAND_INLINE_THRESHOLD);
+        expect(byKey.get("gen_ai.request.model")?.stringValue).toBe(MODEL);
+        await expect(
+          repositories.spoolObjects.read({
+            projectId: TENANT,
+            key: "trace-blobs/spool/project-1/trace-1/span-1",
+          }),
+        ).rejects.toMatchObject({ name: "StoredObjectNotFoundError" });
+      });
+    });
+  });
+
+  describe("given a spooled command whose object the door wrote before this process started", () => {
+    describe("when the worker folds it", () => {
+      /** @scenario A spooled span is read back from the spool the door wrote it to */
+      it("reads the object by the command's own ids rather than refusing the reference", async () => {
+        const { pipeline, repositories } = compose();
+        // A blob store of its own, as the previous process had, over the same object storage.
+        const previousProcess = composeBlobStore(repositories);
+        const full = recordSpanData(oversizedSpan());
+        await previousProcess.putSpool({
+          projectId: TENANT,
+          traceId: "trace-1",
+          spanId: "span-1",
+          body: Buffer.from(JSON.stringify(full), "utf8"),
+        });
+
+        const attributes = await foldSpanThroughRecordCommand(pipeline, {
+          ...full,
+          spoolRef: SPOOL_REF_V2,
+          span: { ...full.span, attributes: [] },
+        });
+
+        expect(attributes.map((attribute) => attribute.key)).toContain("langwatch.input");
+        await expect(
+          repositories.spoolObjects.read({
+            projectId: TENANT,
+            key: "trace-blobs/spool/project-1/trace-1/span-1",
+          }),
+        ).rejects.toMatchObject({ name: "StoredObjectNotFoundError" });
       });
     });
   });
