@@ -44,6 +44,12 @@ export const onboardingTrpcTransport: TrpcRouterDeclaration<OnboardingApi, typeo
       app.recordProviderSkipped({ ...input, userId: actor.id }),
     )
 
+    .procedure("recordProviderPromptDismissed")
+    .serviceAuthorized({ reason: AUTHORIZED_BY_THE_APP, permissions: ["organization:view"] })
+    .handle(async ({ app, input, actor }) =>
+      app.recordProviderPromptDismissed({ ...input, userId: actor.id }),
+    )
+
     .procedure("recordVirtualKeyReveal")
     .serviceAuthorized({ reason: AUTHORIZED_BY_THE_APP, permissions: ["organization:view"] })
     .handle(async ({ app, input, actor }) =>

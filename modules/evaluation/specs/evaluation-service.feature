@@ -112,6 +112,16 @@ Feature: Evaluation service boundary
     When the cost is recorded
     Then the ledger holds one entry under the id the call chose, inside its project only
 
+  # The verdict was answered 200 even when its reported event could not be sent,
+  # so a result the caller saw was never stored.
+  @integration
+  Scenario: An evaluate call whose verdict cannot be recorded answers a retryable 503
+    Given an evaluate call whose evaluator ran
+    And the event pipeline refuses the verdict
+    When the call is answered
+    Then the answer is 503, marked retryable
+    And the caller is not told the evaluation succeeded
+
   @unit
   Scenario: An evaluate call outside a trace still records its cost
     Given an evaluate call from an experiment workbench, which names no trace
@@ -233,6 +243,12 @@ Feature: Evaluation service boundary
     Given langevals answers a clustering call with a server error
     When topic clustering asks evaluation for an incremental clustering
     Then it is refused naming the incremental clustering, the status text and the body
+
+  @unit
+  Scenario: A langevals clustering refusal keeps its status and failure code
+    Given langevals refuses a clustering call with a failure code in its error detail
+    When topic clustering asks evaluation for a batch clustering
+    Then the refusal carries the HTTP status and that failure code
 
   @unit
   Scenario: A clustering call aborted by its caller does not reach langevals

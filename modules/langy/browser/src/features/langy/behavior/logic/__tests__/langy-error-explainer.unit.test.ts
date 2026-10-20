@@ -331,6 +331,84 @@ describe("explainLangyError", () => {
         });
       });
 
+      /** @scenario A request the provider refuses with a plain 400 offers no retry */
+      it.each([[[{ kind: "invalid_request_error" }]], [[{ kind: "upstream_bad_request" }]]])(
+        "reads %j as an invalid request, and offers the settings",
+        (reasons) => {
+          // The chain every Anthropic turn on a Claude 5.5 model recorded while
+          // the worker sent a thinking shape those models refuse.
+          const presentation = explainLangyError(
+            domain({
+              code: "langy_agent_errored",
+              reasons: [
+                {
+                  kind: "llm_upstream_error",
+                  meta: { http_status: 400, provider: "anthropic", body_kind: "json" },
+                  reasons,
+                },
+              ],
+            }),
+          );
+
+          expect(presentation.kind).toBe("llm_upstream_error");
+          expect(presentation.action).toEqual({
+            label: "Configure model",
+            kind: "configure-model",
+          });
+        },
+      );
+
+      /** @scenario A spent provider balance reads as the account to top up, with no retry */
+      it("reads a spent balance as the account to top up, and offers the settings", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, provider: "anthropic", body_kind: "json" },
+                reasons: [
+                  { kind: "invalid_request_error" },
+                  { kind: "llm_provider_out_of_credit" },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("This provider account is out of credit");
+        expect(presentation.description).toBe(
+          "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A key the provider refuses on a 400 reads as a credential to check */
+      it("reads the proxy's refused-key reason as the provider refusing the key", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, provider: "gemini", body_kind: "json" },
+                reasons: [{ kind: "INVALID_ARGUMENT" }, { kind: "llm_provider_key_rejected" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.title).toBe("This provider rejected the API key");
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
       /** @scenario A failure the gateway files as the provider's reads as the provider card */
       it("reads the gateway's provider_error as the provider card", () => {
         // The chain the guided-onboarding turn on Bedrock recorded while the

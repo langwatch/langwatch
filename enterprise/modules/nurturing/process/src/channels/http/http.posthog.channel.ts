@@ -3,6 +3,7 @@
  * construction. No target, no client and no send, as main's `trackServerEvent` without a key.
  */
 import { createLogger } from "@langwatch/observability";
+import { toDate } from "@langwatch/time";
 import { PostHog } from "posthog-node";
 
 import {
@@ -30,7 +31,7 @@ export class HttpPostHogChannel extends PostHogChannel {
     return new HttpPostHogChannel(options.targets);
   }
 
-  track({ userId, event, properties, uuid }: PostHogEventInput): void {
+  track({ userId, event, properties, uuid, timestamp }: PostHogEventInput): void {
     try {
       for (const client of this.clients()) {
         client.capture({
@@ -38,6 +39,7 @@ export class HttpPostHogChannel extends PostHogChannel {
           event,
           properties,
           ...(uuid === undefined ? {} : { uuid }),
+          ...(timestamp === undefined ? {} : { timestamp: toDate(timestamp) }),
         });
       }
     } catch (error) {

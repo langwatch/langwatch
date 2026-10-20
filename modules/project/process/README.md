@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ProjectApi`)
 
-Peers call these through the token, declared at `../contract/src/project.api.ts:94`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/project.api.ts:96`; nothing else in this package is public.
 
 #### `listPaths`
 
