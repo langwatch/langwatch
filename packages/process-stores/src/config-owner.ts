@@ -60,6 +60,8 @@ export const storesOwner = {
     ),
     /** Queue policy, main's names: jobs run at once per worker (default 100). */
     queueConcurrency: c.env("GLOBAL_QUEUE_CONCURRENCY", unsetWhenBlank),
+    /** Most jobs at once a worker adapts up to; unset keeps it at the configured concurrency. */
+    queueConcurrencyCeiling: c.env("GLOBAL_QUEUE_CONCURRENCY_CEILING", unsetWhenBlank),
     /** Per-tenant in-flight soft cap (default 50); "0" turns the cap off. */
     queueTenantCap: c.env("LANGWATCH_DISPATCH_TENANT_CAP", unsetWhenBlank),
     /** Fleet in-flight budget the tenants share; unset or "0" keeps the fixed cap. */

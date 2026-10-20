@@ -13,6 +13,7 @@ const baseConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
   queueConcurrency: undefined,
+  queueConcurrencyCeiling: undefined,
   queueTenantCap: undefined,
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,

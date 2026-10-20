@@ -4,18 +4,47 @@ Feature: A consumer's slots follow its load
   So that a small pod's idle CPU is used and a loaded pod backs off before it stalls
 
   The configured concurrency (GLOBAL_QUEUE_CONCURRENCY, 100 by default) is the floor: a consumer
-  starts there and never runs fewer. Once a second it looks at its own process: with every slot
-  taken and the event loop under 85% busy, the jobs are waiting on ClickHouse and Redis, so the
-  count grows by a quarter up to the ceiling (1000 by default, the queue policy's
-  adaptiveSlotsCeiling overrides it). Above 95% loop or 80% of the heap limit it shrinks by a fifth.
+  starts there and never runs fewer. Slots adapt only up to a ceiling the deployment raises
+  with GLOBAL_QUEUE_CONCURRENCY_CEILING (the queue policy's adaptiveSlotsCeiling); by default the
+  ceiling is the configured concurrency, so the count stays fixed (Alex, 2026-10-20). A ceiling
+  that is not a whole number at least the configured concurrency is refused at boot by name.
+  With a raised ceiling, once a second
+  the consumer looks at its own process: with every slot taken and the event loop under 85% busy,
+  the jobs are waiting on ClickHouse and Redis, so the count grows by a quarter up to the ceiling.
+  Above 95% loop or 80% of the heap limit it shrinks by a fifth.
 
   @integration
-  Scenario: A consumer whose jobs wait on IO grows its slots up to its ceiling
-    Given a consumer configured for two jobs at once with a ceiling of four
+  Scenario: By default a consumer's slots stay at its configured concurrency
+    Given a consumer configured for two jobs at once with no ceiling raised
+    And a backlog of jobs that each wait on IO
+    When every slot stays taken while the event loop is idle
+    Then it never runs more than two jobs at once
+
+  @integration
+  Scenario: A consumer whose jobs wait on IO grows its slots up to a raised ceiling
+    Given a consumer configured for two jobs at once with a ceiling raised to four
     And a backlog of jobs that each wait on IO
     When every slot stays taken while the event loop is idle
     Then the consumer comes to run four jobs at once
     And it never runs more than four
+
+  @unit
+  Scenario: With GLOBAL_QUEUE_CONCURRENCY_CEILING unset the worker keeps its configured concurrency
+    Given a worker whose environment sets GLOBAL_QUEUE_CONCURRENCY and no ceiling
+    When its queue policy is built
+    Then the policy names no ceiling, so slots stay at the configured concurrency
+
+  @unit
+  Scenario: GLOBAL_QUEUE_CONCURRENCY_CEILING raises the ceiling slots adapt up to
+    Given a worker whose environment sets GLOBAL_QUEUE_CONCURRENCY_CEILING to 1000
+    When its queue policy is built
+    Then the policy's ceiling is 1000
+
+  @unit
+  Scenario: An invalid GLOBAL_QUEUE_CONCURRENCY_CEILING is refused by name
+    Given a ceiling that is not a whole number, or is below the configured concurrency
+    When the worker's queue policy is built
+    Then boot is refused with an error naming GLOBAL_QUEUE_CONCURRENCY_CEILING
 
   @unit
   Scenario: Slots grow by a quarter while every slot is taken and the event loop is idle
