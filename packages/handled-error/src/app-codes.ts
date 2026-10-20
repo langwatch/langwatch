@@ -90,6 +90,7 @@ export const APP_ERROR_CODES = [
   "authz_grant_not_confirmed",
   "authz_ledger_unavailable",
   "authz_scope_not_found",
+  "automation_dataset_unavailable",
   "automation_filters_unsupported",
   "automation_not_found",
   "automation_trace_filter_invalid",
