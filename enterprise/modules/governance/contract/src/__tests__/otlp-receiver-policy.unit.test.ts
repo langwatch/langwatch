@@ -132,6 +132,7 @@ describe("Governance receiver policy", () => {
       const groups = [
         { scope: { name: "github.copilot" } },
         { scope: { name: "@github/copilot" } },
+        { scope: { name: "copilot-chat" } },
         { scope: { name: "customer.service" } },
         {},
       ];
@@ -153,6 +154,7 @@ describe("Governance receiver policy", () => {
       expect(scopes?.map((scope) => scope?.scope?.name)).toEqual([
         "github.copilot",
         "@github/copilot",
+        "copilot-chat",
       ]);
       expect(signal === "traces" ? request.resourceSpans : request.resourceMetrics).toHaveLength(1);
     },
