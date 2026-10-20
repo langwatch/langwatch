@@ -49,7 +49,12 @@ export function splitIsolationByMocking({
     projects: [
       {
         extends: true,
-        test: { name: "shared-modules", isolate: false, include, exclude: [...exclude, ...asGlobs] },
+        test: {
+          name: "shared-modules",
+          isolate: false,
+          include,
+          exclude: [...exclude, ...asGlobs],
+        },
       },
       { extends: true, test: { name: "isolated", isolate: true, include: asGlobs } },
     ],
