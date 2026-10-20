@@ -1,15 +1,12 @@
 # Redis group queue performance plan
 
-Design only, based on the uncommitted `feat/redis-queue-perf` tree on 19 October 2026. Keep those changes intact. No production edits, commits or stashes are part of this task.
+Written on 19 October 2026 as the plan for the Redis queue performance work in PR #8861.
 
 ## Evidence and target
 
 Reduce Redis CPU per accepted job and per stored span without weakening delivery, ordering or recovery. Queue mechanics stay in `packages/group-queue`; command routing stays in `packages/eventing`; span admission stays in `modules/trace`. Follow [Architecture §§2 and 9](../ARCHITECTURE.md), [queue hash tags](../../../packages/group-queue/adrs/006-redis-cluster-hash-tags.md), and the queue's pending-counter, claimed-job-recovery, staged-job-id-identity, settling-window and cross-group-batch specs.
 
-Evidence read in full:
-
-- Measured report: `/Users/lw/.config/agtop/tmp/langwatch-74bd14fb/bfececc3/lua/report.md`, size-prod, round 12, about 1,200 spans/s offered, Redis limited to one CPU.
-- Earlier static review: `/Users/lw/.config/agtop/tmp/langwatch-74bd14fb/0be9f1ca/lua/astra-review.md`. Its priorities are superseded by measurements below.
+Evidence: one profiled load run at the size-prod profile, about 1,200 spans/s offered, with Redis limited to one CPU. The raw report is not in the repository; every figure this plan relies on is copied below. An earlier static review is superseded by these measurements.
 
 Scripts consume about 41% of one core: 4,700 EVALSHA/s at 88 µs. The 2% `os.clock` sample attributes 51.6% of script CPU to single stage (55 µs, 16.6 calls), 15.3% to stageBatch (102 µs, 36.3 calls, about four jobs), 13.6% to dispatch (3,113 µs, 873 calls), 11.8% to drain (134 µs, 40.8 calls), and 6.1% to complete (40 µs). `redis.call` argument construction, lookup, reply conversion, string interning and hashing dominate; command bodies cost roughly 1 µs. Closure creation is only 0.2%.
 

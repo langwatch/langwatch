@@ -1,7 +1,7 @@
 /**
  * A command's `sendEach` validates each payload alone, routes the valid ones as `send` routes
- * them, and answers every payload at its position. Staging itself is the group queue's
- * (packages/group-queue/specs/send-each.feature).
+ * them, and answers every payload at its position. Spec: specs/command-send-each.feature;
+ * staging itself is the group queue's (packages/group-queue/specs/send-each.feature).
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -75,6 +75,7 @@ afterEach(() => {
 
 describe("QueueManager command facade sendEach", () => {
   describe("given a batch with one payload that fails the command schema", () => {
+    /** @scenario "A payload that fails the command's schema is rejected alone" */
     it("rejects that payload alone and forwards the others, routed, to the shared queue", async () => {
       const forwarded = vi.fn<SharedSendEach>(async (payloads) =>
         payloads.map((): QueueSendResult => ({ status: "staged" })),
@@ -102,6 +103,7 @@ describe("QueueManager command facade sendEach", () => {
   });
 
   describe("given the shared queue answers some payloads as deduplicated or unknown", () => {
+    /** @scenario "Each payload carries the queue's own answer at its position" */
     it("answers each payload with the queue's answer, at its position", async () => {
       const lost = new Error("reply lost");
       const { sendEach } = commandQueue(
@@ -118,6 +120,7 @@ describe("QueueManager command facade sendEach", () => {
   });
 
   describe("given a shared queue without sendEach", () => {
+    /** @scenario "A queue without batch sends takes the payloads one by one" */
     it("sends each payload in turn, a throw answering that payload as unknown", async () => {
       const queue = sharedQueue();
       queue.send.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("down"));

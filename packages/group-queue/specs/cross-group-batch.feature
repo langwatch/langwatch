@@ -29,6 +29,14 @@ Feature: Cross-group batches
     When a worker claims them
     Then no call carries groups of both tenants
 
+  @integration
+  Scenario: Claims from separate listed runs never share a worker slot
+    Given three open listed runs holding one ready group each, of three tenants
+    And a listed consumer with two slots
+    When it claims from every run in one pass
+    Then each group runs alone, never in a call with another run's group
+    And no more than two groups run at once
+
   @unit
   Scenario: One failing group is retried alone while the others complete
     Given a cross-group call fails because of one group

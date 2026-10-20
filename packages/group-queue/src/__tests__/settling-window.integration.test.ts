@@ -53,9 +53,10 @@ async function deleteSuiteKeys(): Promise<void> {
 }
 
 beforeAll(() => {
-  redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-    maxRetriesPerRequest: 0,
-  });
+  redis = new IORedis(
+    process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379",
+    { maxRetriesPerRequest: 0 },
+  );
 });
 
 beforeEach(async () => {

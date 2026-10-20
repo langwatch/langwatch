@@ -13,7 +13,10 @@ const FULL_CLAIM = 32;
 /** The shortest BRPOP wait: a due-but-unclaimable group cannot spin the loop faster. */
 const MIN_SIGNAL_WAIT_MS = 50;
 
-/** Claims sharing a batch slot become one cross-group task; the rest run alone, in claim order. */
+/**
+ * One script reply's claims: those sharing a batch slot become one cross-group task, the rest run
+ * alone, in claim order. Slots are numbered per call, so never pass claims of two calls together.
+ */
 export function dispatchedWorkOf(results: readonly DispatchResult[]): DispatchedWork[] {
   const work: DispatchedWork[] = [];
   const batches = new Map<number, DispatchResult[]>();
@@ -308,7 +311,7 @@ export class GroupQueueDispatcher {
   }
 
   /** One claim over the allow-list, or over each open list in turn while slots remain. */
-  private async claim(maxJobs: number): Promise<DispatchResult[]> {
+  private async claim(maxJobs: number): Promise<DispatchedWork[]> {
     this.claimedAtMs = nowInstant().epochMilliseconds;
     const claimGuardWorkerId = this.params.claimGuardWorkerId?.();
     const guard = claimGuardWorkerId ? { claimGuardWorkerId } : {};
@@ -332,27 +335,31 @@ export class GroupQueueDispatcher {
     if (!this.params.listedGroupsKeys) {
       const allowList = this.params.dispatchGroupAllowListKey;
       this.scannedCandidates = allowList ? [allowList] : [];
-      if (allowList) return claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs });
-      return this.params.scripts.dispatchBatch({
-        nowMs: nowInstant().epochMilliseconds,
-        activeTtlSec: this.params.activeTtlSec,
-        maxJobs,
-        ...this.groupBatchArgs(),
-        ...guard,
-      });
+      if (allowList) {
+        return dispatchedWorkOf(await claimFrom({ allowedGroupsKey: allowList, jobs: maxJobs }));
+      }
+      return dispatchedWorkOf(
+        await this.params.scripts.dispatchBatch({
+          nowMs: nowInstant().epochMilliseconds,
+          activeTtlSec: this.params.activeTtlSec,
+          maxJobs,
+          ...this.groupBatchArgs(),
+          ...guard,
+        }),
+      );
     }
-    const results: DispatchResult[] = [];
+    const work: DispatchedWork[] = [];
     const lists = await this.params.listedGroupsKeys();
     this.scannedCandidates = lists.map((listKey) => `${listKey}:candidates`);
     const first = this.nextList++ % Math.max(lists.length, 1);
     for (const listKey of [...lists.slice(first), ...lists.slice(0, first)]) {
-      if (results.length >= maxJobs) break;
-      const jobs = maxJobs - results.length;
-      results.push(
-        ...(await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey })),
-      );
+      if (work.length >= maxJobs) break;
+      const jobs = maxJobs - work.length;
+      // Each list's reply numbers its batch slots from one, so it is grouped on its own.
+      const claims = await claimFrom({ allowedGroupsKey: `${listKey}:candidates`, jobs, listKey });
+      work.push(...dispatchedWorkOf(claims));
     }
-    return results;
+    return work;
   }
 
   /** Batching for the queue's own claim; listed and allow-listed claims take groups alone. */
@@ -374,10 +381,11 @@ export class GroupQueueDispatcher {
     }
 
     const maxJobs = Math.min(availableSlots, MAX_BATCH_SIZE);
-    const results = await this.claim(maxJobs);
+    let claimed = 0;
 
-    for (const work of dispatchedWorkOf(results)) {
+    for (const work of await this.claim(maxJobs)) {
       const claims = "groups" in work ? work.groups : [work];
+      claimed += claims.length;
       const run = this.params.processingQueue.push(work).catch((err) => {
         this.params.logger.debug(
           {
@@ -395,16 +403,16 @@ export class GroupQueueDispatcher {
       gqJobsDispatchedTotal.inc({ queue_name: this.params.queueName }, claims.length);
     }
 
-    if (results.length > 0) {
+    if (claimed > 0) {
       this.params.logger.debug(
         {
           queueName: this.params.queueName,
-          count: results.length,
+          count: claimed,
         },
         "Batch dispatched jobs from staging to fastq",
       );
     }
 
-    return results.length;
+    return claimed;
   }
 }
