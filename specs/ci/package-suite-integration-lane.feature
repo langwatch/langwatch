@@ -148,6 +148,12 @@ Feature: A package's integration suite runs in CI when it declares one
       Then they never overlap, and light suites run alongside them
 
     @unit
+    Scenario: A shard starts its heaviest suites first
+      Given a shard whose packages differ in recorded weight
+      When the package suites job runs
+      Then it starts them heaviest first, so a long suite does not run alone at the end
+
+    @unit
     Scenario: A package's own suites run one after another, in order
       Given a package with a unit suite and an integration suite
       When the package suites job runs concurrently

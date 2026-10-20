@@ -10,6 +10,7 @@ import {
   exclusionNotices,
   failureAnnotations,
   formatMeasured,
+  heaviestFirst,
   isHeavyPackage,
   jobsFor,
   laneOf,
@@ -495,6 +496,27 @@ void describe("given a shard that runs several suites at once", () => {
       const weightOf = (candidate: DiscoveredPackage) => weights.get(candidate.name) ?? 0;
       assert.equal(isHeavyPackage({ weightOf, pkg: pkg("@fix/light", ["test"]) }), false);
       assert.equal(isHeavyPackage({ weightOf, pkg: pkg("@fix/heavy", ["test"]) }), true);
+    });
+  });
+
+  void describe("when a shard's packages differ in recorded weight", () => {
+    /** @scenario "A shard starts its heaviest suites first" */
+    void it("orders them heaviest first, ties by name", () => {
+      const weights = new Map([
+        ["@fix/b", 50],
+        ["@fix/slow", 300],
+        ["@fix/a", 50],
+      ]);
+      const ordered = heaviestFirst({
+        packages: ["@fix/b", "@fix/quick", "@fix/a", "@fix/slow"].map((name) =>
+          pkg(name, ["test"]),
+        ),
+        weightOf: (candidate) => weights.get(candidate.name) ?? 5,
+      });
+      assert.deepEqual(
+        ordered.map((candidate) => candidate.name),
+        ["@fix/slow", "@fix/a", "@fix/b", "@fix/quick"],
+      );
     });
   });
 

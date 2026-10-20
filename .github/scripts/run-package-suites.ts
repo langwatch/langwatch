@@ -146,6 +146,16 @@ export const parseOnly = (value: string | undefined): Set<string> | undefined =>
  */
 export const HEAVY_SECONDS = 100;
 
+/** Heaviest first, so a long suite is not the last one left running alone. */
+export const heaviestFirst = ({
+  packages,
+  weightOf,
+}: {
+  packages: readonly DiscoveredPackage[];
+  weightOf: (pkg: DiscoveredPackage) => number;
+}): DiscoveredPackage[] =>
+  packages.toSorted((a, b) => weightOf(b) - weightOf(a) || a.name.localeCompare(b.name));
+
 /** Whether a package's recorded weight puts it in the shard-wide heavy slot. */
 export const isHeavyPackage = ({
   weightOf,
@@ -201,10 +211,10 @@ export const balanceShards = <T extends { name: string }>({
 }): T[][] => {
   const loads = Array.from({ length: total }, () => 0);
   const groupOf = new Map<string, number>();
-  const heaviestFirst = items
+  const byWeight = items
     .map((item) => ({ item, weight: weightOf(item) }))
     .toSorted((a, b) => b.weight - a.weight || a.item.name.localeCompare(b.item.name));
-  for (const { item, weight } of heaviestFirst) {
+  for (const { item, weight } of byWeight) {
     const lightest = loads.indexOf(Math.min(...loads));
     groupOf.set(item.name, lightest);
     loads[lightest] += weight;
@@ -645,12 +655,8 @@ if (isEntrypoint()) {
     }
   }
 
-  // Heaviest first, so the long suites are not the last ones left running alone.
-  const heaviestFirst = assigned.toSorted(
-    (a, b) => weightOf(b) - weightOf(a) || a.name.localeCompare(b.name),
-  );
   const statuses = await runJobs({
-    jobs: jobsFor(heaviestFirst, excluded),
+    jobs: jobsFor(heaviestFirst({ packages: assigned, weightOf }), excluded),
     concurrency,
     run: runner.run,
     isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
