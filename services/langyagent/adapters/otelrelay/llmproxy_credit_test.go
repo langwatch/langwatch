@@ -17,8 +17,12 @@ import (
 
 // What the AI gateway answers a streaming /v1/messages call on an Anthropic
 // account with no credit left: Anthropic's 400 body with its message replaced
-// by the gateway's governance message, and the provider's x-should-retry.
-const gatewayCreditExhaustedBody = `{"type":"error","error":{"message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","type":"invalid_request_error"},"request_id":"req_011CTest"}`
+// by the gateway's governance message and its exhaustion code, and the
+// provider's x-should-retry.
+const gatewayCreditExhaustedBody = `{"type":"error","error":{"message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","type":"invalid_request_error","code":"provider_account_exhausted"},"request_id":"req_011CTest"}`
+
+// The same answer from a gateway released before the exhaustion code existed.
+const olderGatewayCreditExhaustedBody = `{"type":"error","error":{"message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","type":"invalid_request_error"},"request_id":"req_011CTest"}`
 
 // Anthropic's own body for the same failure, which a gateway older than the
 // stream-open fix forwarded as a 200 event stream of bare JSON.
@@ -50,7 +54,8 @@ func TestLLMProxy_SpentBalanceBehindTheGatewayIsOutOfCredit(t *testing.T) {
 		contentType string
 		body        string
 	}{
-		{"the gateway's 400 with its governance message", http.StatusBadRequest, "application/json", gatewayCreditExhaustedBody},
+		{"the gateway's 400 with its exhaustion code", http.StatusBadRequest, "application/json", gatewayCreditExhaustedBody},
+		{"an older gateway's 400 with only its governance message", http.StatusBadRequest, "application/json", olderGatewayCreditExhaustedBody},
 		{"a 200 event stream of Anthropic's bare 400 body", http.StatusOK, "text/event-stream", anthropicCreditBalanceBody},
 	}
 	for _, tc := range cases {
@@ -137,7 +142,7 @@ func TestLLMProxy_FailedCallSpanSaysWhy(t *testing.T) {
 	t.Run("a rejected call records status, type, cause and message", func(t *testing.T) {
 		gateway, _ := countingGateway(t, http.StatusBadRequest, "application/json", gatewayCreditExhaustedBody)
 		span := failedCallSpan(t, gateway.URL)
-		wantStr(t, span, "error.type", "invalid_request_error")
+		wantStr(t, span, "error.type", providererr.GatewayAccountExhaustedCode)
 		wantStr(t, span, "langwatch.langy.error_cause", string(ErrProviderOutOfCredit))
 		wantStr(t, span, "error.message", providererr.GatewayAccountExhaustedMessage)
 		wantStatus(t, span, http.StatusBadRequest)
