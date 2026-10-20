@@ -69,7 +69,8 @@ export class EvaluationExecutionIntentService {
     prepared: EvaluationPreparationResult,
   ): Promise<EvaluationProcessingEvent[]> {
     if (prepared.kind === "drop") {
-      return Promise.resolve([]);
+      // A retry that is dropped would leave the run retrying for ever, so it ends as skipped.
+      return (data.attempt ?? 1) > 1 ? this.reportSkip(data, prepared.reason) : Promise.resolve([]);
     }
 
     if (prepared.kind === "reported-skip") {

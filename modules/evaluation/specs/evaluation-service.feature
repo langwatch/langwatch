@@ -400,6 +400,13 @@ Feature: Evaluation service boundary
     And no further attempt is sent
 
   @unit
+  Scenario: A retried evaluation always ends with a result
+    Given attempt 1 failed because the evaluator service was not up
+    When attempt 2 runs again and its monitor is gone or its preconditions are no longer met
+    Then the evaluation is recorded as skipped, not left retrying
+    And attempt 2 is not dropped by the sampling roll that attempt 1 already passed
+
+  @unit
   Scenario: A retrying evaluation shows as in progress
     Given the evaluator service is not up yet
     When an attempt of the evaluation fails inside the retry window

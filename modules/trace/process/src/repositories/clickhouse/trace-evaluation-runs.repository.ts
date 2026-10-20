@@ -58,26 +58,21 @@ const ATTEMPT_COLUMNS = {
   NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
 } as const;
 
-/** A `DateTime64(3)` as JSONEachRow answers it (UTC text, or a number), in epoch ms. */
-function getEpochMs(value: number | string): number {
-  if (typeof value === "number") return value;
-  if (/^\d+$/.test(value)) return Number(value);
-  const iso = value.replace(" ", "T");
-  const parsed = Date.parse(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
-  if (!Number.isFinite(parsed)) throw new Error(`unreadable ClickHouse moment: ${value}`);
-  return parsed;
-}
+/** The attempt moments in epoch ms, read off the attempt columns' aliases. */
+const ATTEMPT_MOMENTS = [
+  "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
+  "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
+].join(", ");
 
 const chFlag = z.union([z.boolean(), z.number(), z.string()]);
 const nullableString = z.string().nullable();
 const nullableNumber = chNumber.nullable();
-const moment = z.union([z.number(), z.string()]).nullable();
 
 const attemptRowShape = {
   Attempts: chNumber.optional(),
-  LastAttemptAt: moment.optional(),
+  LastAttemptAtMs: nullableNumber.optional(),
   LastAttemptError: nullableString.optional(),
-  NextAttemptAt: moment.optional(),
+  NextAttemptAtMs: nullableNumber.optional(),
 };
 
 const summaryRowSchema = z.looseObject({
@@ -124,11 +119,9 @@ type AttemptRow = z.infer<z.ZodObject<typeof attemptRowShape>>;
 function attemptFields(row: AttemptRow) {
   return {
     attempts: row.Attempts ?? 0,
-    lastAttemptAt:
-      row.LastAttemptAt == null || row.LastAttemptAt === "" ? null : getEpochMs(row.LastAttemptAt),
+    lastAttemptAt: row.LastAttemptAtMs ?? null,
     lastAttemptError: row.LastAttemptError ?? null,
-    nextAttemptAt:
-      row.NextAttemptAt == null || row.NextAttemptAt === "" ? null : getEpochMs(row.NextAttemptAt),
+    nextAttemptAt: row.NextAttemptAtMs ?? null,
   };
 }
 
@@ -245,7 +238,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
           toUnixTimestamp64Milli(${RUNS}.ArchivedAt) AS ArchivedAt,
           toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
           toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
-          toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId, ${input.attempts},
+          toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId, ${input.attempts}, ${ATTEMPT_MOMENTS},
           toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
         FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
         WHERE ${input.tenantPredicate}
@@ -430,7 +423,7 @@ export class ClickHouseTraceEvaluationRunsRepository extends TraceEvaluationRuns
   }): Promise<Record<string, TraceEvaluationData[]>> {
     const result = await input.client.query({
       query: `
-        SELECT ${input.columns}, ${input.attempts}
+        SELECT ${input.columns}, ${input.attempts}, ${ATTEMPT_MOMENTS}
         FROM ${EVALUATION_RUNS_TABLE} AS ${RUNS}
         WHERE ${input.tenantPredicate}
           AND ${RUNS}.TraceId IN ({traceIds:Array(String)})

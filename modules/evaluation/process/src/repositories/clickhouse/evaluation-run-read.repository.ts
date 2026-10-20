@@ -45,15 +45,16 @@ const ATTEMPT_COLUMNS = {
   NextAttemptAt: "CAST(NULL AS Nullable(DateTime64(3)))",
 } as const;
 
-/** A `DateTime64(3)` as JSONEachRow answers it (UTC text, or a number), in epoch ms. */
-function getEpochMs(value: number | string): number {
-  if (typeof value === "number") return value;
-  if (/^\d+$/.test(value)) return Number(value);
-  const iso = value.replace(" ", "T");
-  const parsed = Date.parse(/[Zz]$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : `${iso}Z`);
-  if (!Number.isFinite(parsed)) throw new Error(`unreadable ClickHouse moment: ${value}`);
-  return parsed;
-}
+/** The attempt moments in epoch ms, read off the attempt columns' aliases. */
+const ATTEMPT_MOMENTS = [
+  "toUnixTimestamp64Milli(LastAttemptAt) AS LastAttemptAtMs",
+  "toUnixTimestamp64Milli(NextAttemptAt) AS NextAttemptAtMs",
+].join(", ");
+
+type ClickHouseEvaluationRunRow = ClickHouseEvaluationRunRecord & {
+  LastAttemptAtMs: number | string | null;
+  NextAttemptAtMs: number | string | null;
+};
 
 /** The tenant an unhinted read's retention floor is read for: the one it reads, else its own. */
 function retentionTenantOf(authorization: Authorization): string {
@@ -138,7 +139,7 @@ export class EvaluationRunClickHouseReadRepository {
   }
 
   async getByEvaluationId(input: EvaluationRunFloorLookup): Promise<EvaluationRunData> {
-    let row: ClickHouseEvaluationRunRecord | undefined;
+    let row: ClickHouseEvaluationRunRow | undefined;
     try {
       const { scheduledAtFrom, scheduledAtTo } = await this.resolveScheduledAtRange(input);
       const bounds = (column: string): string =>
@@ -153,7 +154,7 @@ export class EvaluationRunClickHouseReadRepository {
       });
       // The outer scope's bare `ScheduledAt` is the UInt64 alias below, so the windowed fence
       // reads the raw column in the dedup subquery; the outer scope takes the tenant set alone.
-      const result = await client.query<ClickHouseEvaluationRunRecord>({
+      const result = await client.query<ClickHouseEvaluationRunRow>({
         query: `
           SELECT
             t.ProjectionId AS ProjectionId, t.TenantId AS TenantId,
@@ -169,7 +170,7 @@ export class EvaluationRunClickHouseReadRepository {
             toUnixTimestamp64Milli(t.ScheduledAt) AS ScheduledAt,
             toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(t.CompletedAt) AS CompletedAt,
-            t.CostId AS CostId, ${attempts},
+            t.CostId AS CostId, ${attempts}, ${ATTEMPT_MOMENTS},
             t.LastProcessedEventId AS LastProcessedEventId,
             toUnixTimestamp64Milli(t.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS t
@@ -219,7 +220,7 @@ export class EvaluationRunClickHouseReadRepository {
         authorization: input.authorization,
         alias: RUNS,
       });
-      const result = await client.query<ClickHouseEvaluationRunRecord>({
+      const result = await client.query<ClickHouseEvaluationRunRow>({
         query: `
           SELECT ProjectionId, TenantId, EvaluationId, Version, EvaluatorId,
             EvaluatorType, EvaluatorName, TraceId, IsGuardrail, Status, Score,
@@ -230,7 +231,7 @@ export class EvaluationRunClickHouseReadRepository {
             toUnixTimestamp64Milli(${RUNS}.ScheduledAt) AS ScheduledAt,
             toUnixTimestamp64Milli(${RUNS}.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(${RUNS}.CompletedAt) AS CompletedAt, CostId,
-            ${attempts}, LastProcessedEventId,
+            ${attempts}, ${ATTEMPT_MOMENTS}, LastProcessedEventId,
             toUnixTimestamp64Milli(${RUNS}.LastEventOccurredAt) AS LastEventOccurredAt
           FROM ${TABLE_NAME} AS ${RUNS}
           WHERE ${tenantSet()}
@@ -362,7 +363,7 @@ export class EvaluationRunClickHouseReadRepository {
     return Number.isFinite(value) && value > 0 ? value : undefined;
   }
 
-  private fromClickHouseRecord(row: ClickHouseEvaluationRunRecord): EvaluationRunData {
+  private fromClickHouseRecord(row: ClickHouseEvaluationRunRow): EvaluationRunData {
     return evaluationRunDataSchema.parse({
       evaluationId: row.EvaluationId,
       evaluatorId: row.EvaluatorId,
@@ -387,15 +388,9 @@ export class EvaluationRunClickHouseReadRepository {
       completedAt: toNumberOrNull(row.CompletedAt),
       costId: row.CostId,
       attempts: Number(row.Attempts ?? 0),
-      lastAttemptAt:
-        row.LastAttemptAt == null || row.LastAttemptAt === ""
-          ? null
-          : getEpochMs(row.LastAttemptAt),
+      lastAttemptAt: toNumberOrNull(row.LastAttemptAtMs ?? null),
       lastAttemptError: row.LastAttemptError ?? null,
-      nextAttemptAt:
-        row.NextAttemptAt == null || row.NextAttemptAt === ""
-          ? null
-          : getEpochMs(row.NextAttemptAt),
+      nextAttemptAt: toNumberOrNull(row.NextAttemptAtMs ?? null),
     });
   }
 }

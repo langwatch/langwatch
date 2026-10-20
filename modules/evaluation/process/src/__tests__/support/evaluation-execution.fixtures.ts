@@ -266,7 +266,9 @@ export function buildExecutionDeps(
   executionReceipt: TestEvaluationExecutionReceipt;
   retries: TestEvaluationRetries;
 } {
-  const monitors = new TestMonitorLookup(options.monitor ?? buildMonitor());
+  const monitors = new TestMonitorLookup(
+    options.monitor === undefined ? buildMonitor() : options.monitor,
+  );
   const traces = new TestTraceApi();
   const evaluations = new TestEvaluationService();
   if (options.executionResult)
