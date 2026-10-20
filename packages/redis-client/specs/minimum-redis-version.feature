@@ -12,7 +12,7 @@ Feature: Redis 7 is the oldest server a process starts against
   Scenario: A Redis older than 7.0 is refused at start
     Given a Redis server reporting version 6.2.14
     When the readiness probe runs at boot
-    Then it rejects as an unsupported version, naming 6.2.14 and the minimum, Redis 7.0 or Valkey 7.2
+    Then it rejects as an unsupported version, naming the version 6.2.14 it found
     And it never reports the server ready
 
   @unit

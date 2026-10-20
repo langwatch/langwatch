@@ -286,7 +286,7 @@ Roughly 1 KB per span (compressed). See [Sizing & Scaling](/self-hosting/configu
 
 ### Can I use an existing PostgreSQL, Redis?
 
-Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start against an older server. Use the external database overlays:
+Yes. Redis must be 7.0 or later (or Valkey 7.2 or later); LangWatch refuses to start when the server reports an older version (a server that does not report its version starts with a warning). Use the external database overlays:
 
 ```bash
 helm install langwatch langwatch/langwatch \

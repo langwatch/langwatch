@@ -2292,7 +2292,7 @@ const registerPreflightTargetsScript = new CachedLuaScript(REGISTER_PREFLIGHT_TA
  * had). A larger set returns `{-1}` untouched, so no call ever walks more than `maxGroups`.
  */
 const INSPECT_PREFLIGHT_PAGE_LUA =
-  "#!lua flags=no-writes\n" +
+  "#!lua flags=no-writes,allow-oom\n" +
   PREFLIGHT_GROUP_STATE_LUA +
   `
 local targetKey = KEYS[1]

@@ -56,7 +56,7 @@ const UNKNOWN_LABELS: GroupLabels = {
  * Reads each group's head job routing header (p/t/n) on Redis, so the payload
  * never crosses the wire. KEYS[1] only routes the call to the queue's slot.
  */
-const groupRoutingLabelsScript = new CachedLuaScript(`#!lua flags=no-writes
+const groupRoutingLabelsScript = new CachedLuaScript(`#!lua flags=no-writes,allow-oom
 ${ROUTING_META_HELPER_LUA}
 local keyPrefix = ARGV[1]
 local out = {}

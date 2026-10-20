@@ -7,7 +7,8 @@ Feature: Queue scripts at the Redis memory cap
   (staging, retry re-stage, redrive, lease writes) declares `#!lua`, which Redis refuses before it
   runs while memory is over the cap. A script the queue needs to drain (claim, complete, drain,
   dead-letter, sweeps, reaper deletes) declares `#!lua flags=allow-oom` and always runs.
-  Read-only scripts declare `#!lua flags=no-writes`.
+  Read-only scripts declare `#!lua flags=no-writes,allow-oom`, since Redis 7.0.0 refuses a
+  `no-writes` script at the cap unless it also allows it.
 
   Background:
     Given a GroupQueue's staging scripts on a real Redis whose eviction policy is noeviction
