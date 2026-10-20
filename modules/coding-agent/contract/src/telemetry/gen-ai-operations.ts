@@ -34,13 +34,6 @@ export function genAiOperationRoleOf({
   return ROLES.find((role) => operations[role] === operation) ?? "undeclared";
 }
 
-/** Agents whose keyless spans are ambient telemetry, never a session of their own trace. */
-export const SPANS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
-  CODING_AGENT_REGISTRY.filter((agent) => agent.spansRequireSessionKey === true).map(
-    (agent) => agent.id,
-  ),
-);
-
 /** The declared AI-unit count and surface one span carries, as session facts. */
 export function declaredSpanSessionFacts({
   agent,
