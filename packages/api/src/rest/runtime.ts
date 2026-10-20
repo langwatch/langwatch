@@ -113,6 +113,7 @@ import {
   MalformedRequestError,
   loggerMiddleware,
   multipartMiddleware,
+  readRequestBody,
   refusingMalformedBody,
   requestValidationErrorFrom,
   restCacheKey,
@@ -911,7 +912,7 @@ function rawBodyMiddleware(rawBody: RestRawBody): MiddlewareHandler {
       return;
     }
 
-    const bytes = new Uint8Array(await context.req.raw.arrayBuffer());
+    const bytes = new Uint8Array(await readRequestBody(() => context.req.raw.arrayBuffer()));
 
     context.set(ROUTE_RAW_BODY, rawBody.form === "text" ? TEXT.decode(bytes) : bytes);
     await next();
