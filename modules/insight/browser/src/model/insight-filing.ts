@@ -5,10 +5,11 @@
  */
 
 import {
+  type ActionableInsightTone,
   DEFAULT_INSIGHT_VALID_DAYS,
   type FileInsightInput,
-  type InsightTone,
   insightReplaySchema,
+  isActionableTone,
 } from "@langwatch/insight-contract";
 import type {
   LangyAnswerSubject,
@@ -18,11 +19,11 @@ import type {
 
 import { titleFromAnswer } from "./insight-presentation.ts";
 
-/** The words the save form starts with. */
+/** The words the save form starts with; a new insight names a next step, so never `good`. */
 export type InsightDraft = {
   title: string;
   body: string;
-  tone: InsightTone;
+  tone: ActionableInsightTone;
   topic: string;
   validDays: number;
 };
@@ -41,12 +42,15 @@ export function draftOfAnswer(answerText: string): InsightDraft {
   };
 }
 
-/** One finding of an answer's insights card, word for word as Langy typed it. */
+/**
+ * One finding of an answer's insights card, word for word. An older card's good news starts as
+ * Check this: a new insight names a next step.
+ */
 export function draftOfFinding(finding: LangyInsightsCardFinding): InsightDraft {
   return {
     title: finding.title,
     body: finding.body,
-    tone: finding.tone,
+    tone: isActionableTone(finding.tone) ? finding.tone : "watch",
     topic: finding.topic ?? "",
     validDays: finding.validDays ?? DEFAULT_INSIGHT_VALID_DAYS,
   };

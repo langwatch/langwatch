@@ -11,6 +11,7 @@ import {
   type InsightRunFailureReason,
   type InsightRunFinding,
   insightRunFindingsSchema,
+  isActionableTone,
 } from "@langwatch/insight-contract";
 import { type LangyInsightsCardFinding, langyInsightsCardPartsOf } from "@langwatch/langy-contract";
 
@@ -53,7 +54,12 @@ export type CheckedFinding = Readonly<
 type RunAnswerFault = Extract<InsightRunFailureReason, "bad_output" | "finding_has_url">;
 
 type RunAnswerCheck =
-  | Readonly<{ ok: true; findings: CheckedFinding[] }>
+  | Readonly<{
+      ok: true;
+      findings: CheckedFinding[];
+      /** Findings dropped for the `good` tone: they name no next step. */
+      droppedGoodCount: number;
+    }>
   | Readonly<{ ok: false; reason: RunAnswerFault }>;
 
 const REFUSED: RunAnswerCheck = { ok: false, reason: "bad_output" };
@@ -162,7 +168,9 @@ export function checkRunAnswer({
   // Asked of every finding the answer holds, filed or not: one link taints the whole answer.
   if (parsed.data.findings.some(holdsWebAddress)) return { ok: false, reason: "finding_has_url" };
 
-  const findings = parsed.data.findings
+  // Good news names no next step. Dropped before the cut, so it takes no actionable one's place.
+  const actionable = parsed.data.findings.filter(({ tone }) => isActionableTone(tone));
+  const findings = actionable
     .slice(0, maxInsights)
     .map(({ widgetId, topic, lwql, key, renews, ...words }) => {
       const widget = widgets.find((candidate) => candidate.id === widgetId);
@@ -181,5 +189,5 @@ export function checkRunAnswer({
         renews: renews ?? null,
       };
     });
-  return { ok: true, findings };
+  return { ok: true, findings, droppedGoodCount: parsed.data.findings.length - actionable.length };
 }

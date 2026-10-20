@@ -15,6 +15,7 @@ import {
   LWQL_PERIOD_START_PARAMETER,
 } from "@langwatch/analytics-contract";
 import {
+  ACTIONABLE_INSIGHT_TONES,
   INSIGHT_RUN_FINDING_BODY_MAX,
   INSIGHT_RUN_FINDING_KEY_MAX,
   INSIGHT_RUN_FINDING_TITLE_MAX,
@@ -112,6 +113,7 @@ describe("checkRunAnswer", () => {
             renews: null,
           },
         ],
+        droppedGoodCount: 0,
       });
     });
 
@@ -135,7 +137,7 @@ describe("checkRunAnswer", () => {
     });
 
     it("takes an empty list as nothing to report", () => {
-      expect(check(answer([]))).toEqual({ ok: true, findings: [] });
+      expect(check(answer([]))).toEqual({ ok: true, findings: [], droppedGoodCount: 0 });
     });
 
     it("cuts more findings than the maximum to the first ones", () => {
@@ -311,7 +313,36 @@ describe("checkRunAnswer", () => {
         findings: [
           expect.objectContaining({ widget: { id: "widget-cost", name: "Cost per day" } }),
         ],
+        droppedGoodCount: 0,
       });
+    });
+  });
+
+  describe("given an answer that holds a good finding", () => {
+    /** @scenario "A good finding takes no place among the maximum" */
+    it("drops it before the cut, keeps the actionable ones and counts what it dropped", () => {
+      const findings = [
+        good({ title: "Cost fell", tone: "good" }),
+        good({ title: "one" }),
+        good({ title: "two", tone: "watch" }),
+        good({ title: "three" }),
+      ];
+      const checked = check(answer(findings), 3);
+
+      expect(checked.ok && checked.findings.map(({ title, tone }) => [title, tone])).toEqual([
+        ["one", "bad"],
+        ["two", "watch"],
+        ["three", "bad"],
+      ]);
+      expect(checked.ok && checked.droppedGoodCount).toBe(1);
+      // Stored insights keep the tone, so an old one still reads.
+      expect(INSIGHT_TONES).toContain("good");
+    });
+
+    it("still refuses the answer whole when the good finding holds a link", () => {
+      const linked = good({ tone: "good", body: "See https://evil.example/r" });
+
+      expect(check(answer([good(), linked]))).toEqual({ ok: false, reason: "finding_has_url" });
     });
   });
 
@@ -348,8 +379,8 @@ describe("checkRunAnswer", () => {
       expect(skill).toContain(`at most ${INSIGHT_RUN_FINDING_TITLE_MAX} characters`);
       expect(skill).toContain("at most 4,000 characters");
       expect(skill).toContain(`at most ${INSIGHT_RUN_FINDING_KEY_MAX} characters`);
-      expect(INSIGHT_TONES).toEqual(["bad", "watch", "good"]);
-      expect(skill).toContain("`tone` (required): `bad`, `watch` or `good`.");
+      expect(ACTIONABLE_INSIGHT_TONES).toEqual(["bad", "watch"]);
+      expect(skill).toContain("`tone` (required): `bad` or `watch`.");
       expect(skill).toContain(`\`\`\`${LANGY_CARD_FENCE_TAG}`);
       for (const parameter of [
         `{${LWQL_PERIOD_START_PARAMETER}:DateTime}`,

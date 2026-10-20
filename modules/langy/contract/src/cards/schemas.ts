@@ -169,7 +169,10 @@ export const choicesCardFields = {
   bare: z.boolean().optional(),
 } as const;
 
-/** Langy's verdict on a finding: it got worse, it is worth a look, or it got better. */
+/**
+ * Langy's verdict on a finding: `bad` (act now) or `watch` (check this), each naming a next
+ * step. `good` is no longer asked for or filed; it stays so stored cards and insights still read.
+ */
 export const INSIGHTS_CARD_TONES = ["bad", "watch", "good"] as const;
 
 /** A card lists more findings than a run files, never an unbounded list. */

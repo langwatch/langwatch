@@ -1,6 +1,6 @@
 /**
  * The unread pill beside the sidebar's Insights entry, lent through `InsightsNavCountToken`:
- * green when the unseen news skews good, red otherwise; nothing at zero.
+ * red for any unseen bad, amber for unseen watch, green only for older good; nothing at zero.
  */
 
 import type { InsightsNavCountProps } from "@langwatch/insight-contract";

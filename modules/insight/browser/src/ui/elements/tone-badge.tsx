@@ -3,7 +3,7 @@ import type { InsightTone } from "@langwatch/insight-contract";
 
 import { TONE_PRESENTATION } from "../../model/insight-presentation.ts";
 
-/** WARNING / WORTH A LOOK / GOOD NEWS: the verdict in words, on the verdict's colour. */
+/** ACT NOW / CHECK THIS (GOOD NEWS on older insights): the verdict in words, on its colour. */
 export function ToneBadge({ tone }: { tone: InsightTone }) {
   const { label, color } = TONE_PRESENTATION[tone];
   return (

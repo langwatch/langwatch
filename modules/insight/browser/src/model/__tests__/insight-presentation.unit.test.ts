@@ -1,12 +1,18 @@
 /**
- * The line under an insight's title as the page prints it, and the plain text Copy writes.
+ * The verdict in words, the line under an insight's title as the page prints it, and the plain
+ * text Copy writes.
  * @see modules/insight/specs/insight-inbox.feature
  */
 
 import { describe, expect, it } from "vitest";
 
 import { insightEntry } from "../../testing.tsx";
-import { insightPlainText, insightValidity, replayCaption } from "../insight-presentation.ts";
+import {
+  insightPlainText,
+  insightValidity,
+  replayCaption,
+  TONE_PRESENTATION,
+} from "../insight-presentation.ts";
 
 const DAY_MS = 86_400_000;
 /** Midday, so a day in any time zone the suite runs in is the same calendar day. */
@@ -149,5 +155,18 @@ describe("given an insight filed with no board and no window", () => {
         "Checkout errors doubled\n\nCheckout errors doubled overnight.",
       );
     });
+  });
+});
+
+describe("given the verdict an insight carries", () => {
+  /** @scenario "A verdict reads Act now or Check this" */
+  it("reads bad as Act now and watch as Check this", () => {
+    expect(TONE_PRESENTATION.bad.label).toBe("Act now");
+    expect(TONE_PRESENTATION.watch.label).toBe("Check this");
+  });
+
+  /** @scenario "An insight stored with the good tone still reads Good news" */
+  it("still reads good as Good news, for an insight stored before it was retired", () => {
+    expect(TONE_PRESENTATION.good).toEqual({ label: "Good news", color: "green.solid" });
   });
 });

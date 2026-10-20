@@ -15,7 +15,11 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { INSIGHT_TONES, insightBodySchema, insightTitleSchema } from "@langwatch/insight-contract";
+import {
+  ACTIONABLE_INSIGHT_TONES,
+  insightBodySchema,
+  insightTitleSchema,
+} from "@langwatch/insight-contract";
 import type { LangyAnswerActionProps } from "@langwatch/langy-contract";
 import { BookmarkPlus, Check } from "lucide-react";
 import { useState } from "react";
@@ -178,11 +182,12 @@ function SaveAsInsightDialog({
                       setDraft({
                         ...draft,
                         tone:
-                          INSIGHT_TONES.find((value) => value === event.target.value) ?? "watch",
+                          ACTIONABLE_INSIGHT_TONES.find((value) => value === event.target.value) ??
+                          "watch",
                       })
                     }
                   >
-                    {INSIGHT_TONES.map((value) => (
+                    {ACTIONABLE_INSIGHT_TONES.map((value) => (
                       <option key={value} value={value}>
                         {TONE_PRESENTATION[value].label}
                       </option>

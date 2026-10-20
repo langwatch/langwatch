@@ -7,7 +7,7 @@
 
 import type { UiProcedureCall } from "@langwatch/browser/testing-transport";
 import type { LangyAnswerSubject, LangyDerivedInsightsCard } from "@langwatch/langy-contract";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 
@@ -155,13 +155,24 @@ describe("given a Langy answer that carries an insights card", () => {
       expect(filings[0]?.input).toMatchObject({
         title: "Cost per trace fell",
         body: "From 0.12 to 0.08 dollars.",
-        tone: "good",
+        tone: "watch",
         validDays: 7,
         board: { id: "board-1", name: "Checkout health", widget: null },
       });
       expect(filings[0]?.input).not.toHaveProperty("lwql");
       expect(filings[0]?.input).not.toHaveProperty("replay");
       expect(filings[0]?.input).not.toHaveProperty("topic");
+    });
+
+    /** @scenario "The save form offers Act now and Check this, and no Good news" */
+    it("offers Act now and Check this as the verdict, with no Good news", async () => {
+      mountCardAnswer();
+
+      await openDialog();
+
+      const verdict = await screen.findByRole("combobox", { name: "Verdict" });
+      const options = within(verdict).getAllByRole("option");
+      expect(options.map((option) => option.textContent)).toEqual(["Act now", "Check this"]);
     });
 
     it("offers the findings not saved yet, and says saved once every one is", async () => {

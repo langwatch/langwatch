@@ -93,6 +93,19 @@ that fails either check is dropped and its finding is filed without it. The owne
 person, the board is the run's board, and the window of a finding's query is the run's own
 window.
 
+**A run files only findings that name a next step.** Owner decision of 2026-10-20 (issue
+#8859): the inbox holds only what a person can act on. The skill asks for a finding only
+when Langy can name a concrete next step, said in its body, with one of two tones: `bad`
+(read as "Act now": it got worse or is broken, and the body says what to do) or `watch`
+(read as "Check this": it may matter, and the body says exactly what to check). It never
+asks for an improvement on its own. The `good` tone ("Good news") names no next step, so
+the check drops a `good` finding before the cut to the run's maximum: it takes no place,
+is never filed or renewed, and the run logs how many it dropped. A model slip therefore
+files nothing. The checks above still apply to it, so a link in a dropped finding still
+refuses the answer. `good` stays in `INSIGHT_TONES` and the stored schema, so an insight
+filed before this reads and renders as before; `ACTIONABLE_INSIGHT_TONES` in the contract
+names the two a run files and the save form offers.
+
 **Delivery is at least once.** The outbox may carry a run out twice. Every id and
 instant is derived from the run: the Langy idempotency key is the schedule and run
 id, each insight id is a digest of the schedule, the run and the finding's position,

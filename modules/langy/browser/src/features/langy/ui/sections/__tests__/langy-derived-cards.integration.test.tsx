@@ -241,7 +241,7 @@ describe("given an answer that carries an insights card", () => {
     const rows = screen.getAllByTestId("derived-insight-finding");
     expect(derivedFrames()).toHaveLength(1);
     expect(rows.map((row) => row.dataset.tone)).toEqual(["bad", "good"]);
-    expect(rows[0]?.textContent).toContain("Warning");
+    expect(rows[0]?.textContent).toContain("Act now");
     expect(rows[0]?.textContent).toContain("errors");
     expect(rows[0]?.textContent).toContain("Checkout errors doubled");
     expect(rows[0]?.textContent).toContain("rose from 41 to 96");

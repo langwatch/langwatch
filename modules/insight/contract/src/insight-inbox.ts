@@ -49,12 +49,15 @@ export type InsightInbox = Readonly<{
   unseen: readonly InsightEntry[];
   /** What the bell and the sidebar count show. */
   count: number;
-  /** Langy's verdict balance over the unseen news: more good than bad reads green. */
-  tone: "good" | "bad";
+  /** The most urgent verdict among the unseen news, so the pill names the next step. */
+  tone: InsightTone;
 }>;
 
-function countTone(entries: readonly InsightEntry[], tone: InsightTone): number {
-  return entries.filter((entry) => entry.tone === tone).length;
+/** Any `bad` reads Act now, else any `watch` reads Check this; only older `good` reads green. */
+function unseenTone(unseen: readonly InsightEntry[]): InsightTone {
+  if (unseen.some((entry) => entry.tone === "bad")) return "bad";
+  if (unseen.some((entry) => entry.tone === "watch")) return "watch";
+  return "good";
 }
 
 export function deriveInsightInbox({
@@ -75,7 +78,7 @@ export function deriveInsightInbox({
     ...folders,
     unseen,
     count: unseen.length,
-    tone: countTone(unseen, "good") >= countTone(unseen, "bad") ? "good" : "bad",
+    tone: unseenTone(unseen),
   };
 }
 

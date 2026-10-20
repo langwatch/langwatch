@@ -44,7 +44,7 @@ export const DEFAULT_INSIGHTS_SETTINGS: InsightsSettings = {
     "",
     "- File a couple of insights at most. Insist on the issues that matter; fifteen a day is noise nobody acts on.",
     "- Write the headline in plain english. The reader should decide in one sentence whether to care.",
-    "- Judge each one: good news or bad. The inbox takes its color from the balance.",
+    "- Judge each one: act now or check this, and name the next step.",
     "- Estimate how many days each insight stays true and set its validity. Let stale ones fall away.",
     "- If an open insight is still true, renew it instead of filing a duplicate.",
     "- Attach evidence: the query and chart that show it, the signal that caught it, or the traces that prove it.",

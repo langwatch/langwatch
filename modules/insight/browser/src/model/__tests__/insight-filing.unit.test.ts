@@ -34,6 +34,13 @@ describe("draftOfFinding", () => {
     it("leaves the topic empty and the validity at a week when the finding names neither", () => {
       expect(draftOfFinding(finding())).toMatchObject({ topic: "", validDays: 7 });
     });
+
+    /** @scenario "A good finding of an older card starts the save form as Check this" */
+    it("starts a good finding as watch, and keeps a bad or a watch one as it is", () => {
+      expect(draftOfFinding(finding({ tone: "good" })).tone).toBe("watch");
+      expect(draftOfFinding(finding({ tone: "watch" })).tone).toBe("watch");
+      expect(draftOfFinding(finding({ tone: "bad" })).tone).toBe("bad");
+    });
   });
 });
 
