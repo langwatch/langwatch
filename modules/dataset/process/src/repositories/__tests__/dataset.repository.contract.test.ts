@@ -188,6 +188,34 @@ function contractCases(backend: Backend): void {
       expect(page.records).toHaveLength(1);
     });
 
+    /** @scenario "Entries written together list in the byte order of their ids" */
+    it("lists entries written together in the byte order of their ids", async () => {
+      const dataset = await create("byte-ordered");
+      const inByteOrder = ["Aaa", "Zzz", "aaa", "bbb", "zzz"];
+
+      const created = await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        entries: ["bbb", "Zzz", "aaa", "zzz", "Aaa"].map((id) => ({ id, input: id })),
+      });
+      const listed = await backend.records().listAll({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        page: 1,
+        limit: 50,
+      });
+      const afterZzz = await backend.records().findPage({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        limit: 50,
+        cursorId: "Zzz",
+      });
+
+      expect(created.map((record) => record.id)).toEqual(inByteOrder);
+      expect(listed.records.map((record) => record.id)).toEqual(inByteOrder);
+      expect(afterZzz.map((record) => record.id)).toEqual(["aaa", "bbb", "zzz"]);
+    });
+
     it("removes only the entries it was asked to remove", async () => {
       const dataset = await create("deleted");
 
