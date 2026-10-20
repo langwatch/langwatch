@@ -286,6 +286,13 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the codex model is dropped from topic clustering, which falls back to the cascade
 
   @unit
+  Scenario: Saving a config whose only model is a stored Codex clustering model is refused, not deleted
+    Given a saved default-models config whose only model is a codex model for topic clustering
+    When the config is saved again without clearing it
+    Then the save is refused as a validation error asking for another model
+    And the config and its scopes are kept
+
+  @unit
   Scenario: Newly picking a Codex model for topic clustering is still refused
     Given a saved default-models config with no topic clustering model
     When a codex model is picked for topic clustering and the config is saved

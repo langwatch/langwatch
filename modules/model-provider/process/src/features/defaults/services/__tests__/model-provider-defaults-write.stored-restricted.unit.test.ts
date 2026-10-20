@@ -19,8 +19,12 @@ const SCOPE = { scopeType: "PROJECT" as const, scopeId: "project-1" };
 
 function writerOver(existing: ModelDefaultConfig) {
   const saved: Record<string, string>[] = [];
+  const deleted: string[] = [];
   const defaults = {
     getById: async () => existing,
+    delete: async (id: string) => {
+      deleted.push(id);
+    },
     save: async (input: { config: Record<string, string> }) => {
       saved.push(input.config);
       return { ...existing, config: input.config };
@@ -36,7 +40,7 @@ function writerOver(existing: ModelDefaultConfig) {
     ids: idService,
     scopes,
   });
-  return { writer, saved };
+  return { writer, saved, deleted };
 }
 
 function storedConfig(config: Record<string, string>): ModelDefaultConfig {
@@ -62,6 +66,23 @@ describe("ModelProviderDefaultsWriteService.save", () => {
         });
 
         expect(saved).toEqual([{ FAST: CODEX_MODEL, DEFAULT: "openai/gpt-5" }]);
+      });
+    });
+  });
+
+  describe("given a stored config whose only model is a codex clustering model", () => {
+    const existing = storedConfig({ [TOPIC_CLUSTERING]: CODEX_MODEL });
+
+    describe("when the config is saved again without clearing it", () => {
+      /** @scenario "Saving a config whose only model is a stored Codex clustering model is refused, not deleted" */
+      it("refuses the save and deletes nothing", async () => {
+        const { writer, saved, deleted } = writerOver(existing);
+
+        await expect(
+          writer.save({ id: existing.id, scopes: [SCOPE, { ...SCOPE, scopeId: "project-2" }] }),
+        ).rejects.toMatchObject({ code: "validation_error" });
+        expect(saved).toEqual([]);
+        expect(deleted).toEqual([]);
       });
     });
   });

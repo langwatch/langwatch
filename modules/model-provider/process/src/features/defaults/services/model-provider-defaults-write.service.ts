@@ -63,10 +63,16 @@ export class ModelProviderDefaultsWriteService {
       return this.deleteEmptyConfig(parsed.actorId, existing);
     }
 
+    const submitted = parsed.config ?? existing?.config ?? {};
     const config = this.options.catalog.sanitizeDefaultConfig({
-      config: parsed.config ?? existing?.config ?? {},
+      config: submitted,
       stored: existing?.config,
     });
+    if (Object.keys(config).length === 0 && hasPickedModel(submitted)) {
+      throw new ModelDefaultValidationError(
+        "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
+      );
+    }
     if (Object.keys(config).length === 0) {
       if (existing) {
         return this.deleteEmptyConfig(parsed.actorId, existing);
@@ -141,4 +147,9 @@ export class ModelProviderDefaultsWriteService {
 
     return existing;
   }
+}
+
+/** True when the caller kept at least one model, i.e. did not ask to clear the config. */
+function hasPickedModel(config: Record<string, string>): boolean {
+  return Object.values(config).some((model) => model.length > 0);
 }

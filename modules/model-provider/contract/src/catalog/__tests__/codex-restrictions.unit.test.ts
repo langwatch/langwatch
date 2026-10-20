@@ -131,17 +131,6 @@ describe("codexRestrictions", () => {
         expect(findFeatureByKey(key)[0]?.role, `"${key}" must be a FAST feature`).toBe("FAST");
       }
     });
-
-    describe("when topic clustering asks whether a codex model may run it", () => {
-      it("refuses, because clustering runs in the evaluation service, not the gateway", () => {
-        expect(
-          isModelAllowedForFeature({
-            modelId: CODEX_DEFAULT_MODEL,
-            featureKey: "analytics.topic_clustering_llm",
-          }),
-        ).toBe(false);
-      });
-    });
   });
 
   it("pins the allowed set: langy.chat plus the gateway-run FAST tier", () => {
