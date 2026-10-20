@@ -14,7 +14,11 @@ import { buildTimeseriesQuery } from "../clickhouse.aggregation-builder.mapper.t
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
 vi.mock("../clickhouse.aggregation-builder.mapper.ts", () => ({
-  buildTimeseriesQuery: vi.fn().mockReturnValue({ sql: "SELECT 1", params: {} }),
+  // Read through the proof's fence, so the statement carries the marker the reader expands.
+  buildTimeseriesQuery: vi.fn().mockReturnValue({
+    sql: "SELECT 1 FROM trace_summaries WHERE {{tenantScope:OccurredAt}}",
+    params: {},
+  }),
   buildFeedbacksQuery: vi.fn(),
   buildTopDocumentsQuery: vi.fn(),
 }));

@@ -115,7 +115,7 @@ describe("LangWatchQLAggregateScopeService", () => {
           findById: async (id) =>
             project(id, {
               name: `Name of ${id}`,
-              lwqlKey: id === "project_b" ? null : (KEYS[id] ?? null),
+              lwqlKey: id === "project_b" ? "" : (KEYS[id] ?? ""),
             }),
         }),
       })

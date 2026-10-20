@@ -314,8 +314,7 @@ export class AnalyticsService {
       adjustedTimeScale,
       maxResultRows: options.maxResultRows,
     };
-    // The legacy tables read the own project alone, so a proof spanning members has nothing
-    // to compare the routed read with.
+    // The tripwire is asked of one project's reads; a proof spanning members is left out of it.
     const readsOneProject = projectIdsReadBy(options.authorization, "analytics:view").length === 1;
     if (
       table === "trace_summaries" ||

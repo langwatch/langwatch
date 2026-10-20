@@ -47,12 +47,12 @@ const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
 
 /**
- * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection or dedup
- * tuple member is fine. Exported so the source scan over the converted repositories refuses
- * the same shapes the reader refuses at run time.
+ * A tenant predicate written by hand (`TenantId =`, `IN`, comparisons); a projection, a dedup
+ * tuple member or a join key equating two `TenantId` columns is fine. Exported so the source
+ * scan over the converted repositories refuses the shapes the reader refuses at run time.
  */
 export const HAND_WRITTEN_TENANT_PREDICATE =
-  /\bTenantId\s*(?:=|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
+  /\bTenantId\s*(?:=(?!\s*(?:[A-Za-z_]\w*\.)?TenantId\b)|!=|<>|<=|>=|<|>|(?:NOT\s+)?IN\b|(?:NOT\s+)?LIKE\b)/i;
 
 /**
  * A stable cache key for who a proof fences, under which windows. Own projects stay readable;
