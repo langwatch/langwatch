@@ -165,6 +165,47 @@ func TestEndLLMSpan_NilResponseNilErrorIsTreatedAsError(t *testing.T) {
 		"no output to stamp — there's no real assistant reply on a contract break")
 }
 
+// @scenario "The LLM span carries cache counts only when the reply has them"
+func TestEndLLMSpan_StampsCacheCountsOnlyWhenPresent(t *testing.T) {
+	tests := []struct {
+		name         string
+		usage        app.Usage
+		wantRead     int64
+		wantCreation int64
+	}{
+		{"both counts", app.Usage{PromptTokens: 100, CacheReadInputTokens: 80, CacheCreationInputTokens: 15}, 80, 15},
+		{"zero counts", app.Usage{PromptTokens: 100}, 0, 0},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			rec := withRecorder(t)
+
+			tracer := otelapi.Tracer(tracerName)
+			parentCtx, parent := tracer.Start(context.Background(), "test-parent")
+			defer parent.End()
+
+			_, llmSpan := startLLMSpan(parentCtx, "gpt-5-mini", "openai", []app.ChatMessage{
+				{Role: "user", Content: "hi"},
+			})
+			endLLMSpan(llmSpan, &app.LLMResponse{Content: "ok", Usage: tc.usage}, nil)
+
+			spans := rec.Ended()
+			require.Len(t, spans, 1)
+			attrs := attrMap(spans[0].Attributes())
+			if tc.wantRead == 0 {
+				assert.NotContains(t, attrs, "gen_ai.usage.cache_read.input_tokens")
+			} else {
+				assert.EqualValues(t, tc.wantRead, attrs["gen_ai.usage.cache_read.input_tokens"])
+			}
+			if tc.wantCreation == 0 {
+				assert.NotContains(t, attrs, "gen_ai.usage.cache_creation.input_tokens")
+			} else {
+				assert.EqualValues(t, tc.wantCreation, attrs["gen_ai.usage.cache_creation.input_tokens"])
+			}
+		})
+	}
+}
+
 // toFloat coerces an attribute value (recorder serializes numbers as
 // float64, but Int/Int64 attributes round-trip as int64).
 func toFloat(v any) float64 {

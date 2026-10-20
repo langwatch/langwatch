@@ -44,6 +44,7 @@ export interface OnboardingApi {
     input: OnboardingCallerInput & Readonly<{ provider: string; model: string }>,
   ): Promise<GuidedOnboardingState>;
   recordProviderSkipped(input: OnboardingCallerInput): Promise<GuidedOnboardingState>;
+  recordProviderPromptDismissed(input: OnboardingCallerInput): Promise<GuidedOnboardingState>;
   recordVirtualKeyReveal(
     input: OnboardingCallerInput & Readonly<{ name: string; preview: string; revealId: string }>,
   ): Promise<GuidedOnboardingState>;
