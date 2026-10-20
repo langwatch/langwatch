@@ -70,9 +70,9 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
       When the canonicalisation chain runs
       Then the copilot extractor lifts nothing from it
 
-  Rule: spans captured from real Copilot builds canonicalize as the documented shape does
-    The fixtures are redacted captures from Copilot CLI 1.0.79 and 1.0.100 and
-    VS Code Copilot Chat 0.67, each recording its vendor version (#8803).
+  Rule: spans captured from real Copilot CLI builds canonicalize as the documented shape does
+    The fixtures are redacted captures from Copilot CLI 1.0.79 and 1.0.100, each
+    recording its vendor version (#8803).
 
     @unit
     Scenario: A captured Copilot CLI chat span carries model, tokens and the session key
@@ -96,18 +96,11 @@ Feature: Copilot CLI OTLP spans canonicalize on the unified substrate
       And the second carries no repository
 
     @unit
-    Scenario: A captured VS Code agent rollup keeps the repository as the remote URL it was sent as
-      Given a redacted invoke_agent span captured from VS Code Copilot Chat
-      When the canonicalisation chain runs
-      Then the canonical span carries the repository remote URL as metadata
-
-    @unit
-    Scenario: A captured Copilot tool run is a tool span that keeps its name and session key
+    Scenario: A captured Copilot CLI tool run is a tool span that keeps its name and session key
       Given a redacted execute_tool span captured from Copilot CLI
-      And a redacted execute_tool span captured from VS Code Copilot Chat
-      When the canonicalisation chain runs on each
-      Then each is typed as a tool span
-      And each keeps its tool name and conversation id
+      When the canonicalisation chain runs
+      Then the span is typed as a tool span
+      And it keeps its tool name and conversation id
 
   Rule: oversized copilot content cannot destabilize the pipeline
 

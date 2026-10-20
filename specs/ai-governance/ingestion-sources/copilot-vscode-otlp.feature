@@ -65,6 +65,23 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the span is ingested with the copilot_vscode ingest key
       Then the recorded span is stamped with sourceType "copilot_vscode"
 
+  Rule: spans captured from a real VS Code build canonicalize as the documented shape does
+    The fixtures are redacted captures from VS Code Copilot Chat 0.67, each
+    recording its vendor version (#8803).
+
+    @unit
+    Scenario: A captured VS Code agent rollup keeps the repository as the remote URL it was sent as
+      Given a redacted invoke_agent span captured from VS Code Copilot Chat
+      When the canonicalisation chain runs
+      Then the canonical span carries the repository remote URL as metadata
+
+    @unit
+    Scenario: A captured VS Code tool run is a tool span that keeps its name and session key
+      Given a redacted execute_tool span captured from VS Code Copilot Chat
+      When the canonicalisation chain runs
+      Then the span is typed as a tool span
+      And it keeps its tool name and conversation id
+
   Rule: a VS Code turn is typed and counted like a CLI turn
     ADR-039 §Extension #3. Each scenario replays a redacted VS Code Copilot Chat
     0.67 capture from #8803.

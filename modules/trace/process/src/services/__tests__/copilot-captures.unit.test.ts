@@ -14,12 +14,14 @@ interface CapturedSpan {
   spanName: string;
   vendorVersion: string;
   attributes: Record<string, unknown>;
+  events: { name: string; attributes: Record<string, unknown> }[];
 }
 
 const canonicalizeCaptured = (captured: CapturedSpan) =>
   canonicalisation.canonicalizeSpanAttributes({
     spanAttributes: captured.attributes,
-    events: [],
+    // Redaction dropped the event times; the chain still sees every captured event.
+    events: captured.events.map((event) => ({ ...event, timeUnixMs: 0 })),
     span: {
       name: captured.spanName,
       kind: 0,
@@ -96,23 +98,39 @@ describe("Copilot canonicalisation over real captures", () => {
     });
   });
 
-  describe.each([
-    { surface: "Copilot CLI 1.0.100", captured: cliToolSpan },
-    { surface: "VS Code Copilot Chat 0.67", captured: vscodeToolSpan },
-  ])("given an execute_tool span captured from $surface", ({ captured }) => {
+  describe("given an execute_tool span captured from Copilot CLI 1.0.100", () => {
     describe("when the canonicalisation chain runs", () => {
-      const attributes = canonicalizeCaptured(captured);
+      const attributes = canonicalizeCaptured(cliToolSpan);
 
-      /** @scenario A captured Copilot tool run is a tool span that keeps its name and session key */
+      /** @scenario A captured Copilot CLI tool run is a tool span that keeps its name and session key */
       it("types the span as a tool", () => {
         expect(attributes["langwatch.span.type"]).toBe("tool");
       });
 
-      /** @scenario A captured Copilot tool run is a tool span that keeps its name and session key */
+      /** @scenario A captured Copilot CLI tool run is a tool span that keeps its name and session key */
       it("keeps the tool name and the conversation id", () => {
-        expect(attributes["gen_ai.tool.name"]).toBe(captured.attributes["gen_ai.tool.name"]);
+        expect(attributes["gen_ai.tool.name"]).toBe(cliToolSpan.attributes["gen_ai.tool.name"]);
         expect(attributes["gen_ai.conversation.id"]).toBe(
-          captured.attributes["gen_ai.conversation.id"],
+          cliToolSpan.attributes["gen_ai.conversation.id"],
+        );
+      });
+    });
+  });
+
+  describe("given an execute_tool span captured from VS Code Copilot Chat 0.67", () => {
+    describe("when the canonicalisation chain runs", () => {
+      const attributes = canonicalizeCaptured(vscodeToolSpan);
+
+      /** @scenario A captured VS Code tool run is a tool span that keeps its name and session key */
+      it("types the span as a tool", () => {
+        expect(attributes["langwatch.span.type"]).toBe("tool");
+      });
+
+      /** @scenario A captured VS Code tool run is a tool span that keeps its name and session key */
+      it("keeps the tool name and the conversation id", () => {
+        expect(attributes["gen_ai.tool.name"]).toBe(vscodeToolSpan.attributes["gen_ai.tool.name"]);
+        expect(attributes["gen_ai.conversation.id"]).toBe(
+          vscodeToolSpan.attributes["gen_ai.conversation.id"],
         );
       });
     });
