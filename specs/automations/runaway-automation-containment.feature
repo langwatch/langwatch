@@ -149,6 +149,14 @@ Feature: Runaway automations are contained without punishing the customer
       Then the breach is logged as a warning
       And no error is logged
 
+    # Every match past the ceiling raises a breach, so logging each one floods
+    # the logs (thousands an hour from one trigger).
+    @unit
+    Scenario: Repeated breaches within the containment window are logged once
+      Given a selective trigger that has reached its daily ceiling
+      When containment handles several breaches within the same minute
+      Then the breach is logged once
+
     @integration
     Scenario: A throttled automation stays active
       Given a trigger that has reached its daily ceiling

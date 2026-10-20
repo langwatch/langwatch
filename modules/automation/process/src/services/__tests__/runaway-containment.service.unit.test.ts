@@ -145,6 +145,22 @@ describe("runaway containment policy", () => {
       );
       expect(signals.logged.filter(({ level }) => level === "error")).toEqual([]);
     });
+
+    describe("when several breaches arrive within the containment window", () => {
+      /** @scenario "Repeated breaches within the containment window are logged once" */
+      it("logs the breach once", async () => {
+        const { signals, service } = runtime();
+        const selective = trigger({ filters: { status: ["error"] } });
+
+        for (let i = 0; i < 3; i++) {
+          await service.handle(breach({ trigger: selective, count: 899, skipped: 799 }));
+        }
+
+        expect(
+          signals.logged.filter(({ message }) => message.includes("daily ceiling")),
+        ).toHaveLength(1);
+      });
+    });
   });
 
   /** @scenario "A grandfathered match-everything automation is paused on breach" */
