@@ -5,7 +5,6 @@
 
 import { execFileSync, spawn } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync } from "node:fs";
-import { availableParallelism } from "node:os";
 import { join, relative, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
@@ -253,10 +252,9 @@ export const jobsFor = (
     .flatMap((pkg) => pkg.scripts.map((script) => ({ pkg, script })));
 
 /**
- * Runs every job, at most `concurrency` at once, in the given order where it
- * can. A package runs one script at a time, so its lanes keep their order and
- * never share its transform cache; `integration` and `browser` hold one slot
- * each across the whole shard. Every job runs even after one fails.
+ * Runs every job, at most `concurrency` at once, in order where it can. A package
+ * runs one script at a time; `integration` and `browser` hold one slot each across
+ * the shard. Every job runs even after one fails.
  */
 export const runJobs = async ({
   jobs,
@@ -312,6 +310,98 @@ export const outcomeOf = (
     ? { name: pkg.name, outcome: "passed" }
     : { name: pkg.name, outcome: "failed", failedScript };
 };
+
+/** A started script as the runner sees it: its two output streams, and its end. */
+export interface ScriptProcess {
+  stdout: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
+  stderr: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
+  on(event: "error", listener: () => void): unknown;
+  on(event: "close", listener: (code: number | null) => void): unknown;
+}
+
+/**
+ * Starts each job's script and settles with its exit code. Live, the output
+ * streams straight through; otherwise it is held and printed as one group when
+ * the script ends, so two suites never interleave.
+ */
+export const createSuiteRunner = ({
+  live,
+  start,
+  log,
+  write,
+  now = Date.now,
+}: {
+  live: boolean;
+  start: (job: SuiteJob) => ScriptProcess;
+  log: (line: string) => void;
+  write: (output: Buffer) => void;
+  now?: () => number;
+}) => {
+  const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
+  const secondsOf = new Map<string, number>();
+  const run = (job: SuiteJob): Promise<number> =>
+    new Promise((settle) => {
+      const startedAt = now();
+      const title = `${job.pkg.name} (${job.pkg.dir}) — pnpm run ${job.script}`;
+      log(live ? `::group::${title}` : `started: ${title}`);
+      const chunks: Buffer[] = [];
+      if (!live) unfinished.set(job, { title, chunks });
+      let finished = false;
+      const finish = (status: number) => {
+        if (finished) return;
+        finished = true;
+        unfinished.delete(job);
+        const seconds = (now() - startedAt) / 1000;
+        secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
+        if (!live) {
+          log(`::group::${title} (${Math.round(seconds)}s)`);
+          write(Buffer.concat(chunks));
+        }
+        log("::endgroup::");
+        settle(status);
+      };
+      let child: ScriptProcess;
+      try {
+        child = start(job);
+      } catch {
+        finish(1);
+        return;
+      }
+      child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      child.on("error", () => finish(1));
+      child.on("close", (code: number | null) => finish(code ?? 1));
+    });
+  /** What the scripts still running have printed so far, for a cancelled run. */
+  const flushUnfinished = () => {
+    for (const { title, chunks } of unfinished.values()) {
+      log(`::group::${title} (unfinished)`);
+      write(Buffer.concat(chunks));
+      log("::endgroup::");
+    }
+  };
+  return { run, flushUnfinished, secondsOf };
+};
+
+/** One line per excluded package: an exclusion nobody can see reads as never found. */
+export const exclusionNotices = (
+  packages: readonly DiscoveredPackage[],
+  excluded: Map<string, string>,
+): string[] =>
+  packages.flatMap((pkg) => {
+    const reason = excluded.get(pkg.name);
+    return reason === undefined ? [] : [`not run: ${pkg.name} — ${reason}`];
+  });
+
+/** One annotation per failed package, naming the script it is blamed on. */
+export const failureAnnotations = (outcomes: readonly SuiteOutcome[]): string[] =>
+  outcomes
+    .filter((outcome) => outcome.outcome === "failed")
+    .map(
+      (outcome) =>
+        `::error::${outcome.name} failed (pnpm run ${outcome.failedScript}). Fix it, or add it to ` +
+        `.github/package-suites.excluded with a reason.`,
+    );
 
 export const summarise = (outcomes: SuiteOutcome[]): string[] => {
   const count = (kind: SuiteOutcome["outcome"]) =>
@@ -431,67 +521,29 @@ if (isEntrypoint()) {
     console.error(`::error::${error instanceof Error ? error.message : String(error)}`);
     process.exit(1);
   }
-  for (const pkg of assigned) {
-    // Named out loud: an exclusion nobody can see reads as a package never found.
-    const reason = excluded.get(pkg.name);
-    if (reason !== undefined) console.log(`not run: ${pkg.name} — ${reason}`);
-  }
-  // Each suite is its own vitest with its own pool; several at full width
-  // oversubscribe the runner and read as "Worker forks emitted error". So the
-  // cores are shared out, unless the job already chose a worker count.
-  const env =
-    concurrency > 1 && process.env.VITEST_MAX_WORKERS === undefined
-      ? {
-          ...process.env,
-          VITEST_MAX_WORKERS: String(Math.max(1, Math.floor(availableParallelism() / concurrency))),
-        }
-      : process.env;
+  for (const line of exclusionNotices(assigned, excluded)) console.log(line);
+  // Each suite keeps its own configured worker count. VITEST_MAX_WORKERS would
+  // outrank it, and an integration suite's serial files would then overlap.
   const live = concurrency === 1;
   console.log(`Running up to ${concurrency} suite(s) at once.`);
-
-  // Buffered while running and printed whole, so two suites never interleave.
-  const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
-  for (const signal of ["SIGINT", "SIGTERM"] as const) {
-    process.once(signal, () => {
-      for (const { title, chunks } of unfinished.values()) {
-        console.log(`::group::${title} (unfinished)`);
-        process.stdout.write(Buffer.concat(chunks));
-        console.log("::endgroup::");
-      }
-      process.exit(1);
-    });
-  }
-  const secondsOf = new Map<string, number>();
-  const runScript = (job: SuiteJob): Promise<number> =>
-    new Promise((settle) => {
-      const startedAt = Date.now();
-      const title = `${job.pkg.name} (${job.pkg.dir}) — pnpm run ${job.script}`;
-      console.log(live ? `::group::${title}` : `started: ${title}`);
-      const chunks: Buffer[] = [];
-      unfinished.set(job, { title, chunks });
-      const child = spawn("pnpm", ["--filter", job.pkg.name, "run", job.script], {
-        env,
+  const runner = createSuiteRunner({
+    live,
+    start: (job) =>
+      spawn("pnpm", ["--filter", job.pkg.name, "run", job.script], {
         stdio: live ? "inherit" : ["ignore", "pipe", "pipe"],
+      }),
+    log: (line) => console.log(line),
+    write: (output) => process.stdout.write(output),
+  });
+  if (!live) {
+    for (const signal of ["SIGINT", "SIGTERM"] as const) {
+      process.once(signal, () => {
+        runner.flushUnfinished();
+        // Exits once stdout has drained, so the flushed output is not cut short.
+        process.stdout.write("", () => process.exit(1));
       });
-      child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
-      child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
-      let finished = false;
-      const finish = (status: number) => {
-        if (finished) return;
-        finished = true;
-        unfinished.delete(job);
-        const seconds = (Date.now() - startedAt) / 1000;
-        secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
-        if (!live) {
-          console.log(`::group::${title} (${Math.round(seconds)}s)`);
-          process.stdout.write(Buffer.concat(chunks));
-        }
-        console.log("::endgroup::");
-        settle(status);
-      };
-      child.on("error", () => finish(1));
-      child.on("close", (code) => finish(code ?? 1));
-    });
+    }
+  }
 
   // Heaviest first, so the long suites are not the last ones left running alone.
   const heaviestFirst = assigned.toSorted(
@@ -500,21 +552,15 @@ if (isEntrypoint()) {
   const statuses = await runJobs({
     jobs: jobsFor(heaviestFirst, excluded),
     concurrency,
-    run: runScript,
+    run: runner.run,
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;
   const outcomes = assigned.map((pkg) => outcomeOf(pkg, excluded, statusOf(pkg)));
   const measured = outcomes
     .filter((outcome) => outcome.outcome === "passed")
-    .map((outcome) => ({ name: outcome.name, seconds: secondsOf.get(outcome.name) ?? 0 }));
-  for (const outcome of outcomes) {
-    if (outcome.outcome !== "failed") continue;
-    console.log(
-      `::error::${outcome.name} failed (pnpm run ${outcome.failedScript}). Fix it, or add it to ` +
-        `.github/package-suites.excluded with a reason.`,
-    );
-  }
+    .map((outcome) => ({ name: outcome.name, seconds: runner.secondsOf.get(outcome.name) ?? 0 }));
+  for (const line of failureAnnotations(outcomes)) console.log(line);
 
   const summary = summarise(outcomes);
   for (const line of summary) console.log(line);

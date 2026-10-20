@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
+import { EventEmitter } from "node:events";
 import { describe, it } from "node:test";
 
 import {
   DEFAULT_WEIGHT_SECONDS,
   balanceShards,
+  createSuiteRunner,
   discover,
+  exclusionNotices,
+  failureAnnotations,
   formatMeasured,
   jobsFor,
   laneOf,
@@ -52,7 +56,6 @@ void describe("given a package's declared scripts", () => {
   });
 
   void describe("when it declares additional lanes", () => {
-    /** @scenario "A package that declares an integration suite has it run" */
     void it("runs every lane, in order, rather than stopping at the first", () => {
       assert.deepEqual(
         scriptsFor({
@@ -170,6 +173,7 @@ void describe("given a package the gate runs", () => {
       assert.equal(outcome.failedScript, "test:integration");
     });
 
+    /** @scenario "A package that declares an integration suite has it run" */
     void it("still runs the remaining lanes, so one push shows every failure", async () => {
       const two = pkg("@fix/two-lane", ["test", "test:integration"]);
       const ran: string[] = [];
@@ -237,6 +241,155 @@ const pool = async (jobs: SuiteJob[], concurrency: number) => {
   });
   return { events, peak, overlaps, statuses };
 };
+
+/** A stand-in child process: say something, then end with `code`. */
+const fakeProcess = () => {
+  const child = Object.assign(new EventEmitter(), {
+    stdout: new EventEmitter(),
+    stderr: new EventEmitter(),
+  });
+  return {
+    child,
+    say: (text: string) => child.stdout.emit("data", Buffer.from(text)),
+    end: (code: number | null) => child.emit("close", code),
+  };
+};
+
+/** A runner over fake processes, recording every log line and write in order. */
+const fakeRunner = (live: boolean) => {
+  const out: string[] = [];
+  const processes = new Map<string, ReturnType<typeof fakeProcess>>();
+  let clock = 0;
+  const runner = createSuiteRunner({
+    live,
+    start: (job) => {
+      const started = fakeProcess();
+      processes.set(job.pkg.name, started);
+      return started.child;
+    },
+    log: (line) => void out.push(line),
+    write: (output) => void out.push(output.toString()),
+    now: () => (clock += 3000),
+  });
+  return { runner, out, processes };
+};
+
+void describe("given the runner holds each suite's output until it ends", () => {
+  void describe("when two suites print while both are running", () => {
+    void it("prints each one as a single group, never interleaved", async () => {
+      const { runner, out, processes } = fakeRunner(false);
+      const first = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      const second = runner.run({ pkg: pkg("@fix/b", ["test"]), script: "test" });
+      processes.get("@fix/a")!.say("a1 ");
+      processes.get("@fix/b")!.say("b1 ");
+      processes.get("@fix/a")!.say("a2");
+      processes.get("@fix/b")!.end(0);
+      processes.get("@fix/a")!.end(0);
+      assert.deepEqual(await Promise.all([first, second]), [0, 0]);
+      assert.deepEqual(out, [
+        "started: @fix/a (packages/a) — pnpm run test",
+        "started: @fix/b (packages/b) — pnpm run test",
+        "::group::@fix/b (packages/b) — pnpm run test (3s)",
+        "b1 ",
+        "::endgroup::",
+        "::group::@fix/a (packages/a) — pnpm run test (9s)",
+        "a1 a2",
+        "::endgroup::",
+      ]);
+    });
+  });
+
+  void describe("when a suite exits non-zero or is killed", () => {
+    void it("settles with its exit code, or 1 when it has none", async () => {
+      const { runner, processes } = fakeRunner(false);
+      const failed = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      const killed = runner.run({ pkg: pkg("@fix/b", ["test"]), script: "test" });
+      processes.get("@fix/a")!.end(2);
+      processes.get("@fix/b")!.end(null);
+      assert.deepEqual(await Promise.all([failed, killed]), [2, 1]);
+    });
+  });
+
+  void describe("when a package runs two scripts", () => {
+    void it("adds both durations to the package's measured seconds", async () => {
+      const { runner, processes } = fakeRunner(false);
+      const two = pkg("@fix/a", ["test", "test:integration"]);
+      const unit = runner.run({ pkg: two, script: "test" });
+      processes.get("@fix/a")!.end(0);
+      await unit;
+      const integration = runner.run({ pkg: two, script: "test:integration" });
+      processes.get("@fix/a")!.end(0);
+      await integration;
+      assert.equal(runner.secondsOf.get("@fix/a"), 6);
+    });
+  });
+
+  void describe("when the run is cancelled while a suite is still going", () => {
+    void it("prints what that suite said so far as an unfinished group", () => {
+      const { runner, out, processes } = fakeRunner(false);
+      void runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      processes.get("@fix/a")!.say("half way");
+      runner.flushUnfinished();
+      assert.deepEqual(out.slice(1), [
+        "::group::@fix/a (packages/a) — pnpm run test (unfinished)",
+        "half way",
+        "::endgroup::",
+      ]);
+    });
+  });
+
+  void describe("when only one suite runs at a time", () => {
+    void it("opens the group at the start and streams, holding nothing back", async () => {
+      const { runner, out, processes } = fakeRunner(true);
+      const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      processes.get("@fix/a")!.end(0);
+      await done;
+      runner.flushUnfinished();
+      assert.deepEqual(out, ["::group::@fix/a (packages/a) — pnpm run test", "::endgroup::"]);
+    });
+  });
+
+  void describe("when the script cannot be started", () => {
+    void it("settles as failed and closes its group", async () => {
+      const out: string[] = [];
+      const runner = createSuiteRunner({
+        live: false,
+        start: () => {
+          throw new Error("spawn ENOENT");
+        },
+        log: (line) => void out.push(line),
+        write: (output) => void out.push(output.toString()),
+      });
+      assert.equal(await runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" }), 1);
+      assert.equal(out.at(-1), "::endgroup::");
+    });
+  });
+});
+
+void describe("given the lines the run prints around its suites", () => {
+  void describe("when a package is excluded", () => {
+    void it("says so, because a silent skip reads as never discovered", () => {
+      assert.deepEqual(
+        exclusionNotices(
+          [pkg("@fix/elsewhere", ["test"]), pkg("@fix/here", ["test"])],
+          new Map([["@fix/elsewhere", "runs in its own workflow"]]),
+        ),
+        ["not run: @fix/elsewhere — runs in its own workflow"],
+      );
+    });
+  });
+
+  void describe("when a package failed", () => {
+    void it("annotates it with the script it is blamed on", () => {
+      const lines = failureAnnotations([
+        { name: "@fix/green", outcome: "passed" },
+        { name: "@fix/red", outcome: "failed", failedScript: "test:integration" },
+      ]);
+      assert.equal(lines.length, 1);
+      assert.match(lines[0]!, /^::error::@fix\/red failed \(pnpm run test:integration\)/);
+    });
+  });
+});
 
 void describe("given a shard that runs several suites at once", () => {
   void describe("when it has more suites than its concurrency", () => {
