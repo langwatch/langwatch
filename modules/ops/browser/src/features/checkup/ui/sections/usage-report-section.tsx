@@ -142,7 +142,8 @@ function UsageReportSwitchRows({
             <Text fontWeight="medium">Upgrade diagnostics</Text>
             <Text fontSize="sm" color="fg.muted">
               When an upgrade step fails, send its details to the LangWatch team so we can fix it.
-              Secrets are masked and no names are sent. Off, you can still send them from the step.
+              Secrets are masked, but the step's error, report and log lines can still mention an
+              identifier such as a project id. Off, you can still send them from the step.
             </Text>
           </VStack>
           <Switch

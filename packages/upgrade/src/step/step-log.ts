@@ -99,12 +99,30 @@ export class StepLogTail implements MigrationStepLog {
     fields: Record<string, unknown>;
     shouldForward: boolean;
   }): void {
-    if (shouldForward) this.options.forward(level, message, fields);
+    if (shouldForward) {
+      this.options.forward(
+        level,
+        this.options.redact(message),
+        redactFields({ value: fields, redact: this.options.redact }) as Record<string, unknown>,
+      );
+    }
     const extra = Object.keys(fields).length > 0 ? ` ${safeJson(fields)}` : "";
     const line = `${this.options.now()} ${level} ${message}${extra}`;
     this.lines.push(ledgerText({ text: line, redact: this.options.redact }));
     this.lines.splice(0, Math.max(0, this.lines.length - STEP_LOG_TAIL_LINES));
   }
+}
+
+function redactFields({ value, redact }: { value: unknown; redact: LedgerTextRedactor }): unknown {
+  if (typeof value === "string") return redact(value);
+  if (Array.isArray(value)) return value.map((each) => redactFields({ value: each, redact }));
+  if (value instanceof Error) return redact(value.message);
+  if (value !== null && typeof value === "object") {
+    return Object.fromEntries(
+      Object.entries(value).map(([key, each]) => [key, redactFields({ value: each, redact })]),
+    );
+  }
+  return value;
 }
 
 function safeJson(fields: Record<string, unknown>): string {
