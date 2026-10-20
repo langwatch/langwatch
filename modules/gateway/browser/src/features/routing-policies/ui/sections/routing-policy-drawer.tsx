@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useCloseGatewayDrawer } from "../../../../behavior/use-close-gateway-drawer.ts";
 import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 import type { ModelTier } from "../../model/model-tier-presets.ts";
@@ -46,9 +47,10 @@ export function RoutingPolicyDrawer({
   seedScopeType?: string;
   seedScopeId?: string;
   seedIsDefault?: string;
-  /** Puts the address back where it was before the drawer opened. */
-  onClose: () => void;
+  /** Puts the address back where it was before the drawer opened; absent when a link opened it. */
+  onClose?: () => void;
 }) {
+  const close = useCloseGatewayDrawer(onClose);
   const { organization } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";
   const isEditing = !!policyId;
@@ -70,7 +72,7 @@ export function RoutingPolicyDrawer({
 
   const { save, isSaving, saveError, clearSaveError } = useRoutingPolicyMutations({
     organizationId,
-    onSaved: onClose,
+    onSaved: close,
   });
 
   const { values, problems, form } = drawer;
@@ -97,7 +99,7 @@ export function RoutingPolicyDrawer({
 
   return (
     <Drawer
-      onClose={onClose}
+      onClose={close}
       title={isEditing ? "Edit routing policy" : "New routing policy"}
       size="md"
       busy={isSaving}
