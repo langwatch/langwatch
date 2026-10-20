@@ -146,6 +146,15 @@ export const parseOnly = (value: string | undefined): Set<string> | undefined =>
  */
 export const HEAVY_SECONDS = 100;
 
+/** Whether a package's recorded weight puts it in the shard-wide heavy slot. */
+export const isHeavyPackage = ({
+  weightOf,
+  pkg,
+}: {
+  weightOf: (pkg: DiscoveredPackage) => number;
+  pkg: DiscoveredPackage;
+}): boolean => weightOf(pkg) >= HEAVY_SECONDS;
+
 /** Seconds a package costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
@@ -275,8 +284,10 @@ const startReady = ({
   startable: (job: SuiteJob) => boolean;
   start: (job: SuiteJob) => void;
 }) => {
-  for (let index = queue.findIndex(startable); running.size < concurrency && index !== -1; index = queue.findIndex(startable)) {
+  let index = queue.findIndex(startable);
+  while (running.size < concurrency && index !== -1) {
     start(queue.splice(index, 1)[0]!);
+    index = queue.findIndex(startable);
   }
 };
 
@@ -319,8 +330,13 @@ export const runJobs = async ({
       });
     running.add(settled);
   };
+  // Only a package's earliest queued script may start, so a later lane never
+  // overtakes an earlier one that is waiting for its slot.
+  const startable = (job: SuiteJob) =>
+    queue.find((queued) => queued.pkg.name === job.pkg.name) === job &&
+    holds(job).every((key) => !busy.has(key));
   while (queue.length > 0 || running.size > 0) {
-    startReady({ queue, concurrency, running, startable: (job) => holds(job).every((key) => !busy.has(key)), start });
+    startReady({ queue, concurrency, running, startable, start });
     await Promise.race(running);
   }
   return statuses;
@@ -345,7 +361,7 @@ export const outcomeOf = (
 export interface ScriptProcess {
   stdout: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
   stderr: { on(event: "data", listener: (chunk: Buffer) => void): unknown } | null;
-  on(event: "error", listener: () => void): unknown;
+  on(event: "error", listener: (error?: unknown) => void): unknown;
   on(event: "close", listener: (code: number | null) => void): unknown;
 }
 
@@ -370,9 +386,11 @@ export const createSuiteRunner = ({
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
   const secondsOf = new Map<string, number>();
   const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
-    unfinished.delete(job);
+    // Absent once flushed on cancellation: its output is printed already.
+    const pending = unfinished.delete(job);
     const seconds = (now() - startedAt) / 1000;
     secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
+    if (!live && !pending) return;
     if (!live) {
       log(`::group::${title} (${Math.round(seconds)}s)`);
       write(Buffer.concat(chunks));
@@ -390,15 +408,23 @@ export const createSuiteRunner = ({
         report(job, title, chunks, startedAt);
         settle(status);
       });
-      const child = startSafely(() => start(job));
-      if (child === undefined) return finish(1);
+      const failToStart = (error: unknown) => {
+        const line = `could not start pnpm run ${job.script}: ${String(error)}`;
+        if (live) log(line);
+        else chunks.push(Buffer.from(`${line}\n`));
+        finish(1);
+      };
+      const started = startSafely(() => start(job));
+      if ("error" in started) return failToStart(started.error);
+      const { child } = started;
       collectOutput(child, chunks);
-      child.on("error", () => finish(1));
+      child.on("error", failToStart);
       child.on("close", (code: number | null) => finish(code ?? 1));
     });
   /** What the scripts still running have printed so far, for a cancelled run. */
   const flushUnfinished = () => {
-    for (const { title, chunks } of unfinished.values()) {
+    for (const [job, { title, chunks }] of unfinished) {
+      unfinished.delete(job);
       log(`::group::${title} (unfinished)`);
       write(Buffer.concat(chunks));
       log("::endgroup::");
@@ -417,12 +443,12 @@ const once = <T>(fn: (value: T) => void) => {
   };
 };
 
-/** The started process, or undefined when starting it threw. */
-const startSafely = (start: () => ScriptProcess): ScriptProcess | undefined => {
+/** The started process, or what starting it threw. */
+const startSafely = (start: () => ScriptProcess): { child: ScriptProcess } | { error: unknown } => {
   try {
-    return start();
-  } catch {
-    return undefined;
+    return { child: start() };
+  } catch (error) {
+    return { error };
   }
 };
 
@@ -601,7 +627,7 @@ if (isEntrypoint()) {
     jobs: jobsFor(heaviestFirst, excluded),
     concurrency,
     run: runner.run,
-    isHeavy: (pkg) => weightOf(pkg) >= HEAVY_SECONDS,
+    isHeavy: (pkg) => isHeavyPackage({ weightOf, pkg }),
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;

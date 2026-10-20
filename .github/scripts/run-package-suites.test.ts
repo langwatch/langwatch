@@ -10,6 +10,7 @@ import {
   exclusionNotices,
   failureAnnotations,
   formatMeasured,
+  isHeavyPackage,
   jobsFor,
   laneOf,
   outcomeOf,
@@ -276,6 +277,7 @@ const fakeRunner = (live: boolean) => {
 
 void describe("given the runner holds each suite's output until it ends", () => {
   void describe("when two suites print while both are running", () => {
+    /** @scenario "A suite's output is printed as one group when it ends" */
     void it("prints each one as a single group, never interleaved", async () => {
       const { runner, out, processes } = fakeRunner(false);
       const first = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
@@ -325,11 +327,27 @@ void describe("given the runner holds each suite's output until it ends", () => 
   });
 
   void describe("when the run is cancelled while a suite is still going", () => {
+    /** @scenario "A cancelled run prints what its unfinished suites said" */
     void it("prints what that suite said so far as an unfinished group", () => {
       const { runner, out, processes } = fakeRunner(false);
       void runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
       processes.get("@fix/a")!.say("half way");
       runner.flushUnfinished();
+      assert.deepEqual(out.slice(1), [
+        "::group::@fix/a (packages/a) — pnpm run test (unfinished)",
+        "half way",
+        "::endgroup::",
+      ]);
+    });
+
+    void it("prints it once, even if flushed again or the suite ends after", async () => {
+      const { runner, out, processes } = fakeRunner(false);
+      const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      processes.get("@fix/a")!.say("half way");
+      runner.flushUnfinished();
+      runner.flushUnfinished();
+      processes.get("@fix/a")!.end(0);
+      assert.equal(await done, 0);
       assert.deepEqual(out.slice(1), [
         "::group::@fix/a (packages/a) — pnpm run test (unfinished)",
         "half way",
@@ -362,6 +380,24 @@ void describe("given the runner holds each suite's output until it ends", () => 
       });
       assert.equal(await runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" }), 1);
       assert.equal(out.at(-1), "::endgroup::");
+      assert.match(out.at(-2)!, /could not start pnpm run test: Error: spawn ENOENT/);
+    });
+
+    void it("prints why when the process reports the failure after starting", async () => {
+      const { runner, out, processes } = fakeRunner(false);
+      const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      processes.get("@fix/a")!.child.emit("error", new Error("spawn pnpm ENOENT"));
+      processes.get("@fix/a")!.end(null);
+      assert.equal(await done, 1);
+      assert.match(out.join("\n"), /could not start pnpm run test: Error: spawn pnpm ENOENT/);
+    });
+
+    void it("logs why straight away when output is streamed", async () => {
+      const { runner, out, processes } = fakeRunner(true);
+      const done = runner.run({ pkg: pkg("@fix/a", ["test"]), script: "test" });
+      processes.get("@fix/a")!.child.emit("error", new Error("spawn pnpm ENOENT"));
+      assert.equal(await done, 1);
+      assert.match(out[1]!, /could not start pnpm run test: Error: spawn pnpm ENOENT/);
     });
   });
 });
@@ -440,7 +476,25 @@ void describe("given a shard that runs several suites at once", () => {
       for (const together of overlaps) {
         assert.ok(together.filter((name) => name.includes("heavy")).length <= 1, together.join());
       }
-      assert.ok(overlaps.some((together) => together.length > 1));
+      assert.ok(
+        overlaps.some(
+          (together) =>
+            together.some((name) => name.includes("heavy")) &&
+            together.some((name) => name.includes("light")),
+        ),
+        "a light suite ran alongside a heavy one",
+      );
+    });
+
+    /** @scenario "Only one heavy suite runs at a time" */
+    void it("counts a package as heavy from its recorded weight of 100 seconds", () => {
+      const weights = new Map([
+        ["@fix/light", 99],
+        ["@fix/heavy", 100],
+      ]);
+      const weightOf = (candidate: DiscoveredPackage) => weights.get(candidate.name) ?? 0;
+      assert.equal(isHeavyPackage({ weightOf, pkg: pkg("@fix/light", ["test"]) }), false);
+      assert.equal(isHeavyPackage({ weightOf, pkg: pkg("@fix/heavy", ["test"]) }), true);
     });
   });
 
@@ -461,6 +515,28 @@ void describe("given a shard that runs several suites at once", () => {
       const ended = events.indexOf("end @fix/two-lane test");
       const started = events.indexOf("start @fix/two-lane test:integration");
       assert.ok(ended !== -1 && started > ended, events.join("\n"));
+    });
+
+    /** @scenario "A package's own suites run one after another, in order" */
+    void it("keeps a later lane waiting while an earlier one waits for its slot", async () => {
+      const three = pkg("@fix/three-lane", ["test", "test:integration", "test:browser"]);
+      const holder = pkg("@fix/holder", ["test:integration"]);
+      const events: string[] = [];
+      await runJobs({
+        jobs: jobsFor([holder, three], new Map()),
+        concurrency: 3,
+        run: async (job) => {
+          events.push(`start ${job.pkg.name} ${job.script}`);
+          // The holder keeps the integration slot after the unit suite is done.
+          const ms = job.pkg === holder ? 20 : 5;
+          await new Promise((settle) => setTimeout(settle, ms));
+          events.push(`end ${job.pkg.name} ${job.script}`);
+          return 0;
+        },
+      });
+      const integrationEnded = events.indexOf("end @fix/three-lane test:integration");
+      const browserStarted = events.indexOf("start @fix/three-lane test:browser");
+      assert.ok(integrationEnded !== -1 && browserStarted > integrationEnded, events.join("\n"));
     });
   });
 

@@ -152,6 +152,19 @@ Feature: A package's integration suite runs in CI when it declares one
       Given a package with a unit suite and an integration suite
       When the package suites job runs concurrently
       Then its integration suite starts only after its unit suite finished
+      And a later suite of the package never overtakes one waiting for its slot
+
+    @unit
+    Scenario: A suite's output is printed as one group when it ends
+      Given two suites that print while both are running
+      When each of them ends
+      Then each suite's output is printed as one group, never interleaved
+
+    @unit
+    Scenario: A cancelled run prints what its unfinished suites said
+      Given a suite that is still running when the run is cancelled
+      When the runner flushes on cancellation
+      Then what that suite printed so far appears once, as an unfinished group
 
     @unit
     Scenario: Without a concurrency setting the suites run one at a time
