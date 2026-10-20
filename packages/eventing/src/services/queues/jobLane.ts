@@ -32,6 +32,8 @@ export function readJobRouting(envelope: Record<string, unknown>): JobRouting | 
 /** One lane of the shared queue, typed over the payload it parses at the queue boundary. */
 export interface JobLane<P> {
   parse: (payload: unknown) => P;
+  /** The body queued in the payload's place (ADR-069); routing is computed from the payload. */
+  stage?: (payload: P) => P;
   process: (payload: P, delivery?: JobDelivery) => Promise<void>;
   processBatch?: (payloads: P[], delivery?: JobDelivery) => Promise<void>;
   groupKeyFn: (payload: P) => string;

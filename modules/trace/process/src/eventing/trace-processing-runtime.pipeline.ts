@@ -18,7 +18,10 @@ import { OtlpSpanTokenEstimationService } from "../features/span/services/span-t
 import { TraceSpanNormalizationAdapterService } from "../features/span/services/trace-span-normalization-adapter.service.ts";
 import type { TraceRepositories } from "../repositories/trace.repositories.ts";
 import type { TraceProcessingCommandsService } from "../services/trace-processing-commands.service.ts";
-import { createDeferredOriginHandler } from "./deferred-origin.subscriber.ts";
+import {
+  createDeferredOriginHandler,
+  WRITE_COMPACT_ORIGIN_JOBS,
+} from "./deferred-origin.subscriber.ts";
 import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
@@ -87,6 +90,8 @@ export interface TraceProcessingPipelineInput {
   milestones: ProjectMetadataSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
+  /** Test-only: overrides `WRITE_COMPACT_ORIGIN_JOBS`; production never passes it. */
+  writeCompactOriginJobs?: boolean;
 }
 
 /** trace_processing per role: producers send; consumers fold and react as main's worker did. */
@@ -205,6 +210,7 @@ export class TraceProcessingRuntimeAdapter {
       }),
       spanStorageBroadcast: createSpanStorageBroadcastHandler({ broadcast: this.input.broadcast }),
       broadcastDisabled: false,
+      writeCompactOriginJobs: this.input.writeCompactOriginJobs ?? WRITE_COMPACT_ORIGIN_JOBS,
     };
   }
 }
