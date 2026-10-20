@@ -172,6 +172,18 @@ function isCustomerFault(error: unknown): boolean {
   );
 }
 
+/**
+ * The `at ...` lines of an error's stack, without the header line that repeats its
+ * message. They name code locations only, never the values that failed.
+ */
+function stackFramesOf(error: unknown): string[] {
+  if (!(error instanceof Error) || typeof error.stack !== "string") return [];
+  return error.stack
+    .split("\n")
+    .map((frame) => frame.trim())
+    .filter((frame) => frame.startsWith("at "));
+}
+
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
 function toAttemptDiagnostic(error: unknown): {
   errorType: string;
@@ -850,39 +862,56 @@ export class OutboxDispatcherService {
         errorMessage,
         customerFault: isCustomerFault(error),
       });
-      if (diagnosticIsRedacted(error)) this.logRedactedCause({ message, attempt, error });
+      if (diagnosticIsRedacted(error)) {
+        this.logRedactedCause({
+          message,
+          attempt,
+          error,
+          dead,
+          customerFault: isCustomerFault(error),
+        });
+      }
     }
   }
 
   /**
    * The span, the attempt log and the failure line above carry only the redacted
-   * sentence, so this is the one place the real cause (message and stack) is kept.
-   * Server-side log only; it names the message by its ids and never by its payload.
+   * sentence, so this line keeps where the failure happened: the error's class and its
+   * stack frames. The foreign message never reaches it, since it can carry credentials
+   * or customer content, and neither does the payload; the message is named by its ids.
+   * It follows the outcome's level, so a retry or a customer's own refusal never pages.
    */
   private logRedactedCause({
     message,
     attempt,
     error,
+    dead,
+    customerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     error: unknown;
+    dead: boolean;
+    customerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
-    this.logger.error(
-      {
-        processName: message.processName,
-        processKey: message.processKey,
-        projectId: message.projectId,
-        tenantId: message.tenantId,
-        messageKey: message.messageKey,
-        sourceEventId: message.sourceEventId,
-        intentType: message.intentType,
-        attempt,
-        error,
-      },
-      "Process-manager outbox delivery failed with a redacted cause; original error attached",
-    );
+    const fields = {
+      processName: message.processName,
+      processKey: message.processKey,
+      projectId: message.projectId,
+      tenantId: message.tenantId,
+      messageKey: message.messageKey,
+      sourceEventId: message.sourceEventId,
+      intentType: message.intentType,
+      attempt,
+      outcome: dead ? "dead" : "retry_scheduled",
+      causeType: toSafeFailureDiagnostic(error).errorType,
+      causeStackFrames: stackFramesOf(error),
+    };
+    const line =
+      "Process-manager outbox delivery failed with a redacted cause; stack frames attached";
+    if (dead && !customerFault) this.logger.error(fields, line);
+    else this.logger.warn(fields, line);
   }
 
   private logDispatchFailure({

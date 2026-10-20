@@ -177,11 +177,19 @@ Feature: Process outbox lease hardening
     Then it is dead on its first attempt instead of retrying ten times
 
   @unit
-  Scenario: A redacted delivery failure keeps its real cause in the server log
+  Scenario: A redacted delivery failure keeps where it failed in the server log
     Given an outbox message whose handler throws an error we did not write
     When the dispatcher delivers it and the delivery fails
     Then the attempt log records only the redacted sentence
-    And the server log records the original message and stack once, at error level, without the message payload
+    And the server log records the error's class and stack frames once
+    And the server log records neither the error's own message nor the message payload
+
+  @unit
+  Scenario: A redacted cause is logged at the level of the delivery outcome
+    Given an outbox message whose handler throws an error we did not write
+    When the delivery fails with a retry scheduled, or is dead-lettered by a customer fault
+    Then the redacted cause is logged at warn level
+    But when it is dead-lettered by any other fault it is logged at error level
 
   @unit
   Scenario: A message dead-lettered by the customer's own setup is logged as a warning

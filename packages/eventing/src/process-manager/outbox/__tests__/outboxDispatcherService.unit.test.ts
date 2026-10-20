@@ -368,14 +368,10 @@ describe("OutboxDispatcherService", () => {
         expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
       });
 
-      /** @scenario "A redacted delivery failure keeps its real cause in the server log" */
-      it("logs the original error at error level while the attempt log stays redacted", async () => {
-        const { logger: testLogger, lines } = createTestLogger();
-        const logger = testLogger.child(
-          {},
-          { serializers: { error: (e: Error) => ({ message: e.message, stack: e.stack }) } },
-        );
-        const cause = new TypeError("Cannot read properties of null (reading 'organizationId')");
+      /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+      it("logs the cause's class and stack frames but never its message", async () => {
+        const { logger, lines } = createTestLogger();
+        const cause = new TypeError("Cannot read properties of null (reading 'sk-secret')");
         const dispatcher = new OutboxDispatcherService({
           store,
           handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
@@ -391,14 +387,52 @@ describe("OutboxDispatcherService", () => {
           projectId: pilotRef.projectId,
           messageKey: "dispatch:turn_1:1",
         });
-        expect(attempts[0]?.errorMessage).not.toContain("organizationId");
-        const line = lines.findLine("error", "redacted cause");
+        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+        const line = lines.findLine("warn", "redacted cause");
         expect(line).toMatchObject({
           messageKey: "dispatch:turn_1:1",
           attempt: 1,
-          error: { message: cause.message, stack: cause.stack },
+          causeType: "TypeError",
         });
+        const frames = Reflect.get(line ?? {}, "causeStackFrames");
+        expect(frames).toEqual(expect.arrayContaining([expect.stringMatching(/^at /)]));
+        expect(JSON.stringify(line)).not.toContain("sk-secret");
         expect(line).not.toHaveProperty("payload");
+        expect(line).not.toHaveProperty("error");
+      });
+
+      describe("when a redacted cause is logged", () => {
+        /** @scenario "A redacted cause is logged at the level of the delivery outcome" */
+        it.each([
+          ["a scheduled retry", 2, {}, "warn"],
+          [
+            "a customer-fault dead-letter",
+            1,
+            { code: "invalid_action", fault: "customer" },
+            "warn",
+          ],
+          ["a platform dead-letter", 1, { code: "internal_failure", fault: "platform" }, "error"],
+          ["an unattributed dead-letter", 1, {}, "error"],
+        ] as const)("logs %s at %s", async (_outcome, maxAttempts, fields, level) => {
+          const { logger, lines } = createTestLogger();
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: {
+              "worker-dispatch": vi
+                .fn()
+                .mockRejectedValue(Object.assign(new Error("third-party text"), fields)),
+            },
+            retryDelayMs: () => 1_000,
+            maxAttempts,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          const other = level === "warn" ? "error" : "warn";
+          expect(lines.findLine(level, "redacted cause")).toBeDefined();
+          expect(lines.findLine(other, "redacted cause")).toBeUndefined();
+        });
       });
 
       it("logs no extra cause for an error whose message we wrote", async () => {
@@ -417,6 +451,7 @@ describe("OutboxDispatcherService", () => {
 
         await dispatcher.runOnce({ now: T0 + 1 });
 
+        expect(lines.findLine("warn", "redacted cause")).toBeUndefined();
         expect(lines.findLine("error", "redacted cause")).toBeUndefined();
       });
 
@@ -448,7 +483,7 @@ describe("OutboxDispatcherService", () => {
           const lines = await deadLetterOn(serialised);
 
           expect(lines.findLine("warn", DEAD_LINE)).toBeDefined();
-          expect(lines.findLine("error", DEAD_LINE)).toBeUndefined();
+          expect(lines.findLine("error", "")).toBeUndefined();
         });
 
         /** @scenario "A message dead-lettered by our own or a provider's failure is logged as an error" */
