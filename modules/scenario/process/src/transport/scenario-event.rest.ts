@@ -70,6 +70,14 @@ export const scenarioEventsRest = defineRestRouter(ScenarioApi)
   .withQuery(scenarioEventArchiveQuerySchema)
   .withPermission("scenarios:manage")
   .withAudit("scenarios.archiveEvents")
+  // A card names one run, so a Langy key archives one run at a time; a whole set names no run
+  // and is refused for it outright rather than archived unconfirmed.
+  .withConfirmation({
+    resource: "scenario run",
+    action: "delete",
+    idParam: "scenarioRunId",
+    name: async () => null,
+  })
   .withOutput(scenarioEventArchiveOutputSchema)
   .withDocs({
     operationId: "deleteApiScenarioEvents",

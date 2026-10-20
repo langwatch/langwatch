@@ -310,6 +310,19 @@ export function createTestSuitesRest(): Readonly<{
     .withParams(testSuiteIdParamsSchema)
     .withPermission("scenarios:manage")
     .withAudit("suites.testSuites.archive")
+    .withConfirmation({
+      resource: "test suite",
+      action: "delete",
+      idParam: "id",
+      name: ({ app, projectId, id }) =>
+        app.getByIdOrTestSuite({ id, projectId }).then(
+          (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+          (error: unknown) => {
+            if (error instanceof SuiteNotFoundError) return null;
+            throw error;
+          },
+        ),
+    })
     .withOutput(testSuiteArchiveResultSchema)
     .withDocs({
       tags: ["Test Suites"],

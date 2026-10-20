@@ -33,6 +33,7 @@ import {
   type Trigger,
   type TriggerFirePage,
 } from "@langwatch/automation-contract";
+import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -107,6 +108,28 @@ function firePageWire(page: TriggerFirePage): AutomationRestFirePage {
     })),
     nextCursor: page.nextCursor ? encodeTriggerFireCursor(page.nextCursor) : null,
   };
+}
+
+/**
+ * The automation's name as its confirmation card shows it; its id when it is gone, so the card
+ * still names what Langy asked about.
+ */
+function automationName({
+  app,
+  projectId,
+  id,
+}: {
+  app: AutomationApi;
+  projectId: string;
+  id: string;
+}): Promise<string> {
+  return app.getPublicTrigger({ triggerId: id, projectId }).then(
+    (trigger) => trigger.name,
+    (error: unknown) => {
+      if (HandledError.isHandled(error) && error.httpStatus === 404) return id;
+      throw error;
+    },
+  );
 }
 
 /** The `/api/triggers` endpoints; each also answers under `/api/v1/triggers`. */
@@ -214,6 +237,14 @@ export function createAutomationRest(): Readonly<{
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
+      // An update that pauses the automation is a disable, and the disable route's click covers it.
+      .withConfirmation({
+        resource: "automation",
+        action: "disable",
+        idParam: "triggerId",
+        when: (input) => input.active === false,
+        name: automationName,
+      })
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -270,6 +301,12 @@ export function createAutomationRest(): Readonly<{
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
+      .withConfirmation({
+        resource: "automation",
+        action: "disable",
+        idParam: "triggerId",
+        name: automationName,
+      })
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -319,6 +356,12 @@ export function createAutomationRest(): Readonly<{
       .withAudit("automation.deleteById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:manage")
+      .withConfirmation({
+        resource: "automation",
+        action: "delete",
+        idParam: "triggerId",
+        name: automationName,
+      })
       .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
       .withDocs({ tags: ["Triggers"], description: "Delete (soft-delete) a trigger" })
       .handle(async ({ app, input, scope }) => {

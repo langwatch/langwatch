@@ -237,6 +237,13 @@ export function createEvaluatorRest(): Readonly<{
       .withAudit("evaluators.delete")
       .withParams(evaluatorIdParamsSchema)
       .withPermission("evaluations:manage")
+      .withConfirmation({
+        resource: "evaluator",
+        action: "delete",
+        idParam: "id",
+        name: async ({ app, projectId, id }) =>
+          (await app.findById({ id, projectId }))?.name ?? null,
+      })
       .withOutput(archivedEvaluatorResponseSchema)
       .withDocs({
         description: "Archive (soft-delete) an evaluator",

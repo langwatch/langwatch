@@ -1,4 +1,4 @@
-import type { DashboardWidget } from "@langwatch/analytics-contract";
+import { type DashboardWidget, DashboardWidgetNotFoundError } from "@langwatch/analytics-contract";
 import { dashboardWidgetSourceSchema } from "@langwatch/analytics-contract/dashboard-widget-definition";
 /**
  * Dashboard widgets under `/api/v1/projects/:projectId/analytics/dashboard-widgets`,
@@ -262,6 +262,19 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
   .withPermission("analytics:delete")
+  .withConfirmation({
+    resource: "dashboard widget",
+    action: "delete",
+    idParam: "widgetId",
+    name: ({ app, projectId, id }) =>
+      app.getDashboardWidget({ projectId, id }).then(
+        (widget) => widget.name,
+        (error: unknown) => {
+          if (error instanceof DashboardWidgetNotFoundError) return null;
+          throw error;
+        },
+      ),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Delete a dashboard widget",

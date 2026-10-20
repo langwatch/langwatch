@@ -8,6 +8,7 @@ import {
   annotationRestWriteSchema,
 } from "@langwatch/annotation-contract";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
 
 export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -70,6 +71,18 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   .withAudit("annotation.deleteById")
   .withParams(annotationRestParamsSchema)
   .withPermission("annotations:manage")
+  .withConfirmation({
+    resource: "annotation",
+    action: "delete",
+    idParam: "id",
+    name: async ({ app, projectId, id }) => {
+      const annotation = await app.getById({ id, projectId }).catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.httpStatus === 404) return null;
+        throw error;
+      });
+      return annotation?.comment ? annotation.comment.slice(0, 60) : null;
+    },
+  })
   .withOutput(annotationRestDeletedSchema)
   .withDocs({
     operationId: "deleteApiAnnotationsId",

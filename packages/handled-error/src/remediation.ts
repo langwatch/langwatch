@@ -528,6 +528,11 @@ const registry = {
       "Answer each permission card instead; the folder boundary and the privilege rule hold either way",
     ],
   },
+  langy_confirmation_required: {
+    tips: [
+      "Wait for the person to choose Yes on the confirmation card in the Langy conversation, then run the same command again",
+    ],
+  },
   langy_wait_expired: {
     tips: [
       "Send your answer to Langy as a message; it reads a late answer as the next thing you said",

@@ -6,6 +6,7 @@
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import {
   DashboardApi,
+  GraphNotFoundError,
   graphDeletedResponseSchema,
   graphListRestResponseSchema,
   graphRestCreateSchema,
@@ -120,6 +121,19 @@ export const graphRest = defineRestRouter(DashboardApi)
   .withAudit("graphs.delete")
   .withParams(graphRestParamsSchema)
   .withPermission("analytics:manage")
+  .withConfirmation({
+    resource: "graph",
+    action: "delete",
+    idParam: "id",
+    name: ({ app, projectId, id }) =>
+      app.getGraph({ projectId, graphId: id }).then(
+        (graph) => graph.name,
+        (error: unknown) => {
+          if (error instanceof GraphNotFoundError) return null;
+          throw error;
+        },
+      ),
+  })
   .withOutput(graphDeletedResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Delete a custom graph" })
   .handle(async ({ app, input, scope, actor }) => {

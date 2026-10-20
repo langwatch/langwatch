@@ -450,6 +450,13 @@ export function createDatasetRest(): Readonly<{
       .withAudit("dataset.deleteById")
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withPermission("datasets:manage")
+      .withConfirmation({
+        resource: "dataset",
+        action: "delete",
+        idParam: "slugOrId",
+        name: async ({ app, projectId, id }) =>
+          (await app.findBySlugOrId({ slugOrId: id, projectId }))?.name ?? null,
+      })
       .withOutput(datasetRestArchivedSchema)
       .withDocs({ description: "Archive a dataset (soft-delete)" })
       .handle(async ({ app, input, scope }) =>
@@ -528,6 +535,12 @@ export function createDatasetRest(): Readonly<{
       .withParams(datasetRestSlugOrIdParamsSchema)
       .withInput(datasetRestDeleteRecordsSchema)
       .withPermission("datasets:manage")
+      .withConfirmation({
+        resource: "dataset row",
+        action: "delete",
+        idsField: "recordIds",
+        name: async () => null,
+      })
       .withOutput(datasetRestRecordsDeletedSchema)
       .withDocs({ description: "Delete records from a dataset by IDs" })
       .handle(async ({ app, input, scope }) =>

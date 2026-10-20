@@ -49,6 +49,7 @@ import {
   type RestAddressing,
   type RestAddressingOptions,
 } from "./addressing.ts";
+import { assertConfirmationMark, type RestConfirmation } from "./confirmation.ts";
 import type { RestIdempotency } from "./idempotency.ts";
 import {
   isKeyDoor,
@@ -608,6 +609,10 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly audit?: string;
   /** Present exactly when the route declared it leaves no trail, and why. */
   readonly auditExempt?: string;
+  /** Present exactly when a Langy key needs the person's click before the route runs. */
+  readonly confirmation?: RestConfirmation<Api>;
+  /** Present exactly when a route that removes something says why it asks for no click. */
+  readonly confirmationExempt?: string;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -687,6 +692,8 @@ type RouteState = Readonly<{
   session?: z.ZodType;
   audit?: string;
   auditExempt?: string;
+  confirmation?: RestConfirmation<never>;
+  confirmationExempt?: string;
 }>;
 
 type RouteReady<
@@ -1650,6 +1657,38 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   }
 
   /**
+   * The route removes or disables a record, so a Langy session key runs it only once the person
+   * clicked Yes on a card for that record (spec: specs/langy/langy-delete-confirmation.feature).
+   * Every other credential is not asked.
+   */
+  withConfirmation(mark: RestConfirmation<Api>): RouteBuilder<Api, S> {
+    assertConfirmationMark({ address: `REST ${this.operation}`, mark });
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, confirmation: mark },
+    });
+  }
+
+  /** The route removes something yet asks a Langy key for no click; the reason says why. */
+  withoutConfirmation(reason: string): RouteBuilder<Api, S> {
+    if (reason.trim().length === 0) throw new Error("REST withoutConfirmation needs a reason");
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, confirmationExempt: reason },
+    });
+  }
+
+  /**
    * The route leaves no audit row, and the reason says why: ingestion, a read sent as a POST,
    * a run, or another service's webhook. A write route declares this or `withAudit`.
    */
@@ -1685,6 +1724,13 @@ function assertAuditDeclared({
   throw new Error(
     `REST ${operation} is a write route: declare withAudit("<action>") or withoutAudit("<reason>")`,
   );
+}
+
+/** A route says once whether it asks for a click. */
+function assertConfirmationUndeclared(state: RouteState): void {
+  if (state.confirmation !== void 0 || state.confirmationExempt !== void 0) {
+    throw new Error("REST route already declared withConfirmation() or withoutConfirmation()");
+  }
 }
 
 /** A route says once whether it leaves a trail. */
@@ -1771,6 +1817,10 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
     ...(state.keyKinds ? { keyKinds: state.keyKinds } : {}),
     ...(state.audit ? { audit: state.audit } : {}),
     ...(state.auditExempt ? { auditExempt: state.auditExempt } : {}),
+    ...(state.confirmation
+      ? { confirmation: state.confirmation as RestConfirmation<unknown> }
+      : {}),
+    ...(state.confirmationExempt ? { confirmationExempt: state.confirmationExempt } : {}),
   };
 }
 

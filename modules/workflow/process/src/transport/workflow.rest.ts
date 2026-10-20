@@ -13,6 +13,7 @@ import {
 import { createLogger } from "@langwatch/observability";
 import {
   WorkflowApi,
+  WorkflowNotFoundError,
   workflowRestArchivedSchema,
   workflowRestDetailSchema,
   workflowRestParamsSchema,
@@ -127,6 +128,19 @@ export function createWorkflowRest(): Readonly<{
       .withAudit("workflow.archive")
       .withParams(workflowRestParamsSchema)
       .withPermission("workflows:manage")
+      .withConfirmation({
+        resource: "workflow",
+        action: "delete",
+        idParam: "id",
+        name: ({ app, projectId, id }) =>
+          app.getById({ id, projectId }).then(
+            (workflow) => workflow.name,
+            (error: unknown) => {
+              if (error instanceof WorkflowNotFoundError) return null;
+              throw error;
+            },
+          ),
+      })
       .withOutput(workflowRestArchivedSchema)
       .withDocs({
         description: "Archive (soft-delete) a workflow",

@@ -37,6 +37,7 @@ import {
 } from "../../../rules/langy-panel-conversation-dto.rules.ts";
 import type { LangyService } from "../../../services/langy.service.ts";
 import { LangyConversationUpdateStreamService } from "../../conversation/services/langy-conversation-update-stream.service.ts";
+import type { LangyDeleteConfirmationService } from "../../delete-confirmation/services/langy-delete-confirmation.service.ts";
 import type { LangyTurnsBoundsService } from "../../turn/services/langy-turns-bounds.service.ts";
 import type { LangyUiActionPageService } from "../../ui-action/services/langy-ui-action-page.service.ts";
 import { LangyPanelAccessService } from "./langy-panel-access.service.ts";
@@ -68,6 +69,8 @@ export type LangyPanelConversationMembers = Readonly<{
     | "findModelsAllowedForProject"
   >;
   turnBounds: Pick<LangyTurnsBoundsService, "assertTurnWithinBounds">;
+  /** Reads a confirmation card's click that arrives as the next message. */
+  confirmations?: Pick<LangyDeleteConfirmationService, "acceptSelection">;
   rateLimits: LangyRateLimitRepository;
   presence: Pick<PresenceApi, "getTenantEmitter" | "cleanupTenantEmitter">;
   uiActions: Pick<LangyUiActionPageService, "claim" | "complete">;
@@ -394,6 +397,7 @@ export class LangyPanelConversationService {
       throw new ValidationError(message, { meta: { message } });
     }
     await this.members.turnBounds.assertTurnWithinBounds({ projectId: input.projectId });
+    await this.acceptConfirmationClick(input);
 
     return this.members.langy.startConversationTurn({
       projectId: input.projectId,
@@ -405,6 +409,33 @@ export class LangyPanelConversationService {
       ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
       isRetry: input.trigger === "regenerate-message",
       turnContext: { pageContext: input.pageContext, skills: input.skills },
+    });
+  }
+
+  /**
+   * A click on a confirmation card that the panel sent as this message. Only the owner's own
+   * message in their own conversation can carry one: a teammate's cannot confirm their delete.
+   */
+  private async acceptConfirmationClick(
+    input:
+      | LangyPanelCall<typeof langyContinueConversationInputSchema>
+      | LangyPanelCall<typeof langyPanelCreateConversationInputSchema>,
+  ): Promise<void> {
+    const { confirmations } = this.members;
+    const parts = input.messages.at(-1)?.parts;
+    if (!confirmations || !input.conversationId || !Array.isArray(parts)) return;
+    const conversation = await this.members.langy.findByIdVisible({
+      id: input.conversationId,
+      projectId: input.projectId,
+      userId: input.caller.userId,
+    });
+    if (!conversation?.isOwn) return;
+
+    await confirmations.acceptSelection({
+      projectId: input.projectId,
+      conversationId: input.conversationId,
+      userId: input.caller.userId,
+      parts,
     });
   }
 

@@ -207,6 +207,12 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("promptTags.delete")
   .withParams(tagParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt tag",
+    action: "delete",
+    idParam: "tag",
+    name: async ({ id }) => id,
+  })
   .withOutput(z.void())
   .withMiddlewareContext(promptRestContext)
   .withDocs({
@@ -436,6 +442,15 @@ export const promptRest = defineRestRouter(PromptApi)
   .withAudit("prompts.delete")
   .withParams(idParamsSchema)
   .withPermission("prompts:manage")
+  .withConfirmation({
+    resource: "prompt",
+    action: "delete",
+    idParam: "id",
+    name: async ({ app, projectId, id }) => {
+      const prompt = await app.findByIdOrHandle({ idOrHandle: id, projectId });
+      return prompt ? (prompt.handle ?? prompt.name) : null;
+    },
+  })
   .withOutput(successSchema)
   .withMiddlewareContext(promptRestContext)
   .withDocs({

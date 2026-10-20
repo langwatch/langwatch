@@ -263,6 +263,7 @@ export class LangyTurnPreparationService {
       projectId: args.projectId,
       organizationId: args.credentials.organizationId,
       ...(args.readOnly ? { ceiling: "unattended" as const } : {}),
+      conversation: { id: args.conversation.id, turnId: args.turnId },
     });
     args.credentials.langwatchApiKey = minted.token;
     args.credentials.langwatchApiKeyId = minted.apiKeyId;

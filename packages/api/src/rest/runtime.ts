@@ -69,6 +69,7 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
+import { confirmMarkedRequest, type RestConfirmationGate } from "./confirmation.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -183,6 +184,11 @@ export type RestRuntimeMembers = Readonly<{
   idempotency?: IdempotentRunner;
   /** Where the first call of each deprecated route is recorded. */
   deprecationLog?: RestDeprecationLog;
+  /**
+   * Where a Langy key's confirmation clicks are kept. Absent, a route that removes something
+   * refuses a Langy key outright rather than run unconfirmed.
+   */
+  confirmations?: RestConfirmationGate;
 }>;
 
 /**
@@ -1450,8 +1456,19 @@ function handlerMiddleware<Api>({
         credential,
         scope: resolved,
         context,
-        run: async () =>
-          route.handler(
+        run: async () => {
+          // After every permission check and inside the trail, so a refusal is recorded too.
+          await confirmMarkedRequest({
+            mark: route.confirmation,
+            gate: ports.confirmations,
+            credential,
+            request: context.req.raw,
+            input,
+            scope: resolved,
+            app: options.app,
+          });
+
+          return route.handler(
             handlerArguments({
               context,
               route,
@@ -1465,7 +1482,8 @@ function handlerMiddleware<Api>({
               key: keyOf({ route, credential, request: context.req.raw }),
             }),
             ...(await resolveContexts({ route, contexts, context, input })),
-          ),
+          );
+        },
       });
 
       caller.markUsed?.();

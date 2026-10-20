@@ -420,6 +420,7 @@ export const APP_ERROR_CODES = [
   "langy_api_request_invalid",
   "langy_codex_plan_limit",
   "langy_codex_session_expired",
+  "langy_confirmation_required",
   "langy_conversation_id_unadoptable",
   "langy_conversation_not_found",
   "langy_conversation_not_owned",

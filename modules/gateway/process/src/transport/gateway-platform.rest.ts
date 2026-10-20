@@ -839,6 +839,17 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayUpdateCacheRuleSchema)
   .withPermission("gatewayCacheRules:update")
+  // An update that switches the rule off is a disable, so it needs its own click.
+  .withConfirmation({
+    resource: "cache rule",
+    action: "disable",
+    idParam: "id",
+    when: (input) => input.enabled === false,
+    name: async ({ app, projectId, id }) => {
+      const organizationId = await app.organizationIdForProject(projectId);
+      return (await app.findCacheRule({ id, organizationId }))?.name ?? null;
+    },
+  })
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))
   .withDocs({
     summary: "Update a cache rule",
@@ -872,6 +883,15 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withAudit("gatewayCacheRules.archive")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayCacheRules:delete")
+  .withConfirmation({
+    resource: "cache rule",
+    action: "delete",
+    idParam: "id",
+    name: async ({ app, projectId, id }) => {
+      const organizationId = await app.organizationIdForProject(projectId);
+      return (await app.findCacheRule({ id, organizationId }))?.name ?? null;
+    },
+  })
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))
   .withDocs({
     summary: "Archive a cache rule",

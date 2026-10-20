@@ -241,6 +241,19 @@ export function createRunPlansRest(): Readonly<{
     .withParams(runPlanIdParamsSchema)
     .withPermission("scenarios:manage")
     .withAudit("suites.archive")
+    .withConfirmation({
+      resource: "run plan",
+      action: "delete",
+      idParam: "id",
+      name: ({ app, projectId, id }) =>
+        app.getByIdOrTestSuite({ id, projectId }).then(
+          (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+          (error: unknown) => {
+            if (error instanceof SuiteNotFoundError) return null;
+            throw error;
+          },
+        ),
+    })
     .withOutput(runPlanArchiveResultSchema)
     .withDocs({
       tags: ["Run Plans"],

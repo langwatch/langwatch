@@ -148,6 +148,15 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
+      // An update that switches the monitor off is a disable, and the toggle's click covers it.
+      .withConfirmation({
+        resource: "monitor",
+        action: "disable",
+        idParam: "id",
+        when: (input) => input.enabled === false,
+        name: async ({ app, projectId, id }) =>
+          (await app.findById({ id, projectId }))?.name ?? null,
+      })
       .withOutput(monitorRestResponseSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -171,6 +180,15 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
+      // Only the call that turns the monitor off asks for the click; turning it on removes nothing.
+      .withConfirmation({
+        resource: "monitor",
+        action: "disable",
+        idParam: "id",
+        when: (input) => input.enabled === false,
+        name: async ({ app, projectId, id }) =>
+          (await app.findById({ id, projectId }))?.name ?? null,
+      })
       .withOutput(monitorRestToggledSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -188,6 +206,13 @@ export function createMonitorsRest(): Readonly<{
       .withAudit("monitors.delete")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
+      .withConfirmation({
+        resource: "monitor",
+        action: "delete",
+        idParam: "id",
+        name: async ({ app, projectId, id }) =>
+          (await app.findById({ id, projectId }))?.name ?? null,
+      })
       .withOutput(monitorRestDeletedSchema)
       .withDocs({
         tags: ["Monitors"],

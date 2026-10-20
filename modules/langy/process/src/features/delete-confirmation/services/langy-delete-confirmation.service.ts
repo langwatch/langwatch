@@ -1,0 +1,262 @@
+import { ConfirmationRequiredError } from "@langwatch/api";
+import type { RestConfirmationGate, RestConfirmationRequest } from "@langwatch/api/rest";
+import { HandledError } from "@langwatch/handled-error";
+import { parseLangyChoiceSelectionPart } from "@langwatch/langy-contract";
+import { createLogger } from "@langwatch/observability";
+
+import type {
+  ConfirmKeyBinding,
+  LangyDeleteConfirmationRepository,
+} from "../../../repositories/langy-delete-confirmation.repository.ts";
+import type { LangyLocalControlRequestRepository } from "../../../repositories/langy-local-control-request.repository.ts";
+import {
+  CONFIRM_CARD_TTL_SECONDS,
+  confirmBlockWait,
+  confirmationCard,
+  cardUnavailableRefusalMessage,
+  confirmationRefusalMessage,
+  type ConfirmChoice,
+  namedRecord,
+  selectedOption,
+  unboundRefusalMessage,
+} from "../../../rules/langy-delete-confirmation.rules.ts";
+import type { ConfirmTarget } from "../../../rules/langy-local-control-keys.rules.ts";
+import type { StoredUserWait } from "../../../rules/langy-local-user-wait-record.rules.ts";
+import type { UserWaitService } from "../../local-control/services/langy-local-user-wait.service.ts";
+import type { LangyConfirmationAnswersService } from "./langy-confirmation-answers.service.ts";
+
+const logger = createLogger("langwatch:langy:delete-confirmation");
+
+type DeleteConfirmationMembers = Readonly<{
+  confirmations: LangyDeleteConfirmationRepository;
+  answers: Pick<LangyConfirmationAnswersService, "decide">;
+  waits: Pick<UserWaitService, "startQuestion" | "poll" | "getWait" | "answer">;
+  /** The folder-sharing key's own binding, which names its conversation too. */
+  localKeys: Pick<LangyLocalControlRequestRepository, "findKeyBinding">;
+  conversations: {
+    findByIdVisible(input: {
+      id: string;
+      projectId: string;
+      userId: string;
+    }): Promise<{ isOwn: boolean; currentTurnId: string | null } | null>;
+  };
+}>;
+
+/**
+ * The gate every marked route asks for a Langy key: it runs only on an unspent Yes click for each
+ * record, in the key's own conversation; otherwise it shows the card and refuses in words Langy
+ * acts on. Spec: specs/langy/langy-delete-confirmation.feature
+ */
+export class LangyDeleteConfirmationService implements RestConfirmationGate {
+  static create(members: DeleteConfirmationMembers): LangyDeleteConfirmationService {
+    return new LangyDeleteConfirmationService(members);
+  }
+
+  private constructor(private readonly members: DeleteConfirmationMembers) {}
+
+  /**
+   * Spends one click per record, all or none.
+   * @throws {ConfirmationRequiredError} when any record has no unspent click, or the key belongs
+   * to no conversation
+   */
+  async confirm(request: RestConfirmationRequest): Promise<void> {
+    const binding = await this.bindingOf(request.apiKeyId);
+    if (!binding || binding.projectId !== request.projectId) {
+      throw new ConfirmationRequiredError({
+        message: unboundRefusalMessage(request.action),
+        resource: request.resource,
+        action: request.action,
+      });
+    }
+
+    const targets = request.targets.map(({ id }) => ({
+      projectId: request.projectId,
+      conversationId: binding.conversationId,
+      resource: request.resource,
+      action: request.action,
+      id,
+    }));
+    if (await this.members.confirmations.consumeGrants(targets)) return;
+
+    const records: string[] = [];
+    let everyCardShown = true;
+    for (const [index, target] of targets.entries()) {
+      if (await this.members.confirmations.hasGrant(target)) continue;
+      const name = (await request.targets[index]?.name()) ?? target.id;
+      const shown = await this.showCard({
+        target,
+        name,
+        binding,
+        ownerUserId: request.ownerUserId,
+      });
+      everyCardShown &&= shown;
+      records.push(namedRecord({ resource: target.resource, name }));
+    }
+
+    throw new ConfirmationRequiredError({
+      message: everyCardShown
+        ? confirmationRefusalMessage({ action: request.action, records })
+        : cardUnavailableRefusalMessage(request.action),
+      resource: request.resource,
+      action: request.action,
+    });
+  }
+
+  /**
+   * A click that reached the platform as the next message, because the card had stopped
+   * waiting or the panel could not answer it in place. Only the structured selection counts,
+   * read by the option ids the card stored; the words beside it never do.
+   */
+  async acceptSelection({
+    projectId,
+    conversationId,
+    userId,
+    parts,
+  }: {
+    projectId: string;
+    conversationId: string;
+    userId: string;
+    parts: readonly unknown[];
+  }): Promise<void> {
+    for (const part of parts) {
+      const selection = parseLangyChoiceSelectionPart(part);
+      const block = selection ? confirmBlockWait(selection.blockId) : { kind: "other" as const };
+      if (!selection || block.kind !== "card") continue;
+      const wait = await this.readWait(block.waitId);
+      if (
+        !wait?.confirm ||
+        wait.projectId !== projectId ||
+        wait.conversationId !== conversationId
+      ) {
+        continue;
+      }
+
+      const choice = selectedOption({
+        confirm: wait.confirm,
+        optionIds: selection.optionIds,
+        otherText: selection.otherText,
+      });
+      await this.settle({ wait, choice, userId });
+    }
+  }
+
+  /** A still-waiting card is answered in place, which records the click; any other is decided. */
+  private async settle({
+    wait,
+    choice,
+    userId,
+  }: {
+    wait: StoredUserWait;
+    choice: ConfirmChoice;
+    userId: string;
+  }): Promise<void> {
+    // A selection that names no option of the card says nothing, so it claims nothing either.
+    if (choice.kind !== "option" || !wait.confirm) return;
+    const { question, options } = wait.confirm;
+    const label = options.find((option) => option.id === choice.optionId)?.label;
+    if (wait.state === "pending" && label) {
+      const answered = await this.members.waits
+        .answer({ waitId: wait.waitId, userId, answers: [{ question, selected: [label] }] })
+        .then(() => true)
+        .catch((error: unknown) => {
+          if (HandledError.isHandled(error) && error.code === "langy_wait_expired") return false;
+          throw error;
+        });
+      if (answered) return;
+    }
+
+    await this.members.answers.decide({ wait, choice });
+  }
+
+  /** The card for one record, unless one is already waiting for it. True when a card is waiting. */
+  private async showCard({
+    target,
+    name,
+    binding,
+    ownerUserId,
+  }: {
+    target: ConfirmTarget;
+    name: string;
+    binding: ConfirmKeyBinding;
+    ownerUserId: string | null;
+  }): Promise<boolean> {
+    if (await this.isWaiting(target)) return true;
+
+    const turnId = await this.turnOf({ binding, ownerUserId });
+    if (!turnId) {
+      logger.warn(
+        { conversationId: target.conversationId },
+        "no turn to show a confirmation card on",
+      );
+      return false;
+    }
+
+    const card = confirmationCard({
+      resource: target.resource,
+      action: target.action,
+      id: target.id,
+      name,
+    });
+    const wait = await this.members.waits.startQuestion({
+      projectId: target.projectId,
+      conversationId: target.conversationId,
+      turnId,
+      questions: [card.question],
+      confirm: card.confirm,
+    });
+    await this.members.confirmations.savePendingCard({
+      target,
+      waitId: wait.waitId,
+      ttlSeconds: CONFIRM_CARD_TTL_SECONDS,
+    });
+    return true;
+  }
+
+  /**
+   * Whether the card raised for this record still waits. Polling it once also settles one whose
+   * time ran out, so the stale card leaves the screen before its replacement arrives.
+   */
+  private async isWaiting(target: ConfirmTarget): Promise<boolean> {
+    const card = await this.members.confirmations.lookupPendingCard(target);
+    if (card.kind !== "hit") return false;
+    const poll = await this.members.waits.poll({ waitId: card.value, holdMs: 0 });
+    return poll.outcome === "polled" && poll.answer.state === "pending";
+  }
+
+  /** The turn running now, else the one the key was minted in. */
+  private async turnOf({
+    binding,
+    ownerUserId,
+  }: {
+    binding: ConfirmKeyBinding;
+    ownerUserId: string | null;
+  }): Promise<string | undefined> {
+    const conversation = ownerUserId
+      ? await this.members.conversations.findByIdVisible({
+          id: binding.conversationId,
+          projectId: binding.projectId,
+          userId: ownerUserId,
+        })
+      : null;
+    return conversation?.currentTurnId ?? binding.turnId;
+  }
+
+  /** A turn key's binding, else the folder-sharing key's: both name the conversation. */
+  private async bindingOf(apiKeyId: string): Promise<ConfirmKeyBinding | undefined> {
+    const bound = await this.members.confirmations.lookupKeyBinding(apiKeyId);
+    if (bound.kind === "hit") return bound.value;
+    const local = await this.members.localKeys.findKeyBinding(apiKeyId);
+    return local.kind === "hit"
+      ? { projectId: local.value.projectId, conversationId: local.value.conversationId }
+      : undefined;
+  }
+
+  private async readWait(waitId: string): Promise<StoredUserWait | undefined> {
+    return this.members.waits.getWait(waitId).catch((error: unknown) => {
+      if (HandledError.isHandled(error) && error.code === "langy_local_record_not_found") {
+        return undefined;
+      }
+      throw error;
+    });
+  }
+}

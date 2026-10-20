@@ -542,6 +542,19 @@ export function createSuitesAliasRest(): Readonly<{
       .withParams(suiteAliasIdParamsSchema)
       .withPermission("scenarios:manage")
       .withAudit("suites.archive")
+      .withConfirmation({
+        resource: "suite",
+        action: "delete",
+        idParam: "id",
+        name: ({ app, projectId, id }) =>
+          app.getByIdOrTestSuite({ id, projectId }).then(
+            (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+            (error: unknown) => {
+              if (error instanceof SuiteNotFoundError) return null;
+              throw error;
+            },
+          ),
+      })
       .withOutput(archivedSuiteSchema)
       .withDocs({
         description:

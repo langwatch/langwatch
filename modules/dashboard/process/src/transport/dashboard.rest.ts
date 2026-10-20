@@ -14,6 +14,7 @@ import {
   dashboardRestParamsSchema,
   dashboardRestReorderSchema,
   DashboardApi,
+  DashboardNotFoundError,
   type Dashboard,
 } from "@langwatch/dashboard-contract";
 
@@ -129,6 +130,19 @@ export const dashboardRest = defineRestRouter(DashboardApi)
   .withAudit("dashboards.delete")
   .withParams(dashboardRestParamsSchema)
   .withPermission("analytics:manage")
+  .withConfirmation({
+    resource: "dashboard",
+    action: "delete",
+    idParam: "id",
+    name: ({ app, projectId, id }) =>
+      app.getById({ projectId, dashboardId: id }).then(
+        (dashboard) => dashboard.name,
+        (error: unknown) => {
+          if (error instanceof DashboardNotFoundError) return null;
+          throw error;
+        },
+      ),
+  })
   .withOutput(dashboardDeletedResponseSchema)
   .withDocs({
     tags: ["Dashboards"],

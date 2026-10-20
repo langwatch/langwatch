@@ -24,6 +24,7 @@ import {
   savedWorkbenchChartParamsSchema,
   savedWorkbenchChartProjectParamsSchema,
   savedWorkbenchChartResourceSchema,
+  SavedWorkbenchChartNotFoundError,
   updateSavedWorkbenchChartSchema,
   type SavedWorkbenchChart,
 } from "@langwatch/dashboard-contract";
@@ -249,6 +250,19 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:delete")
+  .withConfirmation({
+    resource: "chart",
+    action: "delete",
+    idParam: "chartId",
+    name: ({ app, projectId, id }) =>
+      app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
+        (chart) => chart.name,
+        (error: unknown) => {
+          if (error instanceof SavedWorkbenchChartNotFoundError) return null;
+          throw error;
+        },
+      ),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Delete a saved workbench chart",
@@ -317,6 +331,19 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
   .withPermission("analytics:update")
+  .withConfirmation({
+    resource: "dashboard chart",
+    action: "remove",
+    idParam: "chartId",
+    name: ({ app, projectId, id }) =>
+      app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
+        (chart) => chart.name,
+        (error: unknown) => {
+          if (error instanceof SavedWorkbenchChartNotFoundError) return null;
+          throw error;
+        },
+      ),
+  })
   .withOutput(z.void())
   .withDocs({
     summary: "Remove a saved workbench chart from its dashboard",
