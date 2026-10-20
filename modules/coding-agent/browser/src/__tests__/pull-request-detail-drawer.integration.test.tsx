@@ -574,6 +574,7 @@ describe("the pull request detail drawer", () => {
           sessions: [
             sessionFact({
               sessionId: "session-a",
+              projectId: "proj-personal",
               title: "Teach the fold about branches",
             }),
           ],
@@ -720,6 +721,54 @@ describe("the pull request detail drawer", () => {
           projectId: "proj-personal",
           conversationId: "session-a",
         });
+      });
+    });
+  });
+
+  describe("given a group project's pull request detail listing a member project's session", () => {
+    beforeEach(() => {
+      pinDetail(
+        detailPayload({
+          sessions: [
+            sessionFact({
+              sessionId: "session-a",
+              projectId: "member-b",
+              title: "Teach the fold about branches",
+            }),
+          ],
+        }),
+      );
+    });
+
+    /**
+     * @see specs/governance/aggregate-project.feature
+     * @scenario "Opening a member project's session replays that member's conversation"
+     */
+    it("reads the session under the member project that recorded it", async () => {
+      utils.traces.conversationContext.fetch.mockResolvedValue({
+        turns: [{ traceId: "trace-last", timestamp: 2_000 }],
+      });
+      const user = userEvent.setup();
+      renderDrawer();
+
+      await user.click(screen.getByText("Teach the fold about branches"));
+
+      await waitFor(() =>
+        expect(host.recording.queries.map((write) => write.next)).toEqual([
+          {
+            "drawer.open": "traceV2Details",
+            "drawer.traceId": "trace-last",
+            "drawer.t": "2000",
+            "drawer.mode": "terminal",
+            "drawer.projectId": "proj-personal",
+            "drawer.tenantId": "member-b",
+          },
+        ]),
+      );
+      expect(utils.traces.conversationContext.fetch).toHaveBeenCalledWith({
+        projectId: "proj-personal",
+        conversationId: "session-a",
+        tenantId: "member-b",
       });
     });
   });
