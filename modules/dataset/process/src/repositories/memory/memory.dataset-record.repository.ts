@@ -59,6 +59,8 @@ export class MemoryDatasetRecordRepository implements DatasetRecordRepository {
     const cursorIndex = input.cursorId
       ? records.findIndex((record) => record.id === input.cursorId)
       : -1;
+    // A cursor naming no entry of this dataset answers an empty page, as Postgres does.
+    if (input.cursorId && cursorIndex === -1) return [];
     return records
       .slice(cursorIndex + 1, cursorIndex + 1 + input.limit)
       .map((record) => structuredClone(record));

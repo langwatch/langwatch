@@ -62,6 +62,7 @@ export class PrismaDatasetRecordRepository implements DatasetRecordRepository {
                SELECT "createdAt", "id" COLLATE "C"
                  FROM "DatasetRecord"
                 WHERE "id" = ${cursorId}
+                  AND "datasetId" = ${input.datasetId}
                   AND "projectId" = ${input.projectId}
              ))
        ORDER BY "createdAt" ASC, "id" COLLATE "C" ASC

@@ -81,6 +81,12 @@ Feature: Shared Dataset service
     When each backend lists them, page by page or after a cursor
     Then every backend lists them in the byte order of their ids, capital letters before lowercase
 
+  @integration
+  Scenario: A cursor naming no entry of the dataset answers an empty page
+    Given a dataset with entries
+    When a backend is asked for the page after an id that is no entry of that dataset, or an entry of another dataset
+    Then every backend answers an empty page rather than starting again from the first entry
+
   @unit
   Scenario: A copied dataset lists its entries in the order of its source
     Given a dataset of several hundred entries

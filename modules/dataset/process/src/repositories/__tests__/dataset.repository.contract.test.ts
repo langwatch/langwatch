@@ -204,6 +204,11 @@ function contractCases(backend: Backend): void {
         page: 1,
         limit: 50,
       });
+      const firstPage = await backend.records().findPage({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        limit: 3,
+      });
       const afterZzz = await backend.records().findPage({
         datasetId: dataset.id,
         projectId: backend.mine(),
@@ -213,7 +218,36 @@ function contractCases(backend: Backend): void {
 
       expect(created.map((record) => record.id)).toEqual(inByteOrder);
       expect(listed.records.map((record) => record.id)).toEqual(inByteOrder);
+      expect(firstPage.map((record) => record.id)).toEqual(["Aaa", "Zzz", "aaa"]);
       expect(afterZzz.map((record) => record.id)).toEqual(["aaa", "bbb", "zzz"]);
+    });
+
+    /** @scenario "A cursor naming no entry of the dataset answers an empty page" */
+    it("answers an empty page after a cursor that names no entry of the dataset", async () => {
+      const dataset = await create("cursor-miss");
+      const other = await create("cursor-elsewhere");
+      // The other dataset's entry is written first, so it would sit before this one.
+      await backend.records().createMany({
+        datasetId: other.id,
+        projectId: backend.mine(),
+        entries: [{ id: "elsewhere-1", input: "one" }],
+      });
+      await backend.records().createMany({
+        datasetId: dataset.id,
+        projectId: backend.mine(),
+        entries: [{ id: "miss-1", input: "one" }],
+      });
+
+      const page = (cursorId: string) =>
+        backend.records().findPage({
+          datasetId: dataset.id,
+          projectId: backend.mine(),
+          limit: 50,
+          cursorId,
+        });
+
+      await expect(page("no-such-entry")).resolves.toEqual([]);
+      await expect(page("elsewhere-1")).resolves.toEqual([]);
     });
 
     it("removes only the entries it was asked to remove", async () => {
