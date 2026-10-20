@@ -2267,13 +2267,16 @@ redis:
       size: 10Gi
       storageClass: ""
 
+    ## @param redis.master.maxmemory [string] Explicit --maxmemory (bytes, or a k, M, G, T, Ki, Mi, Gi, Ti size). Empty means half of redis.master.resources.limits.memory, so a snapshot's copied pages still fit under the container limit.
+    maxmemory: ""
+
     # Resource requirements for Redis
     # See: https://kubespec.dev/v1/Pod#spec.containers.resources
     ## @extra redis.master.resources Resource requests and limits.
     ## @param redis.master.resources.requests.cpu [string, default: 250m] Requested CPU.
     ## @param redis.master.resources.requests.memory [string, default: 256Mi] Requested memory.
     ## @param redis.master.resources.limits.cpu [string, default: 500m] CPU limit.
-    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit.
+    ## @param redis.master.resources.limits.memory [string, default: 512Mi] Memory limit. Redis starts with --maxmemory at half of this, because a background snapshot copies changed pages and memory briefly approaches double; with noeviction Redis then refuses writes instead of being OOM-killed. No limit means no ceiling.
     resources:
       requests:
         cpu: 250m
