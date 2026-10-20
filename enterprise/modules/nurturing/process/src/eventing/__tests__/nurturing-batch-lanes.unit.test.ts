@@ -11,7 +11,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { TRACE_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { NURTURING_BATCH_MAX } from "../nurturing-batch-lane.ts";
+import { NURTURING_BATCH_MAX } from "../nurturing-batch.subscriber.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
 
 const MORNING = 1_791_280_800_000;

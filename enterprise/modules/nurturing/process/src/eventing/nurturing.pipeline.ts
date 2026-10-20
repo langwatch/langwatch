@@ -126,7 +126,7 @@ import {
   userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
-import { nurturingBatchLane } from "./nurturing-batch-lane.ts";
+import { nurturingBatchLane } from "./nurturing-batch.subscriber.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
 import {
   NURTURING_PIPELINE_NAME,

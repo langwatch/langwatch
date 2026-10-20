@@ -161,7 +161,7 @@ describe("a batch peer subscriber", () => {
 
       await expect(
         lane.handleBatch?.([readable, unreadable], [contextOf(readable), contextOf(unreadable)]),
-      ).rejects.toThrow();
+      ).rejects.toThrow(z.ZodError);
       expect(handleBatch).not.toHaveBeenCalled();
     });
   });

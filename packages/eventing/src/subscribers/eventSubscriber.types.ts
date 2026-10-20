@@ -93,10 +93,9 @@ export interface EventSubscriberDefinition<E extends Event = Event> {
 }
 
 /**
- * A module's subscriber on a peer pipeline's event (§9), named by the peer contract's event type
- * and data schema; the handler reads only the parsed data. Delivered at least once, per aggregate
- * ordered, never replayed, so the handler is idempotent and throws to be retried. It declares
- * exactly one of `handle` (one event per call) and `handleBatch` (every delivery as a batch).
+ * A module's subscriber on a peer pipeline's event (§9), by contract event type and data schema.
+ * Delivered at least once, per aggregate ordered, never replayed: the handler is idempotent and
+ * throws to be retried. It declares one of `handle` (one event) or `handleBatch` (a batch).
  */
 export type PeerSubscriberDefinition<Data extends ParsingSchema> =
   | PeerEventSubscriberDefinition<Data>
@@ -137,7 +136,7 @@ interface PeerSubscriberDeclaration<Data extends ParsingSchema> {
   };
 }
 
-/** One event of a coalesced peer batch: its contract-parsed data and the context `handle` would get. */
+/** One event of a coalesced peer batch: its parsed data and the context `handle` would get. */
 export interface PeerSubscriberBatchItem<Data extends ParsingSchema> {
   data: z.output<Data>;
   context: PeerSubscriberContext;

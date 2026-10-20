@@ -15,6 +15,9 @@ import type { NurturingProjectDirectoryRepository } from "../../repositories/nur
 import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
+const COUNT_FAILED = "nurturing could not count every project in the batch";
+const CLAIM_FAILED = "nurturing could not claim every item in the batch";
+
 /** `placed` and `created` stand in for project's and organization's tables (R40). */
 function serviceOver({
   placed = new Map([["project-1", "org-1"]]),
@@ -286,7 +289,9 @@ describe("NurturingMilestonesService", () => {
       const delivered: NurturingSignal[] = [];
       const deliver = async (signal: NurturingSignal) => void delivered.push(signal);
 
-      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow();
+      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
+        COUNT_FAILED,
+      );
       expect(delivered).toMatchObject([{ projectId: "project-2", organizationEvaluationCount: 1 }]);
 
       await service.evaluationsCompleted({ evaluations: batch, deliver });
@@ -312,7 +317,7 @@ describe("NurturingMilestonesService", () => {
       const service = serviceOver({ milestones, projects });
       await service.projectCreated(projectCreatedFact());
 
-      await expect(settleAndCount(service, settled("eval-1"))).rejects.toThrow();
+      await expect(settleAndCount(service, settled("eval-1"))).rejects.toThrow(COUNT_FAILED);
       expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([
         { organizationEvaluationCount: 1 },
       ]);
@@ -344,7 +349,9 @@ describe("NurturingMilestonesService", () => {
       const delivered: NurturingSignal[] = [];
       const deliver = async (signal: NurturingSignal) => void delivered.push(signal);
 
-      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow();
+      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
+        CLAIM_FAILED,
+      );
       expect(delivered).toEqual([]);
 
       await service.evaluationsCompleted({ evaluations: batch, deliver });
@@ -382,7 +389,9 @@ describe("NurturingMilestonesService", () => {
         delivered.push(signal);
       };
 
-      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow();
+      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
+        COUNT_FAILED,
+      );
       expect(delivered).toMatchObject([{ projectId: "project-2", organizationEvaluationCount: 1 }]);
 
       await service.evaluationsCompleted({ evaluations: batch, deliver });
