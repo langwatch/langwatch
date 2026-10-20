@@ -1,4 +1,4 @@
-import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { customGraphInputSchema, parseStoredTimeScale } from "@langwatch/dashboard-contract";
 import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
@@ -134,7 +134,8 @@ export interface CustomGraphFormData {
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   groupByKey?: string;
   includePrevious: boolean;
-  timeScale: "full" | number;
+  /** Minutes, or the native select's text: "full" or a number of minutes ("60"). */
+  timeScale: number | string;
   connected?: boolean;
   alert?: {
     enabled: boolean;
@@ -360,9 +361,6 @@ function AnalyticsCustomGraphContent({
 
     const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
     const apiJson = customAPIinput(parsedFormData, filterParams);
-    if (typeof apiJson?.timeScale === "string" && apiJson.timeScale !== "full") {
-      apiJson.timeScale = parseInt(apiJson.timeScale);
-    }
     setDebouncedCustomAPIInput(apiJson);
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
@@ -562,7 +560,8 @@ export const customGraphFormToCustomGraphInput = (
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
-    timeScale: formData.timeScale,
+    // The native select hands its value back as text; the saved chart carries minutes.
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
     connected: formData.connected,
     height: 517,
   };
@@ -603,7 +602,7 @@ const customAPIinput = (
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
-    timeScale: formData.timeScale,
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
   };
 };
 

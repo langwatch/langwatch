@@ -86,6 +86,14 @@ export type OnboardingApiMap = ContractApiMap<typeof inviteTrpc> &
         };
       };
 
+      /** Records "Later" on Langy's model prompt after a skipped provider. */
+      recordProviderPromptDismissed: {
+        mutation: {
+          input: { organizationId: string };
+          output: GuidedState;
+        };
+      };
+
       /** Records a virtual key the gateway tour minted, for the secret snippet card. */
       recordVirtualKeyReveal: {
         mutation: {

@@ -24,6 +24,15 @@ Feature: Langy runs a conversation on the pi worker
     And the manager's explicit settings win over the catalog where both name the same field
     And the entry still routes through the mediated gateway URL, never the catalog's own endpoint
 
+  # pi's catalog lags Anthropic releases (claude-*-5-5 shipped after it), and
+  # every Claude from 4.6 on rejects the legacy thinking shape with a 400.
+  @unit
+  Scenario: A Claude newer than pi's catalog still gets the adaptive thinking shape
+    Given the manager configures an Anthropic Messages model of Claude 4.6 or later that pi's catalog does not list
+    When the wrapper generates the model registry
+    Then the entry asks pi for adaptive thinking
+    And an older Claude pi's catalog does not list keeps the manager's config alone
+
   @unit
   Scenario: A model pi's catalog does not know is written from config alone
     Given the manager configures a model id pi's catalog does not list for that API dialect

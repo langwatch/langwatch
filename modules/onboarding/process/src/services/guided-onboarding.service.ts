@@ -32,6 +32,7 @@ export type GuidedOnboardingAnnouncer = (
 type GuidedOnboardingEvent =
   | GuidedOnboardingRecordedEventName
   | "conversation_attached"
+  | "provider_prompt_dismissed"
   | "virtual_key_minted";
 
 type TourStatus = "completed" | "skipped" | "replayed";
@@ -124,17 +125,26 @@ export class GuidedOnboardingService {
   }
 
   /**
-   * "Skip anyway" on the provider screen skips the guide as a whole: the
-   * tour is recorded as skipped in the same breath, so the landing never
-   * starts it and Langy opens with the no-worries line instead.
+   * "Skip anyway" on the provider screen skips the provider step only: the tour
+   * needs no model, so the landing still runs it and Langy asks for a model after.
    */
   async recordProviderSkipped(actor: GuidedOnboardingActor): Promise<GuidedOnboardingState> {
-    await this.write(actor, {
+    return this.write(actor, {
       event: "provider_skipped",
       payload: {},
       mutate: (state) => ({ ...state, providerSkippedAt: this.now() }),
     });
-    return this.recordTour(actor, { status: "skipped" });
+  }
+
+  /** "Later" on Langy's model prompt: the landing stops prompting and opening the panel. */
+  async recordProviderPromptDismissed(
+    actor: GuidedOnboardingActor,
+  ): Promise<GuidedOnboardingState> {
+    return this.write(actor, {
+      event: "provider_prompt_dismissed",
+      payload: {},
+      mutate: (state) => ({ ...state, providerPromptDismissedAt: this.now() }),
+    });
   }
 
   async recordTour(

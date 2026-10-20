@@ -655,6 +655,52 @@ func reasonCodes(e herr.E) []herr.Code {
 	return codes
 }
 
+// @scenario "A spent balance or a refused key a provider names only in prose rides as a typed reason"
+func TestDecodeProviderErrorBody_NamesTheAccountCause(t *testing.T) {
+	tests := []struct {
+		name   string
+		body   string
+		status int
+		want   []herr.Code
+	}{
+		{
+			name:   "Anthropic spent balance",
+			body:   `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}`,
+			status: http.StatusBadRequest,
+			want:   []herr.Code{"invalid_request_error", ErrProviderOutOfCredit},
+		},
+		{
+			name:   "OpenAI quota",
+			body:   `{"error":{"type":"insufficient_quota","code":"insufficient_quota","message":"redacted"}}`,
+			status: http.StatusTooManyRequests,
+			want:   []herr.Code{"insufficient_quota", ErrProviderOutOfCredit},
+		},
+		{
+			name:   "Gemini invalid key on a 400",
+			body:   `{"error":{"code":400,"status":"INVALID_ARGUMENT","message":"redacted","details":[{"reason":"API_KEY_INVALID"}]}}`,
+			status: http.StatusBadRequest,
+			want:   []herr.Code{"INVALID_ARGUMENT", ErrProviderKeyRejected},
+		},
+		{
+			name:   "Anthropic request-shape refusal names no account cause",
+			body:   `{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`,
+			status: http.StatusBadRequest,
+			want:   []herr.Code{"invalid_request_error"},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := decodeProviderErrorBody([]byte(tc.body), tc.status, "application/json")
+			if got := reasonCodes(e); !slices.Equal(got, tc.want) {
+				t.Fatalf("reasons = %v, want %v", got, tc.want)
+			}
+			if _, ok := e.Meta["message"]; ok {
+				t.Error("provider prose must not enter handled-error metadata")
+			}
+		})
+	}
+}
+
 // @scenario "A refused credential in a dialect the client does not know still reads as a credential to check"
 func TestDecodeProviderErrorBody_RefusedCredentialAlsoCarriesTheStatusReason(t *testing.T) {
 	tests := []struct {
