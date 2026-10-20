@@ -1,12 +1,16 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
+import { DispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
+import {
+  isCustomerConfigurationRefusal,
+  isRetryableSettlementFailure,
+} from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
@@ -238,8 +242,23 @@ export class TriggerSettlementPersistenceService {
   }
 
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
-    const retryable = isDispatchError(error) ? error.retryable : true;
-    if (retryable) {
+    if (isCustomerConfigurationRefusal(error)) {
+      logger.warn(
+        {
+          projectId: page.projectId,
+          triggerId: page.triggerId,
+          traceId,
+          code: error.code,
+          fault: error.fault,
+          error: error.message,
+        },
+        "Persist dispatch refused by the automation's saved configuration; not retrying",
+      );
+
+      return;
+    }
+
+    if (isRetryableSettlementFailure(error)) {
       page.retryableFailures.push(error);
 
       return;
@@ -288,9 +307,9 @@ export class TriggerSettlementPersistenceService {
     throw representative;
   }
 
+  /** Reported once, through the process's error capture. */
   private capture(error: unknown, context: Record<string, unknown>): void {
     const handled = error instanceof Error ? error : new Error(String(error));
-    logger.error({ ...context, error: handled.message }, "Persist dispatch failed terminally");
     this.composition.observability.capture(handled, context);
   }
 }

@@ -19,6 +19,7 @@ import {
   type AutomationSettlementTraceRepository,
 } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
+import { storedActionParamsRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationWebhookProvider } from "../../../services/automation-webhook-secrets.service.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationEmailCapService } from "../../runaway/services/email-cap.service.ts";
@@ -58,13 +59,6 @@ type ConfirmedNotificationCandidate = {
   output: string;
   fullTrace: TraceRecord;
 };
-
-function actionParamsError(trigger: TriggerSummary): DispatchError {
-  return new DispatchError({
-    message: `Automation trigger "${trigger.name}" has invalid ${trigger.action} action parameters`,
-    retryable: false,
-  });
-}
 
 function fallbackTrace(input: {
   projectId: string;
@@ -361,7 +355,7 @@ export class TriggerSettlementNotificationService {
     try {
       params = this.composition.webhooks.parseStored(input.trigger.actionParams);
     } catch {
-      throw actionParamsError(input.trigger);
+      throw storedActionParamsRefusal(input.trigger);
     }
 
     // A JSON content type is checked and falls back to the default envelope; any other is sent

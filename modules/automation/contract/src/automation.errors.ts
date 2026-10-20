@@ -533,6 +533,27 @@ export class AutomationWebhookUpsertRequiredError extends HandledError {
 }
 
 /**
+ * An "add to dataset" automation's dataset refused its rows for a reason no
+ * redelivery can change: the dataset is gone or archived, or none of the
+ * mapped columns exist in it any more. The author fixes it by re-saving the
+ * automation with a dataset and mapping that exist, so it is the customer's
+ * fault and the queue does not retry it.
+ */
+export class AutomationDatasetUnavailableError extends HandledError {
+  declare readonly code: "automation_dataset_unavailable";
+
+  constructor({ datasetId, reason }: { datasetId: string; reason: string }) {
+    super(
+      "automation_dataset_unavailable",
+      `The dataset "${datasetId}" this automation appends to refused the rows: ${reason}. ` +
+        "Re-save the automation with a dataset and mapping that exist.",
+      { httpStatus: 422, fault: "customer" },
+    );
+    this.name = "AutomationDatasetUnavailableError";
+  }
+}
+
+/**
  * Every condition on the saved automation names a field this platform no
  * longer supports, so saving it would leave the automation matching nothing an
  * author could still see.

@@ -1,4 +1,5 @@
 import type { AnnotationApi } from "@langwatch/annotation-contract";
+import { AutomationDatasetUnavailableError } from "@langwatch/automation-contract";
 import type { DatasetApi, DatasetRecordEntry } from "@langwatch/dataset-contract";
 import { DispatchError } from "@langwatch/eventing";
 import { createLogger, type Logger } from "@langwatch/observability";
@@ -67,7 +68,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         { triggerId: input.triggerId, datasetId: input.datasetId },
         "ADD_TO_DATASET dataset is gone or archived; the match was dropped",
       );
-      throw datasetRefusal({
+      throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "it is gone or archived",
       });
@@ -91,7 +92,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
     // A record left with only its id would be stored as an all-empty row and reported as a success.
     const leftEmpty = entries.some(holdsOnlyId);
     if (leftEmpty) {
-      throw datasetRefusal({
+      throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "none of the mapped columns exist in it any more",
       });
@@ -117,10 +118,9 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
         });
       }
       if (readCode(error) !== "dataset_not_found") throw error;
-      throw datasetRefusal({
+      throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "it is gone or archived",
-        cause: error,
       });
     }
   }
@@ -142,25 +142,6 @@ function keepDefined({
   }
 
   return kept as DatasetRecordEntry;
-}
-
-/** The dataset refused the write for a reason a redelivery cannot change. */
-function datasetRefusal({
-  datasetId,
-  reason,
-  cause,
-}: {
-  datasetId: string;
-  reason: string;
-  cause?: unknown;
-}): DispatchError {
-  return new DispatchError({
-    message:
-      `The dataset "${datasetId}" this automation appends to refused the rows: ${reason}. ` +
-      "Re-save the automation with a dataset and mapping that exist.",
-    retryable: false,
-    cause,
-  });
 }
 
 function readCode(error: unknown): unknown {
