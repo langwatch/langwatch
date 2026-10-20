@@ -68,7 +68,8 @@ type TestOptions = NonNullable<ViteUserConfig["test"]>;
 export function moduleVitestTestOptions(
   options: ModuleVitestConfigOptions,
 ): ViteUserConfig["test"] {
-  const { kind, include, exclude, isolate, css, setupFiles, testTimeout, dir, root, test } = options;
+  const { kind, include, exclude, isolate, css, setupFiles, testTimeout, dir, root, test } =
+    options;
   // A fresh worker per file is the single largest cost in a suite whose
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate === undefined ? false : isolate !== false;
