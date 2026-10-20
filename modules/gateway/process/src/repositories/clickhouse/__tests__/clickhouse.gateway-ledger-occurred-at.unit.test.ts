@@ -1,10 +1,6 @@
 /**
- * ClickHouse 26.8 reads an unquoted JSON integer into a DateTime64 column as
- * Unix seconds, not as ticks (ClickHouse #108091), so an epoch-millisecond
- * OccurredAt lands at 9999-12-31. The ledger writes therefore send a Date,
- * which the client serialises as a quoted ISO string that every version reads
- * the same way. These tests serialise the inserted rows the way the client
- * does and read OccurredAt back.
+ * ClickHouse 26.8 reads an unquoted integer into DateTime64 as Unix seconds (ClickHouse #108091).
+ * These serialise the inserted rows as the client does and read OccurredAt back.
  */
 import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
@@ -38,6 +34,7 @@ function recordingClient() {
 
 describe("ledger writes send OccurredAt as a quoted instant", () => {
   describe("when the budget ledger records a debit", () => {
+    /** @scenario "A budget ledger debit carries OccurredAt as an instant, not epoch milliseconds" */
     it("sends OccurredAt as an ISO string, not epoch milliseconds", async () => {
       const { client, sentOccurredAt } = recordingClient();
       const repository = GatewayBudgetClickHouseRepository.create(client as never);
@@ -67,6 +64,7 @@ describe("ledger writes send OccurredAt as a quoted instant", () => {
   });
 
   describe("when the spend fold writes a request", () => {
+    /** @scenario "A spend ledger row carries OccurredAt as an instant, not epoch milliseconds" */
     it("sends OccurredAt as an ISO string, not epoch milliseconds", async () => {
       const { client, sentOccurredAt } = recordingClient();
       const repository = ClickHouseGatewaySpendEventsRepository.create(client as never);
