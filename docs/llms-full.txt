@@ -64192,7 +64192,7 @@ Create one rule per row. Each rule matches the prefix and expires objects after 
 | `group-queue/` | Group-queue S3 tier | No | Expire after 7 days |
 | `evaluation-inputs/r<days>/` | Evaluation inputs | No | One rule per retention class: `r90` after 90 days, `r180` after 180, `r365` after 365, `r730` after 730 |
 | `evaluation-inputs/r-indefinite/` | Evaluation inputs | No | None. Kept for ever |
-| `upgrade-diagnostics/` | Received upgrade diagnostics, on LangWatch Cloud only. A self-hosted install writes nothing here | No | Expire after 30 days |
+| `upgrade-diagnostics/` | Received upgrade diagnostics, on LangWatch Cloud only. A self-hosted install never writes under this prefix | No | Expire after 30 days |
 
 Prefixes are matched from the start of the key, so each one is the first segment of the object key. Existing prefixes are unchanged: if you already hold rules for the three older ones, they keep working.
 
@@ -65231,9 +65231,11 @@ The CLI needs a project API key of the install, either from `langwatch login` or
 
 When a background upgrade step fails, it is almost always a problem on our side. The step's page in **Ops, Upgrades** can copy or download the step's diagnostics, and, on an install with a license, send them to the LangWatch team.
 
-A bundle holds one step: its id, kind, mode, release, status and attempt count, its last error, its checkpoint report, each target's error, the last lines it logged, the release, chart version and install method, and the instance id. Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB. No organization, project or user names, row contents or environment variables are in it. **Send to LangWatch** shows the exact bundle before it is sent.
+A bundle holds one step: its id, kind, mode, release, status and attempt count, its last error, its checkpoint report, each target's error, the last lines it logged, the release, chart version and install method, and the instance id.
 
-On an install with a license, the hourly upgrade check sends the bundle of each newly failed step by itself, once per failure, and the alert email says so. Switch **Upgrade diagnostics** off on **Settings, Checkup**, or set `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`, and nothing is sent unless an admin presses **Send to LangWatch**. Without a license, or with `LANGWATCH_CONNECT_DISABLED=true`, nothing is sent, and the step's page offers the download to email to support@langwatch.ai.
+Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB. No organization, project or user names, row contents or environment variables are in it. **Send to LangWatch** shows the exact bundle before it is sent.
+
+On an install with a license, the hourly upgrade check sends the bundle of each newly failed step by itself, once per failure, and the alert email says so. Switch **Upgrade diagnostics** off on **Settings, Checkup**, or set `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`, and a bundle is sent only when an admin presses **Send to LangWatch**. Without a license, or with `LANGWATCH_CONNECT_DISABLED=true`, the install sends no bundle, and the step's page offers the download to email to support@langwatch.ai.
 
 LangWatch keeps a received bundle for 30 days, in the EU (Frankfurt), and then deletes it.
 
