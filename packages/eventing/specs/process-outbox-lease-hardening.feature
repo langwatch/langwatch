@@ -163,7 +163,18 @@ Feature: Process outbox lease hardening
     Given an outbox message whose dispatch is refused as clickhouse_unavailable over a dropped connection
     When the dispatcher delivers it
     Then it is scheduled for retry with the usual backoff
-    And a handled refusal whose ClickHouse cause is permanent still retires at once
+
+  @unit
+  Scenario: A platform-fault refusal is retried like the group queue retries it
+    Given an outbox message whose dispatch is refused with a platform fault and retryable false
+    When the dispatcher delivers it
+    Then it is scheduled for retry, as the group queue's refusal rule decides
+
+  @unit
+  Scenario: A customer-fault refusal is dead on its first attempt
+    Given an outbox message whose dispatch is refused with a customer fault and retryable false
+    When the dispatcher delivers it
+    Then it is dead on its first attempt instead of retrying ten times
 
   @unit @unimplemented
   Scenario: A wake scheduled for a process that no longer exists is discarded

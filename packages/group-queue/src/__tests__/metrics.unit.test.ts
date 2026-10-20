@@ -1,6 +1,7 @@
 import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { GroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
 import {
   gqBlockedGroups,
   gqGroupsBlockedTotal,
@@ -17,6 +18,7 @@ import {
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   recordDroppedJob,
+  recordNonRetryableJob,
 } from "../metrics.ts";
 
 const routingLabels = {
@@ -125,6 +127,35 @@ describe("GroupQueue metrics", () => {
 
       expect(meter.valuesOf("gq_blocked_groups", { queue_name: "test-queue" })).toEqual([3, 0]);
     });
+  });
+});
+
+describe("non-retryable job reason", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
+  const groupQueueError = new GroupQueueError({
+    queueName: "test-queue",
+    operation: "process",
+    message: "boom",
+    retryable: false,
+  });
+
+  it.each([
+    [
+      "a NonRetryableGroupQueueError",
+      new NonRetryableGroupQueueError("stop"),
+      "non_retryable_error",
+    ],
+    ["a non-retryable GroupQueueError", groupQueueError, "group_queue_error"],
+    ["a plain Error", new Error("bad input"), "classified"],
+  ])("labels %s with its bounded reason", (_label, error, reason) => {
+    recordNonRetryableJob({ labels: routingLabels, error });
+
+    expect(meter.valueOf("gq_jobs_non_retryable_total", { ...routingLabels, reason })).toBe(1);
   });
 });
 

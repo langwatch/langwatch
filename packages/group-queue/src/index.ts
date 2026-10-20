@@ -32,6 +32,7 @@ export {
   GroupQueueError,
   HandBackGroupQueueError,
   NonRetryableGroupQueueError,
+  refusesRetry,
 } from "./errors.ts";
 export type { MintStorageUri, ObjectStore } from "./storage.ts";
 export { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicyEnvInputs } from "./policy-env.ts";

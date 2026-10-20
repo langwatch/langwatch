@@ -98,6 +98,7 @@ describe("Server", () => {
 
   describe("given an application is expected but not yet served", () => {
     describe("when a product path is requested", () => {
+      /** @scenario "The process marks the refusals no handler saw" */
       it("answers 503 with Retry-After, then reaches the route once served", async () => {
         const server = await startServer();
         server.expectApplication();
@@ -107,6 +108,7 @@ describe("Server", () => {
 
         expect(early.status).toBe(503);
         expect(early.headers.get("retry-after")).toBe("5");
+        expect(early.headers.get("x-langwatch-not-handled")).toBe("starting");
 
         await server.serve({
           name: "app",
@@ -343,6 +345,7 @@ describe("Server", () => {
         const health = await fetchFrom(server, "/healthz");
 
         expect(refused.status).toBe(503);
+        expect(refused.headers.get("x-langwatch-not-handled")).toBe("draining");
         expect(health.status).toBe(200);
         releaseDrain();
       });
