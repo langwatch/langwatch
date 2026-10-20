@@ -24,7 +24,6 @@ import {
 import {
   AggregateProjectIsReadOnlyError,
   isAggregateProjectKind,
-  ProjectNotFoundError,
 } from "@langwatch/project-contract";
 
 import type { DataRetentionCacheRepository } from "../repositories/data-retention-cache.repository.ts";
@@ -74,9 +73,10 @@ export class DataRetentionService {
       return cached.value;
     }
 
-    // A project with no row is refused, never cached: the job retries until the row exists.
+    // A project with no row (deleted, or not yet visible) gets the default, never cached,
+    // so a job for it neither retries forever nor keeps the default once the row exists.
     const context = await this.findProjectContext(input.projectId);
-    if (!context) throw new ProjectNotFoundError();
+    if (!context) return this.defaultRetention();
     const chain = resolveScopeChain(context);
     const resolved = resolveRetention({
       rows: await this.options.policies.findForProjectChain({

@@ -179,8 +179,8 @@ describe("DataRetentionService", () => {
   });
 
   describe("given a project with no row in project's table", () => {
-    /** @scenario "A project with no row is refused, and the refusal is never cached" */
-    it("refuses it as not found, caches nothing, and resolves its rules once its row exists", async () => {
+    /** @scenario "A retention lookup for a project with no row gets the platform default, never cached" */
+    it("answers the platform default, caches nothing, and resolves its rules once its row exists", async () => {
       const cache = new RecordingCache();
       const projectScopes = MemoryDataRetentionProjectScopeRepository.create();
       const policies = MemoryDataRetentionRepository.create();
@@ -192,8 +192,10 @@ describe("DataRetentionService", () => {
       });
       const service = createService({ cache, projectScopes, policies });
 
-      await expect(service.getResolvedForProject({ projectId: PROJECT })).rejects.toMatchObject({
-        code: "project_not_found",
+      await expect(service.getResolvedForProject({ projectId: PROJECT })).resolves.toEqual({
+        traces: DEFAULT_DAYS,
+        scenarios: DEFAULT_DAYS,
+        experiments: DEFAULT_DAYS,
       });
       expect(cache.values.size).toBe(0);
 

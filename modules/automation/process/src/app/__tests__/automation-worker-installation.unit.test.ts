@@ -12,7 +12,7 @@ import {
  * The automation module installed on the worker role: the pipeline it hosts, over memory.
  */
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import { type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
+import { type Dataset, type DatasetApi, InvalidColumnError } from "@langwatch/dataset-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import type { EvaluationApi } from "@langwatch/evaluation-contract";
 import type { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -40,6 +40,9 @@ import {
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
 import { automationProcessModule } from "../../automation.module.ts";
 import { AutomationPersistCapService } from "../../features/runaway/services/persist-cap.service.ts";
+
+const qaDataset = async (): Promise<Dataset> =>
+  ({ id: "dataset-1", name: "qa", columnTypes: [{ name: "question", type: "string" }] }) as Dataset;
 
 const CONFIG: AutomationServerConfig = {
   emailHourlyCap: 100,
@@ -368,6 +371,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
         trace: tracesHolding(["trace-1"]),
         entitlement: planWithCeiling(10),
         dataset: createApiFixture<DatasetApi>({
+          findBySlugOrId: qaDataset,
           batchCreateRecords: async (input) => {
             const columnName = input.entries
               .flatMap((entry) => Object.keys(entry))
@@ -405,6 +409,7 @@ describe("given a memory-tier worker settling a match end to end", () => {
         trace: tracesHolding(["trace-1", "trace-2"]),
         entitlement: planWithCeiling(1),
         dataset: createApiFixture<DatasetApi>({
+          findBySlugOrId: qaDataset,
           batchCreateRecords: async ({ slugOrId }) => {
             appended.push(slugOrId);
             return [];
@@ -532,6 +537,7 @@ async function breachedWorker(input: {
       countTracesInLastDay: input.countTracesInLastDay,
     }),
     dataset: createApiFixture<DatasetApi>({
+      findBySlugOrId: qaDataset,
       batchCreateRecords: async ({ slugOrId }) => {
         appended.push(slugOrId);
         return [];

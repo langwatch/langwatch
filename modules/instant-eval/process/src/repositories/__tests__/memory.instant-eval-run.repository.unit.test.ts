@@ -158,6 +158,22 @@ describe("given several runs in a project", () => {
       expect(page.map((row) => row.id)).toEqual(["run-b"]);
       expect(next.map((row) => row.id)).toEqual(["run-a"]);
     });
+
+    it("orders ids that differ only in letter case by code unit, the way the cursor compares", async () => {
+      await repository.create(definition({ id: "instanteval_EJdZ" }));
+      await repository.create(definition({ id: "instanteval_EJda" }));
+
+      const page = await repository.findPage({ projectId: THIS_PROJECT, limit: 1 });
+      const last = page.at(-1);
+      const next = await repository.findPage({
+        projectId: THIS_PROJECT,
+        limit: 1,
+        ...(last ? { before: last.createdAt, beforeId: last.id } : {}),
+      });
+
+      expect(page.map((row) => row.id)).toEqual(["instanteval_EJda"]);
+      expect(next.map((row) => row.id)).toEqual(["instanteval_EJdZ"]);
+    });
   });
 });
 

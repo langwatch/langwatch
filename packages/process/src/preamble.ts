@@ -318,6 +318,7 @@ function hostLogger(name: string): ServerLogger {
     info: (fields, line) => logger().info(fields, line),
     warn: (fields, line) => logger().warn(fields, line),
     error: (fields, line) => logger().error(fields, line),
+    fatal: (fields, line) => logger().fatal(fields, line),
   };
 }
 

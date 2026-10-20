@@ -72,3 +72,34 @@ Feature: Signing in returns people to pages whose address better-auth would refu
     When the resume page opens, even when it renders twice
     Then it goes to that page exactly once
     And nothing is kept for the resume page
+
+  # Linking another sign-in method to a signed-in account sends better-auth a
+  # return address too, so it goes through the same check.
+
+  @unit
+  Scenario: Linking a sign-in method from a page better-auth refuses resumes there
+    Given somebody signed in, on a settings page whose address has a fragment
+    When they link another sign-in method from it
+    Then better-auth is handed the resume page
+    And the resume page continues to the settings page they started from
+
+  @unit
+  Scenario: Linking an account from a page better-auth refuses resumes there
+    Given somebody signed in, on a page whose address has a colon
+    When they link an account from a provider
+    Then better-auth is handed the resume page
+    And the resume page continues to the page they started from
+
+  @unit
+  Scenario: Linking a sign-in method from a page better-auth accepts hands it over unchanged
+    Given somebody signed in, on a page whose address better-auth accepts
+    When they link another sign-in method from it
+    Then better-auth is handed that address as it is
+    And nothing is kept for the resume page
+
+  @unit
+  Scenario: A return address better-auth refuses is written down as a warning, not an error
+    Given better-auth refuses a return address, or cannot read back a sign-in's state
+    When it reports the refusal
+    Then the refusal is logged as a warning
+    And any other failure better-auth reports is still logged as an error

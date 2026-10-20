@@ -52,6 +52,8 @@ import {
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+  onboardingVariantAssignedEventDataSchema,
   onboardingVariantSchema,
 } from "@langwatch/onboarding-contract";
 import {
@@ -108,6 +110,7 @@ import {
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
+  onboardingVariantAssignedSignal,
   projectActiveDaySignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -253,6 +256,14 @@ export function buildNurturingPipeline(deps: {
         data: guidedOnboardingRecordedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = guidedOnboardingSignal({ data, aggregateId });
+          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        },
+      })
+      .withPeerSubscriber("onboardingVariantAssigned", {
+        eventType: ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+        data: onboardingVariantAssignedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = onboardingVariantAssignedSignal({ data, aggregateId });
           return deps.deliver({ key: nurturingSignalKey(signal), signal });
         },
       })

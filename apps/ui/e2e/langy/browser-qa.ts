@@ -9,6 +9,7 @@ import { fileURLToPath } from "node:url";
 import { type Browser, type BrowserContext, chromium, type Page } from "playwright";
 
 import { APP_BASE, CONFIG } from "./config";
+import { getSessionCookie } from "./trpc";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const SCREENSHOT_DIR = path.resolve(__dirname, "scenario-logs", "screenshots");
@@ -47,18 +48,12 @@ async function getSharedContext(): Promise<BrowserContext> {
             }
           : {}),
       });
-      const page = await context.newPage();
-      await page.goto(`${APP_BASE}/auth/signin`, {
-        waitUntil: "domcontentloaded",
-        timeout: 30_000,
-      });
-      await page.locator('input[type="email"]').fill(CONFIG.ADMIN_EMAIL);
-      await page.locator('input[type="password"]').fill(CONFIG.ADMIN_PASSWORD);
-      await page.locator('button[type="submit"]').click();
-      await page.waitForURL((url) => !url.pathname.startsWith("/auth/signin"), {
-        timeout: 20_000,
-      });
-      await page.close();
+      // The session `trpc.ts` signed in, so the browser sees what the scenario's account sees.
+      const cookie = await getSessionCookie();
+      const separator = cookie.indexOf("=");
+      await context.addCookies([
+        { name: cookie.slice(0, separator), value: cookie.slice(separator + 1), url: APP_BASE },
+      ]);
       return context;
     } catch (error) {
       contextPromise = null;
@@ -94,6 +89,8 @@ export interface BrowserQACheck {
   label: string;
   /** Path within the project (e.g. "/prompts"). Defaults to the project home. */
   path?: string;
+  /** The project a project-scoped path opens in. Defaults to `CONFIG.PROJECT_SLUG`. */
+  projectSlug?: string;
   /** Omit for a pure evidence screenshot (always passed:true, no assertion). */
   verify?: (page: Page) => Promise<BrowserQAVerdict>;
 }
@@ -123,7 +120,7 @@ export async function browserQA(check: BrowserQACheck): Promise<BrowserQAResult>
     );
     const target = isOrgScopedPath
       ? `${APP_BASE}${checkPath}`
-      : `${APP_BASE}/${CONFIG.PROJECT_SLUG}${checkPath}`;
+      : `${APP_BASE}/${check.projectSlug ?? CONFIG.PROJECT_SLUG}${checkPath}`;
     await page.goto(target, { waitUntil: "domcontentloaded", timeout: 30_000 });
     // The app is a client-rendered SPA shell — wait for actual content, not
     // just DOM-ready, or the screenshot captures a blank/loading frame.

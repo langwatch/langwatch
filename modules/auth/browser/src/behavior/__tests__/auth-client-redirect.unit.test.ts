@@ -33,7 +33,7 @@ vi.mock("../browser-navigation.ts", () => ({
   reloadPage: vi.fn(),
 }));
 
-import { consumeStoredReturnTo, safeRedirectTarget, signIn } from "../auth-client.tsx";
+import { consumeStoredReturnTo, linkAccount, safeRedirectTarget, signIn } from "../auth-client.tsx";
 
 const ORIGIN = "https://app.example.com";
 
@@ -302,6 +302,31 @@ describe("signIn", () => {
         callbackURL: "/auth/resume",
       });
       expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
+    });
+  });
+});
+
+describe("linkAccount", () => {
+  describe("when linking an account from a page with a colon in its address", () => {
+    /** @scenario "Linking an account from a page better-auth refuses resumes there" */
+    it("hands /link-social the resume page and parks the page for it", async () => {
+      const fetchMock = vi.fn(
+        async (_url: string, _init: RequestInit) =>
+          new Response(JSON.stringify({ redirect: false }), { status: 200 }),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+      try {
+        expect(await linkAccount("github", { callbackUrl: AGENT_TESTING_PATH })).toEqual({
+          ok: true,
+        });
+
+        const init = fetchMock.mock.calls[0]?.[1];
+        const sent = typeof init?.body === "string" ? init.body : "";
+        expect(JSON.parse(sent)).toMatchObject({ callbackURL: "/auth/resume" });
+        expect(consumeStoredReturnTo()).toBe(AGENT_TESTING_PATH);
+      } finally {
+        vi.unstubAllGlobals();
+      }
     });
   });
 });

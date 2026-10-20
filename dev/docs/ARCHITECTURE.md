@@ -858,7 +858,7 @@ readings and publishes them to shared state; each process's gauge reads that sta
 never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
-`hostedStores(stores)` from process-stores, `hostedRuntime({ name, runtime,
+`hostedStores({ source, drainTimeoutMs })` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
