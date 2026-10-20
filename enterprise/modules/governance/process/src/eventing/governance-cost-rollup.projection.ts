@@ -66,8 +66,14 @@ export class GovernanceCostRollupFoldProjection
   readonly store: FoldProjectionStore<GovernanceCostRollupState>;
   protected readonly events = governanceCostRollupEvents;
 
-  /** A re-fold loads one pulled item's history, never the day-wide cell; the fold commutes instead. */
-  readonly options = { refoldOnOutOfOrder: false } as const;
+  /**
+   * A re-fold loads one pulled item's history, never the day-wide cell; the fold commutes instead.
+   * For the same reason a missed hand-off cannot rebuild the cell, so it re-sends the one event:
+   * safe because each item applies idempotently. A repeated observation of an item meets
+   * `foldStaleObservation` (same `observedAtMs`, nothing revealed) and a repeated retraction
+   * re-zeroes an item already at zero, so the cell is unchanged either way.
+   */
+  readonly options = { refoldOnOutOfOrder: false, resendOnRedelivery: true } as const;
 
   /** The day x dimension cell, not the event's own aggregate; loud for an undeclared type. */
   readonly key = (event: { type: string }): string => {

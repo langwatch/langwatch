@@ -864,7 +864,38 @@ export class ProjectionRouter<
   }): Promise<void> {
     if (kind === "map") return this.redeliverToMap({ lane, event });
     if (kind === "subscriber") return this.redeliverToSubscriber({ lane, event });
+    if (kind === "fold" && this.foldAcceptsResend(lane)) {
+      return this.redeliverToFold({ lane, event });
+    }
     return this.requestRebuild({ kind, lane, event });
+  }
+
+  /** A keyed fold that declared a repeated event harmless takes the single event again. */
+  private foldAcceptsResend(lane: string): boolean {
+    const fold = this.foldProjections.get(lane)?.definition;
+    return Boolean(fold?.key && fold.options?.resendOnRedelivery);
+  }
+
+  /** Re-sends one missed event onto a fold's live lane, the way a fresh dispatch stages it. */
+  private async redeliverToFold({
+    lane,
+    event,
+  }: {
+    lane: string;
+    event: EventType;
+  }): Promise<void> {
+    const entry = this.foldProjections.get(lane);
+    if (!entry) throw laneNotRegistered({ kind: "fold", lane });
+    if (this.queueManager.hasProjectionQueues()) {
+      const queue = this.queueManager.getProjectionQueue(lane);
+      if (!queue) throw laneNotRegistered({ kind: "fold", lane });
+      await queue.sendBatch([event]);
+      return;
+    }
+    const context = { tenantId: event.tenantId };
+    await entry.open((fold) =>
+      this.processFoldProjectionEvent({ projectionName: lane, fold, event, context }),
+    );
   }
 
   /**

@@ -1167,4 +1167,84 @@ describe("ProjectionRouter", () => {
       });
     });
   });
+
+  describe("redeliver()", () => {
+    describe("given a fold keyed across aggregates on queued lanes", () => {
+      let sendBatch: ReturnType<typeof vi.fn<(events: Event[]) => Promise<void>>>;
+      let rebuildSend: ReturnType<typeof vi.fn<(event: Event) => Promise<void>>>;
+      let queueManager: ReturnType<typeof createMockQueueManager>;
+
+      function routerWithKeyedFold(options?: { resendOnRedelivery?: boolean }) {
+        const router = new ProjectionRouter({
+          aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
+          pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
+          queueManager,
+        });
+        const fold = createMockFoldProjectionDefinition("perOrganization", {
+          store: createMockFoldProjectionStore<{ count: number }>(),
+        });
+        fold.key = () => "organization-1";
+        if (options) fold.options = options;
+        router.registerFoldProjection(fold);
+        return router;
+      }
+
+      beforeEach(() => {
+        sendBatch = vi.fn<(events: Event[]) => Promise<void>>().mockResolvedValue(void 0);
+        rebuildSend = vi.fn<(event: Event) => Promise<void>>().mockResolvedValue(void 0);
+        queueManager = createMockQueueManager();
+        vi.mocked(queueManager.hasProjectionQueues).mockReturnValue(true);
+        vi.mocked(queueManager.getProjectionQueue).mockReturnValue({
+          send: vi.fn().mockResolvedValue(void 0),
+          sendBatch,
+          close: vi.fn().mockResolvedValue(void 0),
+          waitUntilReady: vi.fn().mockResolvedValue(void 0),
+        });
+        vi.spyOn(queueManager, "getRebuildQueue").mockReturnValue({
+          send: rebuildSend,
+          sendBatch: vi.fn().mockResolvedValue(void 0),
+          close: vi.fn().mockResolvedValue(void 0),
+          waitUntilReady: vi.fn().mockResolvedValue(void 0),
+        });
+      });
+
+      describe("when the fold accepts redelivery", () => {
+        /** @scenario "A keyed lane that accepts redelivery gets the single event re-sent" */
+        it("re-sends the single event onto the live fold queue and requests no rebuild", async () => {
+          const router = routerWithKeyedFold({ resendOnRedelivery: true });
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.redeliver({ kind: "fold", lane: "perOrganization", event });
+
+          expect(sendBatch).toHaveBeenCalledExactlyOnceWith([event]);
+          expect(rebuildSend).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when the fold does not accept redelivery", () => {
+        /** @scenario "A keyed lane that does not accept redelivery cannot rebuild from one aggregate and retires dead" */
+        it("refuses with a non-retryable error and stages nothing", async () => {
+          const router = routerWithKeyedFold();
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await expect(
+            router.redeliver({ kind: "fold", lane: "perOrganization", event }),
+          ).rejects.toMatchObject({
+            retryable: false,
+            message: expect.stringContaining("it keys state across aggregates"),
+          });
+          expect(sendBatch).not.toHaveBeenCalled();
+          expect(rebuildSend).not.toHaveBeenCalled();
+        });
+      });
+    });
+  });
 });

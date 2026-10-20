@@ -66,10 +66,19 @@ Feature: Durable hand-off from an append to its lanes
     And once the log returns its copy, the fold holds that copy and not the redelivery
 
   @unit
-  Scenario: A lane keyed across aggregates cannot rebuild from one aggregate and retires dead
+  Scenario: A keyed lane that does not accept redelivery cannot rebuild from one aggregate and retires dead
     Given a fold whose key spans aggregates
+    And the fold does not accept a re-sent event
     When its missed hand-off is re-driven
     Then the row retires dead naming why it cannot rebuild
+
+  @unit
+  Scenario: A keyed lane that accepts redelivery gets the single event re-sent
+    Given a fold whose key spans aggregates
+    And the fold declares that applying an event twice leaves its state unchanged
+    When its missed hand-off is re-driven
+    Then the missed event is folded onto the live lane once
+    And no rebuild of the aggregate is requested
 
   @unit
   Scenario: A global lane missed while the registry is closed is re-driven once it routes
