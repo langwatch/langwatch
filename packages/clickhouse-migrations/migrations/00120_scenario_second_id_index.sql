@@ -7,7 +7,7 @@
 -- or by ScenarioSetId alone reads only the partitions they live in.
 -- simulation_runs is ordered by (TenantId, ScenarioRunId), so the first index
 -- cannot serve either. Shaped as 00115: per (TenantId, key) the earliest and
--- latest StartedAt and the longest retention; unpartitioned, never tiered cold,
+-- latest StartedAt and the longest retention; unpartitioned, on the data disk, no TTL move to cold,
 -- expiring seven days after the latest row each points at. A view fills each
 -- inside every insert; older rows come from the owner's background step
 -- (scenario:fill-id-indexes).
@@ -24,7 +24,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.simulation_runs_by_batch_run_i
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, BatchRunId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -48,7 +49,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.simulation_runs_by_scenario_se
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, ScenarioSetId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin

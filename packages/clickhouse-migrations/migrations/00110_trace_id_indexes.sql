@@ -10,9 +10,9 @@
 --
 -- FromAt/ToAt keep the source's DateTime64(3), so nothing converts. Retention is
 -- copied with "keep forever" (0) written as 65535, so `max` keeps it sticky; the
--- index expires 7 days after its source rows and is never tiered cold (no
--- storage_policy, absent from TABLE_TTL_CONFIG). Retention changes reach it
--- raise-only through RETENTION_ID_INDEX_TABLES.
+-- index expires 7 days after its source rows and has no TTL move to cold (absent
+-- from TABLE_TTL_CONFIG); it sits on the data disk (local_primary) like its
+-- source. Retention changes reach it raise-only through RETENTION_ID_INDEX_TABLES.
 --
 -- Rows older than the views are filled by the background step
 -- `trace:fill-id-indexes`, which then writes each index's ready marker row.
@@ -30,7 +30,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_summaries_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, TraceId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -54,7 +55,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.stored_spans_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, TraceId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -78,7 +80,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.trace_analytics_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, TraceId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
