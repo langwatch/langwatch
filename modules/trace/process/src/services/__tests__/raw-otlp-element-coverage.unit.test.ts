@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
 import { canonicalisation } from "./canonicalisation/test-helpers.ts";
 import codexBSpan from "./fixtures/codex-b.session-task-turn.json";
 import copilotCliBSpan from "./fixtures/copilot-cli-b.chat.json";
-import copilotVscodeBSpan from "./fixtures/copilot-vscode-b.chat.json";
+import copilotVscodeBSpan from "./fixtures/copilot-vscode-b.chat.cache-read.json";
 import geminiBSpan from "./fixtures/gemini-b.llm-call.json";
 import opencodeBSpan from "./fixtures/opencode-b.do-stream.json";
 
@@ -133,7 +133,7 @@ const TOOLS: {
     },
   },
   {
-    name: "copilot-vscode-B (copilot-chat chat span, VS Code Copilot Chat 0.67)",
+    name: "copilot-vscode-B (copilot-chat chat span, VS Code Copilot Chat 0.67, cache-read call)",
     attrs: () => canonicalizeSpan(copilotVscodeBSpan),
     absentReason: {
       "cache write": "Copilot Chat reports cache reads only, no cache-creation count",
