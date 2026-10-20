@@ -377,7 +377,11 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
           const checkpointEvent = eventAt(CHECKPOINT_MS);
           const earlier = eventAt(2_000);
           const logCopy = { ...eventAt(4_000), id: "evt-log-copy", idempotencyKey: "span-key" };
-          const redelivery = { ...eventAt(3_000), id: "evt-redelivery", idempotencyKey: "span-key" };
+          const redelivery = {
+            ...eventAt(3_000),
+            id: "evt-redelivery",
+            idempotencyKey: "span-key",
+          };
           const { fold } = makeAppliedFold({
             historyReads: [[earlier, logCopy, checkpointEvent]],
             appliedEventIds: [earlier.id, checkpointEvent.id],

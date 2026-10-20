@@ -823,10 +823,11 @@ export class FoldProjectionExecutor {
     const consumes = projectionConsumes<E, Event>(projection);
     // By applied token: a redelivery under a new id is the event the log kept.
     const seen = new Set(history.map(appliedTokenOf));
-    const combined = [
-      ...history.filter(consumes),
-      ...(seen.has(appliedTokenOf(missed)) || !consumes(missed) ? [] : [missed]),
-    ].toSorted((a, b) => compareFoldEvents(projection, a, b));
+    const alreadyInHistory = seen.has(appliedTokenOf(missed));
+    const replaysMissed = !alreadyInHistory && consumes(missed);
+    const combined = [...history.filter(consumes), ...(replaysMissed ? [missed] : [])].toSorted(
+      (a, b) => compareFoldEvents(projection, a, b),
+    );
     let state = projection.init();
     for (const event of combined) {
       state = projection.apply(state, event);
