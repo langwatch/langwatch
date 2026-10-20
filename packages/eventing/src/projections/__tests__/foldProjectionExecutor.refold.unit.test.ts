@@ -558,6 +558,31 @@ describe("FoldProjectionExecutor out-of-order re-fold", () => {
         const committed = vi.mocked(store.store).mock.calls[0]![1];
         expect(committed.appliedEventIds).toEqual(["span-key"]);
       });
+
+      describe("when the later arrival carries the earlier business time", () => {
+        it("keeps the copy that arrived first, as the event log does", async () => {
+          const { fold } = makeFold({
+            storedState: { count: 1, LastEventOccurredAt: 1_000 },
+          });
+          const first = {
+            ...eventAt(3_000),
+            id: "evt-first",
+            idempotencyKey: "span-key",
+            createdAt: 10_000,
+          };
+          const later = {
+            ...eventAt(2_000),
+            id: "evt-later",
+            idempotencyKey: "span-key",
+            createdAt: 20_000,
+          };
+
+          const result = await executor.executeBatch(fold, [later, first], context);
+
+          expect(result.count).toBe(2);
+          expect(result.LastEventOccurredAt).toBe(3_000);
+        });
+      });
     });
   });
 });

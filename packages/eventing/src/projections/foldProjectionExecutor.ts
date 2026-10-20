@@ -677,9 +677,10 @@ export class FoldProjectionExecutor {
 
     // Most folds follow business time. Lifecycle folds may instead select the
     // canonical accepted cursor so a backdated transition cannot jump ahead of
-    // an event the log accepted first.
-    const ordered = uniqueByAppliedToken(
-      [...matching].toSorted((a, b) => compareFoldEvents(projection, a, b)),
+    // an event the log accepted first. Duplicates under one key collapse in
+    // arrival order first, so the batch keeps the copy the event log kept.
+    const ordered = uniqueByAppliedToken(matching.toSorted(compareArrival)).toSorted((a, b) =>
+      compareFoldEvents(projection, a, b),
     );
 
     const key = context.key ?? context.aggregateId;
