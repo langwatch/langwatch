@@ -479,7 +479,7 @@ export function buildNurturingPipeline(deps: {
           const signal = firstTraceRecordedSignal({ data, aggregateId });
           await deliverSignal(signal);
           const activeDay = activeDaySignal({ source: "trace", ...data });
-          await deps.deliver({ key: nurturingSignalKey(activeDay), signal: activeDay });
+          await deliverSignal(activeDay);
         },
       })
       // One trace_received per batch, the latest: Customer.io debounces it per tenant anyway.

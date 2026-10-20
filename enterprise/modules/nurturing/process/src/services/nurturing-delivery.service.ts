@@ -31,7 +31,10 @@ import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
-import { activationTrackInput } from "../rules/nurturing-posthog-activation.rules.ts";
+import {
+  activationTrackInput,
+  evaluationsCompletedEvent,
+} from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
   integrationMethodFor,
@@ -71,13 +74,6 @@ const CIO_SYNC_DEBOUNCED_KINDS = new Set<NurturingSignal["kind"]>([
   "simulation_run_finished",
   "evaluation_completed",
 ]);
-
-/** One PostHog event for a batch of settled evaluations, carrying how many it counted. */
-const evaluationsCompletedEvent = (signal: NurturingSignalOf<"evaluation_completed">) => ({
-  userId: signal.userId,
-  event: "evaluations_completed",
-  properties: { count: signal.evaluationsCounted ?? 1 },
-});
 
 function isoOf(epochMilliseconds: number): string {
   return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
