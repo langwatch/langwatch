@@ -33821,6 +33821,12 @@
                               "ORGANIZATION"
                             ]
                           },
+                          "createdById": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
                           "createdAt": {
                             "type": "string"
                           },
@@ -33841,6 +33847,7 @@
                           "name",
                           "description",
                           "scope",
+                          "createdById",
                           "createdAt",
                           "updatedAt",
                           "platformUrl",
@@ -34251,6 +34258,12 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "createdById": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -34266,6 +34279,7 @@
                     "name",
                     "description",
                     "scope",
+                    "createdById",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -34690,6 +34704,12 @@
                         "ORGANIZATION"
                       ]
                     },
+                    "createdById": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
                     "createdAt": {
                       "type": "string"
                     },
@@ -34705,6 +34725,7 @@
                     "name",
                     "description",
                     "scope",
+                    "createdById",
                     "createdAt",
                     "updatedAt",
                     "platformUrl"
@@ -35183,39 +35204,11 @@
                       "type": "string",
                       "minLength": 1,
                       "maxLength": 255
-                    },
-                    "description": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "scope": {
-                      "type": "string",
-                      "enum": [
-                        "PRIVATE",
-                        "PROJECT",
-                        "ORGANIZATION"
-                      ]
-                    },
-                    "createdAt": {
-                      "type": "string"
-                    },
-                    "updatedAt": {
-                      "type": "string"
-                    },
-                    "platformUrl": {
-                      "type": "string"
                     }
                   },
                   "required": [
                     "id",
-                    "name",
-                    "description",
-                    "scope",
-                    "createdAt",
-                    "updatedAt",
-                    "platformUrl"
+                    "name"
                   ],
                   "additionalProperties": false
                 }
@@ -35633,7 +35626,7 @@
             }
           }
         },
-        "description": "Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
+        "description": "Deletes a board of the Dashboards area together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
         "summary": "Delete a Dashboards board",
         "tags": [
           "Analytics / LangWatchQL"

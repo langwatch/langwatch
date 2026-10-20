@@ -6341,6 +6341,7 @@ export interface operations {
                             description: string | null;
                             /** @enum {string} */
                             scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                            createdById: string | null;
                             createdAt: string;
                             updatedAt: string;
                             platformUrl: string;
@@ -6500,6 +6501,7 @@ export interface operations {
                         description: string | null;
                         /** @enum {string} */
                         scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+                        createdById: string | null;
                         createdAt: string;
                         updatedAt: string;
                         platformUrl: string;

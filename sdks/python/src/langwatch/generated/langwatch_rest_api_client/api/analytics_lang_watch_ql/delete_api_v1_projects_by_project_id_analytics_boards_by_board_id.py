@@ -125,8 +125,9 @@ def sync_detailed(
 ]:
     """Delete a Dashboards board
 
-     Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in
-    another project, or one only Analytics Reports holds, is reported as not found.
+     Deletes a board of the Dashboards area together with the widgets on it and every member's star of
+    it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another
+    project, or one only Analytics Reports holds, is reported as not found.
 
     Args:
         project_id (str):
@@ -168,8 +169,9 @@ def sync(
 ):
     """Delete a Dashboards board
 
-     Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in
-    another project, or one only Analytics Reports holds, is reported as not found.
+     Deletes a board of the Dashboards area together with the widgets on it and every member's star of
+    it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another
+    project, or one only Analytics Reports holds, is reported as not found.
 
     Args:
         project_id (str):
@@ -205,8 +207,9 @@ async def asyncio_detailed(
 ]:
     """Delete a Dashboards board
 
-     Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in
-    another project, or one only Analytics Reports holds, is reported as not found.
+     Deletes a board of the Dashboards area together with the widgets on it and every member's star of
+    it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another
+    project, or one only Analytics Reports holds, is reported as not found.
 
     Args:
         project_id (str):
@@ -246,8 +249,9 @@ async def asyncio(
 ):
     """Delete a Dashboards board
 
-     Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in
-    another project, or one only Analytics Reports holds, is reported as not found.
+     Deletes a board of the Dashboards area together with the widgets on it and every member's star of
+    it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another
+    project, or one only Analytics Reports holds, is reported as not found.
 
     Args:
         project_id (str):

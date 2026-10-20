@@ -17,6 +17,7 @@ import {
   boardProjectParamsSchema,
   boardResourceSchema,
   DashboardApi,
+  dashboardDeletedResponseSchema,
   dashboardRestNameSchema,
   type Dashboard,
 } from "@langwatch/dashboard-contract";
@@ -49,6 +50,7 @@ function boardResource(board: Dashboard, platformUrl: string): z.infer<typeof bo
     name: board.name,
     description: board.description,
     scope: board.scope,
+    createdById: board.createdById,
     createdAt: board.createdAt.toISOString(),
     updatedAt: board.updatedAt.toISOString(),
     platformUrl,
@@ -163,11 +165,11 @@ export const boardRest = defineRestRouter(DashboardApi)
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(boardParamsSchema)
   .withPermission("analytics:delete")
-  .withOutput(boardResourceSchema)
+  .withOutput(dashboardDeletedResponseSchema)
   .withDocs({
     summary: "Delete a Dashboards board",
     description:
-      "Deletes a board of the Dashboards area. Its widgets stay saved and become unplaced. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
+      "Deletes a board of the Dashboards area together with the widgets on it and every member's star of it; this cannot be undone. Answers with the deleted board's id and name. A board saved in another project, or one only Analytics Reports holds, is reported as not found.",
     tags: BOARD_TAGS,
     responses: {
       ...canonicalBaseResponses,
@@ -182,6 +184,6 @@ export const boardRest = defineRestRouter(DashboardApi)
       ...viewerOfActor({ actor }),
     });
 
-    return boardResource(board, "");
+    return { id: board.id, name: board.name };
   })
   .build();

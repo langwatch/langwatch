@@ -17064,27 +17064,6 @@ func (e PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault) Val
 	}
 }
 
-// Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope.
-const (
-	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopeORGANIZATION DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "ORGANIZATION"
-	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePRIVATE      DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "PRIVATE"
-	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePROJECT      DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope = "PROJECT"
-)
-
-// Valid indicates whether the value is a known member of the DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope enum.
-func (e DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope) Valid() bool {
-	switch e {
-	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopeORGANIZATION:
-		return true
-	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePRIVATE:
-		return true
-	case DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScopePROJECT:
-		return true
-	default:
-		return false
-	}
-}
-
 // Defines values for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault.
 const (
 	DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFaultCustomer         DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault = "customer"
@@ -26987,16 +26966,16 @@ func (e GetApiSlackConnections200JSONResponseBodyKind) Valid() bool {
 
 // Defines values for GetApiSlackConnections200JSONResponseBodyScopeType.
 const (
-	ORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
-	PROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
+	GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION GetApiSlackConnections200JSONResponseBodyScopeType = "ORGANIZATION"
+	GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT      GetApiSlackConnections200JSONResponseBodyScopeType = "PROJECT"
 )
 
 // Valid indicates whether the value is a known member of the GetApiSlackConnections200JSONResponseBodyScopeType enum.
 func (e GetApiSlackConnections200JSONResponseBodyScopeType) Valid() bool {
 	switch e {
-	case ORGANIZATION:
+	case GetApiSlackConnections200JSONResponseBodyScopeTypeORGANIZATION:
 		return true
-	case PROJECT:
+	case GetApiSlackConnections200JSONResponseBodyScopeTypePROJECT:
 		return true
 	default:
 		return false
@@ -43874,9 +43853,6 @@ type PostApiV1ProjectsByProjectIdAnalyticsBoards403JSONResponseBodyFault string
 
 // PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault defines parameters for PostApiV1ProjectsByProjectIdAnalyticsBoards.
 type PostApiV1ProjectsByProjectIdAnalyticsBoards500JSONResponseBodyFault string
-
-// DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
-type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope string
 
 // DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault defines parameters for DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId.
 type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId400JSONResponseBodyFault string
@@ -155851,6 +155827,7 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
 	JSON200      *struct {
 		Data []struct {
 			CreatedAt   string                                                                 `json:"createdAt"`
+			CreatedById *string                                                                `json:"createdById"`
 			Description *string                                                                `json:"description"`
 			Id          string                                                                 `json:"id"`
 			Name        string                                                                 `json:"name"`
@@ -155967,6 +155944,7 @@ type PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse struct {
 	HTTPResponse *http.Response
 	JSON201      *struct {
 		CreatedAt   string                                                              `json:"createdAt"`
+		CreatedById *string                                                             `json:"createdById"`
 		Description *string                                                             `json:"description"`
 		Id          string                                                              `json:"id"`
 		Name        string                                                              `json:"name"`
@@ -156080,13 +156058,8 @@ type DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
 	JSON200      *struct {
-		CreatedAt   string                                                                         `json:"createdAt"`
-		Description *string                                                                        `json:"description"`
-		Id          string                                                                         `json:"id"`
-		Name        string                                                                         `json:"name"`
-		PlatformUrl string                                                                         `json:"platformUrl"`
-		Scope       DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope `json:"scope"`
-		UpdatedAt   string                                                                         `json:"updatedAt"`
+		Id   string `json:"id"`
+		Name string `json:"name"`
 	}
 	JSON400 *struct {
 		Code      string                                                                          `json:"code"`
@@ -156214,6 +156187,7 @@ type GetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse struct {
 	HTTPResponse *http.Response
 	JSON200      *struct {
 		CreatedAt   string                                                                      `json:"createdAt"`
+		CreatedById *string                                                                     `json:"createdById"`
 		Description *string                                                                     `json:"description"`
 		Id          string                                                                      `json:"id"`
 		Name        string                                                                      `json:"name"`
@@ -186450,6 +186424,7 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response)
 		var dest struct {
 			Data []struct {
 				CreatedAt   string                                                                 `json:"createdAt"`
+				CreatedById *string                                                                `json:"createdById"`
 				Description *string                                                                `json:"description"`
 				Id          string                                                                 `json:"id"`
 				Name        string                                                                 `json:"name"`
@@ -186586,6 +186561,7 @@ func ParsePostApiV1ProjectsByProjectIdAnalyticsBoardsResponse(rsp *http.Response
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
 		var dest struct {
 			CreatedAt   string                                                              `json:"createdAt"`
+			CreatedById *string                                                             `json:"createdById"`
 			Description *string                                                             `json:"description"`
 			Id          string                                                              `json:"id"`
 			Name        string                                                              `json:"name"`
@@ -186719,13 +186695,8 @@ func ParseDeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *ht
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
-			CreatedAt   string                                                                         `json:"createdAt"`
-			Description *string                                                                        `json:"description"`
-			Id          string                                                                         `json:"id"`
-			Name        string                                                                         `json:"name"`
-			PlatformUrl string                                                                         `json:"platformUrl"`
-			Scope       DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId200JSONResponseBodyScope `json:"scope"`
-			UpdatedAt   string                                                                         `json:"updatedAt"`
+			Id   string `json:"id"`
+			Name string `json:"name"`
 		}
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
@@ -186879,6 +186850,7 @@ func ParseGetApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse(rsp *http.
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest struct {
 			CreatedAt   string                                                                      `json:"createdAt"`
+			CreatedById *string                                                                     `json:"createdById"`
 			Description *string                                                                     `json:"description"`
 			Id          string                                                                      `json:"id"`
 			Name        string                                                                      `json:"name"`

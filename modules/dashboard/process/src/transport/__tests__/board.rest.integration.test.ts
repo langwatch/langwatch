@@ -9,7 +9,8 @@ import {
   createRestRuntime,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
-import type { DashboardApi } from "@langwatch/dashboard-contract";
+import type { Actor } from "@langwatch/authorization";
+import { MY_DASHBOARD_NAME, type DashboardApi } from "@langwatch/dashboard-contract";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
 import { describe, expect, it } from "vitest";
 
@@ -24,8 +25,11 @@ import { dashboardRest } from "../dashboard.rest.ts";
 
 const PROJECT = "project-1";
 const BASE = "https://app.langwatch.test";
+const API_KEY: Actor = { type: "api_key", id: "key-of-project-1" };
+const MEMBER = { type: "user", id: "user-1" } as const satisfies Actor;
 
-async function projectWithBothBoards() {
+async function projectWithBothBoards({ actor = API_KEY }: { actor?: Actor } = {}) {
+  const caller = { actor, scope: { tier: "project" as const, id: PROJECT } };
   const app = createDashboardTestApp({ publicBaseUrl: BASE });
   const reports = await app.create({ projectId: PROJECT, name: "Reports" });
   const board = await app.createBoard({ projectId: PROJECT, name: "Usage" });
@@ -75,13 +79,8 @@ async function projectWithBothBoards() {
     return { status: response.status, json: text === "" ? undefined : JSON.parse(text) };
   };
 
-  return { reports, board, widget, send };
+  return { app, reports, board, widget, send };
 }
-
-const caller = {
-  actor: { type: "api_key" as const, id: "key-of-project-1" },
-  scope: { tier: "project" as const, id: PROJECT },
-};
 const BOARDS = `/api/v1/projects/${PROJECT}/analytics/boards`;
 const WIDGETS = `/api/v1/projects/${PROJECT}/analytics/dashboard-widgets`;
 
@@ -109,6 +108,7 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
         },
       });
       expect(listed.json.data).toHaveLength(1);
+      expect(listed.json.data[0].createdById).toBeNull();
     });
 
     /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
@@ -169,16 +169,23 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
 
       const created = await send("boards", BOARDS, { method: "POST", body: { name: "Fresh" } });
       const boardId = created.json?.id;
+      const listed = await send("boards", BOARDS);
       const placed = await send("widgets", `${WIDGETS}/${widget.id}/dashboard`, {
         method: "POST",
         body: { dashboardId: boardId },
       });
 
       expect({
-        created: { status: created.status, name: created.json?.name },
+        created: {
+          status: created.status,
+          name: created.json?.name,
+          createdById: created.json?.createdById,
+        },
+        listed: listed.json?.data?.find(({ id }: { id: string }) => id === boardId),
         placed: { status: placed.status, dashboardId: placed.json?.dashboardId },
       }).toEqual({
-        created: { status: 201, name: "Fresh" },
+        created: { status: 201, name: "Fresh", createdById: null },
+        listed: expect.objectContaining({ id: boardId, name: "Fresh", widgetCount: 0 }),
         placed: { status: 200, dashboardId: boardId },
       });
     });
@@ -191,7 +198,36 @@ describe("given a Reports board and a Dashboards board holding a widget", () => 
       const deleted = await send("boards", `${BOARDS}/${created.json?.id}`, { method: "DELETE" });
       const read = await send("boards", `${BOARDS}/${created.json?.id}`);
 
-      expect({ deleted: deleted.status, read: read.status }).toEqual({ deleted: 200, read: 404 });
+      expect({ deleted: deleted.status, body: deleted.json, read: read.status }).toEqual({
+        deleted: 200,
+        body: { id: created.json?.id, name: "Gone" },
+        read: 404,
+      });
+    });
+  });
+
+  describe("when a member creates their own My dashboard", () => {
+    /** @scenario "AC199l Split: the public API reads Dashboards boards apart from the Reports boards" */
+    it("records them as its author, at Only me, starred for them", async () => {
+      const { app, send } = await projectWithBothBoards({ actor: MEMBER });
+
+      const created = await send("boards", BOARDS, {
+        method: "POST",
+        body: { name: MY_DASHBOARD_NAME },
+      });
+      const starred = await app.listStarred({ projectId: PROJECT, userId: MEMBER.id });
+
+      expect({
+        status: created.status,
+        createdById: created.json?.createdById,
+        scope: created.json?.scope,
+        starred: starred.map((star) => (star.kind === "board" ? star.dashboard.id : null)),
+      }).toEqual({
+        status: 201,
+        createdById: MEMBER.id,
+        scope: "PRIVATE",
+        starred: [created.json?.id],
+      });
     });
   });
 });

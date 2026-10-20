@@ -48,7 +48,8 @@ shopAssistant.scenario.setup(async (run, params) => {
 });
 
 shopAssistant.scenario.teardown(async (run, state, params) => {
-  if (!state) return;
+  // Setup may have failed before it made the customer
+  if (!state?.customerId) return;
   await deleteTestCustomer(state.customerId as string);
   return { deletedCustomer: state.customerId };
 });
@@ -72,10 +73,12 @@ async def setup(run: langwatch.agent.ScenarioRun, loyalty_tier: str = "none") ->
 
 @shop_assistant.scenario.teardown
 async def teardown(run: langwatch.agent.ScenarioRun, state: dict | None, loyalty_tier: str = "none") -> dict | None:
-    if not state:
+    # Setup may have failed before it made the customer
+    customer_id = (state or {}).get("customerId")
+    if not customer_id:
         return None
-    await delete_test_customer(state["customerId"])
-    return {"deletedCustomer": state["customerId"]}
+    await delete_test_customer(customer_id)
+    return {"deletedCustomer": customer_id}
 ```
 
 </CodeGroup>
@@ -107,7 +110,7 @@ The simulated user and the judge get the current state on every turn, as a syste
 | Situation | What happens |
 |---|---|
 | Setup succeeds | The turns run with the state setup returned. |
-| Setup fails, times out, or the agent is offline | No turn runs. The run ends in `ERROR` with no verdict, shows as **Not scored**, and does not count towards the pass rate. Teardown still runs. |
+| Setup fails, times out, or the agent is offline | No turn runs. The run ends in `ERROR` with no verdict, shows as **Not scored**, and does not count towards the pass rate. LangWatch still calls teardown; if the agent is still offline, teardown shows as not run. |
 | The turns pass or fail | Teardown runs either way. |
 | Teardown fails, times out, or does not run | The score does not change. The run shows the error, the state teardown was given, and "Test data may be left behind." |
 | Live instances of the agent exist, but none declared the hook | The call fails with `hook_not_declared`, and the agent function does not run. |
@@ -125,7 +128,7 @@ Open the run in **Agent Testing** or in **Simulations**. For each hook, the run 
 
 To inspect the data a run made, open the run in **Simulations** and choose **Rerun and keep data**. The rerun skips teardown, and the run shows "Teardown skipped". The action appears only for a run that recorded a teardown.
 
-"Teardown not run" means teardown did not happen even though no one asked to skip it, for example because the agent was offline.
+"Teardown not run" means LangWatch called teardown but no instance of the agent was online to take the call, so teardown did not happen even though no one asked to skip it.
 
 ### Limits
 
@@ -137,7 +140,8 @@ To inspect the data a run made, open the run in **Simulations** and choose **Rer
 This setup creates a Dashboards board for the run through the project REST API, and teardown deletes it. The API routes are [Create a Dashboards board](/api-reference/projects/create-a-dashboards-board) and [Delete a Dashboards board](/api-reference/projects/delete-a-dashboards-board).
 
 ```typescript
-const base = `${process.env.LANGWATCH_ENDPOINT}/api/v1/projects/${process.env.LANGWATCH_PROJECT_ID}/analytics/boards`;
+const endpoint = process.env.LANGWATCH_ENDPOINT ?? "https://app.langwatch.ai";
+const base = `${endpoint}/api/v1/projects/${process.env.LANGWATCH_PROJECT_ID}/analytics/boards`;
 const headers = {
   "X-Auth-Token": process.env.LANGWATCH_API_KEY!,
   "Content-Type": "application/json",
@@ -159,11 +163,14 @@ shopAssistant.scenario.teardown(async (_run, state) => {
   if (!state?.boardId) return;
   const response = await fetch(`${base}/${state.boardId}`, { method: "DELETE", headers });
   // A 404 means the board is already gone, which is the goal
-  return { deletedBoard: response.ok, status: response.status };
+  if (!response.ok && response.status !== 404) {
+    throw new Error(`Board delete failed: ${response.status}`);
+  }
+  return { deletedBoard: state.boardId, status: response.status };
 });
 ```
 
-The create route takes a board `name` and answers `201` with the board, including its `id` and `platformUrl`. The delete route answers `404` for a board that is not in the project. Deleting a board keeps its widgets saved but takes them off the board, so if your scenario adds widgets, delete them in teardown too.
+The create route takes a board `name` and answers `201` with the board, including its `id` and `platformUrl`. The delete route answers `200` with the deleted board's `id` and `name`, and `404` for a board that is not in the project. Deleting a board also deletes the widgets on it, so teardown does not need to delete them one by one. Any other status is an error, so the teardown above throws and the run shows that test data may be left behind.
 
 ## Best practices
 

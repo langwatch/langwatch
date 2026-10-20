@@ -457,9 +457,6 @@ from .delete_api_triggers_by_id_response_404 import DeleteApiTriggersByIdRespons
 from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200 import (
     DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200,
 )
-from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200_scope import (
-    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope,
-)
 from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400 import (
     DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400,
 )
@@ -9003,7 +9000,6 @@ __all__ = (
     "DeleteApiTriggersByIdResponse200",
     "DeleteApiTriggersByIdResponse404",
     "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200",
-    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope",
     "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400",
     "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault",
     "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta",

@@ -440,7 +440,7 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 |             |                                        |
 | ----------- | -------------------------------------- |
-| Declared at | `src/transport/board.rest.ts:58`       |
+| Declared at | `src/transport/board.rest.ts:60`       |
 | Base URL    | none: each route's path is its address |
 | Addressing  | literal                                |
 | Credential  | project                                |
@@ -449,50 +449,39 @@ countUsage(input: { projectIds: readonly string[] }): Promise<DashboardUsageCoun
 
 List Dashboards boards
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:63`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:65`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards`.
 
 ```typescript
-// Params: boardProjectParamsSchema, ../contract/src/board-rest.schemas.ts:46
+// Params: boardProjectParamsSchema, ../contract/src/board-rest.schemas.ts:48
 interface Params {
   projectId: string;
 }
-// Response: boardListSchema, ../contract/src/board-rest.schemas.ts:39
-interface Response {
-  data: {
-    id: string;
-    name: string;
-    description: string | null;
-    scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
-    createdAt: string;
-    updatedAt: string;
-    platformUrl: string;
-    widgetCount: number;
-  }[];
-}
+type Response = z.infer<typeof boardListSchema>; // ../contract/src/board-rest.schemas.ts:41
 ```
 
 #### `GET /api/v1/projects/:projectId/analytics/boards/:boardId` · `getApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId`
 
 Get a Dashboards board
 
-Permission `analytics:view`. Declared at `src/transport/board.rest.ts:94`.
+Permission `analytics:view`. Declared at `src/transport/board.rest.ts:96`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards/:boardId`.
 
 ```typescript
-// Params: boardParamsSchema, ../contract/src/board-rest.schemas.ts:53
+// Params: boardParamsSchema, ../contract/src/board-rest.schemas.ts:55
 interface Params {
   projectId: string;
   boardId: string;
 }
-// Response: boardResourceSchema, ../contract/src/board-rest.schemas.ts:27
+// Response: boardResourceSchema, ../contract/src/board-rest.schemas.ts:29
 interface Response {
   id: string;
   name: string;
   description: string | null;
   scope: "PRIVATE" | "PROJECT" | "ORGANIZATION";
+  createdById: string | null;
   createdAt: string;
   updatedAt: string;
   platformUrl: string;
@@ -503,30 +492,34 @@ interface Response {
 
 Create a Dashboards board
 
-Permission `analytics:create`. Declared at `src/transport/board.rest.ts:125`.
+Permission `analytics:create`. Declared at `src/transport/board.rest.ts:127`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards`.
 
 ```typescript
-type Params = z.infer<typeof boardProjectParamsSchema>; // ../contract/src/board-rest.schemas.ts:46
+type Params = z.infer<typeof boardProjectParamsSchema>; // ../contract/src/board-rest.schemas.ts:48
 // Body: dashboardRestNameSchema, ../contract/src/dashboard.ts:215
 interface Body {
   name: string;
 }
-type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:27
+type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:29
 ```
 
 #### `DELETE /api/v1/projects/:projectId/analytics/boards/:boardId` · `deleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardId`
 
 Delete a Dashboards board
 
-Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:158`.
+Permission `analytics:delete`. Declared at `src/transport/board.rest.ts:160`.
 
 Answers at `/api/v1/projects/:projectId/analytics/boards/:boardId`.
 
 ```typescript
-type Params = z.infer<typeof boardParamsSchema>; // ../contract/src/board-rest.schemas.ts:53
-type Response = z.infer<typeof boardResourceSchema>; // ../contract/src/board-rest.schemas.ts:27
+type Params = z.infer<typeof boardParamsSchema>; // ../contract/src/board-rest.schemas.ts:55
+// Response: dashboardDeletedResponseSchema, ../contract/src/dashboard.responses.ts:115
+interface Response {
+  id: string;
+  name: string;
+}
 ```
 
 ### `dashboardWidgetRest`
@@ -743,11 +736,7 @@ Answers at `/api/dashboards/:id`, `/api/v1/dashboards/:id`; also, undocumented, 
 
 ```typescript
 type Params = z.infer<typeof dashboardRestParamsSchema>; // ../contract/src/dashboard.ts:231
-// Response: dashboardDeletedResponseSchema, ../contract/src/dashboard.responses.ts:115
-interface Response {
-  id: string;
-  name: string;
-}
+type Response = z.infer<typeof dashboardDeletedResponseSchema>; // ../contract/src/dashboard.responses.ts:115
 ```
 
 ### `graphRest`
