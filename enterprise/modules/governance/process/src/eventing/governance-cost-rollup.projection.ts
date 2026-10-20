@@ -67,11 +67,9 @@ export class GovernanceCostRollupFoldProjection
   protected readonly events = governanceCostRollupEvents;
 
   /**
-   * A re-fold loads one pulled item's history, never the day-wide cell; the fold commutes instead.
-   * For the same reason a missed hand-off cannot rebuild the cell, so it re-sends the one event:
-   * safe because each item applies idempotently. A repeated observation of an item meets
-   * `foldStaleObservation` (same `observedAtMs`, nothing revealed) and a repeated retraction
-   * re-zeroes an item already at zero, so the cell is unchanged either way.
+   * One item's history cannot rebuild the day-wide cell, so the fold commutes and a missed hand-off
+   * re-sends its one event, safe because each item applies idempotently: governance-cost-rollup.feature,
+   * "A pulled item delivered twice is counted once".
    */
   readonly options = { refoldOnOutOfOrder: false, resendOnRedelivery: true } as const;
 

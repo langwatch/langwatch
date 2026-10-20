@@ -81,6 +81,21 @@ Feature: Durable hand-off from an append to its lanes
     And no rebuild of the aggregate is requested
 
   @unit
+  Scenario: A keyed lane whose queue is not open yet keeps its hand-off for a retry
+    Given a fold whose key spans aggregates and that accepts a re-sent event
+    And this process has not opened the fold's queue yet
+    When its missed hand-off is re-driven
+    Then the row stays in the outbox to be retried
+    And no rebuild of the aggregate is requested
+
+  @unit
+  Scenario: An unkeyed lane rebuilds its aggregate even when it accepts redelivery
+    Given a fold keyed by its own aggregate that declares it accepts a re-sent event
+    When its missed hand-off is re-driven
+    Then a rebuild of the aggregate is requested
+    And the single event is not re-sent onto the live lane
+
+  @unit
   Scenario: A global lane missed while the registry is closed is re-driven once it routes
     Given a global map projection on a registry that is not routing
     When an event is appended

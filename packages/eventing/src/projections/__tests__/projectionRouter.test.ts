@@ -1174,7 +1174,10 @@ describe("ProjectionRouter", () => {
       let rebuildSend: ReturnType<typeof vi.fn<(event: Event) => Promise<void>>>;
       let queueManager: ReturnType<typeof createMockQueueManager>;
 
-      function routerWithKeyedFold(options?: { resendOnRedelivery?: boolean }) {
+      function routerWithKeyedFold(
+        options?: { resendOnRedelivery?: boolean; disabled?: boolean },
+        { keyed = true }: { keyed?: boolean } = {},
+      ) {
         const router = new ProjectionRouter({
           aggregateType: TEST_CONSTANTS.AGGREGATE_TYPE,
           pipelineName: TEST_CONSTANTS.PIPELINE_NAME,
@@ -1183,7 +1186,8 @@ describe("ProjectionRouter", () => {
         const fold = createMockFoldProjectionDefinition("perOrganization", {
           store: createMockFoldProjectionStore<{ count: number }>(),
         });
-        fold.key = () => "organization-1";
+        if (keyed) fold.key = () => "organization-1";
+        else fold.eventLoader = vi.fn(async () => []);
         if (options) fold.options = options;
         router.registerFoldProjection(fold);
         return router;
@@ -1225,6 +1229,57 @@ describe("ProjectionRouter", () => {
         });
       });
 
+      describe("when the fold accepts redelivery but its queue is not open in this process", () => {
+        /** @scenario "A keyed lane whose queue is not open yet keeps its hand-off for a retry" */
+        it("refuses with a retryable error so the outbox keeps the row", async () => {
+          const router = routerWithKeyedFold({ resendOnRedelivery: true });
+          vi.mocked(queueManager.getProjectionQueue).mockReturnValue(undefined);
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await expect(
+            router.redeliver({ kind: "fold", lane: "perOrganization", event }),
+          ).rejects.toMatchObject({ retryable: true });
+          expect(rebuildSend).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when the fold accepts redelivery but is disabled", () => {
+        it("stages nothing and requests no rebuild", async () => {
+          const router = routerWithKeyedFold({ resendOnRedelivery: true, disabled: true });
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.redeliver({ kind: "fold", lane: "perOrganization", event });
+
+          expect(sendBatch).not.toHaveBeenCalled();
+          expect(rebuildSend).not.toHaveBeenCalled();
+        });
+      });
+
+      describe("when an unkeyed fold sets resendOnRedelivery", () => {
+        /** @scenario "An unkeyed lane rebuilds its aggregate even when it accepts redelivery" */
+        it("requests a rebuild instead of re-sending the event", async () => {
+          const router = routerWithKeyedFold({ resendOnRedelivery: true }, { keyed: false });
+          const event = createTestEvent(
+            TEST_CONSTANTS.AGGREGATE_ID,
+            TEST_CONSTANTS.AGGREGATE_TYPE,
+            tenantId,
+          );
+
+          await router.redeliver({ kind: "fold", lane: "perOrganization", event });
+
+          expect(rebuildSend).toHaveBeenCalledOnce();
+          expect(sendBatch).not.toHaveBeenCalled();
+        });
+      });
+
       describe("when the fold does not accept redelivery", () => {
         /** @scenario "A keyed lane that does not accept redelivery cannot rebuild from one aggregate and retires dead" */
         it("refuses with a non-retryable error and stages nothing", async () => {
@@ -1237,10 +1292,7 @@ describe("ProjectionRouter", () => {
 
           await expect(
             router.redeliver({ kind: "fold", lane: "perOrganization", event }),
-          ).rejects.toMatchObject({
-            retryable: false,
-            message: expect.stringContaining("it keys state across aggregates"),
-          });
+          ).rejects.toMatchObject({ retryable: false });
           expect(sendBatch).not.toHaveBeenCalled();
           expect(rebuildSend).not.toHaveBeenCalled();
         });

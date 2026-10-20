@@ -118,6 +118,14 @@ function laneNotRegistered({ kind, lane }: { kind: HandoffLaneKind; lane: string
   });
 }
 
+/** A registered fold whose queue this process has not opened yet: the hand-off waits for it. */
+function foldQueueNotReady(lane: string): DispatchError {
+  return new DispatchError({
+    message: `The fold lane "${lane}" has no queue in this process yet; the hand-off retries`,
+    retryable: true,
+  });
+}
+
 /** Accepted order: by creation time, then by id so equal times stay stable. */
 function byAcceptedAt(
   a: { createdAt: number; id: string },
@@ -886,9 +894,10 @@ export class ProjectionRouter<
   }): Promise<void> {
     const entry = this.foldProjections.get(lane);
     if (!entry) throw laneNotRegistered({ kind: "fold", lane });
+    if (entry.definition.options?.disabled) return;
     if (this.queueManager.hasProjectionQueues()) {
       const queue = this.queueManager.getProjectionQueue(lane);
-      if (!queue) throw laneNotRegistered({ kind: "fold", lane });
+      if (!queue) throw foldQueueNotReady(lane);
       await queue.sendBatch([event]);
       return;
     }
