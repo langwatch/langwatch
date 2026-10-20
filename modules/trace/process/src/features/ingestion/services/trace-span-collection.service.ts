@@ -39,6 +39,9 @@ type PreparedSpan = { data: RecordSpanCommandData; usageRecord: UsageRecordRef |
 /** Spans claimed per dedup round trip: few enough that each is recorded well inside its claim. */
 const DEDUP_BATCH_SIZE = 100;
 
+/** Spans prepared at once: each may claim usage in Redis or upload a payload blob. */
+const PREPARE_CONCURRENCY = 16;
+
 /** The store gave no answer for this span: ingest it, as an unreachable store would. */
 const UNANSWERED_CLAIM: SpanDedupClaim = { outcome: "unknown" };
 
@@ -114,7 +117,7 @@ export class TraceSpanCollectionService {
   }
 
   /**
-   * One claim round trip, the claimed spans prepared one by one and handed off together, one
+   * One claim round trip, the claimed spans prepared 16 at a time and handed off together, one
    * confirmation for those the pipeline took. A failed span releases its claim, so a resend
    * reaches the pipeline under the same identity (specs/span-admission-batch-hand-off.feature).
    */
@@ -123,21 +126,29 @@ export class TraceSpanCollectionService {
   ): Promise<SpanIngestionResult[]> {
     const claims = await this.options.dedup.claimProcessing(inputs.map(spanDedupRefOf));
     const results: SpanIngestionResult[] = [];
-    const ready: ({ index: number; input: NormalizedSpanInput } & PreparedSpan)[] = [];
+    const prepared: (({ index: number; input: NormalizedSpanInput } & PreparedSpan) | null)[] = [];
     const failures: Promise<void>[] = [];
-    for (const [index, input] of inputs.entries()) {
-      const claim = claims[index] ?? UNANSWERED_CLAIM;
-      if (claim.outcome === "held") {
-        results[index] = { status: "deduped" };
-        continue;
-      }
-      try {
-        ready.push({ index, input, ...(await this.prepareCommand(input)) });
-      } catch (error) {
-        results[index] = this.failedSpan({ input, error });
-        if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
-      }
+    for (let start = 0; start < inputs.length; start += PREPARE_CONCURRENCY) {
+      const slice = inputs.slice(start, start + PREPARE_CONCURRENCY);
+      await Promise.all(
+        slice.map(async (input, offset) => {
+          const index = start + offset;
+          const claim = claims[index] ?? UNANSWERED_CLAIM;
+          prepared[index] = null;
+          if (claim.outcome === "held") {
+            results[index] = { status: "deduped" };
+            return;
+          }
+          try {
+            prepared[index] = { index, input, ...(await this.prepareCommand(input)) };
+          } catch (error) {
+            results[index] = this.failedSpan({ input, error });
+            if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
+          }
+        }),
+      );
     }
+    const ready = prepared.filter((span) => span !== null);
 
     const outcomes = await this.handOff(ready.map(({ data }) => data));
     const recorded: SpanDedupRef[] = [];

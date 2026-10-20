@@ -2345,7 +2345,7 @@ interface Output {
 // ops.upgrade.listMigrationEnrollments
 // Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:410
 type Input = unknown;
-// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:157
+// Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
   enrollments: {
     organizationId: string;
@@ -2358,7 +2358,7 @@ interface Output {
 }
 
 // ops.upgrade.searchMigrationOrganizations
-// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:54
+// Input: opsSearchMigrationOrganizationsInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:57
 interface Input {
   query: string;
 }
@@ -2369,7 +2369,7 @@ type Output = {
 }[];
 
 // ops.upgrade.enrollMigrationTenant
-// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:32
+// Input: opsEnrollMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:35
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2381,7 +2381,7 @@ interface Output {
 }
 
 // ops.upgrade.enrollMigrationCohort
-// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:45
+// Input: opsEnrollMigrationCohortInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:48
 interface Input {
   migrationName: string;
   sampleSize: number;
@@ -2389,7 +2389,7 @@ interface Input {
   includePrivateDataplane?: boolean;
   confirm?: "ENROLL";
 }
-// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:225
+// Output: opsMigrationCohortResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:228
 interface Output {
   enrolled: {
     id: string;
@@ -2399,7 +2399,7 @@ interface Output {
 }
 
 // ops.upgrade.withdrawMigrationTenant
-// Input: opsMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:19
+// Input: opsMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:22
 interface Input {
   organizationId: string;
   migrationName: string;
@@ -2410,13 +2410,13 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationForOrganization
-// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:66
+// Input: opsRunSystemMigrationForOrganizationInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:69
 interface Input {
   organizationId: string;
   migrationName: string;
   confirm?: "RUN";
 }
-// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:241
+// Output: opsMigrationTargetedRunResultSchema, ../contract/src/features/migrations/ops-system-migration.ts:244
 interface Output {
   status: "migrated" | "finalized" | "parked" | "rolled_back" | null;
   waiting: boolean;
@@ -2431,7 +2431,7 @@ interface Output {
 }
 
 // ops.upgrade.assertSystemMigrationLegacyWritersDrained
-// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:78
+// Input: opsAssertLegacyWritersDrainedInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:81
 interface Input {
   migrationName: string;
   tenantId: string;
@@ -2444,7 +2444,7 @@ interface Output {
 }
 
 // ops.upgrade.rollBackSystemMigrationTenant
-// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:90
+// Input: opsRollBackSystemMigrationTenantInputSchema, ../contract/src/features/migrations/ops-system-migration.ts:93
 interface Input {
   migrationName: string;
   tenantId: string;
