@@ -56,7 +56,7 @@ Feature: CI smoke + publish for `@langwatch/server`
     Then it triggers on:
       | trigger           | detail                                                                    |
       | workflow_dispatch | manual                                                                    |
-      | schedule          | "0 4 * * *" (nightly, UTC)                                                |
+      | workflow_call     | from the nightly suite, .github/workflows/nightly.yml (01:00 UTC)        |
       | push paths        | package.json, pnpm-workspace.yaml, apps/server/**                         |
       | push paths        | langwatch_nlp/pyproject.toml, services/langevals/**/pyproject.toml        |
       | push paths        | services/aigateway/**, cmd/service/**                                     |

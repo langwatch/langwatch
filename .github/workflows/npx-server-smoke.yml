@@ -6,7 +6,7 @@
 #
 # Trigger policy:
 # - workflow_dispatch (manual, with optional `port_base` input)
-# - nightly schedule (04:00 UTC)
+# - nightly, called from .github/workflows/nightly.yml (01:00 UTC)
 # - push, on any branch INCLUDING main, when key files change (Linux only off main)
 #
 # main was excluded from the push trigger for as long as this file has existed,
@@ -28,8 +28,14 @@ on:
         description: "Port base to test (default 5560)"
         required: false
         default: "5560"
-  schedule:
-    - cron: "0 4 * * *"
+  # The nightly suite (.github/workflows/nightly.yml) calls this; it owns the schedule.
+  workflow_call:
+    inputs:
+      port_base:
+        description: "Port base to test (default 5560)"
+        type: string
+        required: false
+        default: "5560"
   push:
     paths:
       - "package.json"
@@ -62,11 +68,15 @@ on:
       - "apps/*/package.json"
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
+  # A literal name, not github.workflow: called from the nightly, that is the
+  # nightly's name. The event is in the group so a nightly run and a push run
+  # never share one, and only a branch push supersedes its own older run.
+  group: npx-server-smoke-${{ github.ref }}-${{ github.event_name }}
   # Supersede an outdated run on a PR branch, never on main: every commit
   # that lands on main has to keep its own validation, and cancelling here
-  # would let a merge silently void the run for the commit before it.
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # would let a merge silently void the run for the commit before it. A
+  # nightly or manual run is never cancelled.
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.event_name == 'push' }}
 
 permissions:
   contents: read

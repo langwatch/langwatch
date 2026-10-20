@@ -13,8 +13,8 @@ name: migration-compat
 #   judged only on what the PR adds; base's drift is the baseline.
 # - previous-release (nightly, and on dispatch): the published image of the
 #   newest release manifest in packages/upgrade/releases boots on a schema
-#   head migrated. Scheduled runs use the default branch's copy of
-#   this file, so the nightly starts once this workflow is on main.
+#   head migrated. The nightly runs it by calling this workflow from
+#   .github/workflows/nightly.yml, which owns the schedule.
 #
 # Filtered by path, so these checks must not be required ones: a required check
 # that never reports leaves a PR waiting forever (see migration-order.yml).
@@ -34,16 +34,18 @@ on:
       - "enterprise/modules/*/process/src/**/migrations/**"
       - ".github/workflows/migration-compat.yml"
       - "dev/scripts/migration-compat-smoke/**"
-  schedule:
-    - cron: "37 2 * * *"
+  workflow_call:
   workflow_dispatch:
 
 permissions:
   contents: read
 
+# A newer push supersedes a pull request's run. A nightly or manual run is never
+# cancelled, and never cancels another: under the nightly, github.event_name is
+# the nightly's own event (schedule or workflow_dispatch).
 concurrency:
-  group: migration-compat-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: true
+  group: migration-compat-${{ github.event.pull_request.number || github.ref }}-${{ github.event_name }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   # apps/tasks refuses to boot without one (tasks.nodeEnvironment), as in langwatch-app-ci.yml.

@@ -1372,6 +1372,15 @@ jobs:
       - name: Test the PR impact map categories
         run: node --test --experimental-strip-types .github/scripts/pr-impact-map-categories.test.ts
 
+      # The nightly suite's reports and its workflow promises (specs/ci/nightly-suite.feature).
+      - name: Test the nightly suite's scripts
+        run: >-
+          node --test --experimental-strip-types
+          .github/scripts/nightly-hygiene.test.ts
+          .github/scripts/nightly-flaky.test.ts
+          .github/scripts/nightly-dashboard.test.ts
+          .github/scripts/nightly-workflows.test.ts
+
   # The npm artifact's staging filters, run over the real tree.
   #
   # dev/scripts/pack-npm.sh decides what every `npx @langwatch/server` user
