@@ -105,6 +105,17 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       });
     } catch (error) {
       // A column refusal here means one was removed since the trim: a redelivery re-reads them.
+      // It is a customer-fault handled error, which the outbox would retire as dead, so it is
+      // rethrown as a retryable dispatch failure.
+      if (readCode(error) === "dataset_invalid_column") {
+        throw new DispatchError({
+          message:
+            `The dataset "${input.datasetId}" this automation appends to lost a column while the ` +
+            "rows were written; the redelivery reads its columns again.",
+          retryable: true,
+          cause: error,
+        });
+      }
       if (readCode(error) !== "dataset_not_found") throw error;
       throw datasetRefusal({
         datasetId: input.datasetId,

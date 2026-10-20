@@ -5,14 +5,12 @@ import {
   DatasetNotFoundError,
   InvalidColumnError,
 } from "@langwatch/dataset-contract";
+import { refusesRetry } from "@langwatch/group-queue";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { AutomationDispatchErrorsService } from "../../../settlement/services/automation-dispatch-errors.service.ts";
 import { PersistActionWriterService } from "../persist-action-writer.service.ts";
-
-const errors = AutomationDispatchErrorsService.create();
 
 function datasetWith(columns: string[]): Dataset {
   return {
@@ -103,7 +101,7 @@ describe("PersistActionWriterService.addToDataset", () => {
       const refusal = await refusalOf(writer.addToDataset(write));
 
       expect(appended).toEqual([]);
-      expect(errors.isTerminal(refusal)).toBe(true);
+      expect(refusesRetry(refusal)).toBe(true);
       expect(warnings()).toEqual([
         expect.objectContaining({ droppedColumns: ["question", "input"] }),
       ]);
@@ -146,8 +144,12 @@ describe("PersistActionWriterService.addToDataset", () => {
 
       const refusal = await refusalOf(writer.addToDataset(write));
 
-      expect(refusal).toBeInstanceOf(InvalidColumnError);
-      expect(errors.isTerminal(refusal)).toBe(false);
+      expect(refusal).toEqual(expect.objectContaining({ retryable: true }));
+      const cause = (refusal as Error).cause;
+      expect(cause).toBeInstanceOf(InvalidColumnError);
+      // Rethrown as it came, the dataset's refusal would retire the message as dead.
+      expect(refusesRetry(cause)).toBe(true);
+      expect(refusesRetry(refusal)).toBe(false);
     });
 
     /** @scenario "A dataset that is gone or archived is not retried" */
@@ -162,8 +164,8 @@ describe("PersistActionWriterService.addToDataset", () => {
         },
       });
 
-      expect(errors.isTerminal(goneRefusal)).toBe(true);
-      expect(errors.isTerminal(await refusalOf(raced.writer.addToDataset(write)))).toBe(true);
+      expect(refusesRetry(goneRefusal)).toBe(true);
+      expect(refusesRetry(await refusalOf(raced.writer.addToDataset(write)))).toBe(true);
     });
 
     it("leaves a failure the dataset did not name retryable", async () => {
@@ -178,7 +180,7 @@ describe("PersistActionWriterService.addToDataset", () => {
       const refusal = await refusalOf(writer.addToDataset(write));
 
       expect(refusal).toBe(outage);
-      expect(errors.isTerminal(refusal)).toBe(false);
+      expect(refusesRetry(refusal)).toBe(false);
     });
   });
 });
