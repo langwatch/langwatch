@@ -197,11 +197,6 @@ export { EventUtils } from "./utils/event.utils.ts";
 export * from "./deferred.ts";
 export * from "./disabledPipeline.ts";
 export * from "./mapCommands.ts";
-export {
-  NOOP_EVENT_SOURCING_METRICS,
-  PROMETHEUS_EVENT_SOURCING_METRICS,
-  type EventSourcingStoreMetrics,
-} from "./metrics.ts";
 export * from "./parseErrorText.ts";
 export * from "./pipeline/processBuilder.ts";
 export * from "./pipeline/processManagerDefinition.ts";

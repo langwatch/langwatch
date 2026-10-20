@@ -224,6 +224,14 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
       hasReasonCode(reason.reasons ?? [], codes),
   );
 
+/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
+const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
 /**
  * The provider discriminants meaning "this account has nothing left to spend"
  * — a plan allowance, a prepaid balance, a hard billing cap.
@@ -234,11 +242,10 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
  * balance is too low" beats "try again"), and naming the discriminants is how
  * we keep that meaning without carrying the sentence that came with it.
  */
-const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
-  "usage_limit_reached",
-  "codex_plan_limit",
-  "insufficient_quota",
-  "billing_hard_limit_reached",
+export const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
+  ...PROVIDER_LIMIT_CODES,
+  // The proxy's own name for a spent balance a provider states only in prose.
+  "llm_provider_out_of_credit",
 ]);
 
 /**
@@ -284,6 +291,8 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   // Google's statuses for the same two refusals.
   "UNAUTHENTICATED",
   "PERMISSION_DENIED",
+  // The proxy's own name for a refused key a provider answers with a 400.
+  "llm_provider_key_rejected",
 ]);
 
 /**
@@ -322,12 +331,14 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 
 /**
  * The provider refused the request itself as malformed: Bedrock's
- * "ValidationException", or a 422 status. Deterministic, so the fix is another
- * model, not a retry. The broad "invalid_request_error" and bare 400 are left
- * out: Anthropic files a spent balance under them, and that one can pass.
+ * "ValidationException", Anthropic's "invalid_request_error", a 400 or a 422.
+ * Deterministic, so the fix is another model, not a retry. A spent balance
+ * Anthropic files under the same 400 carries `llm_provider_out_of_credit` too.
  */
 export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_bad_request",
   "upstream_unprocessable_entity",
+  "invalid_request_error",
   "ValidationException",
 ]);
 
@@ -5783,10 +5794,17 @@ const presentations = {
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
     // A refused key has one fix, so the headline names it like the body does.
-    titleFor: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+    titleFor: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_LIMIT_CODES)) {
+        return "This provider account has no allowance left";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "This provider account is out of credit";
+      }
+      return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"
-        : undefined,
+        : undefined;
+    },
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
@@ -5808,6 +5826,18 @@ const presentations = {
       }
       return "Try again, or pick a different model.";
     },
+  },
+  llm_provider_out_of_credit: {
+    // A reason under `llm_upstream_error`; read on its own only by a surface
+    // that renders reasons one by one.
+    title: "This provider account is out of credit",
+    describe: () =>
+      "The model provider took the key and refused to generate: the account behind it has no credit left. Top it up with the provider, or pick a model from a different provider.",
+  },
+  llm_provider_key_rejected: {
+    title: "This provider rejected the API key",
+    describe: () =>
+      "The model provider says the API key is not valid. Check the key saved for it in the model provider settings.",
   },
   lwql_app_function_hydration_failed: {
     // Deliberately says nothing about retrying a different way: the query

@@ -24,6 +24,7 @@ import {
   fireGuidedOnboardingPostHog,
   fireGuidedOnboardingProgress,
   fireGuidedTurnFailedPostHog,
+  fireOnboardingVariantAssignedPostHog,
   postHogUuidFor,
 } from "../rules/nurturing-guided-onboarding-service.rules.ts";
 import {
@@ -286,6 +287,8 @@ export class NurturingDeliveryService {
             currentPath: signal.state.currentPath,
           }),
         );
+      case "onboarding_variant_assigned":
+        return posthog.track(fireOnboardingVariantAssignedPostHog(signal));
       case "scenario_created":
       case "scenario_run_succeeded":
       case "first_trace_integrated":

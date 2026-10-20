@@ -70,10 +70,48 @@ Feature: HTTP agent credentials
 
   @unit
   Scenario: An agent credential that cannot be moved holds the agent credential step
-    Given an HTTP agent whose credential cannot be stored as a project secret
+    Given an HTTP agent whose credential cannot be stored as a project secret for a reason a retry may clear
     When the agent credential upgrade step runs
     Then that agent keeps its credential and every other agent is moved
-    And the step fails saying how many agents were held, with its progress kept before that agent's project
+    And the step fails saying how many agents were held, naming the first five agents with project and reason and counting the rest
+    And its progress is kept before that agent's project
+
+  @unit
+  Scenario: An agent credential an operator can unblock holds the step, naming the agent and why
+    Given an HTTP agent whose credential cannot be stored because its project has no team member, is at the secret limit, holds a secret it cannot read, or already uses the secret's name
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and every other agent is moved
+    And the step fails naming that agent, its project and a stable reason code, so an operator can fix the cause and retry
+    And its progress is kept before that agent's project
+
+  @unit
+  Scenario: An agent credential that can never be moved is left in place and the step completes
+    Given an HTTP agent whose credential no action can ever store as a project secret
+    And the reason is that its project belongs to no organisation, its agent is gone, its config is invalid, or its secret name is reserved
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and every other agent is moved
+    And the step completes, its report naming the agent, its project and a stable reason code
+    And its progress moves past that agent's project
+
+  @unit
+  Scenario: The agent credential step's report names a bounded number of agents
+    Given 25 HTTP agents the step leaves in place, or 25 it holds
+    When the agent credential upgrade step runs
+    Then its report names the first 20 agents and counts all 25
+    And a failure message names the first five and counts all 25
+
+  @unit
+  Scenario: A config the credential step produced that fails validation holds the step
+    Given an HTTP agent whose stored config is valid
+    And the config the step produced for it fails the agent config schema
+    When the agent credential upgrade step runs
+    Then that agent keeps its credential and the step fails naming that agent and the error kind
+
+  @unit
+  Scenario: A credential already stored as a project secret is referenced, not stored again
+    Given an HTTP agent whose literal credential is already the value of its project secret
+    When the agent credential upgrade step runs
+    Then the agent references that secret and no secret is written
 
   @unit
   Scenario: An agent saved while its credential is being moved keeps the newer save

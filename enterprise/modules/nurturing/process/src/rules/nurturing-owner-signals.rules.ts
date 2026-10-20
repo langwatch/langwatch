@@ -14,6 +14,7 @@ import type { ExperimentRanEventData } from "@langwatch/experiment-contract";
 import type {
   GuidedOnboardingRecordedEventData,
   OnboardingVariant,
+  OnboardingVariantAssignedEventData,
 } from "@langwatch/onboarding-contract";
 import type {
   IntegrationMethodChosenEventData,
@@ -77,6 +78,23 @@ export function guidedOnboardingSignal({
         state: data.state,
       };
   }
+}
+
+/** The organization's experiment exposure, keyed by the organization so it is sent once. */
+export function onboardingVariantAssignedSignal({
+  data,
+  aggregateId,
+}: OwnerEvent<OnboardingVariantAssignedEventData>): NurturingSignal {
+  const { tenantId, occurredAt, userId, organizationId, variant } = data;
+  return {
+    kind: "onboarding_variant_assigned",
+    sourceEventId: aggregateId,
+    tenantId,
+    occurredAt,
+    userId,
+    organizationId,
+    variant,
+  };
 }
 
 /** Main told Customer.io of a full run of a saved experiment and PostHog of every run. */
