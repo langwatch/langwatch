@@ -1,12 +1,7 @@
 #!/usr/bin/env bash
-#
-# Renders the chart with and without the redis-valkey overlay and asserts that
-# only the image changes: the same command and probes serve both servers, and
-# the default install still runs Redis. See specs/setup/helm-redis-valkey.feature.
-#
-# Usage (from charts/langwatch):
-#   helm dependency build .
-#   ./tests/redis-valkey.sh
+# Asserts the redis-valkey overlay changes only the image; the default stays Redis.
+# See specs/setup/helm-redis-valkey.feature. Run from charts/langwatch after
+# helm dependency build .
 
 set -euo pipefail
 
