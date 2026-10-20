@@ -115,6 +115,9 @@ type genAICall struct {
 	cacheReadTokens       int64
 	cacheCreationTokens   int64
 	cacheCreation1hTokens int64
+	// streamError is an in-stream error event's JSON payload, kept so the
+	// span records why a 200 stream failed.
+	streamError []byte
 
 	finishOnce sync.Once
 }
@@ -243,10 +246,17 @@ func (g *genAICall) bufferLine(part []byte) {
 
 func (g *genAICall) inspectSSELine(line []byte) {
 	payload, ok := bytes.CutPrefix(line, sseDataLinePrefix)
-	if !ok || !bytes.Contains(payload, []byte(`"usage"`)) {
+	if !ok {
 		return
 	}
-	g.takeUsage(payload)
+	if g.streamError == nil && bytes.Contains(payload, errorEventTypeMark) &&
+		gjson.GetBytes(payload, "type").Str == "error" {
+		g.streamError = append([]byte(nil), payload...)
+		return
+	}
+	if bytes.Contains(payload, []byte(`"usage"`)) {
+		g.takeUsage(payload)
+	}
 }
 
 // takeUsage reads the usage fields out of one JSON payload. Latest non-zero
@@ -360,10 +370,19 @@ func (g *genAICall) forwardSpan() {
 	if strings.HasPrefix(info.Model, codexModelPrefix) {
 		span.Attributes().PutStr(attrCostNonBillable, "true")
 	}
-	if g.isTransportFailure {
-		span.Attributes().PutStr("error.type", "transport_error")
+	if g.status > 0 {
+		span.Attributes().PutInt("http.response.status_code", int64(g.status))
 	}
-	if g.status >= 400 {
+	failed := g.status >= 400 || g.streamError != nil
+	switch {
+	case g.isTransportFailure:
+		span.Attributes().PutStr("error.type", "transport_error")
+	case g.streamError != nil:
+		g.recordFailure(span, g.streamError, 0)
+	case g.status >= 400:
+		g.recordFailure(span, g.jsonBody, g.status)
+	}
+	if failed {
 		span.Status().SetCode(ptrace.StatusCodeError)
 	} else {
 		span.Status().SetCode(ptrace.StatusCodeOk)
@@ -390,6 +409,40 @@ func (g *genAICall) forwardSpan() {
 				zap.Error(err))
 		}
 	}()
+}
+
+// maxGenAIErrorMessageBytes bounds the provider message a failed call's span
+// carries.
+const maxGenAIErrorMessageBytes = 1024
+
+// recordFailure states on the span why the call failed: the error's own type,
+// the account cause the proxy classified (out of credit, key rejected), and the
+// message. The message is left out when the provider refused the key, because
+// those messages can quote the key back. status is 0 for an in-stream error.
+func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
+	attrs := span.Attributes()
+	if code := providerErrorCode(body); code != "" {
+		attrs.PutStr("error.type", string(code))
+	}
+	cause, hasCause := accountCauseReason(status, body)
+	if hasCause {
+		attrs.PutStr("langwatch.langy.error_cause", string(cause))
+	}
+	if _, refused := credentialRefusalReason(status); refused || (hasCause && cause == ErrProviderKeyRejected) {
+		return
+	}
+	message := gjson.GetBytes(body, "error.message").Str
+	if message == "" {
+		message = gjson.GetBytes(body, "message").Str
+	}
+	if message == "" {
+		return
+	}
+	if len(message) > maxGenAIErrorMessageBytes {
+		message = strings.ToValidUTF8(message[:maxGenAIErrorMessageBytes], "")
+	}
+	attrs.PutStr("error.message", message)
+	span.Status().SetMessage(message)
 }
 
 // randomSpanID mints a fresh non-zero span id for a synthesized span.

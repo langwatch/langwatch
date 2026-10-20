@@ -12,12 +12,11 @@ import (
 )
 
 // accountExhaustionMessage is the message shown to a governed user when an
-// upstream provider account is exhausted (credit/quota/billing). The user
-// can't act on the provider's billing portal — the org admin owns the account
-// — so we point them at the right contact. Avoids credit/billing wording so
-// wrapper clients (e.g. Claude Code) render it verbatim instead of overlaying
-// their own billing UI.
-const accountExhaustionMessage = "Your organization's AI gateway access is exhausted. Contact your LangWatch admin."
+// upstream provider account is exhausted (credit/quota/billing). It avoids
+// credit/billing wording so wrapper clients (e.g. Claude Code) render it
+// verbatim instead of overlaying their own billing UI. Shared through
+// providererr so readers past the gateway still classify the exhaustion.
+const accountExhaustionMessage = providererr.GatewayAccountExhaustedMessage
 
 // applyGovernanceMessage rewrites the human-facing message of a terminal
 // account-level provider error to the gateway's governance message. It covers

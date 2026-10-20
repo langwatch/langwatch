@@ -110,10 +110,13 @@ func TestLLMProxyStreamCut_BareJSONErrorBody(t *testing.T) {
 	relay := startRelay(t)
 	token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-json", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
 
-	// The body passes through untouched for the worker's SDK.
+	// The body reaches the worker's SDK untouched, as the 400 it stands for.
 	resp := rateLimitCall(t, relay, token)
-	if resp.StatusCode != http.StatusOK {
-		t.Fatalf("call answered %d, want the 200 passed through", resp.StatusCode)
+	if resp.StatusCode != http.StatusBadRequest {
+		t.Fatalf("call answered %d, want 400 so the SDK does not retry a refusal", resp.StatusCode)
+	}
+	if ct := resp.Header.Get("Content-Type"); ct != "application/json" {
+		t.Errorf("Content-Type = %q, want application/json", ct)
 	}
 	body, _ := io.ReadAll(resp.Body)
 	if string(body) != bareJSONErrorBody {

@@ -18,6 +18,10 @@ func TestAccountExhausted(t *testing.T) {
 		{"provider 503", 503, `{"error":{"message":"overloaded"}}`, false},
 		{"500 internal", 500, `{"error":{"message":"oops"}}`, false},
 		{"5xx naming insufficient_quota", 503, `{"error":{"code":"insufficient_quota"}}`, false},
+		{"gateway governance message on a 400", 400, `{"type":"error","error":{"message":"` + GatewayAccountExhaustedMessage + `","type":"invalid_request_error"}}`, true},
+		{"gateway governance message on a 403", 403, `{"error":{"message":"` + GatewayAccountExhaustedMessage + `"}}`, true},
+		{"credit balance in an in-stream error event", 0, `{"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API."}}`, true},
+		{"credit balance on a 404", 404, `{"error":{"message":"Your credit balance is too low"}}`, false},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
