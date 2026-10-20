@@ -48,6 +48,11 @@ describe("assertKnownColumns", () => {
       expect(thrown).toBeInstanceOf(InvalidColumnError);
       expect((thrown as InvalidColumnError).columnName).toBe("notes");
       expect((thrown as InvalidColumnError).validColumns).toEqual(["input", "output"]);
+      expect(thrown).toMatchObject({
+        code: "dataset_invalid_column",
+        httpStatus: 422,
+        fault: "customer",
+      });
     });
   });
 });
