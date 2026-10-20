@@ -172,16 +172,22 @@ function isCustomerFault(error: unknown): boolean {
   );
 }
 
+/** One V8 frame, `at fn (file:line:col)` or `at file:line:col`; anything else is dropped. */
+const STACK_FRAME = /^at (?:(?:async |new )?[^\s()]+(?: \[as [^\s\]]+\])? \()?[^\s()]+:\d+:\d+\)?$/;
+
 /**
- * The `at ...` lines of an error's stack, without the header line that repeats its
- * message. They name code locations only, never the values that failed.
+ * The frames of an error's stack, read only after the whole message text so no line of
+ * a multi-line message can pass for a frame. No message found in the stack, no frames.
  */
 function stackFramesOf(error: unknown): string[] {
   if (!(error instanceof Error) || typeof error.stack !== "string") return [];
+  const start = error.message === "" ? 0 : error.stack.indexOf(error.message);
+  if (start < 0) return [];
   return error.stack
+    .slice(start + error.message.length)
     .split("\n")
     .map((frame) => frame.trim())
-    .filter((frame) => frame.startsWith("at "));
+    .filter((frame) => STACK_FRAME.test(frame));
 }
 
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
@@ -854,45 +860,38 @@ export class OutboxDispatcherService {
       },
     });
     if (dead || attempt === 1) {
+      const hasCustomerFault = isCustomerFault(error);
       this.logDispatchFailure({
         message,
         attempt,
         dead,
         errorType,
         errorMessage,
-        customerFault: isCustomerFault(error),
+        hasCustomerFault,
       });
       if (diagnosticIsRedacted(error)) {
-        this.logRedactedCause({
-          message,
-          attempt,
-          error,
-          dead,
-          customerFault: isCustomerFault(error),
-        });
+        this.logRedactedCause({ message, attempt, error, dead, hasCustomerFault });
       }
     }
   }
 
   /**
-   * The span, the attempt log and the failure line above carry only the redacted
-   * sentence, so this line keeps where the failure happened: the error's class and its
-   * stack frames. The foreign message never reaches it, since it can carry credentials
-   * or customer content, and neither does the payload; the message is named by its ids.
-   * It follows the outcome's level, so a retry or a customer's own refusal never pages.
+   * Everything else carries only the redacted sentence, so this keeps where it failed:
+   * class and stack frames, never the foreign message or the payload. Its level follows
+   * the outcome, so a retry or a customer's own refusal never pages.
    */
   private logRedactedCause({
     message,
     attempt,
     error,
     dead,
-    customerFault,
+    hasCustomerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     error: unknown;
     dead: boolean;
-    customerFault: boolean;
+    hasCustomerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     const fields = {
@@ -910,7 +909,7 @@ export class OutboxDispatcherService {
     };
     const line =
       "Process-manager outbox delivery failed with a redacted cause; stack frames attached";
-    if (dead && !customerFault) this.logger.error(fields, line);
+    if (dead && !hasCustomerFault) this.logger.error(fields, line);
     else this.logger.warn(fields, line);
   }
 
@@ -920,14 +919,14 @@ export class OutboxDispatcherService {
     dead,
     errorType,
     errorMessage,
-    customerFault,
+    hasCustomerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     dead: boolean;
     errorType: string;
     errorMessage: string;
-    customerFault: boolean;
+    hasCustomerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     const fields = {
@@ -944,7 +943,7 @@ export class OutboxDispatcherService {
       errorType,
       errorMessage,
     };
-    if (dead && customerFault) {
+    if (dead && hasCustomerFault) {
       // The customer's own setup refused the delivery; nothing for on-call to act on.
       this.logger.warn(fields, "Process-manager outbox message exhausted delivery attempts");
     } else if (dead) {

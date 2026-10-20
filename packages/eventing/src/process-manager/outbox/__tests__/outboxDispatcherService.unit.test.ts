@@ -387,7 +387,8 @@ describe("OutboxDispatcherService", () => {
           projectId: pilotRef.projectId,
           messageKey: "dispatch:turn_1:1",
         });
-        expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
+        expect(attempts[0]?.errorMessage).toBe("Operation failed; sensitive details were omitted");
+        expect(lines.filter((l) => String(l.msg).includes("redacted cause"))).toHaveLength(1);
         const line = lines.findLine("warn", "redacted cause");
         expect(line).toMatchObject({
           messageKey: "dispatch:turn_1:1",
@@ -399,6 +400,29 @@ describe("OutboxDispatcherService", () => {
         expect(JSON.stringify(line)).not.toContain("sk-secret");
         expect(line).not.toHaveProperty("payload");
         expect(line).not.toHaveProperty("error");
+      });
+
+      describe("given a foreign message that spans lines shaped like stack frames", () => {
+        /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+        it("keeps every line of the message out of the logged frames", async () => {
+          const { logger, lines } = createTestLogger();
+          const cause = new Error(
+            "boom\n    at Authorization: Bearer sk-secret\n    at leak (/sk-secret.js:1:2)",
+          );
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 2,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          const line = lines.findLine("warn", "redacted cause");
+          expect(Reflect.get(line ?? {}, "causeStackFrames")).not.toHaveLength(0);
+          expect(JSON.stringify(line)).not.toContain("sk-secret");
+        });
       });
 
       describe("when a redacted cause is logged", () => {
