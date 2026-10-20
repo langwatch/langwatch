@@ -1,19 +1,17 @@
-# Copilot sessions and the pull requests they feed
-#
-# Decision: dev/docs/adr/039-copilot-cli-as-tracked-coding-assistant.md, §Extension #3.
-# Tracked by #8589; the facts come from the #8803 captures (Copilot CLI 1.0.100,
-# VS Code Copilot Chat 0.67), redacted in
-# modules/trace/process/src/services/__tests__/fixtures/copilot-*.json.
-#
-# Copilot names its spans `{operation} {target}` (`chat gpt-6-luna`,
-# `execute_tool rg`, `invoke_agent`). Its definition declares which operation
-# plays which role, and the generic fold reads the declaration. Repository and
-# branch arrive through the session context hook, see
-# specs/ai-governance/cli-wrappers/session-context-hook.feature.
-#
-# Out of scope: the Copilot app, which has not been captured.
-
 Feature: Copilot sessions
+  Copilot sessions and the pull requests they feed. Decision:
+  dev/docs/adr/039-copilot-cli-as-tracked-coding-assistant.md, §Extension #3.
+  Tracked by #8589; the facts come from the #8803 captures (Copilot CLI 1.0.100,
+  VS Code Copilot Chat 0.67), redacted in
+  modules/trace/process/src/services/__tests__/fixtures/copilot-*.json.
+
+  Copilot names its spans `{operation} {target}` (`chat gpt-6-luna`,
+  `execute_tool rg`, `invoke_agent`). Its definition declares which operation
+  plays which role, and the generic fold reads the declaration. Repository and
+  branch arrive through the session context hook, see
+  specs/ai-governance/cli-wrappers/session-context-hook.feature.
+
+  Out of scope: the Copilot app, which has not been captured.
 
 Rule: Only Copilot's declared operations join a Copilot session
 

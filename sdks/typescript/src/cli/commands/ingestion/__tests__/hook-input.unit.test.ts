@@ -25,8 +25,12 @@ describe("parseHookInput", () => {
 
     describe("when the agent stops", () => {
       /** @scenario "A VS Code Copilot hook payload reads like Claude Code's" */
-      it("reads the event as Claude Code's Stop", () => {
-        expect(parseHookInput(JSON.stringify(vscode.agentStop)).hookEventName).toBe("Stop");
+      it("reads the session id, the directory and the event as Claude Code's Stop", () => {
+        expect(parseHookInput(JSON.stringify(vscode.agentStop))).toEqual({
+          sessionId: vscode.agentStop.session_id,
+          cwd: vscode.agentStop.cwd,
+          hookEventName: "Stop",
+        });
       });
     });
   });
