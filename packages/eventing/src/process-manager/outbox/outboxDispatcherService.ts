@@ -176,15 +176,15 @@ function isCustomerFault(error: unknown): boolean {
 const STACK_FRAME = /^at (?:(?:async |new )?[^\s()]+(?: \[as [^\s\]]+\])? \()?[^\s()]+:\d+:\d+\)?$/;
 
 /**
- * The frames of an error's stack, read only after the whole message text so no line of
- * a multi-line message can pass for a frame. No message found in the stack, no frames.
+ * The frames of an error's stack, read only after its whole `name: message` header, so
+ * no line of a multi-line name or message can pass for a frame. No header, no frames.
  */
 function stackFramesOf(error: unknown): string[] {
   if (!(error instanceof Error) || typeof error.stack !== "string") return [];
-  const start = error.message === "" ? 0 : error.stack.indexOf(error.message);
-  if (start < 0) return [];
+  const header = Error.prototype.toString.call(error);
+  if (header === "" || !error.stack.startsWith(header)) return [];
   return error.stack
-    .slice(start + error.message.length)
+    .slice(header.length)
     .split("\n")
     .map((frame) => frame.trim())
     .filter((frame) => STACK_FRAME.test(frame));

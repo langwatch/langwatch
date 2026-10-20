@@ -423,6 +423,26 @@ describe("OutboxDispatcherService", () => {
           expect(line?.causeStackFrames).not.toHaveLength(0);
           expect(JSON.stringify(line)).not.toContain("sk-secret");
         });
+
+        /** @scenario "A redacted delivery failure keeps where it failed in the server log" */
+        it("keeps a multi-line name that repeats the message out of the logged frames", async () => {
+          const { logger, lines } = createTestLogger();
+          const cause = new Error("boom");
+          cause.name = "boom\n    at leak (/sk-secret.js:1:2)\nVendorError";
+          cause.stack = `${cause.name}: boom\n    at run (/app/handler.js:3:4)`;
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 2,
+            logger,
+          });
+
+          await dispatcher.runOnce({ now: T0 + 1 });
+
+          const line = lines.findLine("warn", "redacted cause");
+          expect(line?.causeStackFrames).toEqual(["at run (/app/handler.js:3:4)"]);
+        });
       });
 
       describe("when a redacted cause is logged", () => {
