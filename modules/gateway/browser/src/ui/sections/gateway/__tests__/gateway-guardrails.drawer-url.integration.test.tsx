@@ -102,6 +102,28 @@ describe("given a shared link that carries a guardrail", () => {
     expect(await screen.findByText("New guardrail")).toBeInTheDocument();
     expect(screen.getByTestId("gateway-guardrail-name")).toHaveValue("");
   });
+
+  /** @scenario "A guardrail editor opened from a pasted link closes back to the page under it" */
+  it("clears the drawer from the address when no page handed it a close action", async () => {
+    const user = userEvent.setup();
+    const host = fakeGatewayHost({
+      permissions: ["gatewayGuardrails:manage"],
+      project: PROJECT,
+      query: { "drawer.open": "guardrail", "drawer.guardrailId": "gr-1", tab: "all" },
+    });
+    renderWithGatewayHost(<GuardrailDrawer guardrailId="gr-1" />, { host });
+
+    await screen.findByText("Edit guardrail");
+    await user.keyboard("{Escape}");
+
+    await waitFor(() => {
+      expect(host.recording.queries.at(-1)?.next).toEqual({
+        "drawer.open": undefined,
+        "drawer.guardrailId": undefined,
+        tab: "all",
+      });
+    });
+  });
 });
 
 describe("given the guardrail form is saved incomplete", () => {
