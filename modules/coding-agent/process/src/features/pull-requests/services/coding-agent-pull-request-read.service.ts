@@ -83,7 +83,7 @@ export class CodingAgentPullRequestReadService {
       sessionEvents: CodingAgentSessionEventRepository;
       sessionReads: CodingAgentSessionReadService;
       github: GithubApi;
-      projects: ProjectApi;
+      projects: Pick<ProjectApi, "listNamesByIds">;
       clock: CodingAgentClock;
       assignments: CodingAgentPullRequestAssignmentService;
       shares: CodingAgentPullRequestShareService;
