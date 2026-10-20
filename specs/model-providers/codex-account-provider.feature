@@ -278,6 +278,19 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the run is recorded as failed on its first attempt, without retries
     And the run status carries a code the topic clustering settings page explains
 
+  @unit
+  Scenario: Saving model defaults still works over a stored Codex clustering model
+    Given a saved default-models config holds a codex model for topic clustering from before Codex was kept off it
+    When the whole config is saved again with another model changed
+    Then the save succeeds
+    And the codex model is dropped from topic clustering, which falls back to the cascade
+
+  @unit
+  Scenario: Newly picking a Codex model for topic clustering is still refused
+    Given a saved default-models config with no topic clustering model
+    When a codex model is picked for topic clustering and the config is saved
+    Then the save is refused as a validation error naming the restriction
+
   # ── Where Codex is reached ─────────────────────────────────────────────────
 
   Rule: Codex is reached at a configured base, the real vendor unless the deployment names another
