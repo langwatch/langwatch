@@ -213,12 +213,9 @@ function buildWindowPredicates({
 }
 
 /**
- * `sql`, an accepted statement, with every catalogued view it reads replaced by that view minus
- * the `excludeOrigins` traces: a board shows the member's agent, not Langy's turns (ADR-061).
- * Scoping each reference keeps a widget's own Origin filter meaningful (analytics ADR-003).
- *
- * With `memberWindows`, an aggregate's run, each reference is also kept to the members inside
- * their grants' windows, and a reference to a view outside `views` reads nothing (ADR-177 v4.14).
+ * `sql` with each catalogued view it reads replaced by that view minus the `excludeOrigins` traces
+ * (ADR-061, analytics ADR-003). With `memberWindows`, each view is also kept to the members inside
+ * their grants' windows, and a view outside `views` reads nothing (ADR-177 v4.14).
  */
 export function scopeLangWatchQL({
   sql,

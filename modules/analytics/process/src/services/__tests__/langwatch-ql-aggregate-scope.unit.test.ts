@@ -3,11 +3,15 @@
  * keys and from where each grant opens.
  * @see specs/lwql/aggregate-reads.feature
  */
+import { type Authorization, sharedWindowsReadBy } from "@langwatch/authorization";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
+import {
+  analyticsProof,
+  type TestSharedWindow,
+} from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import { LangWatchQLAggregateScopeService } from "../langwatch-ql-aggregate-scope.service.ts";
 import { project } from "./project.fixture.ts";
 
@@ -37,11 +41,15 @@ function scopeOver({
 }
 
 const aggregateProof = (
-  shared = [
+  shared: readonly TestSharedWindow[] = [
     { projectId: "project_a", from: 0 },
     { projectId: "project_b", from: SHARED_FROM },
   ],
 ) => analyticsProof({ projectId: AGGREGATE, shared });
+
+/** The windows the app hands the service: the proof's shared `analytics:view` trace grants. */
+const sharedOf = (authorization: Authorization) =>
+  sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" });
 
 const codeOf = (error: unknown) =>
   error instanceof Error && "code" in error ? String(error.code) : "unknown";
@@ -50,18 +58,18 @@ describe("LangWatchQLAggregateScopeService", () => {
   describe("given an aggregate whose members are project A and project B", () => {
     /** @scenario "The aggregate's statement runs under its members' keys" */
     it("runs under the members' keys, never the aggregate's own", async () => {
-      const scope = await scopeOver().resolve({ authorization: aggregateProof() });
+      const scope = await scopeOver().getMemberScope({ shared: sharedOf(aggregateProof()) });
 
-      expect(scope?.projects).toEqual([
+      expect(scope.projects).toEqual([
         { id: "project_a", lwqlKey: "key_a" },
         { id: "project_b", lwqlKey: "key_b" },
       ]);
     });
 
     it("reads each member from where its grant opens", async () => {
-      const scope = await scopeOver().resolve({ authorization: aggregateProof() });
+      const scope = await scopeOver().getMemberScope({ shared: sharedOf(aggregateProof()) });
 
-      expect(scope?.memberWindows).toEqual([
+      expect(scope.memberWindows).toEqual([
         { projectId: "project_a", from: 0 },
         { projectId: "project_b", from: SHARED_FROM },
       ]);
@@ -69,20 +77,22 @@ describe("LangWatchQLAggregateScopeService", () => {
 
     /** @scenario "The members come from the proof, never from the request" */
     it("reads only the projects the proof shares, so project C is never read", async () => {
-      const scope = await scopeOver().resolve({ authorization: aggregateProof() });
+      const scope = await scopeOver().getMemberScope({ shared: sharedOf(aggregateProof()) });
 
-      expect(scope?.projects.map((project) => project.id)).not.toContain("project_c");
+      expect(scope.projects.map((project) => project.id)).not.toContain("project_c");
     });
 
     it("leaves out a member whose grant has an end", async () => {
-      const scope = await scopeOver().resolve({
-        authorization: aggregateProof([
-          { projectId: "project_a", from: 0 },
-          { projectId: "project_b", from: 0, until: SHARED_FROM },
-        ]),
+      const scope = await scopeOver().getMemberScope({
+        shared: sharedOf(
+          aggregateProof([
+            { projectId: "project_a", from: 0 },
+            { projectId: "project_b", from: 0, until: SHARED_FROM },
+          ]),
+        ),
       });
 
-      expect(scope?.projects.map((project) => project.id)).toEqual(["project_a"]);
+      expect(scope.projects.map((project) => project.id)).toEqual(["project_a"]);
     });
   });
 
@@ -92,7 +102,7 @@ describe("LangWatchQLAggregateScopeService", () => {
       const { project_b: _missing, ...keys } = KEYS;
 
       const refusal = await scopeOver({ keys })
-        .resolve({ authorization: aggregateProof() })
+        .getMemberScope({ shared: sharedOf(aggregateProof()) })
         .catch((error: unknown) => error);
 
       expect(codeOf(refusal)).toBe("lwql_member_key_missing");
@@ -104,7 +114,7 @@ describe("LangWatchQLAggregateScopeService", () => {
     /** @scenario "Too many members is refused before any read" */
     it("refuses before reading any member", async () => {
       const refusal = await scopeOver({ keys: {}, maxMembers: 1 })
-        .resolve({ authorization: aggregateProof() })
+        .getMemberScope({ shared: sharedOf(aggregateProof()) })
         .catch((error: unknown) => error);
 
       expect(codeOf(refusal)).toBe("lwql_too_many_members");
@@ -114,12 +124,8 @@ describe("LangWatchQLAggregateScopeService", () => {
 
   describe("given a plain project's proof", () => {
     /** @scenario "A plain project still runs under its own key alone" */
-    it("adds no members, so the run keeps its own key", async () => {
-      const scope = await scopeOver().resolve({
-        authorization: analyticsProof({ projectId: "project_plain" }),
-      });
-
-      expect(scope).toBeUndefined();
+    it("shares no windows, so the app never asks for members and the run keeps its own key", () => {
+      expect(sharedOf(analyticsProof({ projectId: "project_plain" }))).toEqual([]);
     });
   });
 });

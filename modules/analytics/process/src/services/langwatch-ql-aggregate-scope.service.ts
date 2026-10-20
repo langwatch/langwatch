@@ -1,6 +1,6 @@
 /**
- * Who an aggregate project's LangWatchQL statement reads: its members, taken from the route's
- * proof and never from the request, each under its own key and from where its grant opens.
+ * Who an aggregate project's LangWatchQL statement reads: the members its route's proof shares,
+ * never the request's, each under its own key and from where its grant opens.
  * @see specs/lwql/aggregate-reads.feature
  * @see dev/docs/adr/177-aggregate-project-reads-member-projects-through-grants.md (v4.14)
  */
@@ -10,8 +10,7 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
 } from "@langwatch/analytics-contract";
-import type { Authorization } from "@langwatch/authorization";
-import { fenceFor } from "@langwatch/clickhouse-client";
+import type { SharedWindow } from "@langwatch/authorization";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
 
@@ -39,20 +38,16 @@ export class LangWatchQLAggregateScopeService {
   private constructor(private readonly deps: LangWatchQLAggregateScopeDependencies) {}
 
   /**
-   * The members the proof shares under `analytics:view`, or undefined when it shares none, as
-   * on a plain project. A grant with a closed end is left out: the reconciler writes none, and
-   * no view can tell where a bucket that straddles the end belongs.
+   * The members behind the proof's `shared` windows. A grant with a closed end is left out: the
+   * reconciler writes none, and no view can tell where a bucket that straddles the end belongs.
    * @throws {LangWatchQLTooManyMembersError} before any read, past the member cap.
    * @throws {LangWatchQLMemberKeyMissingError} naming every member whose key cannot be read.
    */
-  async resolve({
-    authorization,
+  async getMemberScope({
+    shared,
   }: {
-    authorization: Authorization;
-  }): Promise<LangWatchQLAggregateScope | undefined> {
-    const { shared } = fenceFor({ authorization, reads: "analytics" });
-    if (shared.length === 0) return undefined;
-
+    shared: readonly SharedWindow[];
+  }): Promise<LangWatchQLAggregateScope> {
     const open = shared.filter((window) => window.until === null);
     if (open.length < shared.length) {
       logger.warn(

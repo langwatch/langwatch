@@ -45,7 +45,11 @@ import {
   type AnalyticsEvaluationUpsertInput,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_LWQL_RESOURCE_LIMITS } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import type { Authorization, RestCredentialPrincipal } from "@langwatch/authorization";
+import {
+  type Authorization,
+  type RestCredentialPrincipal,
+  sharedWindowsReadBy,
+} from "@langwatch/authorization";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
@@ -788,19 +792,19 @@ export class AnalyticsModule
   }
 
   /**
-   * Runs one submitted statement exactly as it was written, counted against the
-   * project's window first so an over-limit caller never reaches the engine.
-   *
-   * On an aggregate the route's proof names the members: the statement runs under their keys,
-   * each read from where its grant opens, and is still counted once, against the aggregate.
+   * Runs one submitted statement as written, counted against the project's window first so an
+   * over-limit caller never reaches the engine. On an aggregate it runs under the proof's members'
+   * keys, each from where its grant opens, and is still counted once, against the aggregate.
    */
   async executeLangWatchQL(
     input: LangWatchQLExecuteInput & Readonly<{ authorization?: Authorization }>,
   ): Promise<LangWatchQLQueryResult> {
     const { authorization, project, ...run } = input;
-    const aggregate = authorization
-      ? await this.#aggregateScope.resolve({ authorization })
-      : undefined;
+    const shared = authorization
+      ? sharedWindowsReadBy({ authorization, permission: "analytics:view", condition: "trace" })
+      : [];
+    const aggregate =
+      shared.length > 0 ? await this.#aggregateScope.getMemberScope({ shared }) : undefined;
     await this.#dependencies.lwqlBounds.assertQueryWithinBounds({ projectId: project.id });
 
     if (aggregate) {

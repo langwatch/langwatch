@@ -203,6 +203,30 @@ export function projectIdsReadBy(
   return [...new Set(read)].toSorted();
 }
 
+/** A shared grant's window: its project and epoch-millisecond bounds, `until` null when open. */
+export type SharedWindow = Readonly<{ projectId: string; from: number; until: number | null }>;
+
+/** The shared grants a proof reads in under `permission` and `condition`, cut to `narrowedTo`. */
+export function sharedWindowsReadBy({
+  authorization,
+  permission,
+  condition,
+}: {
+  authorization: Authorization;
+  permission: ProofBearingPermission;
+  condition: AuthorizationConditionType;
+}): SharedWindow[] {
+  const { narrowedTo } = authorization;
+  return authorization.grants
+    .filter((grant) => grant.kind === "shared" && grant.condition?.type === condition)
+    .filter((grant) => grant.permissions.includes(permission))
+    .flatMap(({ projectId, condition: window }) =>
+      projectId === undefined || (narrowedTo !== undefined && projectId !== narrowedTo)
+        ? []
+        : [{ projectId, from: window?.from ?? 0, until: window?.until ?? null }],
+    );
+}
+
 /** The own project a proof reads traces through, the one a route minted it for; narrowing
  *  does not move it. */
 export function ownProjectIdReadBy(authorization: Authorization): string {
