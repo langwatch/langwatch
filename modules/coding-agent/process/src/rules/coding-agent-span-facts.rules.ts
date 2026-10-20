@@ -3,16 +3,26 @@ import {
   codexAuxiliarySessionFacts,
   type CodingAgentReceivedSpan,
   type ContributeSpanFactsCommandData,
+  declaredSpanSessionFacts,
   detectCodingAgent,
   deriveSpanConversationKey,
+  SPANS_REQUIRE_SESSION_KEY_AGENT_IDS,
 } from "@langwatch/coding-agent-contract";
 
-/** The bounded session facts one normalized span contributes, as main's dispatch lifted them. */
+/** What one span lifts to: its contribution, or ignored as ambient telemetry with no session. */
+export type SpanContribution =
+  | { outcome: "contributes"; contribution: ContributeSpanFactsCommandData }
+  | { outcome: "ignored" };
+
+/**
+ * The bounded session facts one normalized span contributes, as main's dispatch lifted them;
+ * ignored when its agent requires the session key and the span carries none.
+ */
 export function liftSpanContribution({
   tenantId,
   occurredAt,
   span,
-}: CodingAgentReceivedSpan): ContributeSpanFactsCommandData {
+}: CodingAgentReceivedSpan): SpanContribution {
   const serviceName = span.resourceAttributes["service.name"];
   // Cowork shares Claude Code's vocabulary; only the service name tells them apart.
   const agent = detectCodingAgent({
@@ -26,6 +36,9 @@ export function liftSpanContribution({
     name: span.name,
     attrs: span.spanAttributes,
   });
+  if (sessionKey === null && SPANS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent)) {
+    return { outcome: "ignored" };
+  }
   const facts = {
     ...liftSpanFacts(span.spanAttributes),
     // A codex helper thread's request span says so through its request id; the fold reads the
@@ -34,6 +47,7 @@ export function liftSpanContribution({
       scopeName: span.instrumentationScope.name,
       attributes: span.spanAttributes,
     }),
+    ...declaredSpanSessionFacts({ agent, attributes: span.spanAttributes }),
   };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
@@ -42,7 +56,7 @@ export function liftSpanContribution({
     facts["service.version"] = String(serviceVersion);
   }
 
-  return {
+  const contribution: ContributeSpanFactsCommandData = {
     tenantId,
     sessionId: sessionKey ?? span.traceId,
     sessionKeySource: sessionKey !== null ? "provider" : "trace_fallback",
@@ -57,6 +71,7 @@ export function liftSpanContribution({
     facts,
     scopeName: span.instrumentationScope.name || null,
   };
+  return { outcome: "contributes", contribution };
 }
 
 function liftSpanFacts(attrs: Record<string, unknown>): Record<string, string | number | boolean> {

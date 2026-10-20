@@ -106,6 +106,7 @@ const codingAgentSessionSchemaDefinition = z
     cacheCreationTokens: z.number(),
     costUsd: z.number(),
     agentReportedCostUsd: z.number(),
+    aiUnits: z.number(),
     modelCallMs: z.number(),
     toolMs: z.number(),
     ttftMsTotal: z.number(),

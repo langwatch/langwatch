@@ -145,6 +145,7 @@ interface ClickHouseWriteRecord {
   CacheCreationTokens: string;
   CostUsd: number;
   AgentReportedCostUsd: number;
+  AiUnits: number;
   // Array(Tuple(RepositoryHost, RepositoryOwner, RepositoryName, Branch,
   // InputTokens, OutputTokens, CacheReadTokens, CacheCreationTokens, CostUsd));
   // the UInt64 members ride as strings like every other UInt64 column.
@@ -322,6 +323,7 @@ function toRecord({
     CacheCreationTokens: big(row.cacheCreationTokens),
     CostUsd: row.costUsd,
     AgentReportedCostUsd: row.agentReportedCostUsd,
+    AiUnits: row.aiUnits,
 
     ModelCallMs: big(row.modelCallMs),
     ToolMs: big(row.toolMs),
@@ -1229,6 +1231,7 @@ function fromRecord(record: Record<string, unknown>): CodingAgentSessionRow {
     cacheCreationTokens: asNumber(record.CacheCreationTokens),
     costUsd: asNumber(record.CostUsd),
     agentReportedCostUsd: asNumber(record.AgentReportedCostUsd),
+    aiUnits: asNumber(record.AiUnits),
 
     modelCallMs: asNumber(record.ModelCallMs),
     toolMs: asNumber(record.ToolMs),

@@ -163,7 +163,26 @@ export interface CodingAgentDefinition {
 
   /** Events-only telemetry: session fold gets model calls and tool runs from LOG events. */
   logsOnly?: boolean;
+
+  /**
+   * For agents naming spans `{gen_ai.operation.name} {target}`: the operation behind each session
+   * role. A span joins when its name's first word is declared here and its scope detects this
+   * agent.
+   */
+  genAiOperations?: Readonly<Record<GenAiOperationRole, string>>;
+
+  /** A span without the provider session key is not session activity: no trace-id fallback. */
+  spansRequireSessionKey?: boolean;
+
+  /** Per-model-call attributes carrying the agent's AI units in nano units; first present wins. */
+  nanoAiUnitAttributes?: readonly string[];
+
+  /** The row's entrypoint (its surface) per ingestion source type the receiver stamps. */
+  surfaceBySourceType?: Readonly<Record<string, string>>;
 }
+
+/** The part a span plays in its session: the root, one model call, or one tool run. */
+export type GenAiOperationRole = "session" | "modelCall" | "toolRun";
 
 /**
  * Claude Code (CLI): namespaces under `claude_code.`, scope
@@ -202,4 +221,11 @@ export const copilotAgent: CodingAgentDefinition = {
     session_compaction_complete: "compaction",
     skill_invoked: "skill_activated",
   },
+
+  // ADR-039 §Extension: the root's usage is the rollup of its chat calls, so only chat counts.
+  genAiOperations: { session: "invoke_agent", modelCall: "chat", toolRun: "execute_tool" },
+  spansRequireSessionKey: true,
+  // The canonicaliser lifts both surfaces' raw counts onto this one key.
+  nanoAiUnitAttributes: ["metadata.copilot_nano_aiu"],
+  surfaceBySourceType: { copilot_cli: "cli", copilot_vscode: "vscode" },
 };

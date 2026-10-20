@@ -63,6 +63,7 @@ export function toCodingAgentSessionRow({
     cacheCreationTokens: state.cacheCreationTokens,
     costUsd: state.costUsd,
     agentReportedCostUsd: state.agentReportedCostUsd,
+    aiUnits: state.aiUnits,
     usageByContext: Object.values(state.usageByContext),
 
     modelCallMs: state.modelCallMs,

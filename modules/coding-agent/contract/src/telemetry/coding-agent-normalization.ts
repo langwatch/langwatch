@@ -270,6 +270,8 @@ export const CODING_AGENT_CONTRIBUTION_KEYS: readonly string[] = [
   "gen_ai.usage.cache_read.input_tokens",
   "gen_ai.usage.cache_creation.input_tokens",
   "codex.turn.token_usage.non_cached_input_tokens",
+  // The GenAI tool span's own name for the tool it ran (Copilot's execute_tool).
+  "gen_ai.tool.name",
   // Codex's tool_result events spell the MCP server as a bare `mcp_server`.
   "mcp_server",
   "mcp_server.name",

@@ -55,6 +55,7 @@ export function codingAgentSessionFixture(
     cacheCreationTokens: 0,
     costUsd: 0,
     agentReportedCostUsd: 0,
+    aiUnits: 0,
     modelCallMs: 0,
     toolMs: 0,
     ttftMsTotal: 0,

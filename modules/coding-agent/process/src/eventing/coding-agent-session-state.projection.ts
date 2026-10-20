@@ -91,6 +91,8 @@ export interface CodingAgentSessionData {
   /** Registry-computed cost; reported agent cost remains separate. */
   costUsd: number;
   agentReportedCostUsd: number;
+  /** AI units the agent reports per model call (Copilot), a count apart from any dollar figure. */
+  aiUnits: number;
   /**
    * Spend per declared working context, keyed by `contextUsageKey`: where the counters' amount
    * went, which splits a session's cost across its pull requests. Unstamped calls charge no
@@ -227,6 +229,7 @@ export class CodingAgentSessionStateProjection {
       cacheCreationTokens: 0,
       costUsd: 0,
       agentReportedCostUsd: 0,
+      aiUnits: 0,
       usageByContext: {},
 
       modelCallMs: 0,
