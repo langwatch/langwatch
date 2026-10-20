@@ -261,6 +261,25 @@ export const jobsFor = (
     .filter((pkg) => !excluded.has(pkg.name))
     .flatMap((pkg) => pkg.scripts.map((script) => ({ pkg, script })));
 
+/** Starts queued jobs, in order where it can, until the pool is full or none can start. */
+const startReady = ({
+  queue,
+  concurrency,
+  running,
+  startable,
+  start,
+}: {
+  queue: SuiteJob[];
+  concurrency: number;
+  running: Set<Promise<void>>;
+  startable: (job: SuiteJob) => boolean;
+  start: (job: SuiteJob) => void;
+}) => {
+  for (let index = queue.findIndex(startable); running.size < concurrency && index !== -1; index = queue.findIndex(startable)) {
+    start(queue.splice(index, 1)[0]!);
+  }
+};
+
 /**
  * Runs every job, at most `concurrency` at once, in order where it can. A package
  * runs one script at a time; `integration` and `browser` hold one slot each across
@@ -289,24 +308,19 @@ export const runJobs = async ({
       ...(isHeavy(job.pkg) ? ["heavy"] : []),
     ];
   };
-  const nextStartable = () => queue.findIndex((job) => holds(job).every((key) => !busy.has(key)));
+  const start = (job: SuiteJob) => {
+    for (const key of holds(job)) busy.add(key);
+    const settled: Promise<void> = run(job)
+      .catch(() => 1)
+      .then((status) => {
+        statuses.set(job, status);
+        for (const key of holds(job)) busy.delete(key);
+        running.delete(settled);
+      });
+    running.add(settled);
+  };
   while (queue.length > 0 || running.size > 0) {
-    for (
-      let index = nextStartable();
-      running.size < concurrency && index !== -1;
-      index = nextStartable()
-    ) {
-      const [job] = queue.splice(index, 1);
-      for (const key of holds(job!)) busy.add(key);
-      const settled: Promise<void> = run(job!)
-        .catch(() => 1)
-        .then((status) => {
-          statuses.set(job!, status);
-          for (const key of holds(job!)) busy.delete(key);
-          running.delete(settled);
-        });
-      running.add(settled);
-    }
+    startReady({ queue, concurrency, running, startable: (job) => holds(job).every((key) => !busy.has(key)), start });
     await Promise.race(running);
   }
   return statuses;
