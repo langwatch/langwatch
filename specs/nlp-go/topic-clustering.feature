@@ -97,3 +97,19 @@ Feature: Topic clustering runs on langevals
     When the FastAPI app starts up
     Then no routes for /topics/batch_clustering or /topics/incremental_clustering exist
     And per-evaluator routes (e.g. /langevals/basic/evaluate) work as today
+
+  # Batch and incremental clustering used to answer every failure as one 500,
+  # so a refused API key read the same as a crash of ours.
+  @unit
+  Scenario: A model provider refusal is answered as the customer's to fix
+    Given a batch or incremental clustering run whose model provider refuses the configured key, rate limits it, or rejects the request
+    And the same holds for a run with no model configured
+    When langevals answers
+    Then it answers with a 4xx carrying a stable code and fixed copy
+    And the provider's own words, which can quote the key, are not in the answer
+
+  @unit
+  Scenario: A failure of ours is still answered as a server error
+    Given a batch or incremental clustering run that fails for any other reason
+    When langevals answers
+    Then it answers with a 500 and logs the failure as an error

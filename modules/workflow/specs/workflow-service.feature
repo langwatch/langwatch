@@ -553,3 +553,10 @@ Feature: Workflow service boundary
     Given Workflow already archived the graph for an agent archived fact
     When the same fact is delivered again
     Then both deliveries share one deduplication id and the graph is not archived a second time
+
+  @unit
+  Scenario: A side effect refused for a reason the customer fixes is a warning, not an error
+    Given a workflow side effect nothing waits on, such as studio code completion
+    When it fails with a handled error the customer can act on, such as no model configured
+    Then the failure is logged as a warning
+    And a failure that is ours or a provider's is still logged as an error

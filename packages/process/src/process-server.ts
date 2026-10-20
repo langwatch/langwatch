@@ -220,7 +220,9 @@ export class ProcessServer implements ProcessBoot {
           }),
         );
       }
-      this.server.with(hostedStores(members));
+      this.server.with(
+        hostedStores({ source: members, drainTimeoutMs: config.shutdownDrainTimeoutMs }),
+      );
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;
       if (hosted) this.server.with({ name: "raw http doors", stop: () => hosted.close() });

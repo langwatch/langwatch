@@ -61,13 +61,20 @@ const RUNNING_STATUSES = "'IN_PROGRESS','PENDING','PENDING_EVALUATION','QUEUED',
 const AGENT_TEST_SET_EXCLUSION = `AND NOT endsWith(ScenarioSetId, '${AGENT_TEST_SET_SUFFIX}') AND ScenarioSetId != '${VOICE_CALL_SCENARIO_SET_ID}'`;
 
 /**
+ * A run whose setup did not answer is not scored and leaves every pass rate (ADR-180), the rule
+ * `isRunNotScored` applies in the browser. Such a run always finishes ERROR, so the status test
+ * goes first and only those rows pay for reading the metadata.
+ */
+export const RUN_NOT_SCORED_EXPR = `(Status = 'ERROR' AND JSONExtractString(ifNull(Metadata, '{}'), 'langwatch', 'hooks', 'setup', 'status') NOT IN ('', 'ok'))`;
+
+/**
  * Batch aggregate SELECT shared by batch history and single-batch summary. SettledCount is
  * complement of RUNNING_STATUSES (not terminal); PENDING_EVALUATION counts as running.
  */
 const BATCH_AGGREGATE_COLUMNS = `BatchRunId,
         toString(count())                                               AS TotalCount,
         toString(countIf(Status = 'SUCCESS'))                          AS PassCount,
-        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED'))) AS FailCount,
+        toString(countIf(Status IN ('FAILED','FAILURE','ERROR','CANCELLED') AND NOT ${RUN_NOT_SCORED_EXPR})) AS FailCount,
         toString(countIf(Status IN (${RUNNING_STATUSES})))             AS RunningCount,
         toString(countIf(Status NOT IN (${RUNNING_STATUSES})))         AS SettledCount,
         toString(countIf(Status = 'STALLED'))                          AS StalledCount,
@@ -1219,14 +1226,15 @@ export class SimulationClickHouseRepository extends SimulationRepository {
            NormalizedSetId,
            BatchRunId,
            -- Settled is the complement of the running statuses, the same
-           -- list the batch aggregate uses, so a set and its batches agree.
-           countIf(Status NOT IN (${RUNNING_STATUSES})) AS SettledCount,
+           -- list the batch aggregate uses; a run that was not scored is out of the pass rate.
+           countIf(Status NOT IN (${RUNNING_STATUSES}) AND NOT NotScored) AS SettledCount,
            countIf(Status = 'SUCCESS') AS PassCount,
-           countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED')) AS FailCount,
+           countIf(Status IN ('FAILED','FAILURE','ERROR','STALLED','CANCELLED') AND NOT NotScored) AS FailCount,
            -- Use min(StartedAt) to match frontend's minTimestamp (batch creation time)
            toUnixTimestamp64Milli(min(if(StartedAt IS NOT NULL, StartedAt, CreatedAt))) AS MinStartedAtMs
          FROM (
-           SELECT ${selectId}, BatchRunId, Status, CreatedAt, StartedAt, ArchivedAt
+           SELECT ${selectId}, BatchRunId, Status, CreatedAt, StartedAt, ArchivedAt,
+             ${RUN_NOT_SCORED_EXPR} AS NotScored
            FROM ${TABLE_NAME}
            WHERE TenantId = {tenantId:String}
              ${wherePredicate}
