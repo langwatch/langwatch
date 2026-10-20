@@ -176,7 +176,6 @@ export class ConnectInstallService {
     };
   }
 
-  /** The credential this whole install presents: the instance licence, else the first one held. */
   /** Whether the install holds a licence it could present; reads only, never mints an id. */
   async holdsInstallLicence(): Promise<boolean> {
     if (!this.deps.deployment.permitted) return false;
@@ -184,6 +183,7 @@ export class ConnectInstallService {
     return licenseKey !== undefined && this.tokenOf(licenseKey) !== undefined;
   }
 
+  /** The credential this whole install presents: the instance licence, else the first one held. */
   async findInstallCredential(): Promise<ConnectCredential[]> {
     if (!this.deps.deployment.permitted) return [];
     const [licenseKey] = await this.findActiveLicenseKey();

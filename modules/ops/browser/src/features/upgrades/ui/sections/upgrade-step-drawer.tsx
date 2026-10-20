@@ -71,7 +71,7 @@ export function UpgradeStepDrawer({ stepId, onClose }: { stepId: string; onClose
         onClose={diagnostics.closePreview}
         onConfirm={diagnostics.confirmSend}
         title="Send these diagnostics to LangWatch?"
-        description="This is everything that is sent. Secrets are masked, and no organization, project or user names are included."
+        description="This is everything that is sent. Secrets are masked, but the error, report and log lines can still mention an identifier such as a project id. Review them before you send."
         confirmLabel="Send"
         tone="default"
         loading={diagnostics.sending}
