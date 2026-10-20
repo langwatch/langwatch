@@ -1368,6 +1368,9 @@ jobs:
       - name: Test detect-changes-by-sha.sh
         run: bash .github/scripts/__tests__/detect-changes-by-sha.test.sh
 
+      - name: Test pull-request-diff-base.sh
+        run: bash .github/scripts/__tests__/pull-request-diff-base.test.sh
+
       - name: Test the change detector's pathspec parity with dorny's matcher
         run: |
           picomatch_dir="$(mktemp -d)"

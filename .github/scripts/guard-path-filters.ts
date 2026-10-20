@@ -179,8 +179,28 @@ export const pullRequestFilter = (source: string): FilterResult => {
   return { kind: "filtered", entries };
 };
 
-/** Every path named inside any `filters:` block in the file. */
-export const gateFilters = (source: string): FilterResult => {
+const DETECTOR_USES = /^\s*(-\s+)?uses:\s*["']?\.\/\.github\/actions\/detect-changes["']?\s*$/;
+
+/**
+ * Is the line at `index` inside a step that uses .github/actions/detect-changes?
+ * The step is the nearest `- ` item above it at a shallower indent.
+ */
+export const inDetectorStep = (lines: string[], index: number): boolean => {
+  const indent = indentOf(lines[index]!);
+  for (let i = index - 1; i >= 0; i--) {
+    const line = lines[i]!;
+    if (isBlank(line) || indentOf(line) >= indent || !/^\s*-\s/.test(line)) continue;
+    const step = [line, ...blockUnder(lines, i, indentOf(line))];
+    return step.some((stepLine) => DETECTOR_USES.test(stripComment(stepLine)));
+  }
+  return false;
+};
+
+/**
+ * Every path named inside any `filters:` block in the file, or with
+ * `onlyDetector` only those of .github/actions/detect-changes steps.
+ */
+export const gateFilters = (source: string, onlyDetector = false): FilterResult => {
   const lines = source.split("\n");
   const out: string[] = [];
   let hasInlineBlock = false;
@@ -188,6 +208,7 @@ export const gateFilters = (source: string): FilterResult => {
   for (let i = 0; i < lines.length; i++) {
     const match = lines[i]!.match(/^\s*filters:\s*(.*)$/);
     if (!match) continue;
+    if (onlyDetector && !inDetectorStep(lines, i)) continue;
     const value = match[1]!.trim();
 
     // Two spellings of the same thing: a block scalar (`|`, `|-`, `>`, `>-`,
@@ -295,7 +316,9 @@ const triggersOnPullRequest = (source: string): boolean =>
   source
     .split("\n")
     .some((line) =>
-      /(^|[{,\s[])pull_request(_target)?\s*(:|,|\]|$)/.test(stripComment(line).trim()),
+      /(^|[{,\s[])(pull_request(_target)?\s*(:|,|\]|$)|(["'])pull_request(_target)?\5\s*:)/.test(
+        stripComment(line).trim(),
+      ),
     );
 
 /**
@@ -305,7 +328,9 @@ const triggersOnPullRequest = (source: string): boolean =>
  */
 export const pullRequestGateIssues = (file: string, source: string): WorkflowIssue[] => {
   if (!triggersOnPullRequest(source)) return [];
-  const gate = gateFilters(source);
+  // A step that calls dorny/paths-filter directly matches with picomatch,
+  // which reads braces and `!`; only the change detector's filters are git's.
+  const gate = gateFilters(source, true);
   if (gate.kind === "unparsed") {
     return [{ file, rule: "R4", detail: gate.detail.replace("R1", "R4") }];
   }

@@ -196,3 +196,5 @@ Feature: CI path filters skip unnecessary workflows on non-code changes
     Given a workflow step uses dorny/paths-filter outside the change detector
     When that step can run on a pull_request event
     Then it passes an empty token, which makes the filter diff with git
+    And it diffs from the first parent of the pull request's merge commit, not the event's base commit
+    And commits that reached main after the branch was cut do not count as changed

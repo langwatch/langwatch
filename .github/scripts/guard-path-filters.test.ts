@@ -119,13 +119,9 @@ void describe("given a filter shape this guard cannot decompose", () => {
         "          filters: .github/filters.yml",
       ].join("\n");
       const issues = inspect("example.yml", source);
-      // R4 too: on a pull request the change detector reads the filters
-      // inline with git, so a filters file is refused there as well.
-      assert.deepEqual(
-        issues.map((issue) => issue.rule),
-        ["R4", "R3"],
-      );
-      for (const issue of issues) assert.match(issue.detail, /filters\.yml/);
+      assert.equal(issues.length, 1);
+      assert.equal(issues[0]?.rule, "R3");
+      assert.match(issues[0]?.detail ?? "", /filters\.yml/);
     });
   });
 
@@ -378,6 +374,36 @@ void describe("given a pull request workflow's gate filter", () => {
       const source = targetGated(trigger, ["sdks/go/**", "package.json", "a/*.json"]);
       assert.deepEqual(inspect("example.yml", source), [], trigger);
     }
+  });
+
+  void it("reports R4 for a quoted trigger key", () => {
+    for (const quote of ["'", '"']) {
+      const source = targetGated(`${quote}pull_request${quote}`, ["sdks/{go,python}/**"]);
+      assert.deepEqual(
+        inspect("example.yml", source).map((issue) => issue.rule),
+        ["R4"],
+        quote,
+      );
+    }
+  });
+
+  void it("leaves a step that calls dorny directly alone, since picomatch reads braces", () => {
+    const source = targetGated("pull_request", ["sdks/{go,python}/**", "!sdks/go/x"]).replace(
+      "uses: ./.github/actions/detect-changes",
+      "uses: dorny/paths-filter@ceb8a2b8f2d89434be7ff52d3de7ec3738c5cc9d # v4.0.3",
+    );
+    assert.deepEqual(inspect("example.yml", source), []);
+  });
+
+  void it("reads the detector's filters when `uses` is not the step's first key", () => {
+    const source = targetGated("pull_request", ["sdks/{go,python}/**"]).replace(
+      "      - uses: ./.github/actions/detect-changes",
+      "      - id: detect\n        uses: ./.github/actions/detect-changes",
+    );
+    assert.deepEqual(
+      inspect("example.yml", source).map((issue) => issue.rule),
+      ["R4"],
+    );
   });
 
   void it("leaves a push-only workflow to dorny, which reads braces", () => {
