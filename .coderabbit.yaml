@@ -60,9 +60,12 @@ reviews:
       mode: off
 
   tools:
-    # Linters and formatters are off: CI runs the repo's own (oxlint, oxfmt,
-    # golangci-lint, actionlint), and a second copy only repeats them as
-    # review comments. Secret, vulnerability and PII scanners stay on.
+    # Linters and formatters are off. CI runs the repo's own (oxlint, oxfmt,
+    # golangci-lint), and a second copy only repeats them as review comments.
+    # The rest (actionlint, shellcheck, hadolint, ...) have no CI equivalent
+    # and are off on purpose: style findings were most of the review noise.
+    # Security scanners stay on, including zizmor (workflow injection) and
+    # checkov (IaC misconfiguration), which CI does not run.
     ast-grep:
       enabled: false
     shellcheck:
@@ -115,13 +118,9 @@ reviews:
       enabled: false
     circleci:
       enabled: false
-    checkov:
-      enabled: false
     tflint:
       enabled: false
     actionlint:
-      enabled: false
-    zizmor:
       enabled: false
     skillspector:
       enabled: false
