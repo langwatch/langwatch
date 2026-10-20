@@ -3,8 +3,8 @@ import { dirname, join, matchesGlob, relative, resolve } from "node:path";
 
 import { configDefaults, type ViteUserConfig } from "vitest/config";
 
-// The calls that rewrite the module registry, the rule in testing-speed.md.
-const MOCKS_MODULES = /\bvi\s*\.\s*(?:mock|doMock|unmock|doUnmock|resetModules)\s*\(/;
+import { mocksModules } from "./mocks-modules.ts";
+
 const GLOB_SPECIAL = /[\\*?[\]{}()!+@]/g;
 const RELATIVE_IMPORT = /(?:\bfrom\s*|\bimport\s*\(?\s*)["'](\.{1,2}\/[^"']+)["']/g;
 const SOURCE_EXTENSIONS = ["", ".ts", ".tsx", ".js", ".jsx", ".mts", ".mjs"];
@@ -80,7 +80,7 @@ function reachesIsolation(named: (file: string) => boolean): (file: string) => b
       const text = textOf(file);
       const hit =
         named(file) ||
-        MOCKS_MODULES.test(text) ||
+        mocksModules(text) ||
         [...text.matchAll(RELATIVE_IMPORT)].some(([, specifier]) => {
           const target = resolveRelative(resolve(dirname(file), specifier!));
           return target !== undefined && visit(target);

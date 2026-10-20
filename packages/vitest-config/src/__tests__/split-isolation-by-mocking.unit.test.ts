@@ -2,7 +2,7 @@ import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { splitIsolationByMocking } from "../split-isolation-by-mocking.ts";
 import { defineModuleVitestConfig } from "../vitest-config.ts";
@@ -206,6 +206,39 @@ describe("splitIsolationByMocking", () => {
     /** @scenario "A suite that isolates every file is left whole" */
     it("isolates every file and builds no projects", () => {
       const { test } = defineModuleVitestConfig({ kind: "node", isolate: "all" });
+
+      expect(test?.isolate).toBe(true);
+      expect(test?.projects).toBeUndefined();
+    });
+  });
+
+  describe("given a suite built with defineModuleVitestConfig and isolate: true", () => {
+    afterEach(() => {
+      vi.unstubAllEnvs();
+    });
+
+    /** @scenario "A file the suite names as leaking runs isolated without mocking" */
+    it("splits the suite under its root, honouring alsoIsolate", () => {
+      write({ "src/a.test.ts": MOCKING, "src/named.test.ts": PLAIN, "src/b.test.ts": PLAIN });
+
+      const { test } = defineModuleVitestConfig({
+        kind: "node",
+        isolate: true,
+        root,
+        alsoIsolate: ["src/named.test.ts"],
+      });
+
+      expect(test?.projects?.[1]).toMatchObject({
+        test: { include: ["src/a.test.ts", "src/named.test.ts"] },
+      });
+    });
+
+    /** @scenario "Turning fast mode off isolates every file again" */
+    it("isolates the whole suite when fast mode is off", () => {
+      vi.stubEnv("LANGWATCH_VITEST_FAST", "0");
+      write({ "src/a.test.ts": MOCKING, "src/b.test.ts": PLAIN });
+
+      const { test } = defineModuleVitestConfig({ kind: "node", isolate: true, root });
 
       expect(test?.isolate).toBe(true);
       expect(test?.projects).toBeUndefined();

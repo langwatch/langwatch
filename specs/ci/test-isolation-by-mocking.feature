@@ -71,3 +71,10 @@ Feature: Only the test files that mock modules pay for isolation
     And its config asks for every file to be isolated
     When the suite's config is resolved
     Then every file runs isolated in a single project
+
+  @unit
+  Scenario: Turning fast mode off isolates every file again
+    Given some of the suite's test files mock modules
+    And fast mode is turned off for the run
+    When the suite's config is resolved
+    Then every file runs isolated in a single project

@@ -41,6 +41,8 @@ export interface ModuleVitestConfigOptions {
   testTimeout?: number;
   /** Limits the directory vitest scans for test files. */
   dir?: string;
+  /** vitest's root, and where the isolation split scans; the cwd when unset. */
+  root?: string;
   /** Merged over everything above, for the handful of packages that need more. */
   test?: ViteUserConfig["test"];
 }
@@ -57,8 +59,9 @@ export const BROWSER_TEST_GLOB = "**/*.browser.test.{ts,tsx}";
 // LANGWATCH_VITEST_FAST=1 (default) turns on every perf option vitest 5
 // supports that is safe repo-wide; =0 restores the pre-fast-mode config
 // exactly, so an isolate-sensitive suite can opt one CI run out without
-// touching this file. See dev/docs/plans (vitest perf lane report) for the rationale.
-const FAST_MODE = process.env.LANGWATCH_VITEST_FAST !== "0";
+// touching this file. Rationale: dev/docs/best_practices/testing-speed.md.
+// Read per config, not at import, so a test can turn it off.
+const fastMode = () => process.env.LANGWATCH_VITEST_FAST !== "0";
 
 export function moduleVitestTestOptions(
   options: ModuleVitestConfigOptions,
@@ -67,7 +70,8 @@ export function moduleVitestTestOptions(
   // A fresh worker per file is the single largest cost in a suite whose
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate === undefined ? false : isolate !== false;
-  const resolvedCss = css ?? !FAST_MODE;
+  const fast = fastMode();
+  const resolvedCss = css ?? !fast;
   const resolvedSetupFiles = [
     LOGGER_SETUP,
     ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
@@ -82,11 +86,11 @@ export function moduleVitestTestOptions(
     // which vitest 4's pool rework removed. Not absolute: `VITEST_MAX_WORKERS`
     // is applied after the config and outranks it (see
     // ./integration-file-concurrency.ts, and testing-speed.md for both).
-    ...(FAST_MODE && !resolvedIsolate ? { maxWorkers: 1 } : {}),
+    ...(fast && !resolvedIsolate ? { maxWorkers: 1 } : {}),
     // Persists transformed modules between runs, so a rerun skips the
     // transform share of the run entirely.
     // https://vitest.dev/config/#fsmodulecache (top-level since vitest 4.0.11)
-    fsModuleCache: FAST_MODE,
+    fsModuleCache: fast,
     // https://vitest.dev/config/#fileparallelism
     fileParallelism: true,
     // Skips CSS parse/transform on import. No package under this builder
@@ -107,14 +111,15 @@ export function moduleVitestTestOptions(
 
 export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {
   const test = moduleVitestTestOptions(options) ?? {};
+  // vitest runs a package script from the package directory, where its globs are rooted.
+  const root = options.root ?? process.cwd();
   return defineConfig({
+    ...(options.root === undefined ? {} : { root }),
     // The UI ships through the React Compiler (apps/ui/vite.config.ts); jsdom tests match it.
     plugins: options.kind === "jsdom" ? [react({ compiler: true })] : [],
-    // vitest runs every package script from the package directory, which is
-    // where the include globs are rooted.
     test:
-      FAST_MODE && options.isolate === true
-        ? splitIsolationByMocking({ test, root: process.cwd(), alsoIsolate: options.alsoIsolate })
+      fastMode() && options.isolate === true
+        ? splitIsolationByMocking({ test, root, alsoIsolate: options.alsoIsolate })
         : test,
   });
 }
