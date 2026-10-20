@@ -260,6 +260,36 @@ describe("createFinishRunHandler", () => {
     });
   });
 
+  it("dates the finished event at the intent's outcome time", async () => {
+    const finishRun = vi.fn().mockResolvedValue(undefined);
+    const run = createFinishRunHandler(TestSimulationService.create({ finishRun }));
+
+    await run(
+      {
+        scenarioRunId: RUN_ID,
+        projectId: PROJECT_ID,
+        status: "ERROR",
+        error: "stalled",
+        outcomeAtMs: 1_000,
+      },
+      makeContext(),
+    );
+
+    expect(finishRun).toHaveBeenCalledWith(expect.objectContaining({ occurredAt: 1_000 }));
+  });
+
+  /** @scenario "A finish that names no outcome time is dated when it is written" */
+  it("dates the finished event when it is written when the intent names no outcome time", async () => {
+    const finishRun = vi.fn().mockResolvedValue(undefined);
+    const run = createFinishRunHandler(TestSimulationService.create({ finishRun }));
+    const before = Date.now();
+
+    await run({ scenarioRunId: RUN_ID, projectId: PROJECT_ID, status: "CANCELLED" }, makeContext());
+
+    const [{ occurredAt }] = finishRun.mock.calls[0] as [{ occurredAt: number }];
+    expect(occurredAt).toBeGreaterThanOrEqual(before);
+  });
+
   it("omits error when the intent carries none", async () => {
     const finishRun = vi.fn().mockResolvedValue(undefined);
     const run = createFinishRunHandler(TestSimulationService.create({ finishRun }));

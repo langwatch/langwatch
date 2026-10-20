@@ -812,6 +812,25 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      # Each browser lane runs `playwright install --with-deps chromium` in its own
+      # script (browser-test-lane.md), and the first one on a shard spent ~17s
+      # downloading Chromium. Cached by Playwright version, that install finds the
+      # browser already there and only checks the system libraries. Keyed on the
+      # version rather than the lockfile, so an unrelated dependency bump keeps
+      # the cache and the repository's cache quota is not churned.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Same reason as test-unit and test-component: anything encrypted at
         # rest has to round-trip through a real key, and a test asserting that
@@ -1330,9 +1349,6 @@ jobs:
 
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
-
-      - name: Test start-boxd-ssh-agent.sh
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
 
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh

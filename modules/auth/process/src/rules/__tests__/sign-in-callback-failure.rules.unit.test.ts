@@ -63,6 +63,13 @@ describe("signInErrorRedirectOf", () => {
     });
   });
 
+  describe("given a sign-in whose state no longer matches this browser", () => {
+    /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
+    it("lets state_mismatch cross as it is, so nothing is logged as unknown", () => {
+      expect(redirectTo(`${errorPageUrl}?error=state_mismatch`)).toEqual({ kind: "pass" });
+    });
+  });
+
   describe("given a sign-in that failed for a reason we have not written down", () => {
     /** @scenario "An unhandled failure crosses as one generic code" */
     it("sends the generic code with no description, keeping callbackUrl", () => {

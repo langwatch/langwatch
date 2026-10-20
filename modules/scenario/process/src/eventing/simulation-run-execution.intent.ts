@@ -83,7 +83,7 @@ export function createFinishRunHandler(
       scenarioRunId: payload.scenarioRunId,
       status: payload.status,
       ...(payload.error !== undefined ? { error: payload.error } : {}),
-      occurredAt: nowInstant().epochMilliseconds,
+      occurredAt: payload.outcomeAtMs ?? nowInstant().epochMilliseconds,
     });
   };
 }

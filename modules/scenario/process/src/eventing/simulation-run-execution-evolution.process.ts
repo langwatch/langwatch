@@ -328,7 +328,7 @@ export const simulationRunExecutionWake: WakeHandler<
       return {
         state: { ...state, phase: "terminal" },
         nextWakeAt: null,
-        intents: [finishCancelledIntent(ctx)],
+        intents: [finishCancelledIntent(ctx, requestedAtMs + CANCEL_GRACE_MS)],
       };
     }
     return { state, nextWakeAt: requestedAtMs + CANCEL_GRACE_MS };
@@ -351,6 +351,7 @@ export const simulationRunExecutionWake: WakeHandler<
           projectId: ctx.projectId,
           status: ScenarioRunStatus.ERROR,
           error: "stalled",
+          outcomeAtMs: state.lastActivityAtMs + STALL_THRESHOLD_MS,
         }),
       ],
     };
@@ -378,11 +379,12 @@ function computeWake(state: SimulationRunExecutionProcessState): number | null {
   }
 }
 
-function finishCancelledIntent(ctx: Ctx): ProcessIntent {
+function finishCancelledIntent(ctx: Ctx, outcomeAtMs: number = ctx.at): ProcessIntent {
   return ctx.intent("finish", finishCancelledKey(ctx.key), {
     scenarioRunId: ctx.key,
     projectId: ctx.projectId,
     status: ScenarioRunStatus.CANCELLED,
+    outcomeAtMs,
   });
 }
 
@@ -425,6 +427,7 @@ function finishUnexecutable({
         projectId: ctx.projectId,
         status: ScenarioRunStatus.ERROR,
         error,
+        outcomeAtMs: ctx.at,
       }),
     ],
   };
