@@ -88,9 +88,9 @@ For production with single-node ClickHouse.
 - Langy: 1 replica, 500m/2 CPU, 1Gi/4Gi memory
 - ClickHouse: 4 CPU, 8Gi memory, 100Gi storage
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 20Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 5Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 5Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 30d retention, 20Gi storage
-- Total: ~8.9 CPU, ~23 Gi RAM requests
+- Total: ~9.2 CPU, ~23.8 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -111,9 +111,9 @@ For production with replicated ClickHouse.
 - ClickHouse: 3 nodes, 4 CPU, 16Gi memory, 300Gi storage each
 - ClickHouse Keeper: 3 nodes, 250m/1 CPU, 512Mi/1Gi memory
 - PostgreSQL: 250m/1 CPU, 512Mi/1Gi memory, 50Gi storage
-- Redis: 250m/500m CPU, 256Mi/512Mi memory, 10Gi storage
+- Redis: 500m/1 CPU, 1Gi/3Gi memory, 10Gi storage
 - Prometheus: 200m/500m CPU, 512Mi/2Gi memory, 60d retention, 50Gi storage
-- Total: ~22.9 CPU, ~84.8 Gi RAM requests
+- Total: ~23.2 CPU, ~85.6 Gi RAM requests
 
 ```bash
 helm install langwatch langwatch/langwatch \
@@ -126,17 +126,44 @@ helm install langwatch langwatch/langwatch \
 
 Both production overlays turn off the local-filesystem volume for stored objects, because more than one replica cannot share it. Set `app.dataplane.enabled: true` with an S3 or Azure Blob bucket, or stored objects (audio, images and documents) land on the pods' ephemeral disk and are lost on restart. Both commands also need the Secrets from [Provide the Secrets](/self-hosting/deployment/kubernetes-helm#1-provide-the-secrets), or `--set autogen.enabled=true` for a test install.
 
+## Throughput by Size
+
+Highest sustained rate each profile kept up with in our load test (agent traces of 4 spans from several projects, one ClickHouse node).
+
+| Profile | Spans/s | Traces/s | Spans per day | Spans per month | ClickHouse disk per day | Redis memory used |
+| --- | --- | --- | --- | --- | --- | --- |
+| `size-minimal.yaml` | ~47 | ~12 | ~4M | ~120M | ~4 GB | ~50 MiB |
+| `size-dev.yaml` | ~187 | ~48 | ~16M | ~485M | ~16 GB | ~200 MiB |
+| `size-prod.yaml` | ~375 | ~95 | ~32M | ~970M | ~32 GB | ~400 MiB |
+
+| Component | CPU per 100 spans/s |
+| --- | --- |
+| LangWatch Workers | ~0.5 core |
+| LangWatch App | ~0.2 core |
+| ClickHouse | ~0.16 core |
+| Redis | ~0.12 core (one core at most) |
+| PostgreSQL | ~0.03 core |
+
+- These are ceilings: plan to run at no more than 70% of them. Long prompts and completions lower them.
+- Per day and per month assume the rate around the clock; size for your busiest hour.
+- Disk assumes about 1 KB per span on disk, which covers real payloads. Our test spans were about 250 bytes.
+- Redis memory limit: about 2.5 MiB per span/s you need to sustain. The chart caps Redis at half its limit so a snapshot always fits. Add about 240 MiB for each minute you expect to receive more than the install can store.
+- One busy project gets a fair share of the workers, about 47 spans/s on `size-prod.yaml`. To lift it, set `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs` (`0` removes the limit).
+
 ## Scaling Guidelines
 
 ### What to scale first
 
-| Bottleneck                             | Component to Scale | How                                               |
-| -------------------------------------- | ------------------ | ------------------------------------------------- |
-| Trace ingestion is slow, queue backlog | LangWatch Workers  | Increase `workers.replicaCount`                   |
-| UI is slow, many concurrent users      | LangWatch App      | Increase `app.replicaCount`                       |
-| ClickHouse queries are slow            | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory` |
-| Evaluations are slow                   | LangEvals          | Increase `langevals.replicaCount`                 |
-| Topic clustering is slow               | LangEvals          | Increase `langevals.replicaCount`                 |
+| Bottleneck                                          | Component to Scale | How                                                                  |
+| --------------------------------------------------- | ------------------ | -------------------------------------------------------------------- |
+| Redis refuses writes (`OOM command not allowed`) or restarts with `OOMKilled` | Redis | Raise `redis.master.resources.limits.memory` (about 2.5 MiB per span/s, see [Throughput by Size](#throughput-by-size)) |
+| Redis CPU near its limit                            | Redis              | Raise `redis.master.resources.limits.cpu`, up to 1                   |
+| Trace ingestion is slow, workers near their CPU limit | LangWatch Workers | Increase `workers.replicaCount` (about 0.5 core per 100 spans per second) |
+| One project falls behind while others keep up       | LangWatch Workers  | Raise `LANGWATCH_DISPATCH_TENANT_CAP` in `workers.extraEnvs`         |
+| UI is slow, many concurrent users                   | LangWatch App      | Increase `app.replicaCount`                                          |
+| ClickHouse queries are slow, trace summaries lag    | ClickHouse         | Increase `clickhouse.cpu` and `clickhouse.memory`                    |
+| Evaluations are slow                                | LangEvals          | Increase `langevals.replicaCount`                                    |
+| Topic clustering is slow                            | LangEvals          | Increase `langevals.replicaCount`                                    |
 
 ### Horizontal Pod Autoscaler (HPA)
 
@@ -186,6 +213,21 @@ spec:
 
 - Minimal storage: job queue, cache and sessions
 - 1-5 GB is sufficient
+
+## Redis or Valkey
+
+The chart runs Redis by default. Valkey is a drop-in alternative: add `-f examples/overlays/redis-valkey.yaml`. For an external server, use Redis 7.0 or later, or Valkey 7.2 or later.
+
+Measured on `size-prod.yaml` with a 1 CPU limit, three runs each:
+
+| | Redis 8.0 | Valkey 9.2 |
+| --- | --- | --- |
+| Spans stored per second | 450-556 | 509-594 |
+| CPU used | ~0.5 core | ~0.48 core |
+| Time per queue script call | 67 µs | 58 µs |
+| Memory | ~1.2 GiB | ~1.2 GiB |
+
+Throughput is the same within noise. Valkey uses about 10% less CPU, which matters only if Redis CPU is your limit.
 
 ## Cloud Instance Recommendations
 
