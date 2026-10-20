@@ -170,7 +170,9 @@ shopAssistant.scenario.teardown(async (_run, state) => {
 });
 ```
 
-The create route takes a board `name` and answers `201` with the board, including its `id` and `platformUrl`. The delete route answers `200` with the deleted board's `id` and `name`, and `404` for a board that is not in the project. Deleting a board also deletes the widgets on it, so teardown does not need to delete them one by one. Any other status is an error, so the teardown above throws and the run shows that test data may be left behind.
+The create route takes a board `name` and answers `201` with the board, including its `id` and `platformUrl`. The delete route answers `200` with the deleted board's `id` and `name`, and `404` for a board that is not in the project.
+
+Deleting a board also deletes the widgets on it, so teardown does not need to delete them one by one. Any other status is an error, so the teardown above throws and the run shows that test data may be left behind.
 
 ## Best practices
 
