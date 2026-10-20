@@ -65,7 +65,7 @@ export function runHooksViewOf({
   const hooks = reserved?.hooks;
   const setup = hooks?.setup ?? null;
   const teardown = hooks?.teardown ?? null;
-  const isAgentTarget = reserved !== undefined && reserved.targetType !== "prompt";
+  const isAgentTarget = reserved?.targetType !== undefined && reserved.targetType !== "prompt";
   return {
     setup,
     teardown,

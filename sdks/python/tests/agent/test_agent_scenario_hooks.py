@@ -234,6 +234,27 @@ def test_a_hook_that_refuses_the_agent_after_start_deregisters(monkeypatch):
     assert [frame["type"] for frame in sent] == ["deregister"]
 
 
+def test_a_later_hook_that_resolves_the_conflict_lists_the_agent_again():
+    @connect_agent(name="shop-assistant", environment="development")
+    def agent(messages, refund_amount: float = 49.95) -> str:
+        return "ok"
+
+    @agent.scenario.teardown
+    def teardown(run, state, refund_amount: str = "49.95"):
+        return None
+
+    assert client_module.default_client().agents == []
+
+    @agent.scenario.teardown
+    def teardown_fixed(run, state, refund_amount: float = 49.95):
+        return None
+
+    assert agent.refusal is None
+    assert [a.key for a in client_module.default_client().agents] == [
+        "shop-assistant@development"
+    ]
+
+
 # @scenario "An integer and a number for one parameter merge as a number"
 def test_an_integer_and_a_number_merge_as_a_number():
     agent = shop_assistant()

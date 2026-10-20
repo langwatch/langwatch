@@ -282,6 +282,7 @@ class ConnectedAgent:
                 func, agent_call_type=AgentCall, skip=1 if kind == "setup" else 2
             ),
         )
+        self.refusal = None
         try:
             self.run_parameters()
         except ParameterConflict as conflict:

@@ -5,7 +5,7 @@ import { FieldMappingSchema } from "../../resolve-field-mappings.ts";
 import { scenarioCriterionResultSchema } from "../../scenario-criterion-result.ts";
 import { scenarioEvaluationResultSchema } from "../../scenario-evaluation-result.ts";
 import { runParameterValuesSchema } from "../../scenario.parameters.ts";
-import { scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
+import { SCENARIO_HOOK_STATUSES, scenarioRunHooksSchema } from "../execution/scenario-hooks.ts";
 import { runActorLabelSchema } from "../run/run-actor.ts";
 
 /**
@@ -115,6 +115,15 @@ function isRunTargetType(value: string): value is (typeof runTargetTypes)[number
   return (runTargetTypes as readonly string[]).includes(value);
 }
 
+// An unreadable hooks value still keeps a readable setup status, so a failed setup stays unscored.
+function readSetupStatusOnly(hooks: unknown): unknown {
+  const setup = (hooks as { setup?: Record<string, unknown> } | null | undefined)?.setup;
+  const status = setup?.status;
+  if (!(SCENARIO_HOOK_STATUSES as readonly unknown[]).includes(status)) return undefined;
+  const ms = setup?.durationMs;
+  return { setup: { status, durationMs: typeof ms === "number" && ms >= 0 ? ms : 0 } };
+}
+
 /**
  * A namespace is read, never refused: the target type is matched case-blind and an unreadable
  * optional field is dropped. Only one with no readable target reference id is absent.
@@ -131,10 +140,19 @@ function readRunLangwatchNamespace(value: unknown): unknown {
     delete record.targetType;
   }
   if (runLangwatchNamespaceSchema.validate(record)) return record;
+  dropUnreadableFields(record);
+  return runLangwatchNamespaceSchema.validate(record) ? record : undefined;
+}
+
+/** Drops each unreadable optional field in place, keeping a readable setup status of hooks. */
+function dropUnreadableFields(record: Record<string, unknown>): void {
+  const hooks = record.hooks;
   for (const [name, field] of Object.entries(runLangwatchNamespaceSchema.shape)) {
     if (name in record && !field.validate(record[name])) delete record[name];
   }
-  return runLangwatchNamespaceSchema.validate(record) ? record : undefined;
+  if (hooks === undefined || "hooks" in record) return;
+  const kept = readSetupStatusOnly(hooks);
+  if (kept) record.hooks = kept;
 }
 
 /** Platform metadata carried with runs started by a simulation suite. */

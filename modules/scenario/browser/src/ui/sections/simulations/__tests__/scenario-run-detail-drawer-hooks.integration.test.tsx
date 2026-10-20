@@ -321,6 +321,23 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
     });
   });
 
+  describe("given a finished run whose target type is unknown", () => {
+    /** @scenario 'A run with no known target type offers no "Rerun and keep data" and is not marked "No hooks"' */
+    it("shows no No hooks mark and offers no keep-data rerun", async () => {
+      const user = userEvent.setup();
+      const run = buildRunState({});
+      delete run.metadata?.langwatch?.targetType;
+      mocks.runState = run;
+
+      renderDrawer();
+
+      expect(screen.queryByTestId("hook-band-none")).toBeNull();
+      const more = screen.queryByRole("button", { name: "More actions" });
+      if (more) await user.click(more);
+      expect(screen.queryByText("Rerun and keep data")).toBeNull();
+    });
+  });
+
   describe("given a run against a prompt", () => {
     it("shows no hook band at all", () => {
       mocks.runState = buildRunState({ targetType: "prompt" });

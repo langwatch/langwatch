@@ -256,6 +256,12 @@ Feature: Scenario run hooks: setup and teardown
       And teardown is not called
       And the run shows "Teardown skipped"
 
+    @unit @integration
+    Scenario: A run with no known target type offers no "Rerun and keep data" and is not marked "No hooks"
+      Given a finished run whose target type is unknown and that recorded no hooks
+      Then the run does not show "No hooks"
+      And the run offers no "Rerun and keep data"
+
     @unit @unimplemented
     Scenario: Keep data is never saved to a plan
       Given a run started with "Rerun and keep data"
