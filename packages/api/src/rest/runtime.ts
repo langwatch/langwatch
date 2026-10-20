@@ -190,6 +190,12 @@ export type RestRuntimeMembers = Readonly<{
    * refuses a Langy key outright rather than run unconfirmed.
    */
   confirmations?: RestConfirmationGate;
+  /**
+   * Set by the host that serves real doors, each of which records the key it lets in: there a
+   * key door that recorded none is refused on a marked route, gate or no gate. A test's runtime
+   * fakes its identity and records nothing, so it leaves this unset.
+   */
+  servedDoors?: true;
 }>;
 
 /**
@@ -1462,6 +1468,7 @@ function handlerMiddleware<Api>({
           await confirmMarkedRequest({
             mark: route.confirmation,
             gate: ports.confirmations,
+            servedDoors: ports.servedDoors === true,
             credential,
             request: context.req.raw,
             input,

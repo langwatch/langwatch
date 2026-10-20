@@ -24,6 +24,7 @@ import {
   recordProjectCredential,
 } from "../credential.ts";
 import { defineRestRouter } from "../declaration.ts";
+import { RestHost } from "../host.ts";
 import { canonicalErrorResponse } from "../response.ts";
 import { createRestRuntime } from "../runtime.ts";
 
@@ -231,13 +232,15 @@ function gateFor(confirmed: readonly string[]): RestConfirmationGate {
   };
 }
 
-function mount(gate: RestConfirmationGate | undefined) {
+/** Served, as RestHost runs it, unless the call says the runtime fakes its identity. */
+function mount(gate: RestConfirmationGate | undefined, servedDoors = true) {
   return createRestRuntime({
     authorization: authorizationPort,
     identity: door,
     doors: { api_key: keyDoor, organization: organizationDoor },
     audit: { record: async () => {} },
     ...(gate ? { confirmations: gate } : {}),
+    ...(servedDoors ? { servedDoors: true as const } : {}),
     // The envelope every REST family answers with, so the refusal reads as Langy reads it.
   }).mount(router, { app: () => app, onError: canonicalErrorResponse });
 }
@@ -248,14 +251,16 @@ async function call({
   method,
   path,
   body,
+  servedDoors,
 }: {
   gate: RestConfirmationGate | undefined;
+  servedDoors?: boolean;
   token: string;
   method: string;
   path: string;
   body?: unknown;
 }) {
-  const response = await mount(gate).request(`/api/records/${VERSION}${path}`, {
+  const response = await mount(gate, servedDoors).request(`/api/records/${VERSION}${path}`, {
     method,
     headers: { "content-type": "application/json", "x-auth-token": token },
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
@@ -439,9 +444,22 @@ describe("a route marked as removing something", () => {
       expect(ran).toEqual([]);
     });
 
-    it("goes on in a runtime with no gate, as a test's own identity is", async () => {
+    it("refuses with no gate bound too, so a process without Langy is no way around it", async () => {
       const answer = await call({
         gate: undefined,
+        token: "silent",
+        method: "POST",
+        path: "/vk-1/revoke",
+      });
+
+      expect(answer.status).toBe(500);
+      expect(ran).toEqual([]);
+    });
+
+    it("goes on only in a runtime that fakes its identity, as a test's does", async () => {
+      const answer = await call({
+        gate: gateFor([]),
+        servedDoors: false,
         token: "silent",
         method: "POST",
         path: "/vk-1/revoke",
@@ -543,5 +561,29 @@ describe("declaring the mark", () => {
         name: async () => null,
       }),
     ).toThrow(/exactly one of idParam and idsField/);
+  });
+});
+
+describe("the REST host that serves the real doors", () => {
+  /** @scenario "A Langy key needs the click on every door that lets a key in" */
+  it("refuses a marked route whose door recorded no key, with no gate bound", async () => {
+    const silent: RestIdentity = { authenticate: () => CALLER, identify: () => CALLER };
+    const host = RestHost.create({
+      authz: authorizationPort.forRequest(),
+      identities: {
+        project: silent,
+        organization: silent,
+        api_key: silent,
+        instance_admin: silent,
+        browser: silent,
+      },
+      audit: { record: async () => {} },
+    });
+    host.mount(router, () => app);
+
+    const response = await host.app.request(`/api/records/${VERSION}/ev-1`, { method: "DELETE" });
+
+    expect(response.status).toBe(500);
+    expect(ran).toEqual([]);
   });
 });

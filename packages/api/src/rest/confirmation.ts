@@ -116,6 +116,7 @@ export function assertConfirmationMark({
 export async function confirmMarkedRequest<Api>({
   mark,
   gate,
+  servedDoors,
   credential,
   request,
   input,
@@ -124,6 +125,8 @@ export async function confirmMarkedRequest<Api>({
 }: {
   mark: RestConfirmation<Api> | undefined;
   gate: RestConfirmationGate | undefined;
+  /** True where every key door records its key, so a missing one is a fault, not a test. */
+  servedDoors: boolean;
   credential: string;
   request: Request;
   input: unknown;
@@ -133,9 +136,9 @@ export async function confirmMarkedRequest<Api>({
   if (!mark || !isKeyDoor(credential)) return;
   const recorded = recordedKeyCredentialOf({ door: credential, request });
   // Every served key door records the key it let in; one that did not is never trusted to be no
-  // Langy key. A runtime with no gate (a test's own identity) asks no one, so it goes on.
+  // Langy key. Only a test's runtime, which fakes its identity, records none and goes on.
   if (!recorded) {
-    if (!gate) return;
+    if (!servedDoors) return;
     throw new Error(`The ${credential} door recorded no key for a route that asks for a click`);
   }
   const key = keyCredentialOf(recorded);

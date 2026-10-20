@@ -172,6 +172,7 @@ export class RestHost implements FeatureRestHost<MountableRestApp> {
       ...(this.options.entitlements ? { entitlements: this.options.entitlements } : {}),
       ...(this.options.confirmations ? { confirmations: this.options.confirmations } : {}),
       authorization: { forRequest: () => authz },
+      servedDoors: true,
       audit: this.options.audit,
       deprecationLog: restDeprecationLog,
     }).mount(declaration, {
