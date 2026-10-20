@@ -14,6 +14,8 @@ import { ModelProviderResolutionService } from "../model-provider-resolution.ser
 const PLAYGROUND = "prompt.create_default";
 const LANGY = "langy.chat";
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
+const TOPIC_CLUSTERING = "analytics.topic_clustering_llm";
+const TRACE_SEARCH = "traces.ai_search";
 
 const feature = (key: string, role: string) => ({
   key,
@@ -53,6 +55,8 @@ function resolverWith(options: {
         feature(LANGY, "LANGY"),
         feature(PLAYGROUND, "DEFAULT"),
         feature("scenarios.judge", "DEFAULT"),
+        feature(TOPIC_CLUSTERING, "FAST"),
+        feature(TRACE_SEARCH, "FAST"),
       ],
     },
     scopes: {
@@ -241,6 +245,54 @@ describe("ModelProviderResolutionService.resolve", () => {
       });
 
       await expect(resolve(resolver, LANGY)).resolves.toMatchObject({ model: CODEX_MODEL });
+    });
+  });
+
+  // Clustering names its topics in the evaluation service, which calls the
+  // provider directly and has no road to Codex. The codex FAST default set by
+  // the Codex setup must not reach it — and because the skip happens at read
+  // time, a project that stored that default earlier needs no migration.
+  describe("given the FAST role default is a Codex model", () => {
+    const codexFast = (extra: ReturnType<typeof config>[] = []) =>
+      resolverWith({
+        configs: [
+          config({ scopeType: "PROJECT", scopeId: "project-1", config: { FAST: CODEX_MODEL } }),
+          ...extra,
+        ],
+      });
+
+    describe("when topic clustering resolves its model", () => {
+      /** @scenario "Topic clustering never runs on a Codex coding default" */
+      it("steps over the Codex default to a model set for clustering further up", async () => {
+        const resolver = codexFast([
+          config({
+            scopeType: "ORGANIZATION",
+            scopeId: "organization-1",
+            config: { [TOPIC_CLUSTERING]: "openai/gpt-5-mini" },
+          }),
+        ]);
+
+        await expect(resolve(resolver, TOPIC_CLUSTERING)).resolves.toMatchObject({
+          model: "openai/gpt-5-mini",
+          scope: "organization",
+        });
+      });
+
+      /** @scenario "Topic clustering never runs on a Codex coding default" */
+      it("reports the restriction when nothing else is set", async () => {
+        await expect(resolve(codexFast(), TOPIC_CLUSTERING)).rejects.toMatchObject({
+          code: "model_restricted_for_feature",
+          meta: expect.objectContaining({ restrictedModels: [CODEX_MODEL] }),
+        });
+      });
+    });
+
+    describe("when a gateway-run fast assist resolves its model", () => {
+      it("still runs on the Codex default", async () => {
+        await expect(resolve(codexFast(), TRACE_SEARCH)).resolves.toMatchObject({
+          model: CODEX_MODEL,
+        });
+      });
     });
   });
 

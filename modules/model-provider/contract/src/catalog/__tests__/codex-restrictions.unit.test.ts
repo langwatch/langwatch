@@ -8,6 +8,7 @@ import { describe, expect, it } from "vitest";
 import {
   CODEX_ALLOWED_FEATURE_KEYS,
   CODEX_DEFAULT_MODEL,
+  CODEX_NON_GATEWAY_FAST_FEATURE_KEYS,
   CONNECTION_TEST_FEATURE_KEY,
   isCodexAllowedFeature,
   isCodexModel,
@@ -35,7 +36,7 @@ describe("codexRestrictions", () => {
     expect(findFeatureByKey(CONNECTION_TEST_FEATURE_KEY)[0]).toBeFalsy();
   });
 
-  it("allows codex on Langy and the fast assists, nowhere else", () => {
+  it("allows codex on Langy and the gateway-run fast assists, nowhere else", () => {
     expect(
       isModelAllowedForFeature({
         modelId: CODEX_DEFAULT_MODEL,
@@ -43,6 +44,7 @@ describe("codexRestrictions", () => {
       }),
     ).toBe(true);
     for (const fast of featuresByRole("FAST")) {
+      if (CODEX_NON_GATEWAY_FAST_FEATURE_KEYS.includes(fast.key)) continue;
       expect(
         isModelAllowedForFeature({
           modelId: CODEX_DEFAULT_MODEL,
@@ -59,6 +61,7 @@ describe("codexRestrictions", () => {
       "scenarios.user_simulator",
       "scenarios.agent_under_test",
       "analytics.topic_clustering_embeddings",
+      "analytics.topic_clustering_llm",
     ]) {
       expect(
         isModelAllowedForFeature({
@@ -122,10 +125,29 @@ describe("codexRestrictions", () => {
     }
   });
 
-  it("pins the allowed set: langy.chat plus exactly the FAST tier", () => {
-    // The rule is derived (Langy + every FAST feature); this pin makes any
-    // widening of it — a feature moving into FAST, a new fast assist — show
-    // up in review rather than land silently.
+  describe("given the FAST features that execute outside the AI gateway", () => {
+    it("names only registered FAST features", () => {
+      for (const key of CODEX_NON_GATEWAY_FAST_FEATURE_KEYS) {
+        expect(findFeatureByKey(key)[0]?.role, `"${key}" must be a FAST feature`).toBe("FAST");
+      }
+    });
+
+    describe("when topic clustering asks whether a codex model may run it", () => {
+      it("refuses, because clustering runs in the evaluation service, not the gateway", () => {
+        expect(
+          isModelAllowedForFeature({
+            modelId: CODEX_DEFAULT_MODEL,
+            featureKey: "analytics.topic_clustering_llm",
+          }),
+        ).toBe(false);
+      });
+    });
+  });
+
+  it("pins the allowed set: langy.chat plus the gateway-run FAST tier", () => {
+    // The rule is derived (Langy + every FAST feature not listed as
+    // non-gateway); this pin makes any widening of it — a feature moving into
+    // FAST, a new fast assist — show up in review rather than land silently.
     expect([...CODEX_ALLOWED_FEATURE_KEYS].toSorted()).toEqual(
       [
         "langy.chat",
@@ -137,7 +159,6 @@ describe("codexRestrictions", () => {
         "workflows.commit_message",
         "scenarios.generator",
         "datasets.generator",
-        "analytics.topic_clustering_llm",
       ].toSorted(),
     );
     expect(isCodexAllowedFeature("prompt.create_default")).toBe(false);

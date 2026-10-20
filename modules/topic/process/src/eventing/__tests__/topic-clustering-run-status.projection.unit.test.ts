@@ -296,6 +296,30 @@ describe("TopicClusteringRunStatusFoldProjection", () => {
     });
   });
 
+  describe("when a run is refused because its model is coding-assistant only", () => {
+    /** @scenario "A clustering run refused for its Codex model is recorded as failed" */
+    it("records a failed outcome carrying the restriction's code for the settings page", () => {
+      const state = projection.apply(
+        initState(),
+        baseEvent({
+          type: "lw.obs.topic_clustering.run_failed",
+          occurredAt: 8_000,
+          data: {
+            runId: "20260717",
+            page: 1,
+            error: '"openai_codex/gpt-5.6-terra" serves the coding-assistant surfaces only',
+            errorCode: "model_restricted",
+            isUserActionable: true,
+          },
+        }),
+      );
+
+      expect(state.LastRunOutcome).toBe("failed");
+      expect(state.LastRunErrorCode).toBe("model_restricted");
+      expect(state.LastRunErrorUserActionable).toBe(true);
+    });
+  });
+
   describe("when a run fails after an earlier run succeeded", () => {
     it("clears the previous run's counts instead of reporting them as the failed run's", () => {
       // A fully successful run lands real counts on the row.

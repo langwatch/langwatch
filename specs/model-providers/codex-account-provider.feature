@@ -251,6 +251,33 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     Then the prefetch succeeds
     Because those target types never resolve the FAST-role coding default for the agent under test
 
+  # Topic clustering is a FAST-role feature, but it names its topics inside
+  # the evaluation service, which calls the provider itself. Codex is only
+  # reachable through the AI gateway, so clustering is the one fast assist
+  # Codex cannot serve. The skip happens when the model is resolved, so a
+  # project that already set Codex as its Fast default needs no data change.
+  @unit
+  Scenario: Topic clustering never runs on a Codex coding default
+    Given a project whose FAST role default is a codex model
+    When topic clustering resolves its model
+    Then it does not get the codex model
+    And it uses a model set for topic clustering at a wider scope, if there is one
+    And with nothing else set, it fails as "this model can't be used here", not as an unknown error
+
+  @unit
+  Scenario: A refused Codex clustering model logs as a customer setup issue
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then it is classified as the customer's to fix
+    And it logs at warning level, not as an error that pages anyone
+
+  @unit
+  Scenario: A clustering run refused for its Codex model is recorded as failed
+    Given topic clustering is refused because its model is a codex model
+    When the clustering run handles the refusal
+    Then the run is recorded as failed on its first attempt, without retries
+    And the run status carries a code the topic clustering settings page explains
+
   # ── Where Codex is reached ─────────────────────────────────────────────────
 
   Rule: Codex is reached at a configured base, the real vendor unless the deployment names another
