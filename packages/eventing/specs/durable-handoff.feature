@@ -58,6 +58,14 @@ Feature: Durable hand-off from an append to its lanes
     Then the fold holds that event exactly once
 
   @unit
+  Scenario: A rebuild for a redelivered key folds the event log's copy, not the redelivery
+    Given a fold that already applied an event under an idempotency key
+    And the missed event carries the same key under another id
+    When the rebuild reads a history that does not yet hold the key
+    Then the rebuild retries instead of folding the redelivery
+    And once the log returns its copy, the fold holds that copy and not the redelivery
+
+  @unit
   Scenario: A lane keyed across aggregates cannot rebuild from one aggregate and retires dead
     Given a fold whose key spans aggregates
     When its missed hand-off is re-driven

@@ -160,7 +160,7 @@ export class WorkflowStudioDispatchService {
     input: WorkflowStudioDispatchInput,
   ): Promise<void> {
     const decoder = new TextDecoder();
-    const isAborted = input.isAborted;
+    const isAborted = input.isAborted && notAbortedWhenUnreadable(input.isAborted);
     let buffered = "";
     let frames = 0;
     let streamDone = false;
@@ -296,6 +296,23 @@ function reportAsStudioEvent(error: unknown, input: WorkflowStudioDispatchInput)
 }
 
 /**
+ * The stop flag lives in Redis and is polled on a timer: a read that fails counts as "not
+ * stopped" (warned once per run), since a rejection out of the poll is unhandled and exits the
+ * worker. Spec: modules/workflow/specs/studio-lambda-stream.feature
+ */
+function notAbortedWhenUnreadable(isAborted: () => Promise<boolean>): () => Promise<boolean> {
+  let warned = false;
+  return () =>
+    isAborted().catch((error: unknown) => {
+      if (!warned) {
+        warned = true;
+        logger.warn({ error }, "Could not read the stop flag, treating the run as not stopped");
+      }
+      return false;
+    });
+}
+
+/**
  * Reads the next chunk, resolving to `"aborted"` if an abort is requested while the read is
  * still pending. Without the race an abort is only noticed BETWEEN chunks, so a cell blocked on
  * a slow model response keeps running until that response arrives.
@@ -311,22 +328,11 @@ async function readChunkOrAbort(
   let poll: ReturnType<typeof setInterval> | undefined;
   const aborted = new Promise<"aborted">((resolve) => {
     poll = setInterval(() => {
-      // isAborted() reads Redis; a pod shutting down mid-poll can close that
-      // connection and reject (ioredis "Connection is closed."). The timer
-      // runs detached from any awaited call chain, so an unhandled rejection
-      // here would escape the surrounding try/catch entirely and crash the
-      // process (langwatch/langwatch#8534). Treat a failed check as "not
-      // aborted" — the next poll, or the per-chunk `isAborted` check in the
-      // loop below, gets another chance once the connection recovers.
-      void isAborted()
-        .then((stop) => {
-          if (stop) {
-            resolve("aborted");
-          }
-        })
-        .catch((error: unknown) => {
-          logger.warn({ error }, "abort poll failed, treating as not aborted");
-        });
+      void isAborted().then((stop) => {
+        if (stop) {
+          resolve("aborted");
+        }
+      });
     }, ABORT_POLL_INTERVAL_MS);
   });
 
