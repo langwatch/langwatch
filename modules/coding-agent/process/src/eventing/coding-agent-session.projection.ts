@@ -332,7 +332,7 @@ export interface CodingAgentSessionRow {
   cacheCreationTokens: number;
   costUsd: number;
   agentReportedCostUsd: number;
-  /** AI units summed over model calls (migration 00110); 0 for agents that report none. */
+  /** AI units summed over model calls (migration 00122); 0 for agents that report none. */
   aiUnits: number;
   /**
    * What the session spent under each declared working context (migration 00099), first seen first.
