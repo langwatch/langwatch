@@ -728,7 +728,7 @@ describe("given Langy's answer, which is untrusted", () => {
   });
 
   /** @scenario "A card that fails a run's checks is not rescued by a fenced block" */
-  it("fails the run when the card holds a finding over a run's limits, good block or not", async () => {
+  it("fails the run when the card holds a finding over a run's limits, valid block or not", async () => {
     installed.world.langy.answer = [
       answerWith([finding(), finding({ title: "x".repeat(121) })]),
       blockAnswerWith([finding({ title: "from the block" })]),

@@ -239,7 +239,7 @@ describe("checkRunAnswer", () => {
     it.each([
       ["a title of 121 characters", valid({ title: "x".repeat(121) })],
       ["a body of 4,001 characters", valid({ body: "x".repeat(4_001) })],
-    ])("refuses an answer with %s, good finding and all", (_what, long) => {
+    ])("refuses an answer with %s, valid finding and all", (_what, long) => {
       expect(check(answer([valid(), long]))).toEqual({ ok: false, reason: "bad_output" });
     });
 
