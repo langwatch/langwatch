@@ -186,12 +186,12 @@ function addCallKeys({
   into: MutableDistinctKeys;
 }): void {
   const kind = call.keyKind;
-  const readsContent = (call.source ?? call.definition).reads !== "thread-trace-ids";
+  const shouldReadContent = (call.source ?? call.definition).reads !== "thread-trace-ids";
   for (const [keyId, parts] of call.keys) {
     const [first] = parts;
     if (first === undefined) continue;
     if (kind === "thread") into.threadKeys.add(first);
-    if (kind === "thread" && readsContent) into.threadContentKeys.add(first);
+    if (kind === "thread" && shouldReadContent) into.threadContentKeys.add(first);
     else if (kind === "text") into.texts.add(first);
     else into.traceIds.add(first);
     if (kind === "span") into.spanPairs.add(keyId);
