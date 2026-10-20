@@ -39,12 +39,10 @@ export class PrismaTenancyRepository implements TenancyRepository {
     });
 
     // relationMode "prisma" keeps no foreign key, so a project can outlive its
-    // team; the generated type still claims `team` is present. Skip orphans
-    // rather than let one dead row stop the sweep for every organization.
-    const organizationIds = projects.flatMap((project) => {
-      const team = project.team as { organizationId: string } | null;
-      return team ? [team.organizationId] : [];
-    });
+    // team; the generated type still claims `team` is present, hence the optional
+    // chaining. Skip orphans rather than let one dead row stop the sweep for every
+    // organization.
+    const organizationIds = projects.flatMap((project) => project.team?.organizationId ?? []);
 
     return [...new Set(organizationIds)];
   }
