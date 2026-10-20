@@ -119,9 +119,13 @@ void describe("given a filter shape this guard cannot decompose", () => {
         "          filters: .github/filters.yml",
       ].join("\n");
       const issues = inspect("example.yml", source);
-      assert.equal(issues.length, 1);
-      assert.equal(issues[0]?.rule, "R3");
-      assert.match(issues[0]?.detail ?? "", /filters\.yml/);
+      // R4 too: on a pull request the change detector reads the filters
+      // inline with git, so a filters file is refused there as well.
+      assert.deepEqual(
+        issues.map((issue) => issue.rule),
+        ["R4", "R3"],
+      );
+      for (const issue of issues) assert.match(issue.detail, /filters\.yml/);
     });
   });
 
@@ -353,35 +357,37 @@ const targetGated = (trigger: string, entries: string[]): string =>
     ...entries.map((p) => `              - '${p}'`),
   ].join("\n");
 
-void describe("given a pull_request_target workflow's gate filter", () => {
-  /** @scenario "A pull_request_target filter may use neither braces nor negation" */
+void describe("given a pull request workflow's gate filter", () => {
+  /** @scenario "A pull request filter may use neither braces nor negation" */
   void it("reports R4 for braces and for negation, because git pathspecs read neither", () => {
-    const source = targetGated("pull_request_target", ["sdks/{go,python}/**", "!sdks/go/x"]);
-    const issues = inspect("example.yml", source);
-    assert.deepEqual(
-      issues.map((issue) => issue.rule),
-      ["R4", "R4"],
-    );
-    assert.match(issues[0]?.detail ?? "", /braces/);
-    assert.match(issues[1]?.detail ?? "", /negation/);
+    for (const trigger of ["pull_request", "pull_request_target"]) {
+      const source = targetGated(trigger, ["sdks/{go,python}/**", "!sdks/go/x"]);
+      const issues = inspect("example.yml", source);
+      assert.deepEqual(
+        issues.map((issue) => issue.rule),
+        ["R4", "R4"],
+        trigger,
+      );
+      assert.match(issues[0]?.detail ?? "", /braces/);
+      assert.match(issues[1]?.detail ?? "", /negation/);
+    }
   });
 
   void it("reports nothing for plain globs and literal paths", () => {
-    const source = targetGated("pull_request_target", ["sdks/go/**", "package.json", "a/*.json"]);
-    assert.deepEqual(inspect("example.yml", source), []);
+    for (const trigger of ["pull_request", "pull_request_target"]) {
+      const source = targetGated(trigger, ["sdks/go/**", "package.json", "a/*.json"]);
+      assert.deepEqual(inspect("example.yml", source), [], trigger);
+    }
   });
 
-  void it("leaves a pull_request-only workflow to dorny, which reads braces", () => {
-    assert.deepEqual(
-      inspect("example.yml", targetGated("pull_request", ["sdks/{go,python}/**"])),
-      [],
-    );
+  void it("leaves a push-only workflow to dorny, which reads braces", () => {
+    assert.deepEqual(inspect("example.yml", targetGated("push", ["sdks/{go,python}/**"])), []);
   });
 
   void it("does not mistake an event-name comparison for the trigger", () => {
-    const source = targetGated("pull_request", ["sdks/{go,python}/**"]).replace(
+    const source = targetGated("push", ["sdks/{go,python}/**"]).replace(
       "runs-on: ubuntu-latest",
-      "if: github.event_name != 'pull_request_target'\n    runs-on: ubuntu-latest",
+      "if: github.event_name != 'pull_request'\n    runs-on: ubuntu-latest",
     );
     assert.deepEqual(inspect("example.yml", source), []);
   });

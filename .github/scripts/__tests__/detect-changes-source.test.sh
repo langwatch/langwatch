@@ -37,7 +37,7 @@ source_for() {
 }
 
 # @scenario "A pull request's changed paths are its own commits, diffed from the merge base"
-test_a_pull_request_reads_git() {
+test_a_pull_request_reads_git_by_sha() {
   check "a small pull_request diffs by SHA" "source=git-sha" "$(source_for pull_request force 12)"
   check "a pull_request past the API cap diffs by SHA" "source=git-sha" \
     "$(source_for pull_request force 42596)"
@@ -130,7 +130,7 @@ test_git_lists_every_path_in_the_lean_checkout() {
     "$(printf '%s\n' "$listed" | grep -F main-only.txt || true)"
 }
 
-test_a_pull_request_reads_git
+test_a_pull_request_reads_git_by_sha
 test_a_pull_request_target_reads_git_by_sha
 test_push_and_other_events
 test_git_lists_every_path_in_the_lean_checkout
