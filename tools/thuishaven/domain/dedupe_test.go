@@ -112,6 +112,18 @@ func TestJudgeDuplicates(t *testing.T) {
 			t.Fatalf("groups = %+v", g)
 		}
 	})
+	t.Run("copies are listed referenced first, then by pid, whatever order they arrive in", func(t *testing.T) {
+		low := stray
+		low.PID = 5
+		g := JudgeDuplicates([]InfraInstance{stray, low, canonical})
+		var pids []int
+		for _, i := range g[0].Instances {
+			pids = append(pids, i.PID)
+		}
+		if !slices.Equal(pids, []int{1, 5, 9}) {
+			t.Fatalf("pids = %v, want [1 5 9]", pids)
+		}
+	})
 	t.Run("out of scope, protected and young copies are left", func(t *testing.T) {
 		for _, mutate := range []func(*InfraInstance){
 			func(i *InfraInstance) { i.InScope = false },

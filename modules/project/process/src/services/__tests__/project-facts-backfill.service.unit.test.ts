@@ -2,10 +2,14 @@
  * @vitest-environment node
  * Spec: modules/project/specs/project-service.feature
  */
+import { createTestLogger } from "@langwatch/test-harness";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectBackfillRow } from "../../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectBackfillRow,
+} from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import {
   ProjectFactsBackfillService,
@@ -36,15 +40,26 @@ const NOTHING_COUNTED: ProjectFactsBackfillReport = {
   projects: 0,
   departmentAssignments: 0,
   presenceSettings: 0,
+  skippedOrphans: 0,
+  orphanProjectIds: [],
+};
+
+const NO_ORPHANS: Pick<ProjectFactsBackfillReport, "skippedOrphans" | "orphanProjectIds"> = {
+  skippedOrphans: 0,
+  orphanProjectIds: [],
 };
 
 type Sent = { kind: "created" | "department" | "presence"; data: Record<string, unknown>[] };
 
 /** The step over a projects table served two rows a page, recording each batch it sends. */
-function stepOver(projects: readonly ProjectBackfillRow[] = PROJECTS) {
+function stepOver(
+  projects: readonly ProjectBackfillRow[] = PROJECTS,
+  orphanIds: readonly string[] = [],
+) {
   const batches: Sent[] = [];
   const saves: unknown[] = [];
   const reads: (string | null)[] = [];
+  const { logger, lines } = createTestLogger();
   const lifecycle = ProjectCreatedNoticeService.create({
     logger: { error: vi.fn() },
     projects: { findWithOrgAdmin: async () => null, findWithTeam: async () => null },
@@ -71,10 +86,16 @@ function stepOver(projects: readonly ProjectBackfillRow[] = PROJECTS) {
     projects: {
       findBackfillPage: async ({ afterId }) => {
         reads.push(afterId);
-        return projects.filter((project) => afterId === null || project.id > afterId).slice(0, 2);
+        const ids = [...projects.map((project) => project.id), ...orphanIds].toSorted();
+        const page = ids.filter((id) => afterId === null || id > afterId).slice(0, 2);
+        return page.map((id): ProjectBackfillEntry => {
+          const project = projects.find((candidate) => candidate.id === id);
+          return project ? { kind: "whole", project } : { kind: "orphan", id };
+        });
       },
     },
     lifecycle,
+    logger,
   });
   const run = ({
     afterProjectId = null,
@@ -94,7 +115,7 @@ function stepOver(projects: readonly ProjectBackfillRow[] = PROJECTS) {
       countedBefore,
       onPageDone: async (page) => void saves.push(page),
     });
-  return { batches, saves, reads, run };
+  return { batches, saves, reads, run, warnings: lines };
 }
 
 const withoutMoment = (data: Record<string, unknown>[]) =>
@@ -119,14 +140,19 @@ describe("given the project facts step over three projects, two a page", () => {
       expect(saves).toEqual([
         {
           afterProjectId: "project-2",
-          report: { projects: 2, departmentAssignments: 2, presenceSettings: 2 },
+          report: { projects: 2, departmentAssignments: 2, presenceSettings: 2, ...NO_ORPHANS },
         },
         {
           afterProjectId: "project-3",
-          report: { projects: 3, departmentAssignments: 2, presenceSettings: 2 },
+          report: { projects: 3, departmentAssignments: 2, presenceSettings: 2, ...NO_ORPHANS },
         },
       ]);
-      expect(report).toEqual({ projects: 3, departmentAssignments: 2, presenceSettings: 2 });
+      expect(report).toEqual({
+        projects: 3,
+        departmentAssignments: 2,
+        presenceSettings: 2,
+        ...NO_ORPHANS,
+      });
     });
 
     /** @scenario "The project facts step records an archived project as created only" */
@@ -150,11 +176,21 @@ describe("given the project facts step over three projects, two a page", () => {
 
       const report = await run({
         afterProjectId: "project-2",
-        countedBefore: { projects: 2, departmentAssignments: 2, presenceSettings: 2 },
+        countedBefore: {
+          projects: 2,
+          departmentAssignments: 2,
+          presenceSettings: 2,
+          ...NO_ORPHANS,
+        },
       });
 
       expect(batches.flatMap(idsOf)).toEqual(["project-3"]);
-      expect(report).toEqual({ projects: 3, departmentAssignments: 2, presenceSettings: 2 });
+      expect(report).toEqual({
+        projects: 3,
+        departmentAssignments: 2,
+        presenceSettings: 2,
+        ...NO_ORPHANS,
+      });
     });
   });
 
@@ -167,7 +203,12 @@ describe("given the project facts step over three projects, two a page", () => {
 
       expect(batches).toEqual([]);
       expect(saves).toEqual([]);
-      expect(report).toEqual({ projects: 3, departmentAssignments: 2, presenceSettings: 2 });
+      expect(report).toEqual({
+        projects: 3,
+        departmentAssignments: 2,
+        presenceSettings: 2,
+        ...NO_ORPHANS,
+      });
     });
   });
 
@@ -183,6 +224,60 @@ describe("given the project facts step over three projects, two a page", () => {
       expect(reads).toEqual([]);
       expect(batches).toEqual([]);
       expect(saves).toEqual([]);
+    });
+  });
+});
+
+describe("given a live project between two whose team or organization is gone", () => {
+  const orphans = ["project-0", "project-2"];
+  const live = [row({ id: "project-1" })];
+
+  describe("when it runs", () => {
+    /** @scenario "The project facts step skips a project whose team or organization is gone" */
+    it("records the live project only, counts and names both orphans, and saves past them", async () => {
+      const { batches, saves, reads, run, warnings } = stepOver(live, orphans);
+
+      const report = await run();
+
+      expect(batches.map((sent) => [sent.kind, idsOf(sent)])).toEqual([
+        ["created", ["project-1"]],
+        ["department", ["project-1"]],
+        ["presence", ["project-1"]],
+      ]);
+      expect(reads).toEqual([null, "project-1", "project-2"]);
+      expect(saves.map((save) => (save as { afterProjectId: string }).afterProjectId)).toEqual([
+        "project-1",
+        "project-2",
+      ]);
+      expect(report).toEqual({
+        projects: 1,
+        departmentAssignments: 1,
+        presenceSettings: 1,
+        skippedOrphans: 2,
+        orphanProjectIds: ["project-0", "project-2"],
+      });
+      expect(warnings.map((line) => [line.level, line.projectId])).toEqual([
+        [40, "project-0"],
+        [40, "project-2"],
+      ]);
+    });
+  });
+
+  describe("when a page holds only an orphan", () => {
+    /** @scenario "The project facts step skips a project whose team or organization is gone" */
+    it("sends nothing for that page and still moves the checkpoint past it", async () => {
+      const { batches, saves, run } = stepOver([], ["project-9"]);
+
+      const report = await run();
+
+      expect(batches).toEqual([]);
+      expect(saves).toEqual([
+        {
+          afterProjectId: "project-9",
+          report: { ...NOTHING_COUNTED, skippedOrphans: 1, orphanProjectIds: ["project-9"] },
+        },
+      ]);
+      expect(report.skippedOrphans).toBe(1);
     });
   });
 });

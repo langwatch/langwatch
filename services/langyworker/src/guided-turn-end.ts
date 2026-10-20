@@ -40,7 +40,59 @@ export const CLOSING_LINE_PUSHBACK =
 
 /** The shape the framework line takes: "I found a LangGraph agent in app/graph.py." */
 export const FRAMEWORK_LINE_SHAPE = "I found a LangGraph agent in app/graph.py.";
-const FRAMEWORK_LINE_PATTERN = /^I found an? .+ agent in .+\.$/;
+/** The framework line of a starter agent Langy wrote, as the skill writes it. */
+export const STARTER_FRAMEWORK_LINE =
+  "I wrote a plain OpenAI agent in langwatch-starter-agent/main.py.";
+const FRAMEWORK_LINE_PATTERN = /^I (?:found|wrote) an? .+ agent in .+\.$/;
+
+/**
+ * The line that hands the setup back to the person when they pick another
+ * folder: the turn ends on it, waiting for the folder to connect.
+ */
+export const ANOTHER_FOLDER_LINE =
+  "Run the same share command in the folder that holds your agent, and send me a message once it is connected: I'll start the setup there.";
+
+/**
+ * How every continuation opens: the model reads it as a user message, and the
+ * person sent nothing.
+ */
+export const CONTINUATION_NOTE_OPENER = "LangWatch note: the person sent nothing.";
+
+/** How every continuation ends: the way out for a path that cannot go on. */
+export const CONTINUATION_DEAD_END_LINE =
+  'When the path cannot go on, ask the matching question of "When a step fails" in the guided onboarding skill and end the turn on its card. Never reply to this note.';
+
+/** The runner's continuation prompt: the guard's message between the two fixed lines. */
+export function continuationPrompt(message: string): string {
+  return `${CONTINUATION_NOTE_OPENER} ${message} ${CONTINUATION_DEAD_END_LINE}`;
+}
+
+/** The skill's line for a typed question mid-setup, as the model says it. */
+export const MID_SETUP_LINE =
+  "We'll get to that! Let me finish getting you set up first, then I'm all yours.";
+const MID_SETUP_MARKERS = ["we'll get to that", "let me finish getting you set up"];
+
+/** What `say` answers to the mid-setup line in a turn the worker continued. */
+export const MID_SETUP_LINE_PUSHBACK =
+  'Nothing was said: that line answers a message the person typed, and the person sent nothing; the last message is a LangWatch note. Do the step it names, or, when the path cannot go on, ask the matching question of "When a step fails" and end the turn on its card.';
+
+/**
+ * The say tool's rule for the mid-setup line: once the worker continued the
+ * turn, nobody asked anything, so a promise to get back to it is refused.
+ */
+export function midSetupLineRefusal({
+  text,
+  continued,
+}: {
+  text: string;
+  continued: boolean;
+}): string | undefined {
+  if (!continued) return undefined;
+  const folded = text.replace(/[‘’]/g, "'").toLowerCase();
+  return MID_SETUP_MARKERS.some((marker) => folded.includes(marker))
+    ? MID_SETUP_LINE_PUSHBACK
+    : undefined;
+}
 
 /** The templates of the other step 2 lines, brace for brace as the skill writes them. */
 export const STEP2_LINE_TEMPLATES = {
@@ -240,7 +292,7 @@ export function guidedSegment(calls: readonly TurnCall[]): GuidedSegment {
   return { index, calls: calls.slice(start) };
 }
 
-export type GuidedTurnEnder = "card" | "closing_line" | "failed_step" | "bare";
+export type GuidedTurnEnder = "card" | "closing_line" | "failed_step" | "handover" | "bare";
 
 /**
  * What the turn ended on, read off the last call that is not transparent: a
@@ -253,6 +305,8 @@ export function guidedTurnEnding(calls: readonly TurnCall[]): GuidedTurnEnder {
   if (!last) return "bare";
   if (CARD_TOOL_NAMES.has(last.name)) return "card";
   if (last.name !== SAY_TOOL_NAME) return "bare";
+  const handsOver = sayTexts([last]).some((text) => text.endsWith(ANOTHER_FOLDER_LINE));
+  if (handsOver) return "handover";
   // The lines at the end are read against the last call that was not a line.
   let index = meaningful.length - 2;
   while (index >= 0 && meaningful[index]?.name === SAY_TOOL_NAME) index--;

@@ -194,6 +194,27 @@ describe("batchTargetsOf()", () => {
     });
   });
 
+  describe("when a run carries no target type", () => {
+    /** @scenario "A run with no target type still groups under its target" */
+    it("still lists its target under the reference id and name", () => {
+      const untyped = runAgainst({ scenarioRunId: "r1", referenceId: "agent_dev" });
+      delete (untyped.metadata!.langwatch as { targetType?: string }).targetType;
+
+      const targets = batchTargetsOf({
+        scenarioRuns: [
+          untyped,
+          { ...untyped, scenarioRunId: "r2" },
+          runAgainst({ scenarioRunId: "r3", referenceId: "agent_prod" }),
+        ],
+        targetIdentities: NAMES,
+      });
+
+      expect(targets.map((target) => target.referenceId)).toEqual(["agent_dev", "agent_prod"]);
+      expect(targets[0]).toMatchObject({ key: "agent_dev", name: "dev-agent", label: "dev-agent" });
+      expect(runsOfTarget({ scenarioRuns: [untyped], target: targets[0]! })).toHaveLength(1);
+    });
+  });
+
   describe("when a run names no target at all", () => {
     it("leaves it out, and an agent the project no longer names reads by its id", () => {
       const targets = batchTargetsOf({
