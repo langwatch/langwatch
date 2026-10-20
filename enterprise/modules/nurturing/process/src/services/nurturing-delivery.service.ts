@@ -31,7 +31,10 @@ import {
   fireInviteAccepted,
   fireSsoAutoAdded,
 } from "../rules/nurturing-membership-join-service.rules.ts";
-import { activationTrackInput } from "../rules/nurturing-posthog-activation.rules.ts";
+import {
+  activationTrackInput,
+  evaluationsCompletedEvent,
+} from "../rules/nurturing-posthog-activation.rules.ts";
 import {
   fireIntegrationMethod,
   integrationMethodFor,
@@ -297,6 +300,8 @@ export class NurturingDeliveryService {
       case "experiment_ran":
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
+      case "evaluation_completed":
+        return track(evaluationsCompletedEvent(signal));
       case "user_registered":
         return track({ userId: signal.userId, event: "signed_up" });
       case "user_created":

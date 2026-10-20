@@ -711,7 +711,7 @@ describe("NurturingDeliveryService", () => {
     }
 
     /** @scenario "A backed-up project's settled evaluations are counted in one step and send one update" */
-    it("tells Customer.io the new count once and sends PostHog nothing", async () => {
+    it("tells Customer.io the new count once and PostHog how many the batch counted", async () => {
       const { posthog, cio, delivery } = deliveryOverBothSinks();
 
       await delivery.deliver({
@@ -736,7 +736,13 @@ describe("NurturingDeliveryService", () => {
           }),
         },
       ]);
-      expect(posthog.tracked).toEqual([]);
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "admin-1",
+          event: "evaluations_completed",
+          properties: { count: 3, projectId: "project-1" },
+        },
+      ]);
     });
 
     /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
