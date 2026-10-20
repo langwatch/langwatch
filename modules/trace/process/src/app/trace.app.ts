@@ -979,6 +979,7 @@ export class TraceModule implements TraceApi, CollectorApp {
       projects: setup.dependencies.projects,
       usageCount: setup.repositories.usageCount,
       milestones,
+      logger: createLogger("langwatch:trace:month-trace-ids"),
     });
     app.#retention = {
       resolve: (tenantId) =>
