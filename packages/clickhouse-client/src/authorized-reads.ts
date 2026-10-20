@@ -10,8 +10,8 @@ import {
   type Authorization,
   type AuthorizationConditionType,
   type AuthorizationGrant,
+  type ProofBearingPermission,
   usableAuthorization,
-  type AuthzPermission,
 } from "@langwatch/authorization";
 import {
   TENANT_SCOPE_BUCKET_WIDTH_MS,
@@ -28,24 +28,18 @@ import { StatementScopeError, TENANT_SCOPE_PARAM_PREFIX } from "./statementScope
 export type ClickHouseClientResolver = (tenantId: string) => Promise<ClickHouseQueryClient>;
 
 /**
- * What a reader may be asked for: the permission each one needs, and the
- * resource a shared grant's window must apply to for that grant to open
- * rows of it. Both read trace rows, so both take a `trace` window.
+ * What a reader may be asked for: the proof-bearing permission each one needs, and the resource
+ * a shared grant's window must apply to for that grant to open rows of it. Both read trace rows,
+ * so both take a `trace` window.
  */
 const READ_RESOURCES = {
   traces: { permission: "traces:view", condition: "trace" },
   analytics: { permission: "analytics:view", condition: "trace" },
 } as const satisfies Record<
   string,
-  { permission: AuthzPermission; condition: AuthorizationConditionType }
+  { permission: ProofBearingPermission; condition: AuthorizationConditionType }
 >;
 export type ReadResource = keyof typeof READ_RESOURCES;
-
-/** The permissions a route mints a proof for: one per resource a reader may be asked for. */
-export const PROOF_BEARING_PERMISSIONS: ReadonlySet<AuthzPermission> = new Set([
-  READ_RESOURCES.traces.permission,
-  READ_RESOURCES.analytics.permission,
-]);
 
 const MARKER = /\{\{tenantScope:([A-Za-z_][A-Za-z0-9_]*)\}\}/g;
 const SET_MARKER = /\{\{tenantSet\}\}/g;
