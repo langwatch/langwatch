@@ -1,4 +1,5 @@
 import { LangyAgentUnavailableError } from "@langwatch/langy-contract";
+import { Prisma } from "@langwatch/prisma-client/generated";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { describe, expect, it } from "vitest";
 
@@ -20,9 +21,10 @@ const CLAIM_INPUT = {
 
 /** The driver adapter reports a lost serializable race without a Prisma `code`. */
 function driverAdapterWriteConflict(): Error {
-  const error = new Error("write conflict") as Error & { cause: unknown };
+  const error = new Error("write conflict", {
+    cause: { kind: "TransactionWriteConflict", originalCode: "40001" },
+  });
   error.name = "DriverAdapterError";
-  error.cause = { kind: "TransactionWriteConflict", originalCode: "40001" };
   return error;
 }
 
@@ -39,7 +41,25 @@ function fakeDatabase(failures: unknown[]) {
   return { database, calls: () => calls };
 }
 
+/** A unique-key clash: two claims raced to create the same receipt row. */
+function uniqueKeyClash(): Error {
+  return new Prisma.PrismaClientKnownRequestError("Unique constraint failed", {
+    code: "P2002",
+    clientVersion: "test",
+  });
+}
+
 describe("PrismaLangyTurnAdmissionRepository.claim", () => {
+  describe("given the first attempt hits a unique-key clash", () => {
+    it("retries and returns the claim from the second attempt", async () => {
+      const { database, calls } = fakeDatabase([uniqueKeyClash()]);
+      const repository = PrismaLangyTurnAdmissionRepository.create(database);
+
+      await expect(repository.claim(CLAIM_INPUT)).resolves.toBe(CLAIM);
+      expect(calls()).toBe(2);
+    });
+  });
+
   describe("given the first serializable attempt loses a driver-adapter write conflict", () => {
     it("retries and returns the claim from the second attempt", async () => {
       const { database, calls } = fakeDatabase([driverAdapterWriteConflict()]);
