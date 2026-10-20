@@ -77,7 +77,8 @@ export function detectCompression(buf: Buffer): CompressionCodec {
 }
 
 export async function compress(data: Buffer | string, codec: CompressionCodec): Promise<Buffer> {
-  if (codec !== "none" && data.length <= SYNC_CODEC_MAX_BYTES) {
+  const byteLength = typeof data === "string" ? Buffer.byteLength(data) : data.length;
+  if (codec !== "none" && byteLength <= SYNC_CODEC_MAX_BYTES) {
     return codec === "gzip" ? gzipSync(data, GZIP_FAST) : zstdCompressSync(data, ZSTD_FAST);
   }
   switch (codec) {

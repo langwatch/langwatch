@@ -36,6 +36,9 @@ export type NormalizedSpanInput = {
 /** A span's command, and the usage record it claimed, released if the span fails. */
 type PreparedSpan = { data: RecordSpanCommandData; usageRecord: UsageRecordRef | null };
 
+/** A claimed span ready to hand off, at its input position. */
+type ReadySpan = { index: number; input: NormalizedSpanInput } & PreparedSpan;
+
 /** Spans claimed per dedup round trip: few enough that each is recorded well inside its claim. */
 const DEDUP_BATCH_SIZE = 100;
 
@@ -126,29 +129,8 @@ export class TraceSpanCollectionService {
   ): Promise<SpanIngestionResult[]> {
     const claims = await this.options.dedup.claimProcessing(inputs.map(spanDedupRefOf));
     const results: SpanIngestionResult[] = [];
-    const prepared: (({ index: number; input: NormalizedSpanInput } & PreparedSpan) | null)[] = [];
     const failures: Promise<void>[] = [];
-    for (let start = 0; start < inputs.length; start += PREPARE_CONCURRENCY) {
-      const slice = inputs.slice(start, start + PREPARE_CONCURRENCY);
-      await Promise.all(
-        slice.map(async (input, offset) => {
-          const index = start + offset;
-          const claim = claims[index] ?? UNANSWERED_CLAIM;
-          prepared[index] = null;
-          if (claim.outcome === "held") {
-            results[index] = { status: "deduped" };
-            return;
-          }
-          try {
-            prepared[index] = { index, input, ...(await this.prepareCommand(input)) };
-          } catch (error) {
-            results[index] = this.failedSpan({ input, error });
-            if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
-          }
-        }),
-      );
-    }
-    const ready = prepared.filter((span) => span !== null);
+    const ready = await this.prepareClaimed({ inputs, claims, results, failures });
 
     const outcomes = await this.handOff(ready.map(({ data }) => data));
     const recorded: SpanDedupRef[] = [];
@@ -184,6 +166,59 @@ export class TraceSpanCollectionService {
    * The command one span becomes: its usage record claimed, then the optional edge/blob
    * preparation. A preparation that throws releases the usage record it claimed.
    */
+  /** The claimed spans prepared {@link PREPARE_CONCURRENCY} at a time, in input order. */
+  private async prepareClaimed({
+    inputs,
+    claims,
+    results,
+    failures,
+  }: {
+    inputs: readonly NormalizedSpanInput[];
+    claims: readonly SpanDedupClaim[];
+    results: SpanIngestionResult[];
+    failures: Promise<void>[];
+  }): Promise<ReadySpan[]> {
+    const prepared: (ReadySpan | null)[] = [];
+    for (let start = 0; start < inputs.length; start += PREPARE_CONCURRENCY) {
+      const slice = inputs.slice(start, start + PREPARE_CONCURRENCY);
+      const answers = await Promise.all(
+        slice.map((input, offset) =>
+          this.prepareClaimedSpan({ index: start + offset, input, claims, results, failures }),
+        ),
+      );
+      prepared.push(...answers);
+    }
+    return prepared.filter((span) => span !== null);
+  }
+
+  /** One span: held elsewhere is deduped; a failed prepare answers it and releases its claim. */
+  private async prepareClaimedSpan({
+    index,
+    input,
+    claims,
+    results,
+    failures,
+  }: {
+    index: number;
+    input: NormalizedSpanInput;
+    claims: readonly SpanDedupClaim[];
+    results: SpanIngestionResult[];
+    failures: Promise<void>[];
+  }): Promise<ReadySpan | null> {
+    const claim = claims[index] ?? UNANSWERED_CLAIM;
+    if (claim.outcome === "held") {
+      results[index] = { status: "deduped" };
+      return null;
+    }
+    try {
+      return { index, input, ...(await this.prepareCommand(input)) };
+    } catch (error) {
+      results[index] = this.failedSpan({ input, error });
+      if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
+      return null;
+    }
+  }
+
   private async prepareCommand(input: NormalizedSpanInput): Promise<PreparedSpan> {
     const usage = await this.usage.claim(input);
     const commandData: RecordSpanCommandData = {
