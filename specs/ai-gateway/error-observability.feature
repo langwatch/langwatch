@@ -115,3 +115,13 @@ Feature: Gateway errors are logged with fault attribution
     When the error response is written
     Then the response and the log are unaffected
     And nothing panics for want of a recorder
+
+  # A caller that disconnects cancels the request's context, and the error
+  # that surfaces is context.Canceled. That is the caller going away, not a
+  # failure of ours, and it must not read as an unknown platform fault.
+  @unit
+  Scenario: A request the client abandoned is logged at info, not as a platform fault
+    Given a request whose caller disconnected, so it failed with a canceled context
+    When the error response is written
+    Then it is answered and logged as an abandoned request, not as an unhandled error
+    And neither the failure line nor the request completion line is at error level

@@ -95,6 +95,53 @@ import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.
 const logger = createLogger("langwatch:better-auth");
 
 /**
+ * Return addresses better-auth's origin check refuses ("Invalid callbackURL: ..."): the caller
+ * is answered and needs nothing from us.
+ */
+const CALLER_REFUSAL_MESSAGES = [
+  /^Invalid (?:callbackURL|errorCallbackURL|newUserCallbackURL|redirectURL)\b/,
+];
+
+/**
+ * better-auth logs "Failed to parse state" for any failure reading a sign-in's state back. Only
+ * these `StateError` codes are the caller's (an expired or tampered attempt, started again);
+ * `state_generation_error` or a non-state error is ours and stays at error.
+ */
+const CALLER_STATE_CODES: ReadonlySet<string> = new Set([
+  "state_not_found",
+  "state_mismatch",
+  "state_invalid",
+  "state_security_mismatch",
+]);
+
+function isCallerStateRefusal({ message, args }: { message: string; args: readonly unknown[] }) {
+  if (!/^Failed to parse state\b/.test(message)) return false;
+  const first = args[0];
+  const code = typeof first === "object" && first !== null && "code" in first ? first.code : void 0;
+  return typeof code === "string" && CALLER_STATE_CODES.has(code);
+}
+
+/** The level a better-auth log line is written at here: its own, but caller refusals warn. */
+export function betterAuthLogLevel({
+  level,
+  message,
+  args = [],
+}: {
+  level: string | undefined;
+  message: string;
+  /** What better-auth logged alongside the message; the state refusal's error is first. */
+  args?: readonly unknown[];
+}): "error" | "warn" | "info" {
+  if (level === "error") {
+    const refused =
+      CALLER_REFUSAL_MESSAGES.some((pattern) => pattern.test(message)) ||
+      isCallerStateRefusal({ message, args });
+    return refused ? "warn" : "error";
+  }
+  return level === "warn" ? "warn" : "info";
+}
+
+/**
  * Everything about this deployment the option set is built from.
  */
 export type BetterAuthDeploymentConfiguration = Readonly<{
@@ -763,8 +810,9 @@ export const createAuthOptions = ({
   // BetterAuth logger wiring
   logger: {
     disabled: false,
-    log: (level, message, ...args) => {
+    log: (stated, message, ...args) => {
       idTokenIssuerRefusals?.note([message, ...args]);
+      const level = betterAuthLogLevel({ level: stated, message, args });
       if (level === "error") {
         logger.error({ args }, message);
       } else if (level === "warn") {

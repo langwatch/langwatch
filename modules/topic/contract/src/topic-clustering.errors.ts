@@ -10,13 +10,11 @@ export const CLUSTERING_ERROR_CODES = {
    * project's own configuration, so it is attributable with certainty.
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
-  /**
-   * Model provider auth rejection. Defined for backwards compatibility but
-   * not set until langevals returns structured provider errors.
-   */
+  /** The model provider rejected the project's credentials, as named by
+   *  langevals' `model_provider_auth_failed` failure code. */
   MODEL_PROVIDER_AUTH: "model_provider_auth",
-  /** The model provider refused for quota/billing reasons. Same caveat as
-   *  {@link CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH}: nothing sets it yet. */
+  /** The model provider refused for rate or quota reasons, as named by
+   *  langevals' `model_provider_rate_limited` failure code. */
   MODEL_PROVIDER_QUOTA: "model_provider_quota",
   /**
    * The clustering service (langevals) itself failed. Ours to fix, and the

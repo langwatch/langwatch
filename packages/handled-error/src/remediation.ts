@@ -37,6 +37,11 @@ const registry = {
       "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
     ],
   },
+  request_body_unreadable: {
+    tips: [
+      "This usually means the connection closed before the body finished uploading. Send the request again.",
+    ],
+  },
 
   // ---- dataset storage ----
   private_dataplane_unavailable: {
