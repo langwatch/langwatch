@@ -210,8 +210,14 @@ app:
   # wait.
   ## @param app.shutdownDrainSeconds [default: 25] Seconds the queue may spend draining in-flight jobs on shutdown.
   shutdownDrainSeconds: 25
-  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30.
+  ## @param app.terminationGracePeriodSeconds [default: 55] Seconds before SIGKILL. Must be at least shutdownDrainSeconds + 30, and preStopSleepSeconds + shutdownDrainSeconds + 25.
   terminationGracePeriodSeconds: 55
+  # Seconds the app container sleeps in preStop before it gets SIGTERM, so the
+  # Service endpoint removal reaches every load balancer and proxy before the
+  # process stops accepting requests. Spent inside terminationGracePeriodSeconds.
+  # 0 turns it off; an extraLifecycle.preStop replaces it.
+  ## @param app.preStopSleepSeconds [default: 5] Seconds to sleep before SIGTERM so endpoint removal propagates.
+  preStopSleepSeconds: 5
 
   # Kubernetes service configuration
   # See: https://kubespec.dev/v1/Service
