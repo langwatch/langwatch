@@ -10,7 +10,8 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createEventingGroupQueueFactory } from "../groupQueueFactory.ts";
 
 const steps: string[] = [];
-let consumerClose: () => Promise<void> = async () => {};
+/** Answers each consumer's close; `listed` is true for the listed-work consumer. */
+let consumerClose: (listed: boolean) => Promise<void> = async () => {};
 
 vi.mock("@langwatch/group-queue", async (importOriginal) => {
   const actual = await importOriginal<Record<string, unknown>>();
@@ -20,21 +21,26 @@ vi.mock("@langwatch/group-queue", async (importOriginal) => {
     }
   }
   class FakeConsumer {
+    private readonly listed: boolean;
+    constructor(_definition: unknown, dependencies: { dispatchListed?: boolean }) {
+      this.listed = dependencies.dispatchListed === true;
+    }
     handle() {
       return {
         waitUntilReady: async () => {},
         pause: () => {},
         resume: () => {},
-        close: () => consumerClose(),
+        close: () => consumerClose(this.listed),
       };
     }
   }
   return { ...actual, GroupQueueProducer: FakeProducer, GroupQueueConsumer: FakeConsumer };
 });
 
-function startedQueue() {
+function startedQueue({ listedConsumer = false }: { listedConsumer?: boolean } = {}) {
   const queue = createEventingGroupQueueFactory({
     dependencies: { redis: {} } as GroupQueueDependencies<Record<string, unknown>>,
+    listedConsumer,
   })({ name: "close-order", process: async () => {} });
   queue.start?.();
   return queue;
@@ -73,6 +79,7 @@ describe("createEventingGroupQueueFactory close", () => {
 
   describe("given a consumer whose drain fails", () => {
     describe("when the queue closes", () => {
+      /** @scenario The producer closes only after every consumer has drained */
       it("still closes the producer and reports the drain failure", async () => {
         const drainFailure = new Error("Shutdown timed out");
         consumerClose = () => Promise.reject(drainFailure);
@@ -80,6 +87,35 @@ describe("createEventingGroupQueueFactory close", () => {
 
         await expect(queue.close()).rejects.toBe(drainFailure);
         expect(steps).toEqual(["producer closed"]);
+      });
+    });
+  });
+
+  describe("given one consumer whose drain fails while the other is still draining", () => {
+    describe("when the queue closes", () => {
+      /** @scenario The producer closes only after every consumer has drained */
+      it("closes the producer only once the other drain has finished", async () => {
+        const drainFailure = new Error("Shutdown timed out");
+        let finishDrain: () => void = () => {};
+        consumerClose = (listed) =>
+          listed
+            ? new Promise<void>((resolve) => {
+                finishDrain = () => {
+                  steps.push("listed consumer drained");
+                  resolve();
+                };
+              })
+            : Promise.reject(drainFailure);
+        const queue = startedQueue({ listedConsumer: true });
+
+        const closing = queue.close();
+        const outcome = expect(closing).rejects.toBe(drainFailure);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        expect(steps).toEqual([]);
+
+        finishDrain();
+        await outcome;
+        expect(steps).toEqual(["listed consumer drained", "producer closed"]);
       });
     });
   });

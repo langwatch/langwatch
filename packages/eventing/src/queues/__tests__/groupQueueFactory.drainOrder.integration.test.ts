@@ -1,6 +1,6 @@
 /**
  * A job still draining at shutdown must be able to stage its fan-out through the
- * same queue. Needs Redis at REDIS_URL (default localhost:6379).
+ * same queue. Needs Redis at LANGWATCH_TEST_REDIS_URL, else REDIS_URL, else localhost:6379.
  * @see specs/background/queue-drain-send-gate.feature
  */
 
@@ -17,9 +17,10 @@ describe("createEventingGroupQueueFactory close", () => {
   const queues: EventSourcedQueueProcessor<Record<string, unknown>>[] = [];
 
   beforeAll(() => {
-    redis = new IORedis(process.env.REDIS_URL ?? "redis://localhost:6379", {
-      maxRetriesPerRequest: 0,
-    });
+    redis = new IORedis(
+      process.env.LANGWATCH_TEST_REDIS_URL ?? process.env.REDIS_URL ?? "redis://localhost:6379",
+      { maxRetriesPerRequest: 0 },
+    );
   });
 
   afterEach(async () => {
@@ -45,6 +46,7 @@ describe("createEventingGroupQueueFactory close", () => {
         let fanOut: "staged" | Error | undefined;
 
         const queue = createEventingGroupQueueFactory({ dependencies: { redis } })({
+          // defineGroupQueue hash-tags the transport name, so its keys start `{test/eqdrain/`.
           name: `${KEY_NAMESPACE}/${crypto.randomUUID().slice(0, 8)}`,
           groupKey: (payload) => String(payload.groupId),
           process: async (payload) => {

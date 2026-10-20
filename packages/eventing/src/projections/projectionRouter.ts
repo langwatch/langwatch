@@ -1110,7 +1110,6 @@ export class ProjectionRouter<
           fields: {
             projectionName,
             eventCount: filtered.length,
-            error: error instanceof Error ? error.message : String(error),
           },
           message: "Failed to dispatch batch of events to fold projection queue",
         });
@@ -1217,7 +1216,6 @@ export class ProjectionRouter<
           fields: {
             projectionName: name,
             eventCount: matching.length,
-            error: error instanceof Error ? error.message : String(error),
           },
           message: "State projection dispatch failed",
         });
@@ -1353,7 +1351,6 @@ export class ProjectionRouter<
         fields: {
           handlerName: name,
           eventCount: accepted.length,
-          error: error instanceof Error ? error.message : String(error),
         },
         message: "Failed to dispatch batch of events to map projection queue",
       });
@@ -1540,12 +1537,16 @@ export class ProjectionRouter<
   }): void {
     if (isQueueStagingClosed(error)) {
       this.logger.warn(
-        { ...fields, reason: "the queue's drain finished during shutdown; kept for re-drive" },
+        {
+          ...fields,
+          error,
+          reason: "the queue's drain finished during shutdown; kept for re-drive",
+        },
         message,
       );
       return;
     }
-    this.logger.error(fields, message);
+    this.logger.error({ ...fields, error }, message);
   }
 
   /**
@@ -1574,7 +1575,6 @@ export class ProjectionRouter<
         eventType: event.type,
         aggregateId: String(event.aggregateId),
         tenantId: event.tenantId,
-        error: error instanceof Error ? error.message : String(error),
       },
       message: "Event subscriber dispatch failed",
     });
@@ -2263,7 +2263,6 @@ export class ProjectionRouter<
               subscriberName: subscriber.name,
               projectionName,
               eventId: event.id,
-              error: error instanceof Error ? error.message : String(error),
             },
             message: "Failed to dispatch event to subscriber queue",
           });

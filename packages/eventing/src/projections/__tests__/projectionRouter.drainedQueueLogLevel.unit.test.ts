@@ -1,7 +1,6 @@
 /**
  * @vitest-environment node
- * A dispatch refused because the queue's drain already finished is a shutdown race,
- * kept for re-drive, so it warns; every other dispatch failure is still an error.
+ * A refusal after the queue's drain finished is a shutdown race kept for re-drive, so it warns.
  * @see specs/background/queue-drain-send-gate.feature
  */
 import { GroupQueueError, QueueStagingClosedError } from "@langwatch/group-queue";
@@ -9,14 +8,15 @@ import type * as observabilityModule from "@langwatch/observability";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { Event } from "../../domain/types.ts";
+import type { EventSourcedQueueProcessor } from "../../queues/queue.types.ts";
 import {
   createTestAggregateType,
   createTestEvent,
   createTestEventStoreReadContext,
+  createMockQueueManager,
   createTestTenantId,
   TEST_CONSTANTS,
 } from "../../services/__tests__/testHelpers.ts";
-import type { QueueManager } from "../../services/queues/queueManager.ts";
 import { ProjectionRouter } from "../projectionRouter.ts";
 
 const { warnSpy, errorSpy } = vi.hoisted(() => ({ warnSpy: vi.fn(), errorSpy: vi.fn() }));
@@ -43,18 +43,17 @@ const DISPATCH_FAILED = "Event subscriber dispatch failed";
 
 /** Only the subscriber lane is queued, and its queue refuses with `refusal`. */
 function routerWhoseQueueRefuses(refusal: Error): ProjectionRouter<Event> {
-  const queue = { send: () => Promise.reject(refusal) };
+  const queue: EventSourcedQueueProcessor<Event> = {
+    send: () => Promise.reject(refusal),
+    sendBatch: () => Promise.reject(refusal),
+    close: async () => {},
+    waitUntilReady: async () => {},
+  };
   // Every other lane answers "not queued", so only the subscriber's send is exercised.
-  const queueManager = new Proxy(
-    {},
-    {
-      get: (_target, method) => () => {
-        if (method === "hasSubscriberQueues") return true;
-        if (method === "getSubscriberQueue") return queue;
-        return String(method).startsWith("has") ? false : undefined;
-      },
-    },
-  ) as QueueManager<Event>;
+  const queueManager = createMockQueueManager({
+    hasSubscriberQueues: true,
+    getSubscriberQueue: () => queue,
+  });
   const router = new ProjectionRouter<Event>({
     aggregateType,
     pipelineName: TEST_CONSTANTS.PIPELINE_NAME,

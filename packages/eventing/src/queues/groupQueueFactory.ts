@@ -258,9 +258,14 @@ export function createEventingGroupQueueFactory({
       // Consumers first: a job still draining sends its fan-out through THIS producer, and a
       // producer's gate shuts the moment its own close ends, which for a processor with nothing
       // in flight is at once. Spec: specs/background/queue-drain-send-gate.feature
+      // Every consumer settles first, even when one fails, so a failure never shuts the gate early.
       async close() {
         try {
-          await Promise.all(consumers.map((each) => each.close()));
+          const drained = await Promise.allSettled(consumers.map((each) => each.close()));
+          const failed = drained.find(
+            (each): each is PromiseRejectedResult => each.status === "rejected",
+          );
+          if (failed) throw failed.reason;
         } finally {
           await producer.close();
         }

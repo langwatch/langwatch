@@ -42,6 +42,8 @@ export const TEST_COMMAND_TYPES = ["test.command.run"] as const;
 export function createMockQueueManager(overrides?: {
   hasProjectionSubscriberQueues?: boolean;
   getProjectionSubscriberQueue?: QueueManager<Event>["getProjectionSubscriberQueue"];
+  hasSubscriberQueues?: boolean;
+  getSubscriberQueue?: QueueManager<Event>["getSubscriberQueue"];
 }): QueueManager<Event> {
   const queueManager = new QueueManager<Event>({
     parseEvent: parseTestEvent,
@@ -50,13 +52,17 @@ export function createMockQueueManager(overrides?: {
   });
   vi.spyOn(queueManager, "hasProjectionQueues").mockReturnValue(false);
   vi.spyOn(queueManager, "hasHandlerQueues").mockReturnValue(false);
-  vi.spyOn(queueManager, "hasSubscriberQueues").mockReturnValue(false);
+  vi.spyOn(queueManager, "hasSubscriberQueues").mockReturnValue(
+    overrides?.hasSubscriberQueues ?? false,
+  );
   vi.spyOn(queueManager, "hasProjectionSubscriberQueues").mockReturnValue(
     overrides?.hasProjectionSubscriberQueues ?? false,
   );
   vi.spyOn(queueManager, "getProjectionQueue").mockReturnValue(undefined);
   vi.spyOn(queueManager, "getHandlerQueue").mockReturnValue(undefined);
-  vi.spyOn(queueManager, "getSubscriberQueue").mockReturnValue(undefined);
+  vi.spyOn(queueManager, "getSubscriberQueue").mockImplementation(
+    overrides?.getSubscriberQueue ?? (() => undefined),
+  );
   vi.spyOn(queueManager, "getProjectionSubscriberQueue").mockImplementation(
     overrides?.getProjectionSubscriberQueue ?? (() => undefined),
   );

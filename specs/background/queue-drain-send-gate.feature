@@ -113,6 +113,7 @@ Feature: A queue drain accepts the work it is producing
     When the queue closes
     Then the producer is not closed until the consumer's drain has finished
     And a consumer drain that fails still closes the producer
+    And a failed drain does not close the producer while another consumer is still draining
 
   @unit @drain-send-gate
   Scenario: A dispatch refused because the drain already ended is a warning
