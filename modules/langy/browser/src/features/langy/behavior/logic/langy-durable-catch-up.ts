@@ -79,13 +79,9 @@ export async function catchUpConversationFold({
   targetCursor: LangyEventCursor | null | undefined;
 }): Promise<void> {
   const store = useLangyStore.getState();
-  // Deliberately NOT a confirmation. A durable cursor proves the EVENT LOG
-  // knows the conversation, but the history read is served from the Postgres
-  // projection, which trails the log by definition — the first turn's signal
-  // always outruns the fold. Confirming here defeated the pending grace on
-  // every new chat: `unconfirmed` flipped off, the refetch hit the same
-  // not-found, and the panel rendered the card at once. Only a successful
-  // history read confirms (see `useLangyMessages`).
+  // Not a confirmation: a durable cursor proves event-log presence, not that the
+  // trailing Postgres projection is readable. Confirming here dropped the pending
+  // grace on every new chat. Only a history read confirms (`useLangyMessages`).
   const local = store.turnProjection.cursor;
   if (!targetCursor || !local) {
     // Pre-cursor server build, or the snapshot has not seeded the local fold

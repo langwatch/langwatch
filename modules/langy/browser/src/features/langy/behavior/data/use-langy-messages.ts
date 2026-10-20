@@ -72,9 +72,9 @@ export function useLangyMessages(conversationId: string | null): LangyMessagesRe
     },
   );
 
-  // A successful read is durable proof the conversation's projection exists —
-  // confirms a freshly-minted conversation (see `unconfirmedConversations`).
-  const conversationRead = !!conversationId && query.isSuccess;
+  // A successful read of THIS conversation proves its projection exists. Placeholder
+  // data is the previous conversation's, so it must not confirm the new id.
+  const conversationRead = !!conversationId && query.isSuccess && !query.isPlaceholderData;
   useEffect(() => {
     if (conversationRead && conversationId) {
       useLangyStore.getState().confirmConversation(conversationId);

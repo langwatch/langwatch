@@ -89,13 +89,9 @@ const row = (o: Partial<Row> = {}): Row => ({
 
 describe("LangyConversationService", () => {
   describe("given a conversation whose create was just dispatched (projection lagging)", () => {
-    // The dispatch window: the create command is accepted before the projection
-    // row lands. A read in that window must wait it out, not report "not found"
-    // — the panel used to render the lie moments before the turn was accepted.
-    // Whether a miss is worth waiting out is decided from the canonical EVENT
-    // LOG (`dispatchInFlightEvidence`): a log that says this caller will see the
-    // row (owner-establishing event, not archived) extends the wait to the full
-    // budget; anything else gives up at the short grace (#7987).
+    // Dispatch window (#7987): a read before the row lands must wait, not say
+    // "not found". Log evidence of visibility extends to the full budget;
+    // anything else exits at the short grace.
     const startedEvent = (userId: string) => ({
       id: "e-start",
       aggregateId: "c1",
@@ -308,16 +304,36 @@ describe("LangyConversationService", () => {
     });
 
     it("lets a reader failure propagate — 'cannot verify' must not read as 'verified absent'", async () => {
+      const readerFailure = new Error("reader unavailable");
       const svc = LangyConversationService.create({
         commands: makeCommands(),
         repository: makeRepo({ turnExists: vi.fn(async () => false) }),
         events: {
           getEventsOccurredSince: vi.fn(async () => {
-            throw new Error("clickhouse unavailable");
+            throw readerFailure;
           }),
         },
       });
-      await expect(svc.turnExists(triple)).rejects.toThrow("clickhouse unavailable");
+      await expect(svc.turnExists(triple)).rejects.toBe(readerFailure);
+    });
+
+    it("bounds the fallback read to a recent window instead of the whole history", async () => {
+      const now = Date.parse("2026-10-01T00:00:00.000Z");
+      const getEventsOccurredSince = vi.fn(
+        async (_request: { occurredAtFromMs: number }) => [acceptedTurn("turn-7")] as never,
+      );
+      const svc = LangyConversationService.create({
+        commands: makeCommands(),
+        repository: makeRepo({ turnExists: vi.fn(async () => false) }),
+        events: { getEventsOccurredSince },
+        runtime: { now: () => now, generateId: () => "id", createTurnId: () => "turn" },
+      });
+
+      expect(await svc.turnExists(triple)).toBe(true);
+
+      const fromMs = getEventsOccurredSince.mock.calls[0]?.[0].occurredAtFromMs;
+      expect(fromMs).toBeGreaterThan(0);
+      expect(fromMs).toBeLessThan(now);
     });
   });
 
@@ -1137,12 +1153,14 @@ describe("LangyConversationService", () => {
     });
 
     describe("when the conversation is not visible to the caller", () => {
-      it("throws not-found and never touches the event log", async () => {
-        const events = makeEvents([]);
+      it("throws not-found and never reads the tail, only the bounded evidence window", async () => {
+        const getEventsOccurredSince = vi.fn(
+          async (_request: { occurredAtFromMs: number }) => [] as never,
+        );
         const svc = LangyConversationService.create({
           commands: makeCommands(),
           repository: makeRepo(),
-          events,
+          events: { getEventsOccurredSince },
         });
         await expect(
           svc.getEventsAfter({
@@ -1152,7 +1170,13 @@ describe("LangyConversationService", () => {
             after: { acceptedAt: 0, eventId: "" },
           }),
         ).rejects.toThrow(LangyConversationNotFoundError);
-        expect(events.getEventsOccurredSince).not.toHaveBeenCalled();
+
+        // The tail read for `after.acceptedAt: 0` starts at 0; evidence reads start recently.
+        const fromMs = getEventsOccurredSince.mock.calls.map(
+          ([request]) => request.occurredAtFromMs,
+        );
+        expect(fromMs.length).toBeGreaterThan(0);
+        expect(fromMs.every((value) => value > 0)).toBe(true);
       });
     });
 

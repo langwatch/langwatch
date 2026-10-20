@@ -191,11 +191,8 @@ interface LangyState extends TurnPhaseState, LangySliceSurface {
    */
   unconfirmedConversations: Record<string, true>;
   /**
-   * A successful history read proved the projection is readable. Nothing
-   * weaker counts: a freshness signal's cursor proves only that the EVENT LOG
-   * knows the conversation, and the log is ahead of the projection by
-   * definition, so confirming on it would reopen the very window this exists
-   * to cover (#7987).
+   * Only a successful history read confirms: an event-log cursor runs ahead of
+   * the projection, so confirming on it reopens the #7987 window.
    */
   confirmConversation: (id: string) => void;
   /** Start a fresh, empty conversation. */

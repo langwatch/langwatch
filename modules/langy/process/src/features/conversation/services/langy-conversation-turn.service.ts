@@ -1,3 +1,4 @@
+import { createTenantId } from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import type {
   LangyConversationStartedEventData,
@@ -10,7 +11,6 @@ import {
   langyJsonValueSchema,
   LangyTurnErrors,
 } from "@langwatch/langy-contract";
-import { createTenantId } from "@langwatch/eventing";
 
 import type { LangyConversationCommands } from "../../../eventing/langy-conversation.commands.ts";
 import type { LangyConversationRepository } from "../../../repositories/langy-conversation-projection.repository.ts";
@@ -25,6 +25,13 @@ import type {
   LangyConversationEventsReader,
   LangyConversationRuntime,
 } from "./langy-conversation.service.ts";
+
+/**
+ * Bound on the turnExists event-log fallback. It only covers fold lag, so a day
+ * outlives any turn (the longest, an owed local connect, is 6h) without scanning
+ * a long conversation's whole history on every miss.
+ */
+const TURN_ACCEPTANCE_LOOKBACK_MS = 24 * 60 * 60 * 1000;
 
 type LangyConversationTurnOptions = {
   repository: LangyConversationRepository;
@@ -285,15 +292,9 @@ export class LangyConversationTurnService {
     conversationId: string;
     turnId: string;
   }): Promise<boolean> {
-    // Projection-first (one indexed read, a hit is definitive), then the EVENT
-    // LOG on a miss: the turn projection is an asynchronous fold, and the
-    // durable result path races it — an agent can finish a short turn and post
-    // its final before the fold has landed the turn row. The acceptance event
-    // is the record the projection derives from, so it answers "was this turn
-    // really accepted here?" without waiting, and a finished answer is never
-    // discarded because the projection lags. A reader failure PROPAGATES
-    // rather than answering "no": the route turns false into a terminal 404,
-    // and a dropped final is the one outcome this check exists to prevent.
+    // Projection first; on a miss, the acceptance event covers a short turn whose
+    // final outran the fold. A reader failure PROPAGATES: false becomes a terminal
+    // 404, and dropping a finished answer is what this check exists to prevent.
     const projected = await this.deps.repository.turnExists({ projectId, conversationId, turnId });
     if (projected) return true;
     if (!this.deps.events) return false;
@@ -301,7 +302,7 @@ export class LangyConversationTurnService {
       aggregateId: conversationId,
       context: { tenantId: createTenantId(projectId) },
       aggregateType: "langy_conversation",
-      occurredAtFromMs: 0,
+      occurredAtFromMs: Math.max(0, this.deps.runtime.now() - TURN_ACCEPTANCE_LOOKBACK_MS),
     });
     return events.some(
       (event) =>
