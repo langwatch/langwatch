@@ -10,7 +10,6 @@ import type {
   AnalyticsTimeseriesResult,
   AnalyticsTopDocumentsResult,
 } from "@langwatch/analytics-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
 import type { DataPrivacyApi } from "@langwatch/data-privacy-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -21,7 +20,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { analyticsProof } from "../../repositories/__tests__/analytics-proof.fixture.ts";
+import {
+  analyticsProof,
+  analyticsTestAuthz,
+} from "../../repositories/__tests__/analytics-proof.fixture.ts";
 import {
   AnalyticsRepository,
   type AnalyticsTimeseriesQuery,
@@ -80,9 +82,7 @@ async function harness(tripwireOn: boolean) {
           return Promise.resolve(key === TRIPWIRE_FLAG && tripwireOn);
         },
       }),
-      authz: createApiFixture<AuthzApi>({
-        authorizeInternal: async ({ projectId }) => analyticsProof({ projectId }),
-      }),
+      authz: analyticsTestAuthz(),
       dataPrivacy: createApiFixture<DataPrivacyApi>(),
       projects: createApiFixture<ProjectApi>(),
       plans: createApiFixture<EntitlementApi>(),

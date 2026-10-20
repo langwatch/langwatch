@@ -55,7 +55,7 @@ export function analyticsProof({
 }
 
 /** The authz peer as the analytics service asks it: an own-project proof per mint. */
-export function analyticsTestAuthz(): Pick<AuthzApi, "authorizeInternal"> {
+export function analyticsTestAuthz(): AuthzApi {
   return createApiFixture<AuthzApi>({
     authorizeInternal: async ({ projectId }) => analyticsProof({ projectId }),
   });
