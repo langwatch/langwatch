@@ -12,10 +12,7 @@ import {
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
-import {
-  isCustomerConfigurationRefusal,
-  isRetryableSettlementFailure,
-} from "../../../rules/settlement-refusal.rules.ts";
+import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationWebhookProvider } from "../../../services/automation-webhook-secrets.service.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationEmailCapService } from "../../runaway/services/email-cap.service.ts";
@@ -24,7 +21,10 @@ import type { SlackDestinationService } from "../../slack/services/slack-destina
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
-import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service.ts";
+import {
+  isRetryableSettlementFailure,
+  TriggerSettlementPersistenceService,
+} from "./trigger-settlement-persistence.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 

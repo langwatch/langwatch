@@ -1,5 +1,5 @@
 import { InvalidActionParamsError, type TriggerSummary } from "@langwatch/automation-contract";
-import { isDispatchError } from "@langwatch/eventing";
+import { HandledError } from "@langwatch/handled-error";
 
 const ACTION_LABELS: Partial<Record<TriggerSummary["action"], string>> = {
   SEND_EMAIL: "email",
@@ -20,28 +20,8 @@ export function storedActionParamsRefusal(trigger: TriggerSummary): InvalidActio
 }
 
 /** A refusal the customer fixes in the automation's saved configuration. */
-export type CustomerConfigurationRefusal = { code: string; fault: "customer"; message: string };
-
-/**
- * A handled refusal with customer fault that does not ask for a retry. Read by
- * shape, not by class, so a refusal that crossed a module boundary still counts.
- */
 export function isCustomerConfigurationRefusal(
   error: unknown,
-): error is CustomerConfigurationRefusal {
-  if (typeof error !== "object" || error === null) return false;
-  return (
-    Reflect.get(error, "fault") === "customer" &&
-    Reflect.get(error, "retryable") !== true &&
-    typeof Reflect.get(error, "code") === "string"
-  );
-}
-
-/**
- * Whether a settlement failure is worth another attempt. A dispatch error says
- * so itself; a customer configuration refusal never is; anything unclassified is.
- */
-export function isRetryableSettlementFailure(error: unknown): boolean {
-  if (isDispatchError(error)) return error.retryable;
-  return !isCustomerConfigurationRefusal(error);
+): error is InstanceType<typeof HandledError> {
+  return HandledError.isHandled(error) && error.fault === "customer" && !error.retryable;
 }

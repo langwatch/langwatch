@@ -141,7 +141,10 @@ describe("runaway containment policy", () => {
       );
 
       expect(signals.logged).toContainEqual(
-        expect.objectContaining({ level: "warn", message: expect.stringContaining("daily ceiling") }),
+        expect.objectContaining({
+          level: "warn",
+          message: expect.stringContaining("daily ceiling"),
+        }),
       );
       expect(signals.logged.filter(({ level }) => level === "error")).toEqual([]);
     });

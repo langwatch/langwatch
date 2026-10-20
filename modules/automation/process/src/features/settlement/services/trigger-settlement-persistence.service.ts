@@ -1,16 +1,13 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import { DispatchError, pMapLimited } from "@langwatch/eventing";
+import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationSettlementTraceRepository } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
-import {
-  isCustomerConfigurationRefusal,
-  isRetryableSettlementFailure,
-} from "../../../rules/settlement-refusal.rules.ts";
+import { isCustomerConfigurationRefusal } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationPersistActionService } from "../../runaway/services/persist-action.service.ts";
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
@@ -312,4 +309,10 @@ export class TriggerSettlementPersistenceService {
     const handled = error instanceof Error ? error : new Error(String(error));
     this.composition.observability.capture(handled, context);
   }
+}
+
+/** A dispatch error says whether to retry; a customer configuration refusal never is; anything else is. */
+export function isRetryableSettlementFailure(error: unknown): boolean {
+  if (isDispatchError(error)) return error.retryable;
+  return !isCustomerConfigurationRefusal(error);
 }
