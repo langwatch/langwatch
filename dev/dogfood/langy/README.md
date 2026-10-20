@@ -363,3 +363,13 @@ hit. "Fix in" names who closes it.
     criterion with a comma; neither takes parameters or max turns. The sync
     uses `POST` and `PUT /api/v1/scenarios` instead. Fix in: **CLI** (repeatable
     `--criterion`, `--param`, `--max-turns`, or `--from-file <json>`).
+
+## Run plans from the shell
+
+`just` recipes in `justfile` (settings as above, plus `LANGY_AGENT_ID` for `retry`; nothing is defaulted):
+
+- `just run-plan "Langy e2e chat: dogfood" ...` starts each named plan, prints its batch id, polls it to the end.
+- `just poll <batch>` polls `/api/v1/simulation-runs?batchRunId=...` until every run is final, prints
+  `STATUS | name | first 200 chars of reasoning` per run, then `overall: N/M passed`.
+- `just retry 91 154` re-runs the scenarios `E2E <group> <num>:` with those numbers as plan "Langy e2e retry".
+- The exit code is 1 when a run did not pass. Logic: `src/runs-cli.ts`; tested parts: `src/run-report.ts`.
