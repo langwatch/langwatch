@@ -162,10 +162,6 @@ export class TraceSpanCollectionService {
     }
   }
 
-  /**
-   * The command one span becomes: its usage record claimed, then the optional edge/blob
-   * preparation. A preparation that throws releases the usage record it claimed.
-   */
   /** The claimed spans prepared {@link PREPARE_CONCURRENCY} at a time, in input order. */
   private async prepareClaimed({
     inputs,
@@ -219,6 +215,10 @@ export class TraceSpanCollectionService {
     }
   }
 
+  /**
+   * The command one span becomes: its usage record claimed, then the optional edge/blob
+   * preparation. A preparation that throws releases the usage record it claimed.
+   */
   private async prepareCommand(input: NormalizedSpanInput): Promise<PreparedSpan> {
     const usage = await this.usage.claim(input);
     const commandData: RecordSpanCommandData = {
