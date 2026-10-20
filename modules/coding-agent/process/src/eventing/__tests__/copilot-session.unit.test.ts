@@ -358,15 +358,49 @@ describe("Copilot session fold", () => {
     });
   });
 
-  describe("given Claude Code's and Codex's span names", () => {
-    /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
-    it.each([
-      { agent: "claude_code", name: "claude_code.llm_request" },
-      { agent: "claude_code", name: "claude_code.tool" },
-      { agent: "codex", name: "session_task.turn" },
-      { agent: "codex", name: "chat gpt-5.6-sol" },
-    ])("gives $agent's $name no declared role, so it keeps its own fold", (span) => {
-      expect(genAiOperationRoleOf(span)).toBe("undeclared");
+  describe("given Claude Code and Codex spans carrying what the Copilot declarations read", () => {
+    // An AI-unit count and, for codex, a chat span with no session key: each changes a Copilot
+    // row, and neither may change theirs.
+    const claudeCall: CapturedSpan = {
+      name: "claude_code.llm_request",
+      scopeName: "com.anthropic.claude_code",
+      startMs: 1_000,
+      endMs: 2_000,
+      source: "claude_code",
+      attributes: { "session.id": "claude-session", "metadata.copilot_nano_aiu": "214917500" },
+    };
+    const keylessCodexChat: CapturedSpan = {
+      name: "chat gpt-5.6-sol",
+      scopeName: "codex_otel",
+      startMs: 1_000,
+      endMs: 2_000,
+      source: "codex",
+      attributes: { "gen_ai.operation.name": "chat", "metadata.copilot_nano_aiu": "38424000" },
+    };
+
+    describe("when their rows are folded", () => {
+      const sessions = foldSessions([claudeCall, keylessCodexChat]);
+      const claudeRow = sessions.get("claude-session");
+      const codexRow = [...sessions.values()].find((row) => row.agent === "codex");
+
+      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      it("counts no AI units on either row", () => {
+        expect(claudeRow?.agent).toBe("claude_code");
+        expect(claudeRow?.aiUnits).toBe(0);
+        expect(codexRow?.aiUnits).toBe(0);
+      });
+
+      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      it("still keys the keyless codex span by its trace, rather than dropping it", () => {
+        expect(codexRow?.sessionKeySource).toBe("trace_fallback");
+      });
+
+      /** @scenario Claude Code and Codex rows are unchanged by the Copilot declarations */
+      it("does not fold the codex chat span as a Copilot model call", () => {
+        expect(genAiOperationRoleOf({ agent: "codex", name: keylessCodexChat.name })).toBe(
+          "undeclared",
+        );
+      });
     });
   });
 });
