@@ -23,10 +23,9 @@ import { z } from "zod";
 const logger = createLogger("langwatch:topic-clustering:process-effects");
 
 /**
- * The licence refusals Model Provider raises when the project's clustering
- * model is a coding-assistant-only one: at selection (every candidate was
- * restricted) or at execution (a value that predates the restriction). Matched
- * by code, since the error may have crossed a process boundary.
+ * Refusals for a coding-assistant-only clustering model, at selection or at
+ * execution. Matched by code, since the error may have crossed a process
+ * boundary.
  */
 const MODEL_RESTRICTED_CODES: ReadonlySet<string> = new Set([
   "model_restricted_for_feature",

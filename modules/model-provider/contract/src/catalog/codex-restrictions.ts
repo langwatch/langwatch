@@ -12,24 +12,17 @@ export const LANGY_CHAT_FEATURE_KEY = "langy.chat";
 export const CONNECTION_TEST_FEATURE_KEY = "model_provider.connection_test";
 
 /**
- * FAST features that do NOT run through the AI gateway. Codex is reachable
- * only there (its OAuth session lives at the gateway), and these features hand
- * LiteLLM parameters to the langevals service, which calls the provider itself
- * and so has no road to the codex backend. Allowing codex on them only moves
- * the refusal from model selection to execution.
- *
- * - analytics.topic_clustering_llm: names clusters inside langevals, from
- *   parameters built by `ModelProviderExecutionService.prepare`.
+ * FAST features that skip the AI gateway, the only road to codex: they hand
+ * LiteLLM parameters to langevals, which calls the provider itself. Allowing
+ * codex on them only moves the refusal from selection to execution.
  */
 export const CODEX_NON_GATEWAY_FAST_FEATURE_KEYS: readonly string[] = [
   "analytics.topic_clustering_llm",
 ];
 
 /**
- * Langy plus every FAST-role assist that executes through the gateway: the
- * fast tier IS the "light AI assists" the codex terms cover, so a new fast
- * feature is codex-allowed by construction unless it is listed as non-gateway
- * above. A test pins the expansion.
+ * Langy plus every FAST assist that runs through the gateway. A new FAST
+ * feature is codex-allowed unless listed as non-gateway above; a test pins it.
  */
 export const CODEX_ALLOWED_FEATURE_KEYS: readonly string[] = [
   LANGY_CHAT_FEATURE_KEY,
@@ -74,12 +67,9 @@ export function isModelAllowedForFeature({
 }
 
 /**
- * Role-level defaults: a restricted model may sit on LANGY and FAST, the roles
- * that carry the coding-assistant surfaces. Not every FAST feature accepts it
- * (see {@link CODEX_NON_GATEWAY_FAST_FEATURE_KEYS}); those features step over
- * the codex role default at resolution time and resolve their own override,
- * or report the restriction. DEFAULT and EMBEDDINGS carry general inference
- * and stay closed.
+ * A restricted model may be the LANGY or FAST role default. FAST features in
+ * {@link CODEX_NON_GATEWAY_FAST_FEATURE_KEYS} step over it at resolution time.
+ * DEFAULT and EMBEDDINGS carry general inference and stay closed.
  */
 export function isModelAllowedAsRoleDefault(modelId: string, role: ModelRole): boolean {
   if (!isCodexModel(modelId)) return true;

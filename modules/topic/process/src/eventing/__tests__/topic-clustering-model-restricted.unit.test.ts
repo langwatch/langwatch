@@ -1,8 +1,7 @@
 /**
- * A clustering run whose model is licensed for coding-assistant surfaces only
- * (spec: specs/model-providers/codex-account-provider.feature). The refusal is
- * a setting the customer can change, so the run records it with a code the
- * settings page explains, and it logs as routine rather than as an incident.
+ * A clustering run whose model serves coding-assistant surfaces only
+ * (specs/model-providers/codex-account-provider.feature): the customer can fix
+ * it, so the run records a code the UI explains and it logs as routine.
  */
 import type { IntentContext } from "@langwatch/eventing";
 import {
