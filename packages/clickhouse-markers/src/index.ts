@@ -1,7 +1,7 @@
 /**
- * The time columns a marker may name, each a table's partition key a grant's window applies to:
- * `OccurredAt` trace_summaries and trace_analytics, `StartTime` stored_spans, `ScheduledAt`
- * evaluation_runs, `Timestamp` logs, `StartedAt` coding_agent_sessions, `BucketStart` rollups.
+ * Each table's partition key a grant's window applies to: `OccurredAt` trace_summaries and
+ * trace_analytics, `StartTime` stored_spans, `ScheduledAt` evaluation_runs, `Timestamp` logs,
+ * `StartedAt` coding_agent_sessions, `BucketStart` the trace and evaluation minute rollups.
  */
 export const TENANT_SCOPE_TIME_COLUMNS = [
   "OccurredAt",
