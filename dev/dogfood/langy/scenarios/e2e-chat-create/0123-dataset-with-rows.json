@@ -1,0 +1,21 @@
+{
+  "name": "E2E core 123: creates a dataset with rows",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:123",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a dataset \"langy-rows-<tag>\" with 3 rows: France->Paris, Germany->Berlin, Japan->Tokyo'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy's reply names the dataset and reports that the rows were added (a row count or an equivalent success statement).",
+    "Langy did not ask for confirmation before creating.",
+    "Langy ran the commands that add the rows rather than printing the rows back as text for the user to enter themselves.",
+    "Code check: facts_now.new_dataset has at least one entry (a dataset whose name holds tag exists after the turn).",
+    "Code check: an entry of facts_now.new_dataset has recordCount of at least 3."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

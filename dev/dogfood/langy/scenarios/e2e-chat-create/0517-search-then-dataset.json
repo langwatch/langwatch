@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 517: search then create dataset",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:517",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): \"look at last week's failed traces and create a dataset named \"failures-<tag>\" from them\". Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy performed BOTH steps: looked at traces AND created a dataset.",
+    "Langy reports success on the create step (dataset name or id).",
+    "Langy did not split this into two separate requests — handled it as one flow.",
+    "Code check: facts_now.new_dataset has at least one entry (a dataset whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

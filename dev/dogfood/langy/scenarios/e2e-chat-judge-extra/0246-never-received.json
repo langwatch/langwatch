@@ -1,0 +1,22 @@
+{
+  "name": "E2E quality 246: a label the project never saw",
+  "source": "apps/ui/e2e/langy/langy-quality.scenario.test.ts:246",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. No trace was ever sent under the label never-<prompt_handle>. In your first message, write exactly (with the real value of prompt_handle): 'how many traces labelled never-<prompt_handle> did I get in the last hour?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy says there were no matching traces in the last hour.",
+    "Langy says the project has never received traces with that label, or that it found none in any window.",
+    "Langy does not invent a time for a newest matching trace.",
+    "Langy names one likely cause, such as the app not being instrumented to send that label, a wrong project or API key, or export never set up.",
+    "Langy never says or implies that it cannot see or access the data.",
+    "Langy's reply is not empty."
+  ],
+  "labels": ["e2e-migrated", "langy-quality"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

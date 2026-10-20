@@ -1,0 +1,24 @@
+{
+  "name": "E2E core 404: renames an evaluator",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:404",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real values of evaluator_name and tag): 'rename my evaluator \"<evaluator_name>\" to \"langy-renamed-<tag>\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports successfully updating the evaluator.",
+    "Langy did not ask for confirmation before updating.",
+    "Code check: facts_now.seeded_evaluator.name is the new name the user gave (langy-renamed- followed by tag), so the rename landed on the evaluator setup made."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    },
+    {
+      "name": "seed",
+      "description": "What the resources world makes before the first turn",
+      "defaultValue": "evaluator"
+    }
+  ],
+  "maxTurns": 2
+}

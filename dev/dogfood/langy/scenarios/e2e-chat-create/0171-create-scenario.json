@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 171: creates a scenario",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:171",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a basic customer-support scenario test for me, call it \"support-check-<tag>\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy's reply reports the scenario as created (naming it, or its id or handle).",
+    "Langy did NOT just dump a code snippet for the user to paste — it created via the platform.",
+    "Langy did NOT ask for permission first — executed directly.",
+    "Code check: facts_now.new_scenario has at least one entry (a scenario whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

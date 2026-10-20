@@ -1,0 +1,18 @@
+{
+  "name": "E2E core 444: updates a prompt",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:444",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. Your project has a prompt whose handle is prompt_handle. In your first message, write exactly (with the real value of prompt_handle): 'update the prompt \"<prompt_handle>\" — change the system message to \"You are a concise, expert assistant.\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports successfully updating the prompt.",
+    "Langy did not ask for confirmation before updating."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "prompt_and_traces"
+    }
+  ],
+  "maxTurns": 2
+}

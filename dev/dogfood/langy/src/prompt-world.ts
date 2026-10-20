@@ -24,16 +24,19 @@ export function isPromptWorldState(state: unknown): state is PromptWorldState {
   );
 }
 
-async function sendErroredTrace({
+/** One LLM span under `label`; with an error message the span fails with it. */
+export async function sendLlmTrace({
   http,
   traceId,
-  errorMessage,
   atMs,
+  label,
+  errorMessage,
 }: {
   http: LangWatchHttp;
   traceId: string;
-  errorMessage: string;
   atMs: number;
+  label: string;
+  errorMessage?: string;
 }): Promise<void> {
   const answer = await http.request({
     method: "POST",
@@ -50,18 +53,20 @@ async function sendErroredTrace({
             type: "chat_messages",
             value: [{ role: "user", content: "Where is my order?" }],
           },
-          error: { has_error: true, message: errorMessage, stacktrace: [] },
+          ...(errorMessage
+            ? { error: { has_error: true, message: errorMessage, stacktrace: [] } }
+            : { output: { type: "text", value: "Your order is out for delivery." } }),
           timestamps: { started_at: atMs, finished_at: atMs + 1500 },
         },
       ],
-      metadata: { user_id: "langy-hooks-dogfood", labels: ["langy-hooks-dogfood"] },
+      metadata: { user_id: "langy-hooks-dogfood", labels: [label] },
     },
   });
-  expectOk({ answer, what: "send errored trace" });
+  expectOk({ answer, what: "send trace" });
 }
 
 /** The collector projects asynchronously; Langy can only find a trace once it reads back. */
-async function waitUntilSearchable({
+export async function waitUntilSearchable({
   http,
   traceIds,
   deadlineMs,
@@ -106,7 +111,13 @@ export async function setupPromptWorld({
   const nowMs = Date.now();
   const traceIds = Array.from({ length: TRACE_COUNT }, (_, n) => `e2e-${runId}-trace-${n}`);
   for (const [n, traceId] of traceIds.entries()) {
-    await sendErroredTrace({ http, traceId, errorMessage, atMs: nowMs - (n + 1) * 60_000 });
+    await sendLlmTrace({
+      http,
+      traceId,
+      atMs: nowMs - (n + 1) * 60_000,
+      label: "langy-hooks-dogfood",
+      errorMessage,
+    });
   }
   return {
     prompt_id: prompt.id,

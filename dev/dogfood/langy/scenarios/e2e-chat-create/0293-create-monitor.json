@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 293: creates a monitor",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:293",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a production monitor \"langy-monitor-<tag>\" running hallucination evaluation on every trace'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports the concrete result of creating the monitor the user named, rather than refusing on permission grounds or handing the user steps to run themselves.",
+    "Langy did not ask the user to confirm — it attempted the work and reported what came back.",
+    "Langy does not stand up some other resource as a substitute the user did not ask for.",
+    "Code check: facts_now.new_monitor has at least one entry (a monitor whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

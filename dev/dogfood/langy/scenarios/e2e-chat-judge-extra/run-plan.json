@@ -1,0 +1,6 @@
+{
+  "name": "Langy e2e chat: judge extras",
+  "description": "Wave 1b: 2 judge-only runs moved from apps/ui/e2e/langy/ (langy.scenario.test.ts 444, langy-quality.scenario.test.ts 246), against the connected agent langy (dev/dogfood/langy) in the default world prompt_and_traces.",
+  "agent": "langy",
+  "repeatCount": 1
+}

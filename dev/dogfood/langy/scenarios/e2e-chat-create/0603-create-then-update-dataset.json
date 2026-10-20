@@ -1,0 +1,21 @@
+{
+  "name": "E2E core 603: create then update a dataset over 3 turns",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:603",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a dataset \"langy-multiturn-ds-<tag>\" with 2 example Q&A rows'. Once Langy has answered, write exactly: \"add another row to it: 'What's the capital of Italy?' -> 'Rome'\". Once Langy has answered, write exactly: 'how many rows does it have now?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "On turn 2, Langy added a row to the SAME dataset from turn 1.",
+    "On turn 3, Langy reports a row count of at least 3.",
+    "Langy never asked 'which dataset?' on turns 2 or 3.",
+    "Code check: facts_now.new_dataset has at least one entry (a dataset whose name holds tag exists after the turn).",
+    "Code check: an entry of facts_now.new_dataset has recordCount of at least 3."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 4
+}

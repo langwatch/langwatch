@@ -1,0 +1,19 @@
+{
+  "name": "E2E core 357: creates a prompt",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:357",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a prompt with handle \"langy-prompt-<tag>\" containing \"You are a helpful assistant\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports successfully creating the prompt (id/handle returned).",
+    "Langy did not ask the user to confirm — executed directly.",
+    "Code check: facts_now.new_prompt has at least one entry (a prompt whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

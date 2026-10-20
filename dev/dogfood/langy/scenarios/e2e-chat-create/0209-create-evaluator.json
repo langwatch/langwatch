@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 209: creates an evaluator",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:209",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a hallucination evaluator called \"langy-eval-<tag>\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy reports successfully creating the evaluator (returns success/id/name).",
+    "Langy did NOT ask the user to confirm before creating — executed directly.",
+    "Langy ran the create rather than explaining what an evaluator is.",
+    "Code check: facts_now.new_evaluator has at least one entry (an evaluator whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 2
+}

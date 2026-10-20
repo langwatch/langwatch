@@ -8,6 +8,8 @@ export const TOPIC_WORLD = "T1";
 export const QUIET_WORLD = "W1";
 /** A coding-agent cost question that leads to `langwatch whoami` (login-world.ts). */
 export const LOGIN_WORLD = "C1";
+/** Create-then-check runs: a per-run tag in every name (resources-world.ts). */
+export const RESOURCES_WORLD = "resources";
 /** The board worlds (worlds.ts). */
 export const MATRIX_WORLD_NAMES = ["D1", "D2", "A1", "D3", "X1", "D5", "B1"] as const;
 
@@ -17,13 +19,15 @@ export type WorldName =
   | typeof PROMPT_WORLD
   | typeof TOPIC_WORLD
   | typeof QUIET_WORLD
-  | typeof LOGIN_WORLD;
+  | typeof LOGIN_WORLD
+  | typeof RESOURCES_WORLD;
 export const WORLD_NAMES: readonly WorldName[] = [
   PROMPT_WORLD,
   ...MATRIX_WORLD_NAMES,
   TOPIC_WORLD,
   QUIET_WORLD,
   LOGIN_WORLD,
+  RESOURCES_WORLD,
 ];
 
 export function isMatrixWorld(value: unknown): value is MatrixWorld {

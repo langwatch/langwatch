@@ -1,0 +1,24 @@
+{
+  "name": "E2E core 645: creates a scenario then runs it over 2 turns",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:645",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly (with the real value of tag): 'create a simple greeting-bot scenario named \"langy-greeting-check-<tag>\" that checks the agent says hello'. Once Langy has answered, write exactly (with the real value of prompt_handle): 'run it against the prompt \"<prompt_handle>\"'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "On turn 1, Langy created a scenario (reported success/id).",
+    "On turn 2, Langy attempted to run the scenario from turn 1 (did not ask which one).",
+    "Code check: facts_now.new_scenario has at least one entry (a scenario whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    },
+    {
+      "name": "seed",
+      "description": "What the resources world makes before the first turn",
+      "defaultValue": "prompt"
+    }
+  ],
+  "maxTurns": 3
+}

@@ -1,0 +1,27 @@
+{
+  "name": "E2E quality 216: an empty window states the age of the newest data",
+  "source": "apps/ui/e2e/langy/langy-quality.scenario.test.ts:216",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. The project has 3 traces under the label <stale_label>, all about 8 hours old. In your first message, write exactly (with the real value of stale_label): 'how many traces labelled <stale_label> did I get in the last hour?'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "Langy says there were no matching traces in the last hour.",
+    "Langy states how long ago the newest matching trace arrived, about 7 to 9 hours, from a follow-up lookup not limited to the last hour. A clock time is fine alongside the age, but a clock time or \"this morning\" alone fails, and so does a bare \"none in the last hour\".",
+    "Langy names one likely cause of the gap, such as export having stopped, a wrong project or API key, or the app not being instrumented yet.",
+    "The likely cause comes after the stated age of the newest trace and is about how data reaches the project, not a problem with the query.",
+    "Langy never says or implies that it cannot see or access the data. The query succeeded and found nothing; that is an answer, not an access problem.",
+    "Langy's reply is not empty."
+  ],
+  "labels": ["e2e-migrated", "langy-quality"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    },
+    {
+      "name": "seed",
+      "description": "What the resources world makes before the first turn",
+      "defaultValue": "stale_traces"
+    }
+  ],
+  "maxTurns": 2
+}

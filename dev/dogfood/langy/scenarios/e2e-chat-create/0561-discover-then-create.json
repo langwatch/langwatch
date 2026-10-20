@@ -1,0 +1,20 @@
+{
+  "name": "E2E core 561: discovery then create over 3 turns",
+  "source": "apps/ui/e2e/langy/langy.scenario.test.ts:561",
+  "situation": "You are a LangWatch user talking to Langy, the in-product assistant. The test state is the test's own bookkeeping: take only the values the instructions below name, never mention facts or anything else from it. Write short, plain messages. In your first message, write exactly: 'what evaluators do I have configured?'. Once Langy has answered, write exactly: 'what evaluator would you recommend I add next?'. Once Langy has answered, write exactly (with the real value of tag): 'okay create it, call it langy-multiturn-eval-<tag>'. Once Langy has answered, reply 'Thanks.'",
+  "criteria": [
+    "On turn 3, Langy ran the create and its reply reports the evaluator as created, rather than describing one.",
+    "Langy did not re-ask 'what kind of evaluator?' on turn 3 — used context from turns 1-2.",
+    "By turn 3, Langy executed the mutation without asking permission again.",
+    "Code check: facts_now.new_evaluator has at least one entry (an evaluator whose name holds tag exists after the turn)."
+  ],
+  "labels": ["e2e-migrated", "langy"],
+  "parameters": [
+    {
+      "name": "world",
+      "description": "Which world the setup hook builds",
+      "defaultValue": "resources"
+    }
+  ],
+  "maxTurns": 4
+}
