@@ -5,18 +5,15 @@
  */
 
 import * as fs from "node:fs";
-import * as os from "node:os";
-import * as path from "node:path";
 
 import {
-  appSettingsTargetFor,
   readAppSettingsFile,
   readAppSettingsFileForUpdate,
   writeAppSettingsFile,
 } from "./app-settings";
+import { type HookedTool, type HooksTarget, SESSION_CONTEXT_AGENTS } from "./session-context-agents";
 
-/** The agents whose session context rides on a command hook. */
-export type HookedTool = "claude_code" | "codex";
+export type { HookedTool } from "./session-context-agents";
 
 /**
  * What marks an entry as ours. Prefixes rather than whole commands, so an
@@ -40,54 +37,14 @@ const HOOK_EVENTS = ["SessionStart", "Stop"] as const;
 /** Seconds the agent gives the hook before it kills it. */
 const HOOK_TIMEOUT_SECONDS = 10;
 
-export interface HooksTarget {
-  /** Absolute path of the hook file. */
-  path: string;
-  /** The same path with the home directory collapsed, for display. */
-  displayPath: string;
-}
-
-interface ToolSpec {
-  /** The tool argument `langwatch ingest hook` is called with. */
-  hookArgument: string;
-  /** Where the hook declarations live, resolved at call time. */
-  resolveTarget: () => HooksTarget;
-}
-
-const TARGETS: Record<HookedTool, ToolSpec> = {
-  claude_code: {
-    hookArgument: "claude-code",
-    resolveTarget: () => {
-      // app-settings owns the claude settings location, and always has one.
-      const target = appSettingsTargetFor("claude")!;
-      return { path: target.path, displayPath: target.displayPath };
-    },
-  },
-  codex: {
-    hookArgument: "codex",
-    resolveTarget: () => {
-      // CODEX_HOME relocates the whole config directory, hooks included.
-      const home = process.env.CODEX_HOME?.trim();
-      if (home) {
-        const file = path.join(home, "hooks.json");
-        return { path: file, displayPath: file };
-      }
-      return {
-        path: path.join(os.homedir(), ".codex", "hooks.json"),
-        displayPath: "~/.codex/hooks.json",
-      };
-    },
-  },
-};
-
 /** The command an installed hook entry runs, for one agent. */
 export function sessionContextHookCommand(tool: HookedTool): string {
-  return `${OWNED_COMMAND_PREFIX} ${TARGETS[tool].hookArgument}`;
+  return `${OWNED_COMMAND_PREFIX} ${SESSION_CONTEXT_AGENTS[tool].hookArgument}`;
 }
 
 /** Where a tool's hooks live, for the logout scan's label. */
 export function sessionContextHooksTarget(tool: HookedTool): HooksTarget {
-  return TARGETS[tool].resolveTarget();
+  return SESSION_CONTEXT_AGENTS[tool].hookTarget.resolve();
 }
 
 export type SessionContextHooksAction = "created" | "updated" | "unchanged";
@@ -267,7 +224,7 @@ function resolveTarget({
   filePath: string | undefined;
 }): HooksTarget {
   if (filePath) return { path: filePath, displayPath: filePath };
-  return TARGETS[tool].resolveTarget();
+  return sessionContextHooksTarget(tool);
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
