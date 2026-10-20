@@ -860,7 +860,7 @@ interface Response {
 
 |             |                                         |
 | ----------- | --------------------------------------- |
-| Declared at | `src/transport/langy-turns.rest.ts:147` |
+| Declared at | `src/transport/langy-turns.rest.ts:160` |
 | Base URL    | none: each route's path is its address  |
 | Addressing  | literal                                 |
 | Credential  | project                                 |
@@ -869,12 +869,12 @@ interface Response {
 
 Start a Langy conversation with one turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.
 
-Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:153`.
+Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:166`.
 
 Answers at `/api/langy/conversations`, `/api/v1/langy/conversations`.
 
 ```typescript
-// Body: startTurnBodySchema, src/transport/langy-turns.rest.ts:52
+// Body: startTurnBodySchema, src/transport/langy-turns.rest.ts:65
 interface Body {
   messages: {
     role: "user" | "assistant" | "system";
@@ -886,7 +886,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:157
+// Response: inline, src/transport/langy-turns.rest.ts:170
 type Response = unknown;
 ```
 
@@ -894,7 +894,7 @@ type Response = unknown;
 
 Continue one Langy conversation with a turn. The turn surface answers 202 with the accepted turn, 200 with the settled reply under Prefer: wait, and a plain 404 when the rollout is dark for the project.
 
-Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:171`.
+Permission `langy:create`. Declared at `src/transport/langy-turns.rest.ts:184`.
 
 Answers at `/api/langy/conversations/:conversationId/messages`, `/api/v1/langy/conversations/:conversationId/messages`.
 
@@ -915,7 +915,7 @@ interface Body {
   adoptConversationId?: boolean;
 }
 type BodySchema0 = string | number | boolean | null | BodySchema0[] | Record<string, BodySchema0>;
-// Response: inline, src/transport/langy-turns.rest.ts:176
+// Response: inline, src/transport/langy-turns.rest.ts:189
 type Response = unknown;
 ```
 

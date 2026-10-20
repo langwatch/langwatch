@@ -15,7 +15,7 @@ const CODE_ACCESS_LINE =
   "I'm waiting for you to say how I should reach your code, on the card above.";
 
 /**
- * The same line for a settled turn read back as message parts (REST result path), where the
+ * The same line as `langyEmptyTurnLine` for a settled turn read back as message parts (REST result path), where the
  * code access card is a `tool-code_access` part rather than a stream entry. Pending question
  * and permission cards never reach it: a turn waiting on one has not completed.
  */

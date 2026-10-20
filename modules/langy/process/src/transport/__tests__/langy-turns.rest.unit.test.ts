@@ -138,6 +138,31 @@ describe("given a project key starting a Langy turn", () => {
     });
   });
 
+  describe("when the waited turn ends without finishing on a card", () => {
+    /** @scenario "A stream that ends without the turn finishing says nothing" */
+    it("says nothing when the stream stopped before the turn completed", async () => {
+      const api = buildApi({
+        settle: async () => ({
+          kind: "settled",
+          settlement: {
+            succeeded: true,
+            outcome: "stopped",
+            text: "",
+            messageId: "message-1",
+            parts: [{ type: "tool-code_access" }],
+            error: null,
+          },
+        }),
+      });
+
+      const response = await api.post(TURN, { prefer: "wait=30" });
+
+      expect(await response.json()).toMatchObject({
+        reply: { text: "" },
+      });
+    });
+  });
+
   describe("when the waited turn fails", () => {
     /** @scenario "A failed turn settles the wait as a domain outcome, not a transport refusal" */
     it("answers 200 carrying the failed status and error with no reply", async () => {
