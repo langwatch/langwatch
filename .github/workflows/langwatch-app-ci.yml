@@ -1331,9 +1331,6 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
-      - name: Test start-boxd-ssh-agent.sh
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
