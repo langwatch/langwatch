@@ -408,6 +408,25 @@ describe("convergeLwqlAccessModel", () => {
   });
 });
 
+/** Three replicas holding no app function; Keeper has a function store or answers UNKNOWN_TABLE. */
+function threeReplicasHoldingNoFunction({ keeperStore }: { keeperStore: boolean }) {
+  const replicas = ["ch-0", "ch-1", "ch-2"].map((host) => ({ host, functions: {} }));
+  return (sql: string): Record<string, unknown>[] | undefined => {
+    if (sql.includes("system.replicas")) return [{ max_total_replicas: "3" }];
+    if (sql.includes("system.clusters")) {
+      return [{ name: "langwatch", hosts: "3", widest_shard: "3" }];
+    }
+    if (sql.includes("clusterAllReplicas")) return replicas;
+    if (sql.includes("system.functions")) return [];
+    if (sql.includes("system.zookeeper")) {
+      if (!keeperStore) return [{ stores: "0" }];
+      if (sql.includes("path = '/clickhouse/user_defined'")) return [];
+      return [{ stores: sql.includes("name = 'user_defined'") ? "1" : "0" }];
+    }
+    return undefined;
+  };
+}
+
 describe("findLwqlAppOwnedDrift", () => {
   const relations = selfProvisioning.appOwnedRelations({ names: NAMES });
   const approvedViews = selfProvisioning.approvedPostgresViews();
@@ -417,9 +436,12 @@ describe("findLwqlAppOwnedDrift", () => {
   function presentWith({
     columns,
     postgresRead = true,
+    appFunctionRows,
   }: {
     columns: string[];
     postgresRead?: boolean;
+    /** Answers the function and replica-layout reads; unset, every app function is held. */
+    appFunctionRows?: (sql: string) => Record<string, unknown>[] | undefined;
   }) {
     const database: LwqlProvisioningDatabase = {
       ...postgresThat({ refuses: false }).database,
@@ -431,12 +453,13 @@ describe("findLwqlAppOwnedDrift", () => {
     const plan = {
       names: NAMES,
       schema: "public",
-      settings: {},
       openRepository: () =>
         ClickHouseLangWatchQLProvisioningRepository.create({
           statements: {
             command: async () => undefined,
             rows: async (sql: string) => {
+              const layout = appFunctionRows?.(sql);
+              if (layout !== undefined) return layout;
               if (sql.includes("system.functions")) {
                 return lwqlAppFunctionNames().map((name) => ({ name }));
               }
@@ -479,5 +502,27 @@ describe("findLwqlAppOwnedDrift", () => {
       }),
     );
     expect(logCalls.map((call) => call.level)).not.toContain("error");
+  });
+
+  describe("given ClickHouse holds none of the app functions on three replicas", () => {
+    function driftOverThreeReplicas({ keeperStore }: { keeperStore: boolean }) {
+      return presentWith({
+        columns: catalogColumns,
+        appFunctionRows: threeReplicasHoldingNoFunction({ keeperStore }),
+      });
+    }
+
+    it("expects no app function, and logs no error, where no Keeper function store exists", async () => {
+      const drift = await driftOverThreeReplicas({ keeperStore: false });
+
+      expect(drift.clickHouse).toEqual([]);
+      expect(logCalls.map((call) => call.level)).not.toContain("error");
+    });
+
+    it("lists the declared app functions as missing where the Keeper function store exists", async () => {
+      const drift = await driftOverThreeReplicas({ keeperStore: true });
+
+      expect(drift.clickHouse).toEqual(lwqlAppFunctionNames());
+    });
   });
 });

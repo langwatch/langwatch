@@ -171,7 +171,10 @@ export function fillLwqlProjectKeys({
   });
 }
 
-/** False where the probe could not read every replica; the repository logs why. */
+/**
+ * False where the probe could not read the layout. A failed cross-replica read does not
+ * return false: the probe falls back to this server plus Keeper and warns.
+ */
 async function appFunctionsProvisionable(
   store: ClickHouseLangWatchQLAppFunctionStoreRepository,
 ): Promise<boolean> {
@@ -253,7 +256,7 @@ async function withSelfProvisionLock<T>({
   });
 }
 
-/** Inventory, function probe, SQL-mode guard, statements, replica check; key map is a step's. */
+/** The key map is a separate step's, not part of this ClickHouse half. */
 async function convergeClickHouse({
   repository,
   source,
@@ -503,37 +506,38 @@ async function readPostgresGaps({
   }
 }
 
-/** App functions are expected only where a `CREATE FUNCTION` reaches every replica. */
+/**
+ * App functions are expected only where a `CREATE FUNCTION` reaches every replica. An unreadable
+ * or unprovisionable layout expects none: converge would not create them either.
+ */
 async function expectedAppFunctions({
   repository,
-  cluster,
   held,
 }: {
   repository: LangWatchQLProvisioningRepository;
-  cluster: string | undefined;
   held: readonly string[];
 }): Promise<readonly string[]> {
   const declared = lwqlAppFunctionNames();
   if (declared.every((name) => held.includes(name))) return declared;
   const store = ClickHouseLangWatchQLAppFunctionStoreRepository.overAdmin({
     admin: repository,
-    cluster,
+    cluster: undefined,
   });
   const [probe] = await store.findProbe();
   return probe !== undefined && canProvisionAppFunctions(probe) ? declared : [];
 }
 
 /**
- * Which app-owned objects are absent, from catalog reads only: the key map, engine tables, views
- * and app functions in ClickHouse, the approved views and their grant in PostgreSQL. Columns are
- * the deploy's, never compared. Throws when ClickHouse cannot be read.
+ * Which app-owned objects are absent, from catalog reads only: ClickHouse key map, tables, views
+ * and app functions; PostgreSQL approved views and grant. Columns are the deploy's, never
+ * compared. Throws when ClickHouse cannot be read; the app-function probe does not throw.
  */
 export async function findLwqlAppOwnedDrift({
   database,
   plan,
 }: {
   database: LwqlProvisioningDatabase;
-  plan: Pick<LwqlConvergencePlan, "names" | "schema" | "openRepository" | "settings">;
+  plan: Pick<LwqlConvergencePlan, "names" | "schema" | "openRepository">;
 }): Promise<LwqlAppOwnedDrift> {
   const { names } = plan;
   const relations = selfProvisioning.appOwnedRelations({ names });
@@ -547,7 +551,6 @@ export async function findLwqlAppOwnedDrift({
       });
       const functions = await expectedAppFunctions({
         repository,
-        cluster: plan.settings.CLICKHOUSE_CLUSTER,
         held: found.functions,
       });
       return selfProvisioning.findDrift({ names, relations, functions, found });

@@ -16,6 +16,7 @@ import {
   type ReplicaFunctions,
   type SplitAppFunction,
 } from "../../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import { clickHouseErrorSummary } from "../../rules/langwatch-ql-config-store.rules.ts";
 import { LangWatchQLAppFunctionStoreRepository } from "../langwatch-ql-app-function-store.repository.ts";
 import type { LangWatchQLProvisioningRepository } from "../langwatch-ql-provisioning.repository.ts";
 
@@ -127,7 +128,7 @@ export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQL
       return [{ maxTotalReplicas, functionStoreInKeeper: isFunctionStoreInKeeper(readings) }];
     } catch (error) {
       logger.error(
-        { error },
+        { error: clickHouseErrorSummary(error) },
         "Could not read the replica layout from system.replicas or the function store from system.zookeeper and system.functions, so LangWatchQL app functions are not provisionable until it can",
       );
       return [];
@@ -178,7 +179,7 @@ export class ClickHouseLangWatchQLAppFunctionStoreRepository extends LangWatchQL
       return await this.readEveryReplica(maxTotalReplicas);
     } catch (error) {
       logger.warn(
-        { error, keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
+        { error: clickHouseErrorSummary(error), keeperPath: APP_FUNCTION_KEEPER_STORE_PATH },
         "Could not read system.functions from every ClickHouse replica through clusterAllReplicas, so the LangWatchQL app function store is checked on this server only and a replica keeping its functions on local disk goes unseen. A refused login as user default usually means the cluster in remote_servers has no working <secret>",
       );
       return this.readThisServer();

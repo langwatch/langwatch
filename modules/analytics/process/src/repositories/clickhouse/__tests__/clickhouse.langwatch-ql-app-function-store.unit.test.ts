@@ -1,7 +1,7 @@
 /**
  * The probe the deploy task and the ops checkup both read, over a driver that answers as
- * ClickHouse 25.10 does: system.server_settings never lists user_defined_zookeeper_path,
- * a server with no Keeper has no system.zookeeper table, and the first replica is the one reached.
+ * ClickHouse 25.10 does: a server with no Keeper has no system.zookeeper table, and the
+ * first replica is the one reached.
  */
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
 import { describe, expect, it } from "vitest";
@@ -59,7 +59,6 @@ function clickHouse2510({
       if (sql.includes("system.replicas")) {
         return answer([{ max_total_replicas: String(maxTotalReplicas) }]);
       }
-      if (sql.includes("system.server_settings")) return answer([]);
       if (sql.includes("system.clusters")) return answer(clusters);
       if (sql.includes("clusterAllReplicas('langwatch', system.functions)")) {
         if (crossReplicaError !== undefined) return Promise.reject(crossReplicaError);
