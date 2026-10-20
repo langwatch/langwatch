@@ -1,7 +1,8 @@
 /**
  * "Save as insight" under a settled Langy answer, lent through Langy's answer-action extension
- * point. Opens a short form prefilled from the answer, or from one finding of its insights card.
- * Saving files it for the person who saved it. Draws nothing without the flag or `analytics:view`.
+ * point. Opens a short form prefilled from the answer, or from one bad or watch finding of its
+ * insights card; good findings are never offered. Saving files it for the person who saved it.
+ * Draws nothing without the flag or `analytics:view`, or for a card of good news alone.
  */
 
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -28,6 +29,7 @@ import { useFileInsight } from "../../behavior/use-insight-actions.ts";
 import {
   draftOfAnswer,
   draftOfFinding,
+  fileableFindings,
   filedFinding,
   filedSubject,
 } from "../../model/insight-filing.ts";
@@ -44,7 +46,10 @@ export function SaveAsInsightAction(props: LangyAnswerActionProps) {
   const project = host.project();
   if (host.isEnabled() !== true || !host.hasPermission("analytics:view")) return null;
   if (project?.id !== props.projectId) return null;
-  const isAllSaved = saved.length >= Math.max(props.insights?.findings.length ?? 0, 1);
+  const fileable = fileableFindings(props.insights).length;
+  // A card of good news alone names no next step: there is nothing to file.
+  if ((props.insights?.findings.length ?? 0) > 0 && fileable === 0) return null;
+  const isAllSaved = saved.length >= Math.max(fileable, 1);
 
   return (
     <>
@@ -92,7 +97,7 @@ function SaveAsInsightDialog({
   const host = useInsightHost();
   const { file, isPending } = useFileInsight({ projectId: answer.projectId });
   const card = answer.insights;
-  const findings = card?.findings ?? [];
+  const findings = fileableFindings(card);
   const firstUnsaved = Math.max(
     findings.findIndex((_, position) => !saved.includes(position)),
     0,

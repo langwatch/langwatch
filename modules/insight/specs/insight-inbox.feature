@@ -246,11 +246,12 @@ Feature: The insights inbox
       When a member opens the form to save it as an insight
       Then the verdict offers "Act now" and "Check this" and nothing else
 
-    @unit
-    Scenario: A good finding of an older card starts the save form as Check this
-      Given a finding of an insights card with the good tone
-      When the save form starts from it
-      Then its verdict starts as watch, and a bad or a watch finding keeps its own
+    @unit @integration
+    Scenario: A good finding of an insights card is never filed
+      Given a Langy answer whose insights card holds bad, watch and good findings
+      When a member opens the form to save it as an insight
+      Then only the bad and the watch findings are offered, each with its own verdict
+      And a card of good findings alone offers no save
 
   Rule: Evidence on fixed dates
     An insight keeps what to run, never the result: its query, the fixed window the query
@@ -353,23 +354,11 @@ Feature: The insights inbox
       When the badge is derived
       Then the count is 3
 
-    @unit
-    Scenario: The badge reads Act now when any unseen insight is bad
-      Given unseen insights in the inbox that are bad, watch and good
-      When the badge is derived
-      Then its tone is bad, drawn red
-
-    @unit
-    Scenario: The badge reads Check this when the unseen insights hold watch and none bad
-      Given unseen insights in the inbox that are watch only, or watch and good
-      When the badge is derived
-      Then its tone is watch, drawn amber
-
-    @unit
-    Scenario: The badge reads green only for older good news
-      Given unseen insights in the inbox that are all good
-      When the badge is derived
-      Then its tone is good, drawn green
+    @integration
+    Scenario: The unread pill is a plain count in one neutral colour
+      Given unseen insights in the inbox that are bad and watch, or good only
+      When the sidebar draws the unread pill
+      Then it shows only the count, drawn the same neutral way whatever the verdicts
 
   Rule: Seen is marked once
 

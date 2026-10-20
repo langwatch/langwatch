@@ -286,7 +286,9 @@ describe("checkRunAnswer", () => {
       ["a key beside the findings", null],
     ])("refuses an answer that names %s", (_what, extra) => {
       const named =
-        extra === null ? answer([valid()], { ownerUserId: "user-attacker" }) : answer([valid(extra)]);
+        extra === null
+          ? answer([valid()], { ownerUserId: "user-attacker" })
+          : answer([valid(extra)]);
 
       expect(check(named)).toEqual({ ok: false, reason: "bad_output" });
     });

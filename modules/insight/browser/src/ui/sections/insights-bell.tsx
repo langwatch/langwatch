@@ -50,7 +50,7 @@ export function InsightsBell(_props: InsightsBellProps) {
           <Bell size={16} />
           {reading.inbox && reading.inbox.count > 0 && (
             <Box position="absolute" top="-2px" right="-4px">
-              <UnreadPill count={reading.inbox.count} tone={reading.inbox.tone} size="xs" />
+              <UnreadPill count={reading.inbox.count} size="xs" />
             </Box>
           )}
         </IconButton>

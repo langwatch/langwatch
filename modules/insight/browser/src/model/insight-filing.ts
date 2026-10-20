@@ -42,15 +42,24 @@ export function draftOfAnswer(answerText: string): InsightDraft {
   };
 }
 
-/**
- * One finding of an answer's insights card, word for word. An older card's good news starts as
- * Check this: a new insight names a next step.
- */
-export function draftOfFinding(finding: LangyInsightsCardFinding): InsightDraft {
+/** A finding of a card that names a next step, so it may be filed. */
+export type FileableFinding = LangyInsightsCardFinding & { tone: ActionableInsightTone };
+
+/** The findings of a card that may be filed: good news names no next step, so it never is. */
+export function fileableFindings(
+  card: Pick<LangyDerivedInsightsCard, "findings"> | undefined,
+): FileableFinding[] {
+  return (card?.findings ?? []).filter((finding): finding is FileableFinding =>
+    isActionableTone(finding.tone),
+  );
+}
+
+/** One fileable finding of an answer's insights card, word for word with its own verdict. */
+export function draftOfFinding(finding: FileableFinding): InsightDraft {
   return {
     title: finding.title,
     body: finding.body,
-    tone: isActionableTone(finding.tone) ? finding.tone : "watch",
+    tone: finding.tone,
     topic: finding.topic ?? "",
     validDays: finding.validDays ?? DEFAULT_INSIGHT_VALID_DAYS,
   };

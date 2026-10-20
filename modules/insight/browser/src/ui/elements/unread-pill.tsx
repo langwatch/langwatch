@@ -1,28 +1,10 @@
 import { Box } from "@langwatch/design-system/primitives";
-import type { InsightTone } from "@langwatch/insight-contract";
-
-import { TONE_PRESENTATION } from "../../model/insight-presentation.ts";
-
-/** Text that reads on each verdict colour: white on red and green, dark on amber. */
-const PILL_TEXT: Record<InsightTone, string> = {
-  bad: "red.contrast",
-  watch: "yellow.contrast",
-  good: "green.contrast",
-};
 
 /**
- * The unread count, like an email app, in the colour of the most urgent unseen verdict: red
- * for Act now, amber for Check this, green only for older good news. Draws nothing at zero.
+ * The unread count, like an email app, in one neutral colour: the count alone, never a
+ * verdict, since the cards already say Act now or Check this. Draws nothing at zero.
  */
-export function UnreadPill({
-  count,
-  tone,
-  size = "sm",
-}: {
-  count: number;
-  tone: InsightTone;
-  size?: "sm" | "xs";
-}) {
+export function UnreadPill({ count, size = "sm" }: { count: number; size?: "sm" | "xs" }) {
   if (count <= 0) return null;
   return (
     <Box
@@ -38,8 +20,8 @@ export function UnreadPill({
       textStyle="micro"
       fontWeight="bold"
       fontVariantNumeric="tabular-nums"
-      color={PILL_TEXT[tone]}
-      background={TONE_PRESENTATION[tone].color}
+      color="gray.contrast"
+      background="gray.solid"
     >
       {count}
     </Box>

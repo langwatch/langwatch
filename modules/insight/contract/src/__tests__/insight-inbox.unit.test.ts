@@ -7,7 +7,7 @@
 import { describe, expect, it } from "vitest";
 
 import { deriveInsightInbox, INSIGHT_FOLDERS, type InsightFolder } from "../insight-inbox.ts";
-import type { InsightEntry, InsightTone } from "../insight.ts";
+import type { InsightEntry } from "../insight.ts";
 
 const DAY_MS = 86_400_000;
 const NOW = Date.UTC(2026, 9, 9, 7);
@@ -93,36 +93,6 @@ describe("given 3 unseen insights in the inbox and 1 unseen stale insight", () =
 
       expect(inbox.stale.map((shown) => shown.id)).toEqual(["insight-stale"]);
       expect(inbox.count).toBe(3);
-    });
-  });
-});
-
-describe("given unseen insights in the inbox", () => {
-  /** The tone the badge takes over unseen insights of these verdicts. */
-  function badgeTone(tones: readonly InsightTone[]): InsightTone {
-    const entries = tones.map((tone, index) => entry({ id: `insight-${index}`, tone }));
-    return deriveInsightInbox({ entries, now: NOW }).tone;
-  }
-
-  describe("when any of them is bad", () => {
-    /** @scenario "The badge reads Act now when any unseen insight is bad" */
-    it("reads bad, however many are good or watch", () => {
-      expect(badgeTone(["good", "good", "watch", "bad"])).toBe("bad");
-    });
-  });
-
-  describe("when they hold watch and none bad", () => {
-    /** @scenario "The badge reads Check this when the unseen insights hold watch and none bad" */
-    it("reads watch, alone or beside good", () => {
-      expect(badgeTone(["watch"])).toBe("watch");
-      expect(badgeTone(["good", "good", "watch"])).toBe("watch");
-    });
-  });
-
-  describe("when they are all good", () => {
-    /** @scenario "The badge reads green only for older good news" */
-    it("reads good", () => {
-      expect(badgeTone(["good", "good"])).toBe("good");
     });
   });
 });
