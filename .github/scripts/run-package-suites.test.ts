@@ -418,6 +418,32 @@ void describe("given a shard that runs several suites at once", () => {
     });
   });
 
+  void describe("when two packages are heavy", () => {
+    /** @scenario "Only one heavy suite runs at a time" */
+    void it("never overlaps them, while light suites still run alongside", async () => {
+      const heavy = ["a", "b"].map((name) => pkg(`@fix/heavy-${name}`, ["test"]));
+      const light = ["c", "d"].map((name) => pkg(`@fix/light-${name}`, ["test"]));
+      const overlaps: string[][] = [];
+      let running: string[] = [];
+      await runJobs({
+        jobs: jobsFor([...heavy, ...light], new Map()),
+        concurrency: 3,
+        isHeavy: (candidate) => candidate.name.includes("heavy"),
+        run: async (job) => {
+          running = [...running, job.pkg.name];
+          overlaps.push(running);
+          await new Promise((settle) => setTimeout(settle, 5));
+          running = running.filter((name) => name !== job.pkg.name);
+          return 0;
+        },
+      });
+      for (const together of overlaps) {
+        assert.ok(together.filter((name) => name.includes("heavy")).length <= 1, together.join());
+      }
+      assert.ok(overlaps.some((together) => together.length > 1));
+    });
+  });
+
   void describe("when two packages each declare a browser suite", () => {
     /** @scenario "Only one browser suite runs at a time" */
     void it("never overlaps them", async () => {

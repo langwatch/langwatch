@@ -140,6 +140,12 @@ export const parseOnly = (value: string | undefined): Set<string> | undefined =>
   return new Set(parsed);
 };
 
+/**
+ * Packages at least this slow run one at a time: two at once ran design-system's
+ * interaction tests past their five-second timeout. Light suites fill around them.
+ */
+export const HEAVY_SECONDS = 100;
+
 /** Seconds a package costs when the weights file does not name it. */
 export const DEFAULT_WEIGHT_SECONDS = 5;
 
@@ -264,10 +270,12 @@ export const runJobs = async ({
   jobs,
   concurrency,
   run,
+  isHeavy = () => false,
 }: {
   jobs: readonly SuiteJob[];
   concurrency: number;
   run: (job: SuiteJob) => Promise<number>;
+  isHeavy?: (pkg: DiscoveredPackage) => boolean;
 }): Promise<Map<SuiteJob, number>> => {
   const statuses = new Map<SuiteJob, number>();
   const queue = [...jobs];
@@ -275,7 +283,11 @@ export const runJobs = async ({
   const running = new Set<Promise<void>>();
   const holds = (job: SuiteJob) => {
     const lane = laneOf(job.script);
-    return lane === "shared" ? [`package:${job.pkg.name}`] : [`package:${job.pkg.name}`, lane];
+    return [
+      `package:${job.pkg.name}`,
+      ...(lane === "shared" ? [] : [lane]),
+      ...(isHeavy(job.pkg) ? ["heavy"] : []),
+    ];
   };
   const nextStartable = () => queue.findIndex((job) => holds(job).every((key) => !busy.has(key)));
   while (queue.length > 0 || running.size > 0) {
@@ -575,6 +587,7 @@ if (isEntrypoint()) {
     jobs: jobsFor(heaviestFirst, excluded),
     concurrency,
     run: runner.run,
+    isHeavy: (pkg) => weightOf(pkg) >= HEAVY_SECONDS,
   });
   const statusOf = (pkg: DiscoveredPackage) => (script: string) =>
     [...statuses].find(([job]) => job.pkg === pkg && job.script === script)?.[1] ?? 1;

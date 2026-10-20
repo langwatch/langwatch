@@ -142,6 +142,12 @@ Feature: A package's integration suite runs in CI when it declares one
       Then their browser suites never overlap
 
     @unit
+    Scenario: Only one heavy suite runs at a time
+      Given two packages whose recorded weight marks them as heavy
+      When the package suites job runs them concurrently
+      Then they never overlap, and light suites run alongside them
+
+    @unit
     Scenario: A package's own suites run one after another, in order
       Given a package with a unit suite and an integration suite
       When the package suites job runs concurrently
