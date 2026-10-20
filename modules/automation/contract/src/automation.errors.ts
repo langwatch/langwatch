@@ -533,11 +533,9 @@ export class AutomationWebhookUpsertRequiredError extends HandledError {
 }
 
 /**
- * An "add to dataset" automation's dataset refused its rows for a reason no
- * redelivery can change: the dataset is gone or archived, or none of the
- * mapped columns exist in it any more. The author fixes it by re-saving the
- * automation with a dataset and mapping that exist, so it is the customer's
- * fault and the queue does not retry it.
+ * An "add to dataset" automation's dataset is gone, archived, or has none of
+ * the mapped columns left. No redelivery changes that: the author re-saves the
+ * automation, so it is the customer's fault and is not retried.
  */
 export class AutomationDatasetUnavailableError extends HandledError {
   declare readonly code: "automation_dataset_unavailable";

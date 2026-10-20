@@ -1,4 +1,3 @@
-import { InvalidActionParamsError } from "@langwatch/automation-contract";
 import { HandledError } from "@langwatch/handled-error";
 
 /** The actions whose stored settings are parsed at settlement, and how the refusal names them. */
@@ -8,19 +7,19 @@ const STORED_ACTION_LABELS = {
 } as const;
 
 /**
- * The automation's stored action settings no longer satisfy its action, so no
- * redelivery can send it: the author re-saves the automation to fix it.
+ * Why the automation's stored action settings are refused: they no longer
+ * satisfy its action, so the author re-saves the automation to fix it.
  */
-export function storedActionParamsRefusal({
+export function storedActionParamsMessage({
   triggerName,
   action,
 }: {
   triggerName: string;
   action: keyof typeof STORED_ACTION_LABELS;
-}): InvalidActionParamsError {
-  return new InvalidActionParamsError(
+}): string {
+  return (
     `The automation "${triggerName}" has ${STORED_ACTION_LABELS[action]} settings that are no longer valid. ` +
-      "Open the automation and save its settings again.",
+    "Open the automation and save its settings again."
   );
 }
 

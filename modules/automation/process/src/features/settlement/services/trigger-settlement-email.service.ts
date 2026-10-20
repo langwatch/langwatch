@@ -2,6 +2,7 @@ import { createHash } from "node:crypto";
 
 import {
   emailActionParamsSchema,
+  InvalidActionParamsError,
   type TemplateContext,
   type TriggerSummary,
 } from "@langwatch/automation-contract";
@@ -11,7 +12,7 @@ import type { TraceRecord } from "@langwatch/trace-contract";
 import type { AutomationNotificationDelivery } from "../../../channels/automation-notification-delivery.channel.ts";
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
-import { storedActionParamsRefusal } from "../../../rules/settlement-refusal.rules.ts";
+import { storedActionParamsMessage } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationEmailCapService } from "../../runaway/services/email-cap.service.ts";
 
 export type SettlementNotificationCandidate = {
@@ -47,7 +48,9 @@ export class TriggerSettlementEmailService {
   }): Promise<{ didSend: boolean; dropReason?: string }> {
     const parsed = emailActionParamsSchema.safeParse(input.trigger.actionParams);
     if (!parsed.success) {
-      throw storedActionParamsRefusal({ triggerName: input.trigger.name, action: "SEND_EMAIL" });
+      throw new InvalidActionParamsError(
+        storedActionParamsMessage({ triggerName: input.trigger.name, action: "SEND_EMAIL" }),
+      );
     }
 
     const digest = this.dispatchDigest(input.triggerData);

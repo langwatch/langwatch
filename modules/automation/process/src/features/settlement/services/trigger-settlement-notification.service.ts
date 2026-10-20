@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import {
   buildTemplateContext,
   DEFAULT_WEBHOOK_CONTENT_TYPE,
+  InvalidActionParamsError,
   renderWebhookBody,
   type TemplateMatchInput,
   type TemplateContext,
@@ -19,7 +20,7 @@ import {
   type AutomationSettlementTraceRepository,
 } from "../../../repositories/automation-settlement-read.repository.ts";
 import type { AutomationClock } from "../../../repositories/automation.repositories.ts";
-import { storedActionParamsRefusal } from "../../../rules/settlement-refusal.rules.ts";
+import { storedActionParamsMessage } from "../../../rules/settlement-refusal.rules.ts";
 import type { AutomationWebhookProvider } from "../../../services/automation-webhook-secrets.service.ts";
 import type { AutomationProjectDirectory } from "../../../services/automation.service.ts";
 import type { AutomationEmailCapService } from "../../runaway/services/email-cap.service.ts";
@@ -355,7 +356,9 @@ export class TriggerSettlementNotificationService {
     try {
       params = this.composition.webhooks.parseStored(input.trigger.actionParams);
     } catch {
-      throw storedActionParamsRefusal({ triggerName: input.trigger.name, action: "SEND_WEBHOOK" });
+      throw new InvalidActionParamsError(
+        storedActionParamsMessage({ triggerName: input.trigger.name, action: "SEND_WEBHOOK" }),
+      );
     }
 
     // A JSON content type is checked and falls back to the default envelope; any other is sent
