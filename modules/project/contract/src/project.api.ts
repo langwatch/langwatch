@@ -63,6 +63,8 @@ export interface ProjectOrganizationRef {
 
 export interface ProjectOrganizationPage {
   projects: ProjectOrganizationRef[];
+  /** Projects on the page whose team is gone, so no organisation owns them or routes their data. */
+  orphanIds: string[];
   next: string | null;
 }
 

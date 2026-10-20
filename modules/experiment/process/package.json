@@ -61,6 +61,7 @@
     "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",
+    "@opentelemetry/semantic-conventions": "catalog:",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "hono-openapi": "catalog:",

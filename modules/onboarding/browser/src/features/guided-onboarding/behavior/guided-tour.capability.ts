@@ -1,6 +1,6 @@
 /**
- * The tour's state, published for Langy's tour card: whether a tour is on screen and a replay of
- * one, recorded on the organization. Hooks, read during render.
+ * The tour's state, published for Langy's tour card: whether a tour is on screen, a replay of
+ * one, and "Later" on the model prompt, both recorded on the organization. Hooks, read in render.
  * @see specs/langy/langy-guided-onboarding.feature
  */
 import type { GuidedTourState } from "@langwatch/onboarding-client";
@@ -19,5 +19,13 @@ export const onboardingGuidedTour: GuidedTourState = {
       useGuidedTourStore.getState().replay(parsed.data);
       if (organizationId) recordTour.mutate({ organizationId, status: "replayed" });
     };
+  },
+  usePutOffModelPrompt: () => {
+    const utils = onboardingApi.useUtils();
+    const dismiss = onboardingApi.onboarding.recordProviderPromptDismissed.useMutation({
+      onSuccess: (_state, { organizationId }) =>
+        void utils.onboarding.getGuidedState.invalidate({ organizationId }),
+    });
+    return ({ organizationId }) => dismiss.mutate({ organizationId });
   },
 };
