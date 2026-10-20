@@ -10,7 +10,7 @@ import {
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
   type SpanFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
-import { createTenantId } from "@langwatch/eventing";
+import { createTenantId, decodeFoldCacheEntry, encodeFoldCacheEntry } from "@langwatch/eventing";
 import { NormalizedSpanKind, type NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
@@ -93,7 +93,10 @@ function makeProjection() {
 }
 
 /** Lifts and folds the spans in order, keyed by the session each lands in. */
-function foldSessions(spans: CapturedSpan[]): Map<string, CodingAgentSessionState> {
+function foldSessions(
+  spans: CapturedSpan[],
+  initial?: CodingAgentSessionState,
+): Map<string, CodingAgentSessionState> {
   const projection = makeProjection();
   const sessions = new Map<string, CodingAgentSessionState>();
   for (const captured of spans) {
@@ -111,7 +114,7 @@ function foldSessions(spans: CapturedSpan[]): Map<string, CodingAgentSessionStat
       type: SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
       data,
     };
-    const state = sessions.get(data.sessionId) ?? projection.init();
+    const state = sessions.get(data.sessionId) ?? initial ?? projection.init();
     sessions.set(
       data.sessionId,
       projection.handleCodingAgentSessionSpanFactsContributed(event, state),
@@ -278,6 +281,19 @@ describe("Copilot session fold", () => {
       it("counts three tool runs under their names", () => {
         expect(row?.toolCalls).toBe(3);
         expect(row?.toolCounts).toEqual({ rg: 2, view: 1 });
+      });
+    });
+
+    describe("when they fold onto a state cached before the AI units column", () => {
+      const { aiUnits: _addedLater, ...beforeColumn } = makeProjection().init();
+      const cached = decodeFoldCacheEntry<CodingAgentSessionState>(
+        encodeFoldCacheEntry({ state: beforeColumn, updatedAt: 1, appliedEventIds: [] }),
+      ).state;
+
+      /** @scenario A Copilot CLI session becomes one row with model, tokens and AI units */
+      it("sums the AI units from zero, never to NaN", () => {
+        const row = foldSessions(cliSession, cached).get(CLI_CONVERSATION);
+        expect(row?.aiUnits).toBeCloseTo(0.2533415, 9);
       });
     });
   });
