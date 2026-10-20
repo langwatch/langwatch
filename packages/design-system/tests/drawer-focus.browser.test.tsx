@@ -429,3 +429,75 @@ describe("the drawer's close button on open", () => {
     await waitFor(() => expect(closeButton().getAttribute("data-pointer-focus")).toBeNull());
   });
 });
+
+/** Collects uncaught errors and console errors raised while the callback runs and settles. */
+async function collectErrors(run: () => Promise<void>): Promise<string[]> {
+  const seen: string[] = [];
+  const onError = (event: ErrorEvent) => {
+    seen.push(String(event.error?.message ?? event.message));
+    event.preventDefault();
+  };
+  const consoleError = vi.spyOn(console, "error").mockImplementation((...args: unknown[]) => {
+    seen.push(args.map((arg) => (arg instanceof Error ? arg.message : String(arg))).join(" "));
+  });
+  window.addEventListener("error", onError);
+  try {
+    await run();
+    await new Promise((resolve) => setTimeout(resolve, 300));
+  } finally {
+    window.removeEventListener("error", onError);
+    consoleError.mockRestore();
+  }
+  return seen;
+}
+
+describe("a routed drawer unmounted over a dialog that re-renders in the same commit", () => {
+  /** The page holds the dialog; a host later in the tree mounts the drawer only while routed. */
+  function RoutedOverDialog() {
+    const [routed, setRouted] = useState(false);
+    const [picks, setPicks] = useState(0);
+    return (
+      <>
+        <section>
+          <Dialog open onClose={() => undefined} title="Run" cancelLabel={null}>
+            <p>Picked {picks}</p>
+            <button type="button" onClick={() => setRouted(true)}>
+              Add evaluator
+            </button>
+          </Dialog>
+        </section>
+        <aside>
+          {routed && (
+            <Drawer open onClose={() => setRouted(false)} title={NAME}>
+              <button
+                type="button"
+                onClick={() => {
+                  setPicks((count) => count + 1);
+                  setRouted(false);
+                }}
+              >
+                Pick
+              </button>
+            </Drawer>
+          )}
+        </aside>
+      </>
+    );
+  }
+
+  /** @scenario "A routed drawer closing over a dialog that re-renders hands focus back without an error" */
+  it("raises no initialFocus error and focus returns inside the dialog", async () => {
+    renderWithDesignSystem(<RoutedOverDialog />);
+    const dialog = await screen.findByRole("dialog", { name: "Run" });
+
+    const errors = await collectErrors(async () => {
+      await userEvent.click(within(dialog).getByRole("button", { name: "Add evaluator" }));
+      const drawer = await screen.findByRole("dialog", { name: NAME });
+      await userEvent.click(within(drawer).getByRole("button", { name: "Pick" }));
+      await drawerIsGone();
+    });
+
+    expect(errors.filter((message) => /initialFocus|focus-trap/.test(message))).toEqual([]);
+    await waitFor(() => expect(dialog.contains(document.activeElement)).toBe(true));
+  });
+});

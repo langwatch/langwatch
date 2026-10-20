@@ -398,17 +398,20 @@ export class ProjectionRouter<
       };
     }
 
-    this.queueManager.initializeSubscriberQueues(subscriberDefs, async (subscriberName, event) => {
-      const subscriber = this.eventSubscribers.get(subscriberName);
-      if (!subscriber) {
-        throw new ConfigurationError(
-          "ProjectionRouter",
-          `Event subscriber "${subscriberName}" not found`,
-          { subscriberName },
-        );
-      }
-      await this.handleSubscriber(subscriber, event);
-    });
+    this.queueManager.initializeSubscriberQueues(
+      subscriberDefs,
+      async (subscriberName, event, context) => {
+        const subscriber = this.eventSubscribers.get(subscriberName);
+        if (!subscriber) {
+          throw new ConfigurationError(
+            "ProjectionRouter",
+            `Event subscriber "${subscriberName}" not found`,
+            { subscriberName },
+          );
+        }
+        await this.handleSubscriber(subscriber, event, deliveryAttemptOf(context));
+      },
+    );
   }
 
   private subscriberQueueDefinitions({
@@ -635,77 +638,43 @@ export class ProjectionRouter<
       onEvent: async (projectionName, triggerEvent, context) => {
         const fold = this.getFoldProjection(projectionName);
 
-        await this.foldUnlessProjectGone({
-          projectionName,
-          tenantId: triggerEvent.tenantId,
-          run: () =>
-            fold.open((definition) =>
-              this.processFoldProjectionEvent({
-                projectionName,
-                fold: definition,
-                event: triggerEvent,
-                context: {
-                  tenantId: triggerEvent.tenantId,
-                  ...deliveryAttemptOf(context),
-                },
-              }),
-            ),
-        });
+        await fold.open((definition) =>
+          this.processFoldProjectionEvent({
+            projectionName,
+            fold: definition,
+            event: triggerEvent,
+            context: {
+              tenantId: triggerEvent.tenantId,
+              ...deliveryAttemptOf(context),
+            },
+          }),
+        );
       },
       onEventBatch: async (projectionName, events, context) => {
         const fold = this.getFoldProjection(projectionName);
 
-        await this.foldUnlessProjectGone({
-          projectionName,
-          tenantId: events[0]!.tenantId,
-          run: () =>
-            fold.open((definition) =>
-              this.processFoldProjectionBatch({
-                projectionName,
-                fold: definition,
-                events,
-                context: {
-                  tenantId: events[0]!.tenantId,
-                  ...deliveryAttemptOf(context),
-                  // A bisected sub-batch after the first commit of its dispatch: the
-                  // fold commit must extend the applied-id set, not replace it
-                  // (#6578). Dropping this here silently re-enables the double-apply
-                  // this chain exists to prevent.
-                  ...(context.isDeliveryContinuation !== undefined
-                    ? { isDeliveryContinuation: context.isDeliveryContinuation }
-                    : {}),
-                },
-              }),
-            ),
-        });
+        await fold.open((definition) =>
+          this.processFoldProjectionBatch({
+            projectionName,
+            fold: definition,
+            events,
+            context: {
+              tenantId: events[0]!.tenantId,
+              ...deliveryAttemptOf(context),
+              // A bisected sub-batch after the first commit of its dispatch: the
+              // fold commit must extend the applied-id set, not replace it
+              // (#6578). Dropping this here silently re-enables the double-apply
+              // this chain exists to prevent.
+              ...(context.isDeliveryContinuation !== undefined
+                ? { isDeliveryContinuation: context.isDeliveryContinuation }
+                : {}),
+            },
+          }),
+        );
       },
       onRebuild: (projectionName, missed, context) =>
         this.rebuildFold({ projectionName, missed, context }),
     });
-  }
-
-  /**
-   * A fold whose project was deleted after its event can never read its own rows, so the event
-   * completes as a logged no-op instead of retrying into a blocked group, as commands do.
-   */
-  private async foldUnlessProjectGone({
-    projectionName,
-    tenantId,
-    run,
-  }: {
-    projectionName: string;
-    tenantId: string;
-    run: () => Promise<void>;
-  }): Promise<void> {
-    try {
-      await run();
-    } catch (error) {
-      if (!(error instanceof Error && error.name === "ProjectNotFoundError")) throw error;
-      this.logger.warn(
-        { tenantId, projectionName },
-        "Fold's project no longer exists; completing it as a no-op",
-      );
-    }
   }
 
   /**
@@ -1531,6 +1500,7 @@ export class ProjectionRouter<
   private async handleSubscriber(
     subscriber: EventSubscriberDefinition<EventType>,
     event: EventType,
+    delivery: { deliveryAttempt?: number } = {},
   ): Promise<void> {
     await this.tracer.withActiveSpan(
       "EventSubscriber.handle",
@@ -1551,6 +1521,7 @@ export class ProjectionRouter<
             subscriber.handle(event, {
               tenantId: String(event.tenantId),
               aggregateId: String(event.aggregateId),
+              ...delivery,
             }),
           onComplete: (ms) => {
             incrementEsSubscriberTotal({

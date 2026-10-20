@@ -34,7 +34,11 @@ describe("useGuidedTour", () => {
             lends: [
               {
                 token: GuidedTourStateToken,
-                value: { useRunning: () => true, useReplay: () => replay },
+                value: {
+                  useRunning: () => true,
+                  useReplay: () => replay,
+                  usePutOffModelPrompt: () => () => undefined,
+                },
               },
             ],
           },
