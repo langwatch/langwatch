@@ -85,7 +85,9 @@ describe("isTransientModelFailure", () => {
     /** @scenario "A spent provider balance fails the turn on the first attempt" */
     it.each([
       // What pi's Anthropic lane reports for the gateway's 400 on a spent balance.
-      `400 {"type":"error","error":{"type":"invalid_request_error","message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin."},"request_id":"req_011CTest"}`,
+      `400 {"type":"error","error":{"type":"invalid_request_error","message":"Your organization's AI gateway access is exhausted. Contact your LangWatch admin.","code":"provider_account_exhausted"},"request_id":"req_011CTest"}`,
+      // The code alone carries the verdict, whatever the sentence says.
+      `400 {"type":"error","error":{"type":"invalid_request_error","message":"Access paused.","code":"provider_account_exhausted"}}`,
       `400 {"type":"error","error":{"type":"invalid_request_error","message":"Your credit balance is too low to access the Anthropic API. Please go to Plans & Billing to upgrade or purchase credits."},"request_id":"req_011CTest"}`,
       "Your organization's AI gateway access is exhausted. Contact your LangWatch admin.",
     ])("does not retry a spent balance: %s", (message) => {

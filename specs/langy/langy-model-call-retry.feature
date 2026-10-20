@@ -52,7 +52,7 @@ Feature: Langy retries a transient model or tool failure inside the turn
     @unit
     Scenario: A spent provider balance fails the turn on the first attempt
       Given a model call fails because the provider account has no credit left
-      And the failure names the credit balance or the gateway's exhausted-access message
+      And the failure carries the gateway's "provider_account_exhausted" code, the gateway's exhausted-access message or the provider's credit balance message
       When the worker classifies the failure
       Then it is not retried and the turn fails with that error
 

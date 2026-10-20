@@ -24,8 +24,9 @@ const accountExhaustionMessage = providererr.GatewayAccountExhaustedMessage
 // raw-forward Response (a 4xx carrying the provider's native body) and a
 // streaming *domain.UpstreamError.
 //
-// Only the message text changes — the HTTP status, error type, and
-// retry-signaling headers are preserved verbatim, so the terminal-vs-retryable
+// Only the message text changes, plus error.code set to
+// provider_account_exhausted when the provider gave none. The HTTP status,
+// error type and retry-signaling headers are preserved, so the terminal-vs-retryable
 // contract is untouched. It is a no-op for any error that is not account-level
 // exhaustion: a transient rate-limit 429, a 5xx, or a user's own bad request
 // all pass through unchanged.
@@ -60,9 +61,9 @@ func isAccountExhaustionError(ue *domain.UpstreamError) bool {
 	return providererr.AccountExhausted(ue.StatusCode, ue.Body)
 }
 
-// rewriteErrorMessage replaces only the error.message field of a provider
-// error body, preserving the rest of the envelope (error.type, request_id,
-// ...). Dropping the provider's original credit/billing phrasing is
+// rewriteErrorMessage replaces the error.message field of a provider error
+// body and sets error.code when the provider gave none, preserving the rest of
+// the envelope (error.type, request_id, ...). Dropping the provider's original credit/billing phrasing is
 // intentional: it stops a wrapper like Claude Code from pattern-matching the
 // credit signal and overlaying its own billing link (wrong for a governed user
 // who does not own the provider account), so the client renders the org's
