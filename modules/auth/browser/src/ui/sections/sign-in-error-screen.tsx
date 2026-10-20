@@ -63,6 +63,8 @@ const errorTitle = (error: string): string => {
       return "Use your organization's sign-in";
     case "LINK_NEEDS_APPROVAL":
       return "This sign-in method needs approval";
+    case "state_mismatch":
+      return "Your sign-in expired";
     default:
       return (
         cutoverSignInRefusal(error)?.title ??
@@ -295,6 +297,21 @@ function SignInErrorDescription({
         </Text>
         <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
           <a href={FEDERATED_LOGOUT_PATH}>Sign out and try again</a>
+        </Button>
+      </VStack>
+    );
+  }
+
+  if (error === "state_mismatch") {
+    return (
+      <VStack gap={4} align="stretch">
+        <Text>Your sign-in expired or was started in another tab or browser. Start again.</Text>
+        <Button {...FRONT_DOOR_PRIMARY_STYLE} asChild>
+          <Link
+            href={`/auth/signin${callbackUrl ? `?callbackUrl=${encodeURIComponent(callbackUrl)}` : ""}`}
+          >
+            Start again
+          </Link>
         </Button>
       </VStack>
     );

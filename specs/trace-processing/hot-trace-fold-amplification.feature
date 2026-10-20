@@ -69,6 +69,35 @@ Feature: Hot-trace fold amplification is bounded
     Then the loaded state is kept and the delivered event is applied on top
     And no already-folded event is lost from the committed state
 
+  # The event log keeps one event per idempotency key, so two accepted events
+  # under one key read back as one. The applied set must vouch for the key, or
+  # the event the read dropped looks missing on every re-fold, forever.
+  @unit
+  Scenario: A re-fold accounts for an applied event the event log kept under its idempotency key
+    Given a fold whose loaded state was committed with an event's idempotency key
+    And the event log read returns a different event carrying that idempotency key
+    When an event that occurred before the checkpoint is folded
+    Then the full history is replayed
+
+  @unit
+  Scenario: A commit records each folded event under its idempotency key
+    Given an event that carries an idempotency key
+    When the event is folded
+    Then the committed applied set holds the event's idempotency key
+
+  @unit
+  Scenario: A batch folds two events under one idempotency key once
+    Given a batch holding two events with different ids and one idempotency key
+    When the batch is folded
+    Then the key is folded once
+    And the committed applied set holds the key once
+
+  @unit
+  Scenario: A redelivered event is recognised under its id or its idempotency key
+    Given a fold whose loaded state was committed with an event's id
+    When that event is delivered again
+    Then it is not folded a second time
+
   @unit
   Scenario: A re-fold retries a history read that has not caught up yet
     Given a fold whose loaded state was committed with a set of applied events

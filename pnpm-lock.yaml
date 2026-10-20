@@ -6547,6 +6547,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../../packages/group-queue
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
