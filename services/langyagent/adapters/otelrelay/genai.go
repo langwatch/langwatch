@@ -415,10 +415,11 @@ func (g *genAICall) forwardSpan() {
 // carries.
 const maxGenAIErrorMessageBytes = 1024
 
-// recordFailure states on the span why the call failed: the error's own type,
-// the account cause the proxy classified (out of credit, key rejected), and the
-// message. The message is left out when the provider refused the key, because
-// those messages can quote the key back. status is 0 for an in-stream error.
+// recordFailure states on the span why the call failed: the error's own type
+// and the account cause the proxy classified. Provider prose can quote a key
+// back in shapes nobody enumerated, so a message is recorded only for a spent
+// account (a billing sentence, or the gateway's own governance message).
+// status is 0 for an in-stream error.
 func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
 	attrs := span.Attributes()
 	if code := providerErrorCode(body); code != "" {
@@ -428,13 +429,10 @@ func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
 	if hasCause {
 		attrs.PutStr("langwatch.langy.error_cause", string(cause))
 	}
-	if _, refused := credentialRefusalReason(status); refused || (hasCause && cause == ErrProviderKeyRejected) {
+	if !hasCause || cause != ErrProviderOutOfCredit {
 		return
 	}
 	message := gjson.GetBytes(body, "error.message").Str
-	if message == "" {
-		message = gjson.GetBytes(body, "message").Str
-	}
 	if message == "" {
 		return
 	}

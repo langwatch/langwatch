@@ -9,6 +9,7 @@ import (
 	"sync/atomic"
 	"testing"
 
+	"github.com/tidwall/gjson"
 	"go.opentelemetry.io/collector/pdata/ptrace"
 
 	"github.com/langwatch/langwatch/pkg/providererr"
@@ -94,15 +95,41 @@ func TestLLMProxy_BareTransientStreamErrorKeepsItsRetryableStatus(t *testing.T) 
 		{`{"type":"error","error":{"type":"api_error","message":"Internal server error"}}`, http.StatusInternalServerError},
 	}
 	for _, tc := range cases {
-		gateway, _ := countingGateway(t, http.StatusOK, "text/event-stream", tc.body)
-		relay := startRelay(t)
-		token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-transient", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
-		resp := rateLimitCall(t, relay, token)
-		_, _ = io.ReadAll(resp.Body)
-		if resp.StatusCode != tc.want {
-			t.Errorf("%s answered %d, want %d", tc.body, resp.StatusCode, tc.want)
-		}
+		t.Run(gjsonErrorType(tc.body), func(t *testing.T) {
+			gateway, _ := countingGateway(t, http.StatusOK, "text/event-stream", tc.body)
+			relay := startRelay(t)
+			token, _ := relay.Register(WorkerInfo{ConversationID: "conv-bare-transient", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+			resp := rateLimitCall(t, relay, token)
+			body, _ := io.ReadAll(resp.Body)
+			if resp.StatusCode != tc.want {
+				t.Errorf("answered %d, want %d", resp.StatusCode, tc.want)
+			}
+			if string(body) != tc.body {
+				t.Errorf("body altered in flight:\n got %s\nwant %s", body, tc.body)
+			}
+		})
 	}
+
+	t.Run("a healthy stream passes through untouched", func(t *testing.T) {
+		gateway, _ := countingGateway(t, http.StatusOK, "text/event-stream", cleanStream)
+		relay := startRelay(t)
+		token, _ := relay.Register(WorkerInfo{ConversationID: "conv-healthy", GatewayBaseURL: gateway.URL, LLMVirtualKey: "vk"})
+		resp := rateLimitCall(t, relay, token)
+		body, _ := io.ReadAll(resp.Body)
+		if resp.StatusCode != http.StatusOK {
+			t.Errorf("answered %d, want 200", resp.StatusCode)
+		}
+		if ct := resp.Header.Get("Content-Type"); !strings.HasPrefix(ct, "text/event-stream") {
+			t.Errorf("Content-Type = %q, want text/event-stream", ct)
+		}
+		if string(body) != cleanStream {
+			t.Errorf("stream altered in flight:\n got %s\nwant %s", body, cleanStream)
+		}
+	})
+}
+
+func gjsonErrorType(body string) string {
+	return gjson.Get(body, "error.type").Str
 }
 
 // @scenario "The retold span of a failed model call says why it failed"
@@ -126,17 +153,31 @@ func TestLLMProxy_FailedCallSpanSaysWhy(t *testing.T) {
 
 	t.Run("a refused key's message stays off the span", func(t *testing.T) {
 		gateway, _ := countingGateway(t, http.StatusUnauthorized, "application/json",
-			`{"error":{"message":"Incorrect API key provided: sk-proj-abc123","type":"invalid_request_error","code":"invalid_api_key"}}`)
+			`{"error":{"message":"Incorrect API key provided.","type":"invalid_request_error","code":"invalid_api_key"}}`)
 		span := failedCallSpan(t, gateway.URL)
 		wantStr(t, span, "error.type", "invalid_api_key")
-		if v, ok := span.Attributes().Get("error.message"); ok {
-			t.Errorf("error.message = %q, want no message for a refused key", v.Str())
-		}
-		if strings.Contains(span.Status().Message(), "sk-proj") {
-			t.Errorf("span status message quotes the key: %q", span.Status().Message())
-		}
+		wantNoMessage(t, span)
 		wantStatus(t, span, http.StatusUnauthorized)
 	})
+
+	t.Run("any other provider message stays off the span", func(t *testing.T) {
+		gateway, _ := countingGateway(t, http.StatusBadRequest, "application/json",
+			`{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`)
+		span := failedCallSpan(t, gateway.URL)
+		wantStr(t, span, "error.type", "invalid_request_error")
+		wantNoMessage(t, span)
+		wantStatus(t, span, http.StatusBadRequest)
+	})
+}
+
+func wantNoMessage(t *testing.T, span ptrace.Span) {
+	t.Helper()
+	if v, ok := span.Attributes().Get("error.message"); ok {
+		t.Errorf("error.message = %q, want no provider prose", v.Str())
+	}
+	if msg := span.Status().Message(); msg != "" {
+		t.Errorf("span status message = %q, want none", msg)
+	}
 }
 
 func failedCallSpan(t *testing.T, gatewayURL string) ptrace.Span {

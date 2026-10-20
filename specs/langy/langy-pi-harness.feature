@@ -193,11 +193,6 @@ Feature: Langy runs a conversation on the pi worker
     And the hour-long share of the writes when the provider states it
     And the counts use the same attribute names the gateway's own span uses
 
-  # The gateway drops request options a provider cannot take and names them
-  # on the response (X-LangWatch-Params-Dropped). Two production outages were
-  # invisible until a live probe because nothing on the langy side recorded
-  # what the gateway removed: the next field pi starts sending should show up
-  # as a drop record on the first turn, not as a dead card in production.
   # A failed call's span once showed only an error status, so a spent balance
   # retried five times looked like five identical unexplained failures.
   @unit
@@ -205,9 +200,15 @@ Feature: Langy runs a conversation on the pi worker
     Given a pi worker's mediated LLM call the provider rejects, or fails with an error event inside its stream
     When the relay retells the call as a gen_ai span
     Then the span records the upstream HTTP status
-    And it records the provider's error type, the account cause the relay classified, and the provider's message
-    But the message of a refused API key is left off the span, because it can quote the key
+    And it records the provider's error type and the account cause the relay classified
+    And it records the message only for a spent account, the billing sentence or the gateway's own message
+    But any other provider message is left off the span, because it can quote a key
 
+  # The gateway drops request options a provider cannot take and names them
+  # on the response (X-LangWatch-Params-Dropped). Two production outages were
+  # invisible until a live probe because nothing on the langy side recorded
+  # what the gateway removed: the next field pi starts sending should show up
+  # as a drop record on the first turn, not as a dead card in production.
   @unit
   Scenario: An option the gateway dropped from a model call is visible on the turn's telemetry
     Given a pi worker's mediated LLM call whose response names dropped options
