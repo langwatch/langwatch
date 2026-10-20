@@ -50,7 +50,62 @@ export const MAX_DEMANDING_TENANTS = 1000;
 // monitor thread-idle timeout hours out) is never reaped before it is due. The
 // expiry is the later of (now + window) and (latest scheduled dispatch + window).
 export const TTL_HELPER_LUA = `
+-- A parked group is live work that may wait for hours: its keys carry no TTL
+-- (specs/parked-group-retention.feature), like a blocked group's.
+local function holdGroupKeys(jobsKey, dataKey)
+  redis.call("PERSIST", jobsKey)
+  redis.call("PERSIST", dataKey)
+end
+
+-- A lane's parked set is keyed by its pause entry, which the group id does not name,
+-- so lane-parked-groups counts, per group, the lane sets holding it: one HEXISTS answers
+-- however many lanes are paused. parkLaneGroup adds, restoreUnpausedLanes releases.
+local function markLaneParked(kp, groupId)
+  redis.call("HINCRBY", kp .. "lane-parked-groups", groupId, 1)
+end
+
+local function releaseLaneParked(kp, groupId)
+  if redis.call("HINCRBY", kp .. "lane-parked-groups", groupId, -1) <= 0 then
+    redis.call("HDEL", kp .. "lane-parked-groups", groupId)
+  end
+end
+
+-- Groups lane-parked before lane-parked-groups existed carry no count. Once per queue, the
+-- lanes paused then are remembered (SUNIONSTORE: one entry per lane, not per group), and
+-- only those are walked, until restoreUnpausedLanes drains each of them.
+local function inLaneParkedBeforeCounting(kp, groupId)
+  if redis.call("SET", kp .. "lane-parked-groups:counted", "1", "NX") then
+    redis.call("SUNIONSTORE", kp .. "uncounted-parked-lanes", kp .. "parked-lanes")
+  end
+  for _, pauseKey in ipairs(redis.call("SMEMBERS", kp .. "uncounted-parked-lanes")) do
+    if redis.call("ZSCORE", kp .. "parked-lane:" .. pauseKey, groupId) then return true end
+  end
+  return false
+end
+
+-- Whether the group sits in its tenant's parked set or in a paused lane's.
+local function isParkedGroupAt(kp, groupId)
+  local tenantId = groupId
+  local slashPos = string.find(groupId, "/", 1, true)
+  if slashPos and slashPos > 1 then tenantId = string.sub(groupId, 1, slashPos - 1) end
+  if redis.call("ZSCORE", kp .. "parked:" .. tenantId, groupId) then return true end
+  if redis.call("HEXISTS", kp .. "lane-parked-groups", groupId) == 1 then return true end
+  return inLaneParkedBeforeCounting(kp, groupId)
+end
+
+-- The same, for the group behind jobsKey (<prefix>:gq:group:<id>:jobs); an
+-- unrecognised key reads as not parked.
+local function isParkedGroup(jobsKey)
+  local kp, groupId = string.match(jobsKey, "^(.-:gq:)group:(.+):jobs$")
+  if not kp then return false end
+  return isParkedGroupAt(kp, groupId)
+end
+
 local function refreshGroupKeyTtl(jobsKey, dataKey, nowMs)
+  if isParkedGroup(jobsKey) then
+    holdGroupKeys(jobsKey, dataKey)
+    return
+  end
   local latest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
   if not latest[2] then return end
   local ttl = ${GROUP_KEY_TTL_MS}
@@ -129,6 +184,7 @@ local function parkGroup(readyKey, groupId)
   redis.call("ZREM", readyKey, groupId)
   redis.call("ZADD", kp .. "parked:" .. tenantId, score, groupId)
   redis.call("SADD", kp .. "parked-tenants", tenantId)
+  holdGroupKeys(kp .. "group:" .. groupId .. ":jobs", kp .. "group:" .. groupId .. ":data")
   return 1
 end
 
@@ -136,7 +192,7 @@ end
 -- due first) back into ready. Self-limiting: callers pass slots = cap - active
 -- so COMPLETE-unpark and the dispatch-tail reconcile can never over-unpark into
 -- a re-park churn (TRAP 3). Returns how many were moved.
-local function unparkUpTo(readyKey, tenantId, slots)
+local function unparkUpTo(readyKey, tenantId, slots, nowMs)
   local kp = parkKeyPrefixOf(readyKey)
   -- A paused tenant's groups stay parked OUT of the ready scan regardless of cap
   -- headroom or the cap=0 drain: pause is an explicit operator hold and must win.
@@ -158,6 +214,7 @@ local function unparkUpTo(readyKey, tenantId, slots)
   for i = 1, #members, 2 do
     redis.call("ZREM", parkedKey, members[i])
     redis.call("ZADD", readyKey, tonumber(members[i + 1]), members[i])
+    refreshGroupKeyTtl(kp .. "group:" .. members[i] .. ":jobs", kp .. "group:" .. members[i] .. ":data", nowMs)
     moved = moved + 1
   end
   if redis.call("ZCARD", parkedKey) == 0 then
@@ -190,7 +247,7 @@ local function reconcileParked(readyKey, keyPrefix, tenantCap, nowMs)
       -- backlog can't block Redis in one eval.
       slots = ${PARK_RECONCILE_MAX_DRAIN}
     end
-    unparkUpTo(readyKey, tenantId, slots)
+    unparkUpTo(readyKey, tenantId, slots, nowMs)
   end
 end
 
@@ -202,28 +259,34 @@ local function parkLaneGroup(readyKey, groupId, pauseKey)
   if not score then return 0 end
   local kp = parkKeyPrefixOf(readyKey)
   redis.call("ZREM", readyKey, groupId)
-  redis.call("ZADD", kp .. "parked-lane:" .. pauseKey, score, groupId)
+  if redis.call("ZADD", kp .. "parked-lane:" .. pauseKey, score, groupId) == 1 then
+    markLaneParked(kp, groupId)
+  end
   redis.call("SADD", kp .. "parked-lanes", pauseKey)
+  holdGroupKeys(kp .. "group:" .. groupId .. ":jobs", kp .. "group:" .. groupId .. ":data")
   return 1
 end
 
 -- Restores, at their parked scores, the groups of every lane whose pause entry is
 -- gone, whoever removed it; bounded per key per eval like unparkUpTo. LT keeps an
 -- earlier score a stage wrote meanwhile; an active group's score is COMPLETE's.
-local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+local function restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey, nowMs)
   for _, pauseKey in ipairs(redis.call("SMEMBERS", keyPrefix .. "parked-lanes")) do
     if redis.call("SISMEMBER", pausedJobKey, pauseKey) == 0 then
       local parkedKey = keyPrefix .. "parked-lane:" .. pauseKey
       local members = redis.call("ZRANGE", parkedKey, 0, ${PARK_RECONCILE_MAX_DRAIN} - 1, "WITHSCORES")
       for i = 1, #members, 2 do
         local groupId = members[i]
-        redis.call("ZREM", parkedKey, groupId)
+        if redis.call("ZREM", parkedKey, groupId) == 1 then releaseLaneParked(keyPrefix, groupId) end
         if redis.call("EXISTS", keyPrefix .. "group:" .. groupId .. ":active") == 0 then
           addToReadyOrParked(readyKey, groupId, tonumber(members[i + 1]), true)
         end
+        local groupBase = keyPrefix .. "group:" .. groupId
+        refreshGroupKeyTtl(groupBase .. ":jobs", groupBase .. ":data", nowMs)
       end
       if redis.call("ZCARD", parkedKey) == 0 then
         redis.call("SREM", keyPrefix .. "parked-lanes", pauseKey)
+        redis.call("SREM", keyPrefix .. "uncounted-parked-lanes", pauseKey)
       end
     end
   end
@@ -347,7 +410,7 @@ local function unparkLeastServedParked(readyKey, keyPrefix, pausedJobKey, nowMs,
       end
     end
   end
-  if best then unparkUpTo(readyKey, best, slots) end
+  if best then unparkUpTo(readyKey, best, slots, nowMs) end
 end
 `;
 
@@ -963,7 +1026,7 @@ end
 
 -- Not on the reconcile cadence: an unpause restores its lane on the next dispatch.
 if redis.call("SCARD", keyPrefix .. "parked-lanes") > 0 then
-  restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey)
+  restoreUnpausedLanes(readyKey, keyPrefix, pausedJobKey, nowMs)
 end
 
 -- Effective per-tenant cap: dynamic water-level when a budget is configured,
@@ -1305,7 +1368,34 @@ end
 return results
 `;
 
+// The stranded-group reaper's delete. Its discovery reads memberships one call at a time,
+// so this eval asks them all again and deletes only a group that is still in no dispatch
+// set and still stale: one staged or parked since discovery keeps its jobs.
+const DELETE_STRANDED_GROUP_LUA =
+  TTL_HELPER_LUA +
+  `
+local jobsKey    = KEYS[1]
+local dataKey    = KEYS[2]
+local readyKey   = KEYS[3]
+local blockedKey = KEYS[4]
+local activeKey  = KEYS[5]
+
+local keyPrefix = ARGV[1]
+local groupId   = ARGV[2]
+local cutoffMs  = tonumber(ARGV[3])
+
+if redis.call("ZSCORE", readyKey, groupId) then return 0 end
+if redis.call("EXISTS", activeKey) == 1 then return 0 end
+if redis.call("SISMEMBER", blockedKey, groupId) == 1 then return 0 end
+if isParkedGroupAt(keyPrefix, groupId) then return 0 end
+local newest = redis.call("ZRANGE", jobsKey, -1, -1, "WITHSCORES")
+if not newest[2] or tonumber(newest[2]) >= cutoffMs then return 0 end
+redis.call("DEL", jobsKey, dataKey)
+return 1
+`;
+
 const COMPLETE_LUA =
+  TTL_HELPER_LUA +
   PARK_HELPER_LUA +
   WATER_LEVEL_HELPER_LUA +
   CLAIMED_RECORD_HELPER_LUA +
@@ -1379,7 +1469,7 @@ if staticCap > 0 then
   local tenantCap = effectiveCap(parkKeyPrefixOf(readyKey), staticCap)
   local tenantId = parkTenantOf(groupId)
   local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
-  unparkUpTo(readyKey, tenantId, tenantCap - active)
+  unparkUpTo(readyKey, tenantId, tenantCap - active, nowMs)
 end
 
 local pendingCount = redis.call("ZCARD", jobsKey)
@@ -1733,7 +1823,7 @@ if tenantCountKeyPrefix and tenantCountKeyPrefix ~= "" then
     local tenantCap = effectiveCap(parkKeyPrefixOf(readyKey), staticCap)
     local tenantId = parkTenantOf(groupId)
     local active = tenantActiveCount(tenantCountKeyPrefix, tenantId, nowMs)
-    unparkUpTo(readyKey, tenantId, tenantCap - active)
+    unparkUpTo(readyKey, tenantId, tenantCap - active, nowMs)
   end
 end
 
@@ -2069,6 +2159,39 @@ const restageAndBlockScript = new CachedLuaScript(RESTAGE_AND_BLOCK_LUA);
 const retryRestageScript = new CachedLuaScript(RETRY_RESTAGE_LUA);
 const claimGuardScript = new CachedLuaScript(CLAIM_GUARD_LUA);
 const releaseClaimScript = new CachedLuaScript(RELEASE_CLAIM_LUA);
+const deleteStrandedGroupScript = new CachedLuaScript(DELETE_STRANDED_GROUP_LUA);
+
+/**
+ * Deletes a stranded group's jobs and data keys in one eval that first re-checks it is
+ * still in none of ready, active, blocked, its tenant's parked set or a paused lane's,
+ * and its newest job still predates `cutoffMs`. Returns whether it deleted them.
+ */
+export async function deleteStrandedGroup({
+  redis,
+  keyPrefix,
+  groupId,
+  cutoffMs,
+}: {
+  redis: IORedis | Cluster;
+  keyPrefix: string;
+  groupId: string;
+  cutoffMs: number;
+}): Promise<boolean> {
+  const groupBase = `${keyPrefix}group:${groupId}`;
+  const deleted = await deleteStrandedGroupScript.run(
+    redis,
+    5,
+    `${groupBase}:jobs`,
+    `${groupBase}:data`,
+    `${keyPrefix}ready`,
+    `${keyPrefix}blocked`,
+    `${groupBase}:active`,
+    keyPrefix,
+    groupId,
+    cutoffMs,
+  );
+  return deleted === 1;
+}
 
 export class GroupStagingScripts {
   private readonly keyPrefix: string;

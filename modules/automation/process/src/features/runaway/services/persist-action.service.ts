@@ -196,6 +196,7 @@ export class AutomationPersistActionService {
     await this.writer.addToDataset({
       datasetId: parsed.data.datasetId,
       projectId: input.tenantId,
+      triggerId: input.trigger.id,
       datasetRecords,
     });
 

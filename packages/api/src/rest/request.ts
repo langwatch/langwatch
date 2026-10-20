@@ -9,6 +9,7 @@ import {
   getStatusCodeFromError,
   logHttpRequest,
   type Logger,
+  REQUEST_LOGGER_NAME,
   type RequestLogData,
 } from "@langwatch/observability";
 import { runWithContext, updateCurrentContext } from "@langwatch/observability/context";
@@ -624,6 +625,34 @@ export async function drainWithinCap(
   return drained;
 }
 
+/**
+ * The request body could not be read to the end: the client went away mid-upload (an abort, a
+ * reset). The bytes never arrived, so it is the sender's to retry, never a 500 of ours.
+ * Spec: specs/observability/request-log-cause-and-level.feature
+ */
+export class RequestBodyUnreadableError extends HandledError {
+  declare readonly code: "request_body_unreadable";
+
+  constructor({ cause }: Readonly<{ cause?: unknown }> = {}) {
+    super("request_body_unreadable", "The request body could not be read to the end.", {
+      httpStatus: 400,
+      fault: "customer",
+      reasons: cause instanceof Error ? [cause] : [],
+      ...remediation("request_body_unreadable"),
+    });
+    this.name = "RequestBodyUnreadableError";
+  }
+}
+
+/** Reads a request body, answering a read that failed partway as the sender's 400. */
+export async function readRequestBody<T>(read: () => Promise<T>): Promise<T> {
+  try {
+    return await read();
+  } catch (error) {
+    throw new RequestBodyUnreadableError({ cause: error });
+  }
+}
+
 /** RFC 9110: a `Content-Length` is a run of decimal digits and nothing else. */
 const CONTENT_LENGTH = /^\d+$/;
 
@@ -686,7 +715,8 @@ export const bodyLimit = (options: BodyLimitOptions): MiddlewareHandler => {
       return declared > maxSize ? onError(c, next) : next();
     }
 
-    const body = await drainWithinCap(request.body, maxSize);
+    const stream = request.body;
+    const body = await readRequestBody(() => drainWithinCap(stream, maxSize));
     if (!body) return onError(c, next);
 
     c.req.raw = withBufferedBody(request, body);
@@ -805,7 +835,7 @@ function logRequestOutcome({
 /** Creates a Hono middleware that wraps each request in an OTel span. */
 export function tracerMiddleware(options?: { name?: string }) {
   return async (c: Context, next: Next): Promise<void> => {
-    const tracer = trace.getTracer("langwatch:api:hono");
+    const tracer = trace.getTracer(REQUEST_LOGGER_NAME);
 
     const incomingHeaders = c.req.raw.headers;
     const parentCtx = propagation.extract(otContext.active(), incomingHeaders, headersGetter);
@@ -861,10 +891,10 @@ export function tracerMiddleware(options?: { name?: string }) {
 
 /**
  * Creates a Hono middleware that logs each request using
- * `@langwatch/observability`.
+ * `@langwatch/observability`. `name` is the family, carried as a field.
  */
 export function loggerMiddleware(options?: { name?: string }) {
-  const logger = createLogger(`langwatch:api:${options?.name ?? "hono"}`);
+  const logger = createLogger(REQUEST_LOGGER_NAME);
 
   return async (c: Context, next: Next): Promise<void> => {
     if (c.get(REQUEST_LOG_CLAIM)) return next();
@@ -908,6 +938,19 @@ export function loggerMiddleware(options?: { name?: string }) {
       }
     });
   };
+}
+
+/**
+ * Hands the request logger the cause of an answer a lane built itself rather than threw (tRPC
+ * answers its failures as responses), so the access record names the handled code and fault
+ * instead of "request failed without a cause attached".
+ */
+export function recordAnsweredCause(
+  c: Context,
+  { error, status }: Readonly<{ error: unknown; status: number }>,
+): void {
+  const resolved: ResolvedError = { error, status: status as ContentfulStatusCode };
+  c.set(RESOLVED_ERROR, resolved);
 }
 
 /** Records a declared answer without inventing a cause. */
