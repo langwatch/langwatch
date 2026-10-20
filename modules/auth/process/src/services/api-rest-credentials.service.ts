@@ -20,7 +20,6 @@ import {
 } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { HandledError } from "@langwatch/handled-error";
-import { classifyForLangy } from "@langwatch/langy-contract";
 import { createLogger, createWarnThrottle, type Logger } from "@langwatch/observability";
 import { type OrganizationApi } from "@langwatch/organization-contract";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
@@ -31,6 +30,7 @@ import {
   extractApiKeyRequestCredentials,
   type ApiKeyRequestCredentials,
 } from "../rules/api-credential-request.rules.ts";
+import { isUndelegatedForLangy } from "../rules/langy-key-delegation.rules.ts";
 import { ApiKeyHoldsService } from "./api-key-holds.service.ts";
 import {
   ApiOrganizationCredentialsService,
@@ -288,13 +288,7 @@ export class ApiRestCredentialsService {
     const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: {
-        kind: "apiKey",
-        apiKeyId,
-        userId,
-        organizationId,
-        ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
-      },
+      principal: { kind: "apiKey", apiKeyId, userId, organizationId, isLangySessionKey },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
@@ -313,7 +307,9 @@ export class ApiRestCredentialsService {
     const { reach } = input;
     const credential = await this.identifyKey({ request: input.request });
     for (const permission of asked(input.permissions)) {
-      refuseUndelegated({ principal: credential.principal, permission });
+      if (isUndelegatedForLangy({ key: credential.principal, permission })) {
+        throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
+      }
       const allowed = await this.keyHolds.holds({
         principal: credential.principal,
         permission,
@@ -444,21 +440,6 @@ export class ApiRestCredentialsService {
   }
 }
 
-/**
- * A Langy key is refused what Langy is never delegated on the key door too, by the policy itself
- * rather than by whatever grants the key happens to carry.
- */
-function refuseUndelegated(input: {
-  principal: RestKeyDoorPrincipal;
-  permission: AuthzPermission;
-}): void {
-  const { principal, permission } = input;
-  if (principal.kind !== "apiKey" || !principal.isLangySessionKey) return;
-  if (classifyForLangy(permission).disposition === "granted") return;
-
-  throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
-}
-
 /** The one denial every tier answers with, at the scope the key was asked at. */
 function keyPermissionRefusal(input: {
   credential: ApiKeyDoorCredential;
@@ -507,9 +488,7 @@ function apiKeyCeilingRefusal({
       "API key ceiling denial",
     );
   }
-  const langy = resolved.isLangySessionKey ? classifyForLangy(permission) : null;
-  if (langy && langy.disposition !== "granted") {
-    return new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
-  }
-  return new ApiKeyPermissionDeniedError(permission);
+  return isUndelegatedForLangy({ key: resolved, permission })
+    ? new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" })
+    : new ApiKeyPermissionDeniedError(permission);
 }
