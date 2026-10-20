@@ -812,6 +812,25 @@ jobs:
 
       - uses: ./.github/actions/prepare-generated-files
 
+      # Each browser lane runs `playwright install --with-deps chromium` in its own
+      # script (browser-test-lane.md), and the first one on a shard spent ~17s
+      # downloading Chromium. Cached by Playwright version, that install finds the
+      # browser already there and only checks the system libraries. Keyed on the
+      # version rather than the lockfile, so an unrelated dependency bump keeps
+      # the cache and the repository's cache quota is not churned.
+      - name: Read the Playwright version
+        id: playwright
+        run: |
+          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
+          test -n "$version"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Cache the Playwright browser
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.cache/ms-playwright
+          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
+
       - name: Generate a throwaway CREDENTIALS_SECRET
         # Same reason as test-unit and test-component: anything encrypted at
         # rest has to round-trip through a real key, and a test asserting that
@@ -1331,9 +1350,6 @@ jobs:
       - name: Test start-clickhouse-with-storage-policy.sh
         run: bash .github/scripts/__tests__/start-clickhouse-with-storage-policy.test.sh
 
-      - name: Test start-boxd-ssh-agent.sh
-        run: bash .github/scripts/__tests__/start-boxd-ssh-agent.test.sh
-
       - name: Test notify-slack-release.sh
         run: bash .github/scripts/__tests__/notify-slack-release.test.sh
 
@@ -1386,11 +1402,13 @@ jobs:
   # added under dev/scripts therefore merged green and turned every branch that
   # merged main red.
   #
-  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # No path gate, on purpose. The guard reads every tree `files` in the root
   # package.json names, and a path filter listing them would be a second copy of
   # that list, stale the day someone edits it. A minute on an unrelated pull
-  # request is the cheaper mistake.
+  # request is the cheaper mistake. A label event is not a change at all, so it
+  # skips like `changes` does.
   pack-filters:
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout

@@ -1,5 +1,5 @@
 from typing import Any, Optional, TypeVar
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 
 import numpy as np
 from pydantic import BaseModel
@@ -27,6 +27,7 @@ from scipy.spatial.distance import cdist
 import numpy as np
 
 from langevals_topic_clustering.utils import fill_embeddings
+from langevals_topic_clustering.failures import configured_model, failure_answer
 from langevals_topic_clustering._logger import get_logger, set_log_context, clear_log_context
 
 logger = get_logger("topic_clustering.incremental")
@@ -260,9 +261,7 @@ def setup_endpoints(app: FastAPI):
                 existing_subtopics=len(params.subtopics),
             )
 
-            model = params.litellm_params["model"]
-            if model.startswith("azure/") and params.deployment_name:
-                model = f"azure/{params.deployment_name}"
+            model = configured_model(params.litellm_params, params.deployment_name)
 
             logger.info("Generating embeddings for new traces", step="1/3")
             traces_with_embeddings = fill_embeddings(
@@ -319,7 +318,9 @@ def setup_endpoints(app: FastAPI):
                 "cost": cost,
             }
         except Exception as e:
-            logger.error("Incremental clustering failed", error=str(e), error_type=type(e).__name__)
-            raise HTTPException(status_code=500, detail="Incremental clustering failed") from e
+            answer = failure_answer(e, logger, "Incremental")
+            if answer is e:
+                raise
+            raise answer from e
         finally:
             clear_log_context()

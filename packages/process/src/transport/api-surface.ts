@@ -30,7 +30,9 @@ import {
   canonicalErrorAnswer,
   IdempotencyLedger,
   type IdempotentRunner,
+  loggerMiddleware,
   openConfirmationGate,
+  recordAnsweredCause,
   RestHost,
   type RestConfirmationGate,
 } from "@langwatch/api/rest";
@@ -43,8 +45,9 @@ import {
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
+import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
-import { Hono } from "hono";
+import { type Context, Hono } from "hono";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -400,6 +403,11 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
 function trpcLanes(trpc: TrpcHost): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
+  // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
+  // on; the procedure's own failure line stays tRPC's (policy.ts). Spec:
+  // specs/observability/request-log-cause-and-level.feature
+  app.use(`${TrpcHost.path}/*`, loggerMiddleware({ name: "trpc" }));
+  app.use("/api/sse/*", loggerMiddleware({ name: "sse" }));
 
   app.all(`${TrpcHost.path}/*`, async (context) => {
     const request = context.req.raw;
@@ -421,6 +429,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
       ...(await trpc.sessionVersionHeaders({ context: createContext })),
       ...trpc.schemaHashHeaders({ path }),
     };
+    let failure: unknown;
     const response = await fetchRequestHandler({
       endpoint: TrpcHost.path,
       req: bodylessAsNoInput(request),
@@ -428,8 +437,12 @@ function trpcLanes(trpc: TrpcHost): Hono {
       createContext,
       allowBatching: false,
       responseMeta: ({ errors }) => ({ headers: trpc.retryAfterHeaders({ errors }) }),
+      onError: ({ error }) => {
+        failure = error;
+      },
     });
     for (const [name, value] of Object.entries(versionHeaders)) response.headers.set(name, value);
+    recordTrpcFailure({ context, failure, status: response.status });
 
     return response;
   });
@@ -451,6 +464,17 @@ function trpcLanes(trpc: TrpcHost): Hono {
   app.get("/api/sse/*", (context) => sse.answer(context.req.raw, context.res.headers));
 
   return app;
+}
+
+/** Records a failed answer's handled cause, not tRPC's wrapper, with its code and fault. */
+function recordTrpcFailure({
+  context,
+  failure,
+  status,
+}: Readonly<{ context: Context; failure: unknown; status: number }>): void {
+  if (failure === undefined || status < 400) return;
+  const cause = failure instanceof TRPCError && failure.cause ? failure.cause : failure;
+  recordAnsweredCause(context, { error: cause, status });
 }
 
 /** httpLink posts a no-input mutation with no body; tRPC would parse it as JSON and refuse. */

@@ -1371,7 +1371,7 @@ describe("a route that declares the several answers it may give", () => {
   it("records the request as handled rather than as a server fault", async () => {
     await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
 
-    const rows = logsFor("langwatch:api:platform-health");
+    const rows = logsFor("langwatch:api:hono");
 
     expect(rows).toContainEqual(
       expect.objectContaining({
@@ -1395,7 +1395,7 @@ describe("a route that declares the several answers it may give", () => {
       },
     });
 
-    expect(logsFor("langwatch:api:platform-health")).toContainEqual(
+    expect(logsFor("langwatch:api:hono")).toContainEqual(
       expect.objectContaining({
         fields: expect.objectContaining({
           endpointClass: "api",

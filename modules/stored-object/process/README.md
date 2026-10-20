@@ -436,11 +436,11 @@ None: stored-object declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf                            | Environment variable                   | Declared at                                  |
 | ------ | ------------------------------- | -------------------------------------- | -------------------------------------------- |
-| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`           | `../contract/src/stored-object.config.ts:25` |
-| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:27` |
-| config | `blockLocalHttpCalls`           | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:29` |
-| config | `allowedProxyHosts`             | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:30` |
-| config | `isSaas`                        | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:32` |
-| config | `publicBaseUrl`                 | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:34` |
+| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`           | `../contract/src/stored-object.config.ts:35` |
+| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:36` |
+| config | `blockLocalHttpCalls`           | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:38` |
+| config | `allowedProxyHosts`             | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:39` |
+| config | `isSaas`                        | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:41` |
+| config | `publicBaseUrl`                 | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:43` |
 
 <!-- readme:generated:end -->

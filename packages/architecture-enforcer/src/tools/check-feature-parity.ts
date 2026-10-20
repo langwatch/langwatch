@@ -165,7 +165,7 @@ const DEFAULT_TEST_ROOTS: string[] = [
 
 /**
  * Roots scanned for `.bats` shell tests. Shell-driven dev-environment
- * behavior (compose overrides, boxd fork orchestration) is tested with
+ * behavior (compose overrides, worktree setup) is tested with
  * bats, not vitest — without this scan path, scenarios that describe
  * shell behavior would have no way to satisfy parity and would be stuck
  * on `@unimplemented` forever. Bats bindings use the same `@scenario`
@@ -546,7 +546,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
   "specs/npx-installer/02-predeps.feature",
@@ -1247,8 +1246,8 @@ function collectAllBindings(testRoots: string[]): CollectedBinding[] {
 /**
  * Bats binding form (line-oriented, comment-prefixed):
  *
- *   # @scenario "Stale localhost NEXTAUTH_URL is rewritten to the fork's proxy URL"
- *   @test "boxd_rewrite_env: rewrites NEXTAUTH_URL allowlist key" {
+ *   # @scenario "all-local overrides only DATABASE_URL, REDIS_URL, CLICKHOUSE_URL"
+ *   @test "all-local rewrites DATABASE_URL, REDIS_URL, CLICKHOUSE_URL only" {
  *     ...
  *   }
  *
