@@ -7,21 +7,31 @@
 import {
   genAiOperationRoleOf,
   isModelCallSpan,
+  LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+  type LogFactsContributedEvent,
   SPAN_FACTS_CONTRIBUTED_EVENT_TYPE,
   type SpanFactsContributedEvent,
 } from "@langwatch/coding-agent-contract";
 import { createTenantId, decodeFoldCacheEntry, encodeFoldCacheEntry } from "@langwatch/eventing";
+import type { CanonicalLogRecord } from "@langwatch/log-contract";
 import { NormalizedSpanKind, type NormalizedSpan } from "@langwatch/trace-contract";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { TestModelProviderService } from "../../__tests__/fixtures/coding-agent-processing.fixture.ts";
+import { TestGithubService } from "../../__tests__/fixtures/coding-agent.fixture.ts";
 import { ClaudeAnswersTraceCanonicalisation } from "../../__tests__/fixtures/trace-canonicalisation.fixture.ts";
+import { CodingAgentPullRequestAssignmentService } from "../../features/pull-requests/services/coding-agent-pull-request-assignment.service.ts";
+import { liftLogContribution } from "../../rules/coding-agent-log-facts.rules.ts";
 import { liftSpanContribution } from "../../rules/coding-agent-span-facts.rules.ts";
 import { isFoldedModelCall } from "../coding-agent-session-span.projection.ts";
 import {
   CodingAgentSessionFoldProjection,
   type CodingAgentSessionState,
 } from "../coding-agent-session.projection.ts";
+import {
+  createPullRequestMappingHandler,
+  shouldMapPullRequests,
+} from "../pull-request-mapping.subscriber.ts";
 
 const CLI_CONVERSATION = "00000000-0000-4000-8000-000000000001";
 const VSCODE_CONVERSATION = "00000000-0000-4000-8000-000000000014";
@@ -121,6 +131,148 @@ function foldSessions(
     );
   }
   return sessions;
+}
+
+/** One checkout a session context record names, as the CLI's hook reads it from git. */
+interface DeclaredCheckout {
+  host: string;
+  owner: string;
+  name: string;
+  branch: string;
+  worktree: string;
+}
+
+/**
+ * The record `langwatch ingest hook` posts, as log processing stores it: the
+ * CLI's own scope and service, the session id and declared agent beside the
+ * checkout. Nothing in it is Copilot's own, which is why the server needs no
+ * Copilot branch to fold it (ADR-039 S4).
+ */
+function sessionContextRecord({
+  agent,
+  sessionId,
+  checkout,
+  timeMs,
+}: {
+  agent: string;
+  sessionId: string;
+  checkout: DeclaredCheckout;
+  timeMs: number;
+}): CanonicalLogRecord {
+  const attributes = {
+    "event.name": "langwatch.session_context",
+    "session.id": sessionId,
+    "coding_agent.name": agent,
+    "vcs.repository.host": checkout.host,
+    "vcs.repository.owner": checkout.owner,
+    "vcs.repository.name": checkout.name,
+    "vcs.ref.head.name": checkout.branch,
+    "vcs.worktree.name": checkout.worktree,
+  };
+  return {
+    tenantId: "project-1",
+    organizationId: "organization-1",
+    recordId: `${timeMs}`.padStart(64, "0"),
+    resourceSchemaUrl: "",
+    resourceAttributesJson: "[]",
+    resourceAttributesFlatJson: JSON.stringify({ "service.name": "langwatch-cli" }),
+    resourceAttributeKeys: ["service.name"],
+    resourceDroppedAttributesCount: 0,
+    scopeSchemaUrl: "",
+    scopeName: "langwatch.coding_agent.hook",
+    scopeVersion: "",
+    scopeAttributesJson: "[]",
+    scopeAttributeKeys: [],
+    scopeDroppedAttributesCount: 0,
+    wireTraceId: "",
+    wireSpanId: "",
+    correlationTraceId: "",
+    correlationSpanId: "",
+    correlationSource: "none",
+    timeUnixNano: `${timeMs}000000`,
+    observedTimeUnixNano: `${timeMs}000000`,
+    timeUnixMs: timeMs,
+    severityNumber: 9,
+    severityText: "INFO",
+    bodyType: "empty",
+    bodyJson: "null",
+    bodyText: null,
+    attributesJson: "[]",
+    attributesFlatJson: JSON.stringify(attributes),
+    attributeKeys: Object.keys(attributes),
+    droppedAttributesCount: 0,
+    flags: 0,
+    eventName: "langwatch.session_context",
+    providerKind: "generic",
+    providerEventKind: "",
+    providerEventSequence: "",
+    providerSessionId: "",
+    providerConversationId: "",
+    providerPromptId: "",
+    piiRedactionLevel: "DISABLED",
+    canonicalPayload: "",
+    canonicalSizeBytes: 0,
+    occurredAt: timeMs,
+    acceptedAt: timeMs,
+  };
+}
+
+/** Lifts each record as log processing does and folds it onto the session it keys. */
+function foldContextRecords(
+  records: CanonicalLogRecord[],
+  sessions = new Map<string, CodingAgentSessionState>(),
+): Map<string, CodingAgentSessionState> {
+  const projection = makeProjection();
+  for (const record of records) {
+    const lifted = liftLogContribution({
+      record,
+      traces: ClaudeAnswersTraceCanonicalisation.create(),
+    });
+    if (lifted.outcome === "ignored") continue;
+    const data = lifted.contribution;
+    const event: LogFactsContributedEvent = {
+      id: `evt-${data.recordId}`,
+      aggregateId: data.sessionId,
+      aggregateType: "coding_agent_session",
+      createdAt: data.occurredAt,
+      occurredAt: data.occurredAt,
+      version: "2025-01-01",
+      tenantId: createTenantId(data.tenantId),
+      type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+      data,
+    };
+    const state = sessions.get(data.sessionId) ?? projection.init();
+    sessions.set(data.sessionId, projection.handleCodingAgentSessionLogFactsContributed(event, state));
+  }
+  return sessions;
+}
+
+const WIDGETS: DeclaredCheckout = {
+  host: "github.com",
+  owner: "acme",
+  name: "widgets",
+  branch: "feat/copilot-hooks",
+  worktree: "widgets",
+};
+
+const GADGETS: DeclaredCheckout = {
+  host: "github.com",
+  owner: "acme",
+  name: "gadgets",
+  branch: "fix/gadget-sizes",
+  worktree: "gadgets",
+};
+
+/** The row fields a session context sets, the ones a repository switch moves. */
+function checkoutOf(state: CodingAgentSessionState | undefined) {
+  return {
+    repositoryHost: state?.repositoryHost,
+    repositoryOwner: state?.repositoryOwner,
+    repositoryName: state?.repositoryName,
+    gitBranch: state?.gitBranch,
+    gitBranches: state?.gitBranches,
+    gitWorktree: state?.gitWorktree,
+  };
 }
 
 const cliRoot: CapturedSpan = {
@@ -400,6 +552,155 @@ describe("Copilot session fold", () => {
         expect(genAiOperationRoleOf({ agent: "codex", name: keylessCodexChat.name })).toBe(
           "undeclared",
         );
+      });
+    });
+  });
+});
+
+describe("Copilot session context", () => {
+  /** A Copilot CLI row built from its spans, then the hook's record for the same conversation. */
+  const withContext = (...checkouts: DeclaredCheckout[]) =>
+    foldContextRecords(
+      checkouts.map((checkout, index) =>
+        sessionContextRecord({
+          agent: "copilot",
+          sessionId: CLI_CONVERSATION,
+          checkout,
+          timeMs: 30_000 + index * 1_000,
+        }),
+      ),
+      foldSessions(cliSession),
+    );
+
+  describe("given a Copilot session row keyed by its conversation id", () => {
+    describe("when a session context record for the same id declares the agent copilot", () => {
+      const sessions = withContext(WIDGETS);
+      const row = sessions.get(CLI_CONVERSATION);
+
+      /** @scenario "A Copilot session context sets the row's repository and branch" */
+      it("sets the repository host, owner, name and branch on that row, and mints no other", () => {
+        expect(sessions.size).toBe(1);
+        expect(row?.agent).toBe("copilot");
+        expect(checkoutOf(row)).toEqual({
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          gitBranch: "feat/copilot-hooks",
+          gitBranches: ["feat/copilot-hooks"],
+          gitWorktree: "widgets",
+        });
+      });
+
+      /** @scenario "A Copilot session context sets the row's repository and branch" */
+      it("keeps what the spans folded: the model, tokens and AI units", () => {
+        const spansOnly = foldSessions(cliSession).get(CLI_CONVERSATION);
+
+        expect(row?.models).toEqual(spansOnly?.models);
+        expect(row?.inputTokens).toBe(spansOnly?.inputTokens);
+        expect(row?.aiUnits).toBe(spansOnly?.aiUnits);
+      });
+    });
+  });
+
+  describe("given a Copilot session whose branch has an open pull request", () => {
+    const row = withContext(WIDGETS).get(CLI_CONVERSATION)!;
+
+    describe("when the session maps to pull requests", () => {
+      /** @scenario "A Copilot session on a branch with an open pull request is listed on it" */
+      it("asks for its branch's pull requests and is attached to the open one", async () => {
+        const github = TestGithubService.create();
+        const requestBranchMapping = vi.spyOn(github, "requestBranchMapping");
+        const event: LogFactsContributedEvent = {
+          id: "evt-context",
+          aggregateId: CLI_CONVERSATION,
+          aggregateType: "coding_agent_session",
+          createdAt: 30_000,
+          occurredAt: 30_000,
+          version: "2025-01-01",
+          tenantId: createTenantId("project-1"),
+          type: LOG_FACTS_CONTRIBUTED_EVENT_TYPE,
+          data: {
+            tenantId: "project-1",
+            sessionId: CLI_CONVERSATION,
+            sessionKeySource: "provider",
+            agent: "copilot",
+            occurredAt: 30_000,
+            recordId: "rec-context",
+            traceId: null,
+            spanId: null,
+            timeUnixMs: 30_000,
+            severityNumber: 9,
+            providerKind: "generic",
+            scopeName: "langwatch.coding_agent.hook",
+            facts: {},
+          },
+        };
+
+        expect(shouldMapPullRequests(row, github)).toBe(true);
+        await createPullRequestMappingHandler(github)(event, {
+          tenantId: "project-1",
+          aggregateId: CLI_CONVERSATION,
+          state: row,
+        });
+        expect(requestBranchMapping).toHaveBeenCalledWith({
+          tenantId: "project-1",
+          repositoryHost: "github.com",
+          repositoryOwner: "acme",
+          repositoryName: "widgets",
+          headBranch: "feat/copilot-hooks",
+        });
+
+        // A row the record left without a branch attaches to nothing, and fails below.
+        const assignments = CodingAgentPullRequestAssignmentService.create();
+        const attached = assignments.assignSessions({
+          sessions: [
+            {
+              sessionId: CLI_CONVERSATION,
+              startedAtMs: row.startedAtMs,
+              headBranch: row.gitBranch ?? "",
+            },
+          ],
+          pullRequests: [
+            {
+              prNumber: 42,
+              headBranch: "feat/copilot-hooks",
+              prCreatedAtMs: 0,
+              prClosedAtMs: null,
+              prMergedAtMs: null,
+            },
+          ],
+        });
+        expect(attached.get(CLI_CONVERSATION)).toBe(42);
+      });
+    });
+  });
+
+  describe("given a Copilot session that reports one repository and then another", () => {
+    describe("when both session context records are folded", () => {
+      const copilotRow = withContext(WIDGETS, GADGETS).get(CLI_CONVERSATION);
+      const claudeRow = foldContextRecords(
+        [WIDGETS, GADGETS].map((checkout, index) =>
+          sessionContextRecord({
+            agent: "claude_code",
+            sessionId: "claude-session",
+            checkout,
+            timeMs: 30_000 + index * 1_000,
+          }),
+        ),
+      ).get("claude-session");
+
+      /** @scenario "A repository switch during a Copilot session follows the Claude Code rule" */
+      it("shows the repository host, owner and name from the later record", () => {
+        expect(copilotRow?.repositoryHost).toBe("github.com");
+        expect(copilotRow?.repositoryOwner).toBe("acme");
+        expect(copilotRow?.repositoryName).toBe("gadgets");
+        expect(copilotRow?.gitBranch).toBe("fix/gadget-sizes");
+      });
+
+      /** @scenario "A repository switch during a Copilot session follows the Claude Code rule" */
+      it("matches the same records folded for a Claude Code session", () => {
+        expect(claudeRow?.agent).toBe("claude_code");
+        expect(checkoutOf(copilotRow)).toEqual(checkoutOf(claudeRow));
       });
     });
   });
