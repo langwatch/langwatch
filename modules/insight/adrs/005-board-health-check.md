@@ -36,16 +36,17 @@ no stored statement is not checked. Builder graphs on a board are not checked (A
 refuses a project the Workbench rollout does not admit. The check asks
 `AnalyticsApi.isWorkbenchEnabled` once and runs nothing when it is off.
 
-**Broken is an error the person can fix, or no data.** A refusal with `fault: customer` below
-500 is an `error` (tone bad). A widget whose every statement ran and came back empty shows
-`no_data` (tone watch). A statement is empty when it returns no rows, rows whose every value is
-null; or when the analytics module reports no traffic in the period it read
-(`completeness.state = no_traffic`, what the board shows as "No traces in this period"). One row
-whose every value is 0 or null is empty only beside that report. Without it (a rollup view such
-as `trace_metrics_by_minute` carries no report, and a report can fail) or beside traffic, the
-statement is `unchecked` and files nothing: zero errors over a busy month is an answer, and a
-missed card costs less than a false one renewed every day. An error on one statement outweighs
-empty ones.
+**Broken is an error the person can fix, or no data.** A refusal with `fault: customer`
+below 500 is an `error` (tone bad). A widget whose every statement ran and came back
+empty shows `no_data` (tone watch). A statement is empty only beside a completeness
+report of `no_traffic` (no traffic in the period it read, what the board shows as "No
+traces in this period") or `missing` (traffic, but a field it reads is never present).
+Beside `no_traffic` any answer is empty; beside `missing`, no rows or rows whose every
+value is null. Beside `complete` or `partial`, or with no report (a rollup view such as
+`trace_metrics_by_minute`, a statement with its own range, a failed report), no rows,
+rows of nulls and one row of zeros are `unchecked` and file nothing: a correct filter
+can be empty, zero errors over a busy month is an answer, and a missed card costs less
+than a false one renewed every day. An error on one statement outweighs empty ones.
 
 **A failure of ours files nothing.** Every 5xx refusal, a transient refusal, an error that is
 no refusal, and `query_memory_exceeded` and `query_scan_limit_exceeded`, are the platform's:
@@ -108,8 +109,9 @@ Langy chat now counts as a new trace.
 - A run waiting for the query window holds one of the 2 daily-run slots a pod has for up to 3
   minutes, so at a popular hour runs queue behind it and cards and Langy's findings land later.
   Watch the daily run's duration after rollout.
-- A failed read or write of the cards is logged and files nothing; the run carries on, and the
-  next run renews.
+- A failed read or write of the cards is logged; the run carries on, and the next run
+  files or renews the rest. The cards written before the failure stand and are counted
+  in the report, and their widgets are named to Langy as already reported.
 - `InsightRenewed.source` became nullable, since a card has no conversation and every renewal
   needs one. A pod of the release before cannot fold a renewal without one, so this change
   ships alone, one release before the check: rolling back over it is then safe.

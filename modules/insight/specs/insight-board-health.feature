@@ -131,6 +131,13 @@ Feature: The daily run checks the board's widgets
       Then the check reports no card instead of failing the run
 
     @unit
+    Scenario: A write that fails partway reports the cards already filed
+      Given three widgets that show no data, and the insights store fails the second card's write
+      When the run is carried out
+      Then the check reports the one card filed before the failure, for the first widget
+      And the run carries on, and the next run files the rest
+
+    @unit
     Scenario: When most statements fail with the same code, the whole check is the platform's
       Given 4 widgets whose statements all fail with lwql_unknown_identifier
       When the run is carried out

@@ -177,6 +177,7 @@ describe("given a widget that shows no data", () => {
 });
 
 describe("given three widgets that show no data, and a store that fails the second write", () => {
+  /** @scenario "A write that fails partway reports the cards already filed" */
   it("reports the one card filed before the failure", async () => {
     const { service, filed } = harness({ fullFor: 0, store: { writeFailsFrom: 2 } });
 
