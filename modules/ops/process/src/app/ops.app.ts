@@ -928,6 +928,7 @@ export class OpsModule implements OpsApi {
         mail: dependencies.notifications,
         renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
+        audience: config.isSaas || cloudOps ? "langwatch-cloud" : "self-hosted",
       }),
     });
     return app;

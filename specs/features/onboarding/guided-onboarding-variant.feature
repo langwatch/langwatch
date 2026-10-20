@@ -149,6 +149,15 @@ Feature: Guided onboarding variant
     When the user skips the provider step
     Then the guided state carries the time the provider was skipped
 
+  # "Later" on Langy's model prompt after the tour. Recorded on the organization
+  # so the prompt and the forced panel stay away across reloads and devices.
+  @integration
+  Scenario: putting off the model prompt is recorded
+    Given an organization in the guided variant that skipped the provider
+    When the user presses "Later" on Langy's model prompt
+    Then the guided state carries the time the prompt was put off
+    And the provider skip and the tour are left as they were
+
   @integration
   Scenario: completing, skipping and replaying the tour are recorded
     Given an organization in the guided variant
