@@ -7,8 +7,11 @@ import { CODING_AGENT_REGISTRY } from "./index.ts";
 /** The fact a model call's AI units ride on, in whole units: never a dollar figure. */
 export const AI_UNITS_SESSION_FACT = "langwatch.session.ai_units";
 
-/** The receiver-stamped ingestion source type, which tells one agent's surfaces apart. */
-const SOURCE_TYPE_ATTRIBUTE = "langwatch.ingestion_source.source_type";
+/**
+ * The source type the ingest-key receiver stamps on the resource, which tells one agent's surfaces
+ * apart. Governance ingestion sources stamp a span attribute instead, but never a Copilot surface.
+ */
+const SOURCE_TYPE_RESOURCE_ATTRIBUTE = "langwatch.source";
 
 const NANO_PER_UNIT = 1_000_000_000;
 const ROLES: readonly GenAiOperationRole[] = ["session", "modelCall", "toolRun"];
@@ -42,9 +45,11 @@ export const SPANS_REQUIRE_SESSION_KEY_AGENT_IDS: ReadonlySet<string> = new Set(
 export function declaredSpanSessionFacts({
   agent,
   attributes,
+  resourceAttributes,
 }: {
   agent: string;
   attributes: Record<string, unknown>;
+  resourceAttributes: Record<string, unknown>;
 }): Record<string, string | number> {
   const definition = definitionOf(agent);
   if (definition === undefined) return {};
@@ -55,7 +60,7 @@ export function declaredSpanSessionFacts({
     .find((value) => Number.isFinite(value) && value > 0);
   if (nanoAiUnits !== undefined) facts[AI_UNITS_SESSION_FACT] = nanoAiUnits / NANO_PER_UNIT;
 
-  const sourceType = attributes[SOURCE_TYPE_ATTRIBUTE];
+  const sourceType = resourceAttributes[SOURCE_TYPE_RESOURCE_ATTRIBUTE];
   const surface =
     typeof sourceType === "string" ? definition.surfaceBySourceType?.[sourceType] : undefined;
   if (surface !== undefined) facts["app.entrypoint"] = surface;

@@ -25,7 +25,8 @@ import {
 
 const CLI_CONVERSATION = "00000000-0000-4000-8000-000000000001";
 const VSCODE_CONVERSATION = "00000000-0000-4000-8000-000000000014";
-const SOURCE_TYPE = "langwatch.ingestion_source.source_type";
+/** The source type the ingest-key receiver stamps on the resource. */
+const SOURCE = "langwatch.source";
 const PRICE_PER_CALL_USD = 0.001;
 
 interface CapturedSpan {
@@ -33,10 +34,19 @@ interface CapturedSpan {
   scopeName: string;
   startMs: number;
   endMs: number;
+  /** The ingest key's source type, as the receiver stamps it on the resource. */
+  source: string;
   attributes: Record<string, unknown>;
 }
 
-function normalized({ name, scopeName, startMs, endMs, attributes }: CapturedSpan): NormalizedSpan {
+function normalized({
+  name,
+  scopeName,
+  startMs,
+  endMs,
+  source,
+  attributes,
+}: CapturedSpan): NormalizedSpan {
   return {
     id: `row-${name}-${startMs}`,
     traceId: "c0ffee00c0ffee00c0ffee00c0ffee00",
@@ -51,7 +61,7 @@ function normalized({ name, scopeName, startMs, endMs, attributes }: CapturedSpa
     durationMs: endMs - startMs,
     name,
     kind: NormalizedSpanKind.INTERNAL,
-    resourceAttributes: {},
+    resourceAttributes: { [SOURCE]: source },
     spanAttributes: attributes,
     events: [],
     links: [],
@@ -115,6 +125,7 @@ const cliRoot: CapturedSpan = {
   scopeName: "github.copilot",
   startMs: 1_000,
   endMs: 20_000,
+  source: "copilot_cli",
   attributes: {
     "gen_ai.operation.name": "invoke_agent",
     "gen_ai.conversation.id": CLI_CONVERSATION,
@@ -123,7 +134,6 @@ const cliRoot: CapturedSpan = {
     "gen_ai.usage.output_tokens": 88,
     "metadata.copilot_nano_aiu": "253341500",
     "langwatch.reserved.skip_token_accumulation": "true",
-    [SOURCE_TYPE]: "copilot_cli",
   },
 };
 
@@ -147,6 +157,7 @@ function cliChat({
     scopeName: "github.copilot",
     startMs,
     endMs: startMs + 1_500,
+    source: "copilot_cli",
     attributes: {
       "gen_ai.operation.name": "chat",
       "gen_ai.conversation.id": CLI_CONVERSATION,
@@ -157,7 +168,6 @@ function cliChat({
       "gen_ai.usage.cache_read.input_tokens": cacheRead,
       "metadata.copilot_cost": "1",
       "metadata.copilot_nano_aiu": nanoAiUnits,
-      [SOURCE_TYPE]: "copilot_cli",
     },
   };
 }
@@ -168,11 +178,11 @@ function cliTool({ name, startMs }: { name: string; startMs: number }): Captured
     scopeName: "github.copilot",
     startMs,
     endMs: startMs + 200,
+    source: "copilot_cli",
     attributes: {
       "gen_ai.operation.name": "execute_tool",
       "gen_ai.conversation.id": CLI_CONVERSATION,
       "gen_ai.tool.name": name,
-      [SOURCE_TYPE]: "copilot_cli",
     },
   };
 }
@@ -208,6 +218,7 @@ const vscodeChat: CapturedSpan = {
   scopeName: "copilot-chat",
   startMs: 1_000,
   endMs: 3_610,
+  source: "copilot_vscode",
   attributes: {
     "gen_ai.operation.name": "chat",
     "gen_ai.conversation.id": VSCODE_CONVERSATION,
@@ -217,7 +228,6 @@ const vscodeChat: CapturedSpan = {
     "gen_ai.usage.output_tokens": 87,
     "gen_ai.usage.cache_read.input_tokens": 0,
     "metadata.copilot_nano_aiu": "309855000",
-    [SOURCE_TYPE]: "copilot_vscode",
   },
 };
 
@@ -278,12 +288,12 @@ describe("Copilot session fold", () => {
       scopeName: "copilot-chat",
       startMs: 1_000,
       endMs: 1_400,
+      source: "copilot_vscode",
       attributes: {
         "gen_ai.operation.name": "chat",
         "gen_ai.agent.name": "title",
         "gen_ai.usage.input_tokens": 120,
         "gen_ai.usage.output_tokens": 6,
-        [SOURCE_TYPE]: "copilot_vscode",
       },
     };
 

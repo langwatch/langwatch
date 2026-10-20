@@ -47,7 +47,11 @@ export function liftSpanContribution({
       scopeName: span.instrumentationScope.name,
       attributes: span.spanAttributes,
     }),
-    ...declaredSpanSessionFacts({ agent, attributes: span.spanAttributes }),
+    ...declaredSpanSessionFacts({
+      agent,
+      attributes: span.spanAttributes,
+      resourceAttributes: span.resourceAttributes,
+    }),
   };
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
