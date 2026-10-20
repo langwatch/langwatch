@@ -473,7 +473,7 @@ describe("<SubscriptionPage/>", () => {
 
       const block = await screen.findByTestId("current-plan-block");
 
-      expect(within(block).getByText("License: Enterprise")).toBeInTheDocument();
+      expect(within(block).getByText("Enterprise")).toBeInTheDocument();
       expect(screen.queryByText("Upgrade required")).not.toBeInTheDocument();
       expect(screen.queryByTestId("upgrade-plan-block")).not.toBeInTheDocument();
     });

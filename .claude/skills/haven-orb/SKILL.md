@@ -29,4 +29,4 @@ haven orb network --failed --agent
   orb showing. The files live in `.haven/logs/<slug>/orb/`.
 - On a built-UI stack (`haven up` or `--watch`) the dev runtime injects the orb into the built page
   (`tools/dev-runtime/src/haven-orb.ts`); the first page load waits a few seconds while it builds.
-  A `--hmr` stack has none. Without a person's tab, drive the page with `haven-browser`.
+  Under `--hmr` the Vite lane injects the same orb itself (`apps/ui/vite.config.ts`). Without a person's tab, drive the page with `haven-browser`.

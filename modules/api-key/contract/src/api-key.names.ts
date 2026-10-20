@@ -21,6 +21,12 @@ export const WORKFLOW_RUN_API_KEY_NAME = "Workflow run";
 export const TRACE_EXPORT_API_KEY_NAME = "Gateway trace export";
 
 /**
+ * Name of the ownerless key one Ops checkup trace canary runs with: bound to the hidden checkup
+ * project, holding only `traces:create` and `traces:view`, and expiring 5 minutes after its mint.
+ */
+export const CHECKUP_CANARY_API_KEY_NAME = "Checkup canary";
+
+/**
  * Name prefix of the key a `langwatch login` device session carries,
  * matched with the device label for re-login replacement and by the hourly
  * sweep alone. NOT hidden: a customer can name a key this way too.
@@ -39,6 +45,7 @@ export const RESERVED_SYSTEM_KEY_NAMES: readonly string[] = [
   ...HIDDEN_SYSTEM_KEY_NAMES,
   WORKFLOW_RUN_API_KEY_NAME,
   TRACE_EXPORT_API_KEY_NAME,
+  CHECKUP_CANARY_API_KEY_NAME,
 ];
 
 /** A key LangWatch minted for itself: hidden from listings and never updated or revoked by hand. */

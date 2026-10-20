@@ -182,10 +182,13 @@ function logPageUnread({
 
 /** One page of the OpenAI Admin cost report, fetched over the vendor's HTTP and mapped to events. */
 export class OpenAiAdminCostPageService {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly apiBase: string,
+  ) {}
 
-  static create(http: GovernanceHttpClient): OpenAiAdminCostPageService {
-    return new OpenAiAdminCostPageService(http);
+  static create(http: GovernanceHttpClient, apiBase: string): OpenAiAdminCostPageService {
+    return new OpenAiAdminCostPageService(http, apiBase);
   }
 
   /**
@@ -325,7 +328,7 @@ export class OpenAiAdminCostPageService {
       throw new Error("openai admin puller requires an admin API key in credentials.token");
     }
 
-    const url = reportUrl({ startingAt, page, hasKeyGrouping });
+    const url = reportUrl({ startingAt, page, hasKeyGrouping, apiBase: this.apiBase });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);

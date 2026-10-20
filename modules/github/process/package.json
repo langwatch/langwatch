@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -35,7 +35,6 @@
     "@langwatch/plans": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/secrets": "workspace:*",
@@ -47,6 +46,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@types/jsonwebtoken": "catalog:",
     "@types/node": "catalog:",

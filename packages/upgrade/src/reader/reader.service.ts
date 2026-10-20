@@ -15,7 +15,12 @@ import {
   readGooseVersions,
   readPrismaMigrations,
 } from "../seed-sources.ts";
-import { computeInstallationState, describeInstallationState } from "./installation-state.ts";
+import {
+  computeInstallationState,
+  describeInstallationState,
+  imageNameOf,
+  type InstallationFacts,
+} from "./installation-state.ts";
 import { preflightFrom, type UpgradePreflightRow } from "./preflight.ts";
 import { previewUpgradeTo, type UpgradePreview } from "./preview.ts";
 import {
@@ -32,7 +37,6 @@ import type {
   InstalledOrigin,
   ListRunsInput,
   ListStepsFilter,
-  UpgradeFloor,
   UpgradeImage,
   UpgradeImageStep,
   UpgradeLeaseView,
@@ -68,7 +72,6 @@ function summariseRun(run: LedgerRunRow): UpgradeRunSummary {
     id: run.id,
     kind: run.kind,
     release: run.release,
-    floor: run.floor,
     startedAt: run.started_at,
     finishedAt: run.finished_at,
     outcome: run.outcome,
@@ -79,7 +82,7 @@ function viewLease(lease: LedgerLeaseRow): UpgradeLeaseView {
   return {
     name: lease.name,
     owner: lease.owner,
-    image: lease.image,
+    image: lease.image === UNRELEASED_IMAGE ? null : lease.image,
     host: lease.host,
     heartbeatAt: lease.heartbeat_at,
     expiresAt: lease.expires_at,
@@ -130,7 +133,7 @@ function pickLiveLease({ leases }: { leases: readonly LedgerLeaseRow[] }): Ledge
 /**
  * The installed release: the newest succeeded run's, else the highest a settled step carries. An
  * upgrade by an unreleased image installed past every release, so it reads unreleased, never a
- * stale release below the floor (as the gate's `assertCurrent` treats an unreleased build).
+ * stale release.
  */
 export function pickInstalled({
   succeededRun,
@@ -227,8 +230,8 @@ function planFactsFrom({
     const kind = upgradeRunKindSchema.safeParse(run.kind);
     const outcome = upgradeRunOutcomeSchema.nullable().safeParse(run.outcome);
     if (!kind.success || !outcome.success) return [];
-    const { release, floor, plan, started_at: startedAt } = run;
-    return [{ kind: kind.data, outcome: outcome.data, release, floor, plan, startedAt }];
+    const { release, plan, started_at: startedAt } = run;
+    return [{ kind: kind.data, outcome: outcome.data, release, plan, startedAt }];
   });
   return { steps, runs };
 }
@@ -256,21 +259,48 @@ async function readPlanFacts({
   return { steps: [...prisma, ...goose], runs: [] };
 }
 
+/** The installation-state facts of one status read, the image named as the summary names it. */
+function installationFactsOf({
+  image,
+  facts,
+  installed,
+}: {
+  image: UpgradeImage;
+  facts: {
+    ledgerHoldsRecords: boolean;
+    stepFacts: readonly LedgerStepFact[];
+    failedTargets: number;
+    holdsLease: boolean;
+    latestRun: LedgerRunRow | null;
+  };
+  installed: string | null;
+}): InstallationFacts {
+  return {
+    imageRelease: image.release,
+    ...(image.name === undefined ? {} : { imageName: image.name }),
+    imageSteps: image.steps,
+    installed,
+    ledgerHoldsRecords: facts.ledgerHoldsRecords,
+    steps: facts.stepFacts,
+    failedTargets: facts.failedTargets,
+    holdsLease: facts.holdsLease,
+    lastRunFailed: facts.latestRun?.outcome === "failed",
+  };
+}
+
 /**
  * The read model of the Upgrades page and `upgrade status` (dev/docs/plans/upgrade-ui-2026-10-06.md
  * section 8). It touches only the ledger tables, tolerates unknown kinds and statuses, and is
- * handed the image's release, declared steps, floor and old-writer code steps; reads no manifest.
+ * handed the image's release, declared steps and old-writer code steps; reads no manifest.
  */
 export function createUpgradeReader({
   postgres,
   image,
-  floor,
   needsOldWritersGone = new Set(),
   planning,
 }: {
   postgres: UpgradePostgres;
   image: UpgradeImage;
-  floor: UpgradeFloor | null;
   needsOldWritersGone?: ReadonlySet<string>;
   /** The manifests `preview` plans with; ClickHouse seeds goose history into an empty ledger. */
   planning?: UpgradePlanning & { clickhouse?: UpgradeClickHouse };
@@ -281,12 +311,11 @@ export function createUpgradeReader({
     repository.findLiveRoster({ tables, staleAfterMs: SERVING_ROSTER_TIMING.staleAfterMs });
 
   async function readStatusFacts({ tables }: { tables: LedgerTables }) {
-    const [stepFacts, latestRun, succeededRun, floors, leases, unfinishedRun, anyRun, failed] =
+    const [stepFacts, latestRun, succeededRun, leases, unfinishedRun, anyRun, failed] =
       await Promise.all([
         repository.findStepFacts({ tables }),
         repository.findLatestRun({ tables }),
         repository.findLatestSucceededRun({ tables }),
-        repository.findRecordedFloors({ tables }),
         repository.findLeases({ tables }),
         repository.hasUnfinishedUpgradeRun({ tables }),
         repository.hasAnyRun({ tables }),
@@ -297,7 +326,6 @@ export function createUpgradeReader({
       stepFacts,
       latestRun,
       succeededRun,
-      ledgerFloor: pickHighestRelease({ releases: floors }),
       lease,
       holdsLease: tables.lease ? lease !== null : unfinishedRun,
       ledgerHoldsRecords: anyRun || stepFacts.length > 0,
@@ -309,26 +337,14 @@ export function createUpgradeReader({
     const tables = await repository.findTables();
     const facts = await readStatusFacts({ tables });
     const { installed, origin } = pickInstalled(facts);
-    const verdict = computeInstallationState({
-      imageRelease: image.release,
-      imageSteps: image.steps,
-      floor: floor?.release ?? null,
-      installed,
-      ledgerFloor: facts.ledgerFloor,
-      ledgerHoldsRecords: facts.ledgerHoldsRecords,
-      steps: facts.stepFacts,
-      failedTargets: facts.failedTargets,
-      holdsLease: facts.holdsLease,
-      lastRunFailed: facts.latestRun?.outcome === "failed",
-    });
+    const installationFacts = installationFactsOf({ image, facts, installed });
+    const verdict = computeInstallationState(installationFacts);
     return {
       ...verdict,
       ...describeInstallationState({ state: verdict.state }),
-      installed,
+      installed: installed === UNRELEASED_IMAGE ? null : installed,
       origin,
-      image: image.release,
-      floor: floor?.release ?? null,
-      ledgerFloor: facts.ledgerFloor,
+      image: imageNameOf(installationFacts),
       lease: facts.lease ? viewLease(facts.lease) : null,
       lastRun: facts.latestRun ? summariseRun(facts.latestRun) : null,
       counts: countBy({ items: facts.stepFacts, key: (step) => step.status }),
@@ -445,7 +461,12 @@ export function createUpgradeReader({
     });
     return {
       installed,
-      plan: previewUpgradeTo({ plan, image: planning.image, to }),
+      plan: previewUpgradeTo({
+        plan,
+        image: planning.image,
+        manifests: planning.releases.manifests,
+        to,
+      }),
       preflight: await preflight(),
     };
   }

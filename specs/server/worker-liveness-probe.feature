@@ -132,6 +132,28 @@ Feature: Worker liveness probe endpoint
       # The api serves through this thread too: a long poll or a slow export
       # is work in progress, not a stall.
 
+    @unit
+    Scenario: A request no door can parse is answered as Node would and named once in the log
+      Given the liveness thread is serving the process port
+      When a caller sends a request the HTTP parser refuses, with a cookie
+      Then the response is Node's own 400 and the connection closes
+      And one warn line names the parser's code and the request's first bytes
+      And the cookie's value is not in that line
+
+    @unit
+    Scenario: A process that composed no telemetry still writes its server's lines
+      Given an api embedded beside the worker, which owns the process's telemetry
+      When its server writes a line, such as a refused request
+      Then the line goes to the process's logger under the api's name, once
+
+    @unit
+    Scenario: A connection the thread closes is never announced as kept alive
+      Given the liveness thread is serving the process port
+      And the main thread answers an event stream with "Connection: keep-alive"
+      When a pooling proxy sends that request with "Connection: close"
+      Then the thread's answer says "Connection: close"
+      And the proxy's next request opens a new connection and is served
+
   Rule: Liveness boots before any stage that can block for minutes
 
     # The voice public URL tunnel (cloudflared quick tunnel) can take up to

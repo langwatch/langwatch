@@ -74,6 +74,7 @@ var Sets = []Set{
 		Render:           func(key int64) string { return fmt.Sprintf("%05d", key) },
 		ReleaseKeysTaken: true,
 		RetiredKeys: map[int64]string{
+			106: "00106_usage_trace_meter_retention was folded into 00104 before reaching main",
 			107: "00107_create_trace_topic_names was removed with the trace copies",
 			108: "00108 was removed with the trace copies",
 		},

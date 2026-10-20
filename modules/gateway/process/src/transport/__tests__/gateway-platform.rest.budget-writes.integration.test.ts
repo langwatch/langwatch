@@ -192,6 +192,7 @@ async function mountedBudgets() {
   });
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: door, identify: door } },
     idempotency: passthroughIdempotency,

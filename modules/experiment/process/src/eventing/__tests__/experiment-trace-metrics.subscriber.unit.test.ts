@@ -94,6 +94,20 @@ describe("the experiment run marker filter", () => {
 });
 
 describe("traceSpanMetricsSync handler", () => {
+  describe("when the settled span carries its own time", () => {
+    it("anchors the summary lookup on the span's time", async () => {
+      const { handle, findSummary } = setup();
+
+      await handle({ ...SETTLED, occurredAt: 1_700_000_000_000 });
+
+      expect(findSummary).toHaveBeenCalledWith({
+        projectId: "project-1",
+        traceId: "trace-1",
+        occurredAtMs: 1_700_000_000_000,
+      });
+    });
+  });
+
   describe("when the settled trace carries a recorded run and cost", () => {
     /**
      * @scenario Trace metrics are published to experiment pipeline after stabilisation

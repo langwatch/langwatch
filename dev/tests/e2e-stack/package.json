@@ -13,7 +13,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc --noEmit"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b"
   },
   "devDependencies": {
     "@types/node": "catalog:",

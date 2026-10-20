@@ -55,6 +55,7 @@ quotes a customer a different number on a different page.
 | `langwatch/no-boot-hook-outside-guard`      | plugin | A process lifecycle listener is registered only by the boot guard: the `Server` for a long-running process, `bootNodeExecutable` for a one-shot.                                                                 |
 | `langwatch/no-inline-dynamic-import`        | plugin | No inline `import(…)`; a dependency is a top-level import.                                                                                                                                                       |
 | `langwatch/em-dash-in-copy`                 | plugin | No em dash in customer-facing copy.                                                                                                                                                                              |
+| `langwatch/no-raw-font-size`                | plugin | Module browser text is sized by a product `textStyle`, never px, em, rem or a bare number.                                                                                                                       |
 
 Every plugin rule here is a candidate for oxlint configuration and is
 deliberately not written there yet: ADR-135 records the classification and the

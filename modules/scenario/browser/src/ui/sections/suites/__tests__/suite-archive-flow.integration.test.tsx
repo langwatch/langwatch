@@ -161,7 +161,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 
 // Mock panels to avoid deep dependency trees
 vi.mock("../run-history-panel.tsx", () => ({
-  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All runs Panel</div>,
 }));
 
 vi.mock("../suite-detail-panel.tsx", () => ({

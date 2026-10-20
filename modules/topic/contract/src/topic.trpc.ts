@@ -11,6 +11,8 @@ import { z } from "zod";
 import { TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES } from "./topic-clustering.constants.ts";
 import {
   topicClusteringRunHistoryEntrySchema,
+  topicClusteringRunHistoryPageInputSchema,
+  topicClusteringRunHistoryPageSchema,
   topicClusteringStatusSchema,
   namedTopicCountsSchema,
   topicClusteringTriggerResultSchema,
@@ -39,6 +41,10 @@ export const topicTrpc = defineTrpcContract("topics")
   .query("getClusteringRunHistory", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
   .withInput(topicProjectScopeSchema)
   .withOutput(topicClusteringRunHistoryEntrySchema.array())
+
+  .query("getClusteringRunHistoryPage", { invalidatedBy: TOPIC_CLUSTERING_PROCESSING_EVENT_TYPES })
+  .withInput(topicClusteringRunHistoryPageInputSchema)
+  .withOutput(topicClusteringRunHistoryPageSchema)
 
   .mutation("triggerTopicClustering")
   .withInput(topicProjectScopeSchema)

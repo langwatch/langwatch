@@ -160,7 +160,7 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:projectId/:storedObjectId/:filename`, `/api/v1/files/:projectId/:storedObjectId/:filename`.
 
 ```typescript
-// Params: storedObjectFileRouteNamedParamsSchema, ../contract/src/stored-object-file-route.ts:17
+// Params: storedObjectFileRouteNamedParamsSchema, ../contract/src/stored-object-file-route.ts:31
 interface Params {
   projectId: string;
   storedObjectId: string;
@@ -177,12 +177,12 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:projectId/:storedObjectId`, `/api/v1/files/:projectId/:storedObjectId`.
 
 ```typescript
-// Params: storedObjectFileRouteScopedParamsSchema, ../contract/src/stored-object-file-route.ts:8
+// Params: storedObjectFileRouteScopedParamsSchema, ../contract/src/stored-object-file-route.ts:17
 interface Params {
   projectId: string;
   storedObjectId: string;
 }
-// Query: storedObjectFileRouteFilenameQuerySchema, ../contract/src/stored-object-file-route.ts:33
+// Query: storedObjectFileRouteFilenameQuerySchema, ../contract/src/stored-object-file-route.ts:56
 interface Query {
   filename?: string;
 }
@@ -197,11 +197,11 @@ Authenticated: an object is addressed by its id, so the project that owns it is 
 Answers at `/api/files/:storedObjectId`, `/api/v1/files/:storedObjectId`.
 
 ```typescript
-// Params: storedObjectFileRouteIdParamsSchema, ../contract/src/stored-object-file-route.ts:25
+// Params: storedObjectFileRouteIdParamsSchema, ../contract/src/stored-object-file-route.ts:41
 interface Params {
   storedObjectId: string;
 }
-type Query = z.infer<typeof storedObjectFileRouteFilenameQuerySchema>; // ../contract/src/stored-object-file-route.ts:33
+type Query = z.infer<typeof storedObjectFileRouteFilenameQuerySchema>; // ../contract/src/stored-object-file-route.ts:56
 // Response: inline, src/transport/stored-object-file.rest.ts:95
 type Response = unknown;
 ```
@@ -222,7 +222,7 @@ Public: an <img> fires with no credential; every address is fenced by the SSRF e
 Answers at `/api/image-proxy`.
 
 ```typescript
-// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:41
+// Query: imageProxyQuerySchema, ../contract/src/stored-object-file-route.ts:64
 interface Query {
   url?: string;
 }
@@ -249,7 +249,7 @@ Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:46
 Answers at `/api/stored-objects/uploads`, `/api/v1/stored-objects/uploads`; also, undocumented, `/api/stored-objects/2026-08-22/uploads`, `/api/v1/stored-objects/2026-08-22/uploads`, `/api/stored-objects/latest/uploads`, `/api/v1/stored-objects/latest/uploads`.
 
 ```typescript
-// Body: storedObjectsCreateUploadInputSchema, ../contract/src/uploads.ts:13
+// Body: storedObjectsCreateUploadInputSchema, ../contract/src/uploads.ts:27
 interface Body {
   projectId: string;
   purpose: string;
@@ -257,7 +257,7 @@ interface Body {
   mediaType: string;
   byteLength: number;
 }
-// Response: storedObjectsCreateUploadOutputSchema, ../contract/src/uploads.ts:24
+// Response: storedObjectsCreateUploadOutputSchema, ../contract/src/uploads.ts:43
 interface Response {
   objectId: string;
   uploadUrl: string;
@@ -271,36 +271,36 @@ interface Response {
 
 Confirm a stored-object upload
 
-Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:57`.
+Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:58`.
 
 Answers at `/api/stored-objects/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/uploads/:storedObjectId/confirmation`; also, undocumented, `/api/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/stored-objects/latest/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/latest/uploads/:storedObjectId/confirmation`.
 
 ```typescript
-// Params: storedObjectParamsSchema, ../contract/src/uploads.ts:49
+// Params: storedObjectParamsSchema, ../contract/src/uploads.ts:70
 interface Params {
   storedObjectId: string;
 }
-// Body: inline, src/transport/stored-object.rest.ts:59
+// Body: inline, src/transport/stored-object.rest.ts:61
 interface Body {
   projectId: string;
 }
-type Response = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:43
+type Response = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:59
 ```
 
 #### `PUT /uploads/:storedObjectId/content` · `putStoredObjectUploadContent`
 
-Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:71`.
+Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:73`.
 
 Answers at `/api/stored-objects/uploads/:storedObjectId/content`, `/api/v1/stored-objects/uploads/:storedObjectId/content`; also, undocumented, `/api/stored-objects/2026-08-22/uploads/:storedObjectId/content`, `/api/v1/stored-objects/2026-08-22/uploads/:storedObjectId/content`, `/api/stored-objects/latest/uploads/:storedObjectId/content`, `/api/v1/stored-objects/latest/uploads/:storedObjectId/content`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:49
-// Query: inline, src/transport/stored-object.rest.ts:73
+type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:70
+// Query: inline, src/transport/stored-object.rest.ts:76
 interface Query {
   sig: string;
 }
-// Rawbody: "stream" (inline, src/transport/stored-object.rest.ts:74)
-// Response: inline, src/transport/stored-object.rest.ts:76
+// Rawbody: "stream" (inline, src/transport/stored-object.rest.ts:77)
+// Response: inline, src/transport/stored-object.rest.ts:79
 interface Response {
   ok: true;
 }
@@ -308,17 +308,17 @@ interface Response {
 
 #### `GET,HEAD /:storedObjectId/content` · `getStoredObjectContent`
 
-Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:90`.
+Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:93`.
 
 Answers at `/api/stored-objects/:storedObjectId/content`, `/api/v1/stored-objects/:storedObjectId/content`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId/content`, `/api/v1/stored-objects/2026-08-22/:storedObjectId/content`, `/api/stored-objects/latest/:storedObjectId/content`, `/api/v1/stored-objects/latest/:storedObjectId/content`.
 
 ```typescript
-type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:49
-// Query: inline, src/transport/stored-object.rest.ts:92
+type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:70
+// Query: inline, src/transport/stored-object.rest.ts:95
 interface Query {
   sig: string;
 }
-// Response: inline, src/transport/stored-object.rest.ts:94
+// Response: inline, src/transport/stored-object.rest.ts:97
 type Response = unknown;
 ```
 
@@ -326,38 +326,38 @@ type Response = unknown;
 
 Resolve a fresh stored-object capability
 
-Permission `project:view`. Declared at `src/transport/stored-object.rest.ts:106`.
+Permission `project:view`. Declared at `src/transport/stored-object.rest.ts:109`.
 
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: inline, src/transport/stored-object.rest.ts:107
+// Params: inline, src/transport/stored-object.rest.ts:110
 interface Params {
   storedObjectId: string;
 }
-// Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:108)
-type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src/stored-object.commands.ts:29
+// Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:111)
+type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src/stored-object.commands.ts:45
 ```
 
 #### `DELETE /:storedObjectId` · `deleteStoredObject`
 
 Delete a stored object
 
-Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:120`.
+Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:123`.
 
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: inline, src/transport/stored-object.rest.ts:121
+// Params: inline, src/transport/stored-object.rest.ts:125
 interface Params {
   storedObjectId: string;
 }
-// Body: inline, src/transport/stored-object.rest.ts:122
+// Body: inline, src/transport/stored-object.rest.ts:126
 interface Body {
   projectId: string;
   idempotencyKey: string;
 }
-// Response: storedObjectsDeleteOutputSchema, ../contract/src/stored-object.commands.ts:46
+// Response: storedObjectsDeleteOutputSchema, ../contract/src/stored-object.commands.ts:73
 interface Response {
   id: string;
   generation: number;
@@ -369,7 +369,7 @@ interface Response {
 
 ### `storedObjects`
 
-Contract `../contract/src/stored-object.trpc.ts:45`, router `src/transport/stored-object.trpc.ts:12`.
+Contract `../contract/src/stored-object.trpc.ts:62`, router `src/transport/stored-object.trpc.ts:12`.
 
 | Procedure                     | Kind     | Gate                                                        | Input                                   | Output                                   |
 | ----------------------------- | -------- | ----------------------------------------------------------- | --------------------------------------- | ---------------------------------------- |
@@ -380,12 +380,12 @@ Contract `../contract/src/stored-object.trpc.ts:45`, router `src/transport/store
 
 ```typescript
 // storedObjects.headById
-// Input: storedObjectHeadInputSchema, ../contract/src/stored-object.trpc.ts:16
+// Input: storedObjectHeadInputSchema, ../contract/src/stored-object.trpc.ts:24
 interface Input {
   projectId: string;
   id: string;
 }
-// Output: storedObjectHeadSchema, ../contract/src/stored-object.trpc.ts:26
+// Output: storedObjectHeadSchema, ../contract/src/stored-object.trpc.ts:37
 type Output =
   | {
       status: "available";
@@ -400,28 +400,28 @@ type Output =
     };
 
 // storedObjects.getReadUrl
-// Input: storedObjectReadUrlInputSchema, ../contract/src/stored-object.trpc.ts:33
+// Input: storedObjectReadUrlInputSchema, ../contract/src/stored-object.trpc.ts:50
 interface Input {
   projectId: string;
   storedObjectId: string;
   filename?: string;
 }
-// Output: storedObjectReadUrlSchema, ../contract/src/stored-object.trpc.ts:42
+// Output: storedObjectReadUrlSchema, ../contract/src/stored-object.trpc.ts:59
 interface Output {
   url: string;
 }
 
 // storedObjects.createUpload
-type Input = z.infer<typeof storedObjectsCreateUploadInputSchema>; // ../contract/src/uploads.ts:13
-type Output = z.infer<typeof storedObjectsCreateUploadOutputSchema>; // ../contract/src/uploads.ts:24
+type Input = z.infer<typeof storedObjectsCreateUploadInputSchema>; // ../contract/src/uploads.ts:27
+type Output = z.infer<typeof storedObjectsCreateUploadOutputSchema>; // ../contract/src/uploads.ts:43
 
 // storedObjects.confirmUpload
-// Input: storedObjectsConfirmUploadInputSchema, ../contract/src/uploads.ts:35
+// Input: storedObjectsConfirmUploadInputSchema, ../contract/src/uploads.ts:56
 interface Input {
   projectId: string;
   objectId: string;
 }
-type Output = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:43
+type Output = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../contract/src/uploads.ts:59
 ```
 
 ## Sockets
@@ -436,11 +436,11 @@ None: stored-object declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf                            | Environment variable                   | Declared at                                  |
 | ------ | ------------------------------- | -------------------------------------- | -------------------------------------------- |
-| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`           | `../contract/src/stored-object.config.ts:25` |
-| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:27` |
-| config | `blockLocalHttpCalls`           | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:29` |
-| config | `allowedProxyHosts`             | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:30` |
-| config | `isSaas`                        | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:32` |
-| config | `publicBaseUrl`                 | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:34` |
+| config | `objectRetentionConfirmed`      | `OBJECT_RETENTION_CONFIRMED`           | `../contract/src/stored-object.config.ts:35` |
+| config | `legacySpoolRetentionConfirmed` | `AZURE_BLOB_SPOOL_RETENTION_CONFIRMED` | `../contract/src/stored-object.config.ts:36` |
+| config | `blockLocalHttpCalls`           | `BLOCK_LOCAL_HTTP_CALLS`               | `../contract/src/stored-object.config.ts:38` |
+| config | `allowedProxyHosts`             | `ALLOWED_PROXY_HOSTS`                  | `../contract/src/stored-object.config.ts:39` |
+| config | `isSaas`                        | `IS_SAAS`                              | `../contract/src/stored-object.config.ts:41` |
+| config | `publicBaseUrl`                 | `BASE_HOST`                            | `../contract/src/stored-object.config.ts:43` |
 
 <!-- readme:generated:end -->

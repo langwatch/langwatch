@@ -1,19 +1,11 @@
 package diffkit
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
-	"os"
-	"path/filepath"
 	"regexp"
-	"sort"
 	"strings"
 )
-
-// SignaturesFile groups every warn/error/fatal line the stacks logged by its
-// shape, split into new-on-the-candidate and also-on-the-base.
-const SignaturesFile = "signatures.md"
 
 // signatureWidth caps a normalised message, so one long stack is one signature.
 const signatureWidth = 220
@@ -25,15 +17,6 @@ var (
 	quietLevel    = regexp.MustCompile(`\binfo\b|\bdebug\b`)
 	bracketPrefix = regexp.MustCompile(`^\[[^\]]*\]\s*`)
 )
-
-// Signature is one log line shape and where it was seen.
-type Signature struct {
-	Level   string
-	Message string
-	Count   int
-	Sides   map[string]bool
-	First   string
-}
 
 // LogLevelMessage reads one log line's level and message, or "" for a line
 // below warn. It reads pino JSON (40/50/60 or a level name) and plain text.
@@ -85,94 +68,6 @@ func valueOr(value any) any {
 func NormaliseSignature(message string) string {
 	masked := varyingPart.ReplaceAllString(message, "#")
 	return masked[:min(signatureWidth, len(masked))]
-}
-
-// ScanSignatures reads every log under dir; a file's side is its name up to the first dash.
-func ScanSignatures(dir string) ([]Signature, error) {
-	paths, err := filepath.Glob(filepath.Join(dir, "*.log"))
-	if err != nil {
-		return nil, err
-	}
-	sort.Strings(paths)
-	index := &signatureIndex{byKey: map[string]*Signature{}}
-	for _, path := range paths {
-		side, _, _ := strings.Cut(filepath.Base(path), "-")
-		if err := index.scanLog(path, side); err != nil {
-			return nil, err
-		}
-	}
-	signatures := make([]Signature, 0, len(index.order))
-	for _, key := range index.order {
-		signatures = append(signatures, *index.byKey[key])
-	}
-	sort.SliceStable(signatures, func(a, b int) bool { return signatures[a].Count > signatures[b].Count })
-	return signatures, nil
-}
-
-// signatureIndex collects signatures by level and message, in first-seen order.
-type signatureIndex struct {
-	byKey map[string]*Signature
-	order []string
-}
-
-// scanLog folds one log's levelled lines into the index under side.
-func (index *signatureIndex) scanLog(path, side string) error {
-	file, err := os.Open(path) // #nosec G304 -- a log this run wrote.
-	if err != nil {
-		return err
-	}
-	defer func() { _ = file.Close() }()
-	scanner := bufio.NewScanner(file)
-	scanner.Buffer(make([]byte, 0, 64*1024), 4*1024*1024)
-	for number := 1; scanner.Scan(); number++ {
-		level, message := LogLevelMessage(scanner.Text())
-		if level == "" {
-			continue
-		}
-		key := level + "\x00" + NormaliseSignature(message)
-		signature := index.byKey[key]
-		if signature == nil {
-			signature = &Signature{Level: level, Message: NormaliseSignature(message), Sides: map[string]bool{},
-				First: fmt.Sprintf("%s:%d", filepath.Base(path), number)}
-			index.byKey[key] = signature
-			index.order = append(index.order, key)
-		}
-		signature.Count++
-		signature.Sides[side] = true
-	}
-	return scanner.Err()
-}
-
-// RenderSignatures is signatures.md: new on the candidate, then also on the base, then base only.
-func RenderSignatures(signatures []Signature) string {
-	sections := []struct {
-		title string
-		keep  func(Signature) bool
-	}{
-		{"new on the candidate", func(s Signature) bool { return s.Sides["candidate"] && !s.Sides["base"] }},
-		{"also on the base", func(s Signature) bool { return s.Sides["candidate"] && s.Sides["base"] }},
-		{"base only", func(s Signature) bool { return !s.Sides["candidate"] }},
-	}
-	var out strings.Builder
-	out.WriteString("# log signatures (count level first-seen | message)\n")
-	for _, section := range sections {
-		fmt.Fprintf(&out, "\n## %s\n", section.title)
-		for _, signature := range signatures {
-			if section.keep(signature) {
-				fmt.Fprintf(&out, "%5d %-5s %s | %s\n", signature.Count, signature.Level, signature.First, signature.Message)
-			}
-		}
-	}
-	return out.String()
-}
-
-// WriteSignaturesFile scans <runDir>/logs and writes signatures.md.
-func WriteSignaturesFile(runDir string) error {
-	signatures, err := ScanSignatures(filepath.Join(runDir, "logs"))
-	if err != nil {
-		return err
-	}
-	return os.WriteFile(filepath.Join(runDir, SignaturesFile), []byte(RenderSignatures(signatures)), 0o600)
 }
 
 var ansiEscape = regexp.MustCompile(`\x1b\[[0-9;?]*[A-Za-z]`)

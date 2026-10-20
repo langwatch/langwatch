@@ -26,7 +26,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -51,7 +51,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
@@ -88,6 +87,7 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
     "@langwatch/model-provider-process": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",

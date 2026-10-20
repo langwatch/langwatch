@@ -52,8 +52,7 @@ func TestOldCommandsPointAtTheirGroup(t *testing.T) {
 		"clean": "machine clean", "install": "self install", "setup": "self setup", "upgrade": "self upgrade",
 		"shell-init": "self shell-init", "destroy feat-x": "down --destroy --stack feat-x", "play 4913": "pr 4913 --throwaway",
 		"seed --size small": "db seed --size small",
-		"ps":                "hub", "watch": "hub", "ls": "status", "tc": "machine typecheck", "oc": "machine clean",
-		"doctor": "self doctor", "ch": "db url clickhouse", "cd": "switch",
+		"ps":                "hub", "ls": "status", "doctor": "self doctor", "cleanup": "machine clean",
 	})
 }
 

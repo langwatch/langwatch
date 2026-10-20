@@ -95,7 +95,7 @@ function AttachmentBody({
 }) {
   if (uploadingName !== null) {
     return (
-      <HStack gap={1} color="fg.muted" fontSize="12px">
+      <HStack gap={1} color="fg.muted" textStyle="caption">
         <Spinner size="xs" />
         <Text lineClamp={1}>{uploadingName}</Text>
       </HStack>
@@ -128,7 +128,7 @@ function AttachmentBody({
       <>
         {fallbackText}
         {fallbackTruncated && (
-          <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+          <Box as="span" color="fg.subtle" textStyle="micro" marginLeft={1}>
             (truncated)
           </Box>
         )}
@@ -202,7 +202,7 @@ function AttachmentChip({ href, name }: { href: string; name: string }) {
       borderWidth="1px"
       borderColor="border.emphasized"
       bg="bg.subtle"
-      fontSize="12px"
+      textStyle="caption"
       _hover={{ bg: "bg.muted" }}
     >
       <Paperclip size={12} />
@@ -290,7 +290,7 @@ function UploadError({ error }: { error: unknown }) {
   const copy = describeError({ error, fallbackTitle: "Upload failed" });
 
   return (
-    <Box data-testid="attachment-upload-error" color="red.fg" fontSize="11px" marginTop={1}>
+    <Box data-testid="attachment-upload-error" color="red.fg" textStyle="micro" marginTop={1}>
       <Text lineClamp={3}>{copy}</Text>
     </Box>
   );

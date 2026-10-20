@@ -46,6 +46,7 @@ one-line `why`, then `fix`.
 - [`langwatch/no-logger-spy`](#langwatchnologgerspy)
 - [`langwatch/no-port-vocabulary`](#langwatchnoportvocabulary)
 - [`langwatch/no-prototype-stub`](#langwatchnoprototypestub)
+- [`langwatch/no-raw-font-size`](#langwatchnorawfontsize)
 - [`langwatch/no-redux`](#langwatchnoredux)
 - [`langwatch/no-runtime-reflection`](#langwatchnoruntimereflection)
 - [`langwatch/no-tautological-assertion`](#langwatchnotautologicalassertion)
@@ -75,7 +76,6 @@ one-line `why`, then `fix`.
 - [`langwatch/unbounded-loop`](#langwatchunboundedloop)
 - [`langwatch/unit-test-does-not-render`](#langwatchunittestdoesnotrender)
 - [`langwatch/unresolved-relative-import`](#langwatchunresolvedrelativeimport)
-- [`langwatch/upcast-drain-window`](#langwatchupcastdrainwindow)
 - [`langwatch/web-imports-server-shaped-value`](#langwatchwebimportsservershapedvalue)
 - [`langwatch/zod-internals`](#langwatchzodinternals)
 - [`langwatch/zod-object-composition`](#langwatchzodobjectcomposition)
@@ -227,7 +227,7 @@ Messages:
 
 - `missingTenantPredicate`
   - what: This ClickHouse query reads `{{table}}` without a `TenantId` predicate in that table's own WHERE, so it can return another tenant's rows.
-  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN {tenantIds:Array(String)}`) to the WHERE that filters `{{table}}`. Read the `process-module` skill.
+  - fix: Add `TenantId = {tenantId:String}` (or `TenantId IN ({tenantIds:Array(String)})` with `tenantIds` declared) to the WHERE that filters `{{table}}`. Read the `process-module` skill.
   - why: No id but TenantId is unique across tenants.
 
 ## `langwatch/cognitive-complexity`
@@ -338,7 +338,7 @@ Messages:
 
 - `unnamedSchema`
   - what: The exported schema `{{name}}` has no interface name.
-  - fix: Run `pnpm exec oxlint --fix` on this file; it names the schema with `Named` from @langwatch/module.
+  - fix: Run `pnpm exec oxlint --fix` on this file; it names the schema with `Named` from @langwatch/module. See the `contract` skill.
   - why: Its whole Zod tree is printed into every declaration that uses it, so contracts emit huge, unstable types.
 
 ## `langwatch/effect-derives-state`
@@ -888,6 +888,23 @@ Messages:
   - fix: Write it as an object literal typed `satisfies {{name}}`, or import the module's exported fixture if one already exists for this double. Read the `testing` skill.
   - why: A prototype stub skips the constructor and the type check, so the double drifts from the class.
 
+## `langwatch/no-raw-font-size`
+
+- Kind: style
+- Applies to: isBrowserCode
+- Fixable: no
+- Spec: `specs/tooling/lint-no-raw-font-size.feature`
+- Enforced: yes, at `error`
+
+Options: none.
+
+Messages:
+
+- `rawFontSize`
+  - what: `{{prop}}` sizes text as `{{value}}`, a raw size off the product type scale.
+  - fix: Set `textStyle` to a product style (bodySm, label, caption, micro, mono…) as mapped in dev/docs/best_practices/type-scale.md; where an API takes a number, use `TYPE_SCALE_PX` from `@langwatch/design-system/typography`. See the `design-system` skill.
+  - why: Ad hoc pixel sizes make related text differ by half a pixel from screen to screen.
+
 ## `langwatch/no-redux`
 
 - Kind: problem
@@ -1312,7 +1329,7 @@ Messages:
 
 - `missingReason`
   - what: `SKIP_TENANT_CHECK: true` has no real reason in the comment directly above it.
-  - fix: Write a comment on the line directly above the flag saying why this statement spans tenants (at least 20 characters, not a placeholder such as TODO, n/a, skip, temp or tests), or scope the statement to its tenant instead.
+  - fix: Write a comment on the line directly above the flag saying why this statement spans tenants (at least 20 characters, not a placeholder such as TODO, n/a, skip, temp or tests), or scope the statement to its tenant instead. See the `authorization` skill.
   - why: A skipped tenant check can read every tenant's rows; the reason is what a reviewer audits.
 - `retiredTenancyComment`
   - what: The `@tenancy` SQL comment is the retired Postgres opt-out from the tenant check.
@@ -1660,27 +1677,6 @@ Messages:
   - what: `{{specifier}}` names no file on disk.
   - fix: Point it at the file's new path, or delete the line if the file is gone; a move leaves these in batches, so resolve the whole file in one pass.
   - why: A stale `dist/*.d.ts` keeps diagnostics green, so only a test run finds it. Read the `repo-tree` skill.
-
-## `langwatch/upcast-drain-window`
-
-- Kind: problem
-- Applies to: applies
-- Fixable: no
-- Spec: `specs/tooling/lint-upcast-drain-window.feature`
-- Enforced: yes, at `error`
-
-Options: none.
-
-Messages:
-
-- `drainPastWindow`
-  - what: This upcast drain outlived its window: `removeAfter` is {{removeAfter}} and {{newest}} has been cut.
-  - fix: Delete the `drain` from `.withUpcasts`; keep the `events` until their own contract step at the LTS floor. Read the `eventing-and-worker` skill.
-  - why: Every job the previous release queued has drained by now; the drain is dead routing.
-- `drainWithoutWindow`
-  - what: This upcast drain declares no `removeAfter` release.
-  - fix: Add `removeAfter: "<next release>"` (a literal `x.y.z`) to the `drain`, as `.withLaneAliases` does. Read the `eventing-and-worker` skill.
-  - why: A drain carries jobs a previous release queued, so it lives for one release and must say which.
 
 ## `langwatch/web-imports-server-shaped-value`
 

@@ -1,12 +1,13 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { RawMenu as Menu } from "@langwatch/design-system/menu";
-import { IconButton, Portal, Text } from "@langwatch/design-system/primitives";
+import { IconButton, Portal } from "@langwatch/design-system/primitives";
 import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import {
   canRunNow,
   targetNoun,
@@ -157,7 +158,7 @@ function SchedulerConfirmations({
         open={pending === "pause"}
         onClose={onClose}
         onConfirm={() => onSetActive(false)}
-        isLoading={busy}
+        loading={busy}
         title="Pause this schedule?"
         description={`${target} will stop running for ${project} until you resume it. A run already in progress continues. Pausing does not cancel it.`}
       >
@@ -168,7 +169,7 @@ function SchedulerConfirmations({
         open={pending === "resume"}
         onClose={onClose}
         onConfirm={() => onSetActive(true)}
-        isLoading={busy}
+        loading={busy}
         title="Resume this schedule?"
         description={`${target} will go back on the calendar for ${project} and run at its next scheduled time.`}
       >
@@ -179,7 +180,7 @@ function SchedulerConfirmations({
         open={pending === "clear"}
         onClose={onClose}
         onConfirm={onClearSlot}
-        isLoading={busy}
+        loading={busy}
         title="Clear this stuck slot?"
         description={`This releases the run ${target} has been holding for ${project} so it can be picked up again. If the original worker is somehow still alive, the slot could be worked twice.`}
       >
@@ -191,11 +192,7 @@ function SchedulerConfirmations({
 
 /** The identifier, shown where it can be compared rather than read as prose. */
 function TargetIdentity({ targetId }: { targetId: string }) {
-  return (
-    <Text textStyle="xs" fontFamily="mono" color="fg.muted" marginTop={2} wordBreak="break-all">
-      {targetId}
-    </Text>
-  );
+  return <InlineCode variant="neutral">{targetId}</InlineCode>;
 }
 
 /** Confirms by typed project name (irreversible, affects customers). Typing is the

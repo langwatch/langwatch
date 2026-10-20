@@ -8,10 +8,10 @@ Feature: lambdasim, a local stand-in for the per-project NLP Lambda fleet
   the stack's own nlpgo, the way the real image's Lambda Web Adapter would, so
   the per-project path runs with no AWS account. It checks no signature.
 
-  # Bound by Go tests in services/lambdasim/lambdasim_test.go,
+  # Bound by Go tests in services/sims/lambdasim/lambdasim_test.go,
   # tools/thuishaven/domain/overlay_lambda_test.go and
   # tools/thuishaven/app/plan_lambda_test.go and tools/thuishaven/cmd/sim_lambda_test.go, by their
-  # `// @scenario` annotations, and by apps/lambdasim-web/src/__tests__/calls-console.integration.test.tsx.
+  # `// @scenario` annotations, and by apps/sims/src/lambda/__tests__/calls-console.integration.test.tsx.
   # The function's own environment (LANGWATCH_ENDPOINT, CACHE_BUCKET, ...) is
   # recorded, not applied: the local nlpgo runs with the stack's environment.
 

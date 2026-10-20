@@ -53,11 +53,16 @@ class HostServiceNotificationHost extends NotificationHostApi {
 export default function NotificationHostMount({ children }: { children?: ReactNode }) {
   const { session, feedback } = useUiHostServices();
   const { projectId } = useUiScope().activeScope();
+  const projectSlug = session.snapshot().scope.project?.slug;
 
   const host = useMemo(
     () =>
-      new HostServiceNotificationHost(projectId ? { id: projectId } : void 0, session, feedback),
-    [projectId, session, feedback],
+      new HostServiceNotificationHost(
+        projectId ? { id: projectId, slug: projectSlug } : void 0,
+        session,
+        feedback,
+      ),
+    [projectId, projectSlug, session, feedback],
   );
 
   return <NotificationHostProvider value={host}>{children}</NotificationHostProvider>;

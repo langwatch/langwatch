@@ -69,6 +69,7 @@ function buildDoor(options: { dark?: boolean } = {}) {
   return {
     dispatched,
     list: () => hono.request(url),
+    listAt: (path: string) => hono.request(`http://api.test${path}`),
     dispatch: (body: unknown) =>
       hono.request(url, {
         method: "POST",
@@ -95,6 +96,19 @@ describe("given a worker's session key on a project the rollout reached", () => 
       expect(response.status).toBe(200);
       expect(await response.json()).toEqual({ actions: LISTED.dark ? [] : LISTED.actions });
     });
+  });
+
+  describe("when it lists the UI actions at the /api/v1 path", () => {
+    /** @scenario "The CLI's UI-action door is served where main served it" */
+    it.each(["/api/langy/ui/actions", "/api/v1/langy/ui/actions"])(
+      "answers %s the same",
+      async (path) => {
+        const door = buildDoor();
+        const response = await door.listAt(path);
+        expect(response.status).toBe(200);
+        expect(await response.json()).toEqual({ actions: LISTED.dark ? [] : LISTED.actions });
+      },
+    );
   });
 
   describe("when it dispatches one", () => {

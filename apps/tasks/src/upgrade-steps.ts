@@ -1,10 +1,11 @@
 import { writeFileSync } from "node:fs";
 
 import { migrationStepsOverMemory } from "@langwatch/process";
+import { codeStepOf } from "@langwatch/upgrade/runner";
 import { isDeclaredMigrationStep } from "@langwatch/upgrade/step";
 
 import { processModules } from "./process-modules.generated.ts";
-import { codeStepOf, UpgradeArgumentError } from "./upgrade.ts";
+import { UpgradeArgumentError } from "./upgrade.ts";
 
 /** Invented and harmless: the list is an image fact, so it never reads the host's environment. */
 const LISTING_ENVIRONMENT = {

@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Box, Grid, GridItem, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
   Activity,
   ArrowUpRight,
@@ -165,7 +166,7 @@ export function ViaPlatformScreen(): React.ReactElement {
               display: "inline-flex",
               alignItems: "center",
               gap: "4px",
-              fontSize: "13px",
+              fontSize: TYPE_SCALE_PX.bodySm,
               color: "var(--chakra-colors-fg-muted)",
               textDecoration: "none",
             }}

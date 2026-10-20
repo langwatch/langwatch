@@ -1,10 +1,13 @@
 import { useUiDeployment } from "@langwatch/browser-host/capabilities";
 import { Alert, Button, Icon } from "@langwatch/design-system/primitives";
+import { createLogger } from "@langwatch/observability/browser";
 import { RotateCcw } from "lucide-react";
 import type * as React from "react";
 import { ErrorBoundary, type FallbackProps } from "react-error-boundary";
 
 import { explainAnyError } from "./errors/index.ts";
+
+const logger = createLogger("langwatch:trace:isolated-error-boundary");
 
 interface IsolatedErrorBoundaryProps {
   /**
@@ -42,7 +45,7 @@ export const IsolatedErrorBoundary: React.FC<IsolatedErrorBoundaryProps> = ({
     onError={(error, info) => {
       // Default-log so dev tooling and any session-replay / log scraper
       // catch it even when no explicit telemetry hook is wired.
-      console.error("[IsolatedErrorBoundary]", scope ?? "(no scope)", error);
+      logger.error({ scope: scope ?? "(no scope)", error }, "Isolated section failed");
       onError?.(error as Error, info);
     }}
   >
@@ -81,7 +84,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {rawMessage || "No error message"}
+            {rawMessage || "No error message" /* no-raw-error-toast-ok — dev builds only */}
           </Alert.Description>
         )}
         <Button

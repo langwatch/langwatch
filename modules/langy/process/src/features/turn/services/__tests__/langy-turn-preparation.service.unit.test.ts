@@ -247,13 +247,13 @@ describe("LangyTurnPreparationService golden path", () => {
 
     await LangyTurnService.create(fixture.deps).startConversationTurn({
       ...input,
-      messages: [{ role: "user", parts: [{ type: "text", text: "apidiff question" }] }],
+      messages: [{ role: "user", parts: [{ type: "text", text: "pricing question" }] }],
     });
 
     expect(fixture.acceptTurn).toHaveBeenCalledWith(
       expect.objectContaining({
         conversationStart: expect.objectContaining({ title: null }),
-        userMessage: expect.objectContaining({ title: "Apidiff question" }),
+        userMessage: expect.objectContaining({ title: "Pricing question" }),
       }),
     );
   });

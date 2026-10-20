@@ -9,8 +9,7 @@ import { SHAPE } from "../../model/front-door-theme.ts";
  */
 export const FRONT_DOOR_LINK_STYLE = {
   display: "inline-block",
-  fontSize: "13px",
-  fontWeight: 500,
+  textStyle: "label",
   color: "fg",
   textDecoration: "none",
   _hover: { textDecoration: "underline", textUnderlineOffset: "3px" },

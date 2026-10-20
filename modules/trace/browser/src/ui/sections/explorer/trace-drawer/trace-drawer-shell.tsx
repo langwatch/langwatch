@@ -112,9 +112,10 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
       onOpenChange={() => handleClose()}
     >
       <Drawer.Content
-        // Transparent here so the header below can run its own translucent + backdrop-blur fill,
-        // consistent with the rest of the site's translucent chrome.
-        bg="transparent"
+        // Transparent on wide screens so the header runs its own translucent fill; a phone
+        // gets a full-screen, solid sheet so the page never shows round or through it.
+        bg={isCompactViewport ? "bg" : "transparent"}
+        {...(isCompactViewport ? { margin: 0, borderRadius: 0 } : {})}
         ref={drawerContentRef}
         paddingX={0}
         // When `contentWidthStyle` is set (non-compact viewports) the
@@ -152,7 +153,7 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           // white pane fills extend past the bottom-left corner of
           // the drawer since Drawer.Content runs with overflow:visible
           // (to let the ResizeRail pill escape the chrome).
-          borderRadius="lg"
+          borderRadius={isCompactViewport ? 0 : "lg"}
           display="flex"
           flexDirection="column"
           minHeight={0}
@@ -171,7 +172,11 @@ export function TraceV2DrawerShell(_props: TraceV2DrawerShellProps) {
           />
         </Drawer.Body>
       </Drawer.Content>
-      <KeyboardShortcutsHelp open={shortcutsOpen} onClose={() => setShortcutsOpen(false)} />
+      <KeyboardShortcutsHelp
+        open={shortcutsOpen}
+        onClose={() => setShortcutsOpen(false)}
+        fallbackFocusSelector='[data-testid="trace-overflow-menu"]'
+      />
       {/* Show-once feature spotlights — only meaningful once a trace has
           rendered (the anchors live in the drawer body). Keyed reads via
           the traceId prop so the queue re-evaluates per trace. */}

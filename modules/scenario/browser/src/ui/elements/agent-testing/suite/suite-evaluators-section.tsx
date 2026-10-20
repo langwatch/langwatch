@@ -15,7 +15,6 @@ import {
 import { CircleAlert, Plus } from "lucide-react";
 
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldError, FieldLabel } from "../shared/dialog-fields.tsx";
 import { EvaluatorPillRow } from "../shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../shared/remove-block-button.tsx";
@@ -41,7 +40,7 @@ function attachmentPillStyle({
   inherited: boolean;
   onClick?: () => void;
 }) {
-  const presentColor = inherited ? FG_MUTED : "fg";
+  const presentColor = inherited ? "fg.muted" : "fg";
   return {
     borderColor: isMissing ? "orange.solid" : "border",
     background: isMissing ? "orange.subtle" : "bg.muted/60",
@@ -87,7 +86,7 @@ export function EvaluatorAttachmentPill({
     borderColor: style.borderColor,
     background: style.background,
     color: style.color,
-    fontSize: "11px",
+    textStyle: "micro",
     fontWeight: "medium" as const,
     cursor: style.cursor,
     _hover: style.hoverStyle,
@@ -187,7 +186,7 @@ export function AttachmentPills({
       <SmallButton
         height="24px"
         minHeight="24px"
-        fontSize="11px"
+        textStyle="micro"
         onClick={onAdd}
         data-testid={addTestId}
       >
@@ -213,7 +212,7 @@ export function SuiteEvaluatorsSection({
         Evaluators
         <RemoveBlockButton label="Remove the evaluators" onClick={onClose} />
       </FieldLabel>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         {EVALUATORS_SECTION_HELP}
       </Text>
       <AttachmentPills

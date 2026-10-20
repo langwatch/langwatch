@@ -1,8 +1,12 @@
-import { Box } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
 import type { Component } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
+import {
+  WAITING_FOR_ENGINE,
+  useIsStudioConnected,
+} from "../../../../behavior/use-studio-connected.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import {
   type ExecuteData,
@@ -26,6 +30,8 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
     triggerValidation: state.triggerValidation,
     setTriggerValidation: state.setTriggerValidation,
   }));
+
+  const isConnected = useIsStudioConnected();
 
   // Hook to execute the component
   const { startComponentExecution } = useComponentExecution();
@@ -85,23 +91,15 @@ export const InputPanel = ({ node }: { node: Node<Component> }) => {
   }, [animationFinished, inputFields, onExecute, setTriggerValidation, triggerValidation]);
 
   return (
-    <Box
-      background="bg"
-      height="full"
-      padding={6}
-      border="1px solid"
-      borderColor="border.emphasized"
-      borderRadius="8px 0 0 8px"
-      borderRightWidth={0}
-      boxShadow="sm"
-      overflowY="auto"
-    >
+    <Card variant="joined-panel" edge="start">
       <ExecutionInputPanel
         fields={inputFields}
         onExecute={onExecute}
         title="Inputs"
         buttonText="Execute"
+        disabledReason={isConnected ? undefined : WAITING_FOR_ENGINE}
+        pendingText={isConnected ? undefined : "Reconnecting…"}
       />
-    </Box>
+    </Card>
   );
 };

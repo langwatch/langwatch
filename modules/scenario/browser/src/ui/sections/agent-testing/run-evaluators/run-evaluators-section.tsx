@@ -5,11 +5,11 @@
  * @see specs/features/agent-testing/run-dialog.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import type { EvaluatorAttachment, EvaluatorInputSpec } from "@langwatch/scenario-contract";
 
 import type { AttachableEvaluator } from "../../../../model/agent-testing/evaluators/attachment-rules.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { EvaluatorPillRow } from "../../../elements/agent-testing/shared/evaluator-pill.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
@@ -50,7 +50,7 @@ function InheritedSuiteEvaluators({
 }) {
   return (
     <VStack align="stretch" gap={1} data-testid={`run-dialog-inherited-${suite.suiteId}`}>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         {inheritedLabel(suite.suiteName)}
       </Text>
       <EvaluatorPillRow>
@@ -91,40 +91,34 @@ export function RunEvaluatorsSection({
         Evaluators
         {onRemove && <RemoveBlockButton label="Remove the evaluators" onClick={onRemove} />}
       </FieldLabel>
-      <VStack
-        align="stretch"
-        gap={2.5}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        paddingX={3}
-        paddingY={2.5}
-      >
-        {inherited.map((suite) => (
-          <InheritedSuiteEvaluators
-            key={suite.suiteId}
-            suite={suite}
-            evaluatorsById={evaluatorsById}
-            missingOf={missingOf}
-            onOpenInherited={onOpenInherited}
-          />
-        ))}
-        <VStack align="stretch" gap={1}>
-          {inherited.length > 0 && (
-            <Text fontSize="11px" color={FG_MUTED}>
-              On this run
-            </Text>
-          )}
-          <AttachmentPills
-            attachments={extras}
-            evaluatorsById={evaluatorsById}
-            missingOf={missingOf}
-            onEdit={onEditExtra}
-            onAdd={onAddExtra}
-            addTestId="run-dialog-add-evaluator"
-          />
+      <Card variant="nested" padding="sm">
+        <VStack align="stretch" gap={2.5}>
+          {inherited.map((suite) => (
+            <InheritedSuiteEvaluators
+              key={suite.suiteId}
+              suite={suite}
+              evaluatorsById={evaluatorsById}
+              missingOf={missingOf}
+              onOpenInherited={onOpenInherited}
+            />
+          ))}
+          <VStack align="stretch" gap={1}>
+            {inherited.length > 0 && (
+              <Text textStyle="micro" color="fg.muted">
+                On this run
+              </Text>
+            )}
+            <AttachmentPills
+              attachments={extras}
+              evaluatorsById={evaluatorsById}
+              missingOf={missingOf}
+              onEdit={onEditExtra}
+              onAdd={onAddExtra}
+              addTestId="run-dialog-add-evaluator"
+            />
+          </VStack>
         </VStack>
-      </VStack>
+      </Card>
     </VStack>
   );
 }

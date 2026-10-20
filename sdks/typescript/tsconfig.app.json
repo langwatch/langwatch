@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": false,
+    "noEmit": true,
+    "tsBuildInfoFile": "dist/tsconfig.app.tsbuildinfo"
+  },
+  "include": ["**/*.ts", "vitest.config.mts", "vitest.e2e.config.mts", "eslint.config.mjs"],
+  "exclude": [
+    "node_modules",
+    "./dist/**/*",
+    "./examples/**/*",
+    "./coverage/**/*",
+    "./__tests__/**/*",
+    "./scripts/build-cli-binary.ts"
+  ],
+  "references": [
+    {
+      "path": "../../packages/handled-error/tsconfig.build.json"
+    }
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/e2e-stack"]
+    }
+  }
+}

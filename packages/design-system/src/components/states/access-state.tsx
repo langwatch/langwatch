@@ -35,7 +35,7 @@ export function AccessState({
       <Stack gap={4} align="start">
         <AccessStateIcon kind={kind} compact={compact} />
         <Stack gap={2} maxWidth="64ch">
-          <Heading as="h2" size={compact ? "md" : "lg"}>
+          <Heading as="h2" size={compact ? "sm" : "xl"}>
             {title}
           </Heading>
           <Text color="fg.muted" fontSize="sm" lineHeight="tall">

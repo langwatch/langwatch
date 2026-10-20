@@ -104,10 +104,10 @@ export function LangWatchQLChartFailure({ errors }: LangWatchQLChartFailureProps
       data-failure-code={leading.code}
     >
       <Stack gap={1}>
-        <Text fontSize="14px" fontWeight="500">
+        <Text textStyle="body" fontWeight="500">
           {copy.title}
         </Text>
-        <Text fontSize="12.5px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           {copy.guidance}
         </Text>
       </Stack>
@@ -115,7 +115,7 @@ export function LangWatchQLChartFailure({ errors }: LangWatchQLChartFailureProps
       <Stack gap={2}>
         {errors.map((error, index) => (
           <Box key={`${error.rule}-${error.path}-${index}`}>
-            <Text fontSize="12.5px">{error.message}</Text>
+            <Text textStyle="bodySm">{error.message}</Text>
             <Badge size="sm" variant="subtle" fontFamily="mono">
               {error.path}
             </Badge>

@@ -40,41 +40,15 @@ export const FG = {
 /** The one amber accent, spent only on Langy, links, and the primary action. */
 export const ACCENT = "orange.fg" as const;
 
-/** Type roles. Mono for data + chrome, serif for the one display line. */
+/** Type roles on the product scale. Serif for the one display line, mono for values. */
 export const TYPE = {
-  eyebrow: {
-    fontFamily: "mono",
-    fontSize: "11px",
-    letterSpacing: "0.1em",
-    textTransform: "uppercase" as const,
-  },
-  sectionLabel: {
-    fontFamily: "mono",
-    fontSize: "10.5px",
-    letterSpacing: "0.1em",
-    textTransform: "uppercase" as const,
-    color: FG.subtle,
-  },
-  headline: {
-    fontFamily: SERIF,
-    fontWeight: "400",
-    fontSize: { base: "16px", md: "18px" },
-    lineHeight: "1.3",
-    letterSpacing: "-0.01em",
-  },
-  cardTitle: {
-    fontFamily: SERIF,
-    fontWeight: "500",
-    fontSize: "18px",
-    letterSpacing: "-0.01em",
-  },
-  label: {
-    fontFamily: "mono",
-    fontSize: "11.5px",
-    letterSpacing: "0.02em",
-  },
-  body: { fontSize: "12.5px", lineHeight: "1.4" },
-  mono: { fontFamily: "mono", fontSize: "12px" },
+  eyebrow: { textStyle: "eyebrow" },
+  sectionLabel: { textStyle: "eyebrow", color: FG.subtle },
+  headline: { fontFamily: SERIF, fontWeight: "400", textStyle: "sectionTitle" },
+  cardTitle: { fontFamily: SERIF, fontWeight: "500", textStyle: "metric" },
+  label: { textStyle: "caption" },
+  body: { textStyle: "bodySm" },
+  mono: { textStyle: "monoSm" },
   value: {
     fontFamily: "mono",
     fontVariantNumeric: "tabular-nums" as const,

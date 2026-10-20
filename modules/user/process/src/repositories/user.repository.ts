@@ -49,25 +49,35 @@ export type UserDeactivationOutcome =
   | Readonly<{ outcome: "deactivated"; user: UserProfile }>
   | Readonly<{ outcome: "none_active" }>;
 
-/** An account as the created-fact seed reads it: its id and when its row was written. */
-export type UserCreatedRow = Readonly<{ id: string; createdAt: Instant }>;
+/** An account as the lifecycle-fact step reads it: its id, creation and deactivation times. */
+export type UserBackfillRow = Readonly<{
+  id: string;
+  createdAt: Instant;
+  deactivatedAt: Instant | null;
+}>;
 
-/** An account as the standing-fact step reads it: its id and when it was deactivated, if it is. */
-export type UserStandingRow = Readonly<{ id: string; deactivatedAt: Instant | null }>;
+/** An account's stored address, as user's address step reads and rewrites it. */
+export type UserAddressRow = Readonly<{ id: string; email: string }>;
+
+/** A guarded address rewrite: written, the row moved on meanwhile, or another account holds it. */
+export type UserAddressReplacement = "replaced" | "changed" | "taken";
 
 /**
  * Persistence owned by User. It never crosses the feature boundary. Every mint commits user's
  * created fact (and a self-registration its registered fact) to the fact outbox with the row.
  */
-/** A name change, an address change, or both, as the two `UserApi` writes ask for them. */
+/** A name change, an address change, or both; a new address carries its cleared verification. */
 export type StoredProfileChange = UpdateUserProfileInput &
-  Partial<Pick<UpdateUserEmailInput, "email">>;
+  Partial<Pick<UpdateUserEmailInput, "email">> &
+  Partial<Pick<UserProfile, "emailVerified">>;
 
 export interface UserRepository {
   findProfiles(userIds: string[]): Promise<UserFullProfile[]>;
   findById(id: string): Promise<UserProfile | null>;
-  /** Every account on this address, case aside: older rows may carry capitals. */
+  /** The account holding exactly this address; addresses are stored lower-cased. */
   findByEmail(email: string): Promise<UserProfile[]>;
+  /** Every account on this address, case aside, oldest first: rows stored before lower-casing. */
+  findByEmailAnyCase(email: string): Promise<UserProfile[]>;
   create(input: CreateUserInput): Promise<UserProfile>;
   createCredentialUser(input: CreateCredentialUserRow): Promise<CreatedCredentialUser>;
   createPasskeyUser(input: CreatePasskeyUserRow): Promise<CreatedUser>;
@@ -119,8 +129,13 @@ export interface UserRepository {
   hasAccountOnDomain(domain: string): Promise<boolean>;
   /** Whether any account exists, install-wide. */
   hasAnyAccount(): Promise<boolean>;
-  /** One page of every account, in id order after `afterId`, for user's created-fact seed. */
-  findCreatedPage(input: { afterId: string | null; limit: number }): Promise<UserCreatedRow[]>;
-  /** One page of every account, in id order after `afterId`, for user's standing-fact step. */
-  findStandingPage(input: { afterId: string | null; limit: number }): Promise<UserStandingRow[]>;
+  /** One page of every account, in id order after `afterId`, for user's lifecycle-fact step. */
+  findBackfillPage(input: { afterId: string | null; limit: number }): Promise<UserBackfillRow[]>;
+  /** One page of accounts whose stored address is not lower-case, in id order after `afterId`. */
+  findMixedCaseAddressPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserAddressRow[]>;
+  /** Writes `to` only while the row still holds `from`, so a save made meanwhile keeps it. */
+  replaceAddress(input: { id: string; from: string; to: string }): Promise<UserAddressReplacement>;
 }

@@ -4,6 +4,7 @@
  * now, what is left before finishing, and the two levers that move it. The
  * copy is the customer's, never the ledger's. Props-driven; the screen owns I/O.
  */
+import { Card } from "@langwatch/design-system/card";
 import {
   Badge,
   Button,
@@ -32,7 +33,6 @@ import {
   type SsoMigrationRoute,
 } from "../../model/migration-route.ts";
 import { InlineRefusal } from "../elements/refusals.tsx";
-import { SettingsCard } from "../elements/settings-card.tsx";
 
 export function MigrationProgressSection({
   migration,
@@ -76,7 +76,12 @@ export function MigrationProgressSection({
   const routeLever = levers.route;
 
   return (
-    <SettingsCard title={migrationTitle(migration.legacy.providerId)} testId="sso-migration">
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
+      title={migrationTitle(migration.legacy.providerId)}
+      data-testid="sso-migration"
+    >
       <HStack gap={2} justify="space-between" align="start">
         <Text fontSize="sm" data-testid="sso-update-status">
           {updateStatusLine(migration)}
@@ -153,7 +158,7 @@ export function MigrationProgressSection({
           </Button>
         </HStack>
       )}
-    </SettingsCard>
+    </Card>
   );
 }
 

@@ -290,7 +290,7 @@ function ConfirmAndJoin({
           {`Join ${organizationName}`}
         </FrontDoorPrimaryButton>
       )}
-      <Text fontSize="13px" color="fg.muted" textAlign="center">
+      <Text textStyle="bodySm" color="fg.muted" textAlign="center">
         {signedInAs ? (
           <>
             Signed in as{" "}

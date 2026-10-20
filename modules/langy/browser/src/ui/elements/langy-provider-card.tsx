@@ -67,9 +67,8 @@ export function LangyProviderCard({
             top="-8px"
             left="50%"
             transform="translateX(-50%)"
-            fontSize="9px"
-            fontWeight="600"
-            letterSpacing="0.02em"
+            textStyle="micro"
+            fontWeight="semibold"
             lineHeight="1"
             paddingX={1.5}
             paddingY="3px"

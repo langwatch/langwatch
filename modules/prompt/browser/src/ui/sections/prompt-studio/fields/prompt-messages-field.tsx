@@ -11,6 +11,7 @@ import {
   type StackProps,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { VerticalFormControl } from "@langwatch/design-system/vertical-form-control";
 import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { type AvailableSource } from "@langwatch/workflow-contract";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
@@ -22,7 +23,6 @@ import {
 } from "react-hook-form";
 
 import { useLayoutMode } from "../../../../model/layout-mode.ts";
-import { VerticalFormControl } from "../../../elements/vertical-form-control.tsx";
 import { renderSourceTypeIcon } from "../../../elements/workflow/workflow-icons.tsx";
 import { PromptTextAreaWithVariables } from "../../variables/prompt-textarea/prompt-textarea-with-variables.tsx";
 import { type Variable } from "../../variables/variables-section.tsx";
@@ -183,7 +183,7 @@ function MessageRow({
     >
       <MessageContent shared={shared} idx={idx} role={role} />
       {contentError && (
-        <Field.ErrorText fontSize="13px">{String(contentError.message ?? "")}</Field.ErrorText>
+        <Field.ErrorText textStyle="bodySm">{String(contentError.message ?? "")}</Field.ErrorText>
       )}
     </VerticalFormControl>
   );

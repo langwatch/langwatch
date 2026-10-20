@@ -1,8 +1,9 @@
+import { Card } from "@langwatch/design-system/card";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { GitHubIcon } from "@langwatch/design-system/icons";
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import numeral from "numeral";
 import type React from "react";
@@ -55,99 +56,67 @@ export function PullRequestDetailDrawer({
   const detail = detailQuery.data;
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      onClose={onClose}
       // Two five-column tables of facts: a narrower drawer cuts the money off
       // the right of both of them.
       size="xl"
-      onOpenChange={() => onClose()}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack align="start" width="full" gap={3}>
-            <VStack align="start" gap={1} flex={1} minWidth={0}>
-              <HStack gap={2}>
-                <Text fontSize="sm" fontFamily="mono" color="fg.muted">
-                  #{number}
-                </Text>
-                {detail ? (
-                  <PullRequestStatusBadge
-                    status={derivePullRequestStatus({
-                      state: detail.pullRequest.state,
-                      isDraft: detail.pullRequest.isDraft,
-                      prMergedAtMs: detail.pullRequest.prMergedAtMs,
-                    })}
-                    source="payload"
-                  />
-                ) : null}
-              </HStack>
-              <Drawer.Title>{detail?.pullRequest.title || repositoryFullName}</Drawer.Title>
-              <Text fontSize="xs" fontFamily="mono" color="fg.subtle">
-                {repositoryFullName}
-              </Text>
-            </VStack>
-            {detail ? (
-              <Button
-                asChild
-                flexShrink={0}
-                bg="fg"
-                color="fg.inverted"
-                _hover={{ bg: "fg.muted" }}
-              >
-                <a href={detail.pullRequest.htmlUrl} target="_blank" rel="noopener noreferrer">
-                  <GitHubIcon size={16} />
-                  Open on GitHub
-                </a>
-              </Button>
-            ) : null}
-          </HStack>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <PullRequestDetailBody
-            isLoading={detailQuery.isLoading}
-            isError={detailQuery.isError}
-            detail={detail}
-            projectId={projectId}
+      title={detail?.pullRequest.title || repositoryFullName}
+      eyebrow={{ label: `#${number}` }}
+      subtitle={
+        <Text as="span" fontFamily="mono" textStyle="xs">
+          {repositoryFullName}
+        </Text>
+      }
+      badges={
+        detail ? (
+          <PullRequestStatusBadge
+            status={derivePullRequestStatus({
+              state: detail.pullRequest.state,
+              isDraft: detail.pullRequest.isDraft,
+              prMergedAtMs: detail.pullRequest.prMergedAtMs,
+            })}
+            source="payload"
           />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        ) : undefined
+      }
+      headerAction={
+        detail
+          ? {
+              label: "Open on GitHub",
+              icon: <GitHubIcon size={14} />,
+              href: detail.pullRequest.htmlUrl,
+              target: "_blank",
+              rel: "noopener noreferrer",
+            }
+          : void 0
+      }
+      loading={detailQuery.isLoading}
+      error={
+        !detailQuery.isLoading && (detailQuery.isError || !detail)
+          ? {
+              title: "Couldn't load this pull request",
+              onRetry: () => void detailQuery.refetch(),
+            }
+          : void 0
+      }
+    >
+      {detail ? <PullRequestDetailBody detail={detail} projectId={projectId} /> : null}
+    </Drawer>
   );
 }
 
 const PullRequestDetailBody: React.FC<{
-  isLoading: boolean;
-  isError: boolean;
-  detail: DetailPayload | undefined;
+  detail: DetailPayload;
   projectId: string;
-}> = ({ isLoading, isError, detail, projectId }) => {
-  if (isLoading) {
-    return (
-      <VStack align="stretch" gap={4}>
-        <Skeleton height="72px" borderRadius="md" />
-        <Skeleton height="160px" borderRadius="md" />
-        <Skeleton height="160px" borderRadius="md" />
-      </VStack>
-    );
-  }
-  if (isError || !detail) {
-    return (
-      <Text fontSize="sm" color="fg.error">
-        Couldn&apos;t load this pull request
-      </Text>
-    );
-  }
-  return (
-    <VStack align="stretch" gap={6}>
-      <SummaryRow detail={detail} />
-      <ContributorsSection contributors={detail.contributors} />
-      <ModelsSection models={detail.modelBreakdown} />
-      <SessionsSection projectId={projectId} sessions={detail.sessions} />
-    </VStack>
-  );
-};
+}> = ({ detail, projectId }) => (
+  <VStack align="stretch" gap={6}>
+    <SummaryRow detail={detail} />
+    <ContributorsSection contributors={detail.contributors} />
+    <ModelsSection models={detail.modelBreakdown} />
+    <SessionsSection projectId={projectId} sessions={detail.sessions} />
+  </VStack>
+);
 
 const Stat: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <VStack align="start" gap={0} flex={1} minWidth="120px">
@@ -204,7 +173,7 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
   const isBundled = nonBilled > 0;
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+    <Card variant="nested">
       <HStack align="start" gap={6} wrap="wrap">
         <Stat label="Sessions">
           <Text fontSize="lg" fontWeight="medium">
@@ -229,6 +198,6 @@ const SummaryRow: React.FC<{ detail: DetailPayload }> = ({ detail }) => {
           </Text>
         </Stat>
       </HStack>
-    </Box>
+    </Card>
   );
 };

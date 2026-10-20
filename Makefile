@@ -140,13 +140,14 @@ setup-hooks:
 # budget and auth traffic to whichever control plane that port belongs to.
 DEV_ENV_FILE ?= .env
 # Both targets build with -tags dev, which links the simulators (cmd/service/
-# combined_dev.go); release images build untagged. SIM_CONSOLES are the consoles
-# the run embeds (ADR-160): a simulator's own, or those `combined` hosts. Nx
-# caches each build, so an unchanged console costs a cache hit, a changed one rebuilds.
-SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim
+# combined_dev.go); release images build untagged. SIM_CONSOLES are the
+# simulators the run hosts; any at all builds @langwatch/sims, the one app holding
+# every console (ADR-160). Nx caches the build, so unchanged consoles cost a cache hit.
+SIMULATORS = idpsim mailsim storagesim voicesim llmsim analyticssim telemetrysim outboundsim paymentsim lambdasim githubsim mcpsim
 SIM_CONSOLES = $(if $(filter combined,$(svc)),$(if $(args),$(filter $(SIMULATORS),$(args)),$(SIMULATORS)),$(filter $(SIMULATORS),$(svc)))
-BUILD_SIM_CONSOLES = for sim in $(SIM_CONSOLES); do \
-	$(NX) run @langwatch/$$sim-web:build --outputStyle=static || echo "$$sim-web did not build; its console names the fix"; done
+BUILD_SIM_CONSOLES = $(if $(SIM_CONSOLES),$(NX) run @langwatch/sims:build --outputStyle=static || echo "@langwatch/sims did not build; each console names the fix",true)
+# pipefail needs bash; CI runners default to dash.
+service: SHELL := /bin/bash
 service:
 	@test -n "$(svc)" || (echo "usage: make service svc=<name>" && exit 1)
 	@$(BUILD_SIM_CONSOLES)
@@ -313,7 +314,7 @@ go-lint:
 # module's packages are linted from inside that module, in one slot.
 go-lint-changed:
 	@dirs=$$( { git diff --name-only HEAD -- '*.go'; git ls-files -o --exclude-standard -- '*.go'; } \
-		| grep -E '^(services/(aigateway|analyticssim|idpsim|langyagent|llmsim|mailsim|nlpgo|storagesim|telemetrysim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
+		| grep -E '^(services/(aigateway|analyticssim|idpsim|langyagent|llmsim|mailsim|nlpgo|scenariorunner|storagesim|telemetrysim|voicesim)|pkg|cmd|tools)/' | grep -v '/testdata/' \
 		| xargs -n1 dirname | sort -u | while read -r d; do [ -d "$$d" ] && echo "$$d"; done); \
 	if [ -z "$$dirs" ]; then echo "==> no changed Go packages"; exit 0; fi; \
 	echo "==> golangci-lint $(GOLANGCI_VERSION) ($$(echo "$$dirs" | wc -l | tr -d ' ') packages)"; \

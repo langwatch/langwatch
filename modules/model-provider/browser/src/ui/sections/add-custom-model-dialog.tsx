@@ -1,17 +1,8 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Box,
-  Button,
   HStack,
   Input,
   Spacer,
@@ -74,8 +65,8 @@ type AddCustomModelDialogProps = {
   onSubmit: (entry: CustomModelEntry) => void;
   /** When provided, the dialog opens in edit mode pre-filled with these values. */
   initialValues?: CustomModelEntry;
-  /** Override DialogContent background (e.g. "bg.surface" for solid on onboarding). */
-  dialogBackground?: string;
+  /** `card` keeps the card ground the onboarding page gives its dialogs. */
+  ground?: "card";
 };
 
 /**
@@ -88,7 +79,7 @@ export function AddCustomModelDialog({
   onClose,
   onSubmit,
   initialValues,
-  dialogBackground,
+  ground,
 }: AddCustomModelDialogProps) {
   const isEditing = !!initialValues;
   const [modelId, setModelId] = useState("");
@@ -183,123 +174,108 @@ export function AddCustomModelDialog({
   ]);
 
   return (
-    <DialogRoot open={open} onOpenChange={(e) => !e.open && handleClose()} size="md">
-      <DialogContent {...(dialogBackground ? { background: dialogBackground } : {})}>
-        <DialogHeader>
-          <DialogTitle>{isEditing ? "Edit Model" : "Add Model"}</DialogTitle>
-        </DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack gap={0} align="stretch">
-            <HorizontalFormControl
-              label="Model ID"
-              helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
-              error={fieldError(errors.modelId)}
-            >
-              <Input
-                placeholder="e.g. gpt-5-custom"
-                value={modelId}
-                onChange={(e) => handleModelIdChange(e.target.value)}
-                aria-label="Model ID"
-              />
-            </HorizontalFormControl>
+    <Dialog
+      open={open}
+      onClose={handleClose}
+      title={isEditing ? "Edit model" : "Add model"}
+      size="md"
+      ground={ground}
+      onSubmit={handleSubmit}
+      primaryAction={{ label: isEditing ? "Save" : "Add model", type: "submit" }}
+    >
+      <VStack gap={0} align="stretch">
+        <HorizontalFormControl
+          label="Model ID"
+          helper="Exactly as your provider specifies it, e.g. a fine-tune ID or deployment name"
+          error={fieldError(errors.modelId)}
+        >
+          <Input
+            placeholder="e.g. gpt-5-custom"
+            value={modelId}
+            onChange={(e) => handleModelIdChange(e.target.value)}
+            aria-label="Model ID"
+          />
+        </HorizontalFormControl>
 
-            <HorizontalFormControl
-              label="Display Name"
-              helper="How this model appears in selectors across LangWatch"
-              error={fieldError(errors.displayName)}
-            >
-              <Input
-                placeholder="e.g. GPT-5 Custom"
-                value={displayName}
-                onChange={(e) => handleDisplayNameChange(e.target.value)}
-                aria-label="Display Name"
-              />
-            </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Display Name"
+          helper="How this model appears in selectors across LangWatch"
+          error={fieldError(errors.displayName)}
+        >
+          <Input
+            placeholder="e.g. GPT-5 Custom"
+            value={displayName}
+            onChange={(e) => handleDisplayNameChange(e.target.value)}
+            aria-label="Display Name"
+          />
+        </HorizontalFormControl>
 
-            <HorizontalFormControl
-              label="Max Tokens"
-              helper="Maximum number of output tokens the model supports"
-              error={fieldError(errors.maxTokens)}
-            >
-              <Input
-                type="number"
-                placeholder="e.g. 8192"
-                value={maxTokens}
-                onChange={(e) => setMaxTokens(e.target.value)}
-                aria-label="Max Tokens"
-              />
-            </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Max Tokens"
+          helper="Maximum number of output tokens the model supports"
+          error={fieldError(errors.maxTokens)}
+        >
+          <Input
+            type="number"
+            placeholder="e.g. 8192"
+            value={maxTokens}
+            onChange={(e) => setMaxTokens(e.target.value)}
+            aria-label="Max Tokens"
+          />
+        </HorizontalFormControl>
 
-            <Box
-              as="fieldset"
-              aria-label="Supported Parameters"
-              borderBottomWidth="1px"
-              paddingY={5}
-            >
-              <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
-                <VStack align="start" gap={1} width="full">
-                  <Text fontWeight="medium">Supported Parameters</Text>
-                  <Text fontSize="13px" color="fg.muted">
-                    Which sampling parameters this model accepts
-                  </Text>
-                </VStack>
-                <Spacer />
-                <Box minWidth={["full", "full", "50%"]}>
-                  <Wrap gap={3}>
-                    {DIALOG_PARAMETERS.map((param) => (
-                      <Checkbox
-                        key={param.value}
-                        checked={supportedParameters.includes(param.value)}
-                        onCheckedChange={() => toggleParameter(param.value)}
-                        size="sm"
-                      >
-                        <Text fontSize="sm">{param.label}</Text>
-                      </Checkbox>
-                    ))}
-                  </Wrap>
-                </Box>
-              </HStack>
+        <Box as="fieldset" aria-label="Supported Parameters" borderBottomWidth="1px" paddingY={5}>
+          <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
+            <VStack align="start" gap={1} width="full">
+              <Text fontWeight="medium">Supported Parameters</Text>
+              <Text textStyle="bodySm" color="fg.muted">
+                Which sampling parameters this model accepts
+              </Text>
+            </VStack>
+            <Spacer />
+            <Box minWidth={["full", "full", "50%"]}>
+              <Wrap gap={3}>
+                {DIALOG_PARAMETERS.map((param) => (
+                  <Checkbox
+                    key={param.value}
+                    checked={supportedParameters.includes(param.value)}
+                    onCheckedChange={() => toggleParameter(param.value)}
+                    size="sm"
+                  >
+                    <Text fontSize="sm">{param.label}</Text>
+                  </Checkbox>
+                ))}
+              </Wrap>
             </Box>
-
-            <Box as="fieldset" aria-label="Multimodal Support" paddingY={5}>
-              <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
-                <VStack align="start" gap={1} width="full">
-                  <Text fontWeight="medium">Multimodal Support</Text>
-                  <Text fontSize="13px" color="fg.muted">
-                    Input types this model can process besides text
-                  </Text>
-                </VStack>
-                <Spacer />
-                <Box minWidth={["full", "full", "50%"]}>
-                  <Wrap gap={3}>
-                    {multimodalInputValues.map((input) => (
-                      <Checkbox
-                        key={input}
-                        checked={multimodalInputs.includes(input)}
-                        onCheckedChange={() => toggleMultimodal(input)}
-                        size="sm"
-                      >
-                        <Text fontSize="sm">{MULTIMODAL_LABELS[input]}</Text>
-                      </Checkbox>
-                    ))}
-                  </Wrap>
-                </Box>
-              </HStack>
-            </Box>
-          </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={handleClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="orange" size="sm" onClick={handleSubmit}>
-              {isEditing ? "Save" : "Add model"}
-            </Button>
           </HStack>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+        </Box>
+
+        <Box as="fieldset" aria-label="Multimodal Support" paddingY={5}>
+          <HStack width="full" flexDirection={["column", "column", "row"]} gap={4}>
+            <VStack align="start" gap={1} width="full">
+              <Text fontWeight="medium">Multimodal Support</Text>
+              <Text textStyle="bodySm" color="fg.muted">
+                Input types this model can process besides text
+              </Text>
+            </VStack>
+            <Spacer />
+            <Box minWidth={["full", "full", "50%"]}>
+              <Wrap gap={3}>
+                {multimodalInputValues.map((input) => (
+                  <Checkbox
+                    key={input}
+                    checked={multimodalInputs.includes(input)}
+                    onCheckedChange={() => toggleMultimodal(input)}
+                    size="sm"
+                  >
+                    <Text fontSize="sm">{MULTIMODAL_LABELS[input]}</Text>
+                  </Checkbox>
+                ))}
+              </Wrap>
+            </Box>
+          </HStack>
+        </Box>
+      </VStack>
+    </Dialog>
   );
 }

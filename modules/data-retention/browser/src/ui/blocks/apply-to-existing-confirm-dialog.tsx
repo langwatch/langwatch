@@ -1,6 +1,6 @@
 import { INDEFINITE_RETENTION_DAYS } from "@langwatch/data-retention-contract";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Alert, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Text, VStack } from "@langwatch/design-system/primitives";
 
 export function ApplyToExistingConfirmDialog({
   pending,
@@ -17,65 +17,50 @@ export function ApplyToExistingConfirmDialog({
   onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={!!pending}
-      onOpenChange={({ open }) => {
-        if (!open) onCancel();
+      onClose={onCancel}
+      size="md"
+      title="Apply retention to existing data?"
+      primaryAction={{
+        label: "Apply to existing data",
+        onClick: () => void onConfirm(),
+        loading: isApplying,
+        danger: pending?.retentionDays !== INDEFINITE_RETENTION_DAYS,
       }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Apply retention to existing data?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          {pending && (
-            <VStack align="stretch" gap={3}>
-              {pending.retentionDays === INDEFINITE_RETENTION_DAYS ? (
-                <Text>
-                  We will rewrite <strong>this project's</strong> existing data to be kept
-                  indefinitely. No rows are deleted; this removes the retention limit from
-                  already-stored data.
-                </Text>
-              ) : (
-                // No day count named here: the server applies the project's
-                // RESOLVED effective retention (PROJECT > TEAM > ORGANIZATION >
-                // platform default), which may differ from what was just
-                // selected. The toast after apply shows the value actually used.
-                <Text>
-                  We will rewrite <strong>this project's</strong> existing data to use its currently
-                  resolved retention policy. Rows older than the resolved retention become eligible
-                  for deletion on the next background merge. After deletion, this cannot be undone.
-                </Text>
-              )}
-              {pending.savedScopeWiderThanCurrentProject && (
-                <Alert.Root status="warning">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Description>
-                      You also saved an organization or team policy. New rows across those scopes
-                      will use the new retention, but existing rows in other projects keep their
-                      current retention until each project is visited and applied individually.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-            </VStack>
+      {pending && (
+        <VStack align="stretch" gap={3}>
+          {pending.retentionDays === INDEFINITE_RETENTION_DAYS ? (
+            <Text>
+              We will rewrite <strong>this project's</strong> existing data to be kept indefinitely.
+              No rows are deleted; this removes the retention limit from already-stored data.
+            </Text>
+          ) : (
+            // No day count named here: the server applies the project's
+            // RESOLVED effective retention (PROJECT > TEAM > ORGANIZATION >
+            // platform default), which may differ from what was just
+            // selected. The toast after apply shows the value actually used.
+            <Text>
+              We will rewrite <strong>this project's</strong> existing data to use its currently
+              resolved retention policy. Rows older than the resolved retention become eligible for
+              deletion on the next background merge. After deletion, this cannot be undone.
+            </Text>
           )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette={pending?.retentionDays === INDEFINITE_RETENTION_DAYS ? "blue" : "red"}
-            loading={isApplying}
-            onClick={() => void onConfirm()}
-          >
-            Apply to existing data
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+          {pending.savedScopeWiderThanCurrentProject && (
+            <Alert.Root status="warning">
+              <Alert.Indicator />
+              <Alert.Content>
+                <Alert.Description>
+                  You also saved an organization or team policy. New rows across those scopes will
+                  use the new retention, but existing rows in other projects keep their current
+                  retention until each project is visited and applied individually.
+                </Alert.Description>
+              </Alert.Content>
+            </Alert.Root>
+          )}
+        </VStack>
+      )}
+    </Dialog>
   );
 }

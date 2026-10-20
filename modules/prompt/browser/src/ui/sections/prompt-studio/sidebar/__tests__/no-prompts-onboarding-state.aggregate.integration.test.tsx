@@ -42,7 +42,7 @@ describe("NoPromptsOnboardingState", () => {
 
         renderWithDesignSystem(<NoPromptsOnboardingState />);
 
-        expect(screen.getByRole("button", { name: "Create First Prompt" })).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Create first prompt" })).toBeTruthy();
       });
     });
   });
@@ -61,7 +61,7 @@ describe("NoPromptsOnboardingState", () => {
         );
 
         expect(screen.getByText("Data can't be added to this project")).toBeTruthy();
-        expect(screen.queryByRole("button", { name: "Create First Prompt" })).toBeNull();
+        expect(screen.queryByRole("button", { name: "Create first prompt" })).toBeNull();
         expect(screen.queryByText("New Prompt")).toBeNull();
       });
     });

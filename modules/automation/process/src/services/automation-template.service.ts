@@ -224,15 +224,22 @@ export class AutomationTemplateService {
       contentType,
       defaultBody,
     });
-    const response = await this.delivery.sendWebhook({
-      url: destination.url,
-      method: destination.method,
-      headers: destination.headers,
-      signingSecrets: destination.signingSecrets,
-      body: rendered.body,
-      contentType,
-      triggerName: input.trigger.name,
-    });
+    const response = await this.delivery
+      .sendWebhook({
+        url: destination.url,
+        method: destination.method,
+        headers: destination.headers,
+        signingSecrets: destination.signingSecrets,
+        body: rendered.body,
+        contentType,
+        triggerName: input.trigger.name,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof DispatchError && error.customerMessage) {
+          throw new TestFireUnavailableError("webhook", error.customerMessage);
+        }
+        throw error;
+      });
 
     return {
       channel: "webhook",
@@ -261,30 +268,24 @@ export class AutomationTemplateService {
       allowGatedBlocks: input.botDestination ? true : void 0,
     });
 
-    if (input.botDestination) {
-      try {
-        await this.delivery.sendSlackBot({
-          ...input.botDestination,
-          payload: rendered.payload,
-        });
-      } catch (error) {
-        if (error instanceof DispatchError && error.customerMessage) {
-          throw new TestFireUnavailableError("slack", error.customerMessage);
-        }
-        throw error;
+    const webhook = input.webhook;
+    if (!input.botDestination && !webhook) {
+      throw new TestFireUnavailableError(
+        "slack",
+        "This automation has no Slack webhook to test-fire to.",
+      );
+    }
+    try {
+      if (input.botDestination) {
+        await this.delivery.sendSlackBot({ ...input.botDestination, payload: rendered.payload });
+      } else if (webhook) {
+        await this.delivery.sendSlack({ webhook, payload: rendered.payload });
       }
-    } else {
-      if (!input.webhook) {
-        throw new TestFireUnavailableError(
-          "slack",
-          "This automation has no Slack webhook to test-fire to.",
-        );
+    } catch (error) {
+      if (error instanceof DispatchError && error.customerMessage) {
+        throw new TestFireUnavailableError("slack", error.customerMessage);
       }
-
-      await this.delivery.sendSlack({
-        webhook: input.webhook,
-        payload: rendered.payload,
-      });
+      throw error;
     }
 
     return {

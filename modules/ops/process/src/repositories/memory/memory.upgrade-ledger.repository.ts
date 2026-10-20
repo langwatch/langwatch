@@ -7,7 +7,8 @@ import {
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
-  type UpgradePreview,
+  type UpgradeImageVersion,
+  UNRELEASED_IMAGE,
   type UpgradeReleasePage,
   type UpgradeRunDetail,
   type UpgradeRunPage,
@@ -27,6 +28,7 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
   private constructor(
     private readonly reader: UpgradeReader,
     private readonly deprecations: Deprecation[],
+    private readonly version: UpgradeImageVersion,
   ) {}
 
   /** A test may hand a reader of its own, so a page reads a ledger with releases and runs. */
@@ -34,19 +36,21 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
     steps = [],
     reader,
     deprecations = [],
+    version = { kind: "development", containsRelease: null, commit: null },
   }: {
     steps?: UpgradeImage["steps"];
     reader?: UpgradeReader;
     deprecations?: Deprecation[];
+    version?: UpgradeImageVersion;
   } = {}): MemoryUpgradeLedgerRepository {
     return new MemoryUpgradeLedgerRepository(
       reader ??
         createUpgradeReader({
           postgres: { query: async () => ({ rows: [] }) },
-          image: { release: "unreleased", steps },
-          floor: null,
+          image: { release: UNRELEASED_IMAGE, steps },
         }),
       deprecations,
+      version,
     );
   }
 
@@ -85,8 +89,8 @@ export class MemoryUpgradeLedgerRepository implements UpgradeLedgerRepository {
     return this.reader.getRun(input);
   }
 
-  findPreview(input: { to: string }): Promise<UpgradePreview> {
-    return this.reader.preview(input);
+  findImageVersion(): UpgradeImageVersion {
+    return this.version;
   }
 
   findTargets(): Promise<UpgradeTargetSummary[]> {

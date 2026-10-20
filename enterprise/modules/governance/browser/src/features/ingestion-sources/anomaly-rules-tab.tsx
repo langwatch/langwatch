@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
@@ -9,11 +10,11 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
 import { Info, Pencil, Plus, RotateCw, Trash2 } from "lucide-react";
@@ -270,32 +271,29 @@ function RuleSeveritySection({
 }) {
   const meta = SEVERITY_OPTIONS.find((o) => o.value === severity)!;
   return (
-    <Box as="section" borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
-      <HStack alignItems="start" marginBottom={3}>
-        <VStack align="start" gap={0}>
-          <HStack gap={2}>
-            <Text fontSize="sm" fontWeight="semibold">
-              {meta.label}
-            </Text>
-            {/* A count is a claim about the fleet. We only have one when
-                the list actually arrived. */}
-            {knowsFleetIsEmpty && (
-              <Badge size="sm" variant="surface">
-                {rules.length}
-              </Badge>
-            )}
-          </HStack>
-        </VStack>
-        <Spacer />
-        {/* The write is `anomalyRules:manage`. A viewer who only reads is
-            not offered a composer the server refuses. */}
-        {canManage && (
+    <Card
+      title={meta.label}
+      // A count is a claim about the fleet. We only have one when the list actually arrived.
+      badge={
+        knowsFleetIsEmpty ? (
+          <Badge size="sm" variant="surface">
+            {rules.length}
+          </Badge>
+        ) : (
+          void 0
+        )
+      }
+      // The write is `anomalyRules:manage`; a viewer who only reads is not offered a refused composer.
+      actions={
+        canManage ? (
           <Button size="sm" variant="outline" onClick={onNewRule} disabled={composerOpen}>
             <Plus size={14} /> New rule
           </Button>
-        )}
-      </HStack>
-
+        ) : (
+          void 0
+        )
+      }
+    >
       <VStack align="stretch" gap={2}>
         {/* Same rule as the sibling sources page: "None" is a claim we can
             only make when we know. */}
@@ -315,7 +313,7 @@ function RuleSeveritySection({
           />
         ))}
       </VStack>
-    </Box>
+    </Card>
   );
 }
 
@@ -530,7 +528,7 @@ export function AnomalyRulesTab() {
           />
         )}
 
-        {rulesQuery.isLoading && <Spinner size="sm" />}
+        {rulesQuery.isLoading && <SkeletonRows rows={3} label="Loading rules" />}
 
         {rulesQuery.error && (
           <RuleListLoadError
@@ -708,236 +706,218 @@ function RuleComposer({
   const showSourceTypePicker = scopeIdMode === "picker" && composer.scope === "source_type";
   const showCustomScopeId = !showSourcePicker && !showSourceTypePicker;
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      open
+      onClose={onCancel}
       size="lg"
-      onOpenChange={({ open }) => {
-        if (!open) onCancel();
+      title={isEdit ? "Edit anomaly rule" : "New anomaly rule"}
+      footer={{
+        cancel: { onClick: onCancel },
+        primaryAction: {
+          label: isEdit ? "Save changes" : "Create rule",
+          onClick: onSubmit,
+          loading: isPending,
+          disabledReason:
+            !composer.name.trim() || (composer.scope !== "organization" && !composer.scopeId.trim())
+              ? "Fill in the required fields"
+              : void 0,
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.CloseTrigger />
-          <Drawer.Title>{isEdit ? "Edit anomaly rule" : "New anomaly rule"}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <VStack align="stretch" gap={1} flex={2}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Name
-                </Text>
-                <Input
-                  size="sm"
-                  backgroundColor="bg.control"
-                  value={composer.name}
-                  onChange={(e) => setComposer({ ...composer, name: e.target.value })}
-                  placeholder="Display name for this rule"
-                />
-              </VStack>
-              <VStack align="stretch" gap={1} flex={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Severity
-                </Text>
-                <DashboardSelect
-                  ariaLabel="Severity"
-                  options={SEVERITY_OPTIONS}
-                  value={composer.severity}
-                  onChange={(next) => setComposer({ ...composer, severity: next as Severity })}
-                />
-              </VStack>
-            </HStack>
+      <VStack align="stretch" gap={3}>
+        <HStack gap={3}>
+          <VStack align="stretch" gap={1} flex={2}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Name
+            </Text>
+            <Input
+              size="sm"
+              backgroundColor="bg.control"
+              value={composer.name}
+              onChange={(e) => setComposer({ ...composer, name: e.target.value })}
+              placeholder="Display name for this rule"
+            />
+          </VStack>
+          <VStack align="stretch" gap={1} flex={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Severity
+            </Text>
+            <DashboardSelect
+              ariaLabel="Severity"
+              options={SEVERITY_OPTIONS}
+              value={composer.severity}
+              onChange={(next) => setComposer({ ...composer, severity: next as Severity })}
+            />
+          </VStack>
+        </HStack>
 
-            <VStack align="stretch" gap={1}>
-              <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                Description (optional)
-              </Text>
-              <Textarea
-                size="sm"
-                backgroundColor="bg.control"
-                rows={2}
-                value={composer.description}
-                onChange={(e) => setComposer({ ...composer, description: e.target.value })}
-                placeholder="What this rule guards against and who owns it"
-              />
-            </VStack>
+        <VStack align="stretch" gap={1}>
+          <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+            Description (optional)
+          </Text>
+          <Textarea
+            size="sm"
+            backgroundColor="bg.control"
+            rows={2}
+            value={composer.description}
+            onChange={(e) => setComposer({ ...composer, description: e.target.value })}
+            placeholder="What this rule guards against and who owns it"
+          />
+        </VStack>
 
-            <HStack gap={3}>
-              <VStack align="stretch" gap={1} flex={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Rule type
-                </Text>
-                <Input
-                  size="sm"
-                  backgroundColor="bg.control"
-                  list="rule-type-suggestions"
-                  value={composer.ruleType}
-                  onChange={(e) => {
-                    const nextRuleType = e.target.value;
-                    setComposer({
-                      ...composer,
-                      ruleType: nextRuleType,
-                      // Auto-fill the threshold template when the user picks
-                      // spend_spike from a blank composer — saves them
-                      // grepping the subscriber for the schema. If they've
-                      // already customised the JSON, leave it alone.
-                      thresholdConfig:
-                        nextRuleType === "spend_spike" &&
-                        (composer.thresholdConfig.trim() === "" ||
-                          composer.thresholdConfig.trim() === "{}")
-                          ? SPEND_SPIKE_THRESHOLD_TEMPLATE
-                          : composer.thresholdConfig,
-                    });
-                  }}
-                  placeholder="spend_spike"
-                />
-                <datalist id="rule-type-suggestions">
-                  {RULE_TYPE_SUGGESTIONS.map((s) => (
-                    <option key={s} value={s} aria-label={s} />
-                  ))}
-                </datalist>
-                <Text fontSize="xs" color="fg.muted">
-                  Only <InlineCode>spend_spike</InlineCode> is evaluated by the anomaly subscriber
-                  today. Other rule types (<InlineCode>rate_limit</InlineCode>,
-                  <InlineCode>after_hours</InlineCode>, …) are{" "}
-                  <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.fg">
-                    preview
-                  </Link>{" "}
-                  , persisted as active but not yet detected.
-                </Text>
-              </VStack>
-              <VStack align="stretch" gap={1} flex={1}>
-                <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Scope
-                </Text>
-                <DashboardSelect
-                  ariaLabel="Scope"
-                  options={SCOPE_OPTIONS}
-                  value={composer.scope}
-                  // The id belongs to the scope that chose it. Carrying a
-                  // source id into a source-type scope saves a rule the
-                  // subscriber can never match, and the picker shows its
-                  // placeholder throughout, so nothing on screen says so.
-                  onChange={(next) =>
-                    setComposer({
-                      ...composer,
-                      scope: next as Scope,
-                      scopeId: "",
-                    })
-                  }
-                />
-              </VStack>
-              {composer.scope !== "organization" && (
-                <VStack align="stretch" gap={1} flex={1}>
-                  <HStack gap={2} alignItems="center">
-                    <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                      {scopeIdLabel(composer.scope)}
-                    </Text>
-                    <Spacer />
-                    <Button
-                      size="xs"
-                      variant="ghost"
-                      fontSize="xs"
-                      color="blue.fg"
-                      onClick={() => setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))}
-                    >
-                      {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
-                    </Button>
-                  </HStack>
-                  {showSourcePicker && (
-                    <DashboardSelect
-                      ariaLabel="Ingestion source"
-                      // The empty choice is the placeholder rather than an
-                      // option: the app's select shows it until something is
-                      // picked, so an unset scope cannot read as a chosen one.
-                      placeholder={
-                        sourcesQuery.isLoading ? "Loading sources…" : "Select an ingestion source"
-                      }
-                      options={sourceOptions}
-                      value={composer.scopeId}
-                      onChange={(next) => setComposer({ ...composer, scopeId: next })}
-                      disabled={sourcesQuery.isLoading}
-                    />
-                  )}
-                  {showSourceTypePicker && (
-                    <DashboardSelect
-                      ariaLabel="Source type"
-                      placeholder="Select a source type"
-                      options={SOURCE_TYPE_PICKER_OPTIONS}
-                      value={composer.scopeId}
-                      onChange={(next) => setComposer({ ...composer, scopeId: next })}
-                    />
-                  )}
-                  {showCustomScopeId && (
-                    <Input
-                      size="sm"
-                      backgroundColor="bg.control"
-                      value={composer.scopeId}
-                      onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
-                      placeholder={customScopeIdPlaceholder(composer.scope)}
-                    />
-                  )}
-                </VStack>
-              )}
-            </HStack>
-
-            <VStack align="stretch" gap={1}>
+        <HStack gap={3}>
+          <VStack align="stretch" gap={1} flex={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Rule type
+            </Text>
+            <Input
+              size="sm"
+              backgroundColor="bg.control"
+              list="rule-type-suggestions"
+              value={composer.ruleType}
+              onChange={(e) => {
+                const nextRuleType = e.target.value;
+                setComposer({
+                  ...composer,
+                  ruleType: nextRuleType,
+                  // Auto-fill the threshold template when the user picks
+                  // spend_spike from a blank composer — saves them
+                  // grepping the subscriber for the schema. If they've
+                  // already customised the JSON, leave it alone.
+                  thresholdConfig:
+                    nextRuleType === "spend_spike" &&
+                    (composer.thresholdConfig.trim() === "" ||
+                      composer.thresholdConfig.trim() === "{}")
+                      ? SPEND_SPIKE_THRESHOLD_TEMPLATE
+                      : composer.thresholdConfig,
+                });
+              }}
+              placeholder="spend_spike"
+            />
+            <datalist id="rule-type-suggestions">
+              {RULE_TYPE_SUGGESTIONS.map((s) => (
+                <option key={s} value={s} aria-label={s} />
+              ))}
+            </datalist>
+            <Text fontSize="xs" color="fg.muted">
+              Only <InlineCode>spend_spike</InlineCode> is evaluated by the anomaly subscriber
+              today. Other rule types (<InlineCode>rate_limit</InlineCode>,
+              <InlineCode>after_hours</InlineCode>, …) are{" "}
+              <Link href={docsUrl("/ai-governance/anomaly-rules")} color="blue.fg">
+                preview
+              </Link>{" "}
+              , persisted as active but not yet detected.
+            </Text>
+          </VStack>
+          <VStack align="stretch" gap={1} flex={1}>
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Scope
+            </Text>
+            <DashboardSelect
+              ariaLabel="Scope"
+              options={SCOPE_OPTIONS}
+              value={composer.scope}
+              // The id belongs to the scope that chose it. Carrying a
+              // source id into a source-type scope saves a rule the
+              // subscriber can never match, and the picker shows its
+              // placeholder throughout, so nothing on screen says so.
+              onChange={(next) =>
+                setComposer({
+                  ...composer,
+                  scope: next as Scope,
+                  scopeId: "",
+                })
+              }
+            />
+          </VStack>
+          {composer.scope !== "organization" && (
+            <VStack align="stretch" gap={1} flex={1}>
               <HStack gap={2} alignItems="center">
                 <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
-                  Threshold config (rule-type-specific JSON)
+                  {scopeIdLabel(composer.scope)}
                 </Text>
                 <Spacer />
-                <Link
-                  href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
-                  isExternal
-                  color="blue.fg"
+                <Button
+                  size="xs"
+                  variant="ghost"
                   fontSize="xs"
-                  fontWeight="medium"
+                  color="blue.fg"
+                  onClick={() => setScopeIdMode((m) => (m === "picker" ? "custom" : "picker"))}
                 >
-                  <HStack gap={1} alignItems="center">
-                    <Info size={12} />
-                    <Text as="span">Schema reference</Text>
-                  </HStack>
-                </Link>
+                  {scopeIdMode === "picker" ? "type a custom ID" : "use picker"}
+                </Button>
               </HStack>
-              <Textarea
-                size="sm"
-                backgroundColor="bg.control"
-                rows={4}
-                fontFamily="mono"
-                value={composer.thresholdConfig}
-                onChange={(e) => setComposer({ ...composer, thresholdConfig: e.target.value })}
-                placeholder="{}"
-              />
-              <ThresholdPreview ruleType={composer.ruleType} raw={composer.thresholdConfig} />
+              {showSourcePicker && (
+                <DashboardSelect
+                  ariaLabel="Ingestion source"
+                  // The empty choice is the placeholder rather than an
+                  // option: the app's select shows it until something is
+                  // picked, so an unset scope cannot read as a chosen one.
+                  placeholder={
+                    sourcesQuery.isLoading ? "Loading sources…" : "Select an ingestion source"
+                  }
+                  options={sourceOptions}
+                  value={composer.scopeId}
+                  onChange={(next) => setComposer({ ...composer, scopeId: next })}
+                  disabled={sourcesQuery.isLoading}
+                />
+              )}
+              {showSourceTypePicker && (
+                <DashboardSelect
+                  ariaLabel="Source type"
+                  placeholder="Select a source type"
+                  options={SOURCE_TYPE_PICKER_OPTIONS}
+                  value={composer.scopeId}
+                  onChange={(next) => setComposer({ ...composer, scopeId: next })}
+                />
+              )}
+              {showCustomScopeId && (
+                <Input
+                  size="sm"
+                  backgroundColor="bg.control"
+                  value={composer.scopeId}
+                  onChange={(e) => setComposer({ ...composer, scopeId: e.target.value })}
+                  placeholder={customScopeIdPlaceholder(composer.scope)}
+                />
+              )}
             </VStack>
+          )}
+        </HStack>
 
-            <RuleDestinationField composer={composer} setComposer={setComposer} orgId={orgId} />
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={3} width="full">
+        <VStack align="stretch" gap={1}>
+          <HStack gap={2} alignItems="center">
+            <Text fontSize="xs" fontWeight="semibold" color="fg.muted">
+              Threshold config (rule-type-specific JSON)
+            </Text>
             <Spacer />
-            <Button size="sm" variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onSubmit}
-              loading={isPending}
-              disabled={
-                !composer.name.trim() ||
-                (composer.scope !== "organization" && !composer.scopeId.trim())
-              }
+            <Link
+              href={docsUrl("/ai-governance/anomaly-rules#threshold-config")}
+              isExternal
+              color="blue.fg"
+              fontSize="xs"
+              fontWeight="medium"
             >
-              {isEdit ? "Save changes" : "Create rule"}
-            </Button>
+              <HStack gap={1} alignItems="center">
+                <Info size={12} />
+                <Text as="span">Schema reference</Text>
+              </HStack>
+            </Link>
           </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          <Textarea
+            size="sm"
+            backgroundColor="bg.control"
+            rows={4}
+            fontFamily="mono"
+            value={composer.thresholdConfig}
+            onChange={(e) => setComposer({ ...composer, thresholdConfig: e.target.value })}
+            placeholder="{}"
+          />
+          <ThresholdPreview ruleType={composer.ruleType} raw={composer.thresholdConfig} />
+        </VStack>
+
+        <RuleDestinationField composer={composer} setComposer={setComposer} orgId={orgId} />
+      </VStack>
+    </Drawer>
   );
 }
 

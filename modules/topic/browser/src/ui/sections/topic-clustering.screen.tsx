@@ -4,17 +4,17 @@
  */
 
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { LoadMore } from "@langwatch/design-system/load-more";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
   Badge,
   Button,
-  Card,
   Heading,
   HStack,
-  Skeleton,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -24,6 +24,7 @@ import {
   StatTileGrid,
   StatTileSkeleton,
 } from "@langwatch/design-system/stat-tile";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import type {
   ClusteringErrorCode,
   TopicClusteringRunHistoryEntry,
@@ -33,10 +34,7 @@ import type {
 } from "@langwatch/topic-contract";
 
 import { topicApi } from "../../behavior/topic-api.ts";
-import {
-  useClusteringRunHistory,
-  useClusteringStatus,
-} from "../../behavior/use-topic-clustering.ts";
+import { useClusteringStatus } from "../../behavior/use-topic-clustering.ts";
 import { useTopicHost } from "../../model/topic-host.ts";
 
 /**
@@ -73,6 +71,9 @@ const CLUSTERING_FAILURE_GUIDANCE: Partial<
   },
 };
 
+const HISTORY_PAGE_SIZE = 20;
+const DOCS_URL = "https://docs.langwatch.ai/features/topic-clustering";
+
 export default function TopicClusteringScreen() {
   const project = useTopicHost().project();
 
@@ -98,6 +99,7 @@ export default function TopicClusteringScreen() {
 function TopicClusteringCard({ project }: { project: { id: string } }) {
   const host = useTopicHost();
   const utils = topicApi.useUtils();
+  const accent = useProductAccent();
 
   const triggerClustering = topicApi.topics.triggerTopicClustering.useMutation({
     onSuccess: (result) => {
@@ -116,7 +118,7 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
       void utils.topics.getClusteringStatus.invalidate({
         projectId: project.id,
       });
-      void utils.topics.getClusteringRunHistory.invalidate({
+      void utils.topics.getClusteringRunHistoryPage.invalidate({
         projectId: project.id,
       });
     },
@@ -134,38 +136,33 @@ function TopicClusteringCard({ project }: { project: { id: string } }) {
   return (
     <VStack gap={6} width="full" align="stretch" paddingBottom={12}>
       <ClusteringStatusCard projectId={project.id} />
-      <Card.Root width="full">
-        <Card.Header>
-          <Heading>Manual topic clustering</Heading>
-        </Card.Header>
-        <Card.Body width="full">
-          <VStack align="start" gap={4}>
-            <Text>
-              Group your recent traces into topics and subtopics without waiting for the next
-              scheduled run. Choose the model and embeddings it uses in{" "}
-              <strong>Settings → Model Providers → Default Models</strong>.
-            </Text>
+      <Card title="Manual topic clustering" padding="lg">
+        <VStack align="start" gap={4}>
+          <Text>
+            Group your recent traces into topics and subtopics without waiting for the next
+            scheduled run. Choose the model and embeddings it uses in{" "}
+            <strong>Settings → Model Providers → Default Models</strong>.
+          </Text>
 
-            <Alert.Root>
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>
-                  Topic clustering needs at least 10 traces to group anything, and can take several
-                  minutes.
-                </Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
+          <Alert.Root>
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>
+                Topic clustering needs at least 10 traces to group anything, and can take several
+                minutes.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
 
-            <Button
-              colorPalette="orange"
-              onClick={() => triggerClustering.mutate({ projectId: project.id })}
-              loading={triggerClustering.isPending}
-            >
-              Run topic clustering
-            </Button>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+          <Button
+            colorPalette={accent.colorPalette}
+            onClick={() => triggerClustering.mutate({ projectId: project.id })}
+            loading={triggerClustering.isPending}
+          >
+            Run topic clustering
+          </Button>
+        </VStack>
+      </Card>
       <RunHistoryCard projectId={project.id} />
     </VStack>
   );
@@ -341,78 +338,97 @@ function runDetail(run: {
   }
 }
 
-function RunHistoryBody({
-  isLoading,
-  runs,
-}: {
-  isLoading: boolean;
-  runs: TopicClusteringRunHistoryEntry[];
-}) {
-  if (runs.length === 0 && !isLoading) {
-    return (
-      <Text color="fg.muted" textAlign="center" width="full" paddingY={8}>
-        No runs yet. History appears here after the first scheduled or manual run.
-      </Text>
-    );
-  }
-  return (
-    <ListTable size="sm" width="full" containerProps={{ overflowX: "auto" }}>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>When</Table.ColumnHeader>
-          <Table.ColumnHeader>Started by</Table.ColumnHeader>
-          <Table.ColumnHeader>Outcome</Table.ColumnHeader>
-          <Table.ColumnHeader>Details</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {isLoading && <LoadingRunRows />}
-        {runs.map((run) => (
-          <Table.Row key={run.runId}>
-            <Table.Cell whiteSpace="nowrap">{formatTimeAgo(run.startedAt) ?? ""}</Table.Cell>
-            <Table.Cell whiteSpace="nowrap">
-              {run.trigger === "manual" ? "You" : "Schedule"}
-            </Table.Cell>
-            <Table.Cell>{outcomeBadge(run.outcome, false)}</Table.Cell>
-            <Table.Cell>
-              <Text fontSize="sm" color="fg.muted">
-                {runDetail(run)}
-              </Text>
-            </Table.Cell>
-          </Table.Row>
-        ))}
-      </Table.Body>
-    </ListTable>
-  );
-}
-
-/** Two rows in the history's own shape while it loads. */
-function LoadingRunRows() {
-  return Array.from({ length: 2 }, (_, index) => (
-    <Table.Row key={index}>
-      <Table.Cell>
-        <Skeleton height="14px" width="72px" />
-      </Table.Cell>
-      <Table.Cell>
-        <Skeleton height="14px" width="64px" />
-      </Table.Cell>
-      <Table.Cell>
-        <Skeleton height="20px" width="80px" />
-      </Table.Cell>
-      <Table.Cell>
-        <Skeleton height="14px" width="70%" />
-      </Table.Cell>
-    </Table.Row>
-  ));
-}
-
 function RunHistoryCard({ projectId }: { projectId: string }) {
-  const history = useClusteringRunHistory({ projectId });
+  const history = topicApi.topics.getClusteringRunHistoryPage.useInfiniteQuery(
+    { projectId, limit: HISTORY_PAGE_SIZE },
+    {
+      getNextPageParam: (lastPage) =>
+        lastPage.outcome === "page" && lastPage.hasMore ? (lastPage.nextCursor ?? void 0) : void 0,
+    },
+  );
+  const pages = history.data?.pages ?? [];
+  const runs: TopicClusteringRunHistoryEntry[] = pages.flatMap((page) =>
+    page.outcome === "page" ? page.entries : [],
+  );
+  const expired = pages.some((page) => page.outcome === "cursor_expired");
+
+  const showBody = () => {
+    if (history.isError && runs.length === 0) {
+      return (
+        <HStack gap={2}>
+          <Text color="fg.error">Could not load the run history.</Text>
+          <Button size="xs" variant="outline" onClick={() => void history.refetch()}>
+            Retry
+          </Button>
+        </HStack>
+      );
+    }
+    if (runs.length === 0 && !history.isLoading) {
+      return (
+        <NoDataInfoBlock
+          size="line"
+          title="No runs yet. History appears here after the first scheduled or manual run."
+          next={[{ kind: "docs", label: "About topic clustering", href: DOCS_URL }]}
+        />
+      );
+    }
+    return (
+      <>
+        <ListTable
+          density="compact"
+          scroll="x"
+          scrollLabel="Run history table"
+          loading={history.isFetchingNextPage}
+        >
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>When</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Started by</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Outcome</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Details</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {history.isLoading && <ListTable.LoadingRows rows={2} columns={4} />}
+            {runs.map((run) => (
+              <ListTable.Row key={run.runId}>
+                <ListTable.Cell nowrap>{formatTimeAgo(run.startedAt) ?? ""}</ListTable.Cell>
+                <ListTable.Cell nowrap>
+                  {run.trigger === "manual" ? "You" : "Schedule"}
+                </ListTable.Cell>
+                <ListTable.Cell>{outcomeBadge(run.outcome, false)}</ListTable.Cell>
+                <ListTable.Cell>
+                  <Text fontSize="sm" color="fg.muted">
+                    {runDetail(run)}
+                  </Text>
+                </ListTable.Cell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+        {expired && (
+          <HStack justify="center" gap={2}>
+            <Text as="output" textStyle="xs" color="fg.muted">
+              The history moved on while you were reading.
+            </Text>
+            <Button size="xs" variant="outline" onClick={() => void history.refetch()}>
+              Show newest runs
+            </Button>
+          </HStack>
+        )}
+        <LoadMore
+          hasMore={!expired && (history.hasNextPage ?? false)}
+          loading={history.isFetchingNextPage}
+          onLoadMore={() => void history.fetchNextPage()}
+        />
+      </>
+    );
+  };
 
   return (
     <VStack align="stretch" gap={3} width="full">
-      <Heading size="md">Run history</Heading>
-      <RunHistoryBody isLoading={history.isLoading} runs={history.data ?? []} />
+      <Heading size="sm">Run history</Heading>
+      {showBody()}
     </VStack>
   );
 }

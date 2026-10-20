@@ -8,21 +8,18 @@
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["vitest/globals"]
+    "types": [],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

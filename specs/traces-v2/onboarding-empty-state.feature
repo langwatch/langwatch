@@ -64,16 +64,16 @@ Rule: Onboarding empty state
     Then the journey is hidden for this project (persisted in localStorage)
     And the real trace table is shown
 
-  # The project record is re-read on focus and on a route change, so on its
-  # own it learns of the first trace only when the reader leaves and comes
-  # back. While the flag is false the page polls the small first-trace read.
+  # The flag is read once when the page opens. The page already listens to the
+  # project's live trace stream; while the flag is false, a trace event on that stream
+  # is the first trace, ahead of the stored flag (WEB-17803, WEB-17707).
   @integration
   Scenario: The Trace Explorer leaves its empty state when the first trace arrives
     Given the Observe page is open with the project's `firstMessage` flag false
-    When the project receives its first trace
-    Then the page re-reads the first-trace flag on its own, without a reload
-    And the trace results replace the empty state once the flag flips
-    And the shared project record is refreshed so the rest of the app follows
+    When the project's live trace stream reports its first trace
+    Then the page leaves the empty state on its own, without a reload or a poll
+    And the trace list is read again so the trace replaces the empty state
+    And once the flag is true further trace events leave it alone
 
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -265,7 +265,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   During the journey the trace list is overridden by `useSamplePreview`,
   which serves fixtures from `samplePreviewTraces.ts` (no real OTLP
   POST happens). A persistent `SampleDataBanner` reads
-  "Sample data — facets, filters, and the drawer all work, but
+  "Sample data: facets, filters, and the drawer all work, but
   nothing here is real." Pre-aurora stages see only
   `SAMPLE_PREVIEW_TRACES`; arrival-and-after stages also include
   `ARRIVAL_PREVIEW_TRACES` so the rich + simple "just arrived" rows
@@ -277,7 +277,7 @@ Rule: Sample data preview overlays fixture rows on the trace list
   Scenario: Banner appears whenever the preview is active
     When `usePreviewTracesActive()` returns true
     Then the `SampleDataBanner` is visible above the trace list
-    And the banner reads "Sample data — facets, filters, and the drawer all work, but nothing here is real."
+    And the banner reads "Sample data: facets, filters, and the drawer all work, but nothing here is real."
 
   Scenario: Arrival fixtures join the preview after the aurora chapter
     Given the journey has reached an arrival-and-after stage
@@ -318,3 +318,23 @@ Rule: First trace celebration
   # @planned — Auto-dismiss after 10s, confetti burst, and a once-per-
   # project gate are not yet implemented as of 2026-05-01. The current
   # banner stays until manually dismissed.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# SHARED TRACE AND RETIRED SETUP ADDRESS
+# ─────────────────────────────────────────────────────────────────────────────
+
+Rule: The shared trace page and the old setup address
+  The public shared trace page holds no project key, and the retired
+  `/:project/setup` address leads to the Trace Explorer.
+
+  @integration
+  Scenario: The shared trace page asks for no key
+    Given nobody is signed in
+    When the trace explorer mounts for a shared trace
+    Then it asks the server for no project key
+
+  @integration
+  Scenario: The old setup page sends you to Traces
+    Given I have a saved link to a project's setup page
+    When I open the old setup page
+    Then I land on that project's Traces page

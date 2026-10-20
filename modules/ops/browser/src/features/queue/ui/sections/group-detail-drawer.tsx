@@ -1,19 +1,19 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { CodeBlock } from "@langwatch/design-system/primitives";
+import { Button, CodeBlock } from "@langwatch/design-system/primitives";
 import { useShikiAdapter } from "@langwatch/design-system/shiki";
 import {
   grafanaGroupLogsUrl,
   grafanaGroupTracesUrl,
   grafanaTraceUrl,
 } from "@langwatch/observability/grafana-links";
+import { Copy, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { useGroupActions } from "../../behavior/use-group-actions.ts";
-import { GroupDrawerHeader } from "../elements/queue-group-drawer-header.tsx";
-import { GroupActionConfirms, GroupDrawerActions } from "./group-action-confirms.tsx";
+import { GroupActionConfirms, groupDrawerFooter } from "./group-action-confirms.tsx";
 import { GroupDetailContent } from "./queue-group-detail-content.tsx";
 
 interface Props {
@@ -53,46 +53,70 @@ export function GroupDetailDrawer({ queueName = "", groupId = "", onClose }: Pro
   const detail = detailQuery.data ?? null;
   const actions = useGroupActions(target);
 
+  const tracesUrl = grafana ? grafanaGroupTracesUrl(groupId, grafana) : null;
+  const logsUrl = grafana ? grafanaGroupLogsUrl(groupId, grafana) : null;
+
   return (
-    <Drawer.Root open={true} placement="end" size="lg" onOpenChange={() => onClose()}>
-      <Drawer.Content>
-        <Drawer.Header>
-          <GroupDrawerHeader
-            groupId={groupId}
-            tracesUrl={grafana ? grafanaGroupTracesUrl(groupId, grafana) : null}
-            logsUrl={grafana ? grafanaGroupLogsUrl(groupId, grafana) : null}
-            onCopyGroupId={actions.copyGroupId}
+    <>
+      <Drawer
+        onClose={onClose}
+        size="lg"
+        title={groupId}
+        eyebrow={{ label: "Queue group" }}
+        headerTools={
+          <>
+            <Button
+              size="2xs"
+              variant="ghost"
+              aria-label="Copy group ID"
+              onClick={actions.copyGroupId}
+              flexShrink={0}
+            >
+              <Copy size={12} />
+            </Button>
+            {tracesUrl && (
+              <Button size="2xs" variant="outline" asChild flexShrink={0}>
+                <a href={tracesUrl} target="_blank" rel="noreferrer">
+                  Traces <ExternalLink size={11} />
+                </a>
+              </Button>
+            )}
+            {logsUrl && (
+              <Button size="2xs" variant="outline" asChild flexShrink={0}>
+                <a href={logsUrl} target="_blank" rel="noreferrer">
+                  Logs <ExternalLink size={11} />
+                </a>
+              </Button>
+            )}
+          </>
+        }
+        footer={
+          hasAccess && detail
+            ? groupDrawerFooter({ target, actions, isBlocked: detail.isBlocked })
+            : void 0
+        }
+      >
+        <CodeBlock.AdapterProvider value={shikiAdapter}>
+          <GroupDetailContent
+            detail={detail}
+            // isPending, not isLoading: a disabled query reports isLoading
+            // false, which would flash the "no longer exists" state before
+            // the fetch starts.
+            isLoading={detailQuery.isPending}
+            jobs={jobsQuery.data ?? null}
+            jobsLoading={jobsQuery.isPending}
+            jobsPage={jobsPage}
+            jobsPageSize={JOBS_PAGE_SIZE}
+            onJobsPageChange={setJobsPage}
+            jobFilter={jobFilter}
+            onJobFilterChange={setJobFilter}
+            traceUrlForTraceId={(traceId) => (grafana ? grafanaTraceUrl(traceId, grafana) : null)}
+            now={detailQuery.dataUpdatedAt || undefined}
           />
-        </Drawer.Header>
-        <Drawer.Body>
-          <CodeBlock.AdapterProvider value={shikiAdapter}>
-            <GroupDetailContent
-              detail={detail}
-              // isPending, not isLoading: a disabled query reports isLoading
-              // false, which would flash the "no longer exists" state before
-              // the fetch starts.
-              isLoading={detailQuery.isPending}
-              jobs={jobsQuery.data ?? null}
-              jobsLoading={jobsQuery.isPending}
-              jobsPage={jobsPage}
-              jobsPageSize={JOBS_PAGE_SIZE}
-              onJobsPageChange={setJobsPage}
-              jobFilter={jobFilter}
-              onJobFilterChange={setJobFilter}
-              traceUrlForTraceId={(traceId) => (grafana ? grafanaTraceUrl(traceId, grafana) : null)}
-              now={detailQuery.dataUpdatedAt || undefined}
-            />
-          </CodeBlock.AdapterProvider>
-        </Drawer.Body>
-        {hasAccess && detail && (
-          <Drawer.Footer>
-            <GroupDrawerActions target={target} actions={actions} isBlocked={detail.isBlocked} />
-          </Drawer.Footer>
-        )}
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
+        </CodeBlock.AdapterProvider>
+      </Drawer>
 
       <GroupActionConfirms target={target} actions={actions} />
-    </Drawer.Root>
+    </>
   );
 }

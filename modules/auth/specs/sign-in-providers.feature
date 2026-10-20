@@ -8,6 +8,11 @@ Feature: The deployment's sign-in providers mount on Better Auth
   beside it (main's D09), and federation is offered only where a signed
   license permits platform single sign-on (ADR-027).
 
+  Mounting is not offering. On cloud, Auth0 stays mounted so organizations
+  still on legacy Auth0 SSO reach it by domain routing, but the sign-in screen
+  and the Connect buttons never offer it (specs/identity/signin-router.feature,
+  "Cloud never offers the Auth0 broker on the sign-in screen").
+
   @unit
   Scenario: A deployment that names no provider mounts none
     Given no sign-in provider is named
@@ -33,6 +38,19 @@ Feature: The deployment's sign-in providers mount on Better Auth
     And google and github client ids and secrets are set too
     When enterprise SSO shapes the providers Better Auth mounts
     Then google, github and auth0 are all mounted
+
+  @unit
+  Scenario: A social provider reaches the real host unless a base is set
+    Given google and github are mounted and no sign-in base is set
+    When Better Auth builds the google and github sign-in links
+    Then both links point at the real provider
+
+  @unit
+  Scenario: A social provider reaches the base a deployment names
+    Given google and github are mounted and a sign-in base is set for each
+    When Better Auth builds a sign-in link and exchanges the code
+    Then the link and the token, user and email calls all go to that base
+    And gitlab and microsoft take their base as issuer and authority
 
   @unit
   Scenario: Email mode mounts no social provider whatever credentials linger
@@ -66,6 +84,22 @@ Feature: The deployment's sign-in providers mount on Better Auth
   Scenario: A licensed install whose named provider did not mount signs in by email
     Given a licensed self-hosted install that names auth0
     And auth0 did not mount
+    When the sign-in method policy is resolved
+    Then no federated method is offered
+
+  # Main's platformSSOAllowed lives on as enterprise SSO's gate (ADR-027); auth
+  # keeps no second licence check beside it.
+  @unit
+  Scenario: Every sign-in decision asks enterprise SSO's licence gate
+    Given a self-hosted install that names auth0 and mounted it
+    When the sign-in method policy is resolved and the federation gate is asked
+    Then each answer comes from enterprise SSO's gate
+    And that gate's licence log lines, once-only email-mode warning and evaluation timeout apply to sign-in
+
+  @unit
+  Scenario: A gate that gave up on a silent licensing store leaves sign-in on email
+    Given a self-hosted install that names auth0 and mounted it
+    And enterprise SSO's gate refused because the licensing store did not answer in time
     When the sign-in method policy is resolved
     Then no federated method is offered
 

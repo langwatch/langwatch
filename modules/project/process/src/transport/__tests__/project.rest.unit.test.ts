@@ -96,6 +96,21 @@ describe("the projects REST family", () => {
     });
   });
 
+  describe("when the caller uses the /api/v1 path", () => {
+    it.each(["/api/projects/project_1", "/api/v1/projects/project_1"])(
+      "answers %s the same",
+      async (path) => {
+        const findWithTeam = vi.fn(async () => projectWithTeam());
+        const { send } = mountProjectRest({ app: { findWithTeam } });
+
+        const response = await send(path);
+
+        expect(response.status).toBe(200);
+        expect(findWithTeam).toHaveBeenCalledTimes(1);
+      },
+    );
+  });
+
   describe("when one project is read", () => {
     /** @scenario Reading a project never discloses its base key */
     it("answers without the base key or the service key", async () => {

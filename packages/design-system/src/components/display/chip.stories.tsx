@@ -25,6 +25,7 @@ export const Toned: Story = {
   args: { tone: "green", dot: "green.solid", icon: LuFilter },
 };
 
+/** The filter funnel is hidden at rest and shows on chip hover or keyboard focus. */
 export const Clickable: Story = {
   args: { onClick: () => void 0, onFilter: () => void 0 },
 };

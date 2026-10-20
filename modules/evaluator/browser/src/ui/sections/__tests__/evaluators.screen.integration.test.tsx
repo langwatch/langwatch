@@ -24,6 +24,7 @@ const calls = vi.hoisted(() => ({
   deleteEvaluator: vi.fn(),
   cascadeArchive: vi.fn(),
   syncFromSource: vi.fn(),
+  copyEvaluator: vi.fn(),
   invalidateAll: vi.fn(),
   invalidateLimit: vi.fn(),
 }));
@@ -80,7 +81,7 @@ vi.mock("@langwatch/evaluator-client", () => ({
       delete: mutation(calls.deleteEvaluator),
       cascadeArchive: mutation(calls.cascadeArchive),
       syncFromSource: mutation(calls.syncFromSource),
-      copy: mutation(vi.fn()),
+      copy: mutation(calls.copyEvaluator),
       pushToCopies: mutation(vi.fn()),
     },
   },
@@ -158,7 +159,7 @@ describe("given a project with evaluators", () => {
         evaluator({ id: "eval_code", name: "Custom check", type: "code", config: {} }),
       ];
       const { host } = renderWithEvaluatorHost(<EvaluatorsScreen />);
-      await userEvent.click(screen.getByText("Custom check"));
+      await userEvent.click(screen.getByRole("button", { name: "Custom check" }));
 
       expect(host.overlays).toEqual([
         { drawer: "codeEvaluatorEditor", params: { evaluatorId: "eval_code" } },
@@ -167,7 +168,7 @@ describe("given a project with evaluators", () => {
       cleanup();
       state.evaluators = [evaluator()];
       const second = renderWithEvaluatorHost(<EvaluatorsScreen />);
-      await userEvent.click(screen.getByText("Answer relevancy"));
+      await userEvent.click(screen.getByRole("button", { name: "Answer relevancy" }));
 
       expect(second.host.overlays).toEqual([
         {
@@ -232,7 +233,7 @@ describe("given an evaluator other things depend on", () => {
       await userEvent.click(screen.getByRole("button", { name: /Actions for Answer relevancy/i }));
       await userEvent.click(await screen.findByText("Delete"));
 
-      const dialog = await screen.findByRole("dialog");
+      const dialog = await screen.findByRole("alertdialog");
       expect(within(dialog).getByText("Workflows (1)").parentElement).toHaveTextContent("archived");
       expect(within(dialog).getByText("Online Evaluations (2)").parentElement).toHaveTextContent(
         "deleted",
@@ -247,11 +248,10 @@ describe("given an evaluator other things depend on", () => {
       await userEvent.click(screen.getByRole("button", { name: /Actions for Answer relevancy/i }));
       await userEvent.click(await screen.findByText("Delete"));
 
-      const confirm = await screen.findByTestId("cascade-archive-confirm-button");
-      expect(confirm).toBeDisabled();
+      expect(await screen.findByTestId("cascade-archive-confirm-button")).toBeDisabled();
 
       await userEvent.type(screen.getByTestId("cascade-archive-confirm-input"), "delete");
-      expect(confirm).not.toBeDisabled();
+      expect(screen.getByTestId("cascade-archive-confirm-button")).not.toBeDisabled();
     });
 
     /** @scenario "An evaluator that other things depend on is deleted with the cascade" */
@@ -306,8 +306,11 @@ describe("given a reader who may create in one project and not another", () => {
       await user.click(screen.getByRole("button", { name: /Actions for Answer relevancy/i }));
       await user.click(await screen.findByText("Replicate to another project"));
 
-      const replicate = screen.getByRole("button", { name: "Replicate" });
-      expect(replicate).toBeDisabled();
+      // Replicate stays available; pressed with no project it names what is missing
+      // and sends nothing.
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(calls.copyEvaluator).not.toHaveBeenCalled();
+      expect(screen.getByText("Choose a project you can create evaluators in.")).toBeVisible();
 
       await user.click(screen.getByRole("combobox"));
       const refused = await screen.findAllByRole("option", {
@@ -318,7 +321,8 @@ describe("given a reader who may create in one project and not another", () => {
 
       // Choosing a project the reader may not create in must leave the action
       // refused rather than send a copy the server would reject.
-      expect(replicate).toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(calls.copyEvaluator).not.toHaveBeenCalled();
       expect(screen.getByText("(no permission)")).toBeInTheDocument();
 
       await user.click(screen.getByRole("combobox"));
@@ -328,7 +332,8 @@ describe("given a reader who may create in one project and not another", () => {
       });
       await user.click(allowed.find((option) => option.tagName === "DIV")!);
 
-      expect(screen.getByRole("button", { name: "Replicate" })).not.toBeDisabled();
+      await user.click(screen.getByRole("button", { name: "Replicate" }));
+      expect(calls.copyEvaluator).toHaveBeenCalledOnce();
     });
   });
 });

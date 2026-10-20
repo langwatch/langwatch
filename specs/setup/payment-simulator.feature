@@ -9,7 +9,7 @@ Feature: paymentsim, a local stand-in for Stripe
   twice or with the wrong secret, and read metered usage back as exact totals.
   It checks no credential beyond its presence: it is a dev shim.
 
-  # Bound by Go tests in services/paymentsim, tools/thuishaven/domain and
+  # Bound by Go tests in services/sims/paymentsim, tools/thuishaven/domain and
   # cmd/service. Billing's own handling of these deliveries is bound in
   # enterprise/modules/billing; the rows against paymentsim are bound in billing-process's
   # billing-paymentsim.integration.test.ts, which skips where no Go toolchain is present.
@@ -49,6 +49,13 @@ Feature: paymentsim, a local stand-in for Stripe
       When the session is completed through the control API
       Then the subscription is active with the seat quantity and a metered item without one
       And checkout.session.completed, customer.subscription.created, invoice.finalized, invoice.paid and invoice.payment_succeeded fire in that order
+
+    @unit
+    Scenario: A payment-link checkout carries the link and the buyer's details
+      Given a checkout session created with a payment link and the buyer's email
+      When the session is completed through the control API with the buyer's name
+      Then checkout.session.completed names the payment link
+      And its customer_details carry the buyer's email and name
 
     @unit
     Scenario: Tiered prices bill graduated and volume tiers

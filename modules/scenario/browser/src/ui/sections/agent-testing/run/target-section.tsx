@@ -9,7 +9,6 @@ import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organiza
 import { chakra, VStack } from "@langwatch/design-system/primitives";
 import { getRoutePath } from "@langwatch/workflow-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
@@ -41,9 +40,9 @@ function ConfigureAgentsLink() {
       display="flex"
       alignItems="center"
       gap={1}
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="medium"
-      color={FG_MUTED}
+      color="fg.muted"
       _hover={{ color: "fg" }}
       data-testid="run-dialog-configure-agents"
     >

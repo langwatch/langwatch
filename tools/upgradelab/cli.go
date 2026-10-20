@@ -79,6 +79,13 @@ func Run(args []string, stdout, stderr io.Writer) int {
 		}
 		return code
 	}
+	if len(args) > 0 && args[0] == "drill" {
+		code, err := cell.DrillCommand(ctx, args[1:], stdout)
+		if err != nil {
+			fmt.Fprintf(stderr, "upgradelab drill: %v\n", err)
+		}
+		return code
+	}
 	if len(args) > 0 && args[0] == "produce" {
 		code, err := cell.ProduceCommand(ctx, args[1:], stdout)
 		if err != nil {

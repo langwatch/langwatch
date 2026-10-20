@@ -18,6 +18,7 @@ import { LangyCardGallery } from "../langy-card-gallery.tsx";
 import { LangyError } from "../langy-error.tsx";
 import { MessageContent } from "../message-content.tsx";
 import { panelGutter } from "./langy-panel-chrome.ts";
+import { LangyGuidedModelPrompt } from "./langy-panel-guided-model-prompt.tsx";
 
 const MotionBox = motion.create(Box);
 
@@ -269,6 +270,12 @@ export interface LangyColumnState {
    * settled once it ended and the kickoff only waits to send. Never the invitation instead.
    */
   tourCard: { kickoff: GuidedKickoffInput | null; organizationId: string | null } | null;
+  /** The tour ended and its kickoff waits on a model: Langy asks inline, below the tour card. */
+  guidedModelPrompt: {
+    organizationId: string | null;
+    onComplete: () => void;
+    onLater: () => void;
+  } | null;
   /** A queued question counts as content, so the empty state never shows over it. */
   empty: {
     panelWidth: number;
@@ -312,8 +319,14 @@ export function LangyConversationBody({
   if (state.tourCard) {
     const gutter = panelGutter(floating);
     return (
-      <VStack align="stretch" paddingX={gutter} paddingTop={gutter}>
+      <VStack
+        align="stretch"
+        gap={floating ? "16px" : "12px"}
+        paddingX={gutter}
+        paddingTop={gutter}
+      >
         <GuidedTourCard {...state.tourCard} />
+        {state.guidedModelPrompt ? <LangyGuidedModelPrompt {...state.guidedModelPrompt} /> : null}
       </VStack>
     );
   }
@@ -342,7 +355,7 @@ function LangyModelSetup({
 }) {
   const reduceMotion = useReducedMotion();
   return (
-    <VStack align="stretch" gap={2} paddingX="18px" paddingTop="18px">
+    <VStack align="stretch" gap={2} paddingX="4.5" paddingTop="4.5">
       {queuedPrompt ? (
         <VStack align="stretch" gap={1} paddingBottom={2}>
           <QueuedPrompt prompt={queuedPrompt} reduceMotion={reduceMotion} />
@@ -438,7 +451,7 @@ export function LangyTranscript({
       align="stretch"
       paddingX={gutter}
       paddingTop={gutter}
-      paddingBottom="12px"
+      paddingBottom="3"
     >
       {messages.map((message, index) => (
         <Fragment key={message.id}>

@@ -5,10 +5,12 @@
  */
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Box, Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
+import { Button, HStack, Icon, Text } from "@langwatch/design-system/primitives";
 import type { ResultGroup } from "@langwatch/scenario-contract";
-import { Archive, Crosshair, Folder, FolderCode, Layers, MoreVertical, Tag } from "lucide-react";
+import { Archive, Crosshair, Folder, FolderCode, Layers, Tag } from "lucide-react";
 import { useState } from "react";
 
 import type {
@@ -16,7 +18,6 @@ import type {
   RunPlanScopeKind,
 } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import { useNow } from "../../../../behavior/use-now.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetKind } from "../../../../model/target-kind.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { PassRateText } from "../../../elements/agent-testing/shared/pass-rate-text.tsx";
@@ -25,11 +26,10 @@ import { TrendSparkline } from "../../../elements/agent-testing/shared/trend-spa
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import { targetsLabel } from "./result-atoms.ts";
 import {
-  ResultsTableBody,
-  ResultsTableCard,
+  type ResultsColumn,
+  ResultsTable,
   ResultsTableEmptyLine,
   ResultsTableHead,
-  ResultsTableRow,
 } from "./results-table-chrome.tsx";
 
 /**
@@ -64,7 +64,7 @@ function TargetsCell({
   return (
     <HStack gap={1.5} minWidth={0} data-testid="plan-targets">
       {label ? <TargetMark kind={kind} testId="plan-targets-mark" /> : null}
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         {label}
       </Text>
     </HStack>
@@ -77,32 +77,30 @@ function ScopeCell({ plan }: { plan: RunPlan }) {
       <Icon
         as={SCOPE_ICONS[plan.scopeKind]}
         boxSize="13px"
-        color={FG_MUTED}
+        color="fg.muted"
         flexShrink={0}
         aria-hidden
       />
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         {plan.scopeLabel}
       </Text>
     </HStack>
   );
 }
 
-/**
- * The columns of the plan table.
- */
-export const PLAN_COLUMNS =
-  "minmax(0,1fr) minmax(140px,170px) minmax(95px,140px) minmax(100px,155px) 60px 100px 32px";
-
-const PLAN_HEADINGS = [
+/** The columns of the plan table: the name takes the free width, the row menu the last. */
+export const PLAN_COLUMNS: ResultsColumn[] = [
   { key: "plan", text: "Run plan" },
-  { key: "last-run", text: "Last run" },
-  { key: "scope", text: "Scope" },
-  { key: "targets", text: "Targets" },
-  { key: "pass", text: "Pass", align: "right" as const },
-  { key: "trend", text: "Trend" },
-  { key: "menu", text: "" },
+  { key: "last-run", text: "Last run", width: "184px" },
+  { key: "scope", text: "Scope", width: "150px" },
+  { key: "targets", text: "Targets", width: "164px" },
+  { key: "pass", text: "Pass", width: "84px", align: "end" },
+  { key: "trend", text: "Trend", width: "124px" },
+  { key: "menu", text: "", width: "52px", action: true },
 ];
+
+/** Under this the table scrolls sideways, so the name keeps room to be read. */
+const PLAN_MIN_WIDTH = "940px";
 
 /** One row of the plan table: a plan, and the runs of it in the window. */
 export type PlanRowModel = {
@@ -132,7 +130,7 @@ function LastRunCell({
 }) {
   if (!group || group.lastRunAt === null) {
     return (
-      <Text fontSize="11.5px" color={FG_MUTED} truncate>
+      <Text textStyle="caption" color="fg.muted" truncate>
         nothing in {days} days
       </Text>
     );
@@ -143,8 +141,8 @@ function LastRunCell({
 
   return (
     <Text
-      fontSize="11.5px"
-      color={FG_MUTED}
+      textStyle="caption"
+      color="fg.muted"
       fontVariantNumeric="tabular-nums"
       truncate
       data-testid="plan-last-run"
@@ -195,7 +193,7 @@ function PlanRowMenu({
           aria-label={`Actions for ${plan.name}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -257,6 +255,8 @@ export type PlanRowsTableProps = {
   onArchivePlan: (plan: RunPlan) => void;
   /** True while the archive call is out, so the dialog holds its buttons. */
   isArchiving?: boolean;
+  /** Offered in the empty line when filters left no plan to draw. */
+  onClearFilters?: () => void;
 };
 
 export function PlanRowsTable({
@@ -269,6 +269,7 @@ export function PlanRowsTable({
   onEditPlan,
   onArchivePlan,
   isArchiving = false,
+  onClearFilters,
 }: PlanRowsTableProps) {
   const now = useNow();
   const [planToArchive, setPlanToArchive] = useState<RunPlan | null>(null);
@@ -280,72 +281,94 @@ export function PlanRowsTable({
   };
 
   return (
-    <ResultsTableCard testId="agent-testing-run-plans-table">
-      <ResultsTableHead columns={PLAN_COLUMNS} headings={PLAN_HEADINGS} />
+    <>
+      <ResultsTable
+        columns={PLAN_COLUMNS}
+        minWidth={PLAN_MIN_WIDTH}
+        testId="agent-testing-run-plans-table"
+      >
+        <ResultsTableHead columns={PLAN_COLUMNS} />
 
-      <ResultsTableBody>
-        {rows.map(({ plan, group }) => (
-          <ResultsTableRow
-            key={plan.slug}
-            columns={PLAN_COLUMNS}
-            onClick={() => onSelectPlan(plan.slug)}
-            testId={`run-plan-row-${plan.slug}`}
-          >
-            <HStack gap={1.5} minWidth={0}>
-              <Text
-                fontSize="12.5px"
-                fontWeight="medium"
-                color="fg"
-                truncate
-                data-testid={`run-plan-name-${plan.name}`}
-              >
-                {plan.name}
-              </Text>
-              <PlanBadge kind={plan.kind} />
-            </HStack>
+        <ListTable.Body>
+          {rows.map(({ plan, group }) => (
+            <ListTable.Row
+              key={plan.slug}
+              onActivate={() => onSelectPlan(plan.slug)}
+              data-testid={`run-plan-row-${plan.slug}`}
+            >
+              <ListTable.Cell>
+                <HStack gap={1.5} minWidth={0}>
+                  <Text
+                    textStyle="bodySm"
+                    fontWeight="medium"
+                    color="fg"
+                    truncate
+                    data-testid={`run-plan-name-${plan.name}`}
+                  >
+                    {plan.name}
+                  </Text>
+                  <PlanBadge kind={plan.kind} />
+                </HStack>
+              </ListTable.Cell>
 
-            <LastRunCell group={group} days={days} now={now} />
+              <ListTable.Cell>
+                <LastRunCell group={group} days={days} now={now} />
+              </ListTable.Cell>
 
-            <ScopeCell plan={plan} />
+              <ListTable.Cell>
+                <ScopeCell plan={plan} />
+              </ListTable.Cell>
 
-            <TargetsCell
-              targetKeys={group?.targetKeys ?? []}
-              resolveTargetName={resolveTargetName}
-              resolveTargetKind={resolveTargetKind}
-            />
+              <ListTable.Cell>
+                <TargetsCell
+                  targetKeys={group?.targetKeys ?? []}
+                  resolveTargetName={resolveTargetName}
+                  resolveTargetKind={resolveTargetKind}
+                />
+              </ListTable.Cell>
 
-            <PassRateText passRate={group?.passRate ?? null} />
+              <ListTable.Cell align="end">
+                <PassRateText passRate={group?.passRate ?? null} />
+              </ListTable.Cell>
 
-            {/* A plan with no run has no history to draw, and "no runs" here
+              {/* A plan with no run has no history to draw, and "no runs" here
                 would only repeat what the Last run column already says. */}
-            {group && group.trend.length > 0 ? (
-              <TrendSparkline bars={group.trend} per="run" />
-            ) : (
-              <Box />
-            )}
+              <ListTable.Cell>
+                {group && group.trend.length > 0 ? (
+                  <TrendSparkline bars={group.trend} per="run" />
+                ) : null}
+              </ListTable.Cell>
 
-            <HStack justify="flex-end" onClick={(event) => event.stopPropagation()}>
-              <PlanRowMenu
-                plan={plan}
-                group={group}
-                onSelectPlan={onSelectPlan}
-                onEditPlan={onEditPlan}
-                onRequestArchive={setPlanToArchive}
-              />
-            </HStack>
-          </ResultsTableRow>
-        ))}
+              <ListTable.ActionCell>
+                <PlanRowMenu
+                  plan={plan}
+                  group={group}
+                  onSelectPlan={onSelectPlan}
+                  onEditPlan={onEditPlan}
+                  onRequestArchive={setPlanToArchive}
+                />
+              </ListTable.ActionCell>
+            </ListTable.Row>
+          ))}
 
-        {rows.length === 0 ? (
-          <ResultsTableEmptyLine
-            text={
-              hasRunsOutsidePlans
-                ? "These runs were started outside a run plan. Group by scenario or target to read them."
-                : "No run plans match these filters."
-            }
-          />
-        ) : null}
-      </ResultsTableBody>
+          {rows.length === 0 && hasRunsOutsidePlans ? (
+            <ResultsTableEmptyLine
+              columns={PLAN_COLUMNS.length}
+              state="empty"
+              title="These runs were started outside a run plan"
+              description="Group by scenario or target to read them."
+            />
+          ) : null}
+          {rows.length === 0 && !hasRunsOutsidePlans ? (
+            <ResultsTableEmptyLine
+              columns={PLAN_COLUMNS.length}
+              state="no-results"
+              title="No run plans match these filters"
+              onClearFilters={onClearFilters}
+            />
+          ) : null}
+        </ListTable.Body>
+      </ResultsTable>
 
       <SuiteArchiveDialog
         open={!!planToArchive}
@@ -356,6 +379,6 @@ export function PlanRowsTable({
         title={PLAN_ARCHIVE_TITLE}
         description={PLAN_ARCHIVE_DESCRIPTION}
       />
-    </ResultsTableCard>
+    </>
   );
 }

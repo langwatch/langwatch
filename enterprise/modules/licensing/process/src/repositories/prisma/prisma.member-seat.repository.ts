@@ -7,6 +7,7 @@ import {
   type PrismaClient,
   RoleBindingScopeType,
 } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import type { MemberSeatRepository } from "../member-seat.repository.ts";
@@ -53,7 +54,7 @@ export class PrismaMemberSeatRepository implements MemberSeatRepository {
         where: {
           organizationId,
           status: INVITE_STATUS.PENDING,
-          OR: [{ expiration: { gt: new Date() } }, { expiration: null }],
+          OR: [{ expiration: { gt: toDate(nowInstant()) } }, { expiration: null }],
         },
         select: { role: true, teamAssignments: true },
       }),

@@ -33,13 +33,6 @@ export const releaseManifestSchema = z.object({
 });
 export type ReleaseManifest = z.infer<typeof releaseManifestSchema>;
 
-/** `packages/upgrade/releases/lts-floor.json`: the oldest release this image upgrades from. */
-export const ltsFloorSchema = z.object({
-  release: releaseVersionSchema,
-  namedAt: z.iso.date(),
-});
-export type LtsFloor = z.infer<typeof ltsFloorSchema>;
-
 export const SCHEMA_STEP_KINDS: ReadonlySet<ManifestStep["kind"]> = new Set([
   "postgres-schema",
   "clickhouse-schema",
@@ -60,7 +53,6 @@ export const manifestLoadErrorCodes = [
   "invalid_manifest",
   "release_mismatch",
   "duplicate_step",
-  "invalid_floor",
 ] as const;
 
 /** Raised while reading the shipped manifests; `code` is what a caller branches on. */

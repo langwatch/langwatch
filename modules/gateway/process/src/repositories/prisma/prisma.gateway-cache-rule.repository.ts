@@ -16,6 +16,7 @@ import {
   type GatewayCacheRule,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import type { GatewayAuditRepository } from "../gateway-audit.repository.ts";
@@ -189,7 +190,7 @@ export class PrismaGatewayCacheRuleRepository extends GatewayCacheRuleRepository
     return this.database.$transaction(async (transaction) => {
       const row = await transaction.gatewayCacheRule.update({
         where: { id: input.id },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: toDate(nowInstant()) },
       });
       await this.changes.append(
         {

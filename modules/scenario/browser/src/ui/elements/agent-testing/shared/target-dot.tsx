@@ -31,13 +31,13 @@ export function TargetDot({
 export function TargetLegend({
   color,
   label,
-  fontSize = "12px",
+  textStyle = "caption",
   testId,
   isWrapped = false,
 }: {
   color: string;
   label: string;
-  fontSize?: string;
+  textStyle?: string;
   testId?: string;
   /**
    * Whether a label too long for the space wraps to a second line. Cut short
@@ -50,7 +50,7 @@ export function TargetLegend({
     <HStack gap={1.5} minWidth={0} alignItems="flex-start" data-testid={testId}>
       <TargetDot color={color} marginTop={isWrapped ? "5px" : undefined} />
       <Text
-        fontSize={fontSize}
+        textStyle={textStyle}
         fontWeight="semibold"
         truncate={!isWrapped}
         whiteSpace={isWrapped ? "normal" : undefined}

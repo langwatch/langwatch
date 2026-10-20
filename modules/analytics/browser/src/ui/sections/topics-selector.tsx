@@ -1,14 +1,9 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Delayed } from "@langwatch/design-system/delayed";
+import { NoDataInfoBlock, type EmptyNext } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
-import {
-  EmptyState,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Heading, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Tags } from "lucide-react";
 import React, { useEffect, useRef, useState } from "react";
 
 import { useTopicCounts } from "../../behavior/use-filter-options.ts";
@@ -20,6 +15,15 @@ import {
   toggleTopic,
   toListParam,
 } from "../../model/topic-selection.ts";
+import { ChartErrorState } from "../elements/chart-error-state.tsx";
+
+const TOPICS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How topics are grouped",
+    href: "https://docs.langwatch.ai/features/topic-clustering",
+  },
+];
 
 export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
   const host = useAnalyticsHost();
@@ -72,7 +76,7 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
       minHeight={minHeight ? `${minHeight}px` : undefined}
     >
       {showTitle && (
-        <Heading fontSize="sm" as="h2">
+        <Heading size="sm" fontSize="sm" as="h2">
           Topics
         </Heading>
       )}
@@ -83,6 +87,13 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
             <Skeleton width="full" height="20px" />
             <Skeleton width="full" height="20px" />
           </Delayed>
+        )}
+        {topicCountsQuery.error && !topicData && (
+          <ChartErrorState
+            error={topicCountsQuery.error}
+            onRetry={() => void topicCountsQuery.refetch()}
+            fallbackTitle="Couldn't load topics"
+          />
         )}
         {!isLoadingTopics && topicData && topicCounts.length > 0 && (
           <>
@@ -111,23 +122,24 @@ export function TopicsSelector({ showTitle = true }: { showTitle?: boolean }) {
           </>
         )}
         {!isLoadingTopics && topicData && topicCounts.length === 0 && (
-          <EmptyState.Root size="sm">
-            <EmptyState.Content>
-              <VStack textAlign="center">
-                <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
-                <EmptyState.Description textStyle="xs">
-                  Topics are assigned automatically after enough messages are collected.{" "}
-                </EmptyState.Description>
-              </VStack>
-            </EmptyState.Content>
-          </EmptyState.Root>
+          <NoDataInfoBlock
+            size="inline"
+            bordered={false}
+            icon={<Tags size={20} />}
+            title="No topics found"
+            description="Topics are assigned automatically after enough messages are collected."
+            next={TOPICS_NEXT}
+          />
         )}
         {!isLoadingTopics && !topicData && (
-          <EmptyState.Root size="sm">
-            <EmptyState.Content>
-              <EmptyState.Title textStyle="sm">No topics found</EmptyState.Title>
-            </EmptyState.Content>
-          </EmptyState.Root>
+          <NoDataInfoBlock
+            size="inline"
+            bordered={false}
+            icon={<Tags size={20} />}
+            title="No topics found"
+            description="Topics appear here once messages have been grouped."
+            next={TOPICS_NEXT}
+          />
         )}
       </VStack>
     </VStack>
@@ -162,7 +174,7 @@ function TopicRow({ name, count, checked, onToggle }: TopicRowProps) {
           {name}
         </OverflownTextWithTooltip>
       </Checkbox>
-      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+      <Text color="fg.muted" textStyle="caption" whiteSpace="nowrap">
         {count}
       </Text>
     </HStack>
@@ -183,7 +195,7 @@ function SubtopicRow({ name, count, checked, onToggle }: TopicRowProps) {
           {name}
         </OverflownTextWithTooltip>
       </Checkbox>
-      <Text color="fg.muted" fontSize="12px" whiteSpace="nowrap">
+      <Text color="fg.muted" textStyle="caption" whiteSpace="nowrap">
         {count}
       </Text>
     </HStack>

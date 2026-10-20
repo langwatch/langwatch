@@ -146,6 +146,28 @@ describe("given a person subscribing browsers", () => {
   });
 });
 
+describe("given a deployment that configures a push service base", () => {
+  /** @scenario "A configured push service base is accepted and reached beside the browsers' own" */
+  it("stores a subscription below that base", async () => {
+    const subscriptions = MemoryWebPushSubscriptionRepository.create();
+    const service = WebPushService.create({
+      subscriptions,
+      vapidKeys: MemoryWebPushVapidKeyRepository.create(),
+      gateway: MemoryWebPushGatewayChannel.create(),
+      settings: SETTINGS,
+      pushServiceBase: "https://127.0.0.1:5598/push",
+      queue: () => undefined,
+    });
+
+    await service.subscribe({
+      userId: "ada",
+      subscription: browser("https://127.0.0.1:5598/push/laptop").subscription,
+    });
+
+    await expect(subscriptions.findByUser("ada")).resolves.toHaveLength(1);
+  });
+});
+
 describe("given a person subscribed on two browsers", () => {
   async function twoBrowsers() {
     const context = setup();

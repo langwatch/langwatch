@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
+	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
 // redirectStdio points the process's stdout and stderr at files for one test,
@@ -74,8 +75,8 @@ func TestSlotRunPassesTheCommandsOutputAndExitCodeThrough(t *testing.T) {
 // unavailableSlots is a slot directory that cannot be created or written.
 type unavailableSlots struct{}
 
-func (unavailableSlots) TryAcquire(string, int) (func(), int, bool, error) {
-	return nil, 0, false, errors.New("mkdir /nowhere: permission denied")
+func (unavailableSlots) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
+	return nil, false, errors.New("mkdir /nowhere: permission denied")
 }
 
 // @scenario "A queue that cannot be created degrades to an unqueued run"
@@ -109,10 +110,10 @@ type heldSlots struct {
 	polls int
 }
 
-func (h *heldSlots) TryAcquire(string, int) (func(), int, bool, error) {
+func (h *heldSlots) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
 	h.polls++
 	h.job.queuedAt = time.Now().Add(-h.ago)
-	return nil, 0, false, nil
+	return nil, false, nil
 }
 
 // @scenario "A run that waits too long runs anyway"

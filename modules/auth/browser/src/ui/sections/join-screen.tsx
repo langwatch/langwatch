@@ -31,7 +31,7 @@ export default function Join() {
     return (
       <FrontDoorShell>
         <AuthCard title="We couldn't check for your colleagues">
-          <VStack width="full" align="stretch" gap="14px" data-testid="join-lookup-failed">
+          <VStack width="full" align="stretch" gap="3.5" data-testid="join-lookup-failed">
             <HandledErrorAlert
               error={lookup.error ?? mine.error}
               fallbackTitle="We couldn't check for your colleagues"

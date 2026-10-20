@@ -223,6 +223,9 @@ const ssoSetupPageViewSchemaDefinition = z
       .object({ connectionId: z.string(), domain: z.string(), provider: z.string() })
       .strict()
       .nullable(),
+    /** The legacy settings' domain still to move onto this organization's
+     *  own connection (ADR-124 §7); empty when there is none. */
+    legacyDomainsToMove: z.array(z.string()),
     /** Where the cutover stands, when this connection replaces a
      *  grandfathered one. Null for every connection outside a pair. */
     migration: ssoSetupMigrationSchema.nullable(),

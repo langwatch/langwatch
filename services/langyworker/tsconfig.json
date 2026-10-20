@@ -8,18 +8,15 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "resolveJsonModule": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    "types": ["node"],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts", "package.json"],
-  "exclude": [
-    // Bun-only build script (uses the `Bun` global). Compiled BY bun, never by
-    // tsc; typechecked via `bun build` at the point of use (same convention as
-    // sdks/typescript/scripts/build-cli-binary.ts).
-    "scripts/build-binary.ts"
-  ],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

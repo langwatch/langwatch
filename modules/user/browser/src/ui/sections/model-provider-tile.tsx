@@ -1,6 +1,7 @@
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import {
   Alert,
-  Box,
   Button,
   Code,
   HStack,
@@ -34,6 +35,25 @@ function sanitizeDefaultLabel(raw: string | undefined): string {
     .replace(/\s+/g, "-")
     .replace(/[^a-z0-9_-]/g, "")
     .replace(/^[^a-z0-9]+/, "");
+}
+
+/** Whether the clipboard took the text; a missing or refusing clipboard is `false`. */
+async function writeToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function CopyFailedNotice({ failed }: { failed: boolean }) {
+  if (!failed) return null;
+  return (
+    <Banner status="error">
+      Couldn't copy to the clipboard. Reveal the secret and copy it by hand, or try again.
+    </Banner>
+  );
 }
 
 const VOWEL_SOUNDS = ["a", "e", "i", "o", "u"];
@@ -95,6 +115,7 @@ export function ModelProviderTile({
   const [issued, setIssued] = useState<IssuedKey | null>(null);
   const [secretRevealed, setSecretRevealed] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [copyFailed, setCopyFailed] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const workspaceWait = usePersonalWorkspaceWait({ organizationId });
@@ -125,10 +146,11 @@ export function ModelProviderTile({
 
   const issuing = issueMutation.isPending;
 
-  const onCopySecret = () => {
+  const onCopySecret = async () => {
     if (!issued) return;
-    void navigator.clipboard.writeText(issued.secret);
-    setCopied(true);
+    const written = await writeToClipboard(issued.secret);
+    setCopyFailed(!written);
+    setCopied(written);
     setTimeout(() => setCopied(false), 1500);
   };
 
@@ -136,18 +158,12 @@ export function ModelProviderTile({
     setIssued(null);
     setLabel(sanitizeDefaultLabel(config.defaultLabel));
     setSecretRevealed(false);
+    setCopyFailed(false);
     setErrorMessage(null);
   };
 
   return (
-    <Box
-      background="bg.card"
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      padding={4}
-      width="full"
-    >
+    <Card>
       <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
         <TileIcon
           iconAsset={iconAsset}
@@ -198,17 +214,11 @@ export function ModelProviderTile({
             Issue {articleFor(displayName)} {displayName} virtual key
           </Text>
           {config.projectSuggestionText && (
-            <Box
-              padding={3}
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="sm"
-              backgroundColor="bg.subtle"
-            >
+            <Card variant="nested" padding="sm">
               <Text fontSize="xs" color="fg.muted">
                 💡 {config.projectSuggestionText}
               </Text>
-            </Box>
+            </Card>
           )}
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">
@@ -239,14 +249,7 @@ export function ModelProviderTile({
               {PERSONAL_WORKSPACE_WAIT_HINT}
             </Text>
           )}
-          {errorMessage && (
-            <Alert.Root status="error" size="sm">
-              <Alert.Indicator />
-              <Alert.Content>
-                <Alert.Description>{errorMessage}</Alert.Description>
-              </Alert.Content>
-            </Alert.Root>
-          )}
+          {errorMessage && <Banner status="error">{errorMessage}</Banner>}
         </VStack>
       )}
 
@@ -288,11 +291,12 @@ export function ModelProviderTile({
                 size="xs"
                 variant="ghost"
                 aria-label={copied ? "Copied" : "Copy secret"}
-                onClick={onCopySecret}
+                onClick={() => void onCopySecret()}
               >
                 {copied ? <Check size={14} /> : <Copy size={14} />}
               </IconButton>
             </HStack>
+            <CopyFailedNotice failed={copyFailed} />
           </VStack>
           <VStack align="stretch" gap={1}>
             <Text fontSize="xs" color="fg.muted">
@@ -307,6 +311,6 @@ export function ModelProviderTile({
           </Button>
         </VStack>
       )}
-    </Box>
+    </Card>
   );
 }

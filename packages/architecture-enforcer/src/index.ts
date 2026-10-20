@@ -35,7 +35,6 @@ export {
 } from "./policies/quality/service-ceilings.ts";
 export { lintServiceProjectionBoundaries } from "./policies/quality/service-projection-boundaries.ts";
 export { lintStrictContractBuildConfigs } from "./policies/quality/contract-build-config.ts";
-export { lintDeclarationProjectReferences } from "./policies/quality/declaration-project-references.ts";
 export { lintBrowserNodeLeaks } from "./policies/frontend/browser-node-leak.ts";
 export type {
   ModuleImport,

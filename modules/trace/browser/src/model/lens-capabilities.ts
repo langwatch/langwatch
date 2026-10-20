@@ -40,7 +40,7 @@ const TRACE_CAPABILITY: LensCapability = {
     // formats — users pick whichever reads best for their workflow.
     { id: "since", label: "Since (verbose)", section: "Standard" },
     { id: "timestamp", label: "Timestamp (ISO)", section: "Standard" },
-    { id: "trace", label: "Trace (summary)", section: "Standard" },
+    { id: "trace", label: "Trace", section: "Standard" },
     // Broken-out alternates to the composite Trace summary — let users
     // assemble the column shape they prefer (engineer-friendly summary
     // vs. PM-friendly per-field columns) without a hidden density mode.
@@ -69,6 +69,7 @@ const TRACE_CAPABILITY: LensCapability = {
     { id: "ttft", label: "TTFT", section: "Standard" },
     { id: "userId", label: "User ID", section: "Standard" },
     { id: "conversationId", label: "Conversation ID", section: "Standard" },
+    { id: "sessionId", label: "Session ID", section: "Standard" },
     { id: "origin", label: "Origin", section: "Standard" },
     { id: "evaluations", label: "Evals", section: "Evaluations" },
     { id: "events", label: "Events", section: "Events" },
@@ -108,6 +109,7 @@ const CONVERSATION_CAPABILITY: LensCapability = {
   // missing a section, which reads as broken next to the dialog version.
   columns: [
     { id: "conversation", label: "Conversation", section: "Standard" },
+    { id: "sessionId", label: "Session ID", section: "Standard" },
     { id: "turns", label: "Traces", section: "Standard" },
     { id: "started", label: "Started", section: "Standard" },
     { id: "lastTurn", label: "Last Activity", section: "Standard" },
@@ -189,6 +191,23 @@ export function reconcileColumns({
     (id) => validSet.has(id) || (isTraceCapability && isEvalColumnId(id)),
   );
   return filtered.length > 0 ? filtered : [...capability.defaultColumns];
+}
+
+/**
+ * The columns a grouping switch keeps. A switch that loses the new row kind's
+ * identity column (a group's label, a trace's time) starts from its defaults.
+ * Spec: specs/traces-v2/grouping-engine.feature
+ */
+export function columnsForGrouping({
+  ids,
+  capability,
+}: {
+  ids: readonly string[];
+  capability: LensCapability;
+}): string[] {
+  const columns = reconcileColumns({ ids, capability });
+  const identity = capability.defaultColumns[0];
+  return identity && !columns.includes(identity) ? [...capability.defaultColumns] : columns;
 }
 
 export function reconcileAddons(ids: readonly string[], capability: LensCapability): string[] {

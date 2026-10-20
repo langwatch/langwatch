@@ -74,6 +74,34 @@ const BASE = {
   headers: {},
 } satisfies WebhookActionParams;
 
+describe("AutomationWebhookSecretsService.parseStored", () => {
+  describe("given a graph alert delivering by webhook", () => {
+    /** @scenario "A webhook graph alert reads back with its delivery and its rule" */
+    it("keeps the alert rule beside the delivery and redacts only the secrets", () => {
+      const row = {
+        url: "https://acme.test/hook",
+        signingSecretEncrypted: crypto.encrypt("whsec_real"),
+        threshold: 3,
+        operator: "gte",
+        timePeriod: 5,
+        seriesName: "0/metadata.trace_id/cardinality",
+      };
+
+      const redacted = adapter.redact(adapter.parseStored(row));
+
+      expect(redacted).toMatchObject({
+        url: "https://acme.test/hook",
+        signingSecret: WEBHOOK_HEADER_VALUE_KEPT,
+        threshold: 3,
+        operator: "gte",
+        timePeriod: 5,
+        seriesName: "0/metadata.trace_id/cardinality",
+      });
+      expect(JSON.stringify(redacted)).not.toContain("whsec_real");
+    });
+  });
+});
+
 describe("AutomationWebhookSecretsService.persist", () => {
   describe("given the marker comes back for a header", () => {
     it("keeps the stored value instead of writing the marker", () => {

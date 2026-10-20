@@ -7,6 +7,10 @@ argument-hint: "(nothing - reads the merge in progress), or a path prefix to wor
 
 # Carry a long merge
 
+The big merge of `main` into the restructured tree has landed. This is now a **conditional runbook**:
+use it only when `git rev-parse -q --verify MERGE_HEAD` succeeds (or the user names a long merge).
+With no merge in progress, stop; do not infer an active merge from an old handover or plan.
+
 A merge big enough to outlive one session is not a bigger version of a small
 one. It has its own failure mode: **it always looks finished.** Every technique
 below exists because the finished-looking state was wrong.
@@ -25,11 +29,11 @@ If it prints `no merge in progress`, there is nothing to carry. Stop.
 
 ## 2. Read what binds you
 
-| File                                       | What it gives you                        |
-| ------------------------------------------ | ---------------------------------------- |
-| `.claude/skills/core/repository-rules.md`  | what binds every agent here              |
-| `.claude/skills/core/handoff-rules.md`     | the seven statuses, the 150-line cap     |
-| the local merge handoff files (gitignored) | what earlier merge lanes already settled |
+| File                                      | What it gives you                        |
+| ----------------------------------------- | ---------------------------------------- |
+| `.claude/skills/core/repository-rules.md` | what binds every agent here              |
+| `.claude/skills/core/handoff-rules.md`    | the seven statuses, the 150-line cap     |
+| the local merge handoff files, if any     | what earlier merge lanes already settled |
 
 Read the branch's own purpose before resolving anything. A restructuring branch
 deletes things **on purpose**, and main kept developing them; without knowing
@@ -122,9 +126,10 @@ source, our port objects and our logging seam; take their semantics whole. Never
 take a side wholesale — that is how a feature or a restructuring gets reverted.
 
 **When their feature needs data our port does not carry**, extend the port
-rather than dropping the feature or reaching around it. Prefer an optional
-member when many hand-built doubles implement it, and say in the doc what an
-absent value degrades to.
+rather than dropping the feature or reaching around it. Peer doubles come from
+`createApiFixture` (the `testing` skill), which fails loudly on a member a test
+did not provide, so make the member required and update the fixtures that call it;
+no hand-built double needs an optional member to survive.
 
 ## 6. Order: unblock the verifier first
 

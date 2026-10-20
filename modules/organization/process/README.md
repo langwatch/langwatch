@@ -6,18 +6,18 @@ The server half of [organization](../README.md). Organisations and who is in the
 
 ## Installation
 
-`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withMigrations(…).withTasks(…)`, `src/organization.module.ts:29`.
+`defineProcessModule("organization").withRepositories(organizationRepositories).withChannels(organizationChannels).withApi(OrganizationModule).withTransports(organizationTrpcTransport, inviteTrpcTransport, teamTrpcTransport, groupTrpcTransport, licenseEnforcementTrpcTransport, personalWorkspaceFeaturesTrpcTransport, organizationManagementRest, organizationsProvisioningRest, groupsRest, teamsRest).provideMiddlewareContext(…).withEventing(seatLimitEventing).withEventing(organizationLifecycleEventing).withEventing(organizationAuditEventing).withEventing(privateDataplaneRecorderEventing).withMigrations(…)`, `src/organization.module.ts:29`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
 ## Module API (`OrganizationApi`)
 
-Peers call these through the token, declared at `../contract/src/organization.api.ts:240`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/organization.api.ts:241`; nothing else in this package is public.
 
 #### `createAndAssign`
 
 ```typescript
-createAndAssign(input: Readonly<{ orgName?: string; phoneNumber?: string; signUpData?: Record<string, unknown>; primaryIntent?: OrganizationIntent | null; userDisplayName?: string | null; }>, by: OrganizationCaller): Promise<{ organization: { id: string; name: string }; team: { id: string; slug: string; name: string }; }>;
+createAndAssign(input: Readonly<{ orgName?: string; phoneNumber?: string; signUpData?: Record<string, unknown>; primaryIntent?: OrganizationIntent | null; userDisplayName?: string | null; }>, by: OrganizationCaller): Promise<{ organization: { id: string; name: string }; team: { id: string; slug: string; name: string }; /** False while the founder's grants are still landing; a read hint follows when they do. */ grantsConfirmed: boolean; }>;
 ```
 
 #### `checkSignUp`
@@ -42,6 +42,14 @@ The oldest pending invitation on each address the caller has PROVEN, in any orga
 
 ```typescript
 listPendingInvitationsForCaller(by: OrganizationCaller): Promise<PendingInvitationsForCaller>;
+```
+
+#### `findPendingInvitationsByEmail`
+
+Every pending invitation on one address, in any organization (main's operator read). An operator-scope read: only the identity lookup, behind its own operator gate, asks it.
+
+```typescript
+findPendingInvitationsByEmail(input: Readonly<{ email: string }>): Promise<PendingInvitationsByEmail>;
 ```
 
 #### `deleteMember`
@@ -226,6 +234,14 @@ createForProvisioning(input: { name: string; slug?: string }): Promise<{ organiz
 
 ```typescript
 listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+```
+
+#### `ensureSystemOrganization`
+
+The install's hidden system organization, created with its one team on first ask; no fact.
+
+```typescript
+ensureSystemOrganization(): Promise<{ id: string }>;
 ```
 
 #### `findProvisioningSummary`
@@ -1003,12 +1019,12 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups`, `/api/v1/groups`; also, undocumented, `/api/groups/2026-08-07`, `/api/v1/groups/2026-08-07`, `/api/groups/latest`, `/api/v1/groups/latest`.
 
 ```typescript
-// Query: organizationGroupRestListQuerySchema, ../contract/src/features/group/group.rest.ts:77
+// Query: organizationGroupRestListQuerySchema, ../contract/src/features/group/group.rest.ts:136
 interface Query {
   page?: number;
   limit?: number;
 }
-type Response = z.infer<typeof organizationGroupRestPageSchema>; // ../contract/src/features/group/group.rest.ts:28
+type Response = z.infer<typeof organizationGroupRestPageSchema>; // ../contract/src/features/group/group.rest.ts:51
 ```
 
 #### `POST /` · `postApiGroups`
@@ -1020,7 +1036,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups`, `/api/v1/groups`; also, undocumented, `/api/groups/2026-08-07`, `/api/v1/groups/2026-08-07`, `/api/groups/latest`, `/api/v1/groups/latest`.
 
 ```typescript
-// Body: organizationGroupRestCreateSchema, ../contract/src/features/group/group.rest.ts:83
+// Body: organizationGroupRestCreateSchema, ../contract/src/features/group/group.rest.ts:148
 interface Body {
   name: string;
   bindings?: {
@@ -1031,7 +1047,7 @@ interface Body {
   }[];
   memberIds?: string[];
 }
-// Response: organizationGroupRestCreatedSchema, ../contract/src/features/group/group.rest.ts:38
+// Response: organizationGroupRestCreatedSchema, ../contract/src/features/group/group.rest.ts:63
 interface Response {
   id: string;
   organizationId: string;
@@ -1050,11 +1066,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
 ```typescript
-// Params: organizationGroupRestParamsSchema, ../contract/src/features/group/group.rest.ts:99
+// Params: organizationGroupRestParamsSchema, ../contract/src/features/group/group.rest.ts:175
 interface Params {
   groupId: string;
 }
-type Response = z.infer<typeof organizationGroupRestDetailsSchema>; // ../contract/src/features/group/group.rest.ts:52
+type Response = z.infer<typeof organizationGroupRestDetailsSchema>; // ../contract/src/features/group/group.rest.ts:88
 ```
 
 #### `PATCH /:groupId` · `patchApiGroupsById`
@@ -1066,12 +1082,12 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Body: organizationGroupRestRenameSchema, ../contract/src/features/group/group.rest.ts:90
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Body: organizationGroupRestRenameSchema, ../contract/src/features/group/group.rest.ts:158
 interface Body {
   name: string;
 }
-// Response: organizationGroupRestRenamedSchema, ../contract/src/features/group/group.rest.ts:45
+// Response: organizationGroupRestRenamedSchema, ../contract/src/features/group/group.rest.ts:75
 interface Response {
   id: string;
   name: string;
@@ -1088,8 +1104,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId`, `/api/v1/groups/:groupId`; also, undocumented, `/api/groups/2026-08-07/:groupId`, `/api/v1/groups/2026-08-07/:groupId`, `/api/groups/latest/:groupId`, `/api/v1/groups/latest/:groupId`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Response: organizationRestSuccessSchema, ../contract/src/features/group/group.rest.ts:74
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Response: organizationRestSuccessSchema, ../contract/src/features/group/group.rest.ts:125
 interface Response {
   success: boolean;
 }
@@ -1104,8 +1120,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId/members`, `/api/v1/groups/:groupId/members`; also, undocumented, `/api/groups/2026-08-07/:groupId/members`, `/api/v1/groups/2026-08-07/:groupId/members`, `/api/groups/latest/:groupId/members`, `/api/v1/groups/latest/:groupId/members`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Response: organizationGroupRestMemberListSchema, ../contract/src/features/group/group.rest.ts:60
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Response: organizationGroupRestMemberListSchema, ../contract/src/features/group/group.rest.ts:98
 interface Response {
   data: {
     userId: string;
@@ -1124,12 +1140,12 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId/members`, `/api/v1/groups/:groupId/members`; also, undocumented, `/api/groups/2026-08-07/:groupId/members`, `/api/v1/groups/2026-08-07/:groupId/members`, `/api/groups/latest/:groupId/members`, `/api/v1/groups/latest/:groupId/members`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Body: organizationGroupRestAddMemberSchema, ../contract/src/features/group/group.rest.ts:95
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Body: organizationGroupRestAddMemberSchema, ../contract/src/features/group/group.rest.ts:168
 interface Body {
   userId: string;
 }
-type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:74
+type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:125
 ```
 
 #### `DELETE /:groupId/members/:userId` · `deleteApiGroupsByIdMembersByUserId`
@@ -1141,12 +1157,12 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId/members/:userId`, `/api/v1/groups/:groupId/members/:userId`; also, undocumented, `/api/groups/2026-08-07/:groupId/members/:userId`, `/api/v1/groups/2026-08-07/:groupId/members/:userId`, `/api/groups/latest/:groupId/members/:userId`, `/api/v1/groups/latest/:groupId/members/:userId`.
 
 ```typescript
-// Params: organizationGroupRestMemberParamsSchema, ../contract/src/features/group/group.rest.ts:101
+// Params: organizationGroupRestMemberParamsSchema, ../contract/src/features/group/group.rest.ts:185
 interface Params {
   groupId: string;
   userId: string;
 }
-type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:74
+type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:125
 ```
 
 #### `GET /:groupId/bindings` · `getApiGroupsByIdBindings`
@@ -1158,8 +1174,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId/bindings`, `/api/v1/groups/:groupId/bindings`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings`, `/api/v1/groups/2026-08-07/:groupId/bindings`, `/api/groups/latest/:groupId/bindings`, `/api/v1/groups/latest/:groupId/bindings`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Response: organizationGroupRestBindingListSchema, ../contract/src/features/group/group.rest.ts:64
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Response: organizationGroupRestBindingListSchema, ../contract/src/features/group/group.rest.ts:107
 interface Response {
   data: {
     id: string;
@@ -1181,15 +1197,15 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). D
 Answers at `/api/groups/:groupId/bindings`, `/api/v1/groups/:groupId/bindings`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings`, `/api/v1/groups/2026-08-07/:groupId/bindings`, `/api/groups/latest/:groupId/bindings`, `/api/v1/groups/latest/:groupId/bindings`.
 
 ```typescript
-type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:99
-// Body: organizationGroupGrantInputSchema, ../contract/src/features/group/group.ts:75
+type Params = z.infer<typeof organizationGroupRestParamsSchema>; // ../contract/src/features/group/group.rest.ts:175
+// Body: organizationGroupGrantInputSchema, ../contract/src/features/group/group.ts:115
 interface Body {
   role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
   customRoleId?: string;
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
 }
-// Response: organizationGroupRestBindingSchema, ../contract/src/features/group/group.rest.ts:68
+// Response: organizationGroupRestBindingSchema, ../contract/src/features/group/group.rest.ts:117
 interface Response {
   id: string;
   role: "ADMIN" | "MEMBER" | "VIEWER" | "CUSTOM";
@@ -1202,17 +1218,17 @@ interface Response {
 
 Remove a role binding from a group
 
-Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:252`.
+Permission `organization:manage`. Entitlement `enterprise` (feature `GROUPS`). Declared at `src/transport/group.rest.ts:253`.
 
 Answers at `/api/groups/:groupId/bindings/:bindingId`, `/api/v1/groups/:groupId/bindings/:bindingId`; also, undocumented, `/api/groups/2026-08-07/:groupId/bindings/:bindingId`, `/api/v1/groups/2026-08-07/:groupId/bindings/:bindingId`, `/api/groups/latest/:groupId/bindings/:bindingId`, `/api/v1/groups/latest/:groupId/bindings/:bindingId`.
 
 ```typescript
-// Params: organizationGroupRestBindingParamsSchema, ../contract/src/features/group/group.rest.ts:106
+// Params: organizationGroupRestBindingParamsSchema, ../contract/src/features/group/group.rest.ts:195
 interface Params {
   groupId: string;
   bindingId: string;
 }
-type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:74
+type Response = z.infer<typeof organizationRestSuccessSchema>; // ../contract/src/features/group/group.rest.ts:125
 ```
 
 ### `organizationManagementRest`
@@ -1234,7 +1250,7 @@ Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_AP
 Answers at `/api/organization`, `/api/v1/organization`; also, undocumented, `/api/organization/2026-08-07`, `/api/v1/organization/2026-08-07`, `/api/organization/latest`, `/api/v1/organization/latest`.
 
 ```typescript
-type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../contract/src/organization-management.rest.ts:13
+type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../contract/src/organization-management.rest.ts:14
 ```
 
 #### `PATCH /` · `updateOrganization`
@@ -1246,7 +1262,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization`, `/api/v1/organization`; also, undocumented, `/api/organization/2026-08-07`, `/api/v1/organization/2026-08-07`, `/api/organization/latest`, `/api/v1/organization/latest`.
 
 ```typescript
-// Body: organizationManagementRestUpdateSchema, ../contract/src/organization-management.rest.ts:15
+// Body: organizationManagementRestUpdateSchema, ../contract/src/organization-management.rest.ts:32
 interface Body {
   name?: string;
   supportContact?: string | null;
@@ -1258,7 +1274,7 @@ interface Body {
   s3SecretAccessKey?: string | null;
   s3Bucket?: string | null;
 }
-type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../contract/src/organization-management.rest.ts:13
+type Response = z.infer<typeof organizationManagementRestSettingsSchema>; // ../contract/src/organization-management.rest.ts:14
 ```
 
 #### `GET /members` · `listOrganizationMembers`
@@ -1270,13 +1286,13 @@ Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_AP
 Answers at `/api/organization/members`, `/api/v1/organization/members`; also, undocumented, `/api/organization/2026-08-07/members`, `/api/v1/organization/2026-08-07/members`, `/api/organization/latest/members`, `/api/v1/organization/latest/members`.
 
 ```typescript
-// Query: organizationManagementRestListMembersQuerySchema, ../contract/src/organization-management.rest.ts:176
+// Query: organizationManagementRestListMembersQuerySchema, ../contract/src/organization-management.rest.ts:249
 interface Query {
   includeDisabled?: "true" | "false";
   offset?: number;
   limit?: number;
 }
-type Response = z.infer<typeof organizationManagementRestMemberListSchema>; // ../contract/src/organization-management.rest.ts:76
+type Response = z.infer<typeof organizationManagementRestMemberListSchema>; // ../contract/src/organization-management.rest.ts:115
 ```
 
 #### `GET /members/:userId` · `getOrganizationMember`
@@ -1288,11 +1304,11 @@ Permission `organization:view`. Entitlement `enterprise` (feature `MANAGEMENT_AP
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-// Params: organizationManagementRestUserIdParamsSchema, ../contract/src/organization-management.rest.ts:185
+// Params: organizationManagementRestUserIdParamsSchema, ../contract/src/organization-management.rest.ts:258
 interface Params {
   userId: string;
 }
-type Response = z.infer<typeof organizationManagementRestMemberWithTeamsSchema>; // ../contract/src/organization-management.rest.ts:65
+type Response = z.infer<typeof organizationManagementRestMemberWithTeamsSchema>; // ../contract/src/organization-management.rest.ts:94
 ```
 
 #### `GET /members/:userId/access` · `getOrganizationMemberAccess`
@@ -1304,8 +1320,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId/access`, `/api/v1/organization/members/:userId/access`; also, undocumented, `/api/organization/2026-08-07/members/:userId/access`, `/api/v1/organization/2026-08-07/members/:userId/access`, `/api/organization/latest/members/:userId/access`, `/api/v1/organization/latest/members/:userId/access`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
-type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>; // ../contract/src/organization-management.rest.ts:92
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:258
+type Response = z.infer<typeof organizationManagementRestAccessBreakdownSchema>; // ../contract/src/organization-management.rest.ts:151
 ```
 
 #### `PATCH /members/:userId` · `updateOrganizationMember`
@@ -1317,13 +1333,13 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
-// Body: organizationManagementRestUpdateMemberSchema, ../contract/src/organization-management.rest.ts:50
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:258
+// Body: organizationManagementRestUpdateMemberSchema, ../contract/src/organization-management.rest.ts:84
 interface Body {
   role?: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   disabled?: boolean;
 }
-type Response = z.infer<typeof organizationManagementRestUpdatedMemberSchema>; // ../contract/src/organization-management.rest.ts:70
+type Response = z.infer<typeof organizationManagementRestUpdatedMemberSchema>; // ../contract/src/organization-management.rest.ts:104
 ```
 
 #### `DELETE /members/:userId` · `removeOrganizationMember`
@@ -1335,8 +1351,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/members/:userId`, `/api/v1/organization/members/:userId`; also, undocumented, `/api/organization/2026-08-07/members/:userId`, `/api/v1/organization/2026-08-07/members/:userId`, `/api/organization/latest/members/:userId`, `/api/v1/organization/latest/members/:userId`.
 
 ```typescript
-type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:185
-// Response: organizationManagementRestSuccessSchema, ../contract/src/organization-management.rest.ts:190
+type Params = z.infer<typeof organizationManagementRestUserIdParamsSchema>; // ../contract/src/organization-management.rest.ts:258
+// Response: organizationManagementRestSuccessSchema, ../contract/src/organization-management.rest.ts:273
 interface Response {
   success: true;
 }
@@ -1351,7 +1367,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
 ```typescript
-type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // ../contract/src/organization-management.rest.ts:172
+type Response = z.infer<typeof organizationManagementRestInviteListSchema>; // ../contract/src/organization-management.rest.ts:235
 ```
 
 #### `POST /invites` · `createOrganizationInvites`
@@ -1363,7 +1379,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites`, `/api/v1/organization/invites`; also, undocumented, `/api/organization/2026-08-07/invites`, `/api/v1/organization/2026-08-07/invites`, `/api/organization/latest/invites`, `/api/v1/organization/latest/invites`.
 
 ```typescript
-// Body: organizationManagementRestCreateInvitesSchema, ../contract/src/organization-management.rest.ts:130
+// Body: organizationManagementRestCreateInvitesSchema, ../contract/src/organization-management.rest.ts:214
 interface Body {
   invites: {
     email: string;
@@ -1375,7 +1391,7 @@ interface Body {
     }[];
   }[];
 }
-type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; // ../contract/src/organization-management.rest.ts:165
+type Response = z.infer<typeof organizationManagementRestCreatedInvitesSchema>; // ../contract/src/organization-management.rest.ts:225
 ```
 
 #### `DELETE /invites/:inviteId` · `revokeOrganizationInvite`
@@ -1387,11 +1403,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `MANAGEMENT_
 Answers at `/api/organization/invites/:inviteId`, `/api/v1/organization/invites/:inviteId`; also, undocumented, `/api/organization/2026-08-07/invites/:inviteId`, `/api/v1/organization/2026-08-07/invites/:inviteId`, `/api/organization/latest/invites/:inviteId`, `/api/v1/organization/latest/invites/:inviteId`.
 
 ```typescript
-// Params: organizationManagementRestInviteIdParamsSchema, ../contract/src/organization-management.rest.ts:186
+// Params: organizationManagementRestInviteIdParamsSchema, ../contract/src/organization-management.rest.ts:266
 interface Params {
   inviteId: string;
 }
-type Response = z.infer<typeof organizationManagementRestSuccessSchema>; // ../contract/src/organization-management.rest.ts:190
+type Response = z.infer<typeof organizationManagementRestSuccessSchema>; // ../contract/src/organization-management.rest.ts:273
 ```
 
 ### `organizationsProvisioningRest`
@@ -1413,7 +1429,7 @@ Authenticated: Holding the instance administrator bearer key is the only authori
 Answers at `/api/organizations`, `/api/v1/organizations`; also, undocumented, `/api/organizations/2026-08-07`, `/api/v1/organizations/2026-08-07`, `/api/organizations/latest`, `/api/v1/organizations/latest`.
 
 ```typescript
-// Response: organizationsProvisioningRestListSchema, ../contract/src/organizations-provisioning.rest.ts:19
+// Response: organizationsProvisioningRestListSchema, ../contract/src/organizations-provisioning.rest.ts:37
 interface Response {
   organizations: {
     id: string;
@@ -1433,11 +1449,11 @@ Authenticated: Holding the instance administrator bearer key is the only authori
 Answers at `/api/organizations/:organizationId`, `/api/v1/organizations/:organizationId`; also, undocumented, `/api/organizations/2026-08-07/:organizationId`, `/api/v1/organizations/2026-08-07/:organizationId`, `/api/organizations/latest/:organizationId`, `/api/v1/organizations/latest/:organizationId`.
 
 ```typescript
-// Params: organizationsProvisioningRestParamsSchema, ../contract/src/organizations-provisioning.rest.ts:7
+// Params: organizationsProvisioningRestParamsSchema, ../contract/src/organizations-provisioning.rest.ts:15
 interface Params {
   organizationId: string;
 }
-// Response: organizationsProvisioningRestGotOneSchema, ../contract/src/organizations-provisioning.rest.ts:23
+// Response: organizationsProvisioningRestGotOneSchema, ../contract/src/organizations-provisioning.rest.ts:46
 interface Response {
   organization: {
     id: string;
@@ -1467,12 +1483,12 @@ Permission `team:view`. Declared at `src/transport/team.rest.ts:100`.
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
 ```typescript
-// Query: organizationTeamRestPaginationQuerySchema, ../contract/src/features/team/team.rest.ts:50
+// Query: organizationTeamRestPaginationQuerySchema, ../contract/src/features/team/team.rest.ts:84
 interface Query {
   page?: number;
   limit?: number;
 }
-type Response = z.infer<typeof organizationTeamRestPageSchema>; // ../contract/src/features/team/team.rest.ts:21
+type Response = z.infer<typeof organizationTeamRestPageSchema>; // ../contract/src/features/team/team.rest.ts:39
 ```
 
 #### `POST /` · `createTeam`
@@ -1484,11 +1500,11 @@ Permission `team:manage`. Declared at `src/transport/team.rest.ts:122`.
 Answers at `/api/teams`, `/api/v1/teams`; also, undocumented, `/api/teams/2026-08-07`, `/api/v1/teams/2026-08-07`, `/api/teams/latest`, `/api/v1/teams/latest`.
 
 ```typescript
-// Body: organizationTeamRestCreateSchema, ../contract/src/features/team/team.rest.ts:59
+// Body: organizationTeamRestCreateSchema, ../contract/src/features/team/team.rest.ts:101
 interface Body {
   name: string;
 }
-// Response: organizationTeamRestSchema, ../contract/src/features/team/team.rest.ts:14
+// Response: organizationTeamRestSchema, ../contract/src/features/team/team.rest.ts:24
 interface Response {
   id: string;
   name: string;
@@ -1508,11 +1524,11 @@ Permission `team:view`. Declared at `src/transport/team.rest.ts:142`.
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
 ```typescript
-// Params: organizationTeamRestParamsSchema, ../contract/src/features/team/team.rest.ts:84
+// Params: organizationTeamRestParamsSchema, ../contract/src/features/team/team.rest.ts:135
 interface Params {
   teamId: string;
 }
-type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/features/team/team.rest.ts:14
+type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/features/team/team.rest.ts:24
 ```
 
 #### `PATCH /:teamId` · `updateTeam`
@@ -1524,12 +1540,12 @@ Permission `team:manage`. Declared at `src/transport/team.rest.ts:160`.
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
 ```typescript
-type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:84
-// Body: organizationTeamRestUpdateSchema, ../contract/src/features/team/team.rest.ts:68
+type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:135
+// Body: organizationTeamRestUpdateSchema, ../contract/src/features/team/team.rest.ts:116
 interface Body {
   name?: string;
 }
-type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/features/team/team.rest.ts:14
+type Response = z.infer<typeof organizationTeamRestSchema>; // ../contract/src/features/team/team.rest.ts:24
 ```
 
 #### `DELETE /:teamId` · `archiveTeam`
@@ -1541,8 +1557,8 @@ Permission `team:manage`. Declared at `src/transport/team.rest.ts:181`.
 Answers at `/api/teams/:teamId`, `/api/v1/teams/:teamId`; also, undocumented, `/api/teams/2026-08-07/:teamId`, `/api/v1/teams/2026-08-07/:teamId`, `/api/teams/latest/:teamId`, `/api/v1/teams/latest/:teamId`.
 
 ```typescript
-type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:84
-// Response: organizationTeamRestArchivedSchema, ../contract/src/features/team/team.rest.ts:31
+type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:135
+// Response: organizationTeamRestArchivedSchema, ../contract/src/features/team/team.rest.ts:51
 interface Response {
   id: string;
   name: string;
@@ -1559,8 +1575,8 @@ Permission `team:view`. Declared at `src/transport/team.rest.ts:204`.
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
 ```typescript
-type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:84
-// Response: organizationTeamRestMemberListSchema, ../contract/src/features/team/team.rest.ts:45
+type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:135
+// Response: organizationTeamRestMemberListSchema, ../contract/src/features/team/team.rest.ts:73
 interface Response {
   data: {
     userId: string;
@@ -1580,13 +1596,13 @@ Permission `team:manage`. Declared at `src/transport/team.rest.ts:231`.
 Answers at `/api/teams/:teamId/members`, `/api/v1/teams/:teamId/members`; also, undocumented, `/api/teams/2026-08-07/:teamId/members`, `/api/v1/teams/2026-08-07/:teamId/members`, `/api/teams/latest/:teamId/members`, `/api/v1/teams/latest/:teamId/members`.
 
 ```typescript
-type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:84
-// Body: organizationTeamRestAddMemberSchema, ../contract/src/features/team/team.rest.ts:78
+type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:135
+// Body: organizationTeamRestAddMemberSchema, ../contract/src/features/team/team.rest.ts:127
 interface Body {
   userId: string;
   role?: "ADMIN" | "MEMBER" | "VIEWER";
 }
-// Response: organizationTeamRestSuccessSchema, ../contract/src/features/team/team.rest.ts:93
+// Response: organizationTeamRestSuccessSchema, ../contract/src/features/team/team.rest.ts:154
 interface Response {
   success: boolean;
 }
@@ -1601,12 +1617,12 @@ Permission `team:manage`. Declared at `src/transport/team.rest.ts:263`.
 Answers at `/api/teams/:teamId/members/:userId`, `/api/v1/teams/:teamId/members/:userId`; also, undocumented, `/api/teams/2026-08-07/:teamId/members/:userId`, `/api/v1/teams/2026-08-07/:teamId/members/:userId`, `/api/teams/latest/:teamId/members/:userId`, `/api/v1/teams/latest/:teamId/members/:userId`.
 
 ```typescript
-// Params: organizationTeamRestMemberParamsSchema, ../contract/src/features/team/team.rest.ts:87
+// Params: organizationTeamRestMemberParamsSchema, ../contract/src/features/team/team.rest.ts:146
 interface Params {
   teamId: string;
   userId: string;
 }
-type Response = z.infer<typeof organizationTeamRestSuccessSchema>; // ../contract/src/features/team/team.rest.ts:93
+type Response = z.infer<typeof organizationTeamRestSuccessSchema>; // ../contract/src/features/team/team.rest.ts:154
 ```
 
 #### `GET /:teamId/projects` · `listTeamProjects`
@@ -1618,8 +1634,8 @@ Permission `team:view`. Declared at `src/transport/team.rest.ts:287`.
 Answers at `/api/teams/:teamId/projects`, `/api/v1/teams/:teamId/projects`; also, undocumented, `/api/teams/2026-08-07/:teamId/projects`, `/api/v1/teams/2026-08-07/:teamId/projects`, `/api/teams/latest/:teamId/projects`, `/api/v1/teams/latest/:teamId/projects`.
 
 ```typescript
-type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:84
-// Response: organizationTeamRestProjectListSchema, ../contract/src/features/team/team.rest.ts:105
+type Params = z.infer<typeof organizationTeamRestParamsSchema>; // ../contract/src/features/team/team.rest.ts:135
+// Response: organizationTeamRestProjectListSchema, ../contract/src/features/team/team.rest.ts:173
 interface Response {
   data: {
     id: string;
@@ -1653,22 +1669,22 @@ Contract `../contract/src/features/group/group.trpc.ts:29`, router `src/transpor
 
 ```typescript
 // group.listAll
-// Input: organizationApiScopeSchema, ../contract/src/organization.trpc-schemas.ts:8
+// Input: organizationApiScopeSchema, ../contract/src/organization.trpc-schemas.ts:14
 interface Input {
   organizationId: string;
 }
 // Output: groupListItemSchema.array() (inline, ../contract/src/features/group/group.trpc.ts:32)
 
 // group.getById
-// Input: groupApiGroupScopeSchema, ../contract/src/features/group/group.trpc-schemas.ts:12
+// Input: groupApiGroupScopeSchema, ../contract/src/features/group/group.trpc-schemas.ts:21
 interface Input {
   organizationId: string;
   groupId: string;
 }
-type Output = z.infer<typeof groupDetailSchema>; // ../contract/src/features/group/group.responses.ts:28
+type Output = z.infer<typeof groupDetailSchema>; // ../contract/src/features/group/group.responses.ts:48
 
 // group.create
-// Input: groupApiCreateInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:18
+// Input: groupApiCreateInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:34
 interface Input {
   organizationId: string;
   name: string;
@@ -1680,7 +1696,7 @@ interface Input {
   }[];
   memberIds?: string[];
 }
-// Output: organizationGroupSchema, ../contract/src/features/group/group.ts:35
+// Output: organizationGroupSchema, ../contract/src/features/group/group.ts:59
 interface Output {
   id: string;
   organizationId: string;
@@ -1693,7 +1709,7 @@ interface Output {
 }
 
 // group.addGrant
-// Input: groupApiAddGrantInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:26
+// Input: groupApiAddGrantInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:46
 interface Input {
   organizationId: string;
   groupId: string;
@@ -1702,46 +1718,46 @@ interface Input {
   scopeType: "ORGANIZATION" | "TEAM" | "PROJECT";
   scopeId: string;
 }
-// Output: groupGrantCreatedSchema, ../contract/src/features/group/group.responses.ts:65
+// Output: groupGrantCreatedSchema, ../contract/src/features/group/group.responses.ts:87
 interface Output {
   id: string;
 }
 
 // group.removeGrant
-// Input: groupApiRemoveGrantInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:33
+// Input: groupApiRemoveGrantInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:57
 interface Input {
   organizationId: string;
   grantId: string;
 }
-// Output: groupWriteAckSchema, ../contract/src/features/group/group.responses.ts:69
+// Output: groupWriteAckSchema, ../contract/src/features/group/group.responses.ts:93
 interface Output {
   success: true;
 }
 
 // group.addMember
-// Input: groupApiMemberInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:39
+// Input: groupApiMemberInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:69
 interface Input {
   organizationId: string;
   groupId: string;
   userId: string;
 }
-type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:69
+type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:93
 
 // group.delete
-type Input = z.infer<typeof groupApiGroupScopeSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:12
-type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:69
+type Input = z.infer<typeof groupApiGroupScopeSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:21
+type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:93
 
 // group.rename
-// Input: groupApiRenameInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:46
+// Input: groupApiRenameInputSchema, ../contract/src/features/group/group.trpc-schemas.ts:81
 interface Input {
   organizationId: string;
   groupId: string;
   name: string;
 }
-type Output = z.infer<typeof organizationGroupSchema>; // ../contract/src/features/group/group.ts:35
+type Output = z.infer<typeof organizationGroupSchema>; // ../contract/src/features/group/group.ts:59
 
 // group.listForMember
-// Input: groupApiMemberScopeSchema, ../contract/src/features/group/group.trpc-schemas.ts:54
+// Input: groupApiMemberScopeSchema, ../contract/src/features/group/group.trpc-schemas.ts:93
 interface Input {
   organizationId: string;
   userId: string;
@@ -1761,12 +1777,12 @@ type Output = {
 }[];
 
 // group.removeMember
-type Input = z.infer<typeof groupApiMemberInputSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:39
-type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:69
+type Input = z.infer<typeof groupApiMemberInputSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:69
+type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:93
 
 // group.applyEdits
-type Input = z.infer<typeof groupApiApplyEditsInputSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:60
-type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:69
+type Input = z.infer<typeof groupApiApplyEditsInputSchema>; // ../contract/src/features/group/group.trpc-schemas.ts:109
+type Output = z.infer<typeof groupWriteAckSchema>; // ../contract/src/features/group/group.responses.ts:93
 ```
 
 ### `invite`
@@ -1786,30 +1802,30 @@ Contract `../contract/src/invite.trpc.ts:27`, router `src/transport/invite.trpc.
 
 ```typescript
 // invite.createInvites
-type Input = z.infer<typeof organizationApiCreateInvitesInputSchema>; // ../contract/src/organization.trpc-schemas.ts:127
-type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:44
+type Input = z.infer<typeof organizationApiCreateInvitesInputSchema>; // ../contract/src/organization.trpc-schemas.ts:186
+type Output = z.infer<typeof organizationInvitesCreatedSchema>; // ../contract/src/organization.responses.ts:67
 
 // invite.deleteInvite
-// Input: organizationApiInviteScopeSchema, ../contract/src/organization.trpc-schemas.ts:150
+// Input: organizationApiInviteScopeSchema, ../contract/src/organization.trpc-schemas.ts:199
 interface Input {
   inviteId: string;
   organizationId: string;
 }
 
 // invite.resendInvite
-type Input = z.infer<typeof organizationApiInviteScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:150
-type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:47
+type Input = z.infer<typeof organizationApiInviteScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:199
+type Output = z.infer<typeof organizationInviteResentSchema>; // ../contract/src/organization.responses.ts:70
 
 // invite.getOrganizationPendingInvites
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:75
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+type Output = z.infer<typeof organizationListedInvitesSchema>; // ../contract/src/organization.responses.ts:113
 
 // invite.acceptInvite
-// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:185
+// Input: organizationApiAcceptInviteInputSchema, ../contract/src/organization.trpc-schemas.ts:246
 interface Input {
   inviteCode: string;
 }
-// Output: organizationInviteAcceptedSchema, ../contract/src/organization.responses.ts:78
+// Output: organizationInviteAcceptedSchema, ../contract/src/organization.responses.ts:127
 interface Output {
   success: true;
   invite: {
@@ -1824,7 +1840,7 @@ interface Output {
 }
 
 // invite.upgradeWithInvites
-// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:160
+// Input: organizationApiSeatCheckoutInputSchema, ../contract/src/organization.trpc-schemas.ts:223
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -1836,7 +1852,7 @@ interface Input {
     role: "ADMIN" | "MEMBER" | "EXTERNAL" | "DEVELOPER";
   }[];
 }
-// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:178
+// Output: organizationSeatCheckoutRedirectSchema, ../contract/src/organization.trpc-schemas.ts:236
 interface Output {
   url: string | null;
 }
@@ -1844,7 +1860,7 @@ interface Output {
 // invite.myPendingInvitation
 // Input: inline, ../contract/src/invite.trpc.ts:57
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:105
+// Output: organizationPendingInvitationForCallerSchema, ../contract/src/organization.responses.ts:157
 interface Output {
   inviteCode: string | null;
 }
@@ -1852,7 +1868,7 @@ interface Output {
 // invite.pendingForMe
 // Input: inline, ../contract/src/invite.trpc.ts:62
 type Input = Record<string, unknown>;
-// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:113
+// Output: organizationPendingInvitationsForCallerSchema, ../contract/src/organization.responses.ts:196
 type Output = {
   inviteCode: string;
   organizationName: string;
@@ -1878,7 +1894,7 @@ interface Input {
   organizationId: string;
   limitType: "members" | "membersLite";
 }
-// Output: limitCheckResultSchema, ../contract/src/license-limit-type.ts:16
+// Output: limitCheckResultSchema, ../contract/src/license-limit-type.ts:30
 interface Output {
   allowed: boolean;
   current: number;
@@ -1891,7 +1907,7 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-// Output: allLimitChecksSchema, ../contract/src/license-limit-type.ts:31
+// Output: allLimitChecksSchema, ../contract/src/license-limit-type.ts:36
 type Output = Record<
   string,
   {
@@ -1908,7 +1924,7 @@ type Input = z.infer<typeof limitScopeSchema>; // ../contract/src/license-enforc
 
 ### `organization`
 
-Contract `../contract/src/organization.trpc.ts:78`, router `src/transport/organization.trpc.ts:80`.
+Contract `../contract/src/organization.trpc.ts:88`, router `src/transport/organization.trpc.ts:80`.
 
 | Procedure                                              | Kind     | Gate                                                                                                                                  | Input                                            | Output                                |
 | ------------------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------ | ------------------------------------- |
@@ -1929,8 +1945,8 @@ Contract `../contract/src/organization.trpc.ts:78`, router `src/transport/organi
 
 ```typescript
 // organization.createAndAssign
-type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:48
-// Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:9
+type Input = z.infer<typeof organizationApiCreateAndAssignInputSchema>; // ../contract/src/organization.trpc.ts:58
+// Output: organizationCreatedSchema, ../contract/src/organization.responses.ts:28
 interface Output {
   success: true;
   organization: {
@@ -1945,40 +1961,40 @@ interface Output {
 }
 
 // organization.deleteMember
-// Input: organizationApiMemberScopeSchema, ../contract/src/organization.trpc-schemas.ts:12
+// Input: organizationApiMemberScopeSchema, ../contract/src/organization.trpc-schemas.ts:26
 interface Input {
   userId: string;
   organizationId: string;
 }
-// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:5
+// Output: organizationWriteAckSchema, ../contract/src/organization.responses.ts:13
 interface Output {
   success: true;
 }
 
 // organization.setMemberDisabled
-// Input: organizationApiSetMemberDisabledInputSchema, ../contract/src/organization.trpc-schemas.ts:81
+// Input: organizationApiSetMemberDisabledInputSchema, ../contract/src/organization.trpc-schemas.ts:106
 interface Input {
   userId: string;
   organizationId: string;
   disabled: boolean;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:5
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
 
 // organization.getAll
-// Input: organizationApiGetAllInputSchema, ../contract/src/organization.trpc-schemas.ts:90
+// Input: organizationApiGetAllInputSchema, ../contract/src/organization.trpc-schemas.ts:116
 interface Input {
   isDemo?: boolean;
 }
-// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:63
+// Output: organizationFullyLoadedListSchema, ../contract/src/organization.trpc.ts:73
 type Output = unknown[];
 
 // organization.getScopeGraph
-// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:51
+// Input: organizationApiScopeGraphInputSchema, ../contract/src/scope-graph.ts:66
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:54
+type Output = z.infer<typeof scopeGraphSchema>; // ../contract/src/scope-graph.ts:71
 
 // organization.update
-// Input: organizationApiUpdateInputSchema, ../contract/src/organization.trpc-schemas.ts:93
+// Input: organizationApiUpdateInputSchema, ../contract/src/organization.trpc-schemas.ts:149
 interface Input {
   organizationId: string;
   name: string;
@@ -1991,19 +2007,19 @@ interface Input {
   supportContact?: string | null;
   primaryIntent?: "AGENT_GOVERNANCE" | "LLM_OPS" | null;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:5
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
 
 // organization.getOrganizationWithMembersAndTheirTeams
-// Input: organizationApiWithMembersInputSchema, ../contract/src/organization.trpc-schemas.ts:121
+// Input: organizationApiWithMembersInputSchema, ../contract/src/organization.trpc-schemas.ts:160
 interface Input {
   organizationId: string;
   includeDeactivated?: boolean;
 }
-type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:180
+type Output = z.infer<typeof organizationMemberDirectorySchema>; // ../contract/src/organization.responses.ts:302
 
 // organization.getDirectoryCounts
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:205
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+// Output: organizationDirectoryCountsSchema, ../contract/src/organization.responses.ts:319
 interface Output {
   members: number;
   openInvites: number;
@@ -2013,30 +2029,30 @@ interface Output {
 }
 
 // organization.getMemberById
-type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:12
-type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:157
+type Input = z.infer<typeof organizationApiMemberScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:26
+type Output = z.infer<typeof organizationMemberRecordSchema>; // ../contract/src/organization.responses.ts:269
 
 // organization.getInvitedMemberIds
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:290
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+// Output: organizationInvitedMemberIdsSchema, ../contract/src/organization.responses.ts:421
 interface Output {
   memberUserIds: string[];
   invitedUserIds: string[];
 }
 
 // organization.updateTeamMemberRole
-// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:214
+// Input: organizationApiUpdateTeamMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:311
 interface Input {
   teamId: string;
   userId: string;
   role: "ADMIN" | "MEMBER" | "VIEWER" | string;
   customRoleId?: string;
 }
-type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:5
+type Output = z.infer<typeof organizationWriteAckSchema>; // ../contract/src/organization.responses.ts:13
 
 // organization.getAllOrganizationMembers
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
-// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:154
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
+// Output: organizationUserRowsSchema, ../contract/src/organization.responses.ts:245
 type Output = {
   id: string;
   name: string | null;
@@ -2045,7 +2061,7 @@ type Output = {
 }[];
 
 // organization.updateMemberRole
-// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:190
+// Input: organizationApiUpdateMemberRoleInputSchema, ../contract/src/organization.trpc-schemas.ts:270
 interface Input {
   userId: string;
   organizationId: string;
@@ -2057,7 +2073,7 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:217
+// Output: organizationMemberRoleChangedSchema, ../contract/src/organization.responses.ts:333
 interface Output {
   success: true;
   teamsLeftWithoutAdmin: {
@@ -2067,7 +2083,7 @@ interface Output {
 }
 
 // organization.getAuditLogs
-// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:245
+// Input: organizationApiAuditLogsInputSchema, ../contract/src/organization.trpc-schemas.ts:335
 interface Input {
   organizationId: string;
   projectId?: string;
@@ -2080,12 +2096,12 @@ interface Input {
   targetKind?: string;
   targetId?: string;
 }
-type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:261
+type Output = z.infer<typeof organizationAuditLogPageSchema>; // ../contract/src/organization.responses.ts:384
 ```
 
 ### `personalWorkspaceFeatures`
 
-Contract `../contract/src/personal-workspace-features.trpc.ts:15`, router `src/transport/personal-workspace-features.trpc.ts:21`.
+Contract `../contract/src/personal-workspace-features.trpc.ts:20`, router `src/transport/personal-workspace-features.trpc.ts:21`.
 
 | Procedure                              | Kind     | Gate                                                                 | Input                                  | Output                   |
 | -------------------------------------- | -------- | -------------------------------------------------------------------- | -------------------------------------- | ------------------------ |
@@ -2095,11 +2111,11 @@ Contract `../contract/src/personal-workspace-features.trpc.ts:15`, router `src/t
 
 ```typescript
 // personalWorkspaceFeatures.get
-// Input: personalWorkspaceFeaturesScopeSchema, ../contract/src/personal-workspace-features.trpc.ts:12
+// Input: personalWorkspaceFeaturesScopeSchema, ../contract/src/personal-workspace-features.trpc.ts:17
 interface Input {
   projectId: string;
 }
-// Output: personalFeaturesSchema, ../contract/src/personal-workspace.ts:74
+// Output: personalFeaturesSchema, ../contract/src/personal-workspace.ts:101
 interface Output {
   evaluations: boolean;
   datasets: boolean;
@@ -2108,12 +2124,12 @@ interface Output {
 }
 
 // personalWorkspaceFeatures.enableAll
-type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:12
-type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:74
+type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:17
+type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
 
 // personalWorkspaceFeatures.disableAll
-type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:12
-type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:74
+type Input = z.infer<typeof personalWorkspaceFeaturesScopeSchema>; // ../contract/src/personal-workspace-features.trpc.ts:17
+type Output = z.infer<typeof personalFeaturesSchema>; // ../contract/src/personal-workspace.ts:101
 ```
 
 ### `team`
@@ -2133,12 +2149,12 @@ Contract `../contract/src/features/team/team.trpc.ts:25`, router `src/transport/
 
 ```typescript
 // team.getBySlug
-// Input: teamApiSlugSchema, ../contract/src/features/team/team.trpc-schemas.ts:11
+// Input: teamApiSlugSchema, ../contract/src/features/team/team.trpc-schemas.ts:17
 interface Input {
   organizationId: string;
   slug: string;
 }
-// Output: organizationTeamSchema, ../contract/src/features/team/team.ts:10
+// Output: organizationTeamSchema, ../contract/src/features/team/team.ts:25
 interface Output {
   id: string;
   name: string;
@@ -2152,23 +2168,23 @@ interface Output {
 }
 
 // team.getTeamsWithMembers
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
 // Output: teamWithProjectsSchema.array() (inline, ../contract/src/features/team/team.trpc.ts:33)
 
 // team.getTeamsWithGrants
-type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:8
+type Input = z.infer<typeof organizationApiScopeSchema>; // ../contract/src/organization.trpc-schemas.ts:14
 // Output: organizationTeamAccessSchema.array() (inline, ../contract/src/features/team/team.trpc.ts:38)
 
 // team.getTeamWithMembers
-// Input: teamApiSlugWithOrganizationSchema, ../contract/src/features/team/team.trpc-schemas.ts:22
+// Input: teamApiSlugWithOrganizationSchema, ../contract/src/features/team/team.trpc-schemas.ts:33
 interface Input {
   slug: string;
   organizationId: string;
 }
-type Output = z.infer<typeof teamWithProjectsSchema>; // ../contract/src/features/team/team.responses.ts:14
+type Output = z.infer<typeof teamWithProjectsSchema>; // ../contract/src/features/team/team.responses.ts:19
 
 // team.update
-// Input: teamApiUpdateInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:28
+// Input: teamApiUpdateInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:45
 interface Input {
   teamId: string;
   name: string;
@@ -2178,13 +2194,13 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-// Output: teamWriteAckSchema, ../contract/src/features/team/team.responses.ts:20
+// Output: teamWriteAckSchema, ../contract/src/features/team/team.responses.ts:25
 interface Output {
   success: true;
 }
 
 // team.createTeamWithMembers
-// Input: teamApiCreateWithMembersInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:35
+// Input: teamApiCreateWithMembersInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:57
 interface Input {
   organizationId: string;
   name: string;
@@ -2194,22 +2210,22 @@ interface Input {
     customRoleId?: string;
   }[];
 }
-type Output = z.infer<typeof organizationTeamSchema>; // ../contract/src/features/team/team.ts:10
+type Output = z.infer<typeof organizationTeamSchema>; // ../contract/src/features/team/team.ts:25
 
 // team.archiveById
-// Input: teamApiTeamScopeSchema, ../contract/src/features/team/team.trpc-schemas.ts:42
+// Input: teamApiTeamScopeSchema, ../contract/src/features/team/team.trpc-schemas.ts:62
 interface Input {
   teamId: string;
 }
-type Output = z.infer<typeof teamWriteAckSchema>; // ../contract/src/features/team/team.responses.ts:20
+type Output = z.infer<typeof teamWriteAckSchema>; // ../contract/src/features/team/team.responses.ts:25
 
 // team.removeMember
-// Input: teamApiRemoveMemberInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:45
+// Input: teamApiRemoveMemberInputSchema, ../contract/src/features/team/team.trpc-schemas.ts:73
 interface Input {
   teamId: string;
   userId: string;
 }
-// Output: teamMemberRemovedSchema, ../contract/src/features/team/team.responses.ts:24
+// Output: teamMemberRemovedSchema, ../contract/src/features/team/team.responses.ts:33
 interface Output {
   success: true;
   removedUserId: string;
@@ -2254,6 +2270,14 @@ Declared at `src/eventing/organization-lifecycle.pipeline.ts:116`. Events: `orga
 | command | `recordMemberDepartmentChanged`          | –       | `src/eventing/organization-lifecycle.pipeline.ts:155` |
 | command | `recordCreated`                          | –       | `src/eventing/organization-lifecycle.pipeline.ts:156` |
 
+### Pipeline `organization_private_dataplane_recorder` (aggregate `global`)
+
+Declared at `src/eventing/organization-private-dataplane.pipeline.ts:33`.
+
+| Kind            | Name                       | Handles                                                                                         | Declared at                                                  |
+| --------------- | -------------------------- | ----------------------------------------------------------------------------------------------- | ------------------------------------------------------------ |
+| process manager | `privateDataplaneRecorder` | every 5 min (`PRIVATE_DATAPLANE_RECORD_INTERVAL_MS = 5 * 60 * 1000`); intents `record` (outbox) | `src/eventing/organization-private-dataplane.pipeline.ts:38` |
+
 ### Pipeline `organization_seat_limit` (aggregate `organization_seat_limit`)
 
 Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedEventSchema`.
@@ -2262,19 +2286,11 @@ Declared at `src/eventing/seat-limit.pipeline.ts:18`. Events: `seatLimitReachedE
 | ------- | ------------------------ | ------- | ---------------------------------------- |
 | command | `recordSeatLimitReached` | –       | `src/eventing/seat-limit.pipeline.ts:23` |
 
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                     | Class                                     | Declared at                                                   |
-| ---------------------------------------- | ----------------------------------------- | ------------------------------------------------------------- |
-| `backfill-organization-presence-setting` | `OrganizationPresenceSettingBackfillTask` | `src/tasks/organization-presence-setting-backfill.task.ts:15` |
-
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable      | Declared at                                 |
 | ------ | ----------------------------- | ------------------------- | ------------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:299`           |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`   | `src/app/organization.app.ts:301`           |
 | config | `signUp.mode`                 | `SIGN_UP_MODE`            | `../contract/src/organization.config.ts:17` |
 | config | `signUp.allowedDomains`       | `SIGN_UP_ALLOWED_DOMAINS` | `../contract/src/organization.config.ts:18` |
 | config | `signUp.adminEmails`          | `ADMIN_EMAILS`            | `../contract/src/organization.config.ts:19` |

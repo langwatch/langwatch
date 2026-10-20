@@ -1,9 +1,8 @@
 // Plain members signing in through SSO for an upgradelab cell (E6, E7). cwd = <head>/apps/ui;
 // argv[2] = JSON { url, phase, project, stateDir, shots, members: [{ email, inviteCode, door,
-// connectionId }] }. One JSON line per check: { phase, member, door, check, ok, url, detail }.
-// Phase test-login is the go-live checklist's round trip through a connection not yet live;
-// head first replays main's cookie.
-import { existsSync, mkdirSync } from "node:fs";
+// connectionId, project? }] }. Prints one JSON line per check (phase, member, door, check, ok,
+// url, detail). Phase test-login is the go-live round trip; head first replays main's cookie.
+import { appendFileSync, existsSync, mkdirSync } from "node:fs";
 import { createRequire } from "node:module";
 import { join } from "node:path";
 
@@ -13,8 +12,11 @@ mkdirSync(stateDir, { recursive: true });
 const emit = (record) => console.log(JSON.stringify({ phase, ...record }));
 const shown = async (page) =>
   `${new URL(page.url()).pathname}: ${(await page.innerText("body").catch(() => "")).replace(/\s+/g, " ").slice(0, 200)}`;
-const onProject = (at) =>
-  at.origin === new URL(url).origin && at.pathname.split("/")[1] === project;
+// Signed in: on the member's project (the SAML one has its own), or on /me, the personal page a
+// member with no project of their own lands on.
+const onProject = (at, member) =>
+  at.origin === new URL(url).origin &&
+  [member?.project ?? project, "me"].includes(at.pathname.split("/")[1]);
 const atAuth = (at) => at.pathname.startsWith("/auth/");
 const stateFile = (member) => join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}.json`);
 
@@ -22,6 +24,9 @@ async function newContext(browser, storageState) {
   const context = await browser.newContext({
     viewport: { width: 1440, height: 900 },
     storageState,
+    // Legacy-sso cells put idpsim behind a leaf of the cell's own CA; Chromium reads only the OS
+    // store, so the browser waives the check the releases make through NODE_EXTRA_CA_CERTS.
+    ignoreHTTPSErrors: true,
   });
   // The lab has no internet: web fonts answer empty CSS so a stalled DNS lookup never holds
   // the page.
@@ -29,6 +34,60 @@ async function newContext(browser, storageState) {
     route.fulfill({ contentType: "text/css", body: "" }),
   );
   return context;
+}
+
+// A blank page's evidence: console, page errors, failed or 4xx/5xx requests, and at the end what
+// the DOM holds. Written to sso/<member>-console.jsonl; the summary joins the verdict detail.
+function watch(page, member, check) {
+  const file = join(stateDir, `${member.email.replace(/[^a-z0-9]+/gi, "-")}-console.jsonl`);
+  const seen = [];
+  const note = (record) => {
+    seen.push(record);
+    appendFileSync(
+      file,
+      `${JSON.stringify({ phase, check, at: new Date().toISOString(), ...record })}\n`,
+    );
+  };
+  const path = (raw) => new URL(raw).pathname;
+  page.on("console", (message) =>
+    note({ kind: `console.${message.type()}`, text: message.text().slice(0, 2000) }),
+  );
+  page.on("pageerror", (error) =>
+    note({ kind: "pageerror", text: String(error.stack ?? error).slice(0, 2000) }),
+  );
+  page.on("requestfailed", (request) =>
+    note({
+      kind: "requestfailed",
+      text: `${request.method()} ${path(request.url())}: ${request.failure()?.errorText}`,
+    }),
+  );
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      note({ kind: "response", text: `${response.status()} ${path(response.url())}` });
+  });
+  return async () => {
+    const dom = await page
+      .evaluate(() => ({
+        boot: Boolean(document.getElementById("lw-boot")),
+        body: [...document.body.children].map(
+          (el) => `${el.tagName.toLowerCase()}${el.id ? `#${el.id}` : ""}[${el.childElementCount}]`,
+        ),
+        root: document.getElementById("root")?.innerHTML.slice(0, 600) ?? null,
+      }))
+      .catch((error) => ({ error: String(error).slice(0, 200) }));
+    note({ kind: "dom", text: JSON.stringify(dom) });
+    const loud = seen.filter((record) =>
+      /error|pageerror|requestfailed|response/.test(record.kind),
+    );
+    return `; dom ${JSON.stringify(dom).slice(0, 400)}; ${loud.length} errors${
+      loud.length
+        ? `: ${loud
+            .slice(0, 4)
+            .map((record) => `${record.kind} ${record.text.slice(0, 200)}`)
+            .join(" | ")}`
+        : ""
+    }`;
+  };
 }
 
 async function snap(page, member, check) {
@@ -44,25 +103,48 @@ async function checkCookie(browser, member) {
     return emit({ ...base, ok: false, url: "", detail: "main left no session to carry over" });
   const context = await newContext(browser, stateFile(member));
   const page = await context.newPage();
+  const evidence = watch(page, member, "cookie");
   let worst = 0;
   page.on("response", (response) => {
     if (response.request().isNavigationRequest()) worst = Math.max(worst, response.status());
   });
   await page
-    .goto(`${url}/${project}`, { timeout: 30_000, waitUntil: "domcontentloaded" })
+    .goto(`${url}/${member.project ?? project}`, { timeout: 30_000, waitUntil: "domcontentloaded" })
     .catch(() => undefined);
   await page.waitForLoadState("networkidle", { timeout: 15_000 }).catch(() => undefined);
+  // The boot screen stays over the page until the app draws; judge the app, not the boot screen.
+  const bootStuck = await page
+    .waitForSelector("#lw-boot", { state: "detached", timeout: 30_000 })
+    .then(
+      () => false,
+      () => true,
+    );
+  if (bootStuck) {
+    await snap(page, member, "cookie");
+    await context.close();
+    return emit({
+      ...base,
+      ok: false,
+      url: page.url(),
+      detail: "the boot screen never left within 30 s",
+    });
+  }
+  // Releases before the boot screen's fix drop it when the theme's <style> lands, a moment before
+  // the page itself: give the page the same 30 s to draw.
+  await page
+    .waitForFunction(() => document.body.innerText.trim() !== "", undefined, { timeout: 30_000 })
+    .catch(() => undefined);
   const at = new URL(page.url());
   const blank = (await page.innerText("body").catch(() => "")).trim() === "";
   let outcome = "neither";
-  if (onProject(at)) outcome = "still signed in";
+  if (onProject(at, member)) outcome = "still signed in";
   else if (atAuth(at)) outcome = "sent to sign in";
   const ok = worst < 500 && !blank && outcome !== "neither";
   emit({
     ...base,
     ok,
     url: page.url(),
-    detail: `${outcome}; worst navigation ${worst}; ${await shown(page)}`,
+    detail: `${outcome}; worst navigation ${worst}; ${await shown(page)}${await evidence()}`,
   });
   if (!ok) await snap(page, member, "cookie");
   await context.close();
@@ -76,6 +158,13 @@ async function hinted(browser, member) {
     if (to.searchParams.get("login_hint")) return route.continue();
     to.searchParams.set("login_hint", member.email);
     return route.fulfill({ status: 302, headers: { location: to.toString() } });
+  });
+  // SAML: idpsim reads login_hint off the SSO URL whichever binding carries the request.
+  await context.route(/\/saml\/sso/, (route) => {
+    const to = new URL(route.request().url());
+    if (to.searchParams.get("login_hint")) return route.continue();
+    to.searchParams.set("login_hint", member.email);
+    return route.continue({ url: to.toString() });
   });
   return context;
 }
@@ -140,23 +229,28 @@ async function signIn(browser, member) {
       .fill(member.email, { timeout: 30_000 });
     await page.locator('button[type="submit"]').first().click();
     step = "identity provider";
-    const left = await page
-      .waitForURL((at) => !atAuth(at), { timeout: 20_000 })
-      .then(
-        () => true,
-        () => false,
-      );
-    if (!left) {
-      // A method picker rather than a redirect: the deployment's provider by name.
-      await page
-        .getByRole("button", { name: /continue with|sign in with|single sign-on|sso|oidc|openid/i })
-        .first()
-        .click({ timeout: 5_000 });
-      await page.waitForURL((at) => !atAuth(at), { timeout: 30_000 });
+    // Under load the redirect can outlast any fixed wait, so whichever comes first: the page
+    // leaves /auth, or a method picker offers the deployment's provider by name.
+    const picker = page
+      .getByRole("button", { name: /continue with|sign in with|single sign-on|sso|oidc|openid/i })
+      .first();
+    const first = await Promise.race([
+      page
+        .waitForURL((at) => !atAuth(at), { timeout: 45_000, waitUntil: "commit" })
+        .then(() => "left"),
+      picker.waitFor({ state: "visible", timeout: 45_000 }).then(() => "picker"),
+    ]).catch(() => "neither");
+    if (first !== "left" && atAuth(new URL(page.url()))) {
+      await picker.click({ timeout: 5_000 }).catch((error) => {
+        if (atAuth(new URL(page.url()))) throw error;
+      });
+      await page.waitForURL((at) => !atAuth(at), { timeout: 30_000, waitUntil: "commit" });
     }
     step = "landing";
-    await page.waitForURL(onProject, { timeout: 30_000 }).catch(() => undefined);
-    if (!onProject(new URL(page.url())) && member.inviteCode && phase === "main") {
+    const landed = (at) => onProject(at, member);
+    await page.waitForURL(landed, { timeout: 30_000, waitUntil: "commit" }).catch(() => undefined);
+    const onOwnProject = new URL(page.url()).pathname.split("/")[1] === (member.project ?? project);
+    if (!onOwnProject && member.inviteCode && phase === "main") {
       step = "accept invite";
       const answer = await page.request.post(`${url}/api/trpc/invite.acceptInvite`, {
         data: { json: { inviteCode: member.inviteCode } },
@@ -164,9 +258,11 @@ async function signIn(browser, member) {
       });
       if (!answer.ok()) step += ` (answered ${answer.status()})`;
       await page.goto(`${url}/`, { timeout: 30_000, waitUntil: "domcontentloaded" });
-      await page.waitForURL(onProject, { timeout: 30_000 }).catch(() => undefined);
+      await page
+        .waitForURL(landed, { timeout: 30_000, waitUntil: "commit" })
+        .catch(() => undefined);
     }
-    const ok = onProject(new URL(page.url()));
+    const ok = landed(new URL(page.url()));
     if (ok && phase === "main") await context.storageState({ path: stateFile(member) });
     emit({
       ...base,
@@ -187,7 +283,9 @@ async function signIn(browser, member) {
   await context.close();
 }
 
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
+});
 try {
   for (const member of members) {
     if (phase === "test-login") {

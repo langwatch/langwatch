@@ -83,11 +83,10 @@ describe("the directory's status band", () => {
     it("names the source, the people it manages and the groups it sent", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
-      expect(screen.getByTestId("directory-source-chip")).toHaveTextContent("okta · Syncing");
+      expect(screen.getByTestId("directory-source")).toHaveTextContent("okta");
+      expect(screen.getByTestId("directory-source-chip")).toHaveTextContent("Syncing");
       expect(screen.getByTestId("directory-managed-people")).toHaveTextContent("3");
-      expect(screen.getByText("Groups it sent").closest("div")?.parentElement).toHaveTextContent(
-        "1",
-      );
+      expect(screen.getByTestId("directory-groups-sent")).toHaveTextContent("1");
     });
 
     /** @scenario The people the directory did not put here are counted too */
@@ -95,9 +94,7 @@ describe("the directory's status band", () => {
       renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
 
       expect(screen.getByTestId("members-outside-directory")).toHaveTextContent("1 of 4");
-      expect(
-        screen.getByLabelText(/removing them there will not remove them here/),
-      ).toBeInTheDocument();
+      expect(screen.getByText(/removing them there will not remove them here/)).toBeInTheDocument();
     });
   });
 
@@ -116,6 +113,56 @@ describe("the directory's status band", () => {
         "href",
         "/settings/authentication",
       );
+      expect(screen.queryByTestId("manage-identity-providers")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given several connections with long provider names", () => {
+    const connection = (id: string, providerId: string, tone: string, headline: string) => ({
+      connectionId: id,
+      providerId,
+      connectionState: "ACTIVE",
+      status: { headline, waitingFor: "", tone },
+      lastPushedAtMs: Date.now() - 60 * 1000,
+      managedPeople: 1,
+    });
+
+    it("names every source with its own status, none collapsed into a count", () => {
+      state.connections = [
+        connection("c-1", "okta", "working", "Syncing"),
+        connection(
+          "c-2",
+          "azure-active-directory-production-tenant",
+          "attention",
+          "Needs attention",
+        ),
+        connection("c-3", "google-workspace", "idle", "Waiting for first push"),
+        connection("c-4", "onelogin", "working", "Syncing"),
+      ];
+      renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
+
+      const sources = screen.getAllByTestId("directory-source");
+      expect(sources.map((source) => source.textContent)).toEqual([
+        "oktaSyncing",
+        "azure-active-directory-production-tenantNeeds attention",
+        "google-workspaceWaiting for first push",
+        "oneloginSyncing",
+      ]);
+      expect(screen.queryByText(/\+\d+ more/)).not.toBeInTheDocument();
+    });
+
+    it("offers the one way to the page that owns connections, not a second control", () => {
+      renderWithScimHost(<DirectorySummary organizationId="org-1" canReadMembership />);
+
+      const link = screen.getByTestId("manage-identity-providers");
+      expect(link).toHaveAttribute("href", "/settings/authentication");
+      expect(link).toHaveTextContent("Manage identity providers");
+      expect(screen.queryByTestId("connect-identity-provider")).not.toBeInTheDocument();
+      expect(
+        screen
+          .getAllByRole("link")
+          .filter((a) => a.getAttribute("href") === "/settings/authentication"),
+      ).toHaveLength(1);
     });
   });
 
@@ -126,6 +173,8 @@ describe("the directory's status band", () => {
 
       expect(screen.getAllByTestId("directory-fact-unavailable")).toHaveLength(2);
       expect(screen.queryByTestId("members-outside-directory")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("directory-groups-sent")).not.toBeInTheDocument();
+      expect(screen.getByTestId("directory-managed-people")).toHaveTextContent("3");
     });
   });
 });

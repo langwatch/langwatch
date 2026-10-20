@@ -90,7 +90,8 @@ func readManifest(path string) (packageJSON, error) {
 	if err != nil {
 		return manifest, err
 	}
-	return manifest, json.Unmarshal(data, &manifest)
+	err = json.Unmarshal(data, &manifest)
+	return manifest, err
 }
 
 // declarationSite is where one catalogue entry's half would live on disk.
@@ -177,13 +178,13 @@ func listSource(declarations []declaration, constant, half string) string {
 	if len(declarations) > 0 {
 		lines := []string{}
 		for _, d := range declarations {
-			lines = append(lines, fmt.Sprintf("import { %s } from \"%s\";", d.symbol, d.specifier))
+			lines = append(lines, fmt.Sprintf("import { %s } from %q;", d.symbol, d.specifier))
 		}
 		lines = append(lines, "", fmt.Sprintf("/** Every installed module's %s declaration, in name order. */", half),
 			fmt.Sprintf("export const %s = [", constant))
 		for _, d := range declarations {
 			if half == "web" {
-				lines = append(lines, fmt.Sprintf("  %s satisfies { readonly name: \"%s\" },", d.symbol, d.id))
+				lines = append(lines, fmt.Sprintf("  %s satisfies { readonly name: %q },", d.symbol, d.id))
 			} else {
 				lines = append(lines, fmt.Sprintf("  %s,", d.symbol))
 			}
@@ -276,7 +277,7 @@ func withWorkspaceDependency(dependencies Object, name string) Object {
 
 // GenerateModules returns every generated file, in the order the script writes them.
 func GenerateModules(root string) ([]Output, error) {
-	data, err := os.ReadFile(filepath.Join(root, "modules/catalogue.json"))
+	data, err := os.ReadFile(filepath.Join(root, "modules", "catalogue.json"))
 	if err != nil {
 		return nil, err
 	}
@@ -357,7 +358,7 @@ func writeGenerated(command subcommand, out Output, dry bool) error {
 		fmt.Fprintf(command.stdout, "Would generate %s (%d lines)\n", out.Path, strings.Count(out.Source, "\n"))
 		return nil
 	}
-	if err := os.WriteFile(filepath.Join(command.root, out.Path), []byte(out.Source), 0o644); err != nil {
+	if err := os.WriteFile(filepath.Join(command.root, out.Path), []byte(out.Source), 0o644); err != nil { //nolint:gosec // a generated source file, committed and world-readable like the rest of the tree
 		return err
 	}
 	fmt.Fprintf(command.stdout, "Wrote %s\n", out.Path)

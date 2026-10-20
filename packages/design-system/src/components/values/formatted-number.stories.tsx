@@ -8,7 +8,7 @@ const meta = {
   parameters: {
     usage: {
       use: "Any number a person reads: compact by default, every other format on hover.",
-      avoid: "Money: use Format money. Never `toLocaleString` at the call site.",
+      avoid: "Money: use Money. Never `toLocaleString` at the call site. No value: Empty value.",
     },
   },
   component: FormattedNumber,

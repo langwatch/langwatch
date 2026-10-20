@@ -34,8 +34,8 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
     borderBottom: "1px solid var(--chakra-colors-border)",
     padding: "8px 12px",
     textAlign: "left",
-    fontSize: "12px",
-    fontWeight: "600",
+    textStyle: "caption",
+    fontWeight: "semibold",
     color: "var(--chakra-colors-fg-muted)",
     whiteSpace: "nowrap",
     zIndex: 1,
@@ -44,7 +44,7 @@ export const getTableStyles = (minTableWidth: number): SystemStyleObject => ({
     borderBottom: "1px solid var(--chakra-colors-border-muted)",
     padding: "12px",
     verticalAlign: "top",
-    fontSize: "13px",
+    textStyle: "bodySm",
   },
   // First column (row number) should stay small
   "& td:first-of-type": {

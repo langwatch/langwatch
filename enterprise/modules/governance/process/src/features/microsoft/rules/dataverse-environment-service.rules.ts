@@ -58,37 +58,79 @@ const DATAVERSE_ENVIRONMENT_HOST_SUFFIXES = [
 ] as const;
 
 /**
+ * Whether a URL names the configured Dataverse base: the same origin, and for an
+ * environment address the same path, with no credentials, query or fragment.
+ */
+function isConfiguredBase(params: {
+  url: URL;
+  configuredBase: string | undefined;
+  isOriginOnly: boolean;
+}): boolean {
+  const { url, configuredBase, isOriginOnly } = params;
+  if (!configuredBase) return false;
+  let base: URL;
+  try {
+    base = new URL(configuredBase);
+  } catch {
+    return false;
+  }
+  if (url.username !== "" || url.password !== "") return false;
+  if (url.origin !== base.origin) return false;
+  if (isOriginOnly) return true;
+  const bare = (path: string) => path.replace(/\/+$/, "");
+  return bare(url.pathname) === bare(base.pathname) && url.search === "" && url.hash === "";
+}
+
+/**
  * Whether a URL is the very environment the source is configured against.
  *
- * `isDataverseEnvironmentOrigin` answers a broader question — whether Microsoft
+ * `isEnvironmentOrigin` answers a broader question — whether Microsoft
  * serves this host at all — and every tenant's environment passes it. That is
  * the right check for an address an admin typed, and the wrong one for a URL
  * the walk is about to send the token to: a link to another tenant's
  * environment is a Microsoft address, and forwarding the credential there is
- * still forwarding it to a stranger.
+ * still forwarding it to a stranger. The configured base is the one other
+ * origin a link may lead to, and only from a source configured against it.
  */
-export function isSameEnvironment(params: { value: string; environmentUrl: string }): boolean {
-  const { value, environmentUrl } = params;
-  if (!isEnvironmentOrigin(value)) {
-    return false;
-  }
+export function isSameEnvironment(params: {
+  value: string;
+  environmentUrl: string;
+  configuredBase?: string;
+}): boolean {
+  const { value, environmentUrl, configuredBase } = params;
 
   try {
+    const link = new URL(value);
+    const environment = new URL(environmentUrl);
+    if (
+      isConfiguredBase({ url: link, configuredBase, isOriginOnly: true }) &&
+      isConfiguredBase({ url: environment, configuredBase, isOriginOnly: true })
+    ) {
+      return true;
+    }
+    if (!isEnvironmentOrigin(value)) {
+      return false;
+    }
     // `origin` normalises scheme, host case and default ports, so a link that
     // differs from the configured address only in those respects still counts
     // as the same environment.
-    return new URL(value).origin === new URL(environmentUrl).origin;
+    return link.origin === environment.origin;
   } catch {
     return false;
   }
 }
 
-export function isEnvironmentOrigin(value: string): boolean {
+/** `configuredBase` is the one extra address an environment may be (a dev stand-in). */
+export function isEnvironmentOrigin(value: string, configuredBase?: string): boolean {
   let url: URL;
   try {
     url = new URL(value);
   } catch {
     return false;
+  }
+
+  if (isConfiguredBase({ url, configuredBase, isOriginOnly: false })) {
+    return true;
   }
 
   // Plain http would put the token on the wire in clear even for a real

@@ -129,75 +129,37 @@ Feature: Change password from /settings/security
     And I open the dialog again
     Then the New Password field is empty
 
-  # Backend (Auth0 mode)
+  # Backend
+  #
+  # Every Auth0 email+password user's hash was imported into this deployment's
+  # own rows on 2026-10-12, so the password a person signs in with lives here.
+  # A change never goes to Auth0: a change made there would never reach the
+  # local row sign-in reads.
 
-  @integration
-  Scenario: Auth0 backend verifies the current password via Resource Owner Password Grant before updating
-    Given my deployment's Auth0 management application is set up to verify passwords
-    And that application is allowed to check a password directly
-    When the server processes a change-password submission for an Auth0 user
-    Then it verifies the current password against Auth0 before accepting the change
-    And only once that succeeds does it request elevated access to update the record
-    And it updates the password on the Auth0 database connection the user signed up with
+  @unit
+  Scenario: A user who came from Auth0 changes their password locally
+    Given my deployment authenticates through Auth0
+    And my Auth0 password was imported into this deployment's own rows
+    When I submit the dialog with a correct current password and a valid new password
+    Then the deployment changes its own stored password
+    And the new password signs me in and the old one is refused
+    And the server revokes my other sessions
+    And nothing is asked of Auth0
 
-  @integration
-  Scenario: Auth0 backend returns 401 UNAUTHORIZED when the current password is wrong
-    Given my deployment's Auth0 management application is set up to verify passwords
-    When the server submits the wrong current password to Auth0
-    Then Auth0 rejects the current password
-    And the server does NOT go on to update the record
-    And the change is refused as unauthorized with the message "Current password is incorrect"
-
-  # The two `@unimplemented` scenarios below describe behaviour that is
-  # implemented in the source but has no asserting test:
-  #   * AUTH0_CLIENT_ID/SECRET fallback path:
-  #     `passwordService.ts` reads
-  #     `env.AUTH0_MGMT_CLIENT_ID ?? env.AUTH0_CLIENT_ID` (and the secret
-  #     mirror), but the existing
-  #     `passwordService.integration.test.ts` only mocks
-  #     `AUTH0_CLIENT_ID/SECRET` and does not assert which env var the
-  #     service picked. A binding test would need to vary the env
-  #     surface between two test runs.
-  #   * Rate limit (5/15min) — implemented in the `user.changePassword`
-  #     tRPC mutation against a Redis-backed limiter; no router-level
-  #     integration test exercises the limiter today.
+  # Rate limit (5/15min) is implemented in the `user.changePassword` tRPC
+  # mutation against a Redis-backed limiter; no router-level integration test
+  # exercises the limiter today.
   @integration @unimplemented
-  Scenario: Auth0 backend falls back to AUTH0_CLIENT_ID/SECRET when the M2M vars are absent
-    Given my deployment has not set up a dedicated management application for password checks
-    And its regular Auth0 application credentials are configured instead
-    When the server processes a successful change-password submission for an Auth0 user
-    Then it uses those regular application credentials to request elevated access
-
-  @integration @unimplemented
-  Scenario: Rate limit applies to both modes
+  Scenario: Rate limit applies to every password change
     Given I have submitted 5 password change attempts in the last 15 minutes
     When I submit another password change attempt
     Then I see a "Too many password change attempts" error
-    And the server does not contact Auth0 or update the credential password
-
-  @integration
-  Scenario: Surfaces a clear error when the Auth0 Management API scope is missing
-    Given the M2M application is missing the "update:users" Management API scope
-    When I submit a valid current and new password in Auth0 mode
-    Then the Management API PATCH call returns 403 "insufficient_scope"
-    And the server logs the scope error
-    And I see an error toast indicating the Auth0 app is not authorized
-
-  @integration
-  Scenario: Surfaces a clear error when the Auth0 Password grant is missing on the M2M app
-    Given the Management M2M application does not have the "Password" grant enabled
-    When I submit a current and new password in Auth0 mode
-    Then Auth0 /oauth/token returns unauthorized_client
-    And the server logs the grant-misconfig error
-    And I see an error toast telling an administrator to enable the Password grant
+    And the server does not update the credential password
 
   # The email-mode end-to-end flow (router-level test that wires
   # together password verification + Prisma update + session revoke)
-  # has no integration test today. The pieces are tested individually:
-  #   * BetterAuth credential update — covered by `auth.test.ts` paths
-  # but no test exercises the `user.changePassword` mutation in email
-  # mode end-to-end. Leaving `@unimplemented` until the router test
-  # exists.
+  # has no integration test today. Leaving `@unimplemented` until the
+  # router test exists.
   @regression @integration @unimplemented
   Scenario: Email-provider mode continues to verify the current password and revoke other sessions
     Given my deployment authenticates with an email and password directly, not through Auth0
@@ -205,19 +167,3 @@ Feature: Change password from /settings/security
     Then the server updates the BetterAuth credential password in the database
     And the server revokes other sessions for the user
     And I see a "Password changed successfully" toast
-
-  # Which password a change targets is decided by where the password LIVES,
-  # not by what the deployment federates with. Those were the same question
-  # for as long as a brokered deployment could hold no password of its own —
-  # and stopped being one when a deployment could issue its own beside the
-  # broker (D09). Reading the provider alone then picks the wrong copy: it
-  # refuses a password we hold and it silently rewrites the broker's while
-  # leaving ours, which reports success for a change the person's next
-  # sign-in will not see.
-  @unit
-  Scenario: A change targets the password the person actually signs in with
-    Given my deployment brokers through Auth0 and issues its own passwords
-    And I hold a password of this deployment's own
-    When I submit a change of password
-    Then the deployment changes its own stored password
-    And somebody on that deployment holding only a brokered password still changes it at the broker

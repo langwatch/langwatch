@@ -21,6 +21,7 @@ import { SubsystemProbeService } from "../../services/subsystem-probe.service.ts
 import { platformHealthProbeRest } from "../platform-health-probe.rest.ts";
 
 const KEY = "sk-lw-known";
+const MEMBER_KEY = "sk-lw-member";
 const UNKNOWN_KEYS: Record<string, string>[] = [
   { "X-Auth-Token": "nope" },
   { Authorization: "Bearer nope" },
@@ -87,7 +88,12 @@ function probe() {
         workflowExists: async () => false,
       },
     }),
-    resolveProject: async ({ token }) => (token === KEY ? "project-1" : null),
+    resolveCaller: async ({ token }) => {
+      if (token === KEY) return { projectId: "project-1", userId: null, apiKeyId: null };
+      if (token === MEMBER_KEY)
+        return { projectId: "project-1", userId: "user-1", apiKeyId: "key-1" };
+      return null;
+    },
     scenarioCanary,
   });
   const hono = createRestRuntime({
@@ -156,6 +162,26 @@ describe("GET /api/health/scenarios", () => {
       expect(launchRun).toHaveBeenCalledWith(
         expect.objectContaining({ projectId: "project-1", scenarioId: "scenario-1" }),
       );
+    });
+
+    /** @scenario "The scenario canary starts its run as the probe's own API key" */
+    it("starts the run as the member who owns the key, through that key", async () => {
+      const { get, launchRun } = probe();
+
+      await get("?runPlanId=plan-1", { Authorization: `Bearer ${MEMBER_KEY}` });
+
+      expect(launchRun).toHaveBeenCalledWith(
+        expect.objectContaining({ actor: { id: "user-1", label: "api", apiKeyId: "key-1" } }),
+      );
+    });
+
+    /** @scenario "A project key's scenario canary starts its run as nobody, as main ran it with the project key" */
+    it("starts the run with no starter when the key is the project's own", async () => {
+      const { get, launchRun } = probe();
+
+      await get("?runPlanId=plan-1", { "X-Auth-Token": KEY });
+
+      expect(launchRun).toHaveBeenCalledWith(expect.objectContaining({ actor: undefined }));
     });
 
     /** @scenario "Canary runs are confined to the API key's own project regardless of caller input" */

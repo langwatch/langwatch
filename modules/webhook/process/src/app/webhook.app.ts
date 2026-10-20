@@ -212,6 +212,7 @@ export class WebhookModule implements WebhookApiContract, WebhookSpendReplayDoor
       requests: WebhookRequestService.create({
         egress,
         deliveries: input.repositories.endpoints,
+        allowInsecureLocal: input.config.allowInsecureLocalUrls,
       }),
     });
     app.#delivery = {

@@ -53,6 +53,13 @@ Feature: An aggregate project reads its member projects
     Then the row is marked revoked with a reason rather than deleted
     And the organisation's authorization epoch moves forward
 
+  @unit
+  Scenario: A shared grant's window is stored with its row
+    Given a project-reader grant attached with a condition starting today
+    When the grant's attach is projected into the grants table
+    Then the stored row carries that condition
+    And an own grant's row carries none
+
   # ── B. A proof is minted at the door ─────────────────────────────────────
 
   @unit
@@ -321,6 +328,31 @@ Feature: An aggregate project reads its member projects
     And Quick Search offers the same pages as the navigation and no action that creates data
     And no monitor can be created on the aggregate
 
+  # An aggregate records no coding-agent session of its own, so the recency
+  # signal an ordinary project grows the Sessions destination from never
+  # arrives; the aggregate offers it on its kind alone (v4.12).
+
+  @integration
+  Scenario: The aggregate offers Sessions without a session of its own
+    Given the aggregate recorded no coding-agent session
+    When ana opens the aggregate project
+    Then the navigation shows Sessions beside Trace Explorer
+
+  @unit
+  Scenario: The aggregate's Sessions page lists its members' sessions under their windows
+    Given an aggregate reading two members through shared grants
+    And one member's grant starts after some of its sessions
+    When ana opens the aggregate's Sessions page
+    Then the sessions of both members show, newest first
+    And the sessions before that grant's start are absent
+
+  @unit
+  Scenario: A sessions read through the proof names no tenant of its own
+    Given a repository reading sessions through the proof-checked client
+    When it reads an aggregate's page
+    Then the statement's tenants and the window on StartedAt come from the proof
+    And the latest-version group is bound to the same tenants
+
   # ── E. The reconciler keeps members current ──────────────────────────────
 
   @integration
@@ -369,12 +401,75 @@ Feature: An aggregate project reads its member projects
     Then the ledger holds the same grant rows with the same ids
     And no duplicate row exists
 
-  @integration
-  Scenario: A nightly sweep catches a missed trigger
+  # Reconciles come from facts alone: no daily re-check of every aggregate (ADR-177, ADR-025).
+  @unit
+  Scenario: A burst of changes in one organisation queues one reconcile
+    Given an organisation with an aggregate project
+    When several members are removed, moved or disabled within 30 seconds
+    Then one reconcile job is queued for the organisation after the 30 seconds settle
+    And that job carries the newest fact
+
+  @unit
+  Scenario: A reconcile that keeps failing is parked for an operator after five tries
+    Given a reconcile of an aggregate project that fails on every attempt
+    When the outbox has tried it five times
+    Then it is marked dead and tried no more
+    And it stays in the outbox for an operator to redrive
+
+  @unit
+  Scenario: A reconcile that attaches every member but one is tried again
+    Given a reconcile of an aggregate project in which one member's attach is refused
+    When the outbox runs it
+    Then the reconcile is not marked finished
+    And it is tried again, and finishes once that member's attach goes through
+
+  @unit
+  Scenario: The daily wake only clears finished reconciles
+    Given a finished reconcile and a dead one, both older than two days
+    When the daily wake runs
+    Then the finished reconcile is deleted
+    And the dead reconcile is kept
+    And no reconcile is queued
+
+  # A member's read starts at the beginning of time under an all-personal or
+  # explicit rule, and on the day it joined under a department rule, so a move
+  # between departments never shows the new one the old past. ADR-144 (this
+  # feature) records the rule; a missing start is never "everything".
+
+  @unit
+  Scenario: A member's older traces show in an all-personal or explicit aggregate
+    Given an aggregate project with the rule "all personal projects" or an explicit list
+    When a member is attached to it
+    Then the member's read starts at the beginning of time
+    And traces the member wrote before it joined, imported history included, show in the aggregate
+
+  @unit
+  Scenario: A by-department aggregate reads a member only from the day it joined
+    Given an aggregate project with the rule "personal projects in department Engineering"
+    When a member in Engineering is attached to it
+    Then the member's read starts at the moment it was attached
+
+  @unit
+  Scenario: An aggregate whose reads start at their join date is widened to full history
     Given an aggregate project with the rule "all personal projects"
-    And a personal project that was created while the reconciler was unavailable
-    When the nightly sweep runs for the organisation
-    Then that personal project is a member
+    And a member whose read was attached before full history was the rule
+    When the reconciler runs for that aggregate
+    Then that read is revoked as a window change
+    And the member is attached again with a read from the beginning of time
+
+  @unit
+  Scenario: A department aggregate narrows a full-history read to the day it is attached again
+    Given an aggregate project whose rule was changed to "personal projects in department Engineering"
+    And a member that still holds a read from the beginning of time
+    When the reconciler runs
+    Then that read is revoked as a window change
+    And the member is attached again with a read from that moment
+
+  @unit
+  Scenario: A read already on its rule's window is never rewritten
+    Given an aggregate project whose members hold reads on their rule's window
+    When the reconciler runs again, on any later day
+    Then no read is revoked and none is attached
 
   # ── F. Trace routes carry the proof ──────────────────────────────────────
 
@@ -630,6 +725,17 @@ Feature: An aggregate project reads its member projects
     And a member whose name ana's project list lacks is shown by its id
     And a plain project's trace list has no Project column
 
+  @unit
+  Scenario: An empty aggregate says only a department rule starts at the join date
+    Given an aggregate project whose trace list is empty for the current window
+    When ana opens its Trace Explorer
+    Then the empty state says an aggregate built from a department lists a member's traces from the day it joined
+    And it says older traces stay in the member project
+    And it never claims an all-personal or explicit aggregate starts at the join date
+    And it gives that explanation on every lens, with or without filters
+    And it still offers a wider time window
+    And a plain project's empty state says nothing about aggregates
+
   @integration
   Scenario: The app marks the aggregate and offers no way to add data to it
     When ana opens the project switcher
@@ -681,3 +787,9 @@ Feature: An aggregate project reads its member projects
     Then she lands on its Trace Explorer and never sees the home
     And the home is replaced in her history, so Back does not return to it
     And an ordinary project's home still opens as before
+
+  @unit
+  Scenario: A fenced read declared a full scan reaches the client declared
+    Given a repository reading through the proof-checked client
+    When it declares the read a full scan
+    Then the routed client receives the declaration, so it logs no cold-scan warning

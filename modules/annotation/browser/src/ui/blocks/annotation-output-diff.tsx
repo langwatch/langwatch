@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { type Change, diffWordsWithSpace } from "diff";
 import { useDeferredValue, useMemo } from "react";
@@ -56,59 +57,57 @@ export function DiffPanel({ parts }: { parts: Change[] }) {
   const hasChanges = parts.some((p) => p.added || p.removed);
 
   return (
-    <Box
-      height="160px"
-      minHeight="160px"
-      maxHeight="160px"
-      borderRadius="md"
-      borderWidth="1px"
-      borderColor="border.muted"
-      bg="bg.subtle"
-      paddingX={3}
-      paddingY={2.5}
-      overflowY="auto"
-      overflowX="hidden"
-      fontSize="xs"
-      lineHeight="1.6"
-      whiteSpace="pre-wrap"
-      wordBreak="break-word"
-    >
-      {hasChanges ? (
-        parts.map((part, i) => {
-          if (part.added) {
+    <Card variant="nested" tone="neutral" padding="none">
+      <Box
+        height="160px"
+        minHeight="160px"
+        maxHeight="160px"
+        paddingX={3}
+        paddingY={2.5}
+        overflowY="auto"
+        overflowX="hidden"
+        fontSize="xs"
+        lineHeight="1.6"
+        whiteSpace="pre-wrap"
+        wordBreak="break-word"
+      >
+        {hasChanges ? (
+          parts.map((part, i) => {
+            if (part.added) {
+              return (
+                <Box key={i} as="span" bg="green.subtle" color="green.fg" borderRadius="2px">
+                  {part.value}
+                </Box>
+              );
+            }
+
+            if (part.removed) {
+              return (
+                <Box
+                  key={i}
+                  as="span"
+                  bg="red.subtle"
+                  color="red.fg"
+                  textDecoration="line-through"
+                  borderRadius="2px"
+                >
+                  {part.value}
+                </Box>
+              );
+            }
+
             return (
-              <Box key={i} as="span" bg="green.subtle" color="green.fg" borderRadius="2px">
+              <Box key={i} as="span" color="fg.muted">
                 {part.value}
               </Box>
             );
-          }
-
-          if (part.removed) {
-            return (
-              <Box
-                key={i}
-                as="span"
-                bg="red.subtle"
-                color="red.fg"
-                textDecoration="line-through"
-                borderRadius="2px"
-              >
-                {part.value}
-              </Box>
-            );
-          }
-
-          return (
-            <Box key={i} as="span" color="fg.muted">
-              {part.value}
-            </Box>
-          );
-        })
-      ) : (
-        <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
-          Edit the field above to see what changed.
-        </Text>
-      )}
-    </Box>
+          })
+        ) : (
+          <Text textStyle="xs" color="fg.subtle" fontStyle="italic">
+            Edit the field above to see what changed.
+          </Text>
+        )}
+      </Box>
+    </Card>
   );
 }

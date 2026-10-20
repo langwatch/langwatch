@@ -19,6 +19,7 @@ import { Box, Text } from "@langwatch/design-system/primitives";
  * visual break — same width, same header treatment, same chartHeight.
  */
 import { system } from "@langwatch/design-system/system";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
   Bar,
   BarChart,
@@ -57,7 +58,7 @@ export const VARIANT_COLORS = [
 const TIE_COLOR = system.token.var("colors.fg.subtle");
 
 /** Font size of the win count printed above each bar. */
-export const COUNT_LABEL_FONT_SIZE = 11;
+export const COUNT_LABEL_FONT_SIZE = TYPE_SCALE_PX.micro;
 
 /**
  * Gap between a count and the top of the bar it belongs to. Passed explicitly
@@ -210,13 +211,13 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
             angle={axis.angle}
             textAnchor={axis.textAnchor}
             height={axis.height}
-            style={{ fontSize: "11px" }}
+            style={{ fontSize: TYPE_SCALE_PX.micro }}
             tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           />
           <YAxis
             allowDecimals={false}
             domain={[0, yMax]}
-            style={{ fontSize: "11px" }}
+            style={{ fontSize: TYPE_SCALE_PX.micro }}
             tick={{ fill: "var(--chakra-colors-fg-muted)" }}
             width={22}
           />
@@ -226,7 +227,7 @@ export function WinRateChart({ column, chartHeight, targetColors }: WinRateChart
               background: "var(--chakra-colors-bg-panel)",
               border: "1px solid var(--chakra-colors-border)",
               borderRadius: 6,
-              fontSize: 12,
+              fontSize: TYPE_SCALE_PX.caption,
             }}
             formatter={(value) => [JSON.stringify(value), "Wins"]}
             // The axis label is elided; the tooltip is where the full variant

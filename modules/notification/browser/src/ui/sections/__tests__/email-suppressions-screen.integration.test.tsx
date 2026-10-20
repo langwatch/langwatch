@@ -11,10 +11,12 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 const { state, calls } = vi.hoisted(() => ({
   state: {
     rows: [] as Record<string, unknown>[],
+    nextCursor: null as { createdAt: Date; id: string } | null,
     isLoading: false,
     isError: false,
   },
   calls: {
+    fetchNextPage: vi.fn<() => void>(),
     remove: vi.fn<(input: unknown) => void>(),
     invalidate: vi.fn<() => Promise<void>>().mockResolvedValue(void 0),
   },
@@ -23,15 +25,20 @@ const { state, calls } = vi.hoisted(() => ({
 vi.mock("../../../behavior/notification-api.ts", () => ({
   notificationApi: {
     useUtils: () => ({
-      emailSuppression: { getAll: { invalidate: calls.invalidate } },
+      emailSuppression: { getPage: { invalidate: calls.invalidate } },
     }),
     emailSuppression: {
-      getAll: {
-        useQuery: () => ({
-          data: state.rows,
+      getPage: {
+        useInfiniteQuery: () => ({
+          data: state.isLoading
+            ? void 0
+            : { pages: [{ suppressions: state.rows, nextCursor: state.nextCursor }] },
           isLoading: state.isLoading,
           isError: state.isError,
           isRefetching: false,
+          isFetchingNextPage: false,
+          hasNextPage: state.nextCursor !== null,
+          fetchNextPage: calls.fetchNextPage,
           refetch: vi.fn<() => void>(),
         }),
       },
@@ -65,6 +72,7 @@ const row = (overrides: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks();
   state.rows = [row()];
+  state.nextCursor = null;
   state.isLoading = false;
   state.isError = false;
 });
@@ -131,6 +139,19 @@ describe("when the reader may manage the triggers of this project", () => {
   });
 });
 
+describe("given nobody has unsubscribed", () => {
+  it("names where notifications are set up in this project", () => {
+    state.rows = [];
+
+    renderWithNotificationHost(<EmailSuppressionsScreen />);
+
+    expect(screen.getByText("No suppressions yet")).toBeTruthy();
+    expect(screen.getByRole("link", { name: /Open automations/ }).getAttribute("href")).toBe(
+      "/web-app/automations",
+    );
+  });
+});
+
 describe("given the list could not be read", () => {
   it("says so and offers the read again rather than an empty table", () => {
     state.rows = [];
@@ -140,5 +161,20 @@ describe("given the list could not be read", () => {
 
     expect(screen.getByText(/could not load suppressions/i)).toBeTruthy();
     expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+  });
+});
+
+describe("given more suppressions than one page holds", () => {
+  it("reads the next page from Load more and ends without the button", async () => {
+    state.nextCursor = { createdAt: new Date("2026-01-01T00:00:00.000Z"), id: "sup-1" };
+    const { unmount } = renderWithNotificationHost(<EmailSuppressionsScreen />);
+
+    await userEvent.setup().click(screen.getByRole("button", { name: "Load more" }));
+    expect(calls.fetchNextPage).toHaveBeenCalledTimes(1);
+
+    unmount();
+    state.nextCursor = null;
+    renderWithNotificationHost(<EmailSuppressionsScreen />);
+    expect(screen.queryByRole("button", { name: "Load more" })).toBeNull();
   });
 });

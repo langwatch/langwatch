@@ -1,5 +1,6 @@
 import { Link } from "@langwatch/browser-host/link";
 import { Alert } from "@langwatch/design-system/primitives";
+import { explainHandledError } from "@langwatch/handled-error/presentation";
 import type { ParsedLLMError } from "@langwatch/prompt-contract";
 
 interface ErrorMessageProps {
@@ -9,6 +10,20 @@ interface ErrorMessageProps {
 // Type-specific rendering of provider errors: parseLLMError classifies to
 // a closed set, enabling customer-actionable copy per type.
 export function ErrorMessage({ error }: ErrorMessageProps) {
+  // A run our own server refused carries its code: the registry has the words.
+  if (error.handled) {
+    const explained = explainHandledError(error.handled);
+    return (
+      <Alert.Root status="error">
+        <Alert.Indicator />
+        <Alert.Content>
+          <Alert.Title>{explained.title}</Alert.Title>
+          <Alert.Description>{explained.description}</Alert.Description>
+        </Alert.Content>
+      </Alert.Root>
+    );
+  }
+
   const description = error.type === "unknown" ? UNKNOWN_FAILURE : describeLLMError(error.type);
 
   return (

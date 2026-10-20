@@ -7,6 +7,9 @@ export type {
   EventingParticipation,
   FeatureEventing,
   FeatureEventingSetup,
+  OwnAggregateEvents,
+  OwnAggregatesFind,
+  OwnAggregatesQuery,
   OwnEventsAppend,
   OwnEventStore,
   PriorEventsQuery,
@@ -32,7 +35,6 @@ export {
   type LaneAlias,
   type LaneTombstone,
   type RoutedLaneAlias,
-  laneAliasesPastWindow,
   type PipelineLaneAliases,
 } from "./upcast/laneAlias.ts";
 export { pipelineUpcastsOf, upcastReplayEventSource } from "./upcast/upcastReplayEventSource.ts";
@@ -151,6 +153,7 @@ export type { JobRegistryEntry } from "./services/queues/queueManager.ts";
 // Stores
 export type {
   EventStore,
+  EventStoreAggregateKey,
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./stores/eventStore.types.ts";
@@ -194,11 +197,6 @@ export { EventUtils } from "./utils/event.utils.ts";
 export * from "./deferred.ts";
 export * from "./disabledPipeline.ts";
 export * from "./mapCommands.ts";
-export {
-  NOOP_EVENT_SOURCING_METRICS,
-  PROMETHEUS_EVENT_SOURCING_METRICS,
-  type EventSourcingStoreMetrics,
-} from "./metrics.ts";
 export * from "./parseErrorText.ts";
 export * from "./pipeline/processBuilder.ts";
 export * from "./pipeline/processManagerDefinition.ts";
@@ -230,6 +228,11 @@ export * from "./replay/projectionLaneReplay.ts";
 export * from "./replay/types.ts";
 export * from "./services/errorHandling.ts";
 export { type FoldReadAuthorizer, foldReadPurpose } from "./projections/foldReadPurpose.ts";
+export {
+  type CursorScope,
+  type Freshness,
+  freshnessOf,
+} from "./projections/cursor/rules/freshnessOf.ts";
 export * from "./stores/eventStoreUtils.ts";
 export * from "./stores/abstractEventStore.ts";
 export * from "./stores/eventStoreProducerOnly.ts";

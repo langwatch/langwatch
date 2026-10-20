@@ -5,12 +5,14 @@ import type {
   LlmConfigFieldProps,
   LlmConfigPopoverProps,
   OutputsSectionProps,
+  VariablesSectionProps,
 } from "@langwatch/prompt-client";
 
 import { useModelSelectionOptions } from "../../../features/model-selection/behavior/use-model-selection-options.ts";
 import { OutputsSection } from "../outputs/outputs-section.tsx";
 import { LLMConfigField } from "../prompt-studio/model-selection/llm-config-field.tsx";
 import { LLMConfigPopover } from "../prompt-studio/model-selection/llm-config-popover.tsx";
+import { VariablesSection } from "../variables/variables-section.tsx";
 
 /** The config row, with the chosen model resolved against this project's providers. */
 export function LentLlmConfigField(props: LlmConfigFieldProps) {
@@ -28,4 +30,8 @@ export function LentLlmConfigPopover(props: LlmConfigPopoverProps) {
 
 export function LentOutputsSection(props: OutputsSectionProps) {
   return <OutputsSection {...props} />;
+}
+
+export function LentVariablesSection(props: VariablesSectionProps) {
+  return <VariablesSection {...props} />;
 }

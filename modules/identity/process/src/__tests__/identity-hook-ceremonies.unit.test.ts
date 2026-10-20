@@ -36,6 +36,7 @@ async function identityWithLatchedUser(): Promise<IdentityModule> {
     passkeysEnabled: false,
     mfaEnrollmentOpen: false,
     localPasswords: true,
+    identifierBackfillMaxQueuedJobs: 5000,
   };
   return IdentityModule.create({
     config,

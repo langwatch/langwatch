@@ -6,7 +6,6 @@
  */
 import { randomUUID } from "node:crypto";
 
-import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import type { DashboardWidgetQuery } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -17,7 +16,7 @@ import {
   type PrismaQueryExecutor,
 } from "@langwatch/prisma-client";
 import type {
-  Dashboard,
+  DashboardsV2,
   Organization,
   PrismaClient,
   Project,
@@ -25,8 +24,15 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 
-import { createDashboardTestAnalytics } from "../../app/__tests__/dashboard.fixture.ts";
+import {
+  createDashboardTestAnalytics,
+  createDashboardTestAuthz,
+  createDashboardTestProjects,
+  DASHBOARDS_ROLLED_OUT,
+} from "../../app/__tests__/dashboard.fixture.ts";
+import { PrismaBoardRepository } from "../../repositories/prisma/prisma.board.repository.ts";
 import { PrismaDashboardWidgetRepository } from "../../repositories/prisma/prisma.dashboard-widget.repository.ts";
+import { DashboardAccessService } from "../dashboard-access.service.ts";
 import { DashboardWidgetService } from "../dashboard-widget.service.ts";
 
 class AllowTestQueries extends PrismaQueryGuard {
@@ -79,14 +85,9 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     });
   };
 
-  const createDashboard = async (ownerProject: Project): Promise<Dashboard> =>
-    database().dashboard.create({
-      data: {
-        id: randomUUID(),
-        name: "Test dashboard",
-        projectId: ownerProject.id,
-        order: 0,
-      },
+  const createDashboard = async (ownerProject: Project): Promise<DashboardsV2> =>
+    database().dashboardsV2.create({
+      data: { id: randomUUID(), name: "Test dashboard", projectId: ownerProject.id },
     });
 
   const create = (
@@ -110,6 +111,13 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
     service = DashboardWidgetService.create({
       repository: PrismaDashboardWidgetRepository.create({ prisma: database() }),
       analytics: createDashboardTestAnalytics(),
+      // Answers from the real table, so a board of another project reads as absent.
+      boards: DashboardAccessService.create({
+        repository: PrismaBoardRepository.create({ prisma: database() }),
+        projects: createDashboardTestProjects(),
+        rollout: DASHBOARDS_ROLLED_OUT,
+        authz: createDashboardTestAuthz(),
+      }),
     });
     organization = await database().organization.create({
       data: { name: "Test Org", slug: `test-org-${randomUUID()}` },
@@ -126,10 +134,10 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
   });
 
   afterEach(async () => {
-    await database().customGraph.deleteMany({
+    await database().dashboardWidget.deleteMany({
       where: { projectId: { in: [project.id, otherProject.id] } },
     });
-    await database().dashboard.deleteMany({
+    await database().dashboardsV2.deleteMany({
       where: { projectId: { in: [project.id, otherProject.id] } },
     });
   });
@@ -152,13 +160,13 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
       it("allocates its row from the target dashboard alone, not the whole project", async () => {
         const dashboardA = await createDashboard(project);
         const dashboardB = await createDashboard(project);
-        await database().customGraph.create({
+        await database().dashboardWidget.create({
           data: {
             id: randomUUID(),
             projectId: project.id,
             dashboardId: dashboardA.id,
             name: "Tall card on A",
-            graph: { series: [] },
+            definition: { series: [] },
             gridRow: 0,
             rowSpan: 5,
           },
@@ -192,8 +200,8 @@ describe.skipIf(!databaseUrl)("dashboard widget service (integration)", () => {
           code: "dashboard_widget_not_found",
         });
 
-        const written = await database().customGraph.count({
-          where: { projectId: project.id, kind: DASHBOARD_SRCDOC_CHART_KIND },
+        const written = await database().dashboardWidget.count({
+          where: { projectId: project.id },
         });
         expect(written).toBe(0);
       });

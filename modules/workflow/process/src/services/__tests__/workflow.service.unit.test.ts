@@ -337,6 +337,33 @@ describe("WorkflowService", () => {
       });
     });
 
+    /** @scenario "Repeated autosaves keep the autosaved version's number" */
+    it("keeps the autosaved version's number across later autosaves", async () => {
+      const repository = new FakeWorkflowRepository();
+      const workflowService = service(repository);
+      const dsl = { version: "7", name: "Draft 1 - Workflow", nodes: [], edges: [] };
+      const created = await workflowService.create({
+        projectId: "project_1",
+        dsl,
+        commitMessage: "Autosaved",
+        autoSaved: true,
+      });
+      const autosave = () =>
+        workflowService.saveVersion({
+          projectId: "project_1",
+          workflowId: created.workflow.id,
+          dsl,
+          commitMessage: "Autosaved",
+          autoSaved: true,
+          setAsLatestVersion: false,
+        });
+
+      await autosave();
+      const second = await autosave();
+
+      expect(second).toMatchObject({ id: created.version.id, version: "1", autoSaved: true });
+    });
+
     it("stays committed under the graph's own version when autoSaved is not asked for", async () => {
       const workflowService = service(new FakeWorkflowRepository());
 

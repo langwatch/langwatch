@@ -66,7 +66,11 @@ describe("production main colour parity", () => {
     expect(colorSystem).toEqual(mainColours.raw);
   });
 
-  it.each(leaves(mainColours.semantic))("preserves main's %s in both modes", (name, expected) => {
+  // Chosen departures from main, each pinned by its own test below.
+  const departures = new Set(["label.fgMuted"]);
+  const kept = leaves(mainColours.semantic).filter(([name]) => !departures.has(name));
+
+  it.each(kept)("preserves main's %s in both modes", (name, expected) => {
     for (const mode of ["_light", "_dark"] satisfies Mode[]) {
       const reference = typeof expected === "string" ? expected : entry(expected, mode);
       if (typeof reference !== "string") throw new Error(`Missing main value: ${name}`);
@@ -77,17 +81,35 @@ describe("production main colour parity", () => {
     }
   });
 
+  it("lifts dark compact labels to gray.400 for contrast, and keeps main's light label", () => {
+    expect(resolve("label.fgMuted", "_dark")).toBe(resolve("gray.400", "_dark"));
+    expect(resolve("label.fgMuted", "_light")).toBe(resolve("gray.500", "_light"));
+  });
+
+  // The card's dark ink and hairline are chosen, not main's: light still follows main.
   it.each([
-    ["bg.card", "bg.panel"],
+    ["bg.card", "#0f1116"],
+    ["border.card", "#3a3a44"],
+  ])("gives %s its chosen dark value and main's light one", (alias, dark) => {
+    expect(resolve(alias, "_dark")).toBe(dark);
+    expect(resolve(alias, "_light")).toBe(
+      resolve(alias === "bg.card" ? "bg.panel" : "border", "_light"),
+    );
+  });
+
+  it("puts light fields on white, as main's were, and dark ones on main's input ground", () => {
+    expect(resolve("bg.control", "_light")).toBe(resolve("bg.surface", "_light"));
+    expect(resolve("bg.control", "_dark")).toBe(resolve("bg.input", "_dark"));
+  });
+
+  it.each([
     ["bg.overlay", "bg.panel"],
     ["bg.raised", "bg.panel"],
     ["bg.nested", "bg.muted"],
-    ["bg.control", "bg.input"],
     ["bg.hover", "bg.softHover"],
     ["bg.selected", "nav.bgActive"],
     ["bg.stripe", "bg.subtle"],
     ["nav.marker", "fg.subtle"],
-    ["border.card", "border"],
     ["border.control", "border"],
     ["border.nested", "border.muted"],
     ["border.strong", "border.emphasized"],
@@ -130,5 +152,43 @@ describe("main palette contrast", () => {
     expect(luminance(resolve("bg.page", "_dark"))).toBeLessThan(
       luminance(resolve("bg.panel", "_dark")),
     );
+  });
+});
+
+describe("terminal colour parity", () => {
+  it.each([
+    ["terminal.fg", "fg"],
+    ["terminal.bg", "bg.card"],
+    ["terminal.black", "fg.subtle"],
+    ["terminal.red", "red.fg"],
+    ["terminal.green", "green.fg"],
+    ["terminal.yellow", "yellow.fg"],
+    ["terminal.blue", "blue.fg"],
+    ["terminal.magenta", "purple.fg"],
+    ["terminal.cyan", "cyan.fg"],
+    ["terminal.white", "fg"],
+    ["terminal.brightBlack", "fg.muted"],
+    ["terminal.brightRed", "red.fg"],
+    ["terminal.brightGreen", "green.fg"],
+    ["terminal.brightYellow", "yellow.fg"],
+    ["terminal.brightBlue", "blue.fg"],
+    ["terminal.brightMagenta", "pink.fg"],
+    ["terminal.brightCyan", "cyan.fg"],
+    ["terminal.brightWhite", "fg"],
+  ])("preserves %s as %s in both modes", (terminal, previous) => {
+    for (const mode of ["_light", "_dark"] satisfies Mode[]) {
+      expect(resolve(terminal, mode)).toBe(resolve(previous, mode));
+    }
+  });
+});
+
+describe("avatar fills under white initials", () => {
+  const palettes = ["orange", "blue", "green", "yellow", "purple", "teal", "cyan", "pink"];
+
+  it.each(palettes)("keeps white initials on avatar.%s at 3:1 or more in both modes", (palette) => {
+    for (const mode of ["_light", "_dark"] satisfies Mode[]) {
+      const ratio = contrast(resolve("fg.onColor", mode), resolve(`avatar.${palette}`, mode));
+      expect(ratio).toBeGreaterThanOrEqual(3);
+    }
   });
 });

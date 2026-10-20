@@ -157,11 +157,11 @@ export function EntryPointPropertiesPanel({
             data-testid="entry-dataset-card"
           >
             <Database size={14} style={{ flexShrink: 0 }} />
-            <Text fontSize="13px" truncate>
+            <Text textStyle="bodySm" truncate>
               {dataset.name ?? "Dataset"}
             </Text>
             {datasetTotal !== undefined && datasetTotal !== null && (
-              <Text fontSize="13px" color="fg.subtle" flexShrink={0}>
+              <Text textStyle="bodySm" color="fg.subtle" flexShrink={0}>
                 ({datasetTotal} {datasetTotal === 1 ? "row" : "rows"})
               </Text>
             )}
@@ -198,7 +198,7 @@ export function EntryPointPropertiesPanel({
             </Tooltip>
           </HStack>
         ) : (
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             Optional. Attaching a dataset adds its columns to the inputs and provides the rows for
             evaluations.
           </Text>

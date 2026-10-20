@@ -4,6 +4,7 @@
 
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -13,14 +14,12 @@ import {
   Box,
   Button,
   HStack,
-  Skeleton,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
-import { Edit, MoreVertical, Plus, ThumbsUp, Trash } from "lucide-react";
+import { Edit, Plus, ThumbsUp, Trash } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { annotationScoresApi } from "../../behavior/annotation-scores-api.ts";
@@ -54,19 +53,19 @@ function AnnotationScoresTable({
 }) {
   return (
     <Box width="full">
-      <ListTable containerProps={{ overflowX: "auto" }} width="full">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Score Type</Table.ColumnHeader>
-            <Table.ColumnHeader>Score Options</Table.ColumnHeader>
-            <Table.ColumnHeader width="1%">Enabled</Table.ColumnHeader>
-            {canManage && <Table.ColumnHeader width="1%" aria-label="Actions" />}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable scroll="x" scrollLabel="Annotation scores" loading={isLoading}>
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Score Type</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Score Options</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="fit">Enabled</ListTable.ColumnHeader>
+            {canManage && <ListTable.ActionHeader />}
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {isLoading ? (
-            <LoadingScoreRows canManage={canManage} />
+            <ListTable.LoadingRows rows={3} columns={canManage ? 5 : 4} />
           ) : (
             scores?.map((score) => (
               <AnnotationScoreRow
@@ -79,41 +78,10 @@ function AnnotationScoresTable({
               />
             ))
           )}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     </Box>
   );
-}
-
-/** Three rows in the table's own shape while the scores load. */
-function LoadingScoreRows({ canManage }: { canManage: boolean }) {
-  return Array.from({ length: 3 }, (_, index) => (
-    <Table.Row key={index}>
-      <Table.Cell>
-        <VStack align="start" gap={1.5}>
-          <Skeleton height="14px" width="40%" />
-          <Skeleton height="12px" width="70%" />
-        </VStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Skeleton height="14px" width="96px" />
-      </Table.Cell>
-      <Table.Cell>
-        <HStack gap={2}>
-          <Skeleton height="20px" width="48px" />
-          <Skeleton height="20px" width="48px" />
-        </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Skeleton height="20px" width="36px" borderRadius="full" />
-      </Table.Cell>
-      {canManage && (
-        <Table.Cell>
-          <Skeleton height="24px" width="24px" />
-        </Table.Cell>
-      )}
-    </Table.Row>
-  ));
 }
 
 function AnnotationScoreRow({
@@ -130,8 +98,8 @@ function AnnotationScoreRow({
   onDelete: (scoreId: string) => void;
 }) {
   return (
-    <Table.Row data-testid={`annotation-score-row-${score.name}`}>
-      <Table.Cell>
+    <ListTable.Row data-testid={`annotation-score-row-${score.name}`}>
+      <ListTable.Cell>
         <VStack align="start" gap={0.5}>
           <Text fontWeight="medium">{score.name}</Text>
           {score.description && (
@@ -140,33 +108,33 @@ function AnnotationScoreRow({
             </Text>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell width="20%">
+      </ListTable.Cell>
+      <ListTable.Cell width="20%">
         <Text lineClamp={1}>
           {score.dataType === AnnotationScoreDataType.CHECKBOX ? "Checkbox" : "Multiple choice"}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ScoreOptions options={Array.isArray(score.options) ? score.options : []} />
-      </Table.Cell>
-      <Table.Cell textAlign="center">
+      </ListTable.Cell>
+      <ListTable.Cell align="center">
         <Switch
           checked={score.active}
           disabled={!canManage}
           onCheckedChange={() => onToggle(score)}
         />
-      </Table.Cell>
+      </ListTable.Cell>
       {canManage && (
-        <Table.Cell>
+        <ListTable.ActionCell>
           <ScoreActions
             scoreId={score.id}
             scoreName={score.name}
             onEdit={onEdit}
             onDelete={onDelete}
           />
-        </Table.Cell>
+        </ListTable.ActionCell>
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -185,7 +153,7 @@ function ScoreActions({
     <Menu.Root>
       <Menu.Trigger asChild>
         <Button variant="ghost" size="sm" aria-label={`Actions for score ${scoreName}`}>
-          <MoreVertical />
+          <MoreVerticalIcon />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -305,7 +273,7 @@ export default function AnnotationScoresScreen() {
                   To learn more about scores and how to use them, please visit our{" "}
                   <Link
                     color="orange.fg"
-                    href="https://docs.langwatch.ai/features/annotations#annotation-scoring"
+                    href="https://docs.langwatch.ai/annotations/scores"
                     isExternal
                   >
                     documentation

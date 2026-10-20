@@ -1,4 +1,5 @@
-import { Badge, Box, Button, Flex, Text } from "@langwatch/design-system/primitives";
+import { Popover } from "@langwatch/design-system/popover";
+import { Badge, Button, Flex, Text } from "@langwatch/design-system/primitives";
 import { ChevronDown, Shuffle } from "lucide-react";
 import { useState } from "react";
 
@@ -122,44 +123,60 @@ export function PresetPicker() {
   }
 
   return (
-    <Box position="relative">
-      <Button size="sm" variant="outline" onClick={() => setIsOpen(!isOpen)}>
-        Load preset <ChevronDown size={12} />
-      </Button>
-      {isOpen && (
-        <>
-          <Box position="fixed" inset={0} zIndex={40} onClick={() => setIsOpen(false)} />
-          <Box
-            position="absolute"
-            right={0}
-            zIndex={50}
-            mt={1}
-            w="360px"
-            maxH="400px"
-            overflow="auto"
-            rounded="lg"
-            border="1px solid"
-            borderColor="border"
-            bg="bg.panel"
-            shadow="xl"
-            p={1}
+    <Popover.Root
+      open={isOpen}
+      onOpenChange={(details) => setIsOpen(details.open)}
+      positioning={{ placement: "bottom-end" }}
+    >
+      <Popover.Trigger asChild>
+        <Button size="sm" variant="outline">
+          Load preset <ChevronDown size={12} />
+        </Button>
+      </Popover.Trigger>
+      <Popover.Content w="360px" maxH="400px" overflow="auto" p={1}>
+        <Flex px={2} py={1.5}>
+          <Button size="sm" variant="outline" colorPalette="purple" w="full" onClick={loadMashup}>
+            <Shuffle size={12} />
+            Mashup (random spans from all presets)
+          </Button>
+        </Flex>
+        <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1}>
+          Built-in Presets
+        </Text>
+        {builtIn.map((preset) => (
+          <Flex
+            key={preset.id}
+            as="button"
+            w="full"
+            align="flex-start"
+            direction="column"
+            gap={0.5}
+            rounded="md"
+            px={3}
+            py={2}
+            textAlign="left"
+            _hover={{ bg: "bg.subtle" }}
+            onClick={() => loadPreset(preset.id)}
           >
-            <Flex px={2} py={1.5}>
-              <Button
-                size="sm"
-                variant="outline"
-                colorPalette="purple"
-                w="full"
-                onClick={loadMashup}
-              >
-                <Shuffle size={12} />
-                Mashup (random spans from all presets)
-              </Button>
+            <Flex w="full" justify="space-between" align="center">
+              <Text fontSize="sm" fontWeight="medium" color="fg.default">
+                {preset.name}
+              </Text>
+              <Text textStyle="micro" color="fg.muted">
+                {countSpans(preset.config.spans)} spans
+              </Text>
             </Flex>
-            <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1}>
-              Built-in Presets
+            <Text fontSize="xs" color="fg.muted" lineClamp={1}>
+              {preset.description}
             </Text>
-            {builtIn.map((preset) => (
+          </Flex>
+        ))}
+        {userPresets.length > 0 && (
+          <>
+            <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1} mt={1}>
+              Your Presets
+            </Text>
+            {userPresets.map((preset) => (
               <Flex
                 key={preset.id}
                 as="button"
@@ -178,53 +195,18 @@ export function PresetPicker() {
                   <Text fontSize="sm" fontWeight="medium" color="fg.default">
                     {preset.name}
                   </Text>
-                  <Text fontSize="10px" color="fg.muted">
-                    {countSpans(preset.config.spans)} spans
-                  </Text>
+                  <Badge colorPalette="purple" size="sm">
+                    Custom
+                  </Badge>
                 </Flex>
                 <Text fontSize="xs" color="fg.muted" lineClamp={1}>
                   {preset.description}
                 </Text>
               </Flex>
             ))}
-            {userPresets.length > 0 && (
-              <>
-                <Text fontSize="xs" fontWeight="medium" color="fg.muted" px={2} py={1} mt={1}>
-                  Your Presets
-                </Text>
-                {userPresets.map((preset) => (
-                  <Flex
-                    key={preset.id}
-                    as="button"
-                    w="full"
-                    align="flex-start"
-                    direction="column"
-                    gap={0.5}
-                    rounded="md"
-                    px={3}
-                    py={2}
-                    textAlign="left"
-                    _hover={{ bg: "bg.subtle" }}
-                    onClick={() => loadPreset(preset.id)}
-                  >
-                    <Flex w="full" justify="space-between" align="center">
-                      <Text fontSize="sm" fontWeight="medium" color="fg.default">
-                        {preset.name}
-                      </Text>
-                      <Badge colorPalette="purple" size="sm">
-                        Custom
-                      </Badge>
-                    </Flex>
-                    <Text fontSize="xs" color="fg.muted" lineClamp={1}>
-                      {preset.description}
-                    </Text>
-                  </Flex>
-                ))}
-              </>
-            )}
-          </Box>
-        </>
-      )}
-    </Box>
+          </>
+        )}
+      </Popover.Content>
+    </Popover.Root>
   );
 }

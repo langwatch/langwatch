@@ -99,7 +99,7 @@ describe("WebhookDeliveriesDrawer", () => {
     });
     renderDrawer();
 
-    await userEvent.click(screen.getByTestId("webhook-deliveries-load-more"));
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     // The most recent query call carries the cursor from the prior page.
     const lastCall = useQuery.mock.calls.at(-1)?.[0];
@@ -132,7 +132,7 @@ describe("WebhookDeliveriesDrawer", () => {
     renderDrawer();
     expect(screen.getByText("101ms")).toBeInTheDocument();
 
-    await userEvent.click(screen.getByTestId("webhook-deliveries-load-more"));
+    await userEvent.click(screen.getByRole("button", { name: "Load more" }));
 
     for (const latency of ["101ms", "102ms", "103ms", "104ms"]) {
       expect(screen.getByText(latency)).toBeInTheDocument();

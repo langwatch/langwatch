@@ -1,7 +1,6 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
-  Button,
   Field,
   HStack,
   Input,
@@ -10,11 +9,15 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { addDays, nowInstant, toDate } from "@langwatch/time";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 
 import { useActivationCodeCommands } from "../../behavior/use-activation-code-commands.ts";
 import { SERVICES, SERVICE_LABELS, type Service } from "../../model/license-terms.ts";
 import { dateInputToISO } from "../elements/admin-cells.tsx";
+
+/** The controls a failed submit can land on; wrappers that carry the state are skipped. */
+const INVALID_CONTROL =
+  'input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"]';
 
 type PlanType = "GROWTH" | "PRO" | "ENTERPRISE" | "CUSTOM";
 const PLANS: PlanType[] = ["ENTERPRISE", "GROWTH", "PRO", "CUSTOM"];
@@ -57,10 +60,17 @@ function emptyDraft(): Draft {
   };
 }
 
-function namesTheCustomer(draft: Draft): boolean {
-  return Boolean(
-    draft.organizationId.trim() && draft.organizationName.trim() && draft.email.trim(),
-  );
+type Problems = Partial<
+  Record<"organizationId" | "organizationName" | "email" | "expiresOn", string>
+>;
+
+function problemsOf(draft: Draft): Problems {
+  const problems: Problems = {};
+  if (!draft.organizationId.trim()) problems.organizationId = "Enter the customer organization id.";
+  if (!draft.organizationName.trim()) problems.organizationName = "Enter the customer name.";
+  if (!draft.email.trim()) problems.email = "Enter a contact email.";
+  if (!dateInputToISO(draft.expiresOn)) problems.expiresOn = "Choose a valid expiry date.";
+  return problems;
 }
 
 /** Issues an activation code and shows it once: the registry holds only its
@@ -75,116 +85,151 @@ export function IssueActivationCodeDrawer({
 }) {
   const [draft, setDraft] = useState<Draft>(emptyDraft);
   const [issued, setIssued] = useState<string | null>(null);
+  const [attempts, setAttempts] = useState(0);
+  const formId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
   const commands = useActivationCodeCommands();
 
   useEffect(() => {
     if (!open) return;
     setDraft(emptyDraft());
     setIssued(null);
+    setAttempts(0);
   }, [open]);
+
+  useEffect(() => {
+    if (attempts === 0) return;
+    formRef.current?.querySelector<HTMLElement>(INVALID_CONTROL)?.focus();
+  }, [attempts]);
+
+  const problems = attempts > 0 ? problemsOf(draft) : {};
 
   const set = <K extends keyof Draft>(key: K, value: Draft[K]) =>
     setDraft((current) => ({ ...current, [key]: value }));
 
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (commands.issue.isPending) return;
+    const expiresAt = dateInputToISO(draft.expiresOn);
+    if (Object.keys(problemsOf(draft)).length > 0 || !expiresAt) {
+      setAttempts((count) => count + 1);
+      return;
+    }
+    commands.issue.mutate(
+      {
+        organizationId: draft.organizationId.trim(),
+        organizationName: draft.organizationName.trim(),
+        email: draft.email.trim(),
+        planType: draft.planType,
+        maxMembers: Number(draft.maxMembers),
+        ...(draft.maxMembersLite.trim() === ""
+          ? {}
+          : { maxMembersLite: Number(draft.maxMembersLite) }),
+        licenseTermDays: Number(draft.licenseTermDays),
+        services: draft.services,
+        expiresAt,
+        reusable: draft.reusable,
+      },
+      { onSuccess: (result) => setIssued(result.code) },
+    );
+  };
+
   return (
-    <Drawer.Root open={open} onOpenChange={({ open: next }) => !next && onClose()} size="md">
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>New activation code</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {issued ? (
-            <IssuedCode code={issued} />
-          ) : (
-            <VStack align="start" gap={4} width="full">
-              <CustomerFields draft={draft} set={set} />
-              <TermsFields draft={draft} set={set} />
-              <Checkbox
-                checked={draft.reusable}
-                onCheckedChange={({ checked }) => set("reusable", checked === true)}
-              >
-                Reusable, for a customer rolling out several installs
-              </Checkbox>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack gap={3}>
-            <Button variant="outline" onClick={onClose}>
-              {issued ? "Done" : "Cancel"}
-            </Button>
-            {issued ? null : (
-              <Button
-                colorPalette="blue"
-                disabled={!namesTheCustomer(draft)}
-                loading={commands.issue.isPending}
-                onClick={() => {
-                  const expiresAt = dateInputToISO(draft.expiresOn);
-                  if (!expiresAt) return;
-                  commands.issue.mutate(
-                    {
-                      organizationId: draft.organizationId.trim(),
-                      organizationName: draft.organizationName.trim(),
-                      email: draft.email.trim(),
-                      planType: draft.planType,
-                      maxMembers: Number(draft.maxMembers),
-                      ...(draft.maxMembersLite.trim() === ""
-                        ? {}
-                        : { maxMembersLite: Number(draft.maxMembersLite) }),
-                      licenseTermDays: Number(draft.licenseTermDays),
-                      services: draft.services,
-                      expiresAt,
-                      reusable: draft.reusable,
-                    },
-                    { onSuccess: (result) => setIssued(result.code) },
-                  );
-                }}
-              >
-                Issue code
-              </Button>
-            )}
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={open}
+      onClose={onClose}
+      title="New activation code"
+      size="md"
+      footer={
+        issued
+          ? { cancel: { label: "Done", onClick: onClose } }
+          : {
+              cancel: { onClick: onClose },
+              primaryAction: {
+                label: "Issue code",
+                type: "submit",
+                form: formId,
+                loading: commands.issue.isPending,
+              },
+            }
+      }
+    >
+      {issued ? (
+        <IssuedCode code={issued} />
+      ) : (
+        <form id={formId} ref={formRef} noValidate onSubmit={submit}>
+          <VStack align="start" gap={4} width="full">
+            <CustomerFields draft={draft} set={set} problems={problems} />
+            <TermsFields draft={draft} set={set} problems={problems} />
+            <Checkbox
+              checked={draft.reusable}
+              onCheckedChange={({ checked }) => set("reusable", checked === true)}
+            >
+              Reusable, for a customer rolling out several installs
+            </Checkbox>
+          </VStack>
+        </form>
+      )}
+    </Drawer>
   );
 }
 
 type SetField = <K extends keyof Draft>(key: K, value: Draft[K]) => void;
 
-function CustomerFields({ draft, set }: { draft: Draft; set: SetField }) {
+function CustomerFields({
+  draft,
+  set,
+  problems,
+}: {
+  draft: Draft;
+  set: SetField;
+  problems: Problems;
+}) {
   return (
     <>
-      <Field.Root>
+      <Field.Root invalid={problems.organizationId !== undefined}>
         <Field.Label>Customer organization id</Field.Label>
         <Input
+          aria-invalid={problems.organizationId !== undefined || undefined}
           value={draft.organizationId}
           onChange={(event) => set("organizationId", event.target.value)}
           placeholder="organization_..."
         />
+        <Field.ErrorText>{problems.organizationId}</Field.ErrorText>
       </Field.Root>
-      <Field.Root>
+      <Field.Root invalid={problems.organizationName !== undefined}>
         <Field.Label>Customer name</Field.Label>
         <Input
+          aria-invalid={problems.organizationName !== undefined || undefined}
           value={draft.organizationName}
           onChange={(event) => set("organizationName", event.target.value)}
           placeholder="ACME"
         />
+        <Field.ErrorText>{problems.organizationName}</Field.ErrorText>
       </Field.Root>
-      <Field.Root>
+      <Field.Root invalid={problems.email !== undefined}>
         <Field.Label>Contact email</Field.Label>
         <Input
+          aria-invalid={problems.email !== undefined || undefined}
           value={draft.email}
           onChange={(event) => set("email", event.target.value)}
           placeholder="ops@acme.test"
         />
+        <Field.ErrorText>{problems.email}</Field.ErrorText>
       </Field.Root>
     </>
   );
 }
 
-function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
+function TermsFields({
+  draft,
+  set,
+  problems,
+}: {
+  draft: Draft;
+  set: SetField;
+  problems: Problems;
+}) {
   return (
     <>
       <Field.Root>
@@ -260,13 +305,15 @@ function TermsFields({ draft, set }: { draft: Draft; set: SetField }) {
           The license the code mints syncs and refreshes on its own only while it names one.
         </Text>
       </VStack>
-      <Field.Root>
+      <Field.Root invalid={problems.expiresOn !== undefined}>
         <Field.Label>Code expires on</Field.Label>
         <Input
           type="date"
+          aria-invalid={problems.expiresOn !== undefined || undefined}
           value={draft.expiresOn}
           onChange={(event) => set("expiresOn", event.target.value)}
         />
+        <Field.ErrorText>{problems.expiresOn}</Field.ErrorText>
       </Field.Root>
     </>
   );

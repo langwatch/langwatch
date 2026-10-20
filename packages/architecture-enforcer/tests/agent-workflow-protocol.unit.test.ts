@@ -249,7 +249,7 @@ describe("the live-lane roster", () => {
     const recordsBeforeSpawning = coordinator.indexOf("LANES.md` **before** the Agent call");
     expect(recordsBeforeSpawning).toBeGreaterThan(-1);
 
-    const spawnCall = coordinator.indexOf("`subagent_type` set to the `lane");
+    const spawnCall = coordinator.indexOf("`subagent_type` set to the lane type");
     expect(spawnCall).toBeGreaterThan(recordsBeforeSpawning);
 
     expect(coordinator).toContain("no `active` rows");

@@ -312,9 +312,11 @@ export class OrganizationInvitationDoorService {
     await this.#provisionPersonalWorkspace({ organizationId: invite.organizationId, by });
 
     void this.deps.signals
-      .sendSlackSignupEvent({
+      .announceJoin({
+        userId: by.id,
         userName: by.name,
         userEmail: by.email,
+        organizationId: invite.organization.id,
         organizationName: invite.organization.name,
       })
       .catch((failure: unknown) => this.deps.signals.reportError(failure));

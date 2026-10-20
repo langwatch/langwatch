@@ -4,6 +4,7 @@
 import {
   ClickHouseQueryClient,
   type InsertRequest,
+  type QueryRequest,
   TenantGuard,
 } from "@langwatch/clickhouse-client";
 import { createTenantId } from "@langwatch/eventing";
@@ -18,13 +19,22 @@ import { ConsumerPipelines } from "../pipeline-selection.ts";
 const classifyAsTheWorkerDoes = ({ AggregateType }: { AggregateType: string }) =>
   AggregateType === "trace" ? "traces" : "indefinite";
 
-/** The consuming role over a ClickHouse whose every insert is kept for the assertion. */
-function consumingEventingOver({ inserts }: { inserts: InsertRequest[] }) {
-  const refuse = () => Promise.reject(new Error("only inserts run here"));
+/** The consuming role over a ClickHouse whose every insert and read is kept for the assertion. */
+function consumingEventingOver({
+  inserts,
+  reads = [],
+}: {
+  inserts: InsertRequest[];
+  reads?: QueryRequest[];
+}) {
+  const refuse = () => Promise.reject(new Error("only inserts and reads run here"));
   const clickhouse = new ClickHouseQueryClient({
     tenantGuard: new TenantGuard(),
     driver: {
-      execute: refuse,
+      execute: <Row>(request: QueryRequest) => {
+        reads.push(request);
+        return Promise.resolve({ rows: [] as Row[] });
+      },
       command: refuse,
       insert: (request) => {
         inserts.push(request);
@@ -97,6 +107,28 @@ describe("buildEventing", () => {
         expect(inserts.flatMap(({ rows }) => rows).map((row) => row["_retention_days"])).toEqual([
           0, 49,
         ]);
+      } finally {
+        await built.close?.();
+      }
+    });
+  });
+
+  describe("given an aggregate history read the event repository declares a full scan", () => {
+    /** @scenario "An event-log read declared a full scan reaches the ClickHouse member declared" */
+    it("carries the declaration through to the routed ClickHouse member", async () => {
+      const reads: QueryRequest[] = [];
+      const built = consumingEventingOver({ inserts: [], reads });
+      const tenantId = createTenantId("project_abc");
+
+      try {
+        await built.value.eventStore?.getEvents({
+          aggregateId: "user_1",
+          aggregateType: "user",
+          context: { tenantId },
+        });
+
+        expect(reads).toHaveLength(1);
+        expect(reads[0]?.SKIP_COLD_SCAN_CHECK).toBe(true);
       } finally {
         await built.close?.();
       }

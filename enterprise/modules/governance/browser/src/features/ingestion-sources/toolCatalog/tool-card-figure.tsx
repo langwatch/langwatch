@@ -93,8 +93,8 @@ export function ToolCardMark({ card, size = 20 }: { card: ToolCard; size?: numbe
       size={`${size}px`}
       background="bg.emphasized"
       color="fg.muted"
-      fontSize="9px"
-      fontWeight="bold"
+      textStyle="micro"
+      fontWeight="semibold"
       flexShrink={0}
     >
       {toolInitials(card.name)}

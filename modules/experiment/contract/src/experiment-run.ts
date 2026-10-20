@@ -176,6 +176,8 @@ const recordTargetResultInputSchemaDefinition = z.object({
   domainError: serializedHandledErrorSchema.nullable().optional(),
   traceId: z.string().nullable().optional(),
   targets: z.array(experimentRunCommandTargetSchema).optional(),
+  /** Copied into the run from the board, not produced by it: recorded but never streamed. */
+  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 export interface RecordTargetResultInputSchema extends Named<
@@ -201,6 +203,11 @@ const recordEvaluatorResultInputSchemaDefinition = z.object({
   cost: z.number().nullable().optional(),
   inputs: jsonRecordSchema.nullable().optional(),
   duration: z.number().nullable().optional(),
+  errorType: z.string().nullable().optional(),
+  traceback: z.array(z.string()).nullable().optional(),
+  domainError: serializedHandledErrorSchema.nullable().optional(),
+  /** Copied into the run from the board, not produced by it: recorded but never streamed. */
+  carriedOver: z.boolean().optional(),
   occurredAt: z.number(),
 });
 export interface RecordEvaluatorResultInputSchema extends Named<

@@ -12,6 +12,7 @@ import { isShikiLangReady, normalizeShikiLang } from "@langwatch/design-system/s
 import { describe, expect, it } from "vitest";
 
 import {
+  chooseProject,
   CODE_ASSISTANTS,
   TOKEN_SNIPPET_LANGUAGES,
   type CodeAssistant,
@@ -194,6 +195,62 @@ describe("given the token-created-snippets feature is implemented", () => {
       // family reaches it through `@langwatch/design-system/shiki`. A second one
       // declared here would be a second Oniguruma engine in the same document.
       expect(declared.filter((name) => highlightLibPattern.test(name))).toEqual([]);
+    });
+  });
+});
+
+describe("given the projects a new key can reach", () => {
+  const ACME = { id: "project-abc", name: "ACME" };
+  const STAGING = { id: "project-def", name: "ACME Staging" };
+
+  describe("when choosing the project a snippet names", () => {
+    /** @scenario Zero reachable projects say so and keep the key copyable */
+    it.each([["project-abc"], [undefined]])(
+      "names none when there are none, whatever the current project is (%s)",
+      (currentId) => {
+        expect(chooseProject({ projects: [], selectedId: "project-abc", currentId })).toEqual({
+          kind: "none",
+          projectId: undefined,
+        });
+      },
+    );
+
+    /** @scenario One reachable project is shown and used */
+    it.each([["stale-project"], ["project-abc"], [undefined]])(
+      "uses the only project whatever the current one is (%s)",
+      (currentId) => {
+        expect(chooseProject({ projects: [ACME], selectedId: undefined, currentId })).toEqual({
+          kind: "sole",
+          projectId: "project-abc",
+          project: ACME,
+        });
+      },
+    );
+
+    /** @scenario Several reachable projects offer a real choice */
+    it("prefers the reader's pick, then the current project, among several", () => {
+      const projects = [ACME, STAGING];
+      expect(
+        chooseProject({ projects, selectedId: "project-def", currentId: "project-abc" }),
+      ).toEqual({
+        kind: "pick",
+        projectId: "project-def",
+      });
+      expect(chooseProject({ projects, selectedId: undefined, currentId: "project-abc" })).toEqual({
+        kind: "pick",
+        projectId: "project-abc",
+      });
+    });
+
+    /** @scenario Several reachable projects offer a real choice */
+    it("drops a pick or a current project that is not in the list", () => {
+      const projects = [ACME, STAGING];
+      expect(
+        chooseProject({ projects, selectedId: "stale-pick", currentId: "stale-current" }),
+      ).toEqual({ kind: "pick", projectId: undefined });
+      expect(
+        chooseProject({ projects, selectedId: "stale-pick", currentId: "project-def" }),
+      ).toEqual({ kind: "pick", projectId: "project-def" });
     });
   });
 });

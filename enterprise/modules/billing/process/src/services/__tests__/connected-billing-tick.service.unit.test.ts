@@ -45,6 +45,12 @@ function tick({
   const ran: string[] = [];
   const accounts = [account("org-renewing", pending), account("org-settled", null)];
   const service = ConnectedBillingTickService.create({
+    seats: {
+      retryFailedSeatInvoices: async () => {
+        ran.push("seatChanges");
+        return { invoiced: 0, failed: 0 };
+      },
+    },
     statements: withStatements
       ? {
           run: async () => {
@@ -76,12 +82,13 @@ function tick({
 
 describe("ConnectedBillingTickService", () => {
   describe("given every job succeeds", () => {
-    it("runs the statements and each pending renewal", async () => {
+    /** @scenario "A seat invoice that failed at the payment provider is retried once a day" */
+    it("retries the failed seat invoices, then runs the statements and each pending renewal", async () => {
       const { service, ran } = tick();
 
       await service.run();
 
-      expect(ran).toEqual(["statements", "renewal:org-renewing"]);
+      expect(ran).toEqual(["seatChanges", "statements", "renewal:org-renewing"]);
     });
   });
 
@@ -90,7 +97,7 @@ describe("ConnectedBillingTickService", () => {
       const { service, ran } = tick({ failStatements: true });
 
       await expect(service.run()).resolves.toBeUndefined();
-      expect(ran).toEqual(["statements", "renewal:org-renewing"]);
+      expect(ran).toEqual(["seatChanges", "statements", "renewal:org-renewing"]);
     });
   });
 
@@ -100,7 +107,7 @@ describe("ConnectedBillingTickService", () => {
 
       await service.run();
 
-      expect(ran).toEqual(["renewal:org-renewing"]);
+      expect(ran).toEqual(["seatChanges", "renewal:org-renewing"]);
     });
   });
 });

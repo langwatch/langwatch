@@ -241,7 +241,7 @@ var baseTable = []commandSpec{
 		minusArgs: true,
 		flags: []flagSpec{
 			{long: "--watch", short: "-w", summary: "rebuild and reload on a change: one-shot UI builds (open pages reload once idle), Node reload, Go rebuild. Without it nothing reloads; `haven reload` applies changes. Not sticky"},
-			{long: "--hmr", summary: "as --watch, but the UI runs Vite bundledDev with HMR. Not sticky"},
+			{long: "--hmr", summary: "as --watch, but the UI runs the plain Vite dev server with HMR. Not sticky"},
 			{long: "--detach", short: "-d", summary: "run in the background without the log view"},
 			{long: "--force", summary: "restart the stack even when it already matches"},
 			{long: "--rebuild", summary: "rebuild container images even when unchanged"},
@@ -297,6 +297,13 @@ var baseTable = []commandSpec{
 			ctx, unwatch := watchLaunchingGroup(ctx)
 			defer unwatch()
 			d.opts.IsForegroundClient = !isSessionLeader()
+			// The boot's own runs (HAVEN_BOOT) and, when someone is attached, the
+			// wait on it: domain.ResolveCapacity gives that boot the cores first.
+			slug := d.resolvedStack()
+			_ = os.Setenv("HAVEN_BOOT", slug)
+			if d.opts.IsForegroundClient {
+				defer claimBootWait(ctx, d, slug)()
+			}
 			if err := d.orch.Up(ctx, d.params, d.opts); err != nil {
 				return err
 			}
@@ -361,6 +368,13 @@ var baseTable = []commandSpec{
 		maxArgs: -1,
 		flags:   simFlags(idpFlags...),
 		run:     runIdP,
+	},
+	{
+		name:    "history",
+		summary: "record Nx task rows piped in by the Nx plugin (`history add`, JSON lines on stdin) into nx-history.jsonl",
+		args:    "add",
+		maxArgs: 1,
+		run:     runHistory,
 	},
 	{
 		name:    "limits",
@@ -449,6 +463,35 @@ var baseTable = []commandSpec{
 		run: runLambda,
 	},
 	{
+		name:    "github",
+		summary: "githubsim, the GitHub stand-in: status | list | pulls | calls | deliveries | install | pr | app | deliver | fault | clear | reset",
+		args:    "<status|list|pulls|calls|deliveries|install|pr|app|deliver|fault|clear|reset> [verb]",
+		maxArgs: 2,
+		flags: simFlags(
+			flagSpec{long: "--account", takesValue: true, value: "<login>", summary: "install: the account to install the App on"},
+			flagSpec{long: "--type", takesValue: true, value: "<type>", summary: "install: Organization or User"},
+			flagSpec{long: "--repos", takesValue: true, value: "<a/b,c/d>", summary: "install: repositories it can see"},
+			flagSpec{long: "--repo", takesValue: true, value: "<owner/name>", summary: "pr, app, deliver: the repository"},
+			flagSpec{long: "--head", takesValue: true, value: "<branch>", summary: "pr open: the head branch"},
+			flagSpec{long: "--title", takesValue: true, value: "<text>", summary: "pr: the title"},
+			flagSpec{long: "--user", takesValue: true, value: "<login>", summary: "pr open: the author"},
+			flagSpec{long: "--draft", summary: "pr open: open as a draft"},
+			flagSpec{long: "--number", takesValue: true, value: "<n>", summary: "pr, deliver: the pull request number"},
+			flagSpec{long: "--installation", takesValue: true, value: "<id>", summary: "app, deliver: the installation id"},
+			flagSpec{long: "--event", takesValue: true, value: "<name>", summary: "deliver: ping, installation, installation_repositories or pull_request"},
+			flagSpec{long: "--action", takesValue: true, value: "<name>", summary: "deliver: the event's action"},
+			flagSpec{long: "--deliver", summary: "install, pr, app: also send the matching signed webhook to the stack"},
+			flagSpec{long: "--bad-signature", summary: "deliver: sign with the wrong secret"},
+			flagSpec{long: "--omit-signature", summary: "deliver: send no signature header"},
+			flagSpec{long: "--status", takesValue: true, value: "<code>", summary: "fault add: the 4xx/5xx to answer with"},
+			flagSpec{long: "--match", takesValue: true, value: "<text>", summary: "fault add: only calls whose \"METHOD /path\" contains this"},
+			flagSpec{long: "--message", takesValue: true, value: "<text>", summary: "fault add: the message to answer with"},
+			flagSpec{long: "--retry-after", takesValue: true, value: "<seconds>", summary: "fault add: Retry-After to send"},
+			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fault add: apply this many times, then delete itself"},
+		),
+		run: runGithub,
+	},
+	{
 		name:    "payment",
 		summary: "paymentsim, the Stripe stand-in: status | customers | subscriptions | checkouts | invoices | events | usage | complete | retry | advance | fail | clear-failures | deliver | hold | release | reset",
 		args:    "<status|customers|subscriptions|checkouts|invoices|events|usage|complete|retry|advance|fail|clear-failures|deliver|hold|release|reset> [id]",
@@ -530,6 +573,7 @@ var baseTable = []commandSpec{
 	apiSpec(),
 	gatewaySpec(),
 	telemetrySpec(),
+	mcpSpec(),
 	authSpec(),
 	browserSpec(),
 	mfaSpec(),
@@ -558,7 +602,7 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "db",
-		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test/apidiff databases; dry run unless --yes)",
+		summary: "this stack's data: reset [preset] (drop + migrate + seed) | seed [preset] (drops nothing) | url | prune (stray test databases; dry run unless --yes)",
 		args:    "<reset|seed|url|prune> [preset|engine]",
 		maxArgs: 2,
 		flags: []flagSpec{
@@ -610,6 +654,13 @@ var baseTable = []commandSpec{
 		},
 	},
 	{
+		name:    "focus",
+		summary: "the stack kept at full speed under memory pressure: bare prints it, focus <slug> sets it",
+		args:    "[slug]",
+		maxArgs: 1,
+		run:     runFocus,
+	},
+	{
 		name:    "switch",
 		summary: "cd to a worktree by name (the shell function comes from haven self setup)",
 		args:    "[name]",
@@ -646,8 +697,6 @@ var baseTable = []commandSpec{
 			{long: "--class", takesValue: true, value: "heavy", summary: "which slot pool to take (only \"heavy\" today)"},
 			// NOT --agent: that already means plain, token-free output everywhere
 			// else in this CLI, and ADR-064 rule 2 is one meaning per flag.
-			{long: "--agent-id", takesValue: true, value: "<id>", summary: "the sub-agent this run belongs to — picks the shorter wait ceiling its prompt cache needs"},
-			{long: "--workers", takesValue: true, value: "<n>", summary: "run this narrowed to n test workers, the width the gate admitted it at"},
 		},
 		run: runHeavy,
 	},
@@ -689,13 +738,14 @@ var baseTable = []commandSpec{
 	},
 	{
 		name:    "slot",
-		summary: "run any command under the machine-wide check slot (`slot run -- <cmd>`, `slot explain`)",
-		args:    "run [--label <name>] [--timeout <duration>] -- <command> [args…] | explain",
+		summary: "run any command on the machine-wide check budget (`slot run [--class typecheck|test|lint|build] -- <cmd>`, `slot explain`)",
+		args:    "run [--class typecheck|test|lint|build] [--label <name>] [--timeout <duration>] -- <command> [args…] | explain",
 		maxArgs: -1,
-		// The wrapped command lives after the `--` separator; only --label and
-		// --timeout are ours, and they arrive before the `--`.
+		// The wrapped command lives after the `--` separator; only --class,
+		// --label and --timeout are ours, and they arrive before the `--`.
 		minusArgs: true,
 		flags: []flagSpec{
+			{long: "--class", value: "<class>", takesValue: true, summary: "typecheck, lint or build (2 units) or test (VITEST_MAX_WORKERS units, 2 to 4); default one 2-unit check"},
 			{long: "--label", value: "<name>", takesValue: true, summary: "how the run is named while it queues"},
 			{long: "--timeout", value: "<duration>", takesValue: true, summary: "stop the command and exit 124 once it has run this long (e.g. 10m)"},
 		},

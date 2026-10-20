@@ -173,8 +173,7 @@ export function CowboyAnimation({ phase }: { phase: string | null }) {
 
   return (
     <Box
-      fontFamily="mono"
-      fontSize="14px"
+      textStyle="mono"
       lineHeight="1.3"
       whiteSpace="pre"
       textAlign="center"

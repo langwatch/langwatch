@@ -100,7 +100,11 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -108,8 +112,17 @@ jobs:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - uses: ./.github/actions/go-build-cache
+      # Package set = the go.work modules, not a hand-written list, so a new
+      # package or sim is covered the day it lands. Excluded by name:
+      # sdks/go (sdk-go-ci tests it module by module) and
+      # infra/clickhouse-serverless (clickhouse-serverless.yml). Nested modules
+      # outside go.work (services/third_party/*, vendored) are never matched.
+      - name: Select packages from go.work
+        run: |
+          pkgs=$(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."' | tr '\n' ' ')
+          echo "GO_PKGS=$pkgs" >> "$GITHUB_ENV"
       - run: go mod verify
-      - run: go build ./cmd/... ./tools/thuishaven/... ./tools/openapidiff/... ./tools/apidiff/...
+      - run: go build $GO_PKGS
 
   # CI's own invariant: every checkout leaves the marketing media on the
   # server. It regresses silently — a job without the sparse-checkout does not
@@ -133,7 +146,11 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' && needs.changes.outputs.heavy == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -148,6 +165,15 @@ jobs:
       - uses: ./.github/actions/go-build-cache
         with:
           suffix: race
+      # Package set = the go.work modules, not a hand-written list, so a new
+      # package or sim is covered the day it lands. Excluded by name:
+      # sdks/go (sdk-go-ci tests it module by module) and
+      # infra/clickhouse-serverless (clickhouse-serverless.yml). Nested modules
+      # outside go.work (services/third_party/*, vendored) are never matched.
+      - name: Select packages from go.work
+        run: |
+          pkgs=$(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."' | tr '\n' ' ')
+          echo "GO_PKGS=$pkgs" >> "$GITHUB_ENV"
       # The code-block example tests run the committed Python examples through
       # the real runner, so the interpreter they use needs the sandbox packages.
       # `langwatch` comes from this repository rather than from PyPI, because
@@ -156,20 +182,24 @@ jobs:
       - uses: astral-sh/setup-uv@20cfd1bf945f4377ade1205e4dbc17946fc9a30d # v10.0.1
         with:
           enable-cache: true
+          save-cache: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
           cache-dependency-glob: "uv.lock"
       - name: Install the code-block sandbox packages
         run: |
           uv venv "$RUNNER_TEMP/codeblock-venv"
           uv pip install --python "$RUNNER_TEMP/codeblock-venv" requests ./sdks/python
           echo "LANGWATCH_CODEBLOCK_PYTHON=$RUNNER_TEMP/codeblock-venv/bin/python" >> "$GITHUB_ENV"
-      - run: go test -count=1 -race ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/... ./cmd/linkcheck/... ./cmd/openapidiff/...
+      - run: go test -count=1 -race $GO_PKGS
       - run: go test -count=1 -tags dev ./cmd/service/...
+      # Memory ceilings skip under -race (it multiplies memory and time), so
+      # they run here in a plain build.
+      - run: go test -count=1 -run 'TestLargePlanWalkStaysUnder256MB' ./tools/seedgen/
 
   lint:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -180,24 +210,18 @@ jobs:
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
-      # tools/thuishaven is deliberately absent here while it is present in the
-      # build, test and vet jobs. Measured at v2.11.4 it carries 231 pre-existing
-      # findings: misspell 75 (US spelling enforced against prose written in
-      # British English), gosec 72 (of which 41 are file modes on a local dev
-      # tool and 23 are G204 on locally-built argv), gocritic 30, noctx 19,
-      # staticcheck 13, and 22 across eight other linters. Each gosec sub-rule
-      # outside .golangci.yml's excludes was reviewed by hand; none is an
-      # exploitable defect in a single-user local CLI.
-      # Clearing them is a judgement-heavy sweep that belongs in its own change,
-      # not bundled into unrelated work — but building, testing and vetting it
-      # costs nothing and is worth having now. That sweep should also decide
-      # whether adapters/dashboard's gosec G203/G704 hits are false positives
-      # and record it, since this exclusion currently silences them too.
-      #
-      # Also note: a bare `golangci-lint run` cannot replace the explicit
-      # package list — ./... pulls in the non-compiling codegen snippets under
-      # the documentation snippets tree and fails on typecheck.
-      #
+      # tools/thuishaven is excluded from this first step only, by name: at
+      # v2.11.4 it carried 231 pre-existing findings (misspell 75, gosec 72,
+      # gocritic 30, noctx 19, staticcheck 13, 22 others), a judgement-heavy
+      # sweep for its own change. The house-rules step below still covers it
+      # on new and changed lines. Everything else in go.work is selected, not
+      # listed; remove the grep -v when the sweep lands.
+      - name: Select packages from go.work
+        run: |
+          pkgs=$(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."' | tr '\n' ' ')
+          echo "GO_PKGS=$pkgs" >> "$GITHUB_ENV"
+          dirs=$(go list -f '{{.Dir}}' $pkgs | grep -v '/tools/thuishaven' | sed "s#^$PWD/#./#" | tr '\n' ' ')
+          echo "GO_LINT_PKGS=$dirs" >> "$GITHUB_ENV"
       # --disable below drops the three house-rule linters; they are gated on
       # changed lines only in the step after this one.
       # verify: false on both lint steps. `config verify` validates
@@ -217,16 +241,14 @@ jobs:
           verify: false
           args: >-
             --disable=funlen,gocognit,revive
-            ./services/aigateway/... ./services/analyticssim/... ./services/idpsim/... ./services/langyagent/... ./services/llmsim/... ./services/mailsim/... ./services/nlpgo/... ./services/storagesim/... ./services/voicesim/... ./pkg/... ./cmd/...
-            ./tools/migrationorder/... ./tools/herrgen/... ./tools/ciguard/... ./tools/openapidiff/...
-            ./tools/linkcheck/... ./tools/docscheck/...
+            ${{ env.GO_LINT_PKGS }}
 
       # funlen / gocognit / revive encode house rules over a codebase that
       # predates them (331 pre-existing hits), so they are gated on new and
       # changed lines only, much as `pnpm lint:changed` scopes the
       # TypeScript lint to what a change touched.
       #
-      # This step DOES cover ./tools/..., so new thuishaven code is held to
+      # This step DOES cover tools/thuishaven, so new thuishaven code is held to
       # the rules even while its existing baseline stands.
       #
       # --new-from-merge-base needs real history; the checkout above fetches
@@ -241,8 +263,7 @@ jobs:
           args: >-
             --new-from-merge-base=origin/${{ github.base_ref || 'main' }}
             --enable-only=funlen,gocognit,revive
-            ./services/aigateway/... ./services/analyticssim/... ./services/idpsim/... ./services/langyagent/... ./services/llmsim/... ./services/mailsim/... ./services/nlpgo/... ./services/storagesim/... ./services/voicesim/... ./pkg/... ./cmd/...
-            ./tools/...
+            ${{ env.GO_PKGS }}
 
       # The schema validation the two steps above no longer run inline. Last so
       # it uses the binary the action already put on PATH, and advisory so an
@@ -256,7 +277,11 @@ jobs:
     needs: changes
     if: ${{ needs.changes.outputs.go == 'true' }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -274,7 +299,16 @@ jobs:
       # pinning that to what `go vet` runs, so "already covered" is likely but
       # not guaranteed. A cheap job is the wrong thing to bet coverage on.
       - uses: ./.github/actions/go-build-cache
-      - run: go vet ./services/aigateway/... ./services/idpsim/... ./services/langyagent/... ./services/nlpgo/... ./pkg/... ./cmd/... ./tools/migrationorder/... ./tools/thuishaven/... ./tools/herrgen/... ./tools/linkcheck/... ./tools/docscheck/... ./tools/openapidiff/... ./tools/apidiff/...
+      # Package set = the go.work modules, not a hand-written list, so a new
+      # package or sim is covered the day it lands. Excluded by name:
+      # sdks/go (sdk-go-ci tests it module by module) and
+      # infra/clickhouse-serverless (clickhouse-serverless.yml). Nested modules
+      # outside go.work (services/third_party/*, vendored) are never matched.
+      - name: Select packages from go.work
+        run: |
+          pkgs=$(go work edit -json | jq -r '.Use[].DiskPath | select(. != "./sdks/go" and . != "./infra/clickhouse-serverless") | . + "/..."' | tr '\n' ' ')
+          echo "GO_PKGS=$pkgs" >> "$GITHUB_ENV"
+      - run: go vet $GO_PKGS
       - run: go vet -tags dev ./cmd/service/...
 
   # packages/handled-error/src/codes.generated.ts mirrors the services' herr

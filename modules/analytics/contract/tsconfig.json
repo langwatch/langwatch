@@ -19,34 +19,18 @@
     // vocabulary from it — so a `node:*` import or a `Buffer` reference must
     // not compile here. Tests are checked by tsconfig.test.json, which
     // supplies the node types the import-free guard needs to read its subject.
-    "types": ["vitest/globals"]
+    "types": [],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["src/**/__tests__/**"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -5,13 +5,15 @@
     "module": "ESNext",
     "esModuleInterop": true,
     "isolatedModules": true,
-    "noUncheckedIndexedAccess": true
+    "noUncheckedIndexedAccess": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules", "_tests/fixtures"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

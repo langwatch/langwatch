@@ -5,9 +5,13 @@ import { TraceUsageCountRepository } from "../trace-usage-count.repository.ts";
 
 type TotalRow = { total: string | number };
 type HitRow = { hit: number };
+/** How far before a window a counted trace may have started, and been seen first. */
+const FIRST_SEEN_LOOKBACK_MS = 31 * 24 * 60 * 60 * 1_000;
+
+type TraceIdRow = { traceId: string };
 type AttributeCountRow = { value: string; count: string | number };
 
-/** Main's `queryTraceSummariesTotalUniq` for one project: HyperLogLog `uniq`, about 1% error. */
+/** ClickHouse reads of per-project trace counts over `trace_summaries`. */
 export class TraceUsageCountClickHouseRepository extends TraceUsageCountRepository {
   readonly #clickhouse: ClickHouseQueryClient;
 
@@ -20,28 +24,44 @@ export class TraceUsageCountClickHouseRepository extends TraceUsageCountReposito
     return new TraceUsageCountClickHouseRepository(clickhouse);
   }
 
-  async countDistinctTraces(input: {
+  /**
+   * A trace is listed where its earliest summary version was written. The sort key is
+   * (TenantId, TraceId), so `afterTraceId` skips earlier pages by index; `OccurredAt` bounds the
+   * partitions read to traces starting at most {@link FIRST_SEEN_LOOKBACK_MS} before the window.
+   */
+  async findTraceIdsFirstSeen(input: {
     tenantId: string;
-    startDate: string;
-    endDate: string;
-  }): Promise<number> {
-    const result = await this.#clickhouse.query<TotalRow>({
+    fromMs: number;
+    toMs: number;
+    afterTraceId: string;
+    limit: number;
+  }): Promise<string[]> {
+    const result = await this.#clickhouse.query<TraceIdRow>({
       tenantId: input.tenantId,
+      table: "trace_summaries",
       sql: `
-        SELECT uniq(TraceId) as total
+        SELECT TraceId AS traceId
         FROM trace_summaries
         WHERE TenantId = {tenantId:String}
-          AND CreatedAt >= {startDate:DateTime64(3)}
-          AND CreatedAt < {endDate:DateTime64(3)}
+          AND TraceId > {afterTraceId:String}
+          AND OccurredAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
+          AND CreatedAt >= fromUnixTimestamp64Milli({lookbackFrom:Int64})
+          AND CreatedAt < fromUnixTimestamp64Milli({to:Int64})
+        GROUP BY TraceId
+        HAVING min(CreatedAt) >= fromUnixTimestamp64Milli({from:Int64})
+        ORDER BY TraceId
+        LIMIT {limit:UInt32}
       `,
       params: {
         tenantId: input.tenantId,
-        startDate: input.startDate,
-        endDate: input.endDate,
+        afterTraceId: input.afterTraceId,
+        lookbackFrom: input.fromMs - FIRST_SEEN_LOOKBACK_MS,
+        from: input.fromMs,
+        to: input.toMs,
+        limit: input.limit,
       },
     });
-
-    return Number(result.rows[0]?.total ?? 0);
+    return result.rows.map((row) => row.traceId);
   }
 
   /** Main's automation runaway count: exact distinct traces over the trailing 24 hours. */

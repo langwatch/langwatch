@@ -19,12 +19,12 @@ export function mergeContextChips(
 }
 
 /**
- * The page-registered chips that name a resource the route can only give an id
- * for. Both chips share one id and the merge keeps the first, so these go ahead
- * of the route's: the agent reads "dataset: Refund conversations", same ref.
+ * The page-registered chips that say more than the route's id: a dataset's name,
+ * a board's name and period. Both chips share one id and the merge keeps the
+ * first, so these go ahead of the route's.
  */
 export function namedPageChips(pageContext: readonly LangyContextChip[]): LangyContextChip[] {
-  return pageContext.filter((chip) => chip.kind === "dataset");
+  return pageContext.filter((chip) => chip.kind === "dataset" || chip.kind === "dashboard");
 }
 
 /**

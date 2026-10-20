@@ -107,7 +107,7 @@ describe("TraceExportBoundsService", () => {
         httpStatus: 429,
         retryable: true,
         fault: "customer",
-        meta: { retryAfterSeconds: 42 },
+        meta: { retryAfterMs: 42_000 },
       });
       expect(used.get("trace-export:project-1")).toBe(FREE_EXPORTS_PER_MINUTE + 1);
     });

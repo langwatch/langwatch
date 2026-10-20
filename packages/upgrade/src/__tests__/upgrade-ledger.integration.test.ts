@@ -17,7 +17,7 @@ import type { UpgradeClickHouse } from "../ports.ts";
 const DB_URL = process.env.LANGWATCH_TEST_DATABASE_URL;
 const CH_URL = process.env.LANGWATCH_TEST_CLICKHOUSE_URL;
 
-/** The ledger before it was widened (no owner, description or floor), in its own schema. */
+/** The ledger before it was widened (no owner or description), in its own schema. */
 const narrowLedgerDdl = ({ schema }: { schema: string }) =>
   `CREATE SCHEMA "${schema}";
 CREATE TABLE "${schema}"."_langwatch_upgrade_run" ("id" TEXT NOT NULL, "kind" TEXT NOT NULL,
@@ -386,7 +386,7 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
       const tables = await createLedgerTables({ postgres: scratch.postgres });
       const { rows } = await scratch.postgres.query<{ table_name: string; column_name: string }>(
         `SELECT table_name, column_name FROM information_schema.columns
-          WHERE table_schema = $1 AND column_name IN ('owner', 'description', 'floor', 'step_id', 'expires_at', 'process_id')
+          WHERE table_schema = $1 AND column_name IN ('owner', 'description', 'step_id', 'expires_at', 'process_id')
           ORDER BY table_name, column_name`,
         [tables.schema],
       );
@@ -394,7 +394,6 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
         "_langwatch_serving_roster.process_id",
         "_langwatch_upgrade_lease.expires_at",
         "_langwatch_upgrade_lease.owner",
-        "_langwatch_upgrade_run.floor",
         "_langwatch_upgrade_step.description",
         "_langwatch_upgrade_step.owner",
         "_langwatch_upgrade_target.step_id",
@@ -630,20 +629,6 @@ describe.skipIf(!DB_URL || !CH_URL)("the upgrade ledger", () => {
 
       expect(registered).toEqual([
         expect.objectContaining({ status: "done", attempt: 2, description: "New text" }),
-      ]);
-    });
-  });
-
-  describe("when a run starts with a floor", () => {
-    /** @scenario "A run records the floor it applied with" */
-    it("carries the floor on the run it was started with", async () => {
-      const ledger = ledgerOf(scratch);
-      await ledger.createTables();
-
-      await ledger.startRun({ kind: "upgrade", floor: "3.20.1" });
-
-      expect(await ledger.findRuns()).toEqual([
-        expect.objectContaining({ kind: "upgrade", floor: "3.20.1" }),
       ]);
     });
   });

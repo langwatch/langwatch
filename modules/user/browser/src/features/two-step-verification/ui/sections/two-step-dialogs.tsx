@@ -21,50 +21,30 @@ export function TwoStepDialogs({
 }) {
   return (
     <>
-      <Dialog.Root
+      <Dialog
         open={isSettingUp}
-        onOpenChange={({ open }) => {
-          if (!open) onCloseSetup();
-        }}
+        onClose={onCloseSetup}
+        title="Set up two-step verification"
         placement="center"
+        cancelLabel={null}
       >
-        <Dialog.Content bg="bg">
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Set up two-step verification
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body paddingBottom={6}>
-            {isSettingUp ? (
-              <TwoStepSetupFlow
-                holdsPassword={holdsPassword}
-                onFinished={onFinishedSetup}
-                onCancel={onCloseSetup}
-              />
-            ) : null}
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
-      <Dialog.Root
+        {isSettingUp ? (
+          <TwoStepSetupFlow
+            holdsPassword={holdsPassword}
+            onFinished={onFinishedSetup}
+            onCancel={onCloseSetup}
+          />
+        ) : null}
+      </Dialog>
+      <Dialog
         open={regenerated.length > 0}
-        onOpenChange={({ open }) => {
-          if (!open) onCloseCodes();
-        }}
+        onClose={onCloseCodes}
+        title="Your new backup codes"
         placement="center"
+        cancelLabel={null}
       >
-        <Dialog.Content bg="bg">
-          <Dialog.CloseTrigger />
-          <Dialog.Header>
-            <Dialog.Title fontSize="md" fontWeight="500">
-              Your new backup codes
-            </Dialog.Title>
-          </Dialog.Header>
-          <Dialog.Body paddingBottom={6}>
-            <BackupCodesPanel codes={regenerated} onDone={onCloseCodes} />
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+        <BackupCodesPanel codes={regenerated} onDone={onCloseCodes} />
+      </Dialog>
     </>
   );
 }

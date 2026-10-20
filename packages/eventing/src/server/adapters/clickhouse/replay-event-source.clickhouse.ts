@@ -106,6 +106,9 @@ export async function discoverAffectedAggregates({
     // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
     // predicate is present only in the first case.
     SKIP_TENANT_CHECK: true,
+    // The window is on EventTimestamp (recording time), which the EventOccurredAt partition key
+    // does not carry: a late event can have occurred any number of weeks before it was recorded.
+    SKIP_COLD_SCAN_CHECK: true,
   });
 
   return rows;
@@ -138,6 +141,9 @@ export async function discoverTenants({
     // Replay tenant listing: a replay lists the tenants holding a lane's events before it discovers
     // each tenant's aggregates under that tenant.
     SKIP_TENANT_CHECK: true,
+    // The window is on EventTimestamp (recording time), which the EventOccurredAt partition key
+    // does not carry: a late event can have occurred any number of weeks before it was recorded.
+    SKIP_COLD_SCAN_CHECK: true,
   });
   return rows.map((row) => row.tenantId);
 }
@@ -179,6 +185,8 @@ export async function countEventsForAggregates({
     // Replay discovery: a replay is asked for one tenant or for every tenant, and the tenant
     // predicate is present only in the first case.
     SKIP_TENANT_CHECK: true,
+    // Counts every event of the discovered aggregates across all history, as replay applies them.
+    SKIP_COLD_SCAN_CHECK: true,
   });
 
   return parseInt(rows[0]?.totalEvents ?? "0", 10);
@@ -232,6 +240,8 @@ export async function getAggregateOccurredAtBounds({
         AND AggregateId IN ({aggregateIds:Array(String)})
     `,
     params: { tenantId, aggregateTypes, aggregateIds },
+    // This read finds the bounds the batch's later reads prune by, so it must see all history.
+    SKIP_COLD_SCAN_CHECK: true,
   });
 
   const row = rows[0];

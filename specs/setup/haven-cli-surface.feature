@@ -82,6 +82,14 @@ Feature: haven CLI surface
     And in agent mode it prints the report and deletes nothing
     And "haven machine clean --yes" applies only the safe categories, never worktree deletion
 
+  # Bound by cmd/browser_route_test.go; the daemon half is browser-route.test.ts.
+  Scenario: A browser lane can fault matching requests to walk a failure and its retry
+    Given a lane runs "haven browser route add '**/api/trpc/**conversationContext**' --status 503 --times 1 --lane qa-1"
+    When the page makes a request whose URL matches the glob
+    Then that request answers 503 with a JSON error without reaching the stack
+    And the next matching request passes through, so the page's retry can succeed
+    And "haven browser route list --lane qa-1" shows the rule and its hits, and "route off" lifts it
+
   # Bound by cmd/browser_record_test.go; the daemon half is browser-record.test.ts.
   Scenario: A browser lane's actions are recorded as a script and replayed
     Given a lane is recording with "haven browser record start --lane qa-1"

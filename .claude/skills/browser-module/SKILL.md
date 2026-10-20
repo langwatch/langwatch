@@ -42,9 +42,15 @@ Each rule lives in the record; this table only points at it.
 | A screen expects missing data: skeleton in final shape, held data stays, inline Retry         | §3.4   |
 | Four state tiers: React Query, router, the one global UI store (`<module>:<key>`), `useState` | §10.2  |
 | Every read cached (React Query + IndexedDB mirror); no `staleTime` at a call site             | §10    |
-| No polling; visible tabs stay live, hidden tabs make no calls                                 | §10    |
+| No polling, but two bounded exceptions (below); visible tabs stay live, hidden tabs make none | §10    |
 | Deployment facts from `useUiDeployment()` or the module's `*HostApi`, never env               | §6     |
 | Reads take an opaque id plus tenant scope; mutations `setData`, never hand-invalidate         | §10.2  |
+
+**The two polling exceptions** (§10): a refresh interval the user chooses, off by default
+(`modules/analytics/browser/src/behavior/use-dashboard-auto-refresh.ts`), and suite freshness
+polling only while the live stream is down
+(`modules/scenario/browser/src/behavior/suites/use-suite-run-freshness.ts`). Anything else is
+a hint over SSE or a cursor-backed read.
 
 Two habits the table does not show: a sub-flow passes `onClose`, never
 `closeDrawer` (it clears the stack); an in-app link is
@@ -52,27 +58,53 @@ Two habits the table does not show: a sub-flow passes `onClose`, never
 
 ## Worked example: a hook over the derived client
 
+The owner's client is derived from its contract and holds no handwritten procedure map. Clean
+example: `modules/identity/client/src/identity-client.ts` (`createModuleApi<ContractApiMap<...>>()`
+over the contract's declared procedures, never `AppRouter`). A new module puts its derived hooks in
+`modules/<name>/client` (§3.4) and the declaration installs it with
+`.withApi(client, { contracts: [...] })` (`installedModuleApis`, §10.1). Every read is mirrored to
+disk by default (§10.2); there is no per-read cache policy.
+
 ```ts
-// modules/organization/browser/src/behavior/use-department-column.ts
-import { api } from "./organization-api.ts";
-const listQuery = api.departments.list.useQuery({ organizationId }, { enabled });
+const query = identityClient.<router>.<procedure>.useQuery({ organizationId }, { enabled });
 ```
 
-No `invalidate` at the call site: a cursor-backed read goes stale through its key,
-any other through SSE hints (§10, "A write makes reads stale through the key").
+No `invalidate` at the call site: a cursor-backed read goes stale through its key, any other
+through SSE hints (§10, "A write makes reads stale through the key").
 
-`organization-api.ts` is `createModuleApi<…>()` over the contract's declared
-procedures, never `AppRouter`. The declaration names it:
-`.withApi(organizationApi, { contracts: [organizationTrpc, planTrpc] })`, which
-installs the client (`installedModuleApis`, §10.1). There is no per-read cache
-policy: every read is mirrored to disk by default (§10.2). Organization predates
-the `<name>-client` packages; a new module puts its derived hooks in
-`modules/<name>/client` (§3.4).
+**Debt, not a model.** `modules/organization/browser/src/behavior/organization-api.ts` calls the
+same factory but intersects the derived map with a 500-line handwritten one, and
+`use-department-column.ts` hand-invalidates. Do not copy either; when a procedure is missing, add
+it to the owner's contract and client.
 
-A read takes an opaque id plus its tenant scope (`projectId`,
-`organizationId`), never a slug alone. A query never returns a credential; a
-secret comes back only from a mutation. A mutation writes the entity with
-`setData` instead of invalidating by hand.
+A read takes an opaque id plus its tenant scope (`projectId`, `organizationId`), never a slug
+alone. A query never returns a credential; a secret comes back only from a mutation. A mutation
+writes the entity with `setData` instead of invalidating by hand.
+
+## Worked example: a routed drawer
+
+The token (`openDrawer(Token, props)`) opens it; the drawer mounts only while open and passes the
+router's callbacks to the design system's callable `Drawer` (props in the `design-system` skill,
+`references/component-apis.md`):
+
+```tsx
+<Drawer title="Edit score" onClose={onClose} onBack={goBack} size="md" footer={{ primaryAction: { type: "submit", label: "Save" } }} onSubmit={save}>
+```
+
+A sub-flow gets `onClose` from its caller, so closing returns to the caller; only the root drawer
+calls `closeDrawer`. `dev/docs/best_practices/drawers.md` has the routing detail.
+
+## Worked example: state and host services
+
+One global UI store, owned per module and namespaced `<module>:<key>`:
+`defineSlice` from `@langwatch/browser-host/global-store` (`persist` keeps preferences only, never
+server data); another module reads with `readSlice` and cannot write. Example:
+`defineSlice` in `use-dashboard-auto-refresh.ts`.
+
+A host service has two shapes. A module's own `*HostApi` mount is implemented by the shell and
+refused at install if unmounted. A **service the owner provides** is declared with
+`defineBrowserModule(name).provides(Service, { load })` and read with `useHostService`; example:
+`modules/feature-flag/browser/src/feature-flag.web.ts` and `packages/browser-host/src/feature-flag.ts`.
 
 ## Traps
 
@@ -90,8 +122,10 @@ secret comes back only from a mutation. A mutation writes the entity with
   which keeps its name and is off §15's deleted list (§10.1, Alex 2026-10-05).
 - **Host services are not "capabilities".** §3.5 reserves that word for the
   four layers; §16 renames the browser-host list to host services.
-- **A banner, toast or fatal error built by hand.** Use the design system and
-  the code-keyed error presentation (§12), never `error.message`.
+- **Any component built by hand.** A banner or alert, dialog, drawer, empty
+  state, menu, picker or table comes from `@langwatch/design-system`; a missing
+  need is added there first. Errors use the code-keyed presentation (§12),
+  never `error.message`.
 
 ## References
 

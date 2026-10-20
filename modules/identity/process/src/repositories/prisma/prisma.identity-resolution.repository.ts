@@ -5,8 +5,10 @@ import {
 import { createLogger } from "@langwatch/observability";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import { IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME } from "../../rules/identity-migration-names.rules.ts";
+import { isOnIdentifierPath } from "../../rules/identity-sign-in-switch.rules.ts";
 import type { IdentityResolution, IdentityResolver } from "../../rules/identity-storage.rules.ts";
 
 const logger = createLogger("langwatch:identity:resolution");
@@ -17,14 +19,17 @@ const RESOLVABLE_STATES = ["VERIFIED", "PRIMARY"] as const;
 interface ResolutionRow {
   identifierId: string;
   userId: string;
-  status: string | null;
   providerId: string | null;
+  ownOnIdentifiers: boolean | null;
+  ownSwitchedAt: Date | null;
+  legacyStatus: string | null;
+  legacyOccurredAt: Date | null;
 }
 
 /**
- * The reads that carry no `userId` (ADR-116 §2): an identifier and the user's migration-state
- * row in ONE query, so a sign-in never inherits the write gate's TTL cache. Raw SQL because
- * `SystemMigrationTenantState` carries no foreign key. `finalized` alone opens the identity branch.
+ * The reads that carry no `userId` (ADR-116 §2): an identifier and the user's sign-in switch in
+ * ONE query, so a sign-in never inherits the write gate's TTL cache. The switch is identity's row
+ * beside the state row older images still write, the newer answering. Raw SQL: no foreign keys.
  */
 export class PrismaIdentityResolutionRepository implements IdentityResolver {
   static create(database: PrismaClient): PrismaIdentityResolutionRepository {
@@ -41,7 +46,7 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
     const row = await this.resolve(
       Prisma.sql`i."value" = ${normalizedValue} AND i."state" IN (${Prisma.join([...RESOLVABLE_STATES])})`,
     );
-    return { userId: row.userId, finalized: row.status === "finalized" };
+    return { userId: row.userId, finalized: isOnIdentifierPath(signInSwitchRows(row)) };
   }
 
   /** Keyed on better-auth's verbatim `providerId`, the pair `Account` is unique by. */
@@ -55,7 +60,7 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
     const row = await this.resolve(
       Prisma.sql`i."providerId" = ${providerId} AND i."providerAccountId" = ${providerAccountId} AND i."state" IN (${Prisma.join([...LIVE_IDENTIFIER_STATES])})`,
     );
-    return { userId: row.userId, finalized: row.status === "finalized" };
+    return { userId: row.userId, finalized: isOnIdentifierPath(signInSwitchRows(row)) };
   }
 
   /** A provider that asserts its OWN issuer; hands back the row's `providerId`, never a guess. */
@@ -74,7 +79,7 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
     }
     return {
       userId: row.userId,
-      finalized: row.status === "finalized",
+      finalized: isOnIdentifierPath(signInSwitchRows(row)),
       providerId: row.providerId,
     };
   }
@@ -83,13 +88,15 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
   private async resolve(match: Prisma.Sql): Promise<ResolutionRow> {
     const rows = await this.database.$queryRaw<ResolutionRow[]>`
       ${skipTenantCheck({
-        // Sign-in resolves an identifier by its own value before any tenant is known; the join
-        // reads only that user's backfill state row.
+        // Sign-in resolves an identifier by its own value before any tenant is known; the joins
+        // read only that user's switch and backfill state rows.
         SKIP_TENANT_CHECK: true,
       })}
-      SELECT i."id" AS "identifierId", i."userId" AS "userId",
-             i."providerId" AS "providerId", s."status" AS "status"
+      SELECT i."id" AS "identifierId", i."userId" AS "userId", i."providerId" AS "providerId",
+             w."onIdentifiers" AS "ownOnIdentifiers", w."switchedAt" AS "ownSwitchedAt",
+             s."status" AS "legacyStatus", s."occurredAt" AS "legacyOccurredAt"
       FROM "Identifier" i
+      LEFT JOIN "IdentitySignInSwitch" w ON w."userId" = i."userId"
       LEFT JOIN "SystemMigrationTenantState" s
         ON s."tenantId" = i."userId"
        AND s."migrationName" = ${IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME}
@@ -108,7 +115,7 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
   /** `Identifier.lastUsedAt`, fire-and-forget: a timestamp is never worth failing a sign-in. */
   private touchLastUsed(identifierId: string): void {
     void this.database.identifier
-      .update({ where: { id: identifierId }, data: { lastUsedAt: new Date() } })
+      .update({ where: { id: identifierId }, data: { lastUsedAt: toDate(nowInstant()) } })
       .catch((error: unknown) => {
         logger.warn(
           { identifierId, error },
@@ -116,4 +123,18 @@ export class PrismaIdentityResolutionRepository implements IdentityResolver {
         );
       });
   }
+}
+
+/** Both sides of one user's switch, as the decision reads them. */
+function signInSwitchRows(row: ResolutionRow): Parameters<typeof isOnIdentifierPath>[0] {
+  return {
+    own:
+      row.ownOnIdentifiers != null && row.ownSwitchedAt
+        ? { onIdentifiers: row.ownOnIdentifiers, switchedAt: fromDate(row.ownSwitchedAt) }
+        : null,
+    legacy:
+      row.legacyStatus != null && row.legacyOccurredAt
+        ? { status: row.legacyStatus, occurredAt: fromDate(row.legacyOccurredAt) }
+        : null,
+  };
 }

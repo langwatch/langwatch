@@ -22,6 +22,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
   type OrganizationCurrency,
+  ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient, type Team } from "@langwatch/prisma-client/generated";
@@ -35,6 +36,7 @@ import {
   type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
+  type OrganizationPresenceSettingRow,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -76,13 +78,34 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     const rows = await this.database.organization.findMany({
       select: { id: true },
       orderBy: { id: "asc" },
-      ...(after === undefined ? {} : { where: { id: { gt: after } } }),
+      where: {
+        kind: { not: ORGANIZATION_KIND.SYSTEM },
+        ...(after === undefined ? {} : { id: { gt: after } }),
+      },
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
     const ids = rows.map((row) => row.id);
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findPresenceSettingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationPresenceSettingRow[]> {
+    return this.database.organization.findMany({
+      select: { id: true, presenceEnabled: true },
+      orderBy: { id: "asc" },
+      where: {
+        kind: { not: ORGANIZATION_KIND.SYSTEM },
+        ...(afterId === null ? {} : { id: { gt: afterId } }),
+      },
+      take: limit,
+    });
   }
 
   async countUsage({
@@ -267,6 +290,27 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
              "updatedAt" = now()
        WHERE "id" = ${input.organizationId}
          AND "instantEvalsEnabledAt" IS NULL
+    `;
+  }
+
+  async recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void> {
+    // Each label is kept as first seen; a row with both already set is left untouched.
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "Organization"
+         SET "privateClickHouseLabel" = COALESCE("privateClickHouseLabel", ${input.clickhouseLabel}),
+             "privateS3Label" = COALESCE("privateS3Label", ${input.s3Label}),
+             "privateDataplaneSeenAt" = COALESCE("privateDataplaneSeenAt", now())
+       WHERE "id" = ${input.organizationId}
+         AND (("privateClickHouseLabel" IS NULL AND ${input.clickhouseLabel}::text IS NOT NULL)
+           OR ("privateS3Label" IS NULL AND ${input.s3Label}::text IS NOT NULL))
     `;
   }
 

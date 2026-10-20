@@ -17,8 +17,7 @@ const (
 	// ClassNone is a worktree that is only ever removed by hand.
 	ClassNone WorktreeClass = ""
 	// ClassTemporary is scratch a tool made and forgot: a detached checkout in one
-	// of the tools' own directories, a visual-diff or apidiff drive, or a worktree
-	// on an agent-minted branch. Regenerable by definition — the tool that wants
+	// of the tools' own directories, or a worktree on an agent-minted branch. Regenerable by definition — the tool that wants
 	// one makes another.
 	ClassTemporary WorktreeClass = "temporary"
 	// ClassMerged is a worktree whose branch is already contained in origin/main.
@@ -27,47 +26,43 @@ const (
 )
 
 // TemporaryWorktreeIdle is how long a temporary worktree must sit untouched
-// before it is reclaimed. A day is long enough that a diff drive or an agent lane
+// before it is reclaimed. A day is long enough that an agent lane
 // still running this morning is never taken out from under it, and short enough
 // that a machine does not carry a week of scratch.
 const TemporaryWorktreeIdle = 24 * time.Hour
+
+// StaleWorktreeAge is how long a worktree with no stack may go without a commit
+// before the hub marks it stale. Shown only: nothing reclaims on this clock.
+const StaleWorktreeAge = 14 * 24 * time.Hour
 
 // agentBranchPrefixes name the branches a spawned agent or a worktree driver
 // creates for itself. Matching on the branch (not the path) catches the ones that
 // live in an ordinary directory.
 var agentBranchPrefixes = []string{"worktree-agent-", "agent/"}
 
-// scratchDirPrefixes are the basenames the diff drives mint — one directory per
-// comparison, never returned to. They are matched wherever they are, because the
-// drives put them in three different places on one machine (a `worktrees`
-// sibling, /tmp, a job's own scratch) and the names are unmistakable.
-var scratchDirPrefixes = []string{"visual-", "apidiff-"}
-
 // scratchParents are the directories a tool owns wholesale: everything a worktree
 // of theirs contains is theirs. Each entry is matched as consecutive path
 // segments, so `.claude/worktrees` does not match a directory merely called
 // "worktrees".
 var scratchParents = [][]string{
-	{".apidiff"},
 	{".claude", "worktrees"},
 	{".claude", "jobs"},
 }
 
-// IsScratchWorktreePath reports whether dir is one of the locations a diff tool
-// or an agent creates worktrees in: under `.apidiff/`, `.claude/worktrees/` or
-// `.claude/jobs/`, or a directory the drives named `visual-*` / `apidiff-*`. It
+// IsScratchWorktreePath reports whether dir is one of the locations an agent
+// creates worktrees in: under `.claude/worktrees/` or `.claude/jobs/`. It
 // matches on path segments rather than a prefix of the repo root, so a worktree
 // created beside the repository, or in the system temp directory, is classified
 // the same as one created inside it.
 func IsScratchWorktreePath(dir string) bool {
 	segs := strings.Split(strings.Trim(filepath.ToSlash(filepath.Clean(dir)), "/"), "/")
-	return hasScratchParent(segs) || hasScratchBasename(segs)
+	return hasScratchParent(segs)
 }
 
 // hasScratchParent matches the directories a tool owns wholesale: anything under
-// `.apidiff/`, `.claude/worktrees/` or `.claude/jobs/` — the last because a
-// visual-diff drive checks its two worktrees out inside the job's own scratch,
-// where reclaiming the job would otherwise leave git's admin entry dangling.
+// `.claude/worktrees/` or `.claude/jobs/` — the last because a job may check
+// worktrees out inside its own scratch, where reclaiming the job would otherwise
+// leave git's admin entry dangling.
 func hasScratchParent(segs []string) bool {
 	for i := range segs {
 		for _, parent := range scratchParents {
@@ -90,20 +85,6 @@ func segmentsMatchAt(segs []string, i int, want []string) bool {
 		}
 	}
 	return true
-}
-
-// hasScratchBasename matches one drive's own directory by the name the drive
-// gave it, wherever it put it.
-func hasScratchBasename(segs []string) bool {
-	if len(segs) == 0 {
-		return false
-	}
-	for _, p := range scratchDirPrefixes {
-		if strings.HasPrefix(segs[len(segs)-1], p) {
-			return true
-		}
-	}
-	return false
 }
 
 // IsAgentBranch reports whether a branch name is one an agent or worktree driver

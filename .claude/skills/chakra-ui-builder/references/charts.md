@@ -13,7 +13,9 @@ pnpm add @chakra-ui/charts recharts
 yarn add @chakra-ui/charts recharts
 ```
 
-Imports come from `@chakra-ui/charts`, not `@chakra-ui/react`:
+Inside `packages/design-system`, imports come from `@chakra-ui/charts`, not `@chakra-ui/react`.
+Modules and apps take charts from `@langwatch/design-system/charts` (it re-exports this package)
+and `/time-series-chart`, with semantic chart tokens (`chart.N`), never raw colours:
 
 ```ts
 import { BarList, BarSegment, Chart, useChart } from "@chakra-ui/charts";
@@ -285,7 +287,7 @@ return (
 ### Pie / donut chart
 
 ```tsx
-import { Pie, PieChart, Tooltip } from "recharts";
+import { Cell, Label, Pie, PieChart, Tooltip } from "recharts";
 
 const chart = useChart({
   data: [

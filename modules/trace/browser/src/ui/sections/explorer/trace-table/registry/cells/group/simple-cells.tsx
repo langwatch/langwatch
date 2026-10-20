@@ -62,7 +62,7 @@ export const ErrorsCell: CellDef<TraceGroup> = {
     return (
       <HStack gap={2} justifyContent="flex-end">
         <StatusDot status="error" size="8px" />
-        <Text textStyle="sm" color="red.fg" fontWeight="500">
+        <Text textStyle="sm" color="red.fg" fontWeight="medium">
           {row.errorCount}
         </Text>
       </HStack>

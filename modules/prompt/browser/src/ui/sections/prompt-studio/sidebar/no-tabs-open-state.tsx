@@ -1,5 +1,6 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Center, EmptyState, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Center, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { LuFileText } from "react-icons/lu";
 
 import { AddPromptButton } from "./add-prompt-button.tsx";
@@ -16,17 +17,18 @@ export function NoTabsOpenState() {
         <AddPromptButton />
       </PageLayout.Header>
       <Center width="full" height="full" bg="bg.panel">
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <LuFileText />
-            </EmptyState.Indicator>
-            <EmptyState.Title>No prompts open</EmptyState.Title>
-            <EmptyState.Description>
-              Create a new prompt or select an existing prompt to get started.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          icon={<LuFileText />}
+          title="No prompts open"
+          description="Create a new prompt or select an existing prompt to get started."
+          next={[
+            {
+              kind: "docs",
+              label: "Read about prompt management",
+              href: "https://docs.langwatch.ai/prompt-management/overview",
+            },
+          ]}
+        />
       </Center>
     </VStack>
   );

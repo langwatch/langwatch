@@ -39,7 +39,7 @@ func realKeeperOrch(home string) (*app.Orchestrator, *fileregistry.Store) {
 	store := fileregistry.New(home)
 	return app.New(app.Deps{
 		Cfg: app.Config{
-			PortlessDisabled: true, HeartbeatEvery: time.Hour,
+			Home: home, PortlessDisabled: true, HeartbeatEvery: time.Hour,
 			KeepArgv:   []string{os.Args[0], "-test.run=^TestKeeperHelperProcess$"},
 			DaemonArgv: []string{os.Args[0], "-test.run=^TestDaemonHelperProcess$"},
 		},

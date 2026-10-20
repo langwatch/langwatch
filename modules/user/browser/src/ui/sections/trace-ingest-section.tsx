@@ -145,7 +145,7 @@ export function TraceIngestSection() {
   return (
     <VStack align="stretch" gap={3} width="full">
       <VStack align="start" gap={0}>
-        <Heading as="h3" size="md">
+        <Heading as="h3" size="sm">
           Trace Ingest
         </Heading>
         <Text color="fg.muted" fontSize="sm">

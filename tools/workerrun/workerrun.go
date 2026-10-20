@@ -53,7 +53,7 @@ func Main(ctx context.Context, args []string, env Env) int {
 	options := Options{Root: env.Root}
 	flags := flag.NewFlagSet("workerrun", flag.ContinueOnError)
 	flags.SetOutput(errOut)
-	flags.StringVar(&options.Stack, "stack", "", "haven stack slug (default: diffsuite's branch stack, else visualdiff-check)")
+	flags.StringVar(&options.Stack, "stack", "", "haven stack slug (default: the shared check stack, check)")
 	flags.StringVar(&options.URL, "url", "", "app origin instead of a haven stack: no log scan, monitor family attempted blind")
 	flags.StringVar(&options.RunDir, "run-dir", "", "where summary.json goes (default .claude/tmp/workerrun/<time>)")
 	flags.StringVar(&options.Families, "families", strings.Join(familyNames, ","), "families to load")
@@ -182,7 +182,7 @@ func (run *run) resolveStack(ctx context.Context) error {
 	if run.options.Stack != "" {
 		stack, err = diffkit.ReadSharedStack(ctx, run.options.Stack)
 	} else {
-		stack, err = diffkit.BranchStack(ctx)
+		stack, err = diffkit.DefaultStack(ctx)
 	}
 	if err != nil {
 		return err

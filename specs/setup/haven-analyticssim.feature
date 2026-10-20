@@ -4,13 +4,13 @@ Feature: analyticssim, a local stand-in for PostHog and Customer.io
   server, posthog-js in the page) and nurturing's identifies and events to
   Customer.io. analyticssim accepts those calls, normalises each into one record
   (provider, kind, distinct id, name, properties, received time, raw call) and
-  keeps them in memory, so a developer, apidiff and visualdiff can read what was
+  keeps them in memory, so a developer or a test can read what was
   sent. It checks no key: it is a dev shim.
 
-  # Bound by Go tests in services/analyticssim/analyticssim_test.go and
+  # Bound by Go tests in services/sims/analyticssim/analyticssim_test.go and
   # tools/thuishaven/domain/overlay_analytics_test.go and
   # tools/thuishaven/cmd/sim_analytics_test.go, by their `// @scenario`
-  # annotations, and by apps/analyticssim-web/src/__tests__/records-console.integration.test.tsx.
+  # annotations, and by apps/sims/src/analytics/__tests__/records-console.integration.test.tsx.
 
   Scenario: PostHog calls from either client become records
     Given analyticssim is running

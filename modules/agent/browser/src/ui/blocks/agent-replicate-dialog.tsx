@@ -1,11 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Button,
-  createListCollection,
-  Field,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { createListCollection, Field, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { useState } from "react";
 
@@ -31,6 +25,7 @@ export function AgentReplicateDialog({
   onCopy,
 }: AgentReplicateDialogProps) {
   const [selectedProjectId, setSelectedProjectId] = useState<string[]>([]);
+  const [attempted, setAttempted] = useState(false);
 
   const projectCollection = createListCollection({ items: [...projects] });
 
@@ -47,66 +42,59 @@ export function AgentReplicateDialog({
   );
   const hasPermission = currentProject?.hasCreatePermission ?? false;
 
+  const copy = () => {
+    if (isLoading) return;
+    if (selectedProjectId.length === 0 || !hasPermission) return setAttempted(true);
+    void handleCopy();
+  };
+  const missing = attempted && (selectedProjectId.length === 0 || !hasPermission);
+
   return (
-    <Dialog.Root open={open} onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Replicate Agent</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body paddingBottom={6}>
-          <VStack gap={4} align="start">
-            <Text fontSize="sm" color="fg.muted">
-              {`"${agentName}" will be copied into the project you choose.`}
-            </Text>
-            <Field.Root>
-              <Field.Label>Target Project</Field.Label>
-              <Select.Root
-                collection={projectCollection}
-                value={selectedProjectId}
-                onValueChange={(event) => {
-                  const selected = projects.find((project) => project.value === event.value[0]);
-                  if (selected?.hasCreatePermission) setSelectedProjectId(event.value);
-                }}
-              >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select project" />
-                </Select.Trigger>
-                <Select.Content paddingY={2}>
-                  {projectCollection.items.map((project) => (
-                    <Select.Item
-                      key={project.value}
-                      item={project}
-                      opacity={project.hasCreatePermission ? 1 : 0.5}
-                      cursor={project.hasCreatePermission ? "pointer" : "not-allowed"}
-                    >
-                      {project.label}
-                      {!project.hasCreatePermission && (
-                        <Text display="inline-block" fontSize="sm" color="fg.subtle" marginLeft={2}>
-                          (no permission)
-                        </Text>
-                      )}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={() => void handleCopy()}
-            loading={isLoading}
-            disabled={selectedProjectId.length === 0 || !hasPermission}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Replicate Agent"
+      busy={isLoading}
+      primaryAction={{ label: "Replicate", onClick: copy, loading: isLoading }}
+    >
+      <VStack gap={4} align="start">
+        <Text fontSize="sm" color="fg.muted">
+          {`"${agentName}" will be copied into the project you choose.`}
+        </Text>
+        <Field.Root invalid={missing}>
+          <Field.Label>Target Project</Field.Label>
+          <Select.Root
+            collection={projectCollection}
+            value={selectedProjectId}
+            onValueChange={(event) => {
+              const selected = projects.find((project) => project.value === event.value[0]);
+              if (selected?.hasCreatePermission) setSelectedProjectId(event.value);
+            }}
           >
-            Replicate
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            <Select.Trigger>
+              <Select.ValueText placeholder="Select project" />
+            </Select.Trigger>
+            <Select.Content paddingY={2}>
+              {projectCollection.items.map((project) => (
+                <Select.Item
+                  key={project.value}
+                  item={project}
+                  opacity={project.hasCreatePermission ? 1 : 0.5}
+                  cursor={project.hasCreatePermission ? "pointer" : "not-allowed"}
+                >
+                  {project.label}
+                  {!project.hasCreatePermission && (
+                    <Text display="inline-block" fontSize="sm" color="fg.subtle" marginLeft={2}>
+                      (no permission)
+                    </Text>
+                  )}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          <Field.ErrorText>Choose a project you can create agents in.</Field.ErrorText>
+        </Field.Root>
+      </VStack>
+    </Dialog>
   );
 }

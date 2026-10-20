@@ -1,15 +1,10 @@
 import type { ScopedSecrets } from "@langwatch/secrets";
 
-import { clickhouseRoutesOf } from "./clickhouse-routes.ts";
+import { clickhouseRouteFamilyOf } from "./clickhouse-routes.ts";
 import { storesOwner, type StoresConfig } from "./config-owner.ts";
-import type {
-  ClickHousePrivateRoute,
-  ObjectStorageAzureConfig,
-  ObjectStorageConfig,
-  ProcessConfig,
-} from "./config.ts";
+import type { ObjectStorageAzureConfig, ObjectStorageConfig, ProcessConfig } from "./config.ts";
 import { buildProcessStores, type ProcessStores } from "./create-members.ts";
-import { objectStoragePrivateAccountsOf } from "./object-storage-private-accounts.ts";
+import { objectStoragePrivateFamilyOf } from "./object-storage-private-accounts.ts";
 import type { PipelineParticipation } from "./pipeline-selection.ts";
 
 /** The documented single-replica root, when a filesystem deployment names none. */
@@ -74,14 +69,18 @@ function objectStorageConfig(options: {
   const azure = azureConfigOf({ settings: settings.azure, values, production });
   const file = { backend: "file", root: settings.localRoot ?? DEFAULT_LOCAL_STORAGE_ROOT } as const;
   // An organisation with its own S3 account is placed there whatever the shared backend is.
-  const privateAccounts = objectStoragePrivateAccountsOf({
+  const { accounts, malformed } = objectStoragePrivateFamilyOf({
     family: values.dataplaneS3,
     ...(settings.s3.region ? { region: settings.s3.region } : {}),
   });
+  const privateAccounts = {
+    privateAccounts: accounts,
+    ...(malformed.length > 0 ? { malformedPrivateAccounts: malformed } : {}),
+  };
   switch (backend) {
     case "s3":
       // The legacy S3 selector with no bucket keeps its documented local-filesystem fallback.
-      if (!bucket) return { ...file, privateAccounts, legacyAzure: azure };
+      if (!bucket) return { ...file, ...privateAccounts, legacyAzure: azure };
       return {
         backend,
         s3: {
@@ -90,14 +89,41 @@ function objectStorageConfig(options: {
           ...(settings.s3.region ? { region: settings.s3.region } : {}),
           ...s3Credentials(values),
         },
-        privateAccounts,
+        ...privateAccounts,
         legacyAzure: azure,
       };
     case "azure":
-      return { backend, azure, privateAccounts };
+      return { backend, azure, ...privateAccounts };
     case "file":
-      return { ...file, privateAccounts, legacyAzure: azure };
+      return { ...file, ...privateAccounts, legacyAzure: azure };
   }
+}
+
+/** A deployment whose every tenant is private names no shared URL, and still has ClickHouse. */
+function clickhouseConfigOf({
+  config,
+  url,
+  clickhouseRoutes,
+}: {
+  config: StoresConfig;
+  url: string | undefined;
+  clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
+}) {
+  return url || clickhouseRoutes.routes.length > 0
+    ? {
+        clickhouse: {
+          ...(url ? { url: url } : {}),
+          ...(clickhouseRoutes.routes.length > 0 ? { privateRoutes: clickhouseRoutes.routes } : {}),
+          ...(clickhouseRoutes.malformed.length > 0
+            ? { malformedRoutes: clickhouseRoutes.malformed }
+            : {}),
+          poolSizing: config.clickhousePool,
+          ...(config.clickhouseStatementLaneReserveShare === undefined
+            ? {}
+            : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
+        },
+      }
+    : {};
 }
 
 function processConfigOf(options: {
@@ -108,8 +134,9 @@ function processConfigOf(options: {
     database: string | undefined;
     clickhouse: string | undefined;
     redis: string | undefined;
+    redisClusterEndpoints: string | undefined;
   }>;
-  clickhouseRoutes: readonly ClickHousePrivateRoute[];
+  clickhouseRoutes: ReturnType<typeof clickhouseRouteFamilyOf>;
   encryption: string | undefined;
   previousEncryption: string | undefined;
   storage: StorageSecrets;
@@ -118,20 +145,7 @@ function processConfigOf(options: {
   const { name, config, pipelines, urls, clickhouseRoutes, encryption, storage, production } =
     options;
   const previousEncryptionKey = options.previousEncryption;
-  // A deployment whose every tenant is private names no shared URL, and still has ClickHouse.
-  const clickhouse =
-    urls.clickhouse || clickhouseRoutes.length > 0
-      ? {
-          clickhouse: {
-            ...(urls.clickhouse ? { url: urls.clickhouse } : {}),
-            ...(clickhouseRoutes.length > 0 ? { privateRoutes: clickhouseRoutes } : {}),
-            poolSizing: config.clickhousePool,
-            ...(config.clickhouseStatementLaneReserveShare === undefined
-              ? {}
-              : { statementLaneReserveShare: config.clickhouseStatementLaneReserveShare }),
-          },
-        }
-      : {};
+  const clickhouse = clickhouseConfigOf({ config, url: urls.clickhouse, clickhouseRoutes });
   return {
     processName: name,
     encryptionKey: encryption ?? "",
@@ -140,10 +154,11 @@ function processConfigOf(options: {
     rateLimit: config.rateLimit,
     ...(urls.database ? { database: { url: urls.database } } : {}),
     ...clickhouse,
-    ...(urls.redis
+    ...(urls.redis || urls.redisClusterEndpoints
       ? {
           redis: {
-            url: urls.redis,
+            ...(urls.redis ? { url: urls.redis } : {}),
+            ...(urls.redisClusterEndpoints ? { clusterEndpoints: urls.redisClusterEndpoints } : {}),
             ...(config.redis.dbIndex === undefined ? {} : { dbIndex: config.redis.dbIndex }),
           },
         }
@@ -151,6 +166,9 @@ function processConfigOf(options: {
     eventing: pipelines.configure({
       defaultRetentionDays: config.defaultRetentionDays,
       queueDrainTimeoutMs: config.shutdownDrainTimeoutMs,
+      queueConcurrency: config.queueConcurrency,
+      queueTenantCap: config.queueTenantCap,
+      queueGlobalBudget: config.queueGlobalBudget,
     }),
     objectStorage: objectStorageConfig({
       settings: config.objectStorage,
@@ -173,23 +191,25 @@ export function openStores(options: {
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
         secrets.into(storesOwner.secrets.redis, (redis) =>
-          secrets.into(storesOwner.secrets.encryption, (credentials) =>
-            secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
-              secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
-                withStorageSecrets(secrets, (storage) =>
-                  buildProcessStores({
-                    config: processConfigOf({
-                      name,
-                      config,
-                      pipelines,
-                      urls: { database, clickhouse, redis },
-                      clickhouseRoutes: clickhouseRoutesOf(routes),
-                      encryption: credentials ?? session,
-                      previousEncryption: previous,
-                      storage,
-                      production,
+          secrets.into(storesOwner.secrets.redisClusterEndpoints, (redisClusterEndpoints) =>
+            secrets.into(storesOwner.secrets.encryption, (credentials) =>
+              secrets.into(storesOwner.secrets.encryptionFallback, (session) =>
+                secrets.into(storesOwner.secrets.encryptionPrevious, (previous) =>
+                  withStorageSecrets(secrets, (storage) =>
+                    buildProcessStores({
+                      config: processConfigOf({
+                        name,
+                        config,
+                        pipelines,
+                        urls: { database, clickhouse, redis, redisClusterEndpoints },
+                        clickhouseRoutes: clickhouseRouteFamilyOf(routes),
+                        encryption: credentials ?? session,
+                        previousEncryption: previous,
+                        storage,
+                        production,
+                      }),
                     }),
-                  }),
+                  ),
                 ),
               ),
             ),

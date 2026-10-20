@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": false,
+    "outDir": "./dist",
+    "tsBuildInfoFile": "dist/tsconfig.js.tsbuildinfo",
+    // tsc is the whole build: .ts specifiers are rewritten to .js in dist.
+    "rewriteRelativeImportExtensions": true,
+    "declaration": false,
+    "sourceMap": false,
+    "composite": false
+  },
+  "include": ["src/**/*.ts", "package.json"],
+  "exclude": ["src/**/*.test.ts"]
+}

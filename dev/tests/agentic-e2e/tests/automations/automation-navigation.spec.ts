@@ -30,7 +30,8 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   // The retired path renders the merged table in place rather than
   // redirecting, so the URL must survive too.
   await expect(page).toHaveURL(`${basePath}/alerts`);
-  await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
+  // The rail names the section; the content heading names the sub-page, Rules.
+  await expect(page.locator("h1", { hasText: "Rules" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New automation" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("alerts.png") });
 
@@ -42,9 +43,12 @@ test("automation overview keeps activity and setup guidance", async ({ page }, t
   await expect(page.getByRole("button", { name: "New report" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("schedules.png") });
 
-  await page.getByRole("link", { name: "Automations", exact: true }).last().click();
+  await page
+    .getByRole("navigation", { name: "Automations navigation" })
+    .getByRole("link", { name: "Rules", exact: true })
+    .click();
   await expect(page).toHaveURL(`${basePath}/automations`);
-  await expect(page.locator("h1", { hasText: "Automations" })).toBeVisible();
+  await expect(page.locator("h1", { hasText: "Rules" })).toBeVisible();
   await expect(page.getByRole("button", { name: "New automation" })).toHaveCount(1);
   await page.screenshot({ path: testInfo.outputPath("activity.png") });
 });

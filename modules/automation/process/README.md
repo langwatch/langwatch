@@ -6,7 +6,7 @@ The server half of [automation](../README.md). Automations: triggers and their f
 
 ## Installation
 
-`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:23`.
+`defineProcessModule("automation").withRepositories(automationRepositories).withChannels(automationChannels).withApi(AutomationModule).withTransports(…, automationTrpcTransport, emailSuppressionTrpcTransport, slackAutomationRest, unsubscribeRest).provideMiddlewareContext(…).withTasks(…).withMigrations(…).withEventing(automationsEventing)`, `src/automation.module.ts:24`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Callable automation capability shared by transports and process peers.
 
-Peers call these through the token, declared at `../contract/src/automation.api.ts:72`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/automation.api.ts:78`; nothing else in this package is public.
 
 #### `getAllForProject`
 
@@ -420,6 +420,14 @@ The operator-facing suppression list, audited because it reads addresses.
 listSuppressions(input: { projectId: string; actorId: string }): Promise<EmailSuppressionRow[]>;
 ```
 
+#### `listSuppressionsPage`
+
+One audited page of the same list, newest first; `nextCursor` is null on the last page.
+
+```typescript
+listSuppressionsPage(input: EmailSuppressionPageInput & { actorId: string }): Promise<EmailSuppressionPage>;
+```
+
 #### `removeSuppression`
 
 ```typescript
@@ -483,7 +491,7 @@ Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:144`.
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
 ```typescript
-// Params: automationRestIdParamsSchema, ../contract/src/automation-rest.schemas.ts:261
+// Params: automationRestIdParamsSchema, ../contract/src/automation-rest.schemas.ts:307
 interface Params {
   triggerId: string;
 }
@@ -498,8 +506,8 @@ Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:162`.
 Answers at `/api/triggers/:triggerId/fires`, `/api/v1/triggers/:triggerId/fires`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/fires`, `/api/v1/triggers/2026-08-07/:triggerId/fires`, `/api/triggers/latest/:triggerId/fires`, `/api/v1/triggers/latest/:triggerId/fires`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-// Query: automationRestFiresQuerySchema, ../contract/src/automation-rest.schemas.ts:392
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
+// Query: automationRestFiresQuerySchema, ../contract/src/automation-rest.schemas.ts:463
 interface Query {
   limit?: number;
   cursor?: string;
@@ -515,34 +523,34 @@ Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:187`
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
 ```typescript
-type Body = z.infer<typeof automationRestCreateInputSchema>; // ../contract/src/automation-rest.schemas.ts:289
-type Response = z.infer<typeof automationRestResponseSchema>; // ../contract/src/automation-rest.schemas.ts:221
+type Body = z.infer<typeof automationRestCreateInputSchema>; // ../contract/src/automation-rest.schemas.ts:366
+type Response = z.infer<typeof automationRestResponseSchema>; // ../contract/src/automation-rest.schemas.ts:299
 ```
 
 #### `PATCH /:triggerId` · `patchApiTriggersById`
 
 Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:211`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:212`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-type Body = z.infer<typeof automationRestUpdateInputSchema>; // ../contract/src/automation-rest.schemas.ts:318
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
+type Body = z.infer<typeof automationRestUpdateInputSchema>; // ../contract/src/automation-rest.schemas.ts:413
 ```
 
 #### `POST /:triggerId/enable` · `postApiTriggersByIdEnable`
 
 Resume a paused automation. A report goes back on its schedule; the pause record is cleared.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:241`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:243`.
 
 Answers at `/api/triggers/:triggerId/enable`, `/api/v1/triggers/:triggerId/enable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/enable`, `/api/v1/triggers/2026-08-07/:triggerId/enable`, `/api/triggers/latest/:triggerId/enable`, `/api/v1/triggers/latest/:triggerId/enable`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-// Body: automationRestNoBodySchema, ../contract/src/automation-rest.schemas.ts:430
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
+// Body: automationRestNoBodySchema, ../contract/src/automation-rest.schemas.ts:511
 type Body = Record<string, unknown>;
 ```
 
@@ -550,38 +558,38 @@ type Body = Record<string, unknown>;
 
 Pause an automation. A report stops claiming its schedule.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:265`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:268`.
 
 Answers at `/api/triggers/:triggerId/disable`, `/api/v1/triggers/:triggerId/disable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/disable`, `/api/v1/triggers/2026-08-07/:triggerId/disable`, `/api/triggers/latest/:triggerId/disable`, `/api/v1/triggers/latest/:triggerId/disable`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/automation-rest.schemas.ts:430
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
+type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/automation-rest.schemas.ts:511
 ```
 
 #### `POST /:triggerId/test-fire` · `postApiTriggersByIdTestFire`
 
 Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:290`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:294`.
 
 Answers at `/api/triggers/:triggerId/test-fire`, `/api/v1/triggers/:triggerId/test-fire`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/test-fire`, `/api/v1/triggers/2026-08-07/:triggerId/test-fire`, `/api/triggers/latest/:triggerId/test-fire`, `/api/v1/triggers/latest/:triggerId/test-fire`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
-type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/automation-rest.schemas.ts:430
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
+type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/automation-rest.schemas.ts:511
 ```
 
 #### `DELETE /:triggerId` · `deleteApiTriggersById`
 
 Delete (soft-delete) a trigger
 
-Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:313`.
+Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:318`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
 ```typescript
-type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:261
+type Params = z.infer<typeof automationRestIdParamsSchema>; // ../contract/src/automation-rest.schemas.ts:307
 ```
 
 ### `slackAutomationRest`
@@ -602,7 +610,7 @@ Permission `triggers:manage`. Declared at `src/transport/slack-trigger.rest.ts:2
 Answers at `/api/trigger/slack`, `/api/v1/trigger/slack`.
 
 ```typescript
-// Body: slackAutomationRestInputSchema, ../contract/src/automation-rest.schemas.ts:433
+// Body: slackAutomationRestInputSchema, ../contract/src/automation-rest.schemas.ts:559
 interface Body {
   slack_webhook?: string;
   slack_connection_id?: string;
@@ -615,7 +623,7 @@ interface Body {
   >;
   alert_type: "CRITICAL" | "WARNING" | "INFO";
 }
-// Response: slackAutomationRestCreatedSchema, ../contract/src/automation-rest.schemas.ts:476
+// Response: slackAutomationRestCreatedSchema, ../contract/src/automation-rest.schemas.ts:567
 interface Response {
   message: string;
 }
@@ -643,7 +651,7 @@ Answers at `/api/unsubscribe`, `/api/v1/unsubscribe`.
 interface Query {
   token?: string;
 }
-// Response: unsubscribeRestAcknowledgedSchema, ../contract/src/automation-rest.schemas.ts:479
+// Response: unsubscribeRestAcknowledgedSchema, ../contract/src/automation-rest.schemas.ts:575
 interface Response {
   ok: boolean;
 }
@@ -680,37 +688,37 @@ Contract `../contract/src/automation.trpc.ts:43`, router `src/transport/automati
 
 ```typescript
 // automation.create
-type Input = z.infer<typeof automationApiCreateInputSchema>; // ../contract/src/automation.trpc-schemas.ts:92
-type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+type Input = z.infer<typeof automationApiCreateInputSchema>; // ../contract/src/automation.trpc-schemas.ts:152
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:87
 
 // automation.deleteById
-// Input: automationApiTriggerScopeSchema, ../contract/src/automation.trpc-schemas.ts:26
+// Input: automationApiTriggerScopeSchema, ../contract/src/automation.trpc-schemas.ts:40
 interface Input {
   projectId: string;
   triggerId: string;
 }
-// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:46
+// Output: automationDeletedSchema, ../contract/src/automation.responses.ts:66
 interface Output {
   success: boolean;
 }
 
 // automation.getTriggers
-// Input: automationApiProjectScopeSchema, ../contract/src/automation.trpc-schemas.ts:22
+// Input: automationApiProjectScopeSchema, ../contract/src/automation.trpc-schemas.ts:28
 interface Input {
   projectId: string;
 }
 // Output: automationListRowSchema.array() (inline, ../contract/src/automation.trpc.ts:54)
 
 // automation.getDailyCap
-type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:36
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:28
+// Output: automationDailyCapSchema, ../contract/src/automation.responses.ts:49
 interface Output {
   cap: number;
 }
 
 // automation.getDailyCapStatus
-type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
-// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:39
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:28
+// Output: automationDailyCapStatusSchema, ../contract/src/automation.responses.ts:60
 interface Output {
   cap: number;
   counts: Record<
@@ -723,7 +731,7 @@ interface Output {
 }
 
 // automation.getTriggerStats
-type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:28
 // Output: inline, ../contract/src/automation.trpc.ts:71
 type Output = {
   triggerId: string;
@@ -733,7 +741,7 @@ type Output = {
 }[];
 
 // automation.getRecentFires
-// Input: automationApiRecentFiresInputSchema, ../contract/src/automation.trpc-schemas.ts:124
+// Input: automationApiRecentFiresInputSchema, ../contract/src/automation.trpc-schemas.ts:164
 interface Input {
   projectId: string;
   triggerId: string;
@@ -749,7 +757,7 @@ type Output = {
 }[];
 
 // automation.getWebhookDeliveries
-// Input: automationApiWebhookDeliveriesInputSchema, ../contract/src/automation.trpc-schemas.ts:131
+// Input: automationApiWebhookDeliveriesInputSchema, ../contract/src/automation.trpc-schemas.ts:176
 interface Input {
   projectId: string;
   triggerId: string;
@@ -758,7 +766,7 @@ interface Input {
 // Output: webhookDeliveryRowSchema.array() (inline, ../contract/src/automation.trpc.ts:80)
 
 // automation.getFireHistory
-// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:312
+// Input: automationApiFireHistoryTrpcInputSchema, ../contract/src/automation.trpc-schemas.ts:412
 interface Input {
   projectId: string;
   triggerId: string;
@@ -768,10 +776,10 @@ interface Input {
     id: string;
   } | null;
 }
-type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:296
+type Output = z.infer<typeof triggerFirePageSchema>; // ../contract/src/automation.trpc-schemas.ts:384
 
 // automation.getLatestEvaluation
-type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:40
 // Output: inline, ../contract/src/automation.trpc.ts:90
 type Output = {
   triggerId: string;
@@ -786,11 +794,11 @@ type Output = {
 } | null;
 
 // automation.getNextFiring
-type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
-type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:338
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:40
+type Output = z.infer<typeof nextFiringSchema>; // ../contract/src/automation.trpc-schemas.ts:455
 
 // automation.getRecentActivity
-// Input: automationApiRecentActivityInputSchema, ../contract/src/automation.trpc-schemas.ts:140
+// Input: automationApiRecentActivityInputSchema, ../contract/src/automation.trpc-schemas.ts:189
 interface Input {
   projectId: string;
   limit?: number;
@@ -805,7 +813,7 @@ type Output = {
 }[];
 
 // automation.getReportSchedules
-type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:22
+type Input = z.infer<typeof automationApiProjectScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:28
 // Output: inline, ../contract/src/automation.trpc.ts:107
 type Output = {
   triggerId: string;
@@ -815,25 +823,25 @@ type Output = {
 }[];
 
 // automation.toggleTrigger
-// Input: automationApiToggleTriggerInputSchema, ../contract/src/automation.trpc-schemas.ts:148
+// Input: automationApiToggleTriggerInputSchema, ../contract/src/automation.trpc-schemas.ts:203
 interface Input {
   triggerId: string;
   active: boolean;
   projectId: string;
 }
-type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:87
 
 // automation.getTriggerById
-type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:26
+type Input = z.infer<typeof automationApiTriggerScopeSchema>; // ../contract/src/automation.trpc-schemas.ts:40
 // Output: triggerSchema.nullable() (inline, ../contract/src/automation.trpc.ts:115)
 
 // automation.listSlackChannels
-// Input: automationApiListSlackChannelsInputSchema, ../contract/src/automation.trpc-schemas.ts:156
+// Input: automationApiListSlackChannelsInputSchema, ../contract/src/automation.trpc-schemas.ts:215
 interface Input {
   projectId: string;
   slackIntegrationId: string;
 }
-// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:63
+// Output: slackChannelListingSchema, ../contract/src/automation.responses.ts:95
 interface Output {
   channels: {
     id: string;
@@ -845,7 +853,7 @@ interface Output {
 }
 
 // automation.updateTriggerFilters
-// Input: automationApiUpdateTriggerFiltersInputSchema, ../contract/src/automation.trpc-schemas.ts:164
+// Input: automationApiUpdateTriggerFiltersInputSchema, ../contract/src/automation.trpc-schemas.ts:229
 interface Input {
   triggerId: string;
   projectId: string;
@@ -854,11 +862,11 @@ interface Input {
     string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
   >;
 }
-type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:87
 
 // automation.testFireTemplate
-type Input = z.infer<typeof automationApiTestFireInputSchema>; // ../contract/src/automation.trpc-schemas.ts:173
-// Output: testFireResultSchema, ../contract/src/test-fire.ts:62
+type Input = z.infer<typeof automationApiTestFireInputSchema>; // ../contract/src/automation.trpc-schemas.ts:308
+// Output: testFireResultSchema, ../contract/src/test-fire.ts:72
 interface Output {
   channel: "email" | "slack" | "webhook";
   recipientCount: number;
@@ -869,8 +877,8 @@ interface Output {
 }
 
 // automation.previewTriggerEmail
-type Input = z.infer<typeof automationApiPreviewEmailInputSchema>; // ../contract/src/automation.trpc-schemas.ts:246
-// Output: automationEmailPreviewSchema, ../contract/src/automation.trpc-schemas.ts:255
+type Input = z.infer<typeof automationApiPreviewEmailInputSchema>; // ../contract/src/automation.trpc-schemas.ts:323
+// Output: automationEmailPreviewSchema, ../contract/src/automation.trpc-schemas.ts:337
 interface Output {
   subject: string;
   html: string;
@@ -880,28 +888,29 @@ interface Output {
 }
 
 // automation.upsert
-type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:264
-type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:55
+type Input = z.infer<typeof automationApiUpsertInputSchema>; // ../contract/src/automation.trpc-schemas.ts:369
+type Output = z.infer<typeof triggerSchema>; // ../contract/src/trigger.ts:87
 ```
 
 ### `emailSuppression`
 
-Contract `../contract/src/email-suppression.trpc.ts:30`, router `src/transport/email-suppression.trpc.ts:22`.
+Contract `../contract/src/email-suppression.trpc.ts:32`, router `src/transport/email-suppression.trpc.ts:22`.
 
-| Procedure                                  | Kind     | Gate                                                                                                                                                                            | Input                           | Output                               |
-| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- | ------------------------------------ |
-| `emailSuppression.resolveUnsubscribeToken` | query    | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `resolveUnsubscribeInputSchema` | `unsubscribeViewSchema`              |
-| `emailSuppression.confirmUnsubscribe`      | mutation | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `confirmUnsubscribeInputSchema` | `emailSuppressionAcknowledgedSchema` |
-| `emailSuppression.getAll`                  | query    | Permission `triggers:view`                                                                                                                                                      | `suppressionProjectScopeSchema` | inline                               |
-| `emailSuppression.remove`                  | mutation | Permission `triggers:manage`                                                                                                                                                    | `removeSuppressionInputSchema`  | `emailSuppressionAcknowledgedSchema` |
+| Procedure                                  | Kind     | Gate                                                                                                                                                                            | Input                             | Output                               |
+| ------------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------------ |
+| `emailSuppression.resolveUnsubscribeToken` | query    | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `resolveUnsubscribeInputSchema`   | `unsubscribeViewSchema`              |
+| `emailSuppression.confirmUnsubscribe`      | mutation | Public: the unsubscribe link arrives in a mail client where no session exists; the single-purpose token in it, whose HMAC binds it to one recipient, is the whole authorization | `confirmUnsubscribeInputSchema`   | `emailSuppressionAcknowledgedSchema` |
+| `emailSuppression.getAll`                  | query    | Permission `triggers:view`                                                                                                                                                      | `suppressionProjectScopeSchema`   | inline                               |
+| `emailSuppression.getPage`                 | query    | Permission `triggers:view`                                                                                                                                                      | `emailSuppressionPageInputSchema` | `emailSuppressionPageSchema`         |
+| `emailSuppression.remove`                  | mutation | Permission `triggers:manage`                                                                                                                                                    | `removeSuppressionInputSchema`    | `emailSuppressionAcknowledgedSchema` |
 
 ```typescript
 // emailSuppression.resolveUnsubscribeToken
-// Input: resolveUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:16
+// Input: resolveUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:18
 interface Input {
   token: string;
 }
-// Output: unsubscribeViewSchema, ../contract/src/automation.ts:38
+// Output: unsubscribeViewSchema, ../contract/src/automation.ts:49
 interface Output {
   projectName: string;
   triggerName: string | null;
@@ -909,22 +918,22 @@ interface Output {
 }
 
 // emailSuppression.confirmUnsubscribe
-// Input: confirmUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:19
+// Input: confirmUnsubscribeInputSchema, ../contract/src/email-suppression.trpc.ts:21
 interface Input {
   token: string;
   scope: "trigger" | "project";
 }
-// Output: emailSuppressionAcknowledgedSchema, ../contract/src/automation.ts:56
+// Output: emailSuppressionAcknowledgedSchema, ../contract/src/automation.ts:114
 interface Output {
   ok: boolean;
 }
 
 // emailSuppression.getAll
-// Input: suppressionProjectScopeSchema, ../contract/src/email-suppression.trpc.ts:25
+// Input: suppressionProjectScopeSchema, ../contract/src/email-suppression.trpc.ts:27
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/email-suppression.trpc.ts:41
+// Output: inline, ../contract/src/email-suppression.trpc.ts:43
 type Output = {
   id: string;
   email: string;
@@ -934,13 +943,25 @@ type Output = {
   triggerName: string | null;
 }[];
 
+// emailSuppression.getPage
+// Input: emailSuppressionPageInputSchema, ../contract/src/automation.ts:93
+interface Input {
+  projectId: string;
+  limit?: number;
+  cursor?: {
+    createdAt: unknown;
+    id: string;
+  } | null;
+}
+type Output = z.infer<typeof emailSuppressionPageSchema>; // ../contract/src/automation.ts:105
+
 // emailSuppression.remove
-// Input: removeSuppressionInputSchema, ../contract/src/email-suppression.trpc.ts:28
+// Input: removeSuppressionInputSchema, ../contract/src/email-suppression.trpc.ts:30
 interface Input {
   projectId: string;
   id: string;
 }
-type Output = z.infer<typeof emailSuppressionAcknowledgedSchema>; // ../contract/src/automation.ts:56
+type Output = z.infer<typeof emailSuppressionAcknowledgedSchema>; // ../contract/src/automation.ts:114
 ```
 
 ## Sockets
@@ -962,19 +983,19 @@ Declared at `src/eventing/automation.pipeline.ts:181`. Events: `triggerMatchReco
 | command         | `requestReportRun`                 | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:198` |
 | command         | `settleReportRun`                  | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:199` |
 | process manager | `triggerSettlement`                | intents `logOverflow`, `persistMatch`, `notifyDigest`, `persistMatch`, `notifyDigest`, `logOverflow`, `notifyDigest`, `persistMatch` (outbox) | `src/eventing/automation.pipeline.ts:200` |
-| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:298` |
-| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:314` |
-| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:331` |
-| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:342` |
-| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:359` |
-| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:375` |
-| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:392` |
-| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:410` |
-| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:420` |
-| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:430` |
-| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:440` |
-| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:450` |
-| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:451` |
+| process manager | `reportSchedule`                   | intents `dispatchReport` (outbox)                                                                                                             | `src/eventing/automation.pipeline.ts:301` |
+| process manager | `automationAudit`                  | every 1 d (`AUTOMATION_AUDIT_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneAudit`, `recordAudit` (outbox)                          | `src/eventing/automation.pipeline.ts:317` |
+| process manager | `graphAlertSweep`                  | every 30 s (`GRAPH_ALERT_SWEEP_INTERVAL_MS`); intents `evaluateGraph`                                                                         | `src/eventing/automation.pipeline.ts:334` |
+| peer subscriber | `traceSpanTriggerMatch`            | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:345` |
+| peer subscriber | `traceOriginTriggerMatch`          | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:362` |
+| peer subscriber | `evaluationCompletedTriggerMatch`  | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:378` |
+| peer subscriber | `evaluationReportedTriggerMatch`   | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:395` |
+| peer subscriber | `traceSpanGraphActivity`           | `lw.obs.trace.span_received` from [trace](../../trace/README.md)                                                                              | `src/eventing/automation.pipeline.ts:413` |
+| peer subscriber | `traceOriginGraphActivity`         | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)                                                                            | `src/eventing/automation.pipeline.ts:423` |
+| peer subscriber | `evaluationCompletedGraphActivity` | `lw.evaluation.completed` from [evaluation](../../evaluation/README.md)                                                                       | `src/eventing/automation.pipeline.ts:433` |
+| peer subscriber | `evaluationReportedGraphActivity`  | `lw.evaluation.reported` from [evaluation](../../evaluation/README.md)                                                                        | `src/eventing/automation.pipeline.ts:443` |
+| lane aliases    | `≈ MAIN_TRIGGER_LANE_ALIASES`      | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:453` |
+| retention       | `≈ deps.tenantRetention`           | –                                                                                                                                             | `src/eventing/automation.pipeline.ts:454` |
 
 ### Tasks
 
@@ -988,14 +1009,15 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                        | Environment variable                   | Declared at                               |
 | ------ | --------------------------- | -------------------------------------- | ----------------------------------------- |
-| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:408`           |
-| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:17` |
-| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:18` |
-| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:19` |
-| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:20` |
-| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:21` |
-| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:26` |
-| config | `slackApiBase`              | `SLACK_API_BASE`                       | `../contract/src/automation.config.ts:28` |
-| config | `slackWebhookBase`          | `SLACK_WEBHOOK_BASE`                   | `../contract/src/automation.config.ts:29` |
+| secret | `unsubscribe`               | `NEXTAUTH_SECRET`                      | `src/app/automation.app.ts:433`           |
+| config | `emailHourlyCap`            | `TRIGGER_EMAIL_HOURLY_CAP`             | `../contract/src/automation.config.ts:18` |
+| config | `tenantDailyCap`            | `TRIGGER_EMAIL_TENANT_DAILY_CAP`       | `../contract/src/automation.config.ts:19` |
+| config | `persistDailyCapFree`       | `TRIGGER_PERSIST_DAILY_CAP_FREE`       | `../contract/src/automation.config.ts:20` |
+| config | `persistDailyCapPaid`       | `TRIGGER_PERSIST_DAILY_CAP_PAID`       | `../contract/src/automation.config.ts:21` |
+| config | `persistDailyCapEnterprise` | `TRIGGER_PERSIST_DAILY_CAP_ENTERPRISE` | `../contract/src/automation.config.ts:22` |
+| config | `publicBaseUrl`             | `BASE_HOST`                            | `../contract/src/automation.config.ts:27` |
+| config | `slackApiBase`              | `SLACK_API_BASE`                       | `../contract/src/automation.config.ts:29` |
+| config | `slackWebhookBase`          | `SLACK_WEBHOOK_BASE`                   | `../contract/src/automation.config.ts:30` |
+| config | `allowInsecureLocalUrls`    | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`     | `../contract/src/automation.config.ts:32` |
 
 <!-- readme:generated:end -->

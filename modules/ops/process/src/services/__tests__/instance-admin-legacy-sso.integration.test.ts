@@ -10,6 +10,7 @@ import type { AutomationApi } from "@langwatch/automation-contract";
 import { InMemoryProcessStore } from "@langwatch/eventing";
 import { explainHandledError } from "@langwatch/handled-error/presentation";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import type { InsightApi } from "@langwatch/insight-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -60,6 +61,7 @@ function buildInstanceAdmin(connectionDecides = true) {
     scheduler: {
       schedules: createApiFixture<AutomationApi>(),
       projects: createApiFixture<ProjectApi>(),
+      insights: createApiFixture<InsightApi>(),
     },
     explorers: {
       eventExplorer: createApiFixture<OpsEventExplorer>(),

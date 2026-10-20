@@ -261,6 +261,13 @@ Feature: Token Created modal command snippets
   # ─────────────────────────────────────────────────────────────────────
 
   @integration
+  Scenario: The secret panel's footer shows only Done
+    Given a key has just been minted and the dialog is open
+    Then the footer shows Done and no Cancel or second Close button
+    And the X and Escape still close it
+    And Copy API key has the focus when it opens
+
+  @integration
   Scenario: Copy this token now — the reveal is one-time
     Given a key has just been minted and the dialog is open
     When I close the dialog
@@ -287,3 +294,43 @@ Feature: Token Created modal command snippets
     When the MCP config is built
     Then it names that endpoint
     And a cloud deployment leaves the endpoint out, because the SDK defaults to it
+
+  @integration
+  Scenario: The named key can be copied on its own
+    Given a key named "Deploy pipeline" has just been minted
+    Then the dialog names the key and shows its value masked
+    When I click "Copy API key" without revealing it
+    Then the clipboard receives exactly the real token
+
+  @integration
+  Scenario: A refused copy never claims success
+    Given the clipboard refuses the write
+    When I click "Copy API key" or copy any snippet
+    Then no Copied state shows, the key stays on screen
+    And the dialog says to reveal the value and copy it by hand, without printing the token
+
+  @integration
+  Scenario: The setup tabs are real tabs
+    When I move between code formats or assistants with the arrow keys
+    Then the selected tab, its focus and its panel follow
+
+  @integration
+  Scenario: One reachable project is shown and used
+    Given the key can reach exactly one project, which is not the current project
+    Then the dialog names that project and every snippet uses it
+
+  @integration
+  Scenario: Zero reachable projects say so and keep the key copyable
+    Given the key can reach no project
+    Then .env, Bearer and Basic Auth state the limitation instead of a placeholder
+    And Copy API key still works
+
+  @integration
+  Scenario: Several reachable projects offer a real choice
+    Given the key can reach several projects
+    Then the picker lists only those projects, ignores an unreachable current project, and switches every snippet
+
+  @integration
+  Scenario: Reopening starts from the new key alone
+    Given a second key is minted after the first dialog closed
+    Then no earlier token, selection, reveal or copy tick is shown

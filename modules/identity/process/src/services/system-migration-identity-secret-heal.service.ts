@@ -28,6 +28,8 @@ export class IdentitySecretHealMigrationService implements SystemMigration {
   readonly runsAutomaticallyOnSelfHosted = true;
   // Enrols every user as that backfill does; only the drifted ones are visited.
   readonly enrolledAutomatically = true;
+  // Every repaired user stays `migrated` (see migrateTenant), so Ops never reads them as held.
+  readonly migratedIsSteady = true;
   /** Only users whose legacy secrets could have drifted (Q64): a pass over the whole
    *  user table costs a claim and two state writes per user, twice before serving. */
   readonly candidateTenants: TenantSource;

@@ -188,12 +188,12 @@ describe.skipIf(!DB_URL)(
             by,
           }),
         ).resolves.toEqual({ kind: "aggregate", aggregateRule });
-        await expect(
-          repository.findReadableProjectIds({
-            organizationId: ids.organization,
-            projectIds: aggregateRule.projectIds,
-          }),
-        ).resolves.toEqual([ids.shared, ids.personal].toSorted());
+        // Postgres orders ids by the database's collation, which need not match code-unit order.
+        const readable = await repository.findReadableProjectIds({
+          organizationId: ids.organization,
+          projectIds: aggregateRule.projectIds,
+        });
+        expect(readable.toSorted()).toEqual([ids.shared, ids.personal].toSorted());
       });
 
       it.each([

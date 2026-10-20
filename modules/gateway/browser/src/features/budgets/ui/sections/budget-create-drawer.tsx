@@ -7,7 +7,6 @@ import {
   HStack,
   Input,
   NativeSelect,
-  Spacer,
   Text,
   Textarea,
   VStack,
@@ -541,196 +540,186 @@ export function BudgetCreateDrawer({ open, onOpenChange, onCreated }: BudgetCrea
   };
 
   return (
-    <Drawer.Root open={open} onOpenChange={() => close()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>New budget</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>
-                Name
-                <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Typical patterns: 'org monthly cap', 'acme-eng daily', 'prod-vk-burst'."
-                  docHref="/ai-gateway/budgets#creating-a-budget"
-                />
-              </Field.Label>
-              <Input
-                data-testid="gateway-budget-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Engineering monthly $1k cap"
-              />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Optional. Who owns this? What's the policy?"
-              />
-            </Field.Root>
-
-            <BudgetScopeField
-              scopeKind={scopeKind}
-              organizationName={organization?.name}
-              targetId={targetId}
-              targetOptions={targetOptions ?? []}
-              targetsLoading={targetsLoading}
-              groupsFailed={groupsQuery.isError}
-              onPickKind={pickKind}
-              onPickTarget={pickTarget}
+    <Drawer
+      open={open}
+      onClose={close}
+      title="New budget"
+      size="md"
+      busy={createMutation.isPending}
+      footer={{
+        cancel: { label: "Cancel", onClick: close },
+        primaryAction: {
+          label: "Create budget",
+          loading: createMutation.isPending,
+          onClick: () => void submit(),
+          "data-testid": "gateway-budget-create-submit",
+        },
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required>
+          <Field.Label>
+            Name
+            <FieldInfoTooltip
+              description="Human-readable identifier shown in the list and audit log. Typical patterns: 'org monthly cap', 'acme-eng daily', 'prod-vk-burst'."
+              docHref="/ai-gateway/budgets#creating-a-budget"
             />
+          </Field.Label>
+          <Input
+            data-testid="gateway-budget-name"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder="e.g. Engineering monthly $1k cap"
+          />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            placeholder="Optional. Who owns this? What's the policy?"
+          />
+        </Field.Root>
 
-            <Field.Root>
-              <Field.Label>
-                Provider
-                <FieldInfoTooltip
-                  description="Count and constrain spend on one provider only, e.g. 'OpenAI $200/month for this team'. With a provider set, only requests dispatched to that provider debit this budget, and on breach only that provider is withheld; others keep serving."
-                  docHref="/ai-gateway/budgets#provider-filter"
-                  testId="budget-provider-info"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={providerKey}
-                  aria-label="Provider filter"
-                  data-testid="budget-provider"
-                  onChange={(e) => setProviderKey(e.target.value)}
-                >
-                  <option value="">All providers</option>
-                  {providerOptions.map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name} only
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-            </Field.Root>
+        <BudgetScopeField
+          scopeKind={scopeKind}
+          organizationName={organization?.name}
+          targetId={targetId}
+          targetOptions={targetOptions ?? []}
+          targetsLoading={targetsLoading}
+          groupsFailed={groupsQuery.isError}
+          onPickKind={pickKind}
+          onPickTarget={pickTarget}
+        />
 
-            {submitError && (
-              <Field.Root invalid>
-                <Field.ErrorText data-testid="budget-submit-error">{submitError}</Field.ErrorText>
-                {scopeUnreachable && (
-                  <Button
-                    type="button"
-                    size="xs"
-                    variant="outline"
-                    alignSelf="flex-start"
-                    mt={2}
-                    loading={createMutation.isPending}
-                    onClick={() => void submit({ allowUnreachable: true })}
-                    data-testid="budget-create-anyway"
-                  >
-                    Create it anyway
-                  </Button>
-                )}
-              </Field.Root>
-            )}
-            <HStack gap={4} align="flex-start">
-              <Field.Root required flex={1}>
-                <Field.Label>
-                  Window
-                  <FieldInfoTooltip
-                    description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule, calendar aligned in UTC unless you set a cycle start below. 'total' never resets, which suits burn-down budgets on a fixed-fund project. 'manual' accrues until someone resets it."
-                    docHref="/ai-gateway/budgets#windows"
-                  />
-                </Field.Label>
-                <NativeSelect.Root size="sm">
-                  <NativeSelect.Field
-                    data-testid="gateway-budget-window"
-                    value={window}
-                    onChange={(e) => setWindow((e.target.value as Window) ?? "MONTH")}
-                  >
-                    <option value="MINUTE">Per minute</option>
-                    <option value="HOUR">Per hour</option>
-                    <option value="DAY">Per day</option>
-                    <option value="WEEK">Per week</option>
-                    <option value="MONTH">Per calendar month</option>
-                    <option value="TOTAL">Total (no reset)</option>
-                    <option value="MANUAL">Manual (reset on request)</option>
-                  </NativeSelect.Field>
-                </NativeSelect.Root>
-              </Field.Root>
-              <Field.Root required flex={1}>
-                <Field.Label>
-                  Limit (USD)
-                  <FieldInfoTooltip
-                    description="Spend ceiling per window in USD, tracked against the cost each provider reports for the request. Responses carry a warning from 80% of the cap, and past it the on-breach action applies."
-                    docHref="/ai-gateway/budgets#creating-a-budget"
-                  />
-                </Field.Label>
-                <Input
-                  data-testid="gateway-budget-limit"
-                  value={limitUsd}
-                  onChange={(e) => setLimitUsd(e.target.value)}
-                  placeholder="1000.00"
-                  inputMode="decimal"
-                />
-              </Field.Root>
-            </HStack>
-            <Text fontSize="xs" color="fg.muted" data-testid="budget-counts-from-creation">
-              {BUDGET_COUNTS_FROM_CREATION}
-            </Text>
-            {isScheduledWindow && (
-              <Field.Root>
-                <Field.Label>
-                  Start cycle on
-                  <FieldInfoTooltip
-                    description="Optional. Leave empty and the window is calendar aligned, so a monthly budget rolls on the 1st. Set it and the window rolls from this moment instead, which is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly cycle anchored past the 28th clamps into shorter months and springs back, so the 31st gives Feb 28 and then Mar 31. This cannot be changed later."
-                    docHref="/ai-gateway/budgets#windows"
-                    testId="budget-cycle-anchor-info"
-                  />
-                </Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={cycleAnchorAt}
-                  onChange={(e) => setCycleAnchorAt(e.target.value)}
-                  data-testid="budget-cycle-anchor"
-                />
-              </Field.Root>
-            )}
-            <Field.Root required>
-              <Field.Label>
-                On breach
-                <FieldInfoTooltip
-                  description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
-                  docHref="/ai-gateway/budgets#on_breach"
-                />
-              </Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-budget-on-breach"
-                  value={onBreach}
-                  onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
-                >
-                  <option value="BLOCK">Block: reject requests at limit</option>
-                  <option value="WARN">Warn: tag responses, keep serving</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-            </Field.Root>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={close} disabled={createMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              data-testid="gateway-budget-create-submit"
-              onClick={() => void submit()}
-              loading={createMutation.isPending}
-              disabled={!name || !limitUsd}
+        <Field.Root>
+          <Field.Label>
+            Provider
+            <FieldInfoTooltip
+              description="Count and constrain spend on one provider only, e.g. 'OpenAI $200/month for this team'. With a provider set, only requests dispatched to that provider debit this budget, and on breach only that provider is withheld; others keep serving."
+              docHref="/ai-gateway/budgets#provider-filter"
+              testId="budget-provider-info"
+            />
+          </Field.Label>
+          <NativeSelect.Root size="sm">
+            <NativeSelect.Field
+              value={providerKey}
+              aria-label="Provider filter"
+              data-testid="budget-provider"
+              onChange={(e) => setProviderKey(e.target.value)}
             >
-              Create budget
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+              <option value="">All providers</option>
+              {providerOptions.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.name} only
+                </option>
+              ))}
+            </NativeSelect.Field>
+          </NativeSelect.Root>
+        </Field.Root>
+
+        {submitError && (
+          <Field.Root invalid>
+            <Field.ErrorText data-testid="budget-submit-error">{submitError}</Field.ErrorText>
+            {scopeUnreachable && (
+              <Button
+                type="button"
+                size="xs"
+                variant="outline"
+                alignSelf="flex-start"
+                mt={2}
+                loading={createMutation.isPending}
+                onClick={() => void submit({ allowUnreachable: true })}
+                data-testid="budget-create-anyway"
+              >
+                Create it anyway
+              </Button>
+            )}
+          </Field.Root>
+        )}
+        <HStack gap={4} align="flex-start">
+          <Field.Root required flex={1}>
+            <Field.Label>
+              Window
+              <FieldInfoTooltip
+                description="Time window the limit applies to. Minute / hour / day / week / month reset on a rolling schedule, calendar aligned in UTC unless you set a cycle start below. 'total' never resets, which suits burn-down budgets on a fixed-fund project. 'manual' accrues until someone resets it."
+                docHref="/ai-gateway/budgets#windows"
+              />
+            </Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                data-testid="gateway-budget-window"
+                value={window}
+                onChange={(e) => setWindow((e.target.value as Window) ?? "MONTH")}
+              >
+                <option value="MINUTE">Per minute</option>
+                <option value="HOUR">Per hour</option>
+                <option value="DAY">Per day</option>
+                <option value="WEEK">Per week</option>
+                <option value="MONTH">Per calendar month</option>
+                <option value="TOTAL">Total (no reset)</option>
+                <option value="MANUAL">Manual (reset on request)</option>
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+          </Field.Root>
+          <Field.Root required flex={1}>
+            <Field.Label>
+              Limit (USD)
+              <FieldInfoTooltip
+                description="Spend ceiling per window in USD, tracked against the cost each provider reports for the request. Responses carry a warning from 80% of the cap, and past it the on-breach action applies."
+                docHref="/ai-gateway/budgets#creating-a-budget"
+              />
+            </Field.Label>
+            <Input
+              data-testid="gateway-budget-limit"
+              value={limitUsd}
+              onChange={(e) => setLimitUsd(e.target.value)}
+              placeholder="1000.00"
+              inputMode="decimal"
+            />
+          </Field.Root>
+        </HStack>
+        <Text fontSize="xs" color="fg.muted" data-testid="budget-counts-from-creation">
+          {BUDGET_COUNTS_FROM_CREATION}
+        </Text>
+        {isScheduledWindow && (
+          <Field.Root>
+            <Field.Label>
+              Start cycle on
+              <FieldInfoTooltip
+                description="Optional. Leave empty and the window is calendar aligned, so a monthly budget rolls on the 1st. Set it and the window rolls from this moment instead, which is how you line a budget up with a billing date: anchored on the 17th at 09:00, every period starts on the 17th at 09:00. A monthly cycle anchored past the 28th clamps into shorter months and springs back, so the 31st gives Feb 28 and then Mar 31. This cannot be changed later."
+                docHref="/ai-gateway/budgets#windows"
+                testId="budget-cycle-anchor-info"
+              />
+            </Field.Label>
+            <Input
+              type="datetime-local"
+              value={cycleAnchorAt}
+              onChange={(e) => setCycleAnchorAt(e.target.value)}
+              data-testid="budget-cycle-anchor"
+            />
+          </Field.Root>
+        )}
+        <Field.Root required>
+          <Field.Label>
+            On breach
+            <FieldInfoTooltip
+              description="BLOCK: reject new requests with 402 budget_exceeded. WARN: trace annotation only, no user-facing error, which suits soft budgets where ops monitors spend without enforcing a hard cap."
+              docHref="/ai-gateway/budgets#on_breach"
+            />
+          </Field.Label>
+          <NativeSelect.Root size="sm">
+            <NativeSelect.Field
+              data-testid="gateway-budget-on-breach"
+              value={onBreach}
+              onChange={(e) => setOnBreach((e.target.value as "BLOCK" | "WARN") ?? "BLOCK")}
+            >
+              <option value="BLOCK">Block: reject requests at limit</option>
+              <option value="WARN">Warn: tag responses, keep serving</option>
+            </NativeSelect.Field>
+          </NativeSelect.Root>
+        </Field.Root>
+      </VStack>
+    </Drawer>
   );
 }

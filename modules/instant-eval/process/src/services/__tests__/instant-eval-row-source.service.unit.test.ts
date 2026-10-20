@@ -14,6 +14,9 @@ import {
   type InstantEvalStatementRunner,
 } from "../instant-eval-row-source.service.ts";
 
+/** Instant Evals released for every project: the gate a pass states, open. */
+const OPEN_GATE = { isEnabled: () => Promise.resolve(true) };
+
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const PROTECTIONS = {
   catalogue: { permissions: [] },
@@ -51,7 +54,10 @@ function sourceOver(answer: LangWatchQLQueryResult): {
   analytics: RecordingRunner;
 } {
   const analytics = new RecordingRunner(answer);
-  return { source: InstantEvalRowSourceService.create({ analytics }), analytics };
+  return {
+    source: InstantEvalRowSourceService.create({ analytics, access: OPEN_GATE }),
+    analytics,
+  };
 }
 
 describe("given a statement a run is about to read", () => {
@@ -64,7 +70,13 @@ describe("given a statement a run is about to read", () => {
 
       expect(columns).toEqual([{ name: "TraceId", type: "String" }]);
       expect(analytics.asked).toEqual([
-        { project: CALLER, protections: PROTECTIONS, sql: SQL, pass: { kind: "probe" } },
+        {
+          project: CALLER,
+          protections: PROTECTIONS,
+          sql: SQL,
+          pass: { kind: "probe" },
+          isInstantEvalsEnabled: true,
+        },
       ]);
     });
   });
@@ -224,5 +236,37 @@ describe("given a page of keys", () => {
         buckets: 100,
       });
     });
+  });
+});
+
+describe("given a query identity ClickHouse refuses to log in", () => {
+  /** @scenario "A query identity ClickHouse refuses to log in answers as not enabled" */
+  it("answers as not enabled rather than the raw ClickHouse error", async () => {
+    const failing: InstantEvalStatementRunner = {
+      executeLangWatchQLPass: async () => {
+        throw Object.assign(new Error("lwql: Authentication failed"), {
+          code: "516",
+          type: "AUTHENTICATION_FAILED",
+        });
+      },
+    };
+    const source = InstantEvalRowSourceService.create({ analytics: failing, access: OPEN_GATE });
+
+    await expect(
+      source.probe({ caller: CALLER, protections: PROTECTIONS, sql: SQL }),
+    ).rejects.toMatchObject({ code: "instant_eval_not_enabled", httpStatus: 403 });
+  });
+
+  it("leaves every other ClickHouse error as it was", async () => {
+    const failing: InstantEvalStatementRunner = {
+      executeLangWatchQLPass: async () => {
+        throw Object.assign(new Error("Memory limit exceeded"), { code: "241" });
+      },
+    };
+    const source = InstantEvalRowSourceService.create({ analytics: failing, access: OPEN_GATE });
+
+    await expect(
+      source.probe({ caller: CALLER, protections: PROTECTIONS, sql: SQL }),
+    ).rejects.toThrow("Memory limit exceeded");
   });
 });

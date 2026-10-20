@@ -2,48 +2,28 @@
 #   packages/design-system/src/components/layout/section-navigation-frame.tsx
 #   packages/design-system/tests/section-navigation-frame.integration.test.tsx
 
-Feature: One section rail for every section that lists its own pages
-  As someone moving between the pages of a section
-  I want every section's rail to read and behave the same way
-  So that compact text links and one moving selection marker match wherever I am
+Feature: One section rail for a workspace with many real sub-pages
+  As someone moving between the pages of a large workspace
+  I want its rail to read like the product sidebar beside it
+  So that one selection style and one title hold wherever I am
 
   Background: the rail.
-    A section rail lists the section's entries under its title, in labelled runs.
-    A section whose entries carry their own controls, counts, a fold toggle or a
-    period picker uses the same rail rather than a column of its own.
-    The rail shares the content card's surface without a separate fill or texture.
-    A muted vertical divider starts below the shared 48px title row.
-    Selection uses stronger text and a 3px foreground marker, flat on the outer
-    edge and rounded toward the text. Hover changes text colour only.
+    The rail is kept only for a workspace with five or more real sub-pages; a short
+    set of routes uses header tabs (PageLayout.Tabs) and a list nests in the sidebar.
+    The rail names its section in a 13px eyebrow, never a second 20px title; a page whose
+    header above the rail already names the section leaves the eyebrow out.
+    Rows are 28px with 13px text, led by their icon when the page asks for icons; group
+    labels are 10px semibold uppercase. It sits on the page's own ground, with no fill of its own
+    and no rule against the content.
+    Selection is the sidebar's pill: the active fill, foreground text, weight 500.
+    There is no edge marker.
 
   @integration
-  Scenario: One marker follows the active entry
+  Scenario: The active entry wears the sidebar's pill, with no edge marker
     Given a rail with a current entry
-    When the current entry changes to another link
-    Then the same marker moves to that link's position and height
-    And it uses a 180ms transform transition
-    When no entry is current
-    Then the marker is hidden
-
-  @integration
-  Scenario: A replacement rail continues the selection movement
-    Given a route screen with an active rail entry
-    When navigation replaces the rail for the same section in one render
-    Then the replacement marker starts at the previous entry's position
-    And it slides to the new current entry
-    And there is still only one marker in the list
-
-  @integration
-  Scenario: Reduced motion moves the marker without animation
-    Given the reader prefers reduced motion
-    When the current rail entry changes
-    Then the marker jumps to the new entry without a transition
-
-  @integration
-  Scenario: The marker follows entries supplied by a nested list
-    Given a rail whose extra slot renders its own current link
-    When that nested list changes its current entry
-    Then the rail's single marker moves to the new entry
+    When the reader reads the rail
+    Then the current entry is marked as the current page
+    And no separate selection marker is painted
 
   @integration
   Scenario: An entry's own controls sit beside its link, not inside it

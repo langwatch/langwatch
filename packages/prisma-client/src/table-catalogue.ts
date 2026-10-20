@@ -6,6 +6,7 @@ export const prismaTableCatalogue = {
   "User": "User",
   "VerificationToken": "VerificationToken",
   "Identifier": "Identifier",
+  "IdentitySignInSwitch": "IdentitySignInSwitch",
   "IdentifierReservation": "IdentifierReservation",
   "IdentityProjectionCursor": "IdentityProjectionCursor",
   "TwoFactor": "TwoFactor",
@@ -51,6 +52,12 @@ export const prismaTableCatalogue = {
   "Dataset": "Dataset",
   "DatasetRecord": "DatasetRecord",
   "Dashboard": "Dashboard",
+  "DashboardFavourite": "DashboardFavourite",
+  "DashboardsV2": "DashboardsV2",
+  "DashboardWidget": "DashboardWidget",
+  "InsightProjection": "InsightProjection",
+  "InsightReaderProjection": "InsightReaderProjection",
+  "InsightDailyScheduleProjection": "InsightDailyScheduleProjection",
   "SavedView": "SavedView",
   "CustomGraph": "CustomGraph",
   "BatchEvaluation": "BatchEvaluation",
@@ -114,6 +121,7 @@ export const prismaTableCatalogue = {
   "Group": "Group",
   "GroupMembership": "GroupMembership",
   "AuthzUserStanding": "AuthzUserStanding",
+  "AuthzEngineSwitch": "AuthzEngineSwitch",
   "RoleBinding": "RoleBinding",
   "Grant": "Grant",
   "GrantUsage": "GrantUsage",
@@ -172,7 +180,8 @@ export const prismaTableCatalogue = {
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceReport": "SelfHostedInstanceReport",
   "WebPushSubscription": "WebPushSubscription",
-  "WebPushVapidKey": "WebPushVapidKey"
+  "WebPushVapidKey": "WebPushVapidKey",
+  "SignInProviderMount": "SignInProviderMount"
 } as const;
 
 export const prismaModelFieldCatalogue = {
@@ -221,6 +230,7 @@ export const prismaModelFieldCatalogue = {
     "userAgent",
     "identifierId",
     "amr",
+    "startedBySignUp",
     "impersonating",
     "actorUserId",
     "subjectUserId",
@@ -320,6 +330,14 @@ export const prismaModelFieldCatalogue = {
     "detachedAt",
     "lastUsedAt",
     "createdAt",
+    "updatedAt"
+  ],
+  "IdentitySignInSwitch": [
+    "userId",
+    "onIdentifiers",
+    "pinned",
+    "switchedAt",
+    "lastAppliedEventId",
     "updatedAt"
   ],
   "IdentifierReservation": [
@@ -567,6 +585,7 @@ export const prismaModelFieldCatalogue = {
   "Organization": [
     "id",
     "name",
+    "kind",
     "phoneNumber",
     "slug",
     "members",
@@ -577,6 +596,9 @@ export const prismaModelFieldCatalogue = {
     "OrganizationInvite",
     "usageSpendingMaxLimit",
     "datasetAttachmentMaxMb",
+    "privateClickHouseLabel",
+    "privateS3Label",
+    "privateDataplaneSeenAt",
     "maxSessionDurationDays",
     "mfaRequired",
     "lockoutAfterFailedAttempts",
@@ -649,6 +671,7 @@ export const prismaModelFieldCatalogue = {
     "planType",
     "maxMembers",
     "maxMembersLite",
+    "liteSeatsUnlimited",
     "issuedAt",
     "expiresAt",
     "source",
@@ -693,6 +716,7 @@ export const prismaModelFieldCatalogue = {
     "planType",
     "maxMembers",
     "maxMembersLite",
+    "liteSeatsUnlimited",
     "licenseTermDays",
     "services",
     "expiresAt",
@@ -1030,9 +1054,121 @@ export const prismaModelFieldCatalogue = {
     "project",
     "name",
     "order",
+    "description",
+    "createdById",
+    "scope",
+    "organizationId",
     "createdAt",
     "updatedAt",
     "graphs"
+  ],
+  "DashboardFavourite": [
+    "id",
+    "userId",
+    "dashboardId",
+    "templateId",
+    "projectId",
+    "position",
+    "createdAt"
+  ],
+  "DashboardsV2": [
+    "id",
+    "projectId",
+    "name",
+    "description",
+    "createdById",
+    "scope",
+    "organizationId",
+    "createdAt",
+    "updatedAt"
+  ],
+  "DashboardWidget": [
+    "id",
+    "projectId",
+    "dashboardId",
+    "name",
+    "definition",
+    "gridColumn",
+    "gridRow",
+    "colSpan",
+    "rowSpan",
+    "createdAt",
+    "updatedAt"
+  ],
+  "InsightProjection": [
+    "id",
+    "projectId",
+    "title",
+    "body",
+    "tone",
+    "topic",
+    "validDays",
+    "lwql",
+    "sourceConversationId",
+    "sourceMessageId",
+    "filedByUserId",
+    "filedAt",
+    "renewedAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion",
+    "boardId",
+    "boardName",
+    "widgetId",
+    "widgetName",
+    "filedVia",
+    "replayStart",
+    "replayEnd",
+    "replayGranularitySeconds",
+    "replayContext",
+    "ownerUserId",
+    "findingKey"
+  ],
+  "InsightReaderProjection": [
+    "id",
+    "projectId",
+    "insightId",
+    "userId",
+    "seenAt",
+    "archivedAt",
+    "keptAt",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
+  ],
+  "InsightDailyScheduleProjection": [
+    "id",
+    "projectId",
+    "userId",
+    "boardKind",
+    "boardId",
+    "boardName",
+    "state",
+    "offReason",
+    "hour",
+    "timezone",
+    "maxInsights",
+    "lastRunId",
+    "lastRunAt",
+    "lastRunOutcome",
+    "lastRunReason",
+    "lastRunFiled",
+    "lastRunRenewed",
+    "lastRunConversationId",
+    "consecutiveSkips",
+    "skipStreakSlot",
+    "createdAt",
+    "updatedAt",
+    "occurredAt",
+    "acceptedAt",
+    "lastEventId",
+    "projectionVersion"
   ],
   "SavedView": [
     "id",
@@ -1361,6 +1497,7 @@ export const prismaModelFieldCatalogue = {
     "UserId",
     "Title",
     "TitleSource",
+    "Origin",
     "Status",
     "IsShared",
     "SharedAt",
@@ -1987,6 +2124,14 @@ export const prismaModelFieldCatalogue = {
     "deactivatedAt",
     "erasedAt",
     "standingChangedAt"
+  ],
+  "AuthzEngineSwitch": [
+    "organizationId",
+    "onEngine",
+    "pinned",
+    "switchedAt",
+    "lastAppliedEventId",
+    "updatedAt"
   ],
   "RoleBinding": [
     "id",
@@ -2836,6 +2981,13 @@ export const prismaModelFieldCatalogue = {
     "publicKey",
     "privateKeyEncrypted",
     "createdAt"
+  ],
+  "SignInProviderMount": [
+    "id",
+    "provider",
+    "mounted",
+    "lastAppliedEventId",
+    "updatedAt"
   ]
 } as const;
 
@@ -2895,6 +3047,7 @@ export const prismaRelationCatalogue = {
   },
   "VerificationToken": {},
   "Identifier": {},
+  "IdentitySignInSwitch": {},
   "IdentifierReservation": {},
   "IdentityProjectionCursor": {},
   "TwoFactor": {
@@ -3063,6 +3216,12 @@ export const prismaRelationCatalogue = {
     "project": "Project",
     "graphs": "CustomGraph"
   },
+  "DashboardFavourite": {},
+  "DashboardsV2": {},
+  "DashboardWidget": {},
+  "InsightProjection": {},
+  "InsightReaderProjection": {},
+  "InsightDailyScheduleProjection": {},
   "SavedView": {
     "project": "Project",
     "user": "User"
@@ -3300,6 +3459,7 @@ export const prismaRelationCatalogue = {
     "group": "Group"
   },
   "AuthzUserStanding": {},
+  "AuthzEngineSwitch": {},
   "RoleBinding": {
     "organization": "Organization",
     "user": "User",
@@ -3426,7 +3586,8 @@ export const prismaRelationCatalogue = {
   "SelfHostedInstance": {},
   "SelfHostedInstanceReport": {},
   "WebPushSubscription": {},
-  "WebPushVapidKey": {}
+  "WebPushVapidKey": {},
+  "SignInProviderMount": {}
 } as const;
 
 export type PrismaTableModel = keyof typeof prismaTableCatalogue;

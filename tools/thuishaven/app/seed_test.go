@@ -102,7 +102,7 @@ func TestSeedDrivesSeedgenAgainstTheStack(t *testing.T) {
 	if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "/wt/feat-x/cmd/seedgen' run '--size' 'small'") {
 		t.Fatalf("shells = %v", sup.shells)
 	}
-	if !strings.Contains(strings.Join(sup.envs[0], " "), "LANGWATCH_TASK_MODULES=@langwatch/seedgen-runner") {
+	if !strings.Contains(strings.Join(sup.envs[0], " "), "LANGWATCH_TASK_MODULES=/wt/feat-x/tools/seedgen/runner/src/index.ts") {
 		t.Error("the task child is not told to load the runner")
 	}
 	if line := o.SeedStatusLine("feat-x"); !strings.Contains(line, "done") {
@@ -118,7 +118,7 @@ func TestSeedingAgainResumesTheRunRecord(t *testing.T) {
 	sup := &fakeSupervisor{}
 	o := seedOrchestrator(t, sup, seedStack())
 	args := []string{"--size", "tiny", "--seed", "7"}
-	record := o.runRecordArgs("feat-x", args)
+	record := o.runRecordArgs("feat-x", args, time.Time{})
 	dir := record[len(record)-1]
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func TestSeedingAgainResumesTheRunRecord(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(dir, "run.json"), []byte("{}"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if again := o.runRecordArgs("feat-x", args); again[len(again)-1] != "--resume" {
+	if again := o.runRecordArgs("feat-x", args, time.Time{}); again[len(again)-1] != "--resume" {
 		t.Fatalf("a recorded run is not resumed: %v", again)
 	}
 }
@@ -248,7 +248,7 @@ func TestAFailedSeedNamesSeedgensReason(t *testing.T) {
 	sup := &fakeSupervisor{err: exit2Error(t)}
 	o := seedOrchestrator(t, sup, seedStack())
 	args := []string{"--size", "small"}
-	dir := o.seedRunDir("feat-x", args)
+	dir := o.seedRunDir("feat-x", args, time.Time{})
 	if err := os.MkdirAll(dir, 0o750); err != nil {
 		t.Fatal(err)
 	}
@@ -261,5 +261,121 @@ func TestAFailedSeedNamesSeedgensReason(t *testing.T) {
 	}
 	if line := o.SeedStatusLine("feat-x"); !strings.Contains(line, "failed") || !strings.Contains(line, "the api answered 500") {
 		t.Errorf("status line = %q, want the failure and its reason", line)
+	}
+}
+
+// @scenario "A seed that stays paused stops with a checkpoint and resumes later"
+func TestAStalledSeedIsReportedAsStalled(t *testing.T) {
+	sup := &fakeSupervisor{err: exit2Error(t)}
+	o := seedOrchestrator(t, sup, seedStack())
+	args := []string{"--size", "small"}
+	dir := o.seedRunDir("feat-x", args, time.Time{})
+	if err := os.MkdirAll(dir, 0o750); err != nil {
+		t.Fatal(err)
+	}
+	line := "stalled: worker backlog held sending paused; the checkpoint is saved, resume with --resume"
+	if err := os.WriteFile(filepath.Join(dir, seedgen.FailureFile), []byte(line+"\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	err := o.Seed(context.Background(), UpParams{ExplicitSlug: "feat-x"}, SeedRequest{Args: args})
+	var exit *SeedExit
+	if !errors.As(err, &exit) || exit.Code != 4 || !strings.HasSuffix(err.Error(), line) {
+		t.Fatalf("err = %v, want exit 4 ending with seedgen's message", err)
+	}
+	if st, _ := o.readSeedStatus("feat-x"); st.State != "stalled" || st.Exit != 4 {
+		t.Errorf("status = %+v, want stalled with exit 4", st)
+	}
+}
+
+// writeRun records a run of args under the stack with the given anchor, as seedgen leaves it.
+func writeRun(t *testing.T, o *Orchestrator, args []string, anchor time.Time) string {
+	t.Helper()
+	flags, err := seedgen.ParseFlags(args, anchor)
+	if err != nil {
+		t.Fatal(err)
+	}
+	plan, err := seedgen.NewPlan(flags)
+	if err != nil {
+		t.Fatal(err)
+	}
+	dir := filepath.Join(o.seedRunsDir("feat-x"), plan.Run)
+	if err := seedgen.NewManifest(plan).Write(dir); err != nil {
+		t.Fatal(err)
+	}
+	if err := seedgen.NewCheckpoint(plan.Run, nil).Save(filepath.Join(dir, "run.json")); err != nil {
+		t.Fatal(err)
+	}
+	return dir
+}
+
+// @scenario "A resume keeps the run id of the last run"
+func TestResumeKeepsTheLastRunsAnchor(t *testing.T) {
+	sup := &fakeSupervisor{}
+	o := seedOrchestrator(t, sup, seedStack())
+	args := []string{"--size", "tiny", "--age", "2d"}
+	earlier := seedNow.Add(-3 * time.Hour)
+	dir := writeRun(t, o, args, earlier)
+
+	err := o.Seed(context.Background(), UpParams{ExplicitSlug: "feat-x"}, SeedRequest{Args: args, Resume: true})
+	if err != nil {
+		t.Fatalf("Seed: %v", err)
+	}
+	if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "'--run-dir' '"+dir+"' '--resume'") {
+		t.Fatalf("shells = %v, want the earlier run's directory resumed", sup.shells)
+	}
+	if again := o.runRecordArgs("feat-x", args, time.Time{}); strings.Contains(strings.Join(again, " "), dir) {
+		t.Fatalf("without --resume the new hour should plan a new run: %v", again)
+	}
+}
+
+func TestResumeWithoutAnEarlierRunIsRefused(t *testing.T) {
+	sup := &fakeSupervisor{}
+	o := seedOrchestrator(t, sup, seedStack())
+	writeRun(t, o, []string{"--size", "tiny"}, seedNow)
+	err := o.Seed(context.Background(), UpParams{ExplicitSlug: "feat-x"}, SeedRequest{Args: []string{"--size", "small"}, Resume: true})
+	var exit *SeedExit
+	if !errors.As(err, &exit) || exit.Code != 2 || len(sup.shells) != 0 {
+		t.Fatalf("err = %v, shells = %v, want exit 2 and no run", err, sup.shells)
+	}
+}
+
+// @scenario "The access block lists every seeded org and its logins"
+func TestSeedAccessListsAnOrgOnceAcrossRuns(t *testing.T) {
+	o := seedOrchestrator(t, &fakeSupervisor{}, seedStack())
+	args := []string{"--size", "tiny", "--private", "0", "--org", "name=acme,users=2"}
+	for i, id := range []string{"org_old", "org_new"} {
+		anchor := seedNow.Add(time.Duration(i) * time.Hour)
+		dir := writeRun(t, o, args, anchor)
+		flags, _ := seedgen.ParseFlags(args, anchor)
+		plan, _ := seedgen.NewPlan(flags)
+		refs := seedgen.Refs{plan.Orgs[0].Ref: id, plan.Orgs[0].Users[0].Ref: "user_" + id}
+		if err := seedgen.NewCheckpoint(plan.Run, refs).Save(filepath.Join(dir, "run.json")); err != nil {
+			t.Fatal(err)
+		}
+		when := seedNow.Add(time.Duration(i) * time.Minute)
+		if err := os.Chtimes(dir, when, when); err != nil {
+			t.Fatal(err)
+		}
+	}
+	access, err := o.seedAccess(UpParams{ExplicitSlug: "feat-x"}, false)
+	if err != nil {
+		t.Fatalf("seedAccess: %v", err)
+	}
+	if len(access.Orgs) != 1 || access.Orgs[0].ID != "org_new" {
+		t.Fatalf("orgs = %+v, want acme once, from the newest run", access.Orgs)
+	}
+}
+
+// @scenario "Destroying a stack forgets its seeded logins"
+func TestDestroyForgetsTheSeedRecords(t *testing.T) {
+	o := seedOrchestrator(t, &fakeSupervisor{}, seedStack())
+	writeRun(t, o, []string{"--size", "tiny"}, seedNow)
+	o.writeSeedStatus("feat-x", seedStatus{State: "done"})
+	o.ClearSeedStatus("feat-x")
+	if _, ok := o.readSeedStatus("feat-x"); ok {
+		t.Error("the seed status survived")
+	}
+	if entries, _ := os.ReadDir(o.seedRunsDir("feat-x")); len(entries) != 0 {
+		t.Errorf("run records survived: %v", entries)
 	}
 }

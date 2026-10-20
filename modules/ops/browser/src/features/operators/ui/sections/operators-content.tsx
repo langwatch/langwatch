@@ -1,14 +1,8 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Button,
-  Center,
-  HStack,
-  Input,
-  Spinner,
-  Table,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Button, HStack, Input, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import type { OpsPlatformOperator } from "@langwatch/ops-contract";
 import { ShieldCheck } from "lucide-react";
@@ -16,7 +10,6 @@ import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { formatDateTime } from "../../../admin/ui/elements/admin-cells.tsx";
 
 /**
@@ -45,11 +38,7 @@ export function OperatorsContent() {
   });
 
   if (list.isLoading) {
-    return (
-      <Center paddingY={20}>
-        <Spinner />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
   if (list.error) {
     return <HandledErrorAlert error={list.error} fallbackTitle="Couldn't load the operators" />;
@@ -71,58 +60,49 @@ export function OperatorsContent() {
             aria-label="Email address of an existing user"
             placeholder="Email address of an existing user"
             value={email}
+            required
             onChange={(event) => setEmail(event.target.value)}
             maxWidth="420px"
           />
-          <Button
-            type="submit"
-            colorPalette="accent"
-            size="sm"
-            loading={grant.isPending}
-            disabled={!email.trim()}
-          >
+          <Button type="submit" colorPalette="accent" size="sm" loading={grant.isPending}>
             Grant
           </Button>
         </HStack>
       </form>
 
-      <ListTable
-        density="compact"
-        columnRules={false}
-        containerProps={{ overflowX: "auto" }}
-        variant="line"
-        size="sm"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Email</Table.ColumnHeader>
-            <Table.ColumnHeader>Operator since</Table.ColumnHeader>
-            <Table.ColumnHeader width="1%" />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+      <ListTable density="compact" scroll="x" scrollLabel="Platform operators">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Email</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Operator since</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="fit" label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {operators.length === 0 ? (
+            <ListTable.SpanRow columns={4}>
+              <NoDataInfoBlock
+                icon={<ShieldCheck />}
+                title="No platform operators."
+                description="Grant operator access to an existing user by email."
+              />
+            </ListTable.SpanRow>
+          ) : null}
           {operators.map((operator) => (
-            <Table.Row key={operator.grantId}>
-              <Table.Cell>{operator.name ?? "—"}</Table.Cell>
-              <Table.Cell>{operator.email ?? operator.userId}</Table.Cell>
-              <Table.Cell>{formatDateTime(operator.grantedAt)}</Table.Cell>
-              <Table.Cell>
+            <ListTable.Row key={operator.grantId}>
+              <ListTable.Cell>{operator.name ?? "—"}</ListTable.Cell>
+              <ListTable.Cell>{operator.email ?? operator.userId}</ListTable.Cell>
+              <ListTable.Cell>{formatDateTime(operator.grantedAt)}</ListTable.Cell>
+              <ListTable.Cell>
                 <Button size="sm" variant="outline" onClick={() => setRevoking(operator)}>
                   Revoke
                 </Button>
-              </Table.Cell>
-            </Table.Row>
+              </ListTable.Cell>
+            </ListTable.Row>
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
-      {operators.length === 0 ? (
-        <NoDataInfoBlock
-          icon={<ShieldCheck />}
-          title="No platform operators."
-          description="Grant operator access to an existing user by email."
-        />
-      ) : null}
 
       <ConfirmDialog
         open={revoking !== null}
@@ -132,7 +112,7 @@ export function OperatorsContent() {
         }}
         title={`Revoke ${revoking?.email ?? "this operator"}`}
         description="They lose every operator page and action at once. An installation always keeps at least one operator."
-        isLoading={revoke.isPending}
+        loading={revoke.isPending}
       />
     </VStack>
   );

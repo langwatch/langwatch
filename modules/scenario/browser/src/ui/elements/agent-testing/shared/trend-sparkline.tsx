@@ -6,7 +6,6 @@
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import type { TrendPoint } from "@langwatch/scenario-contract";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { formatPassRate, PASS_RATE_BAR_OPACITY, passRateColor } from "./pass-rate-color.ts";
 
 /** How tall the tallest bar is drawn, and so how tall the row of them is. */
@@ -38,7 +37,7 @@ export type TrendSparklineProps = {
 export function TrendSparkline({ bars, per }: TrendSparklineProps) {
   if (bars.length === 0) {
     return (
-      <Text as="span" fontSize="11px" color={FG_MUTED}>
+      <Text as="span" textStyle="micro" color="fg.muted">
         no runs
       </Text>
     );

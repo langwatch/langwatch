@@ -6,13 +6,12 @@ their depth before the load, and no error signature in the stack's log that name
 
 ```bash
 go build -o .bin/workerrun/workerrun ./cmd/workerrun
-.bin/workerrun/workerrun -stack visualdiff-check -n 100 -concurrency 16
-.bin/diffsuite/diffsuite -continuous -stack visualdiff-check -out .claude/tmp/runs/live -tools api,fuzzapi,visual,fuzzui,worker
+.bin/workerrun/workerrun -stack check -n 100 -concurrency 16
 ```
 
 It talks to `https://app.<slug>.langwatch.localhost/api` only, with its own `workerrun`
 organisation seeded like the fuzzer's (diffkit `SeedToolOrg`, recorded under
-`.claude/tmp/workerrun/`). Under diffsuite it takes the branch stack from `DIFFSUITE_BRANCH_*`.
+`.claude/tmp/workerrun/`).
 
 ## Families
 
@@ -49,7 +48,7 @@ Ingestion families take their setup from `WORKERRUN_*` env (see `families_ingest
 The first half fires as fast as `-concurrency` allows (burst), the rest at `-steady-rate`
 a second. Read-back runs alongside, a round at most every 2 s, so lag has that resolution.
 An item unproven `-deadline` after it was fired fails by its id. `monitor` is skipped, and
-says so, when haven reports langevals not running (`diffsuite -up -langevals` has it).
+says so, when haven reports langevals not running.
 Setups (evaluator, monitor, dataset, trigger) are deleted at the end.
 
 ## Drain, health, logs
@@ -70,8 +69,8 @@ Setups (evaluator, monitor, dataset, trigger) are deleted at the end.
 ## Output
 
 - `FAIL <id> (<family>, <why>)` per failing id, `family <name>: pass|fail ...` per family,
-  then `worker: N checked: P pass, F fail`, the line diffsuite tallies.
+  then `worker: N checked: P pass, F fail`.
 - `<run-dir>/summary.json`: per family the landed and missing ids and p50/p95/max lag, the
   drain samples, health, signatures, the failing ids, and `new`/`fixed` against the newest
-  earlier `summary.json` beside the run (diffsuite's previous iteration, or a sibling run).
+  earlier `summary.json` beside the run (a sibling run).
 - Exit 0 all proven, 1 a failure, 2 usage, 3 stopped in setup (`stopping: setup failed: ...`).

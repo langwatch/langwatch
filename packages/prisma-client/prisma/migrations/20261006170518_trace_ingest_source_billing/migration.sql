@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "TraceIngestSourceBilling" (
+CREATE TABLE IF NOT EXISTS "TraceIngestSourceBilling" (
     "organizationId" TEXT NOT NULL,
     "sourceType" TEXT NOT NULL,
     "billed" BOOLEAN NOT NULL,

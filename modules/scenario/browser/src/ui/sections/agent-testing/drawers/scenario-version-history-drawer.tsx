@@ -5,7 +5,7 @@
  */
 
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 
 import { ScenarioVersionList } from "./scenario-version-list.tsx";
 
@@ -19,21 +19,14 @@ export function ScenarioVersionHistoryDrawer({ open }: { open?: boolean }) {
   const isOpen = open !== false;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open: stillOpen }) => !stillOpen && close()}
-      placement="end"
+      onClose={close}
       size="md"
+      title="Version history"
+      data-testid="scenario-version-history"
     >
-      <Drawer.Content bg="bg" data-testid="scenario-version-history">
-        <Drawer.Header>
-          <Drawer.Title>Version history</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <ScenarioVersionList scenarioId={scenarioId} markVersion={markVersion} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <ScenarioVersionList scenarioId={scenarioId} markVersion={markVersion} />
+    </Drawer>
   );
 }

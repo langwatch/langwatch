@@ -42,12 +42,12 @@ export type EvaluatorResultChipProps = {
  */
 const DataTooltipContent = ({ inputs }: { inputs: Record<string, unknown> }) => (
   <VStack align="stretch" gap={1} padding={2} maxWidth="300px">
-    <Text fontSize="12px" fontWeight="semibold" color="fg" marginBottom={1}>
+    <Text textStyle="caption" fontWeight="semibold" color="fg" marginBottom={1}>
       Evaluator Inputs
     </Text>
     <Box
-      fontSize="11px"
-      fontFamily="mono"
+      textStyle="monoSm"
+
       color="fg.muted"
       whiteSpace="pre-wrap"
       wordBreak="break-word"
@@ -95,14 +95,14 @@ export function EvaluatorResultChip({
 
     if (score !== undefined) {
       return (
-        <Text fontSize="10px" fontWeight="semibold">
+        <Text textStyle="micro" fontWeight="semibold">
           {score.toFixed(2)}
         </Text>
       );
     }
     if (label) {
       return (
-        <Text fontSize="10px" fontWeight="medium" maxWidth="60px" truncate>
+        <Text textStyle="micro" fontWeight="medium" maxWidth="60px" truncate>
           {label}
         </Text>
       );
@@ -116,39 +116,39 @@ export function EvaluatorResultChip({
       <VStack align="stretch" gap={1} padding={2}>
         {score !== undefined && (
           <HStack justify="space-between" gap={4}>
-            <Text fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               Score:
             </Text>
-            <Text fontSize="12px" fontWeight="semibold" color="fg">
+            <Text textStyle="caption" fontWeight="semibold" color="fg">
               {score.toFixed(2)}
             </Text>
           </HStack>
         )}
         {label && (
           <HStack justify="space-between" gap={4}>
-            <Text fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               Label:
             </Text>
-            <Text fontSize="12px" fontWeight="semibold" color="fg">
+            <Text textStyle="caption" fontWeight="semibold" color="fg">
               {label}
             </Text>
           </HStack>
         )}
         <HStack justify="space-between" gap={4}>
-          <Text fontSize="12px" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             Status:
           </Text>
-          <Text fontSize="12px" fontWeight="semibold" color={statusColor}>
+          <Text textStyle="caption" fontWeight="semibold" color={statusColor}>
             {getStatusLabel(status)}
           </Text>
         </HStack>
         {details && (
           <Box marginTop={1}>
-            <Text fontSize="12px" color="fg.subtle" marginBottom={0.5}>
+            <Text textStyle="caption" color="fg.subtle" marginBottom={0.5}>
               Details:
             </Text>
             <Text
-              fontSize="12px"
+              textStyle="caption"
               color="fg.muted"
               whiteSpace="pre-wrap"
               maxHeight="200px"
@@ -177,7 +177,7 @@ export function EvaluatorResultChip({
               borderRadius="md"
               marginTop={1}
             >
-              <Text fontSize="12px" color="fg.muted">
+              <Text textStyle="caption" color="fg.muted">
                 Data
               </Text>
               <Icon as={LuChevronRight} boxSize={3} color="fg.subtle" />
@@ -186,7 +186,7 @@ export function EvaluatorResultChip({
         )}
       </VStack>
     ) : (
-      <Text fontSize="12px">Pending</Text>
+      <Text textStyle="caption">Pending</Text>
     );
 
   const chipContent = (
@@ -198,7 +198,7 @@ export function EvaluatorResultChip({
       borderWidth="1px"
       borderColor="border"
       bg="bg.panel"
-      fontSize="11px"
+      textStyle="micro"
       fontWeight="medium"
       cursor="default"
       onMouseEnter={hasInputs ? handleMouseEnter : undefined}
@@ -207,7 +207,7 @@ export function EvaluatorResultChip({
       {/* Status indicator - spinning for running, static for others */}
       {status === "running" ? (
         <Box flexShrink={0}>
-          <Spinner size="xs" color="fg.muted" marginBottom="-2px" />
+          <Spinner size="xs" color="fg.muted" marginBottom="-0.5" />
         </Box>
       ) : (
         <Circle size="10px" bg={statusColor} flexShrink={0} />

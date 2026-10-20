@@ -519,6 +519,7 @@ func TestDBSeed(t *testing.T) {
 type fakeRedis struct {
 	flushed  []int
 	flushErr error
+	onFlush  func()
 }
 
 func (f *fakeRedis) Ensure(context.Context) (int, error)   { return 6379, nil }
@@ -527,6 +528,9 @@ func (f *fakeRedis) Running() bool                         { return true }
 func (f *fakeRedis) Health(context.Context) (bool, string) { return true, "" }
 func (f *fakeRedis) Stop()                                 {}
 func (f *fakeRedis) FlushDB(_ context.Context, db int) error {
+	if f.onFlush != nil {
+		f.onFlush()
+	}
 	f.flushed = append(f.flushed, db)
 	return f.flushErr
 }

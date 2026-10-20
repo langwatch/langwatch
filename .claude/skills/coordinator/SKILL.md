@@ -10,16 +10,32 @@ argument-hint: "(nothing - reads the current drive), or a manifest name to start
 You are the coordinator. You do not do module work: you write manifests, spawn
 lanes, read handoffs, own the shared files, collect coherent slices, and report.
 
+## What is committed and what is local
+
+`.claude/coordinator/`, `.claude/manifests/` and `.claude/handoffs/` hold **local working
+state**. Git carries only the files that teach the protocol, which are the examples to copy:
+
+- `.claude/coordinator/`: `README.md`, `COORDINATOR.md`, `LANE.md`, `manifest-template.md`,
+  `handoff-template.md`.
+- `.claude/manifests/` and `.claude/handoffs/`: their `README.md` only.
+
+Everything dated or per-task (manifests, handoffs, the roster `LANES.md` and its archive) is
+written on this machine, ignored by git and never committed. Do not cite one as authority for
+a rule: a ruling that matters lands in the record (`dev/docs/ARCHITECTURE.md`) or an ADR.
+A fresh checkout has none of them, so a missing roster means the state is **unknown**, not
+that no lane is running: check `ListAgents` and ask before assuming the drive is idle.
+
 ## 1. Read the state before saying anything about it
 
 ```bash
 bash dev/scripts/coordinator-state.sh --full
 ```
 
-That prints the live lane roster, the newest handover's next action, the dirty
-count and the shape counters. It is read from disk, so it is current by
-construction. Never quote a counter from a document when this command is
-available.
+That prints the local lane roster, the newest handover's next action, the dirty
+count and the shape counters, read from disk. It prints "no lanes active" when
+the roster file is absent, which is only a statement about the file: confirm
+against the running agents before relying on it. Never quote a counter from a
+document when this command is available.
 
 ## 2. Read what binds you
 
@@ -30,7 +46,7 @@ In this order, and nothing else up front:
 | `.claude/coordinator/COORDINATOR.md`      | how you coordinate: events, the lane ceiling, model routing, slices |
 | `.claude/skills/core/repository-rules.md` | what binds you and every lane                                       |
 | `.claude/skills/core/handoff-rules.md`    | the seven statuses and the handoff contract                         |
-| the handover named in step 1              | this drive: where it is, what is next                               |
+| the handover named in step 1 (local)      | this drive: where it is, what is next                               |
 
 The drive document the handover points at (a queue or plan under
 `dev/docs/plans/`) is the content. Read a section when a task needs it, not up
@@ -44,7 +60,7 @@ Three things, briefly:
   same or further - **dirty count first**, and a non-zero one is committed or
   explained before anything else;
 - whether any lane is already active, and therefore whether this session may be
-  replaced at all (`LANES.md` with no `active` rows is the test);
+  replaced at all (the local `LANES.md` with no `active` rows, and no running agents);
 - what you intend to do about the gap to `origin/main`, which is yours and never
   a lane's.
 

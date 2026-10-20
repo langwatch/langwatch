@@ -37,6 +37,7 @@ interface OrganizationInitializationDependencies {
     Readonly<{
       organization: Readonly<{ id: string; name: string }>;
       team: Readonly<{ id: string; slug: string; name: string }>;
+      grantsConfirmed: boolean;
     }>
   >;
   ensurePersonalWorkspace(
@@ -81,7 +82,7 @@ export class OrganizationInitializationService {
         await this.#provisionPersonalWorkspace({ organizationId: created.organization.id, by });
       }
 
-      await this.#announce({ input, organizationName: created.organization.name, by });
+      await this.#announce({ input, organization: created.organization, by });
 
       this.deps.lifecycle.signedUp({
         userId: by.id,
@@ -97,6 +98,7 @@ export class OrganizationInitializationService {
         teamName: created.team.name,
         teamId: created.team.id,
         organizationId: created.organization.id,
+        grantsConfirmed: created.grantsConfirmed,
       };
     } catch (error) {
       this.deps.signals.reportError(error);
@@ -134,20 +136,24 @@ export class OrganizationInitializationService {
   /** Marketing traffic, never fatal: a sign-up that was not announced still happened. */
   async #announce(input: {
     input: OnboardingInitializeOrganizationInput;
-    organizationName: string;
+    organization: { id: string; name: string };
     by: OrganizationCaller;
   }): Promise<void> {
     const payload = {
       userName: input.by.name,
       userEmail: input.by.email ?? null,
-      organizationName: input.organizationName,
+      organizationName: input.organization.name,
       phoneNumber: input.input.phoneNumber,
       signUpData: input.input.signUpData,
     };
 
     try {
       await Promise.all([
-        this.deps.signals.sendSlackSignupEvent(payload),
+        this.deps.signals.announceNewOrganization({
+          ...payload,
+          userId: input.by.id,
+          organizationId: input.organization.id,
+        }),
         this.deps.signals.sendHubspotSignupForm(payload),
       ]);
     } catch (error) {

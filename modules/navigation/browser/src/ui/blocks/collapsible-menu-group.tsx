@@ -95,7 +95,7 @@ export const CollapsibleMenuGroup = ({
               {showLabel && (
                 <>
                   <Text
-                    fontSize={density.fontSize}
+                    textStyle={density.textStyle}
                     fontWeight="normal"
                     color="nav.fg"
                     whiteSpace="nowrap"

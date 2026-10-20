@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -139,42 +140,11 @@ func PhaseAt(timeline []PhaseChange, atMs int64) string {
 	return phase
 }
 
-// QueueSample is one reading of the waiting work.
+// QueueSample is one reading of the group queues' waiting jobs.
 type QueueSample struct {
-	AtMs  int64 `json:"atMs"`
-	Depth int   `json:"depth"`
-	Left  int   `json:"cutJobsLeft"` // jobs present at the cut still waiting; -1 unread
-}
-
-// QueueLeft is the jobs of cut still waiting in now.
-func QueueLeft(cut, now map[string]struct{}) []string {
-	var left []string
-	for job := range cut {
-		if _, ok := now[job]; ok {
-			left = append(left, job)
-		}
-	}
-	return left
-}
-
-// LeftByKind counts leftover jobs per job kind: the group key without tenant and aggregate, else the key.
-func LeftByKind(left []string) string {
-	counts := map[string]int{}
-	for _, job := range left {
-		key, _, _ := strings.Cut(job, " ")
-		if at := strings.Index(key, ":gq:group:"); at >= 0 {
-			if parts := strings.Split(strings.TrimSuffix(key[at+len(":gq:group:"):], ":jobs"), "/"); len(parts) >= 3 {
-				key = strings.Join(parts[1:len(parts)-1], "/")
-			}
-		}
-		counts[key]++
-	}
-	rows := make([]string, 0, len(counts))
-	for key, count := range counts {
-		rows = append(rows, fmt.Sprintf("%s: %d", key, count))
-	}
-	slices.Sort(rows)
-	return strings.Join(rows, "; ")
+	AtMs   int64 `json:"atMs"`
+	Depth  int   `json:"depth"`            // jobs due now
+	NotDue int   `json:"notDue,omitempty"` // jobs scheduled later, left out of Depth
 }
 
 type queueKind struct {
@@ -264,7 +234,7 @@ func StoredIDs(ctx context.Context, stores Stores, label, project string) (map[s
 }
 
 // storedTable is where an ingest kind's id lands.
-var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
+var storedTable = map[string]string{"otlp-trace": "spans", "collector": "spans", "collector-eval": "spans", "otlp-log": "logs", "otlp-metric": "metrics"}
 
 // LedgerRow is one step of the upgrade ledger, as far as the invariants read it.
 type LedgerRow struct {
@@ -275,11 +245,13 @@ type LedgerRow struct {
 	Attempt  int    `json:"attempt"`
 	Finished string `json:"finished_at"`
 	Started  string `json:"started_at"`
+	// Report is the step's own JSON report; F1 reads the row counts a data step names there.
+	Report json.RawMessage `json:"report,omitempty"`
 }
 
 // Ledger reads every step row; a missing ledger schema is an empty ledger.
 func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
-	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
+	out, err := psql(ctx, stores.psqlURL(), `SELECT coalesce(json_agg(json_build_object('id', id, 'kind', kind, 'mode', mode, 'status', status, 'attempt', attempt, 'finished_at', finished_at::text, 'started_at', started_at::text, 'report', report) ORDER BY id), '[]') FROM mydb_upgrade_ledger._langwatch_upgrade_step`)
 	if err != nil {
 		if strings.Contains(err.Error(), "does not exist") {
 			return nil, nil
@@ -294,9 +266,10 @@ func Ledger(ctx context.Context, stores Stores) ([]LedgerRow, error) {
 // Outstanding is every step not done or not-needed, operator steps aside (an operator starts those).
 func Outstanding(rows []LedgerRow) []LedgerRow {
 	var left []LedgerRow
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		if row.Status != "done" && row.Status != "not-needed" && row.Mode != "operator" {
-			left = append(left, row)
+			left = append(left, *row)
 		}
 	}
 	return left
@@ -305,11 +278,13 @@ func Outstanding(rows []LedgerRow) []LedgerRow {
 // Reopened is every step done in before that is not done, or ran again, in after.
 func Reopened(before, after []LedgerRow) []string {
 	index := map[string]LedgerRow{}
-	for _, row := range after {
-		index[row.ID] = row
+	for i := range after {
+		row := &after[i]
+		index[row.ID] = *row
 	}
 	var reopened []string
-	for _, row := range before {
+	for i := range before {
+		row := &before[i]
 		now, ok := index[row.ID]
 		if row.Status == "done" && (!ok || now.Status != "done" || now.Attempt != row.Attempt || now.Finished != row.Finished) {
 			reopened = append(reopened, fmt.Sprintf("%s %s/%d -> %s/%d", row.ID, row.Status, row.Attempt, now.Status, now.Attempt))
@@ -340,6 +315,9 @@ func StartWalker(ctx context.Context, spec WalkSpec) (*Walker, error) {
 	script := filepath.Join(spec.RunDir, "walk.mjs")
 	if err := os.WriteFile(script, walkScript, 0o600); err != nil {
 		return nil, err
+	}
+	if spec.Every <= 0 {
+		spec.Every = 10 * time.Second
 	}
 	args, _ := json.Marshal(map[string]any{"url": spec.URL, "email": spec.Email, "password": spec.Password, "runDir": spec.RunDir, "originMs": spec.Origin.UnixMilli(), "every": spec.Every.Milliseconds()})
 	command := exec.CommandContext(ctx, "node", script, string(args)) // #nosec G204 -- harness-written script.
@@ -385,6 +363,35 @@ func expectedWhileStepsRun(record BrowserRecord, switched, ready int64) bool {
 		strings.Contains(record.Text, "upgrade_in_progress") && switched >= 0 && ready >= 0 && record.AtMs >= switched && record.AtMs <= ready
 }
 
+// unreadBody prefixes a walk record's text when the page navigated before its body could be read (walk.mjs).
+const unreadBody = "body unread"
+
+// unreadUpgrade503: a 503 with Retry-After in the window whose body was gone, on a path that answered a
+// readable upgrade_in_progress in the same window: the same answer, read too late.
+func unreadUpgrade503(record BrowserRecord, switched, ready int64, upgrading map[string]bool) bool {
+	return record.Kind == "http" && record.Status == http.StatusServiceUnavailable && record.RetryAfter != "" &&
+		strings.HasPrefix(record.Text, unreadBody) && switched >= 0 && ready >= 0 && record.AtMs >= switched &&
+		record.AtMs <= ready && upgrading[pathOf(record.URL)]
+}
+
+func pathOf(raw string) string {
+	path, _, _ := strings.Cut(raw, "?")
+	return path
+}
+
+// consoleTwinOf503: the console line Chromium writes for a failed load names no url or code, so it is
+// matched by status and window only, and capped at the number of expected 503s it echoes.
+func consoleTwinOf503(record BrowserRecord, switched, ready int64) bool {
+	return record.Kind == "console" && strings.Contains(record.Text, "status of 503") && switched >= 0 && ready >= 0 &&
+		record.AtMs >= switched && record.AtMs <= ready
+}
+
+// stopStartDowntime: a stop-start install serves nothing between the old release stopping and head's api
+// answering (the walker's "down" phase), so the balancer's 502s and the loads they abort are expected there.
+func stopStartDowntime(record BrowserRecord, stopStart bool) bool {
+	return stopStart && record.Phase == "down" && slices.Contains([]string{"console", "http", "requestfailed"}, record.Kind)
+}
+
 // mainTabAcrossSwitch: main's UI, loaded before the switch, reconnects its tRPC WebSocket to head, which
 // serves none and whose UI opens none; tolerated for a minute after the switch, a finding after that.
 func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
@@ -395,11 +402,27 @@ func mainTabAcrossSwitch(record BrowserRecord, switched int64) bool {
 // mainPageAcrossSwitch: main's page, fetched just before the switch, loads its hashed assets from head,
 // which never built them (ADR-086's rolling-deploy skew; the lab has no LANGWATCH_ASSET_BASE). The
 // console line names no url, so only its 404 is matched; the http record beside it carries the path.
+// A stylesheet's 404 (text/plain) shows instead as a MIME refusal naming the asset.
 func mainPageAcrossSwitch(record BrowserRecord, switched int64) bool {
 	asset := strings.Contains(record.URL, "/assets/") &&
 		(record.Kind == "http" && record.Status == http.StatusNotFound || record.Kind == "requestfailed")
 	missing := record.Kind == "console" && strings.Contains(record.Text, "status of 404")
-	return (asset || missing) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+	style := record.Kind == "console" && strings.HasPrefix(record.Text, "Refused to apply style from ") && strings.Contains(record.Text, "/assets/")
+	return (asset || missing || style) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
+}
+
+// mainClientOutdated: main's page, fetched just before the switch, sends head its old enveloped tRPC input
+// (`{"json": ...}`) and head answers 400 client_outdated, as packages/api/src/trpc/client-outdated.ts means
+// it to; its console line names no url. The WebSocket's own 404 is the http twin of mainTabAcrossSwitch.
+func mainClientOutdated(record BrowserRecord, switched int64) bool {
+	decoded, _ := url.QueryUnescape(record.URL)
+	enveloped := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.URL, "/api/trpc/") &&
+		strings.Contains(decoded, `"json":`)
+	socket := record.Kind == "http" && record.Status == http.StatusNotFound && strings.Contains(record.URL, "/api/trpc-ws")
+	refused := record.Kind == "console" && strings.Contains(record.Text, "status of 400")
+	told := record.Kind == "http" && record.Status == http.StatusBadRequest && strings.Contains(record.Text, "client_outdated")
+	logged := record.Kind == "console" && strings.HasPrefix(record.Text, "<< ") // main's tRPC logger echoing those refusals
+	return (enveloped || socket || refused || told || logged) && switched >= 0 && record.AtMs >= switched && record.AtMs <= switched+60_000
 }
 
 // browserNoise is a console error or failed request the lab tolerates: every Match substring in the
@@ -412,30 +435,56 @@ type browserNoise struct {
 var acceptedBrowserNoise = []browserNoise{
 	{[]string{"static.hotjar.com"}, "third-party analytics, same on main"},
 	{[]string{"static.reo.dev", "ERR_BLOCKED_BY_ORB"}, "third-party analytics, same on main"},
+	{[]string{"/api/trpc/", "?input=", "net::ERR_ABORTED"}, "a tRPC read the page cancelled itself (navigation or a re-keyed query); its answer is judged by N2 and the api log"},
+	{[]string{"/api/health", "net::ERR_ABORTED"}, "the boot screen's health probe, cancelled when the walk moves to the next page"},
 }
 
 // BrowserFindings reads browser.jsonl: the walks completed and every error outside the accepted list.
-func BrowserFindings(path string, switched, ready int64) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
+func BrowserFindings(path string, switched, ready int64, stopStart bool) (walks, expected int, tolerated map[string]int, findings []BrowserRecord, err error) {
 	data, err := os.ReadFile(filepath.Clean(path))
 	if err != nil {
 		return 0, 0, nil, nil, err
 	}
 	tolerated = map[string]int{}
+	var records []BrowserRecord
+	upgrading := map[string]bool{} // paths that answered a readable upgrade_in_progress in the window
+	twins := 0                     // the browser echoes each failed load as a console line naming no url: one per expected 503
 	for _, line := range strings.Split(string(data), "\n") {
 		var record BrowserRecord
 		if strings.TrimSpace(line) == "" || json.Unmarshal([]byte(line), &record) != nil {
 			continue
 		}
+		records = append(records, record)
+		if expectedWhileStepsRun(record, switched, ready) {
+			twins++
+			upgrading[pathOf(record.URL)] = true
+		}
+	}
+	for _, record := range records {
+		if unreadUpgrade503(record, switched, ready, upgrading) {
+			twins++
+		}
+	}
+	for _, record := range records {
 		switch {
 		case record.Kind == "walk":
 			walks++
-		case expectedWhileStepsRun(record, switched, ready):
+		case expectedWhileStepsRun(record, switched, ready), unreadUpgrade503(record, switched, ready, upgrading):
 			expected++
+		case twins > 0 && consoleTwinOf503(record, switched, ready):
+			twins--
+			tolerated["console 'status of 503' (the browser's echo of an expected upgrade_in_progress 503)"]++
 		case record.Kind == "walkerror":
+		case record.Kind == "navigated":
+			tolerated["the open tab navigated on its own between walks (told to reload)"]++
+		case stopStartDowntime(record, stopStart):
+			tolerated["502 or aborted load while no release serves (self-hosted stop-start downtime, T4-F3)"]++
 		case mainTabAcrossSwitch(record, switched):
 			tolerated["/api/trpc-ws (main's tab, open across the switch, reconnecting)"]++
 		case mainPageAcrossSwitch(record, switched):
 			tolerated["/assets/* 404 (main's page, fetched across the switch, ADR-086)"]++
+		case mainClientOutdated(record, switched):
+			tolerated["/api/trpc 400 client_outdated (main's page, fetched across the switch, told to reload)"]++
 		default:
 			if noise, ok := accepted(record); ok {
 				tolerated[noise.Match[0]+" ("+noise.Reason+")"]++

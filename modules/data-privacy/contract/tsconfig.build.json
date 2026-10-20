@@ -21,22 +21,22 @@
   ],
   "references": [
     {
-      "path": "../../../packages/config/tsconfig.build.json"
+      "path": "../../../packages/redaction/tsconfig.build.json"
     },
     {
-      "path": "../../evaluation/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../../packages/otlp/tsconfig.build.json"
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/redaction/tsconfig.build.json"
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     },
     {
-      "path": "../../trace/contract/tsconfig.build.json"
+      "path": "../../evaluation/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
     }
   ]
 }

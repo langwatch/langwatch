@@ -2,9 +2,9 @@
  * @vitest-environment jsdom
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AddOverrideDrawer, type RetentionEditTarget } from "../add-override-drawer.tsx";
 
@@ -74,6 +74,18 @@ describe("AddOverrideDrawer", () => {
       expect(screen.getByTestId("scope-chip-picker")).toBeTruthy();
       expect(screen.getByRole("button", { name: "Cancel" })).toBeTruthy();
       expect(screen.getByRole("button", { name: "Create" })).toBeTruthy();
+    });
+
+    it("explains a missing scope on Create instead of saving", () => {
+      const onSave = vi.fn();
+      renderDrawer({ editTarget: null, available: { projects: [] }, onSave });
+
+      const create = screen.getByRole("button", { name: "Create" });
+      expect((create as HTMLButtonElement).disabled).toBe(false);
+      fireEvent.click(create);
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(screen.getByRole("alert").textContent).toBe("Pick at least one scope.");
     });
   });
 });

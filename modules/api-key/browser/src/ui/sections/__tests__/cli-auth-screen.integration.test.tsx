@@ -38,11 +38,18 @@ vi.mock("../../../behavior/api-key-api.ts", () => ({
     },
     project: {
       getHasFirstMessage: {
-        useQuery: () => ({ data: { firstMessage: state.firstMessage ?? true } }),
+        useQuery: () => ({
+          data: { firstMessage: state.firstMessage ?? true },
+          refetch: async () => undefined,
+        }),
       },
     },
     organization: { getAll: { useQuery: () => ({ data: [] }) } },
   },
+}));
+
+vi.mock("@langwatch/trace-client", () => ({
+  traceClient: { traces: { onTraceUpdate: { useSubscription: () => undefined } } },
 }));
 
 // The picker is `@langwatch/design-system`'s and has its own suite; what this file

@@ -178,13 +178,13 @@ Permission `gatewaySpend:manage`. Entitlement `webhook_endpoints`. Declared at `
 Answers at `/api/gateway/v1/spend-events/replay`.
 
 ```typescript
-// Body: webhookSpendReplayBodySchema, ../contract/src/webhook-spend-replay.schemas.ts:14
+// Body: webhookSpendReplayBodySchema, ../contract/src/webhook-spend-replay.schemas.ts:31
 interface Body {
   from: number;
   to: number;
   endpoint_id: string;
 }
-// Response: webhookSpendReplayResponseSchema, ../contract/src/webhook-spend-replay.schemas.ts:35
+// Response: webhookSpendReplayResponseSchema, ../contract/src/webhook-spend-replay.schemas.ts:48
 interface Response {
   data: {
     endpoint_id: string;
@@ -216,8 +216,8 @@ Permission `webhookEndpoints:manage`. Declared at `src/transport/webhook.rest.ts
 Answers at `/api/webhooks/v1/endpoints`.
 
 ```typescript
-type Body = z.infer<typeof createEndpointSchema>; // ../contract/src/webhook-rest.schemas.ts:198
-type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:124
+type Body = z.infer<typeof createEndpointSchema>; // ../contract/src/webhook-rest.schemas.ts:265
+type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:168
 ```
 
 #### `GET /endpoints` · `getApiWebhooksV1Endpoints`
@@ -229,7 +229,7 @@ Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:1
 Answers at `/api/webhooks/v1/endpoints`.
 
 ```typescript
-type Response = z.infer<typeof endpointListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:102
+type Response = z.infer<typeof endpointListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:126
 ```
 
 #### `GET /endpoints/:id` · `getApiWebhooksV1EndpointsById`
@@ -245,7 +245,7 @@ Answers at `/api/webhooks/v1/endpoints/:id`.
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:122
+type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:161
 ```
 
 #### `PATCH /endpoints/:id` · `patchApiWebhooksV1EndpointsById`
@@ -258,8 +258,8 @@ Answers at `/api/webhooks/v1/endpoints/:id`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-type Body = z.infer<typeof updateEndpointSchema>; // ../contract/src/webhook-rest.schemas.ts:211
-type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:122
+type Body = z.infer<typeof updateEndpointSchema>; // ../contract/src/webhook-rest.schemas.ts:280
+type Response = z.infer<typeof endpointResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:161
 ```
 
 #### `DELETE /endpoints/:id` · `deleteApiWebhooksV1EndpointsById`
@@ -272,7 +272,7 @@ Answers at `/api/webhooks/v1/endpoints/:id`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-// Response: endpointArchivedResponseSchema, ../contract/src/webhook-rest.schemas.ts:126
+// Response: endpointArchivedResponseSchema, ../contract/src/webhook-rest.schemas.ts:177
 interface Response {
   data: {
     archived: true;
@@ -290,9 +290,9 @@ Answers at `/api/webhooks/v1/endpoints/:id/roll-secret`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-// Body: rollEndpointSecretBodySchema, ../contract/src/webhook-rest.schemas.ts:273
+// Body: rollEndpointSecretBodySchema, ../contract/src/webhook-rest.schemas.ts:348
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:124
+type Response = z.infer<typeof endpointWithSecretResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:168
 ```
 
 #### `POST /endpoints/:id/test` · `postApiWebhooksV1EndpointsByIdTest`
@@ -305,9 +305,9 @@ Answers at `/api/webhooks/v1/endpoints/:id/test`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-// Body: testEndpointBodySchema, ../contract/src/webhook-rest.schemas.ts:276
+// Body: testEndpointBodySchema, ../contract/src/webhook-rest.schemas.ts:353
 type Body = Record<string, unknown>;
-// Response: testFireResponseSchema, ../contract/src/webhook-rest.schemas.ts:270
+// Response: testFireResponseSchema, ../contract/src/webhook-rest.schemas.ts:340
 interface Response {
   data: {
     delivered: boolean;
@@ -322,43 +322,43 @@ interface Response {
 
 List an endpoint's delivery attempts
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:315`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:316`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/deliveries`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-// Query: deliveriesQuerySchema, ../contract/src/webhook-rest.schemas.ts:224
+// Query: deliveriesQuerySchema, ../contract/src/webhook-rest.schemas.ts:287
 interface Query {
   cursor?: string;
   limit?: number;
 }
-type Response = z.infer<typeof deliveryListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:110
+type Response = z.infer<typeof deliveryListResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:145
 ```
 
 #### `GET /endpoints/:id/health` · `getApiWebhooksV1EndpointsByIdHealth`
 
 Read an endpoint's delivery health
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:354`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:355`.
 
 Answers at `/api/webhooks/v1/endpoints/:id/health`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-type Response = z.infer<typeof healthResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:268
+type Response = z.infer<typeof healthResponseSchema>; // ../contract/src/webhook-rest.schemas.ts:336
 ```
 
 #### `GET /event-types` · `getApiWebhooksV1EventTypes`
 
 List subscribable event types
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:384`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:385`.
 
 Answers at `/api/webhooks/v1/event-types`.
 
 ```typescript
-// Response: eventTypeListResponseSchema, ../contract/src/webhook-rest.schemas.ts:106
+// Response: eventTypeListResponseSchema, ../contract/src/webhook-rest.schemas.ts:135
 interface Response {
   data: {
     type: string;
@@ -374,12 +374,12 @@ interface Response {
 
 List emitted events
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:407`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:408`.
 
 Answers at `/api/webhooks/v1/events`.
 
 ```typescript
-// Query: eventsQuerySchema, ../contract/src/webhook-rest.schemas.ts:229
+// Query: eventsQuerySchema, ../contract/src/webhook-rest.schemas.ts:304
 interface Query {
   type?: string;
   from: number;
@@ -387,7 +387,7 @@ interface Query {
   cursor?: string;
   limit?: number;
 }
-// Response: webhookEventListResponseSchema, ../contract/src/webhook-rest.schemas.ts:115
+// Response: webhookEventListResponseSchema, ../contract/src/webhook-rest.schemas.ts:155
 interface Response {
   data: {
     id: string;
@@ -404,13 +404,13 @@ interface Response {
 
 Get one emitted event
 
-Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:435`.
+Permission `webhookEndpoints:view`. Declared at `src/transport/webhook.rest.ts:436`.
 
 Answers at `/api/webhooks/v1/events/:id`.
 
 ```typescript
 type Params = z.infer<typeof endpointIdParams>; // src/transport/webhook.rest.ts:34
-// Response: webhookEventResponseSchema, ../contract/src/webhook-rest.schemas.ts:130
+// Response: webhookEventResponseSchema, ../contract/src/webhook-rest.schemas.ts:184
 interface Response {
   data: {
     id: string;
@@ -426,7 +426,7 @@ interface Response {
 
 ### `webhookEndpoints`
 
-Contract `../contract/src/webhook-endpoint.trpc.ts:74`, router `src/transport/webhook-endpoint.trpc.ts:13`.
+Contract `../contract/src/webhook-endpoint.trpc.ts:104`, router `src/transport/webhook-endpoint.trpc.ts:13`.
 
 | Procedure                     | Kind     | Gate                                 | Input                                    | Output                            |
 | ----------------------------- | -------- | ------------------------------------ | ---------------------------------------- | --------------------------------- |
@@ -443,11 +443,11 @@ Contract `../contract/src/webhook-endpoint.trpc.ts:74`, router `src/transport/we
 
 ```typescript
 // webhookEndpoints.eventTypes
-// Input: webhookEndpointOrganizationScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:19
+// Input: webhookEndpointOrganizationScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:26
 interface Input {
   organizationId: string;
 }
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:78
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:108
 type Output = {
   type: string;
   family: string;
@@ -457,11 +457,11 @@ type Output = {
 }[];
 
 // webhookEndpoints.list
-type Input = z.infer<typeof webhookEndpointOrganizationScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:19
-// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:82)
+type Input = z.infer<typeof webhookEndpointOrganizationScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:26
+// Output: webhookEndpointViewSchema.array() (inline, ../contract/src/webhook-endpoint.trpc.ts:112)
 
 // webhookEndpoints.deliveries
-// Input: webhookEndpointDeliveriesInputSchema, ../contract/src/webhook-endpoint.trpc.ts:41
+// Input: webhookEndpointDeliveriesInputSchema, ../contract/src/webhook-endpoint.trpc.ts:65
 interface Input {
   organizationId: string;
   endpointId: string;
@@ -471,19 +471,19 @@ interface Input {
     id: string;
   };
 }
-type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:122
+type Output = z.infer<typeof webhookDeliveryPageSchema>; // ../contract/src/webhook.ts:170
 
 // webhookEndpoints.create
-type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:47
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
+type Input = z.infer<typeof webhookEndpointCreateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:82
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:137
 
 // webhookEndpoints.health
-// Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:23
+// Input: webhookEndpointScopeSchema, ../contract/src/webhook-endpoint.trpc.ts:36
 interface Input {
   organizationId: string;
   endpointId: string;
 }
-// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:83
+// Output: webhookEndpointHealthSchema, ../contract/src/webhook.ts:122
 interface Output {
   status: "ACTIVE" | "DISABLED";
   disabledReason: string | null;
@@ -498,24 +498,24 @@ interface Output {
 }
 
 // webhookEndpoints.update
-type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:59
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
+type Input = z.infer<typeof webhookEndpointUpdateInputSchema>; // ../contract/src/webhook-endpoint.trpc.ts:102
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:92
 
 // webhookEndpoints.rollSecret
-type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:102
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:36
+type Output = z.infer<typeof webhookEndpointWithSecretSchema>; // ../contract/src/webhook.ts:137
 
 // webhookEndpoints.enable
-type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:36
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:92
 
 // webhookEndpoints.disable
-type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:51
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:36
+type Output = z.infer<typeof webhookEndpointViewSchema>; // ../contract/src/webhook.ts:92
 
 // webhookEndpoints.archive
-type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:23
-// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:114
+type Input = z.infer<typeof webhookEndpointScopeSchema>; // ../contract/src/webhook-endpoint.trpc.ts:36
+// Output: inline, ../contract/src/webhook-endpoint.trpc.ts:144
 type Output = unknown;
 ```
 
@@ -559,9 +559,9 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                         | Environment variable                        | Declared at                            |
 | ------ | ---------------------------- | ------------------------------------------- | -------------------------------------- |
-| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:10` |
-| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:11` |
-| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:13` |
-| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:15` |
+| config | `allowInsecureLocalUrls`     | `WEBHOOKS_UNSAFE_ALLOW_LOCAL_URLS`          | `../contract/src/webhook.config.ts:17` |
+| config | `allowAmbientAwsCredentials` | `WEBHOOKS_UNSAFE_ALLOW_AMBIENT_CREDENTIALS` | `../contract/src/webhook.config.ts:18` |
+| config | `isSaas`                     | `IS_SAAS`                                   | `../contract/src/webhook.config.ts:20` |
+| config | `outboundProxy`              | `HTTPS_PROXY`                               | `../contract/src/webhook.config.ts:22` |
 
 <!-- readme:generated:end -->

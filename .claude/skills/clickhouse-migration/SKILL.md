@@ -1,20 +1,20 @@
 ---
 name: clickhouse-migration
-description: "Change the ClickHouse schema without breaking any release still in the supported window: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every statement, why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, the LTS floor (3.20.1) and the retirement note required before any DROP or type change, historic values by a background .withMigrations step instead of an operator comment, the `-- background step:` note on a mutation (MODIFY TTL needs materialize_ttl_after_modify = 0) and the deploy-time rewrites it never excuses (MODIFY ORDER BY, OPTIMIZE FINAL, POPULATE), a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
+description: "Change the ClickHouse schema without breaking the previous release, which keeps serving on the new schema: where the goose migrations live, `clickhouse:<NNNNN>` numbering and the migration-order check for collisions, one owner per file, one statement per StatementBegin block, IF NOT EXISTS / IF EXISTS on every CREATE, ADD, DROP, MODIFY and RENAME (CREATE OR REPLACE is exempt), why a variable-size column added by ALTER needs a DEFAULT, why down migrations stay commented out, partition keys and TTL, deduped tables and argMax, why a goose file never drops a table, a column or a materialised view with an inner table (a drop is an operator step), why a type change waits until old writers are gone, historic values by a background .withMigrations step instead of an operator comment, the `-- background step:` note on a mutation (MODIFY TTL needs materialize_ttl_after_modify = 0) and the deploy-time rewrites it never excuses (MODIFY ORDER BY, OPTIMIZE FINAL, POPULATE), a changed view under a new name, every ClickHouse target applied by `pnpm task upgrade`, keeping the LWQL catalogue in step, and the expand/contract recipes. Use whenever someone says 'add a ClickHouse column', 'add a ClickHouse table', 'change that column type', 'drop the old table', 'replace the view', 'backfill a ClickHouse column', 'MATERIALIZE', 'write a goose migration', 'goose number taken', 'Code 173', 'Code 241', or the migration-safety test named their migration."
 user-invocable: true
 argument-hint: "<the schema change, or the migration name the scanner refused>"
 ---
 
-# Change the ClickHouse schema inside the window
+# Change the ClickHouse schema safely
 
-**The rule** (ADR-155, widened to the floor; ADR-173): every release from the LTS floor
-(`packages/upgrade/releases/lts-floor.json`, `3.20.1`) to head keeps running on every later schema.
-`upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
+**The rule** (ADR-155; ADR-173): no release is a required stop (Alex, 2026-10-11); any install upgrades
+to the latest image through every step. `upgrade` runs under a lease while the old pods keep serving, and a rollback puts an older image on
 the new schema. (A one-release upgrade runs goose `up` on each target in one pass; a jump across
 several releases runs goose `up-to` each release's last version in turn, `releaseSteppingApplier`
-in `apps/tasks/src/upgrade.ts`, `specs/upgrade/stepping.feature`.) Every change is
-expand/contract, and a destructive step may only remove what **no release at or above the floor**
-reads. Which recipe applies at all: the `migration` skill.
+in `packages/upgrade/src/runner/release-stepping-applier.ts`, `specs/upgrade/stepping.feature`.)
+Every change is expand/contract, and nothing is deleted automatically (Alex, 2026-10-11): a goose
+file never drops a table, a column or a materialised view that owns an inner table; a drop is an
+operator step confirmed in Ops once safe. Which recipe applies at all: the `migration` skill.
 
 Files: `packages/clickhouse-migrations/migrations/<NNNNN>_<slug>.sql`, applied by goose in sequence
 order. Read `dev/docs/best_practices/clickhouse-queries.md` before writing any query the migration
@@ -25,8 +25,8 @@ asks nothing here.
 pnpm start:prepare:db   # apply it the way a deployment does: `pnpm task upgrade` (the worker runs the same command at boot)
 ```
 
-`pnpm clickhouse:migrate` still exists but bypasses the ledger, so the api and worker keep refusing
-until `upgrade` runs. `upgrade` applies goose on **every** target (the shared `CLICKHOUSE_URL` and
+The root `pnpm clickhouse:migrate` is an alias of `pnpm task upgrade`, so it goes through the ledger;
+raw `goose` does not, and the api and worker keep refusing until `upgrade` runs. `upgrade` applies goose on **every** target (the shared `CLICKHOUSE_URL` and
 each private dataplane endpoint), then fails the release if any target failed (round 14). It waits
 `CLICKHOUSE_MIGRATE_WAIT_SECONDS` (default 180) for ClickHouse to accept connections. ClickHouse is
 mandatory: a serving process with no ClickHouse refuses (round 20).
@@ -35,10 +35,9 @@ mandatory: a serving process with no ClickHouse refuses (round 20).
 after the others have run and the run exits 1 with code `schema_failed`, naming the target (`shared`
 or `private:<organizationId>`) and its error with the URL redacted. The ledger keeps one row per step
 and target (`done`, `failed` or `pending`), so `pnpm task upgrade status` shows which target stopped
-at which `clickhouse:<NNNNN>`. The retry is `pnpm task upgrade` again: every statement is
-`IF [NOT] EXISTS`, so goose re-runs the failed file from its first statement. Other settings it reads:
-`CLICKHOUSE_CLUSTER` (set, every engine is Replicated), `SKIP_CLICKHOUSE_MIGRATE=true` (the app then
-refuses until an upgrade runs without it) and, in the reconcile phase, the cold-storage TTL variables
+at which `clickhouse:<NNNNN>`. The retry is `pnpm task upgrade` again (or Retry on Ops > Upgrades):
+every DDL statement is `IF [NOT] EXISTS`, so goose re-runs the failed file from its first statement. Other settings it reads:
+`CLICKHOUSE_CLUSTER` (set, every engine is Replicated) and, in the reconcile phase, the cold-storage TTL variables
 (`packages/clickhouse-migrations/src/ttl.reconciler.ts`).
 
 **Numbering and collisions.** The step id is `clickhouse:<NNNNN>`. Take one above the highest on
@@ -78,14 +77,15 @@ Every line is load-bearing:
 - **`${CLICKHOUSE_DATABASE}` with `ENVSUB ON`**: the database name is deployment configuration.
 - **One statement per `StatementBegin`/`StatementEnd` pair.** ClickHouse has no multi-statement
   query; a second statement fails the migration halfway, leaving neither shape.
-- **`IF NOT EXISTS` / `IF EXISTS` on every statement.** goose on ClickHouse has no transactions, so
-  a half-run migration is re-run from its first statement. The scanner refuses a statement without
-  it (`ddl-without-if-exists`).
+- **`IF NOT EXISTS` / `IF EXISTS` on every `CREATE`, `ADD`, `DROP`, `MODIFY` and `RENAME`.** goose
+  on ClickHouse has no transactions, so a half-run migration is re-run from its first statement.
+  The scanner refuses a statement of those forms without it (`ddl-without-if-exists`);
+  `CREATE OR REPLACE` is exempt, and a mutation must be safe to run twice.
 - **`DEFAULT` on any variable-size column** (`Array`, `Map`, `Tuple`, `Nested`). Parts written
   before an `ALTER` are unmaterialised and decode as garbage without one: **Code 173** at read,
   **Code 241** at merge. The most common ClickHouse outage in this repository's history.
 - **The down migration stays commented out**, under `To roll back, uncomment and run manually.`
-  The way back is the previous image on the migrated schema, which the window guarantees.
+  The way back is the previous image on the migrated schema, which expand/contract guarantees.
 
 ## Recipe: add a column
 
@@ -98,12 +98,14 @@ ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries ADD COLUMN IF NOT EXISTS Tier
 
 **Historic values are a background data step**, a `MATERIALIZE COLUMN` or `ALTER TABLE ... UPDATE`
 run on the worker, never a comment asking the operator to run it (plan 6.12, the "ClickHouse add
-column" row; today's comments in `00034`, `00035`, `00062`, `00063`, `00076` are what that replaces,
-plan 3.2 K2). A mutation is asynchronous and rewrites parts: the step starts it, watches
+column" row; the operator comments in `00034`, `00035`, `00062`, `00063`, `00076` are historical
+debt, never a template, plan 3.2 K2). A mutation is asynchronous and rewrites parts: the step starts it, watches
 `system.mutations`, and is level-triggered. Declare it with `.withMigrations` as a `data` step,
-mode `background`, on the module that owns the table (the `migration-data-step` skill). A goose file
+mode `background`, on the module that owns the table (the `migration-data-step` skill, which also covers pacing by the
+step's own queue work and `upgradelab` runs in the `upgrade` skill). A goose file
 that still starts the mutation puts `-- background step: <step id>` above it, naming the step that
-waits on it (`00103`, `trace:track-updated-at-index-materialisation`); without the note the scanner
+waits on it (`00103`; the step `trace:track-updated-at-index-materialisation` only observes the
+mutation, it does not start it); without the note the scanner
 refuses it (Alex, 2026-10-09). The note excuses a mutation only: `MODIFY ORDER BY`, `OPTIMIZE ... FINAL`
 and `POPULATE` are refused with or without it, because they run inside goose and block the upgrade.
 
@@ -113,31 +115,29 @@ Never `MODIFY COLUMN` to a new type: it rewrites every part while older releases
 
 1. **Expand**: a new column of the new type with a `DEFAULT`, beside the old.
 2. **Migrate**: dual-write from release A; a background step backfills history; readers switch in A.
-3. **Contract**: drop the old column once the LTS floor is at or above A, with the note.
+3. **Retire**: the old column stays; an operator step in the owning module drops it once an
+   operator confirms in Ops that old writers are gone.
 
 `MODIFY COLUMN` that sets only a `CODEC`, a `TTL` or a comment is not a type change: write
 `MODIFY COLUMN <name> CODEC(...)` without restating the type.
 
 ## Recipe: remove a column, a table or a view
 
-Release A stops reading it; the first release whose LTS floor is at or above A drops it, with the note
-naming A:
-
-```sql
--- contract: retired in 3.20.1
-ALTER TABLE ${CLICKHOUSE_DATABASE}.trace_summaries DROP COLUMN IF EXISTS LegacyCost;
-```
-
-The note's release must be at or below the floor (`retirement-note-above-floor`). When it is not,
-leave the drop out and name it in the handoff: a lane does not move the floor.
+Release A stops reading it. No goose file drops it (`drop-table-or-column`, above the newest
+`langwatch@v*` tag): the owning module declares an operator step (`mode: "operator"`) whose run
+drops it through the module's own repository, and an operator confirms it in Ops once old writers
+are gone. The upgrade registers it pending and never runs it; Ops has no generic "start this
+operator step" action yet, so until it exists stopping use is the whole job. Dropping an index, a projection, a
+plain view or a materialised view that writes `TO` a table holds no data and stays allowed; a
+materialised view created without `TO` owns an inner table, so its drop is refused like a table's.
 
 ## Recipe: change a view
 
 - **Same columns, same meaning** (a fix to the body): `CREATE OR REPLACE VIEW`, or
   `EXCHANGE TABLES` for a materialized one. Never drop-and-create: every read in the gap fails.
 - **Different columns**: a view replaced in place is destructive (plan 6.12, enforcement item 2).
-  Create a new view under a new name, switch readers in release A, drop the old view under the
-  floor rule.
+  Create a new view under a new name and switch readers in release A. A plain old view may then
+  be dropped; one that owns an inner table is dropped by an operator step, as above.
 
 Either way the catalogue moves with it (below).
 
@@ -173,8 +173,8 @@ with the fix:
 
 | Rule                                       | Refuses                                                                                                                                                                          |
 | ------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `drop-without-retirement-note`             | a `DROP` with no `-- contract: retired in <release>`                                                                                                                             |
-| `retirement-note-above-floor`              | a note naming a release above the floor                                                                                                                                          |
+| `drop-table-or-column`                     | a `DROP TABLE`, `DROP COLUMN`, or a dropped materialised view with no `TO` table, in a file above the newest release tag                                                         |
+| `drop-without-retirement-note`             | released history only: a `DROP` with no `-- contract: retired in <release>`; a note never excuses a new drop                                                                     |
 | `modify-column-type`                       | `MODIFY COLUMN` to a new type                                                                                                                                                    |
 | `add-variable-size-column-without-default` | `Array`, `Map`, `Tuple`, `Nested` added with no `DEFAULT`                                                                                                                        |
 | `one-statement-per-goose-block`            | two statements in one `StatementBegin` block                                                                                                                                     |

@@ -8,10 +8,9 @@ import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import { resolveRequestBound } from "@langwatch/plans";
 import type { ProjectApi } from "@langwatch/project-contract";
 /**
- * The eval-function gate is Analytics' own answer, read from the project's
- * rollout — a caller never states it, and a statement that judges nothing
- * never pays for the read.
- * @vitest-environment node
+ * The eval-function gate on a member's statement is Analytics' own answer, read from the
+ * project's rollout, and a statement that judges nothing never pays for the read. A pass
+ * takes Instant Evals' answer instead. @vitest-environment node
  */
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
@@ -152,6 +151,39 @@ describe("AnalyticsModule.executeLangWatchQL", () => {
           target: { kind: "project", projectId: PROJECT_ID, organizationId: ORGANIZATION_ID },
         },
       ]);
+    });
+  });
+});
+
+describe("AnalyticsModule.executeLangWatchQLPass", () => {
+  const pass = (app: AnalyticsModule, isInstantEvalsEnabled: boolean) =>
+    app.executeLangWatchQLPass({
+      project: { id: PROJECT_ID, lwqlKey: "lwql-key" },
+      protections: { catalogue: EVERY_CATALOGUE_PERMISSION },
+      sql: "SELECT TraceId, eval(TraceName, 'is it rude?') AS rude FROM analytics.traces",
+      pass: { kind: "probe" },
+      isInstantEvalsEnabled,
+    });
+
+  describe("given a caller that says eval functions are refused, with the flag on", () => {
+    /** @scenario "Every read a run makes carries Instant Evals' own answer to whether eval functions may run" */
+    it("refuses the eval call without reading the flag", async () => {
+      const { app, flagReads } = await harness(true);
+
+      await expect(pass(app, false)).rejects.toMatchObject({ code: "lwql_not_permitted" });
+      expect(flagReads).toEqual([]);
+    });
+  });
+
+  describe("given a caller that says eval functions are allowed, with the flag off", () => {
+    /** @scenario "Every read a run makes carries Instant Evals' own answer to whether eval functions may run" */
+    it("admits the eval call without reading the flag", async () => {
+      const { app, flagReads } = await harness(false);
+
+      const refusal: unknown = await pass(app, true).catch((error: unknown) => error);
+
+      expect(refusal).not.toMatchObject({ code: "lwql_not_permitted" });
+      expect(flagReads).toEqual([]);
     });
   });
 });

@@ -18,16 +18,47 @@ const { state } = vi.hoisted(() => ({
   state: {
     firstMessage: void 0 as boolean | undefined,
     lastOptions: void 0 as Record<string, unknown> | undefined,
+    refetches: 0,
+    setData: [] as unknown[],
+    stream: {
+      input: void 0 as unknown,
+      enabled: false,
+      onData: void 0 as (() => void) | undefined,
+    },
+  },
+}));
+
+vi.mock("@langwatch/trace-client", () => ({
+  traceClient: {
+    traces: {
+      onTraceUpdate: {
+        useSubscription: (input: unknown, options: { enabled?: boolean; onData?: () => void }) => {
+          state.stream = { input, enabled: options.enabled ?? true, onData: options.onData };
+        },
+      },
+    },
   },
 }));
 
 vi.mock("../api-key-api.ts", () => ({
   apiKeyApi: {
+    useUtils: () => ({
+      project: {
+        getHasFirstMessage: {
+          setData: (input: unknown, data: unknown) => state.setData.push([input, data]),
+        },
+      },
+    }),
     project: {
       getHasFirstMessage: {
         useQuery: (_input: unknown, options: Record<string, unknown>) => {
           state.lastOptions = options;
-          return { data: { firstMessage: state.firstMessage } };
+          return {
+            data: { firstMessage: state.firstMessage },
+            refetch: async () => {
+              state.refetches += 1;
+            },
+          };
         },
       },
     },
@@ -58,21 +89,24 @@ const ORGANIZATIONS = [
   },
 ];
 
-function watchElement(host: FakeApiKeyHost) {
+function watchElement(host: FakeApiKeyHost, organizationId = "org-1") {
   return (
     <ApiKeyHostProvider value={host}>
-      <FirstTraceRedirect />
+      <FirstTraceRedirect organizationId={organizationId} />
     </ApiKeyHostProvider>
   );
 }
 
-function renderWatch(host: FakeApiKeyHost) {
-  return renderWithDesignSystem(watchElement(host));
+function renderWatch(host: FakeApiKeyHost, organizationId = "org-1") {
+  return renderWithDesignSystem(watchElement(host, organizationId));
 }
 
 beforeEach(() => {
   state.firstMessage = void 0;
   state.lastOptions = void 0;
+  state.refetches = 0;
+  state.setData = [];
+  state.stream = { input: void 0, enabled: false, onData: void 0 };
 });
 
 afterEach(() => {
@@ -137,5 +171,83 @@ describe("given a reader with no personal workspace", () => {
     const { container } = renderWatch(host);
     await waitFor(() => expect(container).toBeEmptyDOMElement());
     expect(host.navigations).toEqual([]);
+  });
+});
+
+describe("given the page was opened in one organization and the approval names another", () => {
+  const SECOND_ORGANIZATION = {
+    id: "org-2",
+    name: "Globex",
+    teams: [
+      {
+        id: "team-personal-2",
+        name: "Jane's Globex Workspace",
+        isPersonal: true,
+        ownerUserId: "user-1",
+        projects: [
+          {
+            id: "proj-personal-2",
+            name: "Personal Workspace",
+            slug: "jane-globex",
+            isPersonal: true,
+            ownerUserId: "user-1",
+          },
+        ],
+      },
+    ],
+  };
+
+  /** @scenario The watch follows the organization the approval was granted for */
+  it("watches the approved organization's personal project and takes the reader there", async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    const host = new FakeApiKeyHost({ organizations: [...ORGANIZATIONS, SECOND_ORGANIZATION] });
+    state.firstMessage = false;
+    const { rerender } = renderWatch(host, "org-2");
+
+    expect(await screen.findByText(/Waiting for your first trace/)).toBeInTheDocument();
+
+    state.firstMessage = true;
+    rerender(watchElement(host, "org-2"));
+    await screen.findByText(/First trace received/);
+    await act(async () => {
+      vi.advanceTimersByTime(FIRST_TRACE_REDIRECT_DELAY_MS);
+    });
+    await waitFor(() =>
+      expect(host.navigations).toEqual([{ kind: "navigate", to: "/jane-globex/traces" }]),
+    );
+  });
+});
+
+describe("given the watch confirmed the project has never synced a trace", () => {
+  describe("when the project's first trace is received", () => {
+    /** @scenario The watch updates when the project's first trace is received */
+    it("learns of it from trace's stream and redirects without waiting for the flag", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      const host = new FakeApiKeyHost({ organizations: ORGANIZATIONS });
+      state.firstMessage = false;
+      const { rerender } = renderWatch(host);
+      await screen.findByText(/Waiting for your first trace/);
+
+      expect(state.stream.input).toEqual({ projectId: "proj-personal" });
+      expect(state.stream.enabled).toBe(true);
+      expect(state.refetches).toBe(0);
+
+      // The stored flag is still false: the stream event alone is the first trace.
+      await act(async () => {
+        state.stream.onData?.();
+      });
+      rerender(watchElement(host));
+      await screen.findByText(/First trace received/);
+      expect(state.refetches).toBe(0);
+      // The traces page the redirect lands on reads the flag already true.
+      expect(state.setData).toEqual([[{ projectId: "proj-personal" }, { firstMessage: true }]]);
+      expect(state.stream.enabled).toBe(false);
+      await act(async () => {
+        vi.advanceTimersByTime(FIRST_TRACE_REDIRECT_DELAY_MS);
+      });
+      await waitFor(() =>
+        expect(host.navigations).toEqual([{ kind: "navigate", to: "/jane-personal/traces" }]),
+      );
+    });
   });
 });

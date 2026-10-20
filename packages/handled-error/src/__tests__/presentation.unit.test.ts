@@ -75,6 +75,19 @@ describe("explainHandledError", () => {
     });
 
     /** @scenario "meta is read only where the client knows its shape" */
+    it("titles a refused test fire as not sent, its reason naming the fix", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "test_fire_unavailable",
+          meta: { channel: "slack", reason: "Slack no longer accepts this webhook." },
+        }),
+      );
+
+      expect(title).toBe("Test message not sent");
+      expect(description).toBe("Slack no longer accepts this webhook.");
+    });
+
+    /** @scenario "meta is read only where the client knows its shape" */
     it("falls back cleanly when the declared meta is absent", () => {
       const { title, description } = explainHandledError(
         shape({ code: "filter_field_unknown", meta: {} }),
@@ -524,6 +537,33 @@ describe("explainHandledError", () => {
       expect(description).toBe(
         "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.",
       );
+    });
+
+    /** @scenario "A plan or quota limit that resets reads as no allowance left" */
+    it.each([
+      "usage_limit_reached",
+      "codex_plan_limit",
+      "insufficient_quota",
+      "billing_hard_limit_reached",
+    ])("headlines the provider's %s code as no allowance left", (code) => {
+      const { title } = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+      );
+
+      expect(title).toBe("This provider account has no allowance left");
+      expect(title).not.toContain("out of credit");
+    });
+
+    /** @scenario "A plan or quota limit that resets reads as no allowance left" */
+    it("keeps the allowance headline when the proxy files its out-of-credit reason beside the code", () => {
+      const { title } = explainHandledError(
+        shape({
+          code: "llm_upstream_error",
+          reasons: [reason("insufficient_quota"), reason("llm_provider_out_of_credit")],
+        }),
+      );
+
+      expect(title).toBe("This provider account has no allowance left");
     });
 
     /** @scenario "A provider that does not know the model gets its own remediation copy" */
@@ -1139,5 +1179,56 @@ describe("webhook_endpoint_invalid", () => {
     );
 
     expect(description).toContain("reserved");
+  });
+});
+
+describe("codex_auth_failed", () => {
+  const codex = (kind: string) =>
+    explainHandledError(shape({ code: "codex_auth_failed", httpStatus: 401, meta: { kind } }));
+
+  describe("when the OpenAI session ran out", () => {
+    it("says to sign in to Codex again, never to check a key", () => {
+      const { title, description } = codex("refresh_rejected");
+
+      expect(title).toBe("Your OpenAI session expired");
+      expect(description).toContain("Sign in to Codex again");
+      expect(description).not.toContain("key");
+    });
+  });
+
+  describe("when the device code expired before approval", () => {
+    it("says the code expired and offers a new one", () => {
+      const { title, description } = codex("sign_in_expired");
+
+      expect(title).toBe("The sign-in code expired");
+      expect(description).toContain("Start the sign-in again");
+    });
+  });
+
+  describe("when the failure is OpenAI's own", () => {
+    it("keeps the generic sign-in line", () => {
+      const { title, description } = codex("http");
+
+      expect(title).toBe("OpenAI sign-in didn't go through");
+      expect(description).toContain("Connect it again");
+    });
+  });
+});
+
+describe("provider_usage_limit_reached", () => {
+  it("explains the plan's allowance, never the key", () => {
+    const { title, description } = explainSerializedError({
+      code: "provider_usage_limit_reached",
+      kind: "provider_usage_limit_reached",
+      retryable: false,
+      meta: { provider: "openai_codex" },
+      httpStatus: 429,
+      fault: "customer",
+      reasons: [],
+    });
+
+    expect(title).toBe("That plan is over its usage limit");
+    expect(description).toContain("allowance resets");
+    expect(description).not.toContain("copied the whole key");
   });
 });

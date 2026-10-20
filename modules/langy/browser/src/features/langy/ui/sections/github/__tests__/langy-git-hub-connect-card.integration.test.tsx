@@ -12,6 +12,12 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
   useRouter: () => ({ push: pushMock }),
 }));
 
+vi.mock("../../../../behavior/github-connect-popup.ts", () => ({
+  useGitHubConnectPopup: () => ({
+    connect: async () => ({ ok: false, reason: "popup-blocked" }),
+  }),
+}));
+
 import { LangyGitHubConnectCard } from "../langy-git-hub-connect-card.tsx";
 
 function renderCard() {
@@ -40,8 +46,6 @@ describe("given the GitHub connect card", () => {
 
   describe("when the install popup is blocked", () => {
     it("offers the in-app settings route into the same flow", async () => {
-      // A blocked popup — window.open returns null.
-      vi.spyOn(window, "open").mockReturnValue(null);
       renderCard();
       fireEvent.click(screen.getByText("Install GitHub App"));
 

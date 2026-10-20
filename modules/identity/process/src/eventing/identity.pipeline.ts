@@ -10,6 +10,10 @@ import {
   type EventingSetup,
 } from "@langwatch/eventing";
 import {
+  TENANT_MIGRATION_ROLLED_BACK_EVENT_TYPE,
+  tenantMigrationRolledBackEventDataSchema,
+} from "@langwatch/ops-contract";
+import {
   USER_REGISTERED_EVENT_TYPE,
   userRegisteredEventDataSchema,
 } from "@langwatch/user-contract";
@@ -42,12 +46,18 @@ import {
   ssoDomainReproofSweepWake,
 } from "../features/sso-domain/eventing/sso-domain-reproof-sweep.process.ts";
 import type { IdentityRepositories } from "../repositories/identity.repositories.ts";
+import { isIdentifierBackfillStep } from "../rules/identity-migration-names.rules.ts";
+import { IdentitySignInSwitchService } from "../services/identity-sign-in-switch.service.ts";
 
 export const IDENTITY_MAINTENANCE_PIPELINE_NAME = "identity_maintenance";
 
 export const identityEventing = defineEventingModule({
   pipeline: IDENTITY_MAINTENANCE_PIPELINE_NAME,
-  build: ({ app, processStore }: EventingSetup<IdentityRepositories, IdentityModule>) =>
+  build: ({
+    app,
+    processStore,
+    repositories,
+  }: EventingSetup<IdentityRepositories, IdentityModule>) =>
     definePipeline({
       name: IDENTITY_MAINTENANCE_PIPELINE_NAME,
       aggregate: defineAggregate({ type: "global" }),
@@ -59,6 +69,18 @@ export const identityEventing = defineEventingModule({
         eventType: USER_REGISTERED_EVENT_TYPE,
         data: userRegisteredEventDataSchema,
         handle: (registration) => app.signUpIdentifiers().attachRegistered({ registration }),
+      })
+      // An operator's rollback is ops' fact; identity pins its own switch (Alex, 2026-10-12).
+      .withPeerSubscriber("identifierBackfillRolledBack", {
+        eventType: TENANT_MIGRATION_ROLLED_BACK_EVENT_TYPE,
+        data: tenantMigrationRolledBackEventDataSchema,
+        options: { enqueue: { filter: (fact) => isIdentifierBackfillStep(fact.stepId) } },
+        handle: (fact, { eventId, occurredAt }) =>
+          IdentitySignInSwitchService.create({ latch: repositories.latch }).rolledBack({
+            fact,
+            eventId,
+            occurredAt,
+          }),
       })
       .withPeerSubscriber(
         JOIN_REQUEST_INVITE_ACCEPTED_SUBSCRIBER_NAME,

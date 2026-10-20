@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { memo, type RefObject, useCallback, useMemo } from "react";
@@ -27,6 +28,7 @@ import {
   useDensityStore,
 } from "../../../../features/explorer/behavior/density.store.ts";
 import { useDisplayRoleVisuals } from "../../../../features/trace-drawer/behavior/scenario-role.store.tsx";
+import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import {
   type UseTextTranslationResult,
   useTextTranslation,
@@ -619,6 +621,7 @@ const ConversationRow = memo(function ConversationRow({
   onSelect: (traceId: string) => void;
 }) {
   const isCurrent = row.position === "current";
+  const neighbourShortcutId = row.position === "previous" ? "previous-trace" : "next-trace";
   const isPlaceholder = !!row.isPlaceholder;
   const handleClick = useCallback(() => {
     if (isPlaceholder || isCurrent) return;
@@ -655,11 +658,15 @@ const ConversationRow = memo(function ConversationRow({
 
   return (
     <Tooltip
-      content={`View the trace of the ${row.position} turn in the conversation`}
+      content={`${row.position === "previous" ? "Previous" : "Next"} trace in conversation`}
+      shortcut={isCurrent ? undefined : drawerShortcut(neighbourShortcutId)}
       disabled={row.position === "current"}
     >
       <Flex
         as={isCurrent ? "div" : "button"}
+        aria-keyshortcuts={
+          isCurrent ? undefined : shortcutAriaKeys(drawerShortcut(neighbourShortcutId))
+        }
         align="stretch"
         gap={2.5}
         paddingX={3}
@@ -804,7 +811,7 @@ const TurnLine: React.FC<{
         // first text line's center, not with the top edge — `boxSize`
         // 3.5 (14px) inside `textStyle="xs"` (12px / 18px line) needs
         // (18-14)/2 = 2px of nudge.
-        marginTop="2px"
+        marginTop="0.5"
       />
       {redacted && !text ? (
         // Content hidden by a privacy rule — the shared lock + "Redacted"

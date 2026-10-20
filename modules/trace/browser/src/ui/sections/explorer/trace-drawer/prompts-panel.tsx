@@ -317,7 +317,7 @@ function WarningRow({
   const icon = tone === "warning" ? LuTriangleAlert : LuCircleDashed;
   return (
     <HStack gap={2} align="flex-start">
-      <Icon as={icon} boxSize={3.5} color={color} marginTop="2px" flexShrink={0} />
+      <Icon as={icon} boxSize={3.5} color={color} marginTop="0.5" flexShrink={0} />
       <VStack align="stretch" gap={0.5}>
         <Text textStyle="xs" fontWeight="semibold" color={color}>
           {title}

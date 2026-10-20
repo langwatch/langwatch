@@ -1,6 +1,7 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box, HStack, Spacer, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type {
   GovernanceAgentRow,
   AgentsListingOutcome,
@@ -281,12 +282,7 @@ function AgentsPane({
   if (isLoading) {
     return (
       <Box padding={6}>
-        {/*
-         * Named, so a screen reader announces a wait rather than nothing at
-         * all — and so a test can assert the wait is what rendered. Without a
-         * name this branch is indistinguishable from an empty pane to both.
-         */}
-        <Spinner aria-label="Loading agents" />
+        <SkeletonRows rows={4} label="Loading agents" />
       </Box>
     );
   }

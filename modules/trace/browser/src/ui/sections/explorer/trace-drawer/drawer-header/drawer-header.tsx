@@ -5,7 +5,7 @@ import {
   formatDuration,
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
-import { Kbd } from "@langwatch/design-system/kbd";
+import { IdText } from "@langwatch/design-system/id-text";
 import { MenuContent, MenuContextTrigger, MenuItem, MenuRoot } from "@langwatch/design-system/menu";
 import {
   Box,
@@ -19,20 +19,12 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { toaster } from "@langwatch/design-system/toaster";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { TriggerAnchor } from "@langwatch/design-system/trigger-anchor";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { memo, useCallback, useEffect, useMemo, useState } from "react";
-import {
-  LuArrowLeft,
-  LuCopy,
-  LuMaximize2,
-  LuMinimize2,
-  LuRefreshCw,
-  LuShare2,
-  LuX,
-} from "react-icons/lu";
+import { LuArrowLeft, LuMaximize2, LuMinimize2, LuRefreshCw, LuShare2, LuX } from "react-icons/lu";
 
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
 import { useRetainedTraceHeader } from "../../../../../behavior/explorer/trace-drawer/drawer-header/use-retained-trace-header.ts";
@@ -44,6 +36,7 @@ import { useConversationContext } from "../../../../../features/conversation/beh
 import { usePinnedAttributes } from "../../../../../features/facet/behavior/use-pinned-attributes.ts";
 import { useSpanTree } from "../../../../../features/span/behavior/use-span-tree.ts";
 import { useFocusSectionStore } from "../../../../../features/trace-drawer/behavior/focus-section.store.ts";
+import { drawerShortcut } from "../../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import { useTraceDrawerNavigation } from "../../../../../features/trace-drawer/behavior/use-trace-drawer-navigation.ts";
 import {
   formatAbsoluteTime,
@@ -58,12 +51,14 @@ import {
 } from "../../../../../model/explorer/trace-drawer/drawer-header/utils.ts";
 import { isTerminalOrigin } from "../../../../../model/terminal-origin.ts";
 import { TokenBreakdownTooltipContent } from "../../../../blocks/explorer/shared/token-breakdown-tooltip.tsx";
-import { splitChipsForOverflow } from "../../../../blocks/explorer/trace-drawer/chip-bar.tsx";
 import { SyntheticTraceBadge } from "../../../../blocks/explorer/trace-drawer/drawer-header/synthetic-trace-badge.tsx";
+import {
+  type FittedChip,
+  FittedChipRow,
+} from "../../../../blocks/explorer/trace-drawer/fitted-chip-row.tsx";
 import { ExceptionsContent } from "../../../../elements/explorer/trace-drawer/exceptions-content.tsx";
 import { TracePresenceAvatars } from "../../../../elements/presence/trace-presence-avatars.tsx";
 import { EditableTraceName } from "../../../editable-trace-name.tsx";
-import { showErrorToast } from "../../../errors/index.ts";
 import { PersonalFeatureGateDialog } from "../../../me/personal-feature-gate-dialog.tsx";
 import { usePersonalFeatureGate } from "../../../me/use-personal-feature-gate.ts";
 import { useDejaViewLink } from "../../../use-deja-view-link.ts";
@@ -96,75 +91,9 @@ interface DrawerHeaderProps {
   readOnly?: boolean;
 }
 
-/**
- * Inline trace ID chip, collapsed by default so it doesn't compete with the trace name; expands
- * to the full ID with a copy icon on hover.
- */
+/** Inline trace ID: cut in the middle so both ends stay legible, copyable on hover. */
 function TraceIdChip({ traceId }: { traceId: string }) {
-  const short = traceId.slice(0, 8);
-  const handleCopy = async () => {
-    // navigator.clipboard requires a secure context (https or localhost).
-    // Surface a friendly hint when it fails so users running LangWatch on
-    // a plain-http internal domain understand what went wrong instead of
-    // seeing a silent no-op.
-    try {
-      if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
-        await navigator.clipboard.writeText(traceId);
-        toaster.create({
-          title: "Trace ID copied",
-          // Show the full id so the operator can verify what landed on
-          // their clipboard at a glance. The chip shows a short id by
-          // design (git-SHA convention) but the toast has the real
-          // estate — operator report: the previous "<8 chars>…" felt
-          // truncated for no benefit.
-          description: traceId,
-          type: "success",
-          duration: 2500,
-        });
-        return;
-      }
-      throw new Error("clipboard unavailable");
-    } catch {
-      showErrorToast({
-        fallbackTitle: "Couldn't copy trace ID",
-        description:
-          "Clipboard access is restricted. This can happen on non-HTTPS domains. Copy the ID manually from the URL.",
-      });
-    }
-  };
-  const value = (
-    <Box
-      display="inline-flex"
-      alignItems="center"
-      gap={1}
-      fontFamily="mono"
-      // Hover affordances: swap short text for full id, reveal the copy
-      // icon. CSS-only so we don't need a React state per row of header.
-      css={{
-        "& [data-hover-only]": { display: "none" },
-        ".chip-root:hover & [data-hover-only]": { display: "inline-flex" },
-        ".chip-root:hover & [data-collapsed]": { display: "none" },
-        ".chip-root:hover & [data-expanded]": { display: "inline" },
-      }}
-    >
-      <Text as="span" data-collapsed textStyle="xs" color="fg" fontWeight="medium">
-        {short}
-      </Text>
-      <Text as="span" data-expanded textStyle="xs" color="fg" fontWeight="medium" display="none">
-        {traceId}
-      </Text>
-      <Icon as={LuCopy} boxSize={3} color="fg.muted" data-hover-only />
-    </Box>
-  );
-  return (
-    <Chip
-      value={value}
-      tone="neutral"
-      onClick={() => void handleCopy()}
-      tooltip="Hover to see full ID, click to copy"
-      ariaLabel={`Copy trace ID ${traceId}`}
-    />
-  );
+  return <IdText value={traceId} label="trace ID" tail={4} />;
 }
 
 /**
@@ -458,10 +387,8 @@ export const DrawerHeader = memo(function DrawerHeader({
     reasoningTokens,
   } = readTokenUsage(trace.attributes);
 
-  // Total tokens the model actually processed = input + output PLUS cache read + cache
-  // write.
-  const totalTokensWithCache =
-    trace.totalTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0);
+  // The header's total already counts the cache reads and writes.
+  const totalTokensWithCache = trace.totalTokens;
 
   // If we have concrete input AND output token numbers to display, trust them
   // and suppress the "estimated" caveat — historical trace summaries can carry
@@ -571,22 +498,21 @@ export const DrawerHeader = memo(function DrawerHeader({
       // intentional no-op — see comment above
     },
   });
-  // Source chips: cap inline at 10 so multi-evaluator traces don't hide
-  // their second & third verdicts in the overflow popover by default —
-  // eval status is the highest-signal data on the strip, not something
-  // to bury after a half-dozen capabilities. Anything beyond 10 still
-  // rolls into "+N more" so the row stays scannable.
-  const { primary: primaryChips, overflowChip: chipsOverflow } = splitChipsForOverflow(
-    chipDefs,
-    10,
-  );
-  // Pins: auto-pins (identity/run/tag) always inline. Custom + metadata pins inline up
-  // to MAX_INLINE_PINS — the rest still spill into the overflow popover so a
-  // pathological 200-pin trace can't blow out the header.
+  // Pins: custom + metadata pins beyond MAX_INLINE_PINS fold into their own "+N pinned"
+  // chip first, so a pathological 200-pin trace never mounts 200 pills.
   const MAX_INLINE_PINS = 12;
   const pinResult = renderPinPills(categorizedPins, removePin, {
     maxCustomInline: MAX_INLINE_PINS,
   });
+  // The context line: source chips (service, origin, scenario, sdk, prompts, evals,
+  // annotations), then pins. Whatever does not fit sits behind its "+N".
+  const contextChips: FittedChip[] = [
+    ...chipDefs
+      .filter((c) => !c.hidden)
+      .map((c) => ({ id: `chip:${c.id}`, node: <Chip {...c} /> })),
+    ...pinResult.inline.map((el, i) => ({ id: `pin:${el.key ?? i}`, node: el })),
+    ...(pinResult.overflow ? [{ id: "pin:overflow", node: pinResult.overflow }] : []),
+  ];
 
   return (
     <VStack align="stretch" gap={2} paddingX={4} paddingTop={3}>
@@ -649,31 +575,24 @@ export const DrawerHeader = memo(function DrawerHeader({
         cacheCreation5mTokens={cacheCreation5mTokens}
         cacheCreationTokens={cacheCreationTokens}
         cacheReadTokens={cacheReadTokens}
-        chipsOverflow={chipsOverflow}
         contextSizeTokens={contextSizeTokens}
         grandCost={grandCost}
         hasAuthoritativeTokens={hasAuthoritativeTokens}
         isBundledCost={isBundledCost}
         isPlaceholder={isPlaceholder}
         nonBilledCost={nonBilledCost}
-        primaryChips={primaryChips}
         reasoningEffort={reasoningEffort}
         reasoningTokens={reasoningTokens}
         totalTokensWithCache={totalTokensWithCache}
         trace={trace}
       />
 
-      {/* Pin strip only renders when there's something to show — many traces have no auto-pins,
-          and a small height jump between trace-with-pins and trace-without beats dead chrome. */}
+      {/* The context line only renders when there's something to show: many traces have no
+          pins, and a small height jump beats a permanent empty band. */}
       {isPlaceholder ? (
         <Skeleton height="22px" width="180px" borderRadius="md" />
       ) : (
-        (pinResult.inline.length > 0 || pinResult.overflow != null) && (
-          <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-            {pinResult.inline}
-            {pinResult.overflow}
-          </HStack>
-        )
+        contextChips.length > 0 && <FittedChipRow chips={contextChips} ariaLabel="Trace context" />
       )}
 
       {/* Row 5: Inline mode tabs — Trace / Conversation. Trace ID + relative
@@ -1001,15 +920,11 @@ function BackNavigationMenu({
     <MenuRoot>
       <Tooltip
         content={
-          <HStack gap={1}>
-            <Text>
-              {backStackDepth > 1
-                ? `Back (${backStackDepth} traces). Right-click for full history`
-                : "Back to previous trace"}
-            </Text>
-            <Kbd>B</Kbd>
-          </HStack>
+          backStackDepth > 1
+            ? `Back (${backStackDepth} traces). Right-click for full history`
+            : "Back to previous trace"
         }
+        shortcut={drawerShortcut("back")}
         positioning={{ placement: "bottom" }}
       >
         <TriggerAnchor>
@@ -1019,6 +934,7 @@ function BackNavigationMenu({
               variant="ghost"
               onClick={goBack}
               aria-label="Back to previous trace"
+              aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("back"))}
               flexShrink={0}
             >
               <Icon as={LuArrowLeft} boxSize={3.5} />
@@ -1115,12 +1031,8 @@ function HeaderActions({
         </Tooltip>
       )}
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>{isRefreshing ? "Refreshing…" : "Refresh"}</Text>
-            <Kbd>R</Kbd>
-          </HStack>
-        }
+        content={isRefreshing ? "Refreshing…" : "Refresh"}
+        shortcut={drawerShortcut("refresh")}
         positioning={{ placement: "bottom" }}
       >
         <Button
@@ -1129,6 +1041,7 @@ function HeaderActions({
           onClick={() => void onRefresh()}
           disabled={isRefreshing}
           aria-label="Refresh trace"
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("refresh"))}
           css={
             isRefreshing
               ? {
@@ -1147,12 +1060,8 @@ function HeaderActions({
         </Button>
       </Tooltip>
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>{isMaximized ? "Restore" : "Maximize"}</Text>
-            <Kbd>M</Kbd>
-          </HStack>
-        }
+        content={isMaximized ? "Restore" : "Maximize"}
+        shortcut={drawerShortcut("maximize")}
         positioning={{ placement: "bottom" }}
       >
         <Button
@@ -1160,6 +1069,7 @@ function HeaderActions({
           variant="ghost"
           onClick={onMaximizeClick}
           aria-label={isMaximized ? "Restore drawer" : "Maximize drawer"}
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("maximize"))}
         >
           <Icon as={isMaximized ? LuMinimize2 : LuMaximize2} boxSize={3.5} />
         </Button>
@@ -1179,12 +1089,8 @@ function HeaderActions({
       />
       <Box width="1px" height="16px" bg="border.muted" marginX={0.5} flexShrink={0} />
       <Tooltip
-        content={
-          <HStack gap={1}>
-            <Text>Close</Text>
-            <Kbd>Esc</Kbd>
-          </HStack>
-        }
+        content="Close. Escape clears a selected span first."
+        shortcut={drawerShortcut("close")}
         positioning={{ placement: "bottom" }}
       >
         {/* Plain ghost Button — the standard Chakra `CloseButton`
@@ -1199,6 +1105,7 @@ function HeaderActions({
           variant="ghost"
           onClick={onClose}
           aria-label="Close drawer"
+          aria-keyshortcuts={shortcutAriaKeys(drawerShortcut("close"))}
           paddingX={1.5}
           paddingY={1.5}
           height="auto"
@@ -1215,8 +1122,8 @@ function HeaderActions({
 }
 
 /**
- * Performance metrics, pinned context and the source/tools chips in one wrapped
- * strip, so a single row of pills doesn't carry a permanent empty band beneath.
+ * The metrics line: duration, spans, cost, tokens, models. One line; whatever does not
+ * fit sits behind a "+N" chip.
  */
 function HeaderMetricsRow({
   billedCost,
@@ -1224,14 +1131,12 @@ function HeaderMetricsRow({
   cacheCreation5mTokens,
   cacheCreationTokens,
   cacheReadTokens,
-  chipsOverflow,
   contextSizeTokens,
   grandCost,
   hasAuthoritativeTokens,
   isBundledCost,
   isPlaceholder,
   nonBilledCost,
-  primaryChips,
   reasoningEffort,
   reasoningTokens,
   totalTokensWithCache,
@@ -1242,25 +1147,33 @@ function HeaderMetricsRow({
   cacheCreation5mTokens: number | null;
   cacheCreationTokens: number | null;
   cacheReadTokens: number | null;
-  chipsOverflow: ReturnType<typeof splitChipsForOverflow>["overflowChip"];
   contextSizeTokens: number | null;
   grandCost: number;
   hasAuthoritativeTokens: boolean;
   isBundledCost: boolean;
   isPlaceholder: boolean;
   nonBilledCost: number;
-  primaryChips: ReturnType<typeof splitChipsForOverflow>["primary"];
   reasoningEffort: string | null;
   reasoningTokens: number | null;
   totalTokensWithCache: number;
   trace: TraceHeader;
 }) {
-  return (
-    <HStack gap={1.5} flexWrap="wrap" align="center" alignContent="flex-start">
-      {/* Section 1: Performance metrics */}
-      <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />
-      {trace.spanCount > 0 && <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />}
-      {trace.ttft != null && (
+  const metrics: FittedChip[] = [
+    {
+      id: "duration",
+      node: <MetricPill label="Duration" value={formatDuration(trace.durationMs)} />,
+    },
+  ];
+  if (trace.spanCount > 0) {
+    metrics.push({
+      id: "spans",
+      node: <MetricPill label="Spans" value={trace.spanCount.toLocaleString()} />,
+    });
+  }
+  if (trace.ttft != null) {
+    metrics.push({
+      id: "ttft",
+      node: (
         <Tooltip
           content={`Time to First Token: ${formatDuration(trace.ttft)}`}
           positioning={{ placement: "top" }}
@@ -1269,8 +1182,13 @@ function HeaderMetricsRow({
             <MetricPill label="TTFT" value={formatDuration(trace.ttft)} />
           </Box>
         </Tooltip>
-      )}
-      {grandCost > 0 && (
+      ),
+    });
+  }
+  if (grandCost > 0) {
+    metrics.push({
+      id: "cost",
+      node: (
         <Tooltip
           content={
             <CostBreakdownTooltipContent
@@ -1292,8 +1210,13 @@ function HeaderMetricsRow({
             )}
           </Box>
         </Tooltip>
-      )}
-      {contextSizeTokens != null && contextSizeTokens > 0 && (
+      ),
+    });
+  }
+  if (contextSizeTokens != null && contextSizeTokens > 0) {
+    metrics.push({
+      id: "context-size",
+      node: (
         <Tooltip
           content="Context carried into this trace's first model call."
           positioning={{ placement: "top" }}
@@ -1302,8 +1225,13 @@ function HeaderMetricsRow({
             <MetricPill label="Context size" value={formatTokens(contextSizeTokens)} />
           </Box>
         </Tooltip>
-      )}
-      {trace.totalTokens > 0 && (
+      ),
+    });
+  }
+  if (trace.totalTokens > 0) {
+    metrics.push({
+      id: "tokens",
+      node: (
         <Tooltip
           content={
             <TokenBreakdownTooltipContent
@@ -1325,52 +1253,61 @@ function HeaderMetricsRow({
               label="Tokens"
               value={
                 trace.inputTokens != null && trace.outputTokens != null
-                  ? `${formatTokens(trace.inputTokens)} in · ${formatTokens(trace.outputTokens)} out`
+                  ? `${formatTokens(trace.inputTokens + (cacheReadTokens ?? 0) + (cacheCreationTokens ?? 0))} in · ${formatTokens(trace.outputTokens)} out`
                   : trace.totalTokens.toLocaleString()
               }
             />
           </Box>
         </Tooltip>
-      )}
-      {reasoningTokens != null && reasoningTokens > 0 && (
-        <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />
-      )}
-      {trace.models.length > 0 &&
-        (trace.models.length > 1 ? (
-          // Folded +N (matches the table's model chip) — the count lives
-          // inside the pill value rather than as a separate badge; the
-          // full model list is one hover away via the tooltip.
+      ),
+    });
+  }
+  if (reasoningTokens != null && reasoningTokens > 0) {
+    metrics.push({
+      id: "reasoning",
+      node: <MetricPill label="Reasoning" value={formatTokens(reasoningTokens)} />,
+    });
+  }
+  const [firstModel, ...otherModels] = trace.models;
+  if (firstModel) {
+    metrics.push({
+      id: "models",
+      // Folded +N (matches the table's model chip): the full list is one hover away.
+      node:
+        otherModels.length > 0 ? (
           <ModelsTooltip models={trace.models}>
             <Box display="inline-flex">
-              <MetricPill
-                label="Models"
-                value={`${trace.models[0]!}  +${trace.models.length - 1}`}
-              />
+              <MetricPill label="Models" value={`${firstModel}  +${otherModels.length}`} />
             </Box>
           </ModelsTooltip>
         ) : (
-          <MetricPill label="Model" value={trace.models[0]!} />
-        ))}
-      {reasoningEffort && <MetricPill label="Reasoning effort" value={reasoningEffort} />}
+          <MetricPill label="Model" value={firstModel} />
+        ),
+    });
+  }
+  if (reasoningEffort) {
+    metrics.push({
+      id: "reasoning-effort",
+      node: <MetricPill label="Reasoning effort" value={reasoningEffort} />,
+    });
+  }
 
-      {/* Section 2: Source / tools chips (service, origin, scenario, sdk,
-          prompts, annotations). Capped at 6 inline; surplus rolls into
-          the standard "+N more" popover. No PinDivider before this
-          section — the chip borders give enough visual grouping on
-          their own, the extra rule just read as a stray line. */}
-      {primaryChips.map((c) => (
-        <Chip key={c.id} {...c} />
-      ))}
-      {chipsOverflow}
-      {isPlaceholder && (
-        <Skeleton
-          data-testid="trace-header-metric-skeleton"
-          height="22px"
-          width="120px"
-          borderRadius="md"
-        />
-      )}
-    </HStack>
+  return (
+    <FittedChipRow
+      chips={metrics}
+      ariaLabel="Trace metrics"
+      trailing={
+        isPlaceholder && (
+          <Skeleton
+            data-testid="trace-header-metric-skeleton"
+            height="22px"
+            width="120px"
+            borderRadius="md"
+            flexShrink={0}
+          />
+        )
+      }
+    />
   );
 }
 
@@ -1550,7 +1487,7 @@ function HeaderIdentity({
         // and without a resolved project there is no tenant to make it in.
         <Text
           fontSize="sm"
-          fontWeight="600"
+          fontWeight="semibold"
           color={titleIsFallback ? "fg.muted" : "fg"}
           lineClamp={1}
         >

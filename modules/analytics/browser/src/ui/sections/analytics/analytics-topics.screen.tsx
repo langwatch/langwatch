@@ -1,4 +1,5 @@
-import { Card, GridItem, Heading, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, GridItem, SimpleGrid, HStack } from "@langwatch/design-system/primitives";
 import { BarChart2 } from "react-feather";
 
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -47,44 +48,33 @@ const mostDiscussedTopics = {
 
 function TopicsContent() {
   return (
-    <AnalyticsLayout title="Topics" railEntry="topics">
+    <AnalyticsLayout tab="topics">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={1} display="inline-grid">
-            <Card.Root height="100%">
-              <Card.Header>
-                <Heading size="sm">Top Topics</Heading>
-              </Card.Header>
-              <Card.Body maxHeight="340px" overflowY="auto">
+            <Card padding="lg" title="Top Topics">
+              <Box maxHeight="340px" overflowY="auto">
                 <TopicsSelector showTitle={false} />
-              </Card.Body>
-            </Card.Root>
+              </Box>
+            </Card>
           </GridItem>
           <GridItem colSpan={3} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading size="sm">Threads Per Topic</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={threadsPerTopic as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
+            <Card
+              padding="lg"
+              icon={<BarChart2 color="var(--chakra-colors-orange-fg)" />}
+              title="Threads Per Topic"
+            >
+              <CustomGraph input={threadsPerTopic as CustomGraphInput} />
+            </Card>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root>
-              <Card.Header>
-                <HStack gap={2}>
-                  <BarChart2 color="var(--chakra-colors-orange-fg)" />
-                  <Heading size="sm">Most Discussed Topics</Heading>
-                </HStack>
-              </Card.Header>
-              <Card.Body>
-                <CustomGraph input={mostDiscussedTopics as CustomGraphInput} />
-              </Card.Body>
-            </Card.Root>
+            <Card
+              padding="lg"
+              icon={<BarChart2 color="var(--chakra-colors-orange-fg)" />}
+              title="Most Discussed Topics"
+            >
+              <CustomGraph input={mostDiscussedTopics as CustomGraphInput} />
+            </Card>
           </GridItem>
         </SimpleGrid>
         <FilterSidebar hideTopics={true} />

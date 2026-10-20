@@ -11,7 +11,7 @@ import {
   Prisma,
   type PrismaClient,
 } from "@langwatch/prisma-client/generated";
-import { fromDate, toDate, type Instant } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import {
   GatewayRealtimeSessionRepository,
@@ -84,7 +84,7 @@ export class PrismaGatewayRealtimeSessionRepository extends GatewayRealtimeSessi
         // never signals that it closed.
         await expireOpenSessions(tx, {
           virtualKeyId: session.virtualKeyId,
-          closedAt: new Date(),
+          closedAt: toDate(nowInstant()),
           staleBefore,
           closeReason,
         });

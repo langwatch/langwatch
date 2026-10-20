@@ -25,13 +25,17 @@ export {
   formatError,
   ProjectInputMismatchError,
   InvalidApiVersionError,
+  isUpgradeInProgress,
   KeyKindRefusedError,
   MediaTypeMalformedRequestError,
   PayloadTooLargeError,
   PlatformPermissionDeniedError,
   PlatformSurfaceHiddenError,
+  RateLimitedError,
+  retryAfterOf,
   ScopeInputMismatchError,
   setLedgerCurrent,
+  setOrganizationsCatchingUp,
   UnsupportedMediaTypeError,
 } from "./errors.ts";
 

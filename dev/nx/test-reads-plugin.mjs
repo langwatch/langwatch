@@ -7,19 +7,9 @@ import { memberPatterns } from "./workspace-members.mjs";
 // package that its tests read from disk (measured, not guessed: ADR-150). The
 // test targets take it, so editing one of those files misses the cache and
 // makes the reader affected. A member absent from the table reads nothing.
-const sourceRoots = [
-  "modules/**/*",
-  "enterprise/**/*",
-  "packages/**/*",
-  "apps/**/*",
-  "sdks/**/*",
-  "mcp/**/*",
-  "services/**/*",
-];
+// Suites that walk the whole tree run uncached as `test:repo` and need no row.
 export const reads = {
-  "@langwatch/time": sourceRoots,
   "@langwatch/handled-error": [
-    ...sourceRoots,
     "docs/agent-testing/**/*",
     "docs/api-reference/**/*",
     "docs/evaluations/**/*",
@@ -28,8 +18,6 @@ export const reads = {
     "docs/self-hosting/connect.mdx",
     "docs/features/instant-evals/limits-and-cost.mdx",
   ],
-  "@langwatch/csv": sourceRoots,
-  "@langwatch/scenario-contract": sourceRoots,
   "@langwatch/agent-process": [
     "modules/agent/**/*",
     "modules/workflow/process/src/**/*",
@@ -44,22 +32,18 @@ export const reads = {
     "modules/dashboard/process/src/**/*",
     "modules/topic/process/src/**/*",
   ],
+  "@langwatch/scenario-process": ["infra/docker/Dockerfile"],
   "@langwatch/stored-object-process": [
-    "modules/**/*",
-    "enterprise/modules/**/*",
+    "modules/stored-object/**/*",
+    "modules/scenario/process/src/transport/scenario-event.rest.ts",
+    "modules/scenario/process/src/services/scenario-event.service.ts",
     "apps/*/package.json",
-    "apps/tasks/**/*",
-    "apps/worker/**/*",
     "charts/langwatch/**/*",
     "docs/self-hosting/**/*",
     "packages/clickhouse-migrations/migrations/00023_create_stored_objects.sql",
     ".env.example",
   ],
-  "@langwatch/authz-process": ["modules/**/*", "enterprise/modules/**/*"],
   "@langwatch/workflow-process": [
-    "modules/*/{process,contract}/**/*",
-    "enterprise/modules/*/{process,contract}/**/*",
-    "apps/{api,worker,tasks}/**/*",
     "sdks/go/**/*",
     "services/nlpgo/**/*",
     "pkg/**/*",
@@ -71,13 +55,12 @@ export const reads = {
   "@langwatch/internal-slack": ["modules/automation/**/*", ".oxlintrc.native.jsonc"],
   "@langwatch/identity-process": ["modules/auth/**/*"],
   "@langwatch/clickhouse-client": ["packages/clickhouse-migrations/**/*"],
-  "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/lts-floor.json"],
-  "@langwatch/prisma-client": ["packages/upgrade/releases/lts-floor.json"],
-  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*"],
+  "@langwatch/upgrade": ["packages/clickhouse-migrations/**/*", "apps/tasks/**/*"],
   "@langwatch/evaluator-contract": [
     "skills/**/*",
     "feature-map.json",
     "services/langyagent/internal/assets/AGENTS.md",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/skills": ["services/langyagent/**/*", "docs/**/*", "feature-map.json"],
   langwatch: [
@@ -98,30 +81,24 @@ export const reads = {
   "@langwatch/webhook-process": ["specs/webhooks/**/*"],
   "@langwatch/egress": ["pkg/ssrf/testdata/**/*", "go.work"],
   "@langwatch/langy-browser": ["services/langyagent/**/*", "infra/docker/Dockerfile.langyagent"],
-  "@langwatch/langy-contract": ["services/langyagent/**/*"],
+  "@langwatch/langy-contract": ["services/langyagent/**/*", "pnpm-workspace.yaml"],
+  "@langwatch/insight-process": [
+    "services/langyagent/internal/assets/skills/daily-insights/SKILL.md",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/enterprise-billing-process": ["docs/pricing/**/*", "docs/pricing.mdx"],
   "@langwatch/trace-process": [
     "modules/analytics/process/src/repositories/clickhouse/clickhouse.aggregation-builder.mapper.ts",
     "modules/scenario/process/src/repositories/clickhouse/simulation-clickhouse.repository.ts",
     "modules/experiment/process/src/repositories/clickhouse/clickhouse.experiment-run.repository.ts",
+    "pnpm-workspace.yaml",
   ],
   "@langwatch/annotation-process": [
     "modules/annotation/browser/src/behavior/annotation-api.ts",
     "modules/annotation/browser/src/behavior/annotation-scores-api.ts",
     "modules/catalogue.json",
   ],
-  "@langwatch/design-system": [
-    "apps/ui/src/**/*",
-    "packages/**/*",
-    "modules/**/*",
-    "enterprise/modules/**/*",
-  ],
-  "@langwatch/entitlement-process": [
-    "modules/**/*",
-    "enterprise/modules/**/*",
-    "docs/pricing.mdx",
-    "docs/pricing/billable-events.mdx",
-  ],
+  "@langwatch/entitlement-process": ["docs/pricing.mdx", "docs/pricing/billable-events.mdx"],
   "@langwatch/group-queue": ["apps/*/package.json"],
   "@langwatch/process": ["charts/langwatch/**/*"],
   "@langwatch/automation-contract": ["modules/automation/**/*"],
@@ -134,6 +111,10 @@ export const reads = {
     "apps/ui/src/shell/route-patterns.generated.json",
   ],
   "@langwatch/onboarding-browser": ["apps/ui/src/shell/route-patterns.generated.json"],
+  "@langwatch/analytics-browser": [
+    "apps/ui/public/images/dashboards/templates/**/*",
+    "pnpm-workspace.yaml",
+  ],
   "@langwatch/webhook-verify": ["specs/webhooks/signature-vectors.json"],
   "@langwatch/oxlint-rules": [
     ".oxlintrc.jsonc",
@@ -144,7 +125,6 @@ export const reads = {
   ],
   "@langwatch/instant-eval-process": ["docs/pricing.mdx"],
   "@langwatch/langyworker": ["skills/guided-onboarding/SKILL.mdx"],
-  "@langwatch/visual-diff-runner": ["tools/visualdiff/config.go"],
   "@langwatch/experiment-browser": [
     "services/langevals/evaluators/langevals/langevals_langevals/select_best_compare.py",
   ],
@@ -166,8 +146,7 @@ export const reads = {
     "dev/**/*",
     "specs/tooling/**/*",
     "infra/clickhouse-serverless/**/*",
-    "infra/docker/Dockerfile.langyagent",
-    "infra/docker/Dockerfile",
+    "infra/docker/**/*",
     "docs/integration/**/*",
     "docs/scripts/**/*",
     "docs/snippets/**/*",
@@ -192,6 +171,7 @@ export const reads = {
     "pyproject.toml",
     "uv.lock",
     "tsconfig*.json",
+    "pnpm-workspace.yaml",
   ],
   // The pack tests read each workspace member's manifest and tsconfigs.
   "@langwatch/server": [
@@ -206,8 +186,6 @@ export const reads = {
     "services/langyworker/package.json",
     "skills/{package.json,tsconfig*.json}",
     "tools/dev-runtime/package.json",
-    "tools/interactionsimulator/package.json",
-    "tools/{fuzz,visualdiff}/runner/package.json",
     "tools/devscripts/ensurebuilt.go",
     "dev/dogfood/acme-support/typescript/package.json",
     "dev/scripts/**/*",
@@ -215,9 +193,17 @@ export const reads = {
     "dev/tsconfig*.json",
     "package.json",
     "tsconfig*.json",
+    ".github/workflows/**/*",
+    "nx.json",
+    "pnpm-workspace.yaml",
+    "tools/seedgen/runner/package.json",
+    "infra/docker/compat/platform-app/package.json",
   ],
   "@langwatch/user-browser": ["docs/coding-agents/explore-your-usage-with-your-own-agent.mdx"],
   "@langwatch/gateway-contract": [".env.example"],
+  "@langwatch/analytics-contract": ["dev/scripts/build-charts-lib.mjs"],
+  "@langwatch/clickhouse-migrations": ["packages/upgrade/releases/image/code-steps.json"],
+  "@langwatch/seedgen-runner": ["tools/seedgen/**/*"],
 };
 
 const members = memberPatterns(new URL("../..", import.meta.url).pathname);

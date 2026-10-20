@@ -24,22 +24,37 @@
   ],
   "references": [
     {
-      "path": "../handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../ksuid/tsconfig.build.json"
-    },
-    {
-      "path": "../process-stores/tsconfig.build.json"
-    },
-    {
-      "path": "../secrets/tsconfig.build.json"
+      "path": "../time/tsconfig.build.json"
     },
     {
       "path": "../system-migrations/tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "../secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../redis-client/tsconfig.build.json"
+    },
+    {
+      "path": "../process-stores/tsconfig.build.json"
+    },
+    {
+      "path": "../observability/tsconfig.build.json"
+    },
+    {
+      "path": "../ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../clickhouse-migrations/tsconfig.build.json"
+    },
+    {
+      "path": "../vitest-config/tsconfig.build.json"
     }
   ]
 }

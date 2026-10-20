@@ -19,7 +19,7 @@ import {
   buildAndChain,
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
-import { boundedSubquery } from "./trace-query-subquery.rules.ts";
+import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -203,44 +203,29 @@ export function translateTraceTag({
   negated,
   ctx,
   fieldDefs,
+  searchContent = true,
+  isHiddenAttribute = () => false,
 }: {
   tag: TagToken;
   negated: boolean;
   ctx: TranslationContext;
   fieldDefs: ReadonlyMap<string, FieldDef>;
+  /** False for a viewer under a content protection: free text then skips captured I/O. */
+  searchContent?: boolean;
+  /** Attribute keys whose values the viewer may not read. */
+  isHiddenAttribute?: (key: string) => boolean;
 }): string {
   if (tag.field.type === "ImplicitField") {
-    return translateFreeText(tag, negated, ctx);
+    return translateFreeText({ tag, negated, ctx, searchContent });
   }
 
   const fieldName = tag.field.name;
 
-  // Namespaced attribute prefixes — unique root keeps autocomplete clean.
-  // `trace.attribute.<k>` and `span.attribute.<k>` are the canonical
-  // forms; `attribute.<k>` and `event.<k>` (one dot) are kept as aliases
-  // so saved queries from the previous schema still translate cleanly.
-  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX)) {
-    const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX.length);
-    return translateTraceAttribute({ attrKey: key, tag, negated, ctx });
-  }
-  if (fieldName.startsWith(SPAN_ATTRIBUTE_PREFIX)) {
-    const key = fieldName.slice(SPAN_ATTRIBUTE_PREFIX.length);
-    return translateSpanAttribute({ attrKey: key, tag, negated, ctx });
-  }
-  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX)) {
-    const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX.length);
-    return translateEventAttribute({ attrKey: key, tag, negated, ctx });
-  }
-  // Legacy alias — `attribute.<k>`. Identical SQL to `trace.attribute.<k>`.
-  if (fieldName.startsWith(TRACE_ATTRIBUTE_PREFIX_LEGACY)) {
-    const key = fieldName.slice(TRACE_ATTRIBUTE_PREFIX_LEGACY.length);
-    return translateTraceAttribute({ attrKey: key, tag, negated, ctx });
-  }
-  // Legacy alias — `event.<k>` (single-dot form). Skips the bare `event`
-  // field so `event:<name>` still routes to the static handler map.
-  if (fieldName.startsWith(EVENT_ATTRIBUTE_PREFIX_LEGACY) && fieldName !== "event") {
-    const key = fieldName.slice(EVENT_ATTRIBUTE_PREFIX_LEGACY.length);
-    return translateEventAttribute({ attrKey: key, tag, negated, ctx });
+  const attribute = fieldTargetOf(fieldName);
+  if (attribute.kind === "attribute") {
+    // A value the viewer may not read is never matched; negated, nothing is excluded by it.
+    if (isHiddenAttribute(attribute.key)) return negated ? "1 = 1" : "0 = 1";
+    return attribute.translate({ attrKey: attribute.key, tag, negated, ctx });
   }
 
   // `.get()` — own keys only. A plain-object index would resolve a field named
@@ -253,6 +238,37 @@ export function translateTraceTag({
   }
 
   return def.toClickHouse(tag, negated, ctx);
+}
+
+type AttributeTranslator = (input: {
+  attrKey: string;
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+}) => string;
+
+/**
+ * The attribute a namespaced field names. `trace.attribute.<k>` and `span.attribute.<k>` are
+ * canonical; `attribute.<k>` and `event.<k>` (one dot) stay as aliases for saved queries, and
+ * the bare `event` field keeps routing to the static handler map.
+ */
+function fieldTargetOf(
+  fieldName: string,
+): { kind: "attribute"; key: string; translate: AttributeTranslator } | { kind: "field" } {
+  const routes: [string, AttributeTranslator][] = [
+    [TRACE_ATTRIBUTE_PREFIX, translateTraceAttribute],
+    [SPAN_ATTRIBUTE_PREFIX, translateSpanAttribute],
+    [EVENT_ATTRIBUTE_PREFIX, translateEventAttribute],
+    [TRACE_ATTRIBUTE_PREFIX_LEGACY, translateTraceAttribute],
+    [EVENT_ATTRIBUTE_PREFIX_LEGACY, translateEventAttribute],
+  ];
+  for (const [prefix, translate] of routes) {
+    if (prefix === EVENT_ATTRIBUTE_PREFIX_LEGACY && fieldName === "event") continue;
+    if (fieldName.startsWith(prefix)) {
+      return { kind: "attribute", key: fieldName.slice(prefix.length), translate };
+    }
+  }
+  return { kind: "field" };
 }
 
 function translateTraceAttribute({
@@ -303,7 +319,7 @@ function translateEventAttribute({
   const pVal = nextParam(ctx, "eventAttrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
-  return wrap(
+  return wrapMembership(
     boundedSubquery(
       "stored_spans",
       "StartTime",
@@ -337,7 +353,7 @@ function translateSpanAttribute({
   const pVal = nextParam(ctx, "spanAttrValue");
   ctx.params[pKey] = attrKey;
   ctx.params[pVal] = value;
-  return wrap(
+  return wrapMembership(
     boundedSubquery(
       "stored_spans",
       "StartTime",
@@ -347,7 +363,17 @@ function translateSpanAttribute({
   );
 }
 
-function translateFreeText(tag: TagToken, negated: boolean, ctx: TranslationContext): string {
+function translateFreeText({
+  tag,
+  negated,
+  ctx,
+  searchContent,
+}: {
+  tag: TagToken;
+  negated: boolean;
+  ctx: TranslationContext;
+  searchContent: boolean;
+}): string {
   const value = extractStringValue(tag);
   validateValueLength(value);
   const paramName = nextParam(ctx, "freeText");
@@ -359,12 +385,11 @@ function translateFreeText(tag: TagToken, negated: boolean, ctx: TranslationCont
   // span off trace_summaries; the subquery covers every other span via
   // stored_spans.SpanName. Both branches evaluate to a definite true/false,
   // never NULL (parity suite pins this), keeping three-valued logic unchanged.
-  const clause = `(ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ifNull(TraceName, '') ILIKE ${p} OR ${boundedSubquery(
-    "stored_spans",
-    "StartTime",
-    `SpanName ILIKE ${p}`,
-  )})`;
-  return negated ? `NOT ${clause}` : clause;
+  const content = searchContent ? `ComputedInput ILIKE ${p} OR ComputedOutput ILIKE ${p} OR ` : "";
+  const own = `${content}ifNull(TraceName, '') ILIKE ${p}`;
+  const spans = boundedSubquery("stored_spans", "StartTime", `SpanName ILIKE ${p}`);
+  // Negated by De Morgan, so the span membership is a `NOT IN` the tenant guard admits.
+  return negated ? `(NOT (${own}) AND ${wrapMembership(spans, true)})` : `(${own} OR ${spans})`;
 }
 
 /**

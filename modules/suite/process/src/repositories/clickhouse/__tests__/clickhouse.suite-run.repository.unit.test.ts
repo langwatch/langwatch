@@ -164,4 +164,17 @@ describe("ClickHouseSuiteRunRepository", () => {
       }),
     );
   });
+
+  describe("given the replay sweep for a tenant's open runs", () => {
+    /** @scenario "A tenant's open suite-run sweep is a declared full scan" */
+    it("declares a full scan, since a run started in any week can still be open", async () => {
+      const { repository, query } = setup([stateReadRow]);
+
+      await repository.findOpenRuns({ tenantId: "project_1" });
+
+      expect(query).toHaveBeenCalledWith(
+        expect.objectContaining({ tenantId: "project_1", SKIP_COLD_SCAN_CHECK: true }),
+      );
+    });
+  });
 });

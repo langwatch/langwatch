@@ -276,7 +276,7 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays 'Create Scenario' heading", () => {
       renderWithDesignSystem(<ScenarioFormDrawer open={true} />);
 
-      expect(screen.getByText("Create Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Create scenario")).toBeInTheDocument();
     });
 
     it("does not call create mutation on open", () => {
@@ -391,7 +391,7 @@ describe("<ScenarioFormDrawer/>", () => {
     it("displays 'Edit Scenario' heading", () => {
       renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="existing-scenario-id" />);
 
-      expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
+      expect(screen.getByText("Edit scenario")).toBeInTheDocument();
     });
 
     describe("when user saves without running", () => {
@@ -679,8 +679,8 @@ describe("<ScenarioFormDrawer/>", () => {
     it("titles itself Edit Scenario rather than Create Scenario", () => {
       renderWithDesignSystem(<ScenarioFormDrawer open={true} scenarioId="scenario-123" />);
 
-      expect(screen.getByText("Edit Scenario")).toBeInTheDocument();
-      expect(screen.queryByText("Create Scenario")).toBe(null);
+      expect(screen.getByText("Edit scenario")).toBeInTheDocument();
+      expect(screen.queryByText("Create scenario")).toBe(null);
     });
 
     /** @scenario "Saving is not offered until the scenario has loaded" */

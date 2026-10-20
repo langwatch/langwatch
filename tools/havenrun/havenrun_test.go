@@ -3,107 +3,13 @@ package havenrun
 import (
 	"strings"
 	"testing"
-	"time"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-func TestSlugIsPrefixedAndSanitized(t *testing.T) {
-	got := Slug("apidiff", "20260909t2230", "branch")
-	if got != "apidiff-20260909t2230-branch" {
-		t.Fatalf("Slug = %q", got)
-	}
-	if got := Slug("visualdiff", "20260909T22:30", "candidate"); got != "visualdiff-20260909t22-30-candidate" {
-		t.Fatalf("Slug did not sanitize: %q", got)
-	}
-}
-
-func TestRunIDDerivesFromTheWorkRootBaseName(t *testing.T) {
-	cases := []struct{ root, want string }{
-		{"/repos/langwatch/.apidiff/20260909-143130", "20260909_143130"},
-		{"/repos/langwatch/.visualdiff/20260909-143130/", "20260909_143130"},
-		{"", "run"},
-		{"/", "run"},
-	}
-	for _, testCase := range cases {
-		if got := RunID(testCase.root); got != testCase.want {
-			t.Errorf("RunID(%q) = %q, want %q", testCase.root, got, testCase.want)
-		}
-	}
-}
-
-func TestSelected(t *testing.T) {
-	cases := []struct {
-		name                               string
-		onPath, noHaven, alternative, want bool
-	}{
-		{name: "on PATH with nothing else set", onPath: true, want: true},
-		{name: "opted out", onPath: true, noHaven: true},
-		{name: "not installed"},
-		{name: "an explicit alternative was named", onPath: true, alternative: true},
-	}
-	for _, testCase := range cases {
-		t.Run(testCase.name, func(t *testing.T) {
-			if got := Selected(testCase.onPath, testCase.noHaven, testCase.alternative); got != testCase.want {
-				t.Errorf("Selected = %v, want %v", got, testCase.want)
-			}
-		})
-	}
-}
-
-func TestEnvStripsManagedKeysAndAppendsTheSlug(t *testing.T) {
-	inherit := []string{
-		"HOME=/home/user",
-		"DATABASE_URL=postgres://real:secret@127.0.0.1:5432/lw_feat_x",
-		"CLICKHOUSE_URL=http://127.0.0.1:8123/lw_feat_x",
-		"REDIS_URL=redis://127.0.0.1:6379",
-		"REDIS_DB_INDEX=13",
-		"LANGWATCH_SLUG=someone-elses-stack",
-	}
-	env := Env(inherit, "apidiff-20260909t2230-branch", EnvOptions{})
-	joined := strings.Join(env, "\n")
-	for _, key := range ManagedEnvKeys {
-		if strings.Contains(joined, key+"=someone-elses-stack") {
-			t.Errorf("a managed key leaked through unstripped: %s\n%s", key, joined)
-		}
-	}
-	if !strings.Contains(joined, "HOME=/home/user") {
-		t.Errorf("the inherited environment was dropped:\n%s", joined)
-	}
-	if !strings.Contains(joined, "LANGWATCH_SLUG=apidiff-20260909t2230-branch") {
-		t.Errorf("the slug was not set:\n%s", joined)
-	}
-	if !strings.Contains(joined, "LANGWATCH_DEV_WATCH=0") {
-		t.Errorf("a measured stack must not restart on checkout edits:\n%s", joined)
-	}
-}
-
-func TestEnvHonoursExtraManagedKeysAndExtras(t *testing.T) {
-	env := Env([]string{"LANGWATCH_INSTANCE_ADMIN_API_KEY=leaked"}, "slug", EnvOptions{
-		ExtraManagedKeys: []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY"},
-		Extra:            []string{"LANGWATCH_INSTANCE_ADMIN_API_KEY=throwaway"},
-	})
-	joined := strings.Join(env, "\n")
-	if strings.Contains(joined, "LANGWATCH_INSTANCE_ADMIN_API_KEY=leaked") {
-		t.Errorf("the inherited admin key was not stripped:\n%s", joined)
-	}
-	if !strings.Contains(joined, "LANGWATCH_INSTANCE_ADMIN_API_KEY=throwaway") {
-		t.Errorf("the extra was not appended:\n%s", joined)
-	}
-}
-
 func TestArgvBuilders(t *testing.T) {
-	if got := strings.Join(UpArgs(), " "); got != "up --agent --detach" {
-		t.Errorf("UpArgs = %q", got)
-	}
 	if got := strings.Join(StatusArgs(), " "); got != "status --agent --json stacks" {
 		t.Errorf("StatusArgs = %q", got)
-	}
-	if got := strings.Join(DestroyArgs("slug-1"), " "); got != "down --destroy --stack slug-1 --agent --yes" {
-		t.Errorf("DestroyArgs = %q", got)
-	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
-		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
 
@@ -175,12 +81,9 @@ func TestStackReadyResolvesUIAndBackendToTheAppLaneOnAMonolithStack(t *testing.T
 	}
 }
 
-func TestLogArgsAndBackendLogArgs(t *testing.T) {
+func TestLogArgs(t *testing.T) {
 	if got := strings.Join(LogArgs(AppService, "slug-1"), " "); got != "logs app --agent --stack slug-1" {
 		t.Errorf("LogArgs = %q", got)
-	}
-	if got := strings.Join(BackendLogArgs("slug-1"), " "); got != "logs api --agent --stack slug-1" {
-		t.Errorf("BackendLogArgs = %q", got)
 	}
 }
 
@@ -197,26 +100,6 @@ func TestStackStatusServiceURL(t *testing.T) {
 	}
 }
 
-func TestPollDelayNeverOutlastsTheDeadline(t *testing.T) {
-	deadline := time.Now().Add(200 * time.Millisecond)
-	if got := PollDelay(deadline, time.Second); got > 250*time.Millisecond {
-		t.Errorf("PollDelay = %s, want capped near the remaining time", got)
-	}
-	if got := PollDelay(time.Now().Add(time.Hour), time.Second); got != time.Second {
-		t.Errorf("PollDelay = %s, want the poll interval when plenty of time remains", got)
-	}
-}
-
-func TestLastLinesKeepsOnlyTheTail(t *testing.T) {
-	text := "one\ntwo\nthree\nfour\n"
-	if got := LastLines(text, 2); got != "three\nfour" {
-		t.Errorf("LastLines = %q", got)
-	}
-	if got := LastLines("solo line", 40); got != "solo line" {
-		t.Errorf("LastLines = %q", got)
-	}
-}
-
 func TestTheAPILaneAnswersForTheBackend(t *testing.T) {
 	status := Status{Stacks: []StackStatus{{
 		Slug: "s1", Live: true,
@@ -224,17 +107,5 @@ func TestTheAPILaneAnswersForTheBackend(t *testing.T) {
 	}}}
 	if _, ready := StackReady(status, "s1", UILane, BackendLane); !ready {
 		t.Fatal("a stack whose api lane listens is not ready")
-	}
-}
-
-func TestACopiedDotenvNeverDecidesWhereAStacksDataLives(t *testing.T) {
-	copied := NeutraliseStackOwnedKeys("DATABASE_URL=\"postgresql://postgres@localhost:5432/langwatch_db\"\nexport BASE_HOST=http://localhost:5560\nOPENAI_API_KEY=sk-user\n# DATABASE_URL=old\n")
-	for _, owned := range []string{"# owned by haven for this stack: DATABASE_URL=", "# owned by haven for this stack: export BASE_HOST="} {
-		if !strings.Contains(copied, owned) {
-			t.Errorf("want %q in:\n%s", owned, copied)
-		}
-	}
-	if !strings.Contains(copied, "\nOPENAI_API_KEY=sk-user\n") || !strings.Contains(copied, "\n# DATABASE_URL=old\n") {
-		t.Errorf("unrelated lines must survive untouched:\n%s", copied)
 	}
 }

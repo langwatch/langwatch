@@ -96,3 +96,8 @@ Feature: Design system foundations and boundary
     When it is measured against a width and a per-line cost
     Then the line break is charged that cost, so the answer changes at the boundary
     And nothing is measured in the DOM to reach it
+
+  @integration
+  Scenario: Pagination may centre, sit on the card ground and replace its total summary
+    Given a known-total pagination with layout center, ground card, summaryTone subtle and a totalSummary
+    Then the summary shows that text in place of the total, the bar is on bg.card and the tracks are centred

@@ -5,7 +5,7 @@
  */
 import { EMPTY_AUDIENCE, type ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { createTenantId } from "@langwatch/eventing";
-import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { describe, expect, it, vi } from "vitest";
 
 import { DataPrivacyResolutionFake } from "../../app/__tests__/data-privacy.fixture.ts";

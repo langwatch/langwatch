@@ -4,7 +4,7 @@ import {
   type ShareResourceType,
   type ShareWithProject,
 } from "@langwatch/share-contract";
-import { toDate } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type {
   ConsumeShareViewParams,
@@ -88,7 +88,7 @@ export class PrismaShareRepository
         projectId,
         resourceType,
         resourceId,
-        OR: [{ expiresAt: null }, { expiresAt: { gt: new Date() } }],
+        OR: [{ expiresAt: null }, { expiresAt: { gt: toDate(nowInstant()) } }],
       },
     });
   }

@@ -1,3 +1,4 @@
+import { ClickHouseColumns } from "@langwatch/clickhouse-client";
 import type {
   Projection,
   ProjectionStoreReadContext,
@@ -37,6 +38,12 @@ function clickHouseDateTime(epochMs: number): ClickHouseDateTime {
 }
 
 const TABLE_NAME = "experiment_runs" as const;
+
+/** Goose 00105's columns, with the default each reads as until it lands (NO-HOLDS). */
+const EXPECTED_RESULTS_COLUMNS = {
+  ExpectedTargetResults: "CAST(NULL AS Nullable(UInt32))",
+  ExpectedEvaluatorResults: "CAST(NULL AS Nullable(UInt32))",
+} as const;
 
 const logger = createLogger("langwatch:experiment-run-processing:run-state-repository");
 
@@ -198,6 +205,8 @@ export class ClickHouseExperimentRunStateRepository<
 
     try {
       const client = await this.clickhouse.resolveClient(context.tenantId);
+      const input = { table: TABLE_NAME, alias: "t", columns: EXPECTED_RESULTS_COLUMNS };
+      const expected = (await client.select?.(input)) ?? ClickHouseColumns.named(input);
       // IN-tuple dedup over the ReplacingMergeTree (see
       // dev/docs/best_practices/clickhouse-queries.md). UpdatedAt is referenced via
       // table alias because it's also projected as `toUnixTimestamp64Milli(...) AS
@@ -220,8 +229,7 @@ export class ClickHouseExperimentRunStateRepository<
             toUnixTimestamp64Milli(t.StartedAt) AS StartedAt,
             toUnixTimestamp64Milli(t.FinishedAt) AS FinishedAt,
             toUnixTimestamp64Milli(t.StoppedAt) AS StoppedAt,
-            t.ExpectedTargetResults AS ExpectedTargetResults,
-            t.ExpectedEvaluatorResults AS ExpectedEvaluatorResults,
+            ${expected},
             t.LastProcessedEventId AS LastProcessedEventId,
             t.TotalScoreSum AS TotalScoreSum, t.ScoreCount AS ScoreCount,
             t.PassedCount AS PassedCount, t.GradedCount AS GradedCount,

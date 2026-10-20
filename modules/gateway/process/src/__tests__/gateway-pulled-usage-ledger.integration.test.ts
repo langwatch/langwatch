@@ -191,7 +191,6 @@ describe.skipIf(!databaseUrl)(
             await ClickHouseMigrateTask.createFromConfig({
               config: {
                 buildTime: false,
-                skipped: false,
                 sharedUrl: endpoint.url,
                 privateEndpoints: [],
               },

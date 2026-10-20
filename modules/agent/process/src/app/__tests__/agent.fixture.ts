@@ -10,6 +10,7 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, toDate } from "@langwatch/time";
 import type { UserApi } from "@langwatch/user-contract";
 
+import { MemoryAgentChannels } from "../../channels/memory/memory.agent.channels.ts";
 import type { RecordAgentArchivedCommandData } from "../../eventing/agent-lifecycle.commands.ts";
 import type { AgentRepositories } from "../../repositories/agent.repositories.ts";
 import { MemoryAgentRepositories } from "../../repositories/memory/memory.agent.repositories.ts";
@@ -88,6 +89,7 @@ export function createAgentAppFixture(
     resources,
     secrets: new ScopedSecrets(async (_handle, build) => build(undefined)),
     repositories,
+    channels: MemoryAgentChannels.create(),
   });
   const archivedFacts: RecordAgentArchivedCommandData[] = [];
   app.connectLifecycleCommands({

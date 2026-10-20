@@ -8,6 +8,8 @@ Epic: `../plans/identity-platform-redesign.md` · Plan: `delivery-plan.md` · Wa
 > `modules/auth/process/src/channels/auth0-password.channel.ts` (re-pointed 2026-10-05) —
 > re-verify what remains against the current tree before executing this
 > deliverable's exit gate.
+>
+> **Amendment 2026-10-12:** the Auth0 password broker (`auth0-password.channel.ts`, the Management API change and `AUTH0_MGMT_CLIENT_ID`/`SECRET`) was removed after the 2026-10-12 hash import; every Auth0 email+password user now changes their password locally.
 
 # Overview
 

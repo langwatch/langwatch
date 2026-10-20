@@ -3,24 +3,17 @@
   "compilerOptions": {
     "noEmit": true,
     "types": ["node"],
-    "incremental": true,
-    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.test.tsbuildinfo",
+    "composite": false
   },
   // The suite, plus the sources it exercises. `node:fs` compiles here and
   // nowhere else: the browser-graph guard has to read its subjects off disk,
   // while the config itself must stay loadable by a browser.
-  "include": ["src/**/*.ts"],
-  "exclude": [],
+  "include": ["src/**/__tests__/**/*.ts"],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     }
   ]
 }

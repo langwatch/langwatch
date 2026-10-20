@@ -10,9 +10,13 @@
       "!{projectRoot}/**/*.test.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
       "!{projectRoot}/**/*.spec.{ts,tsx,mts,cts,js,jsx,mjs,cjs}",
       "!{projectRoot}/**/*.stories.{ts,tsx}",
+      "!{projectRoot}/**/__tests__/**/*",
+      "!{projectRoot}/**/__fixtures__/**/*",
+      "!{projectRoot}/**/*.md",
       "!{projectRoot}/tsconfig.test.json",
       "!{projectRoot}/vitest.config.*",
-      "!{projectRoot}/vitest.integration.config.*"
+      "!{projectRoot}/vitest.integration.config.*",
+      "!{projectRoot}/vitest.repo.config.*"
     ],
     "lintGlobals": [
       "sharedGlobals",
@@ -74,7 +78,8 @@
     "./dev/nx/npm-deps-plugin.mjs",
     "./dev/nx/helm-plugin.mjs",
     "./dev/nx/workspace-plugin.mjs",
-    "./dev/nx/test-reads-plugin.mjs"
+    "./dev/nx/test-reads-plugin.mjs",
+    "./dev/nx/haven-plugin.mjs"
   ],
   "targetDefaults": {
     "build": [
@@ -85,7 +90,7 @@
         "outputs": [
           "{projectRoot}/dist",
           "!{projectRoot}/dist/typecheck",
-          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,app,preview}.tsbuildinfo"
         ]
       },
       {
@@ -118,6 +123,7 @@
           "!{projectRoot}/dist/test-setup.*",
           "!{projectRoot}/dist/package.json",
           "!{projectRoot}/dist/tsconfig.typecheck.tsbuildinfo",
+          "!{projectRoot}/dist/tsconfig.app.tsbuildinfo",
           "{projectRoot}/src/internal/generated"
         ]
       },
@@ -148,7 +154,7 @@
         "outputs": [
           "{projectRoot}/dist",
           "!{projectRoot}/dist/typecheck",
-          "!{projectRoot}/dist/tsconfig.{typecheck,test,preview}.tsbuildinfo"
+          "!{projectRoot}/dist/tsconfig.{typecheck,test,app,preview}.tsbuildinfo"
         ]
       },
       {
@@ -162,93 +168,12 @@
       },
       {
         "filter": {
-          "projects": ["@langwatch/idpsim-web"]
+          "projects": ["@langwatch/sims"]
         },
         "cache": true,
         "dependsOn": ["^build"],
         "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/idpsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/mailsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/mailsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/llmsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/llmsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/storagesim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/storagesim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/voicesim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/voicesim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/analyticssim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/analyticssim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/outboundsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/outboundsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/paymentsim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/paymentsim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/telemetrysim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/telemetrysim/web/dist"]
-      },
-      {
-        "filter": {
-          "projects": ["@langwatch/lambdasim-web"]
-        },
-        "cache": true,
-        "dependsOn": ["^build"],
-        "inputs": ["production", "^production", "jsBuild"],
-        "outputs": ["{workspaceRoot}/services/lambdasim/web/dist"]
+        "outputs": ["{workspaceRoot}/services/sims/simconsole/dist"]
       },
       {
         "filter": {
@@ -337,6 +262,9 @@
         }
       ],
       "outputs": []
+    },
+    "test:repo": {
+      "cache": false
     },
     "lint": [
       {
@@ -466,7 +394,15 @@
       "outputs": ["{workspaceRoot}/packages/handled-error/src/codes.generated.ts"]
     }
   },
-  "parallel": 2,
+  "sync": {
+    "applyChanges": true,
+    "generatorOptions": {
+      "@nx/js:typescript-sync": {
+        "runtimeTsConfigFileNames": ["tsconfig.build.json", "tsconfig.app.json"]
+      }
+    }
+  },
+  "parallel": 4,
   "maxCacheSize": "10GB",
   "analytics": false,
   "pluginsConfig": {

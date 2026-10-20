@@ -244,6 +244,24 @@ Feature: One ClickHouse client, reached one way, bounded where it can be seen
       When a repository streams a read
       Then the whole result arrives as one batch
 
+  # A server older than 25.11 that fails after sending 200 writes the failure into the body as a
+  # last `{"exception": "Code: N. ..."}` row, and the vendor client hands that over as a row.
+  Rule: A failure the server writes into a read's body fails the read
+
+    @unit
+    Scenario: A read whose body ends in the server's exception fails with the server's code
+      Given a tenant read that the server fails after sending its first rows
+      When a repository runs the read
+      Then the read fails with the server's code and message
+      And no row reaches the repository's decoder
+
+    @unit
+    Scenario: A streamed read whose last batch ends in the server's exception fails the stream
+      Given a streamed tenant read that the server fails after sending its first batch
+      When a repository streams the read
+      Then the batches before the failure arrive
+      And the stream then fails with the server's code
+
   @unit
   Scenario: ClickHouse is reached through a repository, from the application object
     Given a service needs data that lives in ClickHouse

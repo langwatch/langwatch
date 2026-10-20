@@ -131,6 +131,10 @@
       "types": "./dist/wire/transport.d.ts",
       "default": "./src/wire/transport.ts"
     },
+    "./testing-transport": {
+      "types": "./dist/testing-transport.d.ts",
+      "default": "./src/testing-transport.ts"
+    },
     "./browser-rpc": {
       "types": "./dist/wire/browser-rpc.d.ts",
       "default": "./src/wire/browser-rpc.ts"
@@ -149,7 +153,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json tsconfig.type-tests.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

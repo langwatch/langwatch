@@ -74,8 +74,8 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
       await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
     });
 
-    /** A case-twin beside an address would leave two accounts answering for one person. */
-    it("finds the same account from an address typed with capitals", async () => {
+    /** The service lower-cases what it asks; the store compares exactly, on its unique index. */
+    it("matches the stored address exactly", async () => {
       const { users } = create();
 
       const created = await users.createCredentialUser({
@@ -86,9 +86,8 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         emailVerified: false,
       });
 
-      await expect(users.findByEmail("Ada@Example.com")).resolves.toMatchObject([
-        { id: created.id },
-      ]);
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
+      await expect(users.findByEmail("Ada@Example.com")).resolves.toEqual([]);
       await expect(users.findByEmail("other@example.com")).resolves.toEqual([]);
     });
 
@@ -155,13 +154,27 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   });
 
   describe("when an account was stored with capitals in its address", () => {
-    /** Rows written before sign-in lowercased addresses may carry capitals. */
-    it("finds it from the lowercased address", async () => {
+    /** Rows written before addresses were lower-cased: the address step rewrites them. */
+    it("rewrites the address only while the row still holds the one read", async () => {
       const { users } = create();
-
       const created = await users.create({ name: "Ada", email: "Ada@Example.com" });
 
+      await users.create({ name: "Grace", email: "grace@example.com" });
+      await expect(users.findByEmail(EMAIL)).resolves.toEqual([]);
+      await expect(users.findByEmailAnyCase(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
+      await expect(users.findMixedCaseAddressPage({ afterId: null, limit: 10 })).resolves.toEqual([
+        { id: created.id, email: "Ada@Example.com" },
+      ]);
+      await expect(
+        users.replaceAddress({ id: created.id, from: "ADA@example.com", to: EMAIL }),
+      ).resolves.toBe("changed");
+      await expect(
+        users.replaceAddress({ id: created.id, from: "Ada@Example.com", to: EMAIL }),
+      ).resolves.toBe("replaced");
       await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: created.id }]);
+      await expect(users.findMixedCaseAddressPage({ afterId: null, limit: 10 })).resolves.toEqual(
+        [],
+      );
     });
   });
 
@@ -260,6 +273,7 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
         hasPasskey: false,
         twoStepEnabled: false,
         dismissedAt,
+        accountCreatedAt: expect.any(Date),
       });
     });
 
@@ -291,6 +305,22 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
     });
   });
 
+  describe("when the address is changed", () => {
+    /** @scenario "Changing an email clears its verification" */
+    it("stores the new address with its verification cleared", async () => {
+      const { users } = create();
+      const created = await users.createPasskeyUser({
+        email: EMAIL,
+        issuer: ISSUER,
+        emailVerified: true,
+      });
+
+      await expect(
+        users.updateProfile({ id: created.id, email: "new@example.com", emailVerified: false }),
+      ).resolves.toMatchObject({ email: "new@example.com", emailVerified: false });
+    });
+  });
+
   describe("when the account is retired and restored", () => {
     it("stamps and then clears the deactivation date", async () => {
       const { users } = create();
@@ -311,16 +341,19 @@ describe.each(backends)("given the $name user repositories", ({ create }) => {
   });
 
   describe("when two accounts hold one address in different case", () => {
-    /** @scenario "A lookup by address never guesses between case-twins" */
-    it("answers both, oldest first", async () => {
+    /** @scenario "A case-only duplicate is left as it is and reported" */
+    it("answers the lower-cased holder only, and refuses to give its address to the other", async () => {
       const { users } = create();
-      const older = await users.create({ name: "Ada", email: "Ada@Example.com" });
-      const newer = await users.create({ name: "Ada", email: EMAIL });
+      const capitals = await users.create({ name: "Ada", email: "Ada@Example.com" });
+      const lowered = await users.create({ name: "Ada", email: EMAIL });
 
-      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([
-        { id: older.id },
-        { id: newer.id },
-      ]);
+      await expect(users.findByEmail(EMAIL)).resolves.toMatchObject([{ id: lowered.id }]);
+      await expect(
+        users.replaceAddress({ id: capitals.id, from: "Ada@Example.com", to: EMAIL }),
+      ).resolves.toBe("taken");
+      await expect(users.findById(capitals.id)).resolves.toMatchObject({
+        email: "Ada@Example.com",
+      });
     });
   });
 

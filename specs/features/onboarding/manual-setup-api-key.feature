@@ -29,14 +29,6 @@ Feature: Personal access token on the onboarding setup screens
     Then it offers no project key
     And each project keeps its creation time, so the newest can be picked when no projectSlug is given
 
-  # Bound in modules/trace/browser/src/behavior/__tests__/trace-host-mount.integration.test.tsx.
-
-  @integration
-  Scenario: The shared trace page asks for no key
-    Given nobody is signed in
-    When the trace explorer mounts for a shared trace
-    Then it asks the server for no project key
-
   @integration
   Scenario: Manual setup drops a token when the signed-in user changes
     Given a personal access token is shown on the manual setup card

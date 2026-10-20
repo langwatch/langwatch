@@ -296,7 +296,10 @@ describe("the project tRPC namespace", () => {
      */
     it("asks for project:manage on that project alone", async () => {
       const update = vi.fn(async () => ({ slug: "my-project" }) as never);
-      const { caller, probePermission } = mount({ projects: { updateSettings: update } });
+      const setTraceSharing = vi.fn(async () => undefined);
+      const { caller, probePermission } = mount({
+        projects: { updateSettings: update, setTraceSharing },
+      });
 
       await caller.update({ projectId: "project_123", traceSharingEnabled: true });
 
@@ -304,6 +307,12 @@ describe("the project tRPC namespace", () => {
         permission: "project:manage",
         scope: { tier: "project", id: "project_123" },
         by: expect.objectContaining({ id: ACTOR_ID }),
+      });
+      expect(setTraceSharing).toHaveBeenCalledWith({
+        projectId: "project_123",
+        enabled: true,
+        revokeExistingLinks: true,
+        by: { id: ACTOR_ID },
       });
     });
 

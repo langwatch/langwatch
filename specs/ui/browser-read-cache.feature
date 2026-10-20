@@ -60,3 +60,9 @@ Feature: The framework caches every read in the browser, so no module or screen 
     Given a write sent with keepalive
     When the document navigates away
     Then the request is sent with keepalive and is not cancelled
+
+  @unit
+  Scenario: A polling read is marked as one
+    Given a read sent with the background context
+    When it goes out beside an ordinary read
+    Then only the polling read carries the background-read header

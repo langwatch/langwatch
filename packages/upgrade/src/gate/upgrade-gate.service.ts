@@ -1,4 +1,4 @@
-import type { UpgradeRun, UpgradeStep } from "../ledger.ts";
+import type { InferredStep, UpgradeStep } from "../ledger.ts";
 import type { ServingRoster } from "../serving-roster/index.ts";
 import {
   detectRollbacks,
@@ -10,7 +10,6 @@ import {
   apiPhaseVerdict,
   assertCurrent,
   firstInstallVerdict,
-  ledgerFloor,
   servingImageSchema,
   servingRoleSchema,
   type ServingImage,
@@ -21,7 +20,9 @@ import {
 /** What the gate reads; `UpgradeLedgerRepository` answers it as it stands. */
 export interface ServingGateLedger {
   findSteps(): Promise<readonly (Pick<UpgradeStep, "id" | "status"> & RollbackLedgerStep)[]>;
-  findRuns(): Promise<readonly (Pick<UpgradeRun, "floor"> & RollbackLedgerRun)[]>;
+  findRuns(): Promise<readonly RollbackLedgerRun[]>;
+  /** The steps the ledger seed would infer from the stores' own history (T0-F5). */
+  findSeedSteps?(): Promise<readonly Pick<InferredStep, "id" | "status">[]>;
 }
 
 /** Reopens done steps and answers the ids it reopened; `onError` hears a reopen that failed. */
@@ -46,8 +47,8 @@ export interface UpgradeGate {
 }
 
 /**
- * One serving process's gate (plan D5): `admit` reads the ledger, refuses by name when behind or
- * below the floor, and records its roster entry only once admitted; `release` removes it at a
+ * One serving process's gate (plan D5): `admit` reads the ledger, refuses by name when behind,
+ * and records its roster entry only once admitted; `release` removes it at a
  * graceful stop. Spec: specs/upgrade/serving-gate.feature.
  */
 export function createUpgradeGate({
@@ -82,10 +83,16 @@ export function createUpgradeGate({
       const verdict = assertCurrent({
         ledger: { steps },
         image: { release, blockingSteps: [...blockingSteps, ...unregistered] },
-        floor: ledgerFloor({ runs }),
       });
       if (verdict.outcome === "behind") {
-        if (gatedRole === "api") return apiPhaseVerdict({ outstanding: verdict.outstanding });
+        if (gatedRole === "api") {
+          const outstanding = await pastTheSeed({
+            ledger,
+            steps,
+            outstanding: verdict.outstanding,
+          });
+          return apiPhaseVerdict({ outstanding });
+        }
         const empty = steps.length === 0 && runs.length === 0;
         return empty && (await schemaIsEmpty()) ? firstInstallVerdict() : verdict;
       }
@@ -108,6 +115,22 @@ export function createUpgradeGate({
     },
     serving: () => admitted,
   };
+}
+
+/** Before the seed the ledger is empty; a step the seed would record done is not outstanding. */
+async function pastTheSeed({
+  ledger,
+  steps,
+  outstanding,
+}: {
+  ledger: ServingGateLedger;
+  steps: readonly unknown[];
+  outstanding: readonly string[];
+}): Promise<readonly string[]> {
+  if (steps.length > 0 || !ledger.findSeedSteps) return outstanding;
+  const seeded = (await ledger.findSeedSteps()).filter(({ status }) => status === "done");
+  const done = new Set(seeded.map(({ id }) => id));
+  return outstanding.filter((id) => !done.has(id));
 }
 
 /** Only an upgrade run registers a declared step, so the worker runs one for any not there yet. */

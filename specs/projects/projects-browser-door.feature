@@ -11,7 +11,6 @@ Feature: The project.* browser namespace is served by the application the compos
   # over its module's application, so a member the door names and the
   # application does not serve is not caught at the seam — it is a TypeError on
   # the first access, which the boundary degrades to a generic "unknown".
-  # apidiff never saw this family, because apidiff probes REST only.
   #
   # These scenarios are bound to tests that build the REAL ProjectModule over its
   # own repository interface and reach it through that same proxy.
@@ -67,6 +66,15 @@ Feature: The project.* browser namespace is served by the application the compos
     When the organization form is saved with the name cleared
     Then the name field says it is required, as on main
     And no organization update is sent
+
+  # The language and framework stay stored (onboarding picks snippets from them); settings
+  # stop showing and editing them.
+  @integration
+  Scenario: The project settings page asks nothing about the tech stack
+    Given somebody who manages a project with a stored language and framework
+    When the project settings page opens
+    Then it shows no tech stack field and no way to change it
+    And saving the page keeps the stored language and framework
 
   Scenario: A blank storage secret leaves the stored secret unchanged
     Given storage settings with a stored secret

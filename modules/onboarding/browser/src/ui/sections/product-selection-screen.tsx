@@ -20,7 +20,7 @@ interface ProductOption {
 const productOptions: ProductOption[] = [
   {
     key: "via-platform",
-    title: "Via the Platform",
+    title: "In the platform",
     description: "Configure everything directly from the LangWatch dashboard",
     icon: Monitor,
     gradient:
@@ -28,7 +28,7 @@ const productOptions: ProductOption[] = [
   },
   {
     key: "via-claude-code",
-    title: "Via Coding Agent",
+    title: "With a coding agent",
     description:
       "Set up with prompts, skills, or MCP. Works with Claude Code, Cursor, Windsurf, and more",
     icon: Terminal,
@@ -37,7 +37,7 @@ const productOptions: ProductOption[] = [
   },
   {
     key: "via-claude-desktop",
-    title: "Via MCP",
+    title: "With MCP",
     description: "Connect any MCP client. Claude Desktop, ChatGPT, Cursor, Windsurf, and more",
     icon: MessageSquare,
     gradient:
@@ -74,7 +74,7 @@ export const ProductSelectionScreen: React.FC<ProductSelectionScreenProps> = ({
           borderRadius="2xl"
           bg="bg.panel/80"
           border="1px solid"
-          borderColor={{ base: "orange.emphasized", _dark: "orange.emphasized" }}
+          borderColor="border.emphasized"
           boxShadow="sm"
           backdropFilter="blur(20px) saturate(1.3)"
           px={6}

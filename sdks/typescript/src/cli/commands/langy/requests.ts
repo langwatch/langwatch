@@ -13,6 +13,7 @@ import chalk from "chalk";
 import prompts from "prompts";
 
 import type { WorkspaceInfo } from "../../../agent/local-control-protocol";
+import { formatApiErrorMessage } from "../../../client-sdk/services/_shared/format-api-error";
 import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
@@ -23,6 +24,7 @@ import {
   resolvePersonCredentials,
 } from "../../utils/apiKey";
 import { isLoggedIn, loadConfig } from "../../utils/governance/config";
+import { untrustedCertHint } from "../../utils/localDevCa";
 import { askBox, createStdinKeySource, type BoxCard, type KeySource } from "./approval";
 import { LocalCallFailure } from "./errors";
 import { askedAgo, consoleWriter, noticeRows, terminalWidth, wrapWords, type UiWriter } from "./ui";
@@ -299,6 +301,14 @@ export function hasDeviceSession(): boolean {
 export const SIGN_IN_FAILED_MESSAGE =
   "Could not sign you in, so this folder is not shared. Run `langwatch login --device`, then run `langwatch langy --share-control` again.";
 
+/** The sign-in failure with its real cause; an untrusted certificate gets its fix, not a retry. */
+export function signInFailure(error: unknown): string {
+  const reason = error instanceof Error ? formatApiErrorMessage({ error }).trim() : "";
+  const certHint = untrustedCertHint(error);
+  if (certHint) return `Could not sign you in: ${reason}. ${certHint}`;
+  return reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`;
+}
+
 /**
  * What the command says when the login belongs to another address. A project
  * key is no way out here, since the command acts as a person.
@@ -369,10 +379,7 @@ async function signInAgain({
   try {
     await login({ device: true });
   } catch (error) {
-    const reason = error instanceof Error ? error.message.trim() : "";
-    throw new ShareControlError(
-      reason === "" ? SIGN_IN_FAILED_MESSAGE : `${SIGN_IN_FAILED_MESSAGE} (${reason})`,
-    );
+    throw new ShareControlError(signInFailure(error));
   }
 }
 

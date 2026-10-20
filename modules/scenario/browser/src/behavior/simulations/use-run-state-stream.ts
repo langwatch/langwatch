@@ -10,6 +10,8 @@ import {
 } from "@langwatch/scenario-contract";
 import { useEffect, useMemo } from "react";
 
+import { isFinishedRunStatus } from "../../model/scenario-run-status.utils.ts";
+import { storedDisplayText } from "../../model/stored-display-text.ts";
 import { useSimulationStreamingState } from "../use-simulation-streaming-state.ts";
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 
@@ -30,9 +32,8 @@ export function useRunStateStream({
   projectId: string | undefined;
   isOpen: boolean;
 }) {
-  const { streamingMessages, handleStreamingEvent, clearCompleted } = useSimulationStreamingState(
-    scenarioRunId ?? undefined,
-  );
+  const { streamingMessages, handleStreamingEvent, reconcileWithServer } =
+    useSimulationStreamingState(scenarioRunId ?? undefined);
 
   const isWatching = !!projectId && !!scenarioRunId && isOpen;
 
@@ -59,16 +60,19 @@ export function useRunStateStream({
 
   const scenarioState = useMemo(() => withParsedMetadata(runState), [runState]);
 
-  // Clear streaming messages once server data includes them
+  // Settle streamed previews against the stored run once it moves on.
   useEffect(() => {
-    if (scenarioState?.messages) {
-      clearCompleted(
-        scenarioState.messages
-          .map((m: { id?: string }) => m.id)
-          .filter((id: string | undefined): id is string => !!id),
-      );
-    }
-  }, [scenarioState?.messages, clearCompleted]);
+    if (!scenarioState) return;
+    reconcileWithServer({
+      serverMessages: (scenarioState.messages ?? []).map(
+        (m: { id?: string; content?: unknown }) => ({
+          id: m.id ?? "",
+          text: storedDisplayText(m.content),
+        }),
+      ),
+      isFinished: isFinishedRunStatus(scenarioState.status),
+    });
+  }, [scenarioState, reconcileWithServer]);
 
   return {
     scenarioState,

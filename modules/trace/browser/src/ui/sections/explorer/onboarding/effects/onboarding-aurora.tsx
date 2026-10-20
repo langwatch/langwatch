@@ -31,9 +31,9 @@ export const OnboardingAurora: React.FC = () => {
             zIndex: 2,
             overflow: "hidden",
             maskImage:
-              "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
+              "linear-gradient(to bottom, var(--chakra-colors-fg) 0%, var(--chakra-colors-fg) 35%, color-mix(in srgb, var(--chakra-colors-fg) 70%, transparent) 65%, transparent 100%), linear-gradient(to right, transparent 0%, var(--chakra-colors-fg) 14%, var(--chakra-colors-fg) 86%, transparent 100%)",
             WebkitMaskImage:
-              "linear-gradient(to bottom, rgba(0,0,0,1) 0%, rgba(0,0,0,1) 35%, rgba(0,0,0,0.7) 65%, transparent 100%), linear-gradient(to right, transparent 0%, rgba(0,0,0,1) 14%, rgba(0,0,0,1) 86%, transparent 100%)",
+              "linear-gradient(to bottom, var(--chakra-colors-fg) 0%, var(--chakra-colors-fg) 35%, color-mix(in srgb, var(--chakra-colors-fg) 70%, transparent) 65%, transparent 100%), linear-gradient(to right, transparent 0%, var(--chakra-colors-fg) 14%, var(--chakra-colors-fg) 86%, transparent 100%)",
             maskComposite: "intersect",
             WebkitMaskComposite: "source-in",
           }}

@@ -9,7 +9,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // Trace's lent menu reaches a skill-prompt query these scenarios never open;
 // only its trigger's own label and ordering are asserted.
 vi.mock("../../../../../behavior/lent-peers.tsx", () => ({
-  InlineCommandPalette: () => <input placeholder="ask" />,
+  InlineCommandPalette: ({ placeholder }: { placeholder: string }) => (
+    <input placeholder="ask" aria-label={placeholder} />
+  ),
   GuidedOnboardingOffer: () => null,
   AgentActionsMenu: ({ trigger }: { trigger: React.ReactNode }) => trigger,
 }));
@@ -47,7 +49,10 @@ import {
 import { LangyHomeHero } from "../langy-home-hero.tsx";
 
 class StubProjectHomeHost extends ProjectHomeHost {
-  constructor(private readonly canAsk = true) {
+  constructor(
+    private readonly canAsk = true,
+    private readonly hasLangy = true,
+  ) {
     super();
   }
   project(): ProjectHomeProject | undefined {
@@ -66,7 +71,7 @@ class StubProjectHomeHost extends ProjectHomeHost {
     return true;
   }
   langyVisibility() {
-    return { show: true, isResolving: false };
+    return { show: this.hasLangy, isResolving: false };
   }
   canAskLangy(): boolean {
     return this.canAsk;
@@ -80,10 +85,10 @@ class StubProjectHomeHost extends ProjectHomeHost {
   navigate(): void {}
 }
 
-function renderHero(canAsk = true) {
+function renderHero(canAsk = true, hasLangy = true) {
   return render(
     <DesignSystemProvider forcedTheme="light">
-      <ProjectHomeHostProvider value={new StubProjectHomeHost(canAsk)}>
+      <ProjectHomeHostProvider value={new StubProjectHomeHost(canAsk, hasLangy)}>
         <LangyHomeHero />
       </ProjectHomeHostProvider>
     </DesignSystemProvider>,
@@ -164,6 +169,20 @@ describe("LangyHomeHero ask row", () => {
 
       expect(screen.getByText(/ask whoever manages your account for access/i)).toBeDefined();
       expect(screen.queryByText("Show me around")).toBeNull();
+    });
+  });
+
+  describe("given a reader without Langy", () => {
+    /** @scenario Without Langy the home shows the command bar and says Langy isn't enabled */
+    it("keeps the command bar, drops the asks and says Langy isn't enabled", () => {
+      reachMock.mockReturnValue(POPULATED_REACH);
+      // Even a stray create grant does not turn the field back into Langy's.
+      renderHero(true, false);
+
+      expect(screen.getByLabelText("Search, or jump to anything")).toBeDefined();
+      expect(screen.getByText("Langy isn't enabled for this workspace.")).toBeDefined();
+      expect(screen.queryByText("Compare two runs")).toBeNull();
+      expect(screen.queryByText(/ask whoever manages your account/i)).toBeNull();
     });
   });
 

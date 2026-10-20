@@ -59,7 +59,7 @@ describe("PrismaGraphTriggerSentRepository candidate discovery", () => {
     ).toBe("evaluation");
     expect(findUnique).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { id: "graph-1", projectId: "project-1", kind: "builder" },
+        where: expect.objectContaining({ id: "graph-1", projectId: "project-1", kind: "builder" }),
       }),
     );
   });

@@ -1,4 +1,4 @@
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 import type {
   ExperimentEventingClickHouseClient,
@@ -38,6 +38,11 @@ export class ClickHouseExperimentSession implements ExperimentEventingClickHouse
       params: input.query_params,
     };
     return { json: async <T>() => (await this.clickhouse.query<T>(request)).rows };
+  }
+
+  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
+  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
   }
 
   async insert(input: {

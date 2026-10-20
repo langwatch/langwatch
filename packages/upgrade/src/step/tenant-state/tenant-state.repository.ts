@@ -4,11 +4,15 @@ import {
   type SystemMigrationStateRepository,
   TENANT_MIGRATION_STATUSES,
   type TenantMigrationRecord,
+  type TenantMigrationStatus,
 } from "@langwatch/system-migrations";
-import { Temporal } from "@langwatch/time";
+import { type Instant, Temporal } from "@langwatch/time";
 
 import { type LedgerTableNames, ledgerTables } from "../../ledger-tables.ts";
 import type { UpgradePostgres } from "../../ports.ts";
+
+/** One tenant's state with when it last moved, as Ops' attention list reads it. */
+export type TenantStepStateRow = TenantMigrationRecord & { updatedAt: Instant };
 
 type StateRow = {
   status: string;
@@ -47,6 +51,24 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
     return recordOf({ migrationName, tenantId, row });
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    if (tenantIds.length === 0) return [];
+    const table = await this.table();
+    const { rows } = await this.postgres.query<StateRow & { tenant_id: string }>(
+      `SELECT "tenant_id", "status", "report", "held_reason",
+        (extract(epoch FROM "held_since") * 1000)::bigint::text AS "held_since_ms"
+       FROM ${table} WHERE "step_id" = $1 AND "tenant_id" = ANY($2::text[])`,
+      [migrationName, [...tenantIds]],
+    );
+    return rows.map((row) => recordOf({ migrationName, tenantId: row.tenant_id, row }));
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     await this.write({ record, unlessRolledBack: false });
   }
@@ -74,6 +96,78 @@ export class TenantStepStateRepository implements SystemMigrationStateRepository
       [migrationName],
     );
     return rows.length > 0;
+  }
+
+  /** Whether a later pass could still move a tenant of these steps: parked or migrated. */
+  async hasTenantAwaitingRedrive({
+    migrationNames,
+  }: {
+    migrationNames: readonly string[];
+  }): Promise<boolean> {
+    if (migrationNames.length === 0) return false;
+    const table = await this.table();
+    const { rows } = await this.postgres.query<{ found: number }>(
+      `SELECT 1 AS "found" FROM ${table}
+       WHERE "step_id" = ANY($1::text[]) AND "status" IN ('parked', 'migrated') LIMIT 1`,
+      [[...migrationNames]],
+    );
+    return rows.length > 0;
+  }
+
+  /** Ops' rollup: how many tenants sit in each status for one step. */
+  async findStatusCounts({
+    migrationName,
+  }: {
+    migrationName: string;
+  }): Promise<Record<TenantMigrationStatus, number>> {
+    const table = await this.table();
+    const { rows } = await this.postgres.query<{ status: string; count: string }>(
+      `SELECT "status", count(*)::text AS "count" FROM ${table}
+       WHERE "step_id" = $1 GROUP BY "status"`,
+      [migrationName],
+    );
+    const counts: Record<TenantMigrationStatus, number> = {
+      migrated: 0,
+      finalized: 0,
+      parked: 0,
+      rolled_back: 0,
+    };
+    for (const row of rows) {
+      const status = TENANT_MIGRATION_STATUSES.find((known) => known === row.status);
+      if (status) counts[status] = Number(row.count);
+    }
+    return counts;
+  }
+
+  /** Ops' drill-down: tenants in these statuses, newest movement first; no step reads every one. */
+  async findRecordsByStatus({
+    migrationName,
+    statuses,
+    limit,
+    offset = 0,
+  }: {
+    migrationName?: string | undefined;
+    statuses: TenantMigrationStatus[];
+    limit: number;
+    offset?: number;
+  }): Promise<TenantStepStateRow[]> {
+    const table = await this.table();
+    const { rows } = await this.postgres.query<
+      StateRow & { step_id: string; tenant_id: string; updated_at_ms: string }
+    >(
+      `SELECT "step_id", "tenant_id", "status", "report", "held_reason",
+        (extract(epoch FROM "updated_at") * 1000)::bigint::text AS "updated_at_ms",
+        (extract(epoch FROM "held_since") * 1000)::bigint::text AS "held_since_ms"
+       FROM ${table}
+       WHERE ($1::text IS NULL OR "step_id" = $1) AND "status" = ANY($2::text[])
+       ORDER BY "updated_at" DESC, "step_id" ASC, "tenant_id" ASC
+       LIMIT $3 OFFSET $4`,
+      [migrationName ?? null, [...statuses], limit, offset],
+    );
+    return rows.map((row) => ({
+      ...recordOf({ migrationName: row.step_id, tenantId: row.tenant_id, row }),
+      updatedAt: Temporal.Instant.fromEpochMilliseconds(Number(row.updated_at_ms)),
+    }));
   }
 
   /** One statement, so the rolled-back check and the write cannot interleave with another. */

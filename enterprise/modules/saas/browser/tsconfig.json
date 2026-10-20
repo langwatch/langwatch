@@ -9,21 +9,18 @@
     "types": [],
     "jsx": "react-jsx",
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

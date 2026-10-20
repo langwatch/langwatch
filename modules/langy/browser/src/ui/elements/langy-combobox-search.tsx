@@ -44,7 +44,7 @@ export function LangyComboboxSearch({ placeholder }: { placeholder: string }) {
           border={0}
           outline="none"
           background="transparent"
-          fontSize="13px"
+          textStyle="bodySm"
           color="fg"
           _placeholder={{ color: "fg.subtle" }}
           _focusVisible={{ outline: "none" }}

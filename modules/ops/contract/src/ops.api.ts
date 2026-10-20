@@ -52,7 +52,12 @@ import type {
   AggregateSearchResult,
   ProjectionStateAtEvent,
 } from "./features/event-log/ops-event-log.ts";
-import type { ReplayHistoryEntry, ReplayStatus } from "./features/event-log/ops-replay.ts";
+import type {
+  ReplayHistoryEntry,
+  ReplayHistoryPage,
+  ReplayHistoryPageInput,
+  ReplayStatus,
+} from "./features/event-log/ops-replay.ts";
 import type {
   OpsMigrationCohortResult,
   OpsMigrationEnrollmentListing,
@@ -61,12 +66,11 @@ import type {
   OpsMigrationTargetedRunResult,
 } from "./features/migrations/ops-system-migration.ts";
 import type {
+  OpsUpgradeAttentionNotice,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
   OpsUpgradeListStepsInput,
   OpsUpgradeListTenantsInput,
-  OpsUpgradePreview,
-  OpsUpgradePreviewInput,
   OpsUpgradeReleasePage,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
@@ -113,9 +117,11 @@ import type {
 } from "./ops-bug-report.ts";
 import type { OpsPlatformOperator } from "./ops-operators.ts";
 import type {
+  ListInsightSchedulesInput,
   ListPausedSchedulesInput,
   ListScheduledJobsInput,
   ListSchedulerActionsInput,
+  OpsInsightSchedule,
   OpsScheduledJob,
   ScheduleControlInput,
   SchedulerAuditEntryView,
@@ -439,6 +445,8 @@ export interface OpsApi {
   listScheduledJobs(input: ListScheduledJobsInput): Promise<OpsScheduledJob[]>;
   listPausedSchedules(input: ListPausedSchedulesInput): Promise<ListPausedSchedulesResult>;
   listSchedulerActions(input: ListSchedulerActionsInput): Promise<SchedulerAuditEntryView[]>;
+  /** Every person's daily insights schedule, across projects: the ones that are on first. */
+  listInsightSchedules(input: ListInsightSchedulesInput): Promise<OpsInsightSchedule[]>;
   setScheduleActive(input: SetScheduleActiveInput): Promise<OpsScheduledJob>;
   clearStuckScheduleSlot(input: ScheduleControlInput): Promise<OpsScheduledJob>;
   runScheduleNow(input: ScheduleControlInput): Promise<OpsScheduledJob>;
@@ -652,6 +660,7 @@ export interface OpsApi {
   getOutboxAttempts(input: GetOutboxAttemptsInput): Promise<OutboxAttemptView[]>;
   releaseLapsedLease(input: ReleaseLapsedLeaseInput): Promise<ReleaseLapsedLeaseResult>;
   getHistory(): Promise<ReplayHistoryEntry[]>;
+  getHistoryPage(input: ReplayHistoryPageInput): Promise<ReplayHistoryPage>;
   findHistoryEntry(input: FindHistoryEntryInput): Promise<ReplayHistoryEntry | null>;
   startReplay(input: StartReplayInput): Promise<StartReplayResult>;
   getStatus(): Promise<ReplayStatus>;
@@ -692,6 +701,8 @@ export interface OpsApi {
   runProjectCheckup(input: { projectId: string } & ExplicitCheckInput): Promise<CheckupResult>;
   // -- Ops, Upgrades: the upgrade ledger through UpgradeReader, read only (round 8, U2-API) ---
   getUpgradeStatus(): Promise<OpsUpgradeStatus>;
+  /** Self-hosted: whether every signed-in user sees the upgrade needs attention. */
+  getUpgradeAttentionNotice(): Promise<OpsUpgradeAttentionNotice>;
   listUpgradeReleases(): Promise<OpsUpgradeReleasePage>;
   listUpgradeSteps(input: OpsUpgradeListStepsInput): Promise<OpsUpgradeStepPage>;
   /** Refuses with `upgrade_not_found` when the ledger and the image hold no such step. */
@@ -699,8 +710,6 @@ export interface OpsApi {
   listUpgradeRuns(input: OpsUpgradeListRunsInput): Promise<OpsUpgradeRunPage>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getUpgradeRun(input: OpsUpgradeIdInput): Promise<OpsUpgradeRun>;
-  /** The plan narrowed to `to`, beside the preflight; `upgrade_plan_unavailable` when unwired. */
-  previewUpgrade(input: OpsUpgradePreviewInput): Promise<OpsUpgradePreview>;
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;

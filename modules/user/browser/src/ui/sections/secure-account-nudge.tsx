@@ -4,7 +4,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
  * sign-in: a step rather than a banner, "Not now" beside the offer, and never
  * a gate. Which halves to show is the server's answer. specs/identity/passkeys.feature
  */
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { Fingerprint, ShieldCheck } from "lucide-react";
 
 import { useSecureAccountNudge } from "../../behavior/use-secure-account-nudge.ts";
@@ -19,66 +19,42 @@ export default function SecureAccountNudge() {
   if (offer?.offer !== true || offer.signedInWith !== "password") return null;
   if (nudge.isAnswered) return null;
 
+  const setUpTwoStep = {
+    label: "Set up two-step verification",
+    onClick: () => void nudge.setUpTwoStep(),
+    "data-testid": "nudge-set-up-two-step",
+  };
+  const createPasskey = {
+    label: "Create a passkey",
+    onClick: () => void nudge.createPasskey(),
+    loading: nudge.isCreating,
+    "data-testid": "nudge-create-passkey",
+  };
+  let primaryAction: typeof setUpTwoStep | typeof createPasskey | undefined;
+  if (offer.passkey) primaryAction = createPasskey;
+  else if (offer.twoStep) primaryAction = setUpTwoStep;
+
   return (
-    <Dialog.Root
+    <Dialog
       open
-      onOpenChange={(details) => {
-        if (!details.open) void nudge.later();
-      }}
+      onClose={() => void nudge.later()}
       placement="center"
+      title={offer.passkey ? "Sign in faster next time" : "Secure your account"}
+      icon={offer.passkey ? <Fingerprint size={18} /> : <ShieldCheck size={18} />}
+      busy={nudge.isCreating}
+      secondaryAction={{ label: "Not now", onClick: () => void nudge.later() }}
+      secondaryActions={offer.passkey && offer.twoStep ? [setUpTwoStep] : void 0}
+      primaryAction={primaryAction}
+      cancelLabel={null}
+      data-testid="secure-account-nudge"
     >
-      <Dialog.Content bg="bg" data-testid="secure-account-nudge">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <HStack gap={2}>
-            {offer.passkey ? <Fingerprint size={18} /> : <ShieldCheck size={18} />}
-            <Dialog.Title fontSize="md" fontWeight="500">
-              {offer.passkey ? "Sign in faster next time" : "Secure your account"}
-            </Dialog.Title>
-          </HStack>
-        </Dialog.Header>
-        <Dialog.Body>
-          <NudgeCopy offersPasskey={offer.passkey} offersTwoStep={offer.twoStep} />
-          {nudge.ssoGoverned && (
-            <Text fontSize="sm" color="fg.muted" marginTop={3} data-testid="nudge-sso-governed">
-              {SSO_HANDLES_SIGN_IN}
-            </Text>
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button
-              variant="outline"
-              onClick={() => void nudge.later()}
-              disabled={nudge.isCreating}
-            >
-              Not now
-            </Button>
-            {offer.twoStep && (
-              <Button
-                variant={offer.passkey ? "outline" : "solid"}
-                colorPalette={offer.passkey ? undefined : "orange"}
-                onClick={() => void nudge.setUpTwoStep()}
-                disabled={nudge.isCreating}
-                data-testid="nudge-set-up-two-step"
-              >
-                Set up two-step verification
-              </Button>
-            )}
-            {offer.passkey && (
-              <Button
-                colorPalette="orange"
-                loading={nudge.isCreating}
-                onClick={() => void nudge.createPasskey()}
-                data-testid="nudge-create-passkey"
-              >
-                Create a passkey
-              </Button>
-            )}
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <NudgeCopy offersPasskey={offer.passkey} offersTwoStep={offer.twoStep} />
+      {nudge.ssoGoverned && (
+        <Text fontSize="sm" color="fg.muted" marginTop={3} data-testid="nudge-sso-governed">
+          {SSO_HANDLES_SIGN_IN}
+        </Text>
+      )}
+    </Dialog>
   );
 }
 

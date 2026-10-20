@@ -175,7 +175,7 @@ describe("the /me usage home's Connect your agent button, given a personal proje
     hasFirstMessageRef.current = false;
     renderPage();
     // The page itself is alive (heading rendered), the button is not.
-    expect(screen.getByText("My Usage")).toBeDefined();
+    expect(screen.getByText("My usage")).toBeDefined();
     expect(connectButton()).toBeNull();
     // The gate read the SAME first-traces signal the authorize page
     // watches, for the personal project the /me home resolves.
@@ -187,7 +187,7 @@ describe("the /me usage home's Connect your agent button, given a personal proje
 
 describe("the /me usage home's Connect your agent button, given a personal project with traces", () => {
   /** @scenario the /me home shows Connect your agent once the personal project has traces */
-  it("renders the menu button in the My Usage header", () => {
+  it("renders the menu button in the My usage header", () => {
     renderPage();
     expect(connectButton()).not.toBeNull();
   });

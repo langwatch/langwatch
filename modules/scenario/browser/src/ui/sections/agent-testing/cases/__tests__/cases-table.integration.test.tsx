@@ -554,7 +554,7 @@ describe("the scenarios table", () => {
     await user.click(await screen.findByRole("menuitem", { name: "Move to suite..." }));
 
     expect(screen.getByTestId("cases-selection-action-bar")).toHaveTextContent("1 selected");
-    expect(screen.getByTestId("case-row-Double charge-checkbox")).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Select Double charge" })).toBeChecked();
   });
 
   /** @scenario "Move to suite... confirms a bulk move to another suite" */
@@ -1084,7 +1084,7 @@ describe("the scenarios table", () => {
       expect(empty).toHaveTextContent("Connect the agent you want to test");
       expect(screen.queryByTestId("agent-testing-first-suite-empty")).not.toBeInTheDocument();
 
-      await user.click(within(empty).getByRole("button", { name: "Setup agent" }));
+      await user.click(within(empty).getByRole("button", { name: "Set up agent" }));
       expect(props.onConnectAgent).toHaveBeenCalled();
     });
 

@@ -3,28 +3,18 @@ import {
   RESULT_TTL_SECONDS,
   buildCallEnvelope,
   type StoredResult,
-  storedCallSchema,
 } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 /**
  * The dispatcher against the in-memory store, with a fake instance that plays the
  * gateway's part: it reads envelopes off the store and writes acks and results back the
  * @see specs/agents/connected-agents.feature
  */
-import { afterEach, beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  callAckKey,
-  callKey,
-  INSTANCE_GONE_CHANNEL,
-  instanceChannel,
-  replyChannel,
-  resultKey,
-} from "../rules/connected-agent-keys.rules.ts";
-import type {
-  InstanceMeta,
-  ConnectedAgentRuntime,
-} from "../services/connected-agent-runtime.service.ts";
+import { MemoryConnectedAgentRelayChannel } from "../channels/memory/memory.connected-agent-relay.channel.ts";
+import type { InstanceMeta } from "../repositories/connected-agent-state.repository.ts";
+import { MemoryConnectedAgentStateRepository } from "../repositories/memory/memory.connected-agent-state.repository.ts";
+import type { ConnectedAgentRuntime } from "../services/connected-agent-runtime.service.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 
 const projectId = "proj_1";
@@ -96,38 +86,39 @@ async function connectInstance({
     meta: meta(instanceId, maxConcurrency),
     agentIds,
   });
-  const unsubscribe = await runtime.store.subscribe(
-    instanceChannel(projectId, instanceId),
-    (raw) => {
-      const nudge = JSON.parse(raw) as { call?: string; cancel?: string };
-      if (nudge.cancel) {
+  const unsubscribe = await runtime.relay.listenToInstance({
+    projectId,
+    instanceId,
+    onNudge: (nudge) => {
+      if ("cancel" in nudge) {
         cancelled.push(nudge.cancel);
         return;
       }
-      const callId = nudge.call!;
+      const callId = nudge.call;
       received.push(callId);
       void (async () => {
-        const stored = storedCallSchema.parse(
-          JSON.parse((await runtime.store.tryGet(callKey(projectId, callId)))!),
-        );
+        const lookup = await runtime.state.readCall({ projectId, callId });
+        if (lookup.kind !== "hit") throw new Error(`call ${callId} is not stored`);
+        const stored = lookup.value;
         await behavior(callId, {
           ack: async () => {
-            await runtime.store.set(callAckKey(projectId, callId), "1", 60);
-            await runtime.store.publish(
-              replyChannel(stored.replyTo),
-              JSON.stringify({ callId, kind: "ack" }),
-            );
+            await runtime.state.markCallAcked({ projectId, callId, ttlSeconds: 60 });
+            await runtime.relay.nudgeReply({
+              podId: stored.replyTo,
+              nudge: { callId, kind: "ack" },
+            });
           },
           result: async (result) => {
-            await runtime.store.set(
-              resultKey(projectId, callId),
-              JSON.stringify({ instanceId, ...result }),
-              RESULT_TTL_SECONDS,
-            );
-            await runtime.store.publish(
-              replyChannel(stored.replyTo),
-              JSON.stringify({ callId, kind: "result" }),
-            );
+            await runtime.state.saveResult({
+              projectId,
+              callId,
+              result: { instanceId, ...result },
+              ttlSeconds: RESULT_TTL_SECONDS,
+            });
+            await runtime.relay.nudgeReply({
+              podId: stored.replyTo,
+              nudge: { callId, kind: "result" },
+            });
           },
           gone: async () => {
             await runtime.registry.deregister({
@@ -135,15 +126,12 @@ async function connectInstance({
               instanceId,
               agentIds,
             });
-            await runtime.store.publish(
-              INSTANCE_GONE_CHANNEL,
-              JSON.stringify({ instanceId, projectId }),
-            );
+            await runtime.relay.announceInstanceGone({ instanceId, projectId });
           },
         });
       })();
     },
-  );
+  });
   cleanups.push(unsubscribe);
   return { received, cancelled };
 }
@@ -151,7 +139,8 @@ async function connectInstance({
 async function startRuntime(overrides: { firstTurnGraceMs?: number } = {}): Promise<void> {
   runtime = ConnectedAgentRuntimeService.create({
     podId: "pod_a",
-    store: memorySessionState(),
+    state: MemoryConnectedAgentStateRepository.create(),
+    relay: MemoryConnectedAgentRelayChannel.create(),
     firstTurnGraceMs: 300,
     firstTurnPollMs: 20,
     resultPollMs: 50,
@@ -165,7 +154,7 @@ async function useRuntime(overrides: { firstTurnGraceMs?: number }): Promise<voi
   for (const cleanup of cleanups) await cleanup();
   cleanups = [];
   await runtime.dispatcher.close();
-  await runtime.store.close();
+  await runtime.relay.close();
   await startRuntime(overrides);
 }
 
@@ -177,7 +166,7 @@ beforeEach(async () => {
 afterEach(async () => {
   for (const cleanup of cleanups) await cleanup();
   await runtime.dispatcher.close();
-  await runtime.store.close();
+  await runtime.relay.close();
 });
 
 describe("ConnectedAgentDispatchService", () => {
@@ -550,10 +539,9 @@ describe("ConnectedAgentDispatchService", () => {
           await reply.result({ output: "the call after the failure" });
         },
       });
-      const zadd = runtime.store.zadd.bind(runtime.store);
-      runtime.store.zadd = async () => {
-        throw new Error("the store refused the pending write");
-      };
+      const refused = vi
+        .spyOn(runtime.state, "addPendingCall")
+        .mockRejectedValueOnce(new Error("the store refused the pending write"));
 
       await expect(
         runtime.dispatcher.dispatch({
@@ -563,7 +551,7 @@ describe("ConnectedAgentDispatchService", () => {
         }),
       ).rejects.toThrow("the store refused the pending write");
 
-      runtime.store.zadd = zadd;
+      refused.mockRestore();
       const outcome = await runtime.dispatcher.dispatch({
         projectId,
         agent: agent(),

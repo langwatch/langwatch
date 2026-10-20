@@ -20,6 +20,7 @@ import { useNavigationMode } from "../../behavior/use-navigation-mode.ts";
 import { usePersonalWorkspaceEntries } from "../../behavior/use-personal-workspace-entries.ts";
 import { useUserAvatarUrl } from "../../behavior/user/use-user-avatar-url.ts";
 import { useNavigationHost, type NavigationHost } from "../../model/navigation-host.ts";
+import { OPERATIONS_CONSOLE } from "../../model/products.ts";
 import { NavigationLink } from "../elements/navigation-link.tsx";
 
 const NAVIGATION_MODE_LABELS: Record<NavigationMode, string> = {
@@ -75,8 +76,8 @@ export function AppHeaderUserMenu() {
             name={user?.name ?? void 0}
             src={avatarSrc}
             size="xs"
-            backgroundColor="accent.solid"
-            color="fg"
+            backgroundColor="avatar.orange"
+            color="fg.onColor"
             width="28px"
             height="28px"
           />
@@ -90,12 +91,22 @@ export function AppHeaderUserMenu() {
               <PersonalWorkspaceEntries entries={personalWorkspaceEntries} host={host} />
               {!plan.isLiteMember && (
                 <Menu.Item value="api-keys" asChild>
-                  <NavigationLink href="/settings/api-keys">API Keys</NavigationLink>
+                  <NavigationLink href="/settings/api-keys">API keys</NavigationLink>
                 </Menu.Item>
               )}
               <Menu.Item value="settings" asChild>
                 <NavigationLink href="/settings">Settings</NavigationLink>
               </Menu.Item>
+              {host.opsAccess().hasAccess && (
+                <Menu.Item value="admin" asChild>
+                  <NavigationLink href={OPERATIONS_CONSOLE.href}>
+                    <HStack gap={2}>
+                      <OPERATIONS_CONSOLE.icon size={14} aria-hidden="true" />
+                      <span>{OPERATIONS_CONSOLE.label}</span>
+                    </HStack>
+                  </NavigationLink>
+                </Menu.Item>
+              )}
               {accountMenu?.presence}
               {accountMenu?.experiments && (
                 <Menu.Item value="experiments" onSelect={accountMenu.experiments.open}>

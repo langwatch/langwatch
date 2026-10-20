@@ -187,6 +187,14 @@ export const TOPIC_CLUSTERING_MAX_ATTEMPTS = 3;
 export const TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS = 20 * 60 * 1000;
 
 /**
+ * Each call through the page's dependencies marks progress, but its one langevals call may run
+ * to its deadline (60% of the lease, 12 minutes) in silence; the limit covers it with room.
+ */
+export const TOPIC_CLUSTERING_MAX_SILENCE_MS = Math.floor(
+  TOPIC_CLUSTERING_OUTBOX_LEASE_DURATION_MS * 0.75,
+);
+
+/**
  * The effective clustering concurrency (ADR-051 §4), matching the old
  * worker's cap of 3. Bounding the lease batch to the same number keeps
  * waiting messages from sitting invisible behind a slow page.

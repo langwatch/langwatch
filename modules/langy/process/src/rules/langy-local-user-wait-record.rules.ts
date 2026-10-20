@@ -4,7 +4,6 @@ import {
   type LangyUserWaitStartedEventData,
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 /**
  * The user wait as a record and as a refusal: what the platform keeps about one card while it
  * is on screen, the answer shape the panel polls for, and the error a second answer gets. No
@@ -84,25 +83,6 @@ export interface UserWaitQuestion {
   multiple?: boolean;
   allowOther?: boolean;
   bare?: boolean;
-}
-
-export interface UserWaitServiceOptions {
-  store: SessionStateStore;
-  events: UserWaitEvents;
-  buffer: UserWaitBuffer;
-  /**
-   * Sends the developer's answer to the folder holding the call. Injected, so
-   * the wait service never depends on the transport and a unit test proves the
-   * frame was asked for without a socket.
-   */
-  sendPermission?: (args: {
-    conversationId: string;
-    callId: string;
-    decision: "allow_once" | "allow_pattern" | "deny" | "expired";
-  }) => Promise<void>;
-  now?: () => number;
-  pollIntervalMs?: number;
-  keepaliveMs?: number;
 }
 
 /**

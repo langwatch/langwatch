@@ -4,7 +4,7 @@
  * from the request body, and keeps tenant policy out of a viewer's catalogue.
  */
 import { PermissionDeniedError } from "@langwatch/authorization";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { AuthzScopeNotFoundError, type AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -100,6 +100,68 @@ describe("featureFlag target authorization", () => {
       }),
     ).rejects.toBeInstanceOf(PermissionDeniedError);
     expect(resolveFrontendFlags).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "Any member of a project's organization reads that project's flags" */
+  it("reads a project's flags on organization:view at its own organization", async () => {
+    const { app, hasPermission } = buildApp();
+    hasPermission.mockImplementation(async (check) => check.permission === "organization:view");
+    const isEnabled = vi.spyOn(FeatureFlagService.prototype, "isEnabled").mockResolvedValue(true);
+    const resolveFrontendFlags = vi
+      .spyOn(FeatureFlagService.prototype, "resolveFrontendFlags")
+      .mockResolvedValue({} as never);
+
+    await expect(
+      app.isEnabledForCaller({ flag: FLAG, projectId: PROJECT_ID, userId: USER_ID }),
+    ).resolves.toBe(true);
+    await app.resolveFrontendFlagsForCaller({
+      userId: USER_ID,
+      target: { kind: "project", projectId: PROJECT_ID, organizationId: ORGANIZATION_ID },
+    });
+
+    expect(resolveFrontendFlags).toHaveBeenCalled();
+    expect(isEnabled).toHaveBeenCalled();
+    expect(hasPermission).toHaveBeenCalledWith({
+      userId: USER_ID,
+      permission: "organization:view",
+      organizationId: ORGANIZATION_ID,
+    });
+    expect(hasPermission).not.toHaveBeenCalledWith(
+      expect.objectContaining({ permission: "project:view" }),
+    );
+  });
+
+  /** @scenario "A project in another organization is refused a flag read" */
+  it("refuses a project flag read to a caller outside the project's organization", async () => {
+    const { app, hasPermission, getOrganizationId } = buildApp();
+    getOrganizationId.mockResolvedValue("organization_2");
+    hasPermission.mockImplementation(async (check) => check.organizationId === ORGANIZATION_ID);
+    const isEnabled = vi.spyOn(FeatureFlagService.prototype, "isEnabled");
+    const resolveFrontendFlags = vi.spyOn(FeatureFlagService.prototype, "resolveFrontendFlags");
+
+    await expect(
+      app.isEnabledForCaller({ flag: FLAG, projectId: PROJECT_ID, userId: USER_ID }),
+    ).rejects.toBeInstanceOf(PermissionDeniedError);
+    await expect(
+      app.resolveFrontendFlagsForCaller({
+        userId: USER_ID,
+        target: { kind: "project", projectId: PROJECT_ID, organizationId: "organization_2" },
+      }),
+    ).rejects.toBeInstanceOf(PermissionDeniedError);
+    expect(isEnabled).not.toHaveBeenCalled();
+    expect(resolveFrontendFlags).not.toHaveBeenCalled();
+  });
+
+  /** @scenario "A project in another organization is refused a flag read" */
+  it("refuses an unknown project as it refuses another organization's", async () => {
+    const { app, getOrganizationId } = buildApp();
+    getOrganizationId.mockRejectedValue(new AuthzScopeNotFoundError({ projectId: PROJECT_ID }));
+    const isEnabled = vi.spyOn(FeatureFlagService.prototype, "isEnabled");
+
+    await expect(
+      app.isEnabledForCaller({ flag: FLAG, projectId: PROJECT_ID, userId: USER_ID }),
+    ).rejects.toBeInstanceOf(PermissionDeniedError);
+    expect(isEnabled).not.toHaveBeenCalled();
   });
 
   it("evaluates an authorized organization as that organization's target", async () => {

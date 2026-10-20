@@ -350,7 +350,7 @@ describe("<SuiteSidebar/>", () => {
     it("displays the All Runs link", () => {
       renderWithDesignSystem(<SuiteSidebar {...defaultProps} suites={[]} />);
 
-      expect(screen.getByText("All Runs")).toBeInTheDocument();
+      expect(screen.getByText("All runs")).toBeInTheDocument();
     });
   });
 
@@ -649,7 +649,7 @@ describe("<SuiteSidebar/>", () => {
 
       renderWithDesignSystem(<SuiteSidebar {...defaultProps} onSelectSuite={onSelectSuite} />);
 
-      await user.click(screen.getByText("All Runs"));
+      await user.click(screen.getByText("All runs"));
       expect(onSelectSuite).toHaveBeenCalledWith(ALL_RUNS_ID);
     });
 
@@ -676,7 +676,7 @@ describe("<SuiteSidebar/>", () => {
         />,
       );
 
-      const allRunsButton = screen.getByText("All Runs");
+      const allRunsButton = screen.getByText("All runs");
       const container = allRunsButton.parentElement;
       expect(container).not.toBeNull();
       expect(container!.textContent).not.toMatch(/passed/);
@@ -837,7 +837,7 @@ describe("<SuiteSidebar/>", () => {
 
         await user.click(screen.getByRole("button", { name: "Collapse sidebar" }));
 
-        expect(screen.getByRole("button", { name: "All Runs" })).toBeInTheDocument();
+        expect(screen.getByRole("button", { name: "All runs" })).toBeInTheDocument();
       });
 
       it("persists collapsed state to localStorage", async () => {

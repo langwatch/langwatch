@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`ApiKeyApi`)
 
-Peers call these through the token, declared at `../contract/src/api-key.api.ts:98`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/api-key.api.ts:108`; nothing else in this package is public.
 
 #### `create`
 
@@ -371,13 +371,13 @@ Authenticated: Holding the instance administrator bearer key is the only authori
 Answers at `/api/organizations`, `/api/v1/organizations`; also, undocumented, `/api/organizations/2026-08-07`, `/api/v1/organizations/2026-08-07`, `/api/organizations/latest`, `/api/v1/organizations/latest`.
 
 ```typescript
-// Body: organizationsProvisioningRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:146
+// Body: organizationsProvisioningRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:180
 interface Body {
   name: string;
   slug?: string;
   adminApiKeyName?: string;
 }
-type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // ../contract/src/api-key-rest.schemas.ts:158
+type Response = z.infer<typeof organizationsProvisioningRestCreatedSchema>; // ../contract/src/api-key-rest.schemas.ts:199
 ```
 
 ### `apiKeyProjectsRest`
@@ -395,15 +395,15 @@ List projects
 
 Authenticated: the listing answers exactly the projects the presented credential already reaches, resolved per key, so authentication is the whole gate and a narrower key is filtered rather than refused. Declared at `src/transport/api-key-projects.rest.ts:91`.
 
-Answers at `/api/projects`.
+Answers at `/api/projects`, `/api/v1/projects`.
 
 ```typescript
-// Query: projectRestPaginationQuerySchema, ../contract/src/api-key-rest.schemas.ts:117
+// Query: projectRestPaginationQuerySchema, ../contract/src/api-key-rest.schemas.ts:137
 interface Query {
   page?: number;
   limit?: number;
 }
-type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-key.rest.ts:75
+type Response = z.infer<typeof projectRestPageSchema>; // ../contract/src/api-key.rest.ts:103
 ```
 
 #### `POST /api/projects` · `createProject`
@@ -412,10 +412,10 @@ Create a project
 
 Permission `project:create`. Declared at `src/transport/api-key-projects.rest.ts:118`.
 
-Answers at `/api/projects`.
+Answers at `/api/projects`, `/api/v1/projects`.
 
 ```typescript
-// Body: projectRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:122
+// Body: projectRestCreateSchema, ../contract/src/api-key-rest.schemas.ts:162
 interface Body {
   name: string;
   teamId?: string;
@@ -423,7 +423,7 @@ interface Body {
   language: string;
   framework: string;
 }
-// Response: projectRestCreatedSchema, ../contract/src/api-key.rest.ts:93
+// Response: projectRestCreatedSchema, ../contract/src/api-key.rest.ts:117
 interface Response {
   id: string;
   name: string;
@@ -457,7 +457,7 @@ Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:279`.
 Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-keys/2026-08-07`, `/api/v1/api-keys/2026-08-07`, `/api/api-keys/latest`, `/api/v1/api-keys/latest`.
 
 ```typescript
-type Response = z.infer<typeof apiKeyRestListSchema>; // ../contract/src/api-key.rest.ts:36
+type Response = z.infer<typeof apiKeyRestListSchema>; // ../contract/src/api-key.rest.ts:46
 ```
 
 #### `POST /` · `createApiKey`
@@ -469,8 +469,8 @@ Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:315
 Answers at `/api/api-keys`, `/api/v1/api-keys`; also, undocumented, `/api/api-keys/2026-08-07`, `/api/v1/api-keys/2026-08-07`, `/api/api-keys/latest`, `/api/v1/api-keys/latest`.
 
 ```typescript
-type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-// Response: apiKeyRestMintedSchema, ../contract/src/api-key.rest.ts:52
+type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:92
+// Response: apiKeyRestMintedSchema, ../contract/src/api-key.rest.ts:71
 interface Response {
   token: string;
   apiKey: {
@@ -490,11 +490,11 @@ Permission `organization:view`. Declared at `src/transport/api-key.rest.ts:383`.
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
 ```typescript
-// Params: apiKeyRestParamsSchema, ../contract/src/api-key-rest.schemas.ts:40
+// Params: apiKeyRestParamsSchema, ../contract/src/api-key-rest.schemas.ts:43
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
+type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:58
 ```
 
 #### `PATCH /:id` · `updateApiKey`
@@ -506,8 +506,8 @@ Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:418
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-// Body: apiKeyRestUpdateSchema, ../contract/src/api-key-rest.schemas.ts:99
+type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:43
+// Body: apiKeyRestUpdateSchema, ../contract/src/api-key-rest.schemas.ts:126
 interface Body {
   name?: string;
   description?: string | null;
@@ -519,7 +519,7 @@ interface Body {
     scopeId: string;
   }[];
 }
-type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:40
+type Response = z.infer<typeof apiKeyRestDetailSchema>; // ../contract/src/api-key.rest.ts:58
 ```
 
 #### `DELETE /:id` · `revokeApiKey`
@@ -531,8 +531,8 @@ Permission `organization:manage`. Declared at `src/transport/api-key.rest.ts:475
 Answers at `/api/api-keys/:id`, `/api/v1/api-keys/:id`; also, undocumented, `/api/api-keys/2026-08-07/:id`, `/api/v1/api-keys/2026-08-07/:id`, `/api/api-keys/latest/:id`, `/api/v1/api-keys/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:40
-// Response: apiKeyRestRevokedSchema, ../contract/src/api-key.rest.ts:62
+type Params = z.infer<typeof apiKeyRestParamsSchema>; // ../contract/src/api-key-rest.schemas.ts:43
+// Response: apiKeyRestRevokedSchema, ../contract/src/api-key.rest.ts:76
 interface Response {
   success: boolean;
 }
@@ -547,8 +547,8 @@ Permission `traces:create`. Credential `project`. Declared at `src/transport/api
 Answers at `/api/api-keys/ingestion`, `/api/v1/api-keys/ingestion`; also, undocumented, `/api/api-keys/2026-08-07/ingestion`, `/api/v1/api-keys/2026-08-07/ingestion`, `/api/api-keys/latest/ingestion`, `/api/v1/api-keys/latest/ingestion`.
 
 ```typescript
-type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
+type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:92
+type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:71
 ```
 
 #### `POST /full-access` · `createFullAccessApiKey`
@@ -560,8 +560,8 @@ Permission `project:manage`. Credential `project`. Declared at `src/transport/ap
 Answers at `/api/api-keys/full-access`, `/api/v1/api-keys/full-access`; also, undocumented, `/api/api-keys/2026-08-07/full-access`, `/api/v1/api-keys/2026-08-07/full-access`, `/api/api-keys/latest/full-access`, `/api/v1/api-keys/latest/full-access`.
 
 ```typescript
-type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:42
-type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:52
+type Body = z.infer<typeof apiKeyRestCreateSchema>; // ../contract/src/api-key-rest.schemas.ts:92
+type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-key.rest.ts:71
 ```
 
 ## tRPC transport
@@ -584,7 +584,7 @@ Contract `../contract/src/api-key.trpc.ts:33`, router `src/transport/api-key.trp
 
 ```typescript
 // apiKey.myBindings
-// Input: apiKeyTrpcOrganizationScopeSchema, ../contract/src/api-key-trpc.schemas.ts:28
+// Input: apiKeyTrpcOrganizationScopeSchema, ../contract/src/api-key-trpc.schemas.ts:34
 interface Input {
   organizationId: string;
 }
@@ -600,7 +600,7 @@ type Output = {
 }[];
 
 // apiKey.nameById
-// Input: apiKeyTrpcNameByIdInputSchema, ../contract/src/api-key-trpc.schemas.ts:30
+// Input: apiKeyTrpcNameByIdInputSchema, ../contract/src/api-key-trpc.schemas.ts:44
 interface Input {
   organizationId: string;
   apiKeyId: string;
@@ -612,12 +612,12 @@ type Output = {
 } | null;
 
 // apiKey.list
-type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
 // Output: apiKeyListEntrySchema.array() (inline, ../contract/src/api-key.trpc.ts:44)
 
 // apiKey.create
-type Input = z.infer<typeof apiKeyTrpcCreateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:35
-// Output: apiKeyMintedSchema, ../contract/src/api-key.responses.ts:27
+type Input = z.infer<typeof apiKeyTrpcCreateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:63
+// Output: apiKeyMintedSchema, ../contract/src/api-key.responses.ts:43
 interface Output {
   token: string;
   apiKey: {
@@ -628,8 +628,8 @@ interface Output {
 }
 
 // apiKey.update
-type Input = z.infer<typeof apiKeyTrpcUpdateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:50
-// Output: apiKeyUpdatedSchema, ../contract/src/api-key.responses.ts:35
+type Input = z.infer<typeof apiKeyTrpcUpdateInputSchema>; // ../contract/src/api-key-trpc.schemas.ts:81
+// Output: apiKeyUpdatedSchema, ../contract/src/api-key.responses.ts:54
 interface Output {
   id: string;
   name: string;
@@ -637,18 +637,18 @@ interface Output {
 }
 
 // apiKey.revoke
-// Input: apiKeyTrpcRevokeInputSchema, ../contract/src/api-key-trpc.schemas.ts:62
+// Input: apiKeyTrpcRevokeInputSchema, ../contract/src/api-key-trpc.schemas.ts:91
 interface Input {
   organizationId: string;
   apiKeyId: string;
 }
-// Output: apiKeyRevokedSchema, ../contract/src/api-key.responses.ts:44
+// Output: apiKeyRevokedSchema, ../contract/src/api-key.responses.ts:59
 interface Output {
   success: boolean;
 }
 
 // apiKey.orgProjects
-type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
 // Output: inline, ../contract/src/api-key.trpc.ts:60
 type Output = {
   id: string;
@@ -657,7 +657,7 @@ type Output = {
 }[];
 
 // apiKey.orgTeams
-type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
 // Output: inline, ../contract/src/api-key.trpc.ts:64
 type Output = {
   id: string;
@@ -665,7 +665,7 @@ type Output = {
 }[];
 
 // apiKey.orgMembers
-type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:28
+type Input = z.infer<typeof apiKeyTrpcOrganizationScopeSchema>; // ../contract/src/api-key-trpc.schemas.ts:34
 // Output: inline, ../contract/src/api-key.trpc.ts:68
 type Output = {
   id: string;

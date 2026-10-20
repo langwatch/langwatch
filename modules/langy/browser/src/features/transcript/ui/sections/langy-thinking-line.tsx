@@ -164,9 +164,8 @@ function ThinkingLineText({
           key={text}
           as="output"
           aria-live="polite"
-          fontSize="13px"
-          fontWeight="500"
-          letterSpacing="-0.005em"
+          textStyle="bodySm"
+          fontWeight="medium"
           lineHeight="1.5"
           whiteSpace="nowrap"
           minWidth={0}

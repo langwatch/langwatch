@@ -2,7 +2,6 @@ package domain
 
 import (
 	"fmt"
-	"sort"
 	"strings"
 )
 
@@ -173,16 +172,4 @@ func PostureLine(p ContainerPosture, source PostureSource) string {
 	default:
 		return fmt.Sprintf("containers: colima (%s)", source)
 	}
-}
-
-// SortedPostureNames is every spelling haven accepts, for help and errors.
-func SortedPostureNames() []string {
-	names := make([]string, 0, len(PostureNames))
-	for p, name := range PostureNames {
-		if p != PostureUnset {
-			names = append(names, name)
-		}
-	}
-	sort.Strings(names)
-	return names
 }

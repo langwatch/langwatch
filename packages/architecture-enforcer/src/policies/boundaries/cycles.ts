@@ -2,7 +2,7 @@ import { join } from "node:path";
 
 import type { ArchitectureViolation } from "../../types.ts";
 import type { WorkspaceSnapshot } from "../../workspace/snapshot.ts";
-import { readWorkspaceMembers } from "../../workspace/tsconfig-references.ts";
+import { readWorkspaceMembers } from "../../workspace/workspace-members.ts";
 import { manifestDependencies } from "./manifests.ts";
 
 export function lintCycles(snapshot: WorkspaceSnapshot): ArchitectureViolation[] {

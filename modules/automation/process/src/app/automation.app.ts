@@ -39,6 +39,8 @@ import {
   type CreateTriggerCommand,
   type CustomGraphNameRef,
   type EmailSuppression,
+  type EmailSuppressionPage,
+  type EmailSuppressionPageInput,
   type EmailSuppressionRow,
   type OperatorReportSchedule,
   type ReportSchedule,
@@ -110,7 +112,7 @@ import {
   RunawayContainmentService,
   type AutomationRunawaySignals,
 } from "../features/runaway/services/runaway-containment.service.ts";
-import { AutomationDispatchErrorsTerminalService } from "../features/settlement/services/automation-dispatch-errors-terminal.service.ts";
+import { AutomationDispatchErrorsService } from "../features/settlement/services/automation-dispatch-errors.service.ts";
 import { AutomationSettlementBreachLateService } from "../features/settlement/services/automation-settlement-breach-late.service.ts";
 import { AutomationSettlementBreachLoggedService } from "../features/settlement/services/automation-settlement-breach-logged.service.ts";
 import { AutomationSettlementLedgerService } from "../features/settlement/services/automation-settlement-ledger.service.ts";
@@ -160,6 +162,11 @@ import {
 import { AutomationService, type AutomationLogger } from "../services/automation.service.ts";
 import { DatasetTraceMapperService } from "../services/dataset-trace-mapper.service.ts";
 import { TriggerFilterValidationService } from "../services/trigger-filter-validation.service.ts";
+import {
+  TriggerJsonTextUnwrapService,
+  type TriggerJsonTextCounts,
+  type TriggerJsonTextUnwrapInput,
+} from "../services/trigger-json-text-unwrap.service.ts";
 import { TriggerLatestEvaluationService } from "../services/trigger-latest-evaluation.service.ts";
 import {
   HmacUnsubscribeTokenAdapter,
@@ -184,11 +191,13 @@ type AutomationActionParamsParse =
   | Readonly<{ success: true; data: unknown }>
   | Readonly<{
       success: false;
-      error: Readonly<{ issues: readonly Readonly<{ message: string }>[] }>;
+      error: Readonly<{
+        issues: readonly Readonly<{ message: string; path: readonly PropertyKey[] }>[];
+      }>;
     }>;
 
 /** The per-action `actionParams` parser the process's provider registry owns. */
-interface AutomationActionParamsSchema {
+export interface AutomationActionParamsSchema {
   safeParse(value: unknown): AutomationActionParamsParse;
 }
 
@@ -382,6 +391,20 @@ interface AutomationAppCollaborators {
   settlement: AutomationSettlement | undefined;
 }
 
+/** The stored row as the operator table renders it: no project id, plus the automation's name. */
+function toSuppressionRow(
+  row: EmailSuppression & { triggerName: string | null },
+): EmailSuppressionRow {
+  return {
+    id: row.id,
+    email: row.email,
+    triggerId: row.triggerId,
+    triggerName: row.triggerName,
+    reason: row.reason,
+    createdAt: row.createdAt,
+  };
+}
+
 export class AutomationModule implements AutomationApi {
   static readonly contract = AutomationApiToken;
   static readonly dependencies = {
@@ -481,6 +504,7 @@ export class AutomationModule implements AutomationApi {
         triggers,
         slackConnections,
       });
+      automation.#triggerJsonText = TriggerJsonTextUnwrapService.create({ triggers });
       return automation;
     });
   }
@@ -535,7 +559,7 @@ export class AutomationModule implements AutomationApi {
       logger,
       slackDestinations: input.slackDestinations,
       slackConnections: input.slackConnections,
-      dispatchErrors: AutomationDispatchErrorsTerminalService.create(),
+      dispatchErrors: AutomationDispatchErrorsService.create(),
       runaway: AutomationRunawayUncontainedService.create(logger),
       testFire: AutomationTestFireService.create({
         mail: input.notifications,
@@ -812,6 +836,7 @@ export class AutomationModule implements AutomationApi {
   readonly #triggerMatches: AutomationTriggerMatchDispatcherService;
   readonly #reportSchedules: ReportScheduleService;
   #slackClaims: AutomationSlackClaimReconcileService | undefined;
+  #triggerJsonText: TriggerJsonTextUnwrapService | undefined;
   #settlement: AutomationSettlement | undefined;
   #reportDispatcher: ReportDispatcher | undefined;
   #tenantRetention: RetentionPolicyResolver | undefined;
@@ -876,6 +901,17 @@ export class AutomationModule implements AutomationApi {
       );
     }
     return this.#slackClaims.reconcile(input);
+  }
+
+  /** Rewrites trigger filters and action params an earlier release stored as JSON text. */
+  unwrapTriggerJsonText(input: TriggerJsonTextUnwrapInput): Promise<TriggerJsonTextCounts> {
+    if (!this.#triggerJsonText) {
+      throw new Error(
+        "This AutomationModule was composed from already-built services, so it holds no trigger " +
+          "JSON-text unwrap: compose it through AutomationModule.create to run that step.",
+      );
+    }
+    return this.#triggerJsonText.unwrap(input);
   }
 
   // -- reads -----------------------------------------------------------------
@@ -1329,14 +1365,36 @@ export class AutomationModule implements AutomationApi {
       },
     });
 
-    return rows.map((row) => ({
-      id: row.id,
-      email: row.email,
-      triggerId: row.triggerId,
-      triggerName: row.triggerName,
-      reason: row.reason,
-      createdAt: row.createdAt,
-    }));
+    return rows.map(toSuppressionRow);
+  }
+
+  /**
+   * One page of the operator-facing list. Every page read is audited on its
+   * own, since each page shows customer emails.
+   */
+  async listSuppressionsPage(
+    input: EmailSuppressionPageInput & { actorId: string },
+  ): Promise<EmailSuppressionPage> {
+    const { rows, nextCursor } = await this.#automation.getPageEnriched({
+      projectId: input.projectId,
+      limit: input.limit,
+      cursor: input.cursor,
+    });
+
+    await this.#audit.record({
+      userId: input.actorId,
+      projectId: input.projectId,
+      action: "emailSuppression.getAll",
+      args: {
+        recordCount: rows.length,
+        triggerIds: [
+          ...new Set(rows.map((row) => row.triggerId).filter((id): id is string => id != null)),
+        ],
+        paged: true,
+      },
+    });
+
+    return { suppressions: rows.map(toSuppressionRow), nextCursor };
   }
 
   /** Removing a suppression resumes delivery - a deliberate operator action. */

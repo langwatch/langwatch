@@ -1,7 +1,8 @@
 /** The confirmation dialog shown before enabling personal-workspace advanced features. */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+
 type PersonalFeatureGateDialogState = {
   open: boolean;
   onConfirm: () => void;
@@ -11,52 +12,28 @@ type PersonalFeatureGateDialogState = {
 
 export function PersonalFeatureGateDialog({ state }: { state: PersonalFeatureGateDialogState }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={state.open}
-      onOpenChange={(details) => {
-        if (!details.open) state.onCancel();
-      }}
-      modal
+      onClose={state.onCancel}
+      title="Enable advanced features?"
       size="sm"
+      busy={state.isEnabling}
+      primaryAction={{
+        label: "Enable and continue",
+        onClick: state.onConfirm,
+        loading: state.isEnabling,
+      }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Enable advanced features?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="start" gap={3}>
-            <Text fontSize="sm">
-              Datasets are part of the advanced-features bundle for your personal workspace. Turning
-              it on enables Evaluations, Datasets, Annotations, and Automations together.
-            </Text>
-            <Text fontSize="xs" color="fg.muted">
-              You can disable them later in /me/configure, your data is preserved and reappears on
-              re-enable.
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={2}>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={state.onCancel}
-              disabled={state.isEnabling}
-            >
-              Cancel
-            </Button>
-            <Button
-              size="sm"
-              colorPalette="orange"
-              onClick={state.onConfirm}
-              loading={state.isEnabling}
-            >
-              Enable and continue
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="start" gap={3}>
+        <Text fontSize="sm">
+          Datasets are part of the advanced-features bundle for your personal workspace. Turning it
+          on enables Evaluations, Datasets, Annotations, and Automations together.
+        </Text>
+        <Text fontSize="xs" color="fg.muted">
+          You can disable them later in /me/configure, your data is preserved and reappears on
+          re-enable.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }

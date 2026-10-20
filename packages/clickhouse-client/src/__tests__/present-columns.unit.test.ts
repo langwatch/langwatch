@@ -27,9 +27,9 @@ describe("ClickHouseColumns", () => {
       clock = 1_500;
       const added = await columns.select({ table: "trace_summaries", columns: COLUMNS });
 
-      expect(pending).toBe("TraceId, CAST(0 AS Float64) AS CostUsd");
+      expect(pending).toBe("`TraceId`, CAST(0 AS Float64) AS `CostUsd`");
       expect(cached).toBe(pending);
-      expect(added).toBe("TraceId, CostUsd");
+      expect(added).toBe("`TraceId`, `CostUsd`");
       expect(read).toHaveBeenCalledTimes(2);
     });
   });
@@ -45,8 +45,22 @@ describe("ClickHouseColumns", () => {
       const blind = await columns.select({ table: "trace_summaries", columns: COLUMNS });
       const known = await columns.select({ table: "trace_summaries", columns: COLUMNS });
 
-      expect(blind).toBe("TraceId, CostUsd");
-      expect(known).toBe("TraceId, CAST(0 AS Float64) AS CostUsd");
+      expect(blind).toBe("`TraceId`, `CostUsd`");
+      expect(known).toBe("`TraceId`, CAST(0 AS Float64) AS `CostUsd`");
+    });
+  });
+
+  describe("given a read through a table alias", () => {
+    it("reads each present column through the alias under its own name", async () => {
+      const columns = ClickHouseColumns.over({ read: async () => BEFORE, now: () => 0 });
+
+      const aliased = await columns.select({
+        table: "trace_summaries",
+        alias: "t",
+        columns: COLUMNS,
+      });
+
+      expect(aliased).toBe("t.`TraceId` AS `TraceId`, CAST(0 AS Float64) AS `CostUsd`");
     });
   });
 });

@@ -27,27 +27,34 @@ type TenancyInput struct {
 	Seed   int64
 	Anchor time.Time
 	Cloud  bool
-	// Volume is "S" (default) or "M": seedgen's medium tier shape, 12 organizations and 48 projects.
+	// Volume is "S" (default), "M" (seedgen's medium: 12 organizations, 48 projects) or "L" (the cloud long tail).
 	Volume string
 }
 
 // volume is how many rows each tier lays out.
 type volume struct{ orgs, teams, projects, users int }
 
-var volumes = map[string]volume{"": {3, 6, 12, 40}, "S": {3, 6, 12, 40}, "M": {12, 24, 48, 400}}
+var volumes = map[string]volume{"": {3, 6, 12, 40}, "S": {3, 6, 12, 40}, "M": {12, 24, 48, 400}, "L": {2_000, 6_000, 20_000, 200_000}}
+
+// longTailBig is how many of tier L's organizations are big: every other row past the first per organization goes to them.
+const longTailBig = 10
+
+// longTailTeamMembers caps each tier L team's members, the first of the organization's users in id order.
+const longTailTeamMembers = 50
 
 // subscriptionStatuses cycle over M's organizations: the rare states main can hold besides ACTIVE.
 var subscriptionStatuses = []string{"ACTIVE", "ACTIVE", "PENDING", "FAILED", "CANCELLED"}
 
 // Tenancy is the S tier's organizations, teams, projects and users, ids snap_<cell>_<kind>_<n>.
 type Tenancy struct {
-	Cell          string
-	Organizations []Organization
-	Teams         []Team
-	Projects      []Project
-	Users         []User
-	Subscriptions []Subscription
-	withVerified  bool
+	Cell           string
+	Organizations  []Organization
+	Teams          []Team
+	Projects       []Project
+	Users          []User
+	Subscriptions  []Subscription
+	withVerified   bool
+	teamMembersCap int // 0: every member of the organization joins each of its teams
 }
 
 // Organization is one tenant organization row.
@@ -114,6 +121,15 @@ func (builder tenancyBuilder) instant(kind string, n int) time.Time {
 	return builder.start.Add(time.Duration(Pick(PickParams{builder.input.Seed, kind + "/at", n, minutes})) * time.Minute)
 }
 
+// orgOf is row n's organization number: round-robin, except tier L, where row n of the first orgCount is
+// organization n and past that every even row goes to one of the longTailBig big organizations.
+func (builder tenancyBuilder) orgOf(n int) int {
+	if builder.input.Volume != "L" || n <= builder.orgCount || n%2 == 1 {
+		return (n-1)%builder.orgCount + 1
+	}
+	return (n/2)%longTailBig + 1
+}
+
 func (builder tenancyBuilder) pick(kind string, n, size int) int {
 	return Pick(PickParams{Seed: builder.input.Seed, Kind: kind, Index: n, N: size})
 }
@@ -126,6 +142,9 @@ func BuildTenancy(input TenancyInput) Tenancy {
 		builder.orgCount++
 	}
 	tenancy := Tenancy{Cell: builder.cell, withVerified: input.Cloud}
+	if input.Volume == "L" {
+		tenancy.teamMembersCap = longTailTeamMembers
+	}
 	tenancy.Organizations = builder.organizations()
 	if input.Cloud {
 		tenancy.Subscriptions = builder.subscriptions()
@@ -150,7 +169,7 @@ func (builder tenancyBuilder) subscriptions() []Subscription {
 	var subscriptions []Subscription
 	for n := 1; n <= builder.orgCount; n++ {
 		status := "ACTIVE"
-		if builder.input.Volume == "M" {
+		if builder.input.Volume == "M" || builder.input.Volume == "L" {
 			status = subscriptionStatuses[(n-1)%len(subscriptionStatuses)]
 		}
 		subscriptions = append(subscriptions, Subscription{
@@ -173,7 +192,7 @@ func (builder tenancyBuilder) users() []User {
 		}
 		users = append(users, User{
 			ID: builder.id("user", n), Name: fmt.Sprintf("Snapshot User %d", n), Email: fmt.Sprintf("user%d@snapshot.test", n),
-			State: state, OrganizationID: builder.id("org", (n-1)%builder.orgCount+1), Role: role, CreatedAt: builder.instant("user", n),
+			State: state, OrganizationID: builder.id("org", builder.orgOf(n)), Role: role, CreatedAt: builder.instant("user", n),
 		})
 	}
 	return users
@@ -182,7 +201,7 @@ func (builder tenancyBuilder) users() []User {
 func (builder tenancyBuilder) teams() []Team {
 	var teams []Team
 	for n := 1; n <= builder.size.teams; n++ {
-		org := (n-1)%builder.orgCount + 1
+		org := builder.orgOf(n)
 		team := Team{ID: builder.id("team", n), Name: fmt.Sprintf("Snapshot Team %d", n), Slug: fmt.Sprintf("snap-%s-team-%d", builder.cell, n),
 			OrganizationID: builder.id("org", org), CreatedAt: builder.instant("team", n)}
 		if n%3 == 0 {

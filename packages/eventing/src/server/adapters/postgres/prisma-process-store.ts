@@ -62,6 +62,12 @@ function isPrismaTransactionClient(
 
 class DuplicateInboxRollback extends Error {}
 
+/** One instance a wake claim took, with the due time it held before the claim moved it. */
+type ClaimedWakeRow = Pick<
+  ProcessManagerInstance,
+  "processName" | "projectId" | "processKey" | "revision"
+> & { wakeAt: Date };
+
 /** A commit or transaction before its read: `decide` sees the row the lock is holding. */
 type LockedWrite<State> = Omit<ProcessTransaction<State>, "apply"> & {
   decide: (
@@ -151,6 +157,31 @@ const COMMIT_TRANSACTION_OPTIONS = {
 } as const;
 
 /** Durable Postgres implementation of the process state/inbox/outbox port. */
+/** The sweep's dispatched-outbox delete, shared with the test that plans it. */
+export function dispatchedOutboxSweepDelete(params: { before: number; limit: number }): Prisma.Sql {
+  return Prisma.sql`
+    DELETE FROM "ProcessManagerOutbox"
+    WHERE "id" IN (
+      SELECT "id" FROM "ProcessManagerOutbox"
+      WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
+        AND "dispatchedAt" < ${asDate(params.before)}
+      LIMIT ${params.limit}
+    )
+  `;
+}
+
+/** The sweep's consumed-inbox delete, shared with the test that plans it. */
+export function consumedInboxSweepDelete(params: { before: number; limit: number }): Prisma.Sql {
+  return Prisma.sql`
+    DELETE FROM "ProcessManagerInbox"
+    WHERE "id" IN (
+      SELECT "id" FROM "ProcessManagerInbox"
+      WHERE "consumedAt" < ${asDate(params.before)}
+      LIMIT ${params.limit}
+    )
+  `;
+}
+
 export class PrismaProcessStore implements ProcessStore {
   static create(options: { database: EventingProcessPersistenceDatabase }): PrismaProcessStore {
     if (!isProcessPersistencePrismaClient(options.database)) {
@@ -613,6 +644,25 @@ export class PrismaProcessStore implements ProcessStore {
     return { applied: updated === 1 };
   }
 
+  async renewLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    leaseDurationMs: number;
+  }): Promise<{ applied: boolean }> {
+    const updated = await this.#prisma.$executeRaw`
+      UPDATE "ProcessManagerOutbox"
+         SET "leasedUntil" = ${asDate(params.now + params.leaseDurationMs)},
+             "updatedAt" = ${asDate(params.now)}
+       WHERE "processName" = ${params.identity.processName}
+         AND "projectId" = ${params.identity.projectId}
+         AND "messageKey" = ${params.identity.messageKey}
+         AND "leaseToken" = ${params.leaseToken}
+         AND "status" = 'pending'
+    `;
+    return { applied: updated === 1 };
+  }
+
   async markFailed(params: {
     identity: OutboxMessageIdentity;
     leaseToken: string;
@@ -747,6 +797,77 @@ export class PrismaProcessStore implements ProcessStore {
     );
   }
 
+  async leaseDueWakes(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    processNames?: readonly string[];
+  }): Promise<DueWake[]> {
+    if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
+    // One statement claims the batch, as leaseDueMessages does: SKIP LOCKED hands concurrent
+    // workers disjoint rows and never waits, and the lease keeps a claimed row out of later
+    // scans. The revision is untouched, so the wake's fence still holds against any commit.
+    const rows = await this.#prisma.$queryRaw<ClaimedWakeRow[]>(
+      Prisma.sql`
+        ${skipTenantCheck({
+          // The due-wake claim is cross-project worker infrastructure: it takes every process
+          // instance whose wake time has passed, in any project.
+          SKIP_TENANT_CHECK: true,
+        })}
+        WITH due AS MATERIALIZED (
+          SELECT "id", "nextWakeAt"
+          FROM "ProcessManagerInstance"
+          WHERE "nextWakeAt" <= ${asDate(params.now)}
+          ${processNameFilter}
+          ORDER BY "nextWakeAt" ASC, "processName" ASC,
+                   "projectId" ASC, "processKey" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT ${params.limit}
+        ),
+        claimed AS (
+          UPDATE "ProcessManagerInstance" AS instance
+          SET "nextWakeAt" = ${asDate(params.now + params.leaseDurationMs)}
+          FROM due
+          WHERE instance."id" = due."id"
+          RETURNING instance."processName", instance."projectId", instance."processKey",
+                    instance."revision", due."nextWakeAt" AS "wakeAt"
+        )
+        SELECT * FROM claimed
+        ORDER BY "wakeAt" ASC, "processName" ASC, "projectId" ASC, "processKey" ASC
+      `,
+    );
+    return rows.map((row) => ({
+      ref: {
+        processName: row.processName,
+        projectId: row.projectId,
+        processKey: row.processKey,
+      },
+      revision: row.revision,
+      wakeAt: row.wakeAt.getTime(),
+    }));
+  }
+
+  async releaseWakeClaim(params: {
+    ref: ProcessRef;
+    revision: number;
+    wakeAt: number;
+    claimedUntil: number;
+  }): Promise<{ applied: boolean }> {
+    const result = await this.#prisma.processManagerInstance.updateMany({
+      where: {
+        ...refWhere(params.ref),
+        revision: params.revision,
+        nextWakeAt: asDate(params.claimedUntil),
+      },
+      data: { nextWakeAt: asDate(params.wakeAt) },
+    });
+    return { applied: result.count === 1 };
+  }
+
   async requeueDeadMessages(params: {
     processName: string;
     projectId: string;
@@ -797,13 +918,7 @@ export class PrismaProcessStore implements ProcessStore {
   async deleteDispatchedOutboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
     return this.#prisma.$executeRaw`
-      DELETE FROM "ProcessManagerOutbox"
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerOutbox"
-        WHERE "status" = 'dispatched'::"ProcessManagerOutboxStatus"
-          AND "dispatchedAt" < ${asDate(params.before)}
-        LIMIT ${params.limit}
-      )
+      ${dispatchedOutboxSweepDelete(params)}
       ${skipTenantCheck({
         // Process-manager retention sweep, dispatched outbox (system-owned maintenance)
         SKIP_TENANT_CHECK: true,
@@ -834,12 +949,7 @@ export class PrismaProcessStore implements ProcessStore {
   async deleteConsumedInboxBatch(params: { before: number; limit: number }): Promise<number> {
     if (params.limit <= 0) return 0;
     return this.#prisma.$executeRaw`
-      DELETE FROM "ProcessManagerInbox"
-      WHERE "id" IN (
-        SELECT "id" FROM "ProcessManagerInbox"
-        WHERE "consumedAt" < ${asDate(params.before)}
-        LIMIT ${params.limit}
-      )
+      ${consumedInboxSweepDelete(params)}
       ${skipTenantCheck({
         // Process-manager retention sweep, consumed inbox (system-owned maintenance)
         SKIP_TENANT_CHECK: true,

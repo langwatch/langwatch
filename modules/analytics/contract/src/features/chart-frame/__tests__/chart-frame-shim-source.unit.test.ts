@@ -42,13 +42,13 @@ function evaluateShim() {
   const run = new Function("window", "console", "setInterval", buildShimScript());
   run(win, fakeConsole, () => 0);
 
-  const dispatchInit = (source: unknown, widgetSource: string) => {
-    const port = { onmessage: null as unknown, postMessage: () => {} };
+  const port = { onmessage: null as ((event: unknown) => void) | null, postMessage: () => {} };
+  const dispatchInit = (source: unknown, widgetSource: string, theme = "light") => {
     const event = {
       data: {
         type: "lw:init",
         source: widgetSource,
-        dashboardContext: { theme: "light" },
+        dashboardContext: { theme },
         params: {},
       },
       source,
@@ -57,7 +57,7 @@ function evaluateShim() {
     for (const handler of listeners.message ?? []) handler(event);
   };
 
-  return { win, parent, activateAuthor, dispatchInit };
+  return { win, parent, port, activateAuthor, dispatchInit };
 }
 
 describe("given the frame's shim is listening for lw:init", () => {
@@ -82,6 +82,22 @@ describe("given the frame's shim is listening for lw:init", () => {
 
       expect(win.__LW_AUTHOR_SOURCE__).toBe("export default () => null;");
       expect(activateAuthor).toHaveBeenCalledTimes(1);
+    });
+  });
+});
+
+describe("given the frame paints its own canvas", () => {
+  describe("when the theme arrives on init and then changes", () => {
+    it("sets the document colour scheme from the theme each time", () => {
+      const { parent, port, dispatchInit } = evaluateShim();
+
+      dispatchInit(parent, "export default () => null;", "dark");
+      expect(document.documentElement.style.colorScheme).toBe("dark");
+
+      port.onmessage?.({
+        data: { type: "lw:dashboard-context-change", dashboardContext: { theme: "light" } },
+      });
+      expect(document.documentElement.style.colorScheme).toBe("light");
     });
   });
 });

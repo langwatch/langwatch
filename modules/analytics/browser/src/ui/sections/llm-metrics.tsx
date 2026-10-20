@@ -1,5 +1,5 @@
+import { Card } from "@langwatch/design-system/card";
 import {
-  Card,
   Grid,
   GridItem,
   Heading,
@@ -153,12 +153,12 @@ export function LLMMetrics() {
   return (
     <>
       <HStack paddingTop={6} paddingBottom={2}>
-        <Heading as="h2" size="md">
-          LLM Metrics
+        <Heading as="h2" size="sm">
+          LLM metrics
         </Heading>
-        <Tooltip content="View LLM Metrics dashboard">
+        <Tooltip content="View LLM metrics dashboard">
           <Link href={`/${project?.slug}/analytics/metrics`}>
-            <IconButton aria-label="View LLM Metrics" variant="ghost" size="xs" color="fg.subtle">
+            <IconButton aria-label="View LLM metrics" variant="ghost" size="xs" color="fg.subtle">
               <ArrowUpRight size={14} />
             </IconButton>
           </Link>
@@ -166,126 +166,106 @@ export function LLMMetrics() {
       </HStack>
       <Grid width="100%" templateColumns="1fr 0.5fr" gap={6}>
         <GridItem colSpan={2}>
-          <Card.Root>
-            <Card.Body>
-              <Tabs.Root
-                variant="plain"
-                defaultValue="llmCallsGraph"
-                // Every panel here is a read-only CustomGraph analytics
-                // query with no user-entered state, so fully unmounting
-                // inactive tabs is safe and avoids firing/holding queries
-                // for graphs the user never looks at.
-                lazyMount
-                unmountOnExit
-              >
-                <Tabs.List gap={12}>
-                  <Tabs.Trigger value="llmCallsGraph" paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={{
-                        ...llmCallsGraph,
-                        graphType: "summary",
-                        groupBy: undefined,
-                      }}
-                      titleProps={{
-                        textStyle: "sm",
-                        color: "fg",
-                      }}
-                    />
-                  </Tabs.Trigger>
-                  {hasPermission("cost:view") && (
-                    <Tabs.Trigger value="totalCostGraph" paddingX={0} paddingBottom={4}>
-                      <CustomGraph
-                        input={{ ...totalCostGraph, graphType: "summary" }}
-                        titleProps={{
-                          textStyle: "sm",
-                          color: "fg",
-                        }}
-                      />
-                    </Tabs.Trigger>
-                  )}
-                  <Tabs.Trigger value="tokensGraph" paddingX={0} paddingBottom={4}>
-                    <CustomGraph
-                      input={totalTokensSummary}
-                      titleProps={{
-                        textStyle: "sm",
-                        color: "fg",
-                      }}
-                    />
-                  </Tabs.Trigger>
-                  <Tabs.Indicator
-                    mt="-1.5px"
-                    height="4px"
-                    bg="orange.solid"
-                    borderRadius="1px"
-                    bottom={0}
+          <Card padding="lg">
+            <Tabs.Root
+              variant="line"
+              defaultValue="llmCallsGraph"
+              // Every panel here is a read-only CustomGraph analytics
+              // query with no user-entered state, so fully unmounting
+              // inactive tabs is safe and avoids firing/holding queries
+              // for graphs the user never looks at.
+              lazyMount
+              unmountOnExit
+            >
+              <Tabs.List gap={12}>
+                <Tabs.Trigger value="llmCallsGraph" paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={{
+                      ...llmCallsGraph,
+                      graphType: "summary",
+                      groupBy: undefined,
+                    }}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
                   />
-                </Tabs.List>
-                <Tabs.Content value="llmCallsGraph">
-                  <CustomGraph input={llmCallsGraph} />
-                </Tabs.Content>
+                </Tabs.Trigger>
                 {hasPermission("cost:view") && (
-                  <Tabs.Content value="totalCostGraph">
-                    <CustomGraph input={totalCostGraph} />
-                  </Tabs.Content>
+                  <Tabs.Trigger value="totalCostGraph" paddingX={0} paddingBottom={4}>
+                    <CustomGraph
+                      input={{ ...totalCostGraph, graphType: "summary" }}
+                      titleProps={{
+                        textStyle: "sm",
+                        color: "fg",
+                      }}
+                    />
+                  </Tabs.Trigger>
                 )}
-                <Tabs.Content value="tokensGraph">
-                  <CustomGraph input={tokensGraph} />
+                <Tabs.Trigger value="tokensGraph" paddingX={0} paddingBottom={4}>
+                  <CustomGraph
+                    input={totalTokensSummary}
+                    titleProps={{
+                      textStyle: "sm",
+                      color: "fg",
+                    }}
+                  />
+                </Tabs.Trigger>
+              </Tabs.List>
+              <Tabs.Content value="llmCallsGraph">
+                <CustomGraph input={llmCallsGraph} />
+              </Tabs.Content>
+              {hasPermission("cost:view") && (
+                <Tabs.Content value="totalCostGraph">
+                  <CustomGraph input={totalCostGraph} />
                 </Tabs.Content>
-              </Tabs.Root>
-            </Card.Body>
-          </Card.Root>
+              )}
+              <Tabs.Content value="tokensGraph">
+                <CustomGraph input={tokensGraph} />
+              </Tabs.Content>
+            </Tabs.Root>
+          </Card>
         </GridItem>
         <GridItem>
           <LLMSummary />
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
-              <HStack gap={1}>
-                <Heading size="sm">Evaluations Summary</Heading>
-                <Tooltip content="View Online Evaluations">
-                  <Link href={`/${project?.slug}/analytics/evaluations`}>
-                    <IconButton
-                      aria-label="View Evaluations"
-                      variant="ghost"
-                      size="2xs"
-                      color="fg.subtle"
-                    >
-                      <ArrowUpRight size={14} />
-                    </IconButton>
-                  </Link>
-                </Tooltip>
-              </HStack>
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph
-                input={{
-                  ...evaluationsSummary,
-                  graphType: "summary",
-                }}
-              />
-            </Card.Body>
-          </Card.Root>
+          <Card
+            variant="panel-fill"
+            padding="lg"
+            title="Evaluations summary"
+            actions={
+              <Tooltip content="View online evaluations">
+                <Link href={`/${project?.slug}/analytics/evaluations`}>
+                  <IconButton
+                    aria-label="View evaluations"
+                    variant="ghost"
+                    size="2xs"
+                    color="fg.subtle"
+                  >
+                    <ArrowUpRight size={14} />
+                  </IconButton>
+                </Link>
+              </Tooltip>
+            }
+          >
+            <CustomGraph
+              input={{
+                ...evaluationsSummary,
+                graphType: "summary",
+              }}
+            />
+          </Card>
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
-              <Heading size="sm">Error Trend</Heading>
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph input={errorTrend} />
-            </Card.Body>
-          </Card.Root>
+          <Card variant="panel-fill" padding="lg" title="Error trend">
+            <CustomGraph input={errorTrend} />
+          </Card>
         </GridItem>
         <GridItem>
-          <Card.Root height="full">
-            <Card.Header>
-              <Heading size="sm">Latency Trend</Heading>
-            </Card.Header>
-            <Card.Body>
-              <CustomGraph input={latencyTrend} />
-            </Card.Body>
-          </Card.Root>
+          <Card variant="panel-fill" padding="lg" title="Latency trend">
+            <CustomGraph input={latencyTrend} />
+          </Card>
         </GridItem>
       </Grid>
     </>

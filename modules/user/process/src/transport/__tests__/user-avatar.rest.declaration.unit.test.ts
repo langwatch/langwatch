@@ -12,10 +12,10 @@ const declaration = userAvatarRest.router();
 
 describe("the user-avatar REST family", () => {
   describe("given the declaration a process mounts", () => {
-    it("keeps the literal address it has always answered at, with no /api/v1 twin", () => {
+    it("keeps the literal address it has always answered at, and its /api/v1 twin", () => {
       expect(userAvatarRest.namespace).toBe("user-avatar");
       expect(declaration.addressing).toBe("literal");
-      expect(declaration.v1Twin).toBe(false);
+      expect(declaration.v1Twin).toBe(true);
       expect(
         declaration.routes.map((route) => [route.path, route.operation, route.methods]),
       ).toEqual([

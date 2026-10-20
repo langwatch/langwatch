@@ -60,7 +60,9 @@ Langy's native selection is a strict superset of the public selection, so what
 we publish always ships in Langy. The `github/` skill is Langy-only because it
 depends on provisioned `GH_TOKEN` and bot-authored PR behavior; its canonical
 source still lives here, while `listPublishedSkills()` keeps it out of the
-public repository. The copy under the Go embed directory supports local builds,
+public repository. A Langy-only skill that only a module's own brief names, such
+as `daily-insights`, also says `internal: true` in its front matter: the worker
+installs it and the composer's skill palette never offers it. The copy under the Go embed directory supports local builds,
 and `_tests/native-skills.test.ts` pins it to the root-compiled output.
 
 ## Adding or changing a skill

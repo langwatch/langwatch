@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -33,6 +33,7 @@
     "@langwatch/authorization": "workspace:*",
     "@langwatch/authz-contract": "workspace:*",
     "@langwatch/clickhouse-client": "workspace:*",
+    "@langwatch/clickhouse-markers": "workspace:*",
     "@langwatch/coding-agent-contract": "workspace:*",
     "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/enterprise-governance-contract": "workspace:*",

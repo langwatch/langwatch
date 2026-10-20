@@ -22,11 +22,10 @@
   "scripts": {
     "dev": "vite --config gallery/vite.config.ts",
     "screenshot": "node gallery/screenshot.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "generate:haven-icon": "node scripts/generate-haven-icon.mjs"
   },
-  "dependencies": {},
   "devDependencies": {
     "@testing-library/react": "catalog:",
     "@testing-library/user-event": "catalog:",

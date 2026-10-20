@@ -1,6 +1,6 @@
-import { type TenantId } from "@langwatch/eventing";
+import { type StateProjectionStore, type TenantId } from "@langwatch/eventing";
 import { generate } from "@langwatch/ksuid";
-import type { LangyUsageCount } from "@langwatch/langy-contract";
+import type { LangyConversationTurnData, LangyUsageCount } from "@langwatch/langy-contract";
 import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
@@ -67,6 +67,7 @@ export class LangyConversationService {
     finalParts = LangyFinalPartsService.create(),
     runtime = defaultRuntime,
     turnOrder = null,
+    turnStates = null,
   }: {
     repository: LangyConversationRepository;
     commands: LangyConversationCommands;
@@ -75,6 +76,7 @@ export class LangyConversationService {
     finalParts?: LangyFinalPartsService;
     runtime?: LangyConversationRuntime;
     turnOrder?: LangyTurnOrderReader | null;
+    turnStates?: StateProjectionStore<LangyConversationTurnData> | null;
   }) {
     this.repository = repository;
     this.commands = commands;
@@ -83,7 +85,7 @@ export class LangyConversationService {
     this.finalParts = finalParts;
     this.runtime = runtime;
     this.turnOrder = turnOrder;
-    this.reads = LangyConversationReadService.create({ repository, events });
+    this.reads = LangyConversationReadService.create({ repository, events, turnStates });
     this.turns = LangyConversationTurnService.create({
       repository,
       commands,
@@ -117,6 +119,12 @@ export class LangyConversationService {
     input: Parameters<LangyConversationReadService["getEventsAfter"]>[0],
   ): ReturnType<LangyConversationReadService["getEventsAfter"]> {
     return this.reads.getEventsAfter(input);
+  }
+
+  findTurn(
+    input: Parameters<LangyConversationReadService["findTurn"]>[0],
+  ): ReturnType<LangyConversationReadService["findTurn"]> {
+    return this.reads.findTurn(input);
   }
 
   getLocalRecord(
@@ -275,6 +283,7 @@ export class LangyConversationService {
     finalParts,
     runtime,
     turnOrder,
+    turnStates,
   }: {
     commands: LangyConversationCommands;
     repository: LangyConversationRepository;
@@ -283,6 +292,7 @@ export class LangyConversationService {
     finalParts?: LangyFinalPartsService;
     runtime?: LangyConversationRuntime;
     turnOrder?: LangyTurnOrderReader | null;
+    turnStates?: StateProjectionStore<LangyConversationTurnData> | null;
   }): LangyConversationService {
     return new LangyConversationService({
       repository,
@@ -292,6 +302,7 @@ export class LangyConversationService {
       finalParts,
       runtime,
       turnOrder,
+      turnStates,
     });
   }
 }

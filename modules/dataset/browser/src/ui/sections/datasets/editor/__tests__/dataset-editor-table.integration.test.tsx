@@ -255,6 +255,19 @@ describe("given an in-memory dataset", () => {
     });
   });
 
+  describe("when the selection is cleared from the bar", () => {
+    it("empties the selection and returns focus to the select-all box", async () => {
+      const user = userEvent.setup();
+      renderInMemory();
+
+      await user.click(screen.getByLabelText("Select row 1"));
+      await user.click(await screen.findByRole("button", { name: "Clear selection" }));
+
+      expect(screen.queryByTestId("dataset-selection-bar")).not.toBeInTheDocument();
+      await waitFor(() => expect(document.querySelector("[data-select-all]")).toHaveFocus());
+    });
+  });
+
   describe("when rows are selected and deleted", () => {
     /** @scenario Select and delete rows */
     it("removes the rows and propagates the change", async () => {
@@ -264,8 +277,11 @@ describe("given an in-memory dataset", () => {
       await user.click(screen.getByLabelText("Select row 1"));
       await user.click(screen.getByLabelText("Select row 2"));
 
-      const deleteButton = await screen.findByTestId("delete-selected-rows");
-      expect(deleteButton).toHaveTextContent("Delete 2 rows");
+      const bar = await screen.findByTestId("dataset-selection-bar");
+      expect(bar).toHaveAttribute("data-placement", "inline");
+      expect(bar).toHaveTextContent("2 selected");
+      const deleteButton = screen.getByTestId("delete-selected-rows");
+      expect(deleteButton).toHaveTextContent("Delete");
       await user.click(deleteButton);
 
       await waitFor(() => {

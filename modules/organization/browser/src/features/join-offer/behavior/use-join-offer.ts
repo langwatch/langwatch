@@ -103,10 +103,11 @@ export function useJoinOffer({
     [acceptInvite, utils, showErrorToast, joinUtils],
   );
 
-  const checkAgain = useCallback(
-    () => void joinUtils.identity.joinRequests.mine.invalidate(),
-    [joinUtils],
-  );
+  // An approval lands as a membership, so the organizations are read again with the request.
+  const checkAgain = useCallback(() => {
+    void joinUtils.identity.joinRequests.mine.invalidate();
+    void utils.organization.getAll.invalidate();
+  }, [joinUtils, utils]);
 
   const settled = !offer.isPending && !mine.isPending && !(onboarding && invitations.isPending);
   const view = settled

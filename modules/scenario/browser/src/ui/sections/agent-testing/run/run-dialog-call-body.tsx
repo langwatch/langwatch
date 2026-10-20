@@ -1,6 +1,5 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { Button, VStack } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Box, Button, VStack } from "@langwatch/design-system/primitives";
 import { ArrowLeft } from "lucide-react";
 
 import { WiredTalkToItPanel } from "../../../../features/talk-to-it/ui/sections/wired-talk-to-it-panel.tsx";
@@ -16,7 +15,7 @@ export function RunDialogCallBody({
 }) {
   const { project } = useOrganizationTeamProject();
   return (
-    <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+    <Box paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
       <VStack align="stretch" gap={3} data-testid="run-dialog-call">
         <Button
           variant="ghost"
@@ -36,6 +35,6 @@ export function RunDialogCallBody({
           scenarioId={voiceCall.scenarioId}
         />
       </VStack>
-    </Dialog.Body>
+    </Box>
   );
 }

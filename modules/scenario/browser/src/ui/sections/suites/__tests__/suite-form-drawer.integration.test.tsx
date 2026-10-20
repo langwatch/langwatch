@@ -162,20 +162,6 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   getFlowCallbacks: vi.fn(() => undefined),
 }));
 
-vi.mock("@langwatch/design-system/studio-drawer", () => ({
-  Drawer: {
-    Root: ({ children, open }: { children: React.ReactNode; open?: boolean }) =>
-      open ? <div data-testid="drawer">{children}</div> : null,
-    Backdrop: () => null,
-    Content: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Header: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Title: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    CloseTrigger: () => null,
-    Body: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-    Footer: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
-  },
-}));
-
 vi.mock("@langwatch/design-system/toaster", () => ({
   toaster: { create: vi.fn() },
 }));
@@ -184,7 +170,7 @@ vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
   ScenarioFormDrawer: ({ open, onClose }: { open?: boolean; onClose?: () => void }) =>
     open ? (
       <div data-testid="scenario-editor-child-drawer">
-        <span>Create Scenario</span>
+        <span>Create scenario</span>
         <button onClick={onClose}>Close Scenario Editor</button>
       </div>
     ) : null,
@@ -232,12 +218,12 @@ describe("<SuiteFormDrawer/>", () => {
   });
 
   describe("given the drawer is open in create mode", () => {
-    /** @scenario 'Form drawer title reads "New Run Plan" for creation' */
+    /** @scenario 'Form drawer title reads "New run plan" for creation' */
     /** @scenario 'Form placeholder uses "Run Plan" terminology' */
     it("displays the 'New Run Plan' title", () => {
       renderWithDesignSystem(<SuiteFormDrawer />);
 
-      expect(screen.getByText("New Run Plan")).toBeInTheDocument();
+      expect(screen.getByText("New run plan")).toBeInTheDocument();
     });
 
     it("renders fields for Name, Description, Scenarios, and Targets", () => {
@@ -255,7 +241,7 @@ describe("<SuiteFormDrawer/>", () => {
       renderWithDesignSystem(<SuiteFormDrawer />);
 
       expect(screen.getByRole("button", { name: /^Save$/i })).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Run Now/i })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: /Run now/i })).toBeInTheDocument();
     });
 
     /** @scenario "The run plan drawer exposes simulator and judge model fields" */
@@ -377,13 +363,13 @@ describe("<SuiteFormDrawer/>", () => {
         expect(descInput.value).toBe("Runs every deploy");
       });
 
-      /** @scenario 'Form drawer title reads "Edit Run Plan" for editing' */
+      /** @scenario 'Form drawer title reads "Edit run plan" for editing' */
       it("displays the Edit Run Plan title", () => {
         mocks.mockGetByIdData = makeSuiteConfig();
 
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        expect(screen.getByText("Edit Run Plan")).toBeInTheDocument();
+        expect(screen.getByText("Edit run plan")).toBeInTheDocument();
       });
     });
   });
@@ -435,7 +421,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.click(targetCheckboxes[3]!); // First target
 
         // Open execution options and change repeat count
-        const executionOptionsTrigger = screen.getByText("Execution Options");
+        const executionOptionsTrigger = screen.getByText("Execution options");
         await user.click(executionOptionsTrigger);
 
         const repeatInput = screen.getByDisplayValue("1") as HTMLInputElement;
@@ -459,7 +445,7 @@ describe("<SuiteFormDrawer/>", () => {
       it("renders the drawer shell", () => {
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        expect(screen.getByTestId("drawer")).toBeInTheDocument();
+        expect(screen.getByRole("dialog", { name: /run plan/i })).toBeInTheDocument();
       });
     });
 
@@ -469,7 +455,7 @@ describe("<SuiteFormDrawer/>", () => {
 
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        expect(screen.queryByTestId("drawer")).not.toBeInTheDocument();
+        expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
       });
     });
   });
@@ -485,13 +471,13 @@ describe("<SuiteFormDrawer/>", () => {
 
       /** @scenario "A sub-flow is a navigation rather than a second overlay" */
       it("opens the scenario editor as a child drawer", async () => {
-        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        await user.click(screen.getByRole("button", { name: "Add scenario" }));
 
         expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
       });
 
       it("keeps the suite editor mounted underneath", async () => {
-        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        await user.click(screen.getByRole("button", { name: "Add scenario" }));
 
         // Parent suite editor content remains in the DOM
         expect(screen.getByPlaceholderText("e.g., Critical Path Run Plan")).toBeInTheDocument();
@@ -510,7 +496,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.type(nameInput, "My Suite");
 
         // Open scenario editor
-        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        await user.click(screen.getByRole("button", { name: "Add scenario" }));
         expect(screen.getByTestId("scenario-editor-child-drawer")).toBeInTheDocument();
 
         // Close scenario editor (fireEvent bypasses pointer-events from parent mock)
@@ -533,7 +519,7 @@ describe("<SuiteFormDrawer/>", () => {
         const user = userEvent.setup();
         renderWithDesignSystem(<SuiteFormDrawer />);
 
-        await user.click(screen.getByRole("button", { name: "Add Target" }));
+        await user.click(screen.getByRole("button", { name: "Add target" }));
 
         expect(mocks.mockOpenDrawer).toHaveBeenCalledWith("agentHttpEditor");
       });
@@ -544,7 +530,7 @@ describe("<SuiteFormDrawer/>", () => {
         const user = userEvent.setup();
         const first = renderWithDesignSystem(<SuiteFormDrawer />);
         await user.type(screen.getByPlaceholderText("e.g., Critical Path Run Plan"), "My Suite");
-        await user.click(screen.getByRole("button", { name: "Add Target" }));
+        await user.click(screen.getByRole("button", { name: "Add target" }));
         first.unmount();
       });
 
@@ -584,7 +570,7 @@ describe("<SuiteFormDrawer/>", () => {
         await user.click(screen.getAllByRole("checkbox")[0]!);
 
         // Open and close scenario editor
-        await user.click(screen.getByRole("button", { name: "Add Scenario" }));
+        await user.click(screen.getByRole("button", { name: "Add scenario" }));
         fireEvent.click(screen.getByText("Close Scenario Editor"));
 
         // Verify form state is preserved (re-query to avoid stale node references)

@@ -227,7 +227,7 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
     case "codex":
       return [
         `export OTEL_TRACES_EXPORTER=otlp`,
-        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`,
         ...base,
         `export OTEL_RESOURCE_ATTRIBUTES="service.name=codex"`,
       ];
@@ -247,7 +247,8 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
-        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`,
+        `export OTEL_EXPORTER_OTLP_COMPRESSION=gzip`,
         ...base,
         `export OTEL_RESOURCE_ATTRIBUTES="service.name=claude-code"`,
       ];
@@ -270,7 +271,7 @@ function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): st
         `export OTEL_TRACES_EXPORTER=otlp`,
         `export OTEL_LOGS_EXPORTER=otlp`,
         `export OTEL_METRICS_EXPORTER=otlp`,
-        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/json`,
+        `export OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`,
         ...base,
         `export OTEL_RESOURCE_ATTRIBUTES="service.name=opencode"`,
       ];

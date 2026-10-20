@@ -6,13 +6,12 @@ import {
   Alert,
   Box,
   Button,
-  Center,
   HStack,
   Separator,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Link2Off } from "lucide-react";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 
@@ -107,7 +106,7 @@ function SharePageSignUpInvitation() {
   return (
     <VStack gap={3} width="full" paddingTop={2} data-testid="share-page-unavailable">
       <Separator />
-      <Text fontSize="14px" color="fg.muted" maxWidth="420px">
+      <Text textStyle="body" color="fg.muted" maxWidth="420px">
         LangWatch shows you what your AI agents actually did - every call, its cost, and where it
         went wrong.
       </Text>
@@ -116,7 +115,7 @@ function SharePageSignUpInvitation() {
           <Button colorPalette="orange">Create a free account</Button>
         </Link>
         <Link href="/auth/signin">
-          <Text fontSize="13px" color="fg.muted" textDecoration="underline">
+          <Text textStyle="bodySm" color="fg.muted" textDecoration="underline">
             Already have an account?
           </Text>
         </Link>
@@ -199,9 +198,9 @@ export default function SharePage() {
   // in flight. Show a spinner rather than a blank page for that round trip.
   if (!shared.isSuccess) {
     return (
-      <Center height="100vh" padding={8}>
-        <Spinner size="lg" />
-      </Center>
+      <Box padding={8}>
+        <SkeletonRows rows={8} />
+      </Box>
     );
   }
 

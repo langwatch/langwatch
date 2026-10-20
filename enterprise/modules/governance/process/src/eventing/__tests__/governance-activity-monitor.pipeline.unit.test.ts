@@ -1,9 +1,12 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { JsonValue } from "@langwatch/eventing";
+import { InMemoryProcessStore, type JsonValue } from "@langwatch/eventing";
 import { intentAccessorOf } from "@langwatch/eventing/testing";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
+import type { GovernanceModule } from "../../app/governance.app.ts";
+import type { GovernanceRepositories } from "../../repositories/governance.repositories.ts";
 import {
   GOVERNANCE_ACTIVITY_MONITOR_PIPELINE_NAME,
   governanceActivityMonitorEventing,
@@ -139,5 +142,32 @@ describe("governance trace facts", () => {
     expect(deleteDispatchedBefore).toHaveBeenCalledWith(
       expect.objectContaining({ processName: GOVERNANCE_TRACE_FACTS_PROCESS_NAME }),
     );
+  });
+});
+
+describe("main's trace-side governance lanes", () => {
+  describe("when the activity monitor pipeline is built", () => {
+    /** @scenario "Governance KPI and OCSF jobs the previous release queued on trace are acknowledged" */
+    it("tombstones both former trace keys for one release, naming the pull that took their work", () => {
+      const definition = governanceActivityMonitorEventing.build({
+        participation: "consume",
+        repositories: createApiFixture<GovernanceRepositories>({}),
+        app: createApiFixture<GovernanceModule>({
+          connectAnomalyAlertOutbox: vi.fn(),
+        }),
+        processStore: InMemoryProcessStore.createForTesting(),
+      });
+
+      expect(definition.laneAliases).toEqual([
+        {
+          from: "trace_processing:reactor:governanceKpisSync",
+          tombstone: expect.stringContaining(GOVERNANCE_TRACE_FACTS_PROCESS_NAME),
+        },
+        {
+          from: "trace_processing:reactor:governanceOcsfEventsSync",
+          tombstone: expect.stringContaining(GOVERNANCE_TRACE_FACTS_PROCESS_NAME),
+        },
+      ]);
+    });
   });
 });

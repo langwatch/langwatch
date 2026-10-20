@@ -81,6 +81,7 @@ export class ScimSyncGuardsService {
           userId: data.userId,
           externalId: data.externalId,
           op: data.op,
+          ...(data.changed === undefined ? {} : { changed: data.changed }),
         },
       },
       ...this.recoveryOf(state),

@@ -54,7 +54,7 @@ export function FormErrorDisplay({ error }: FormErrorDisplayProps) {
   // Handle primitive errors (strings and numbers)
   if (typeof error === "string" || typeof error === "number") {
     return (
-      <Text marginTop="6px" fontSize="13px" color="fg.error">
+      <Text marginTop="6px" textStyle="bodySm" color="fg.error">
         {error}
       </Text>
     );
@@ -68,7 +68,7 @@ export function FormErrorDisplay({ error }: FormErrorDisplayProps) {
   return (
     <VStack align="start" gap={1} marginTop="6px">
       {messages.map((message, index) => (
-        <Text key={index} fontSize="13px" color="fg.error">
+        <Text key={index} textStyle="bodySm" color="fg.error">
           {message}
         </Text>
       ))}

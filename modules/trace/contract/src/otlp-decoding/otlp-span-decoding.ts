@@ -1,4 +1,9 @@
-import type { OtlpInstrumentationScope, OtlpResource, OtlpSpan } from "../trace.otlp.ts";
+import type {
+  OtlpInstrumentationScope,
+  OtlpResource,
+  OtlpSpan,
+} from "@langwatch/otlp/trace-request";
+
 import type { NormalizedEvent, NormalizedSpan } from "../trace.spans.ts";
 import {
   convertUnixNanoToUnixMs,

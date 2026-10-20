@@ -139,9 +139,12 @@ function renderWalker(options: StubAnnotationHostOptions = {}) {
       <AnnotationQueueWalker />
     </AnnotationTestHarness>,
   );
+  // The real host is a new value whenever the address changes, and the
+  // compiled walker reuses what it read from an unchanged one. A proxy is the
+  // same host under a new identity, so a test that edits it is heard.
   const rerender = () =>
     utils.rerender(
-      <AnnotationTestHarness host={host}>
+      <AnnotationTestHarness host={new Proxy(host, {})}>
         <AnnotationQueueWalker />
       </AnnotationTestHarness>,
     );
@@ -504,7 +507,7 @@ describe("given a reviewer walking their annotation queue", () => {
       mocks.state.step = stepAt(1, { ...unanswered, queueLoading: true });
       renderWalker({ scopeStatus: "loading" });
 
-      expect(screen.getByText("Loading your queue")).toBeTruthy();
+      expect(screen.getByLabelText("Loading your queue")).toBeTruthy();
       expect(screen.queryByText("All tasks complete")).toBeNull();
     });
 

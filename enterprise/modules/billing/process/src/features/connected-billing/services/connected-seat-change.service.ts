@@ -1,8 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 /**
- * One pass over the seat changes licensing recorded (ARCHITECTURE.md section 9): each is decided
- * once, `not_onboarded` included, then every intent is invoiced once, per seat then multiplied.
+ * The seat changes licensing recorded (ARCHITECTURE.md section 9): the minute pass decides each
+ * once, `not_onboarded` included, and invoices what it decided; an invoice that failed is retried
+ * on the daily tick, as main's connectedBillingWorker.ts:104 did, per seat then multiplied.
  * Spec: specs/self-hosting/connected-services/connected-billing.feature, "Changing seats mid-term".
  */
 
@@ -45,26 +46,38 @@ export class ConnectedSeatChangeService {
     return new ConnectedSeatChangeService(input.repository, input.invoicing, input.licensing);
   }
 
-  /** One pass: every undecided change is decided, then every intent is invoiced. */
+  /** The minute pass: every undecided change is decided, and each intent it decided is invoiced. */
   async invoicePendingSeatChanges(): Promise<SeatInvoicingSummary> {
     const decided = await this.decideNewSeatChanges();
-    const { invoiced, failed } = await this.completePendingSeatChanges();
+    const { invoiced, failed } = await this.invoice(decided.intents);
     return { decided: decided.decided, invoiced, failed: decided.failed + failed };
   }
 
+  /** The daily tick: every intent whose invoice was never confirmed, failed ones included. */
+  async retryFailedSeatInvoices(): Promise<{ invoiced: number; failed: number }> {
+    return this.invoice(await this.repository.findPendingSeatChanges());
+  }
+
   /** Each change licensing recorded that has no stored decision yet. */
-  private async decideNewSeatChanges(): Promise<{ decided: number; failed: number }> {
+  private async decideNewSeatChanges(): Promise<{
+    decided: number;
+    failed: number;
+    intents: ConnectedSeatChangeRecord[];
+  }> {
     const changes = await this.licensing.findSeatChanges({});
     const stored = await this.repository.findSeatChangesByLicenseRows(
       changes.map((change) => change.licenseRowId),
     );
     const known = new Set(stored.map((change) => change.licenseRowId));
-    const summary = { decided: 0, failed: 0 };
+    const intents: ConnectedSeatChangeRecord[] = [];
+    const summary = { decided: 0, failed: 0, intents };
     for (const change of changes.filter((candidate) => !known.has(candidate.licenseRowId))) {
       try {
         const account = await this.repository.findAccount(change.organizationId);
-        const created = await this.repository.createSeatChange(this.decide({ account, change }));
-        if (created) summary.decided += 1;
+        const decision = this.decide({ account, change });
+        if (!(await this.repository.createSeatChange(decision))) continue;
+        summary.decided += 1;
+        if (decision.state === "intent") summary.intents.push(decision);
       } catch (error) {
         summary.failed += 1;
         logger.error(
@@ -76,10 +89,12 @@ export class ConnectedSeatChangeService {
     return summary;
   }
 
-  /** Invoices every change whose invoice was intended and never confirmed. */
-  private async completePendingSeatChanges(): Promise<{ invoiced: number; failed: number }> {
+  /** Invoices each intent; one that fails stays an intent for the daily tick. */
+  private async invoice(
+    intents: readonly ConnectedSeatChangeRecord[],
+  ): Promise<{ invoiced: number; failed: number }> {
     const summary = { invoiced: 0, failed: 0 };
-    for (const pending of await this.repository.findPendingSeatChanges()) {
+    for (const pending of intents) {
       try {
         await this.complete(pending);
         summary.invoiced += 1;
@@ -87,7 +102,7 @@ export class ConnectedSeatChangeService {
         summary.failed += 1;
         logger.error(
           { licenseRowId: pending.licenseRowId, error },
-          "seat change invoice failed, retrying on the next pass",
+          "seat change invoice failed, retrying on the daily billing tick",
         );
       }
     }

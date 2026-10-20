@@ -281,6 +281,8 @@ type ScopedQueryParams = {
   query_params?: Record<string, unknown>;
   format?: "JSONEachRow";
   clickhouse_settings?: Record<string, string | number>;
+  /** Set when the read must walk every partition; see the member's cold-scan warning. */
+  SKIP_COLD_SCAN_CHECK?: true | undefined;
 };
 
 /**
@@ -330,6 +332,7 @@ export class TenantScopedReader {
       sql: expanded.query,
       params: expanded.queryParams,
       ...(params.clickhouse_settings ? { settings: params.clickhouse_settings } : {}),
+      ...(params.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
     });
     return { json: async () => result.rows };
   }

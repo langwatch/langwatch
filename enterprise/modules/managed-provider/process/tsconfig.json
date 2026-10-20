@@ -8,30 +8,18 @@
     "lib": ["es2023"],
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

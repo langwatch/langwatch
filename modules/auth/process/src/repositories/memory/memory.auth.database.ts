@@ -21,6 +21,7 @@ export type MemorySessionRow = {
   userAgent?: string | null;
   amr?: readonly string[];
   identifierId?: string | null;
+  startedBySignUp?: boolean;
   /** The idle-window stamp (GAC-10), absent on a session never under one. */
   lastSeenAt?: Date;
 };

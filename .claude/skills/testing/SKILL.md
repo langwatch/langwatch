@@ -20,13 +20,15 @@ and judging whether a bind proves its scenario (the `spec-binding-review` skill)
    covers your task, write it first, error paths included.
 2. **A scenario enforces nothing until bound.** It needs a level tag (`@unit`, `@integration`, `@e2e`,
    `@regression`) and the covering test carries `/** @scenario "<exact title>" */` directly above the
-   `it`. Untagged scenarios read `0/0 bound` and green. `@unimplemented` marks a known gap. The ruling
+   `it`. Untagged scenarios read `0/0 bound` and enforce nothing; a new feature file wholly untagged
+   or partly untagged fails the parity run (`newInert`, `newPartial`). `@unimplemented` marks a known gap. The ruling
    is that every scenario is bound and its tests written (record §13, 2026-10-05).
 3. **Tests live beside what they test**, in a colocated `__tests__/` folder. Never a root `tests/` next
    to `src/`.
 4. **Name the level honestly.** `*.unit.test.ts`: no rendering, no datastore. `*.integration.test.ts`:
-   reaches a datastore. `*.integration.test.tsx`: renders a component (jsdom). A test that renders is an
-   integration test, however small.
+   several components together, whether over a datastore or an installed list booted over memory twins.
+   `*.integration.test.tsx`: renders a component (jsdom). A test that renders is an integration test,
+   however small. The `test:integration` script is the datastore lane, not the definition of the level.
 5. **Doubles throw by name.** `createApiFixture<XApi>({ ...only what this test calls })`
    (`@langwatch/test-harness/api-fixture`) for a peer or app. An unconfigured method throws, so a test cannot pass on a
    silent no-op. Raw clients (Prisma, ClickHouse, ioredis, Stripe) have one typed double each in
@@ -57,14 +59,16 @@ submit")` for given/when instead of a flat test with comments.
 | a REST family       | integration: real router on a real runtime, assert status, body, `code`                           | `modules/automation/process/src/transport/__tests__/automation.rest.integration.test.ts`                    |
 | a subscriber        | unit, delivered twice (at least once)                                                             | `modules/automation/process/src/eventing/__tests__/trace-alert-trigger-match.subscriber.redelivery.test.ts` |
 | a repository        | a contract suite over the memory twin; the datastore twin has its own test in `prisma/__tests__/` | `modules/organization/process/src/repositories/__tests__/organization.repositories.contract.test.ts`        |
-| the module installs | installation test (below)                                                                         | `apps/api/src/__tests__/api-installation.fixture.ts` (record §13)                                           |
+| the module installs | installation test (below)                                                                         | `apps/api/src/__tests__/share-link-engine.integration.test.ts` (record §13)                                 |
 
 **The installation test** boots the real module through the same chain production uses, over the memory
 tier, in each role it runs in, and calls its `*Api`. Memory bundles need no datastore and no Docker, while
 peers still resolve through the real tokens. Zero test-only spellings. Always `await runtime.stop()` in a
-`finally`. The per-module installation tests under `app/__tests__/` (organization's, automation's worker
-one) still use the deleted `createApp` chain and `withMemoryRepositories` (§15): read them for what they
-assert, not for how they boot.
+`finally`. Boot with `bootInstalledProcess({ role, modules, config, stores: memoryStores(), peers })`
+and stand in for an uninstalled peer with `testPeer({ token, instance })` from `@langwatch/process/testing`.
+The older per-module installation tests under `app/__tests__/` (monitor's builds with `createApp` and
+`.provide`) and the api, worker and tasks fixtures (`withMembers`) are conversion debt: read them for what
+they assert, not for how they boot.
 
 Worked example (`modules/automation/process/src/eventing/__tests__/automation-peer-subscribers.unit.test.ts`):
 
@@ -88,8 +92,10 @@ Scenario: A trace's span event wakes trace trigger matching, the same on redeliv
 ## Frontend: the shapes
 
 - A component test is `*.integration.test.tsx` with `// @vitest-environment jsdom` (a docblock, first
-  lines). No vitest config declares a global environment, so every jsdom file says it. A pure
-  function or store is a `.unit.test.ts` and needs no jsdom.
+  lines) unless its package already selected jsdom: `defineModuleVitestConfig({ kind: "jsdom" })`
+  from `@langwatch/vitest-config` (`modules/organization/browser`) sets it for every file, while a
+  package on `node` (`modules/analytics/browser`) needs the docblock. A pure function or store is a
+  `.unit.test.ts` and needs no jsdom.
 - Render inside the module's host double, not a hand-rolled provider tree:
   `modules/analytics/browser/src/testing.tsx` exports `StubAnalyticsHost` and `renderWithAnalyticsHost`;
   each browser module that needs one ships its own `testing.tsx`
@@ -105,7 +111,8 @@ Scenario: A trace's span event wakes trace trigger matching, the same on redeliv
 ## Checking a binding
 
 Run `pnpm --filter @langwatch/architecture-enforcer check:feature-parity` and read the verdict banner, not a
-per-file tick: a `all bound` for one file can coexist with a failing run. A scenario bound from a package's
+per-file tick: a `all bound` for one file can coexist with a failing run (an inert or partly untagged
+new file fails it). A scenario bound from a package's
 tests counts like one bound from a module's. Sabotage once per changed behaviour: break the path, watch the
 bound test fail for the stated reason, restore.
 

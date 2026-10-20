@@ -61,7 +61,6 @@ const runRowSchema = z.object({
   id: z.string(),
   kind: z.string(),
   release: nullable(z.string()),
-  floor: nullable(z.string()),
   started_at: instant.transform((value) => value ?? "1970-01-01T00:00:00Z"),
   finished_at: instant,
   outcome: nullable(z.string()),
@@ -83,7 +82,6 @@ const runFactSchema = z.object({
   kind: z.string(),
   outcome: nullable(z.string()),
   release: nullable(z.string()),
-  floor: nullable(z.string()),
   started_at: z.date(),
   plan: jsonObject,
 });
@@ -307,16 +305,6 @@ export class UpgradeReaderRepository {
     return rows[0]?.found ?? false;
   }
 
-  /** The floors runs applied with; read through to_jsonb, so an older ledger has none. */
-  async findRecordedFloors({ tables }: { tables: LedgerTables }): Promise<string[]> {
-    if (!tables.run) return [];
-    const { rows } = await this.query<{ floor: string }>(
-      (t) => `SELECT DISTINCT to_jsonb(run) ->> 'floor' AS "floor" FROM ${t.run} run
-        WHERE to_jsonb(run) ->> 'floor' IS NOT NULL`,
-    );
-    return rows.map((row) => row.floor);
-  }
-
   async findRuns({
     tables,
     after,
@@ -342,7 +330,7 @@ export class UpgradeReaderRepository {
     if (!tables.run) return [];
     const { rows } = await this.query<object>(
       (t) => `SELECT run."kind", run."outcome", run."release",
-          to_jsonb(run) ->> 'floor' AS "floor", to_jsonb(run) -> 'plan' AS "plan",
+          to_jsonb(run) -> 'plan' AS "plan",
           run."started_at" FROM ${t.run} run`,
     );
     return rows.map((row) => runFactSchema.parse(row));

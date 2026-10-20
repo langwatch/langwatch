@@ -52,7 +52,7 @@ export function JoinInsteadAction({ origin = "web" }: JoinInsteadProps) {
       </Button>
       {choosing && (
         <VStack gap={2} align="stretch" data-testid="join-instead-chooser">
-          <Text fontSize="12.5px" color="fg.subtle" textAlign="center">
+          <Text textStyle="bodySm" color="fg.subtle" textAlign="center">
             Your colleagues are in these organizations. Pick the one to join.
           </Text>
           {view.organizations.map((organization) => (

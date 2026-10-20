@@ -16,8 +16,10 @@ import {
   SystemMigrationRecordNotFoundError,
   TENANT_MIGRATION_STATUSES,
 } from "@langwatch/system-migrations";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
+import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
 
+import { SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER } from "../../../eventing/ops-system-migrations.process.ts";
 import {
   ATTENTION_LIMIT,
   type MigrationEnrollmentRecord,
@@ -30,6 +32,13 @@ import { SystemMigrationRollbackService } from "./system-migration-rollback.serv
 import { SystemMigrationRunService } from "./system-migration-run.service.ts";
 
 const logger = createLogger("langwatch:ops:system-migrations");
+
+/** The boot loop's cap and gap (packages/system-migrations/src/convergence.ts:19,27). */
+const PASSES_PER_RUN = 25;
+const PASS_GAP_MS = 5_000;
+
+/** Held rows the pending check reads; a row held for queued work is re-written each pass. */
+const PENDING_SCAN_LIMIT = 200;
 
 /** How many tenant rows one `listTenants` page holds when the caller names no limit. */
 const TENANT_PAGE_LIMIT = 50;
@@ -76,7 +85,8 @@ export class SystemMigrationsService {
           this.deps.state.findStatusCounts({ migrationName: migration.name }),
           this.deps.state.findRecordsByStatus({
             migrationName: migration.name,
-            statuses: ["migrated", "parked"],
+            // A step whose `migrated` is its steady state holds nobody; only parked rows count.
+            statuses: migration.migratedIsSteady ? ["parked"] : ["migrated", "parked"],
             limit: ATTENTION_LIMIT,
           }),
         ]);
@@ -88,6 +98,8 @@ export class SystemMigrationsService {
           requiresOperatorConfirmation: migration.requiresOperatorConfirmation,
           availableOnThisInstallation: isSaaS || migration.runsAutomaticallyOnSelfHosted,
           enrolledAutomatically: migration.enrolledAutomatically,
+          tenant: migration.tenant ?? "organization",
+          migratedIsSteady: migration.migratedIsSteady ?? false,
           counts,
           // Null for a migration that admits every organization automatically:
           // the gauge would describe rows that decide nothing. That is what
@@ -101,7 +113,7 @@ export class SystemMigrationsService {
                   notEnrolledCount: Math.max(0, totalOrganizations - enrolledCount),
                 }
               : null,
-          attention,
+          attention: attention.map(onTheWire),
         };
       }),
     );
@@ -122,14 +134,13 @@ export class SystemMigrationsService {
       offset,
     });
     return {
-      items: rows.slice(0, limit),
+      items: rows.slice(0, limit).map(onTheWire),
       cursor: rows.length > limit ? String(offset + limit) : null,
     };
   }
 
   /** The enrollment listing for the ops page, audited because it carries enrollers' names. */
   async getEnrollments({ requestedBy }: { requestedBy: string }): Promise<{
-    isSaaS: boolean;
     enrollments: MigrationEnrollmentRecord[];
   }> {
     return this.enrollment.getEnrollments({ requestedBy });
@@ -191,20 +202,41 @@ export class SystemMigrationsService {
   private passCompletedInProcess = false;
 
   /**
-   * One pass on the worker. An operator's kick and a process's first re-drive always run, so a
-   * pass that died part-way is finished (Alex, 2026-10-09); later re-drives first ask the stored
-   * state whether any tenant could still move or be discovered, so a latched fleet is not swept.
+   * Passes while each advances something; kicks and a process's first pass always run. A run
+   * leaving work pending tells the process, whose next wake runs another; tenants waiting on an
+   * operator are not pending, so the short cadence ends (Alex, 2026-10-09, 2026-10-13).
    */
-  async executePass({ redrive }: { redrive: boolean }): Promise<void> {
-    if (redrive && this.passCompletedInProcess && !(await this.deps.hasTenantAwaitingRedrive())) {
-      logger.debug(
-        "no parked, held or undiscovered tenant; skipping the system migration re-drive",
-      );
-      return;
+  async executePass({ redrive, due = true }: { redrive: boolean; due?: boolean }): Promise<void> {
+    if (redrive && this.passCompletedInProcess) {
+      if (!due) return;
+      if (!(await this.deps.hasTenantAwaitingRedrive())) {
+        logger.debug(
+          "no parked, held or undiscovered tenant; skipping the system migration re-drive",
+        );
+        return;
+      }
     }
-    const summary = await this.deps.runPass({});
+    let summary = await this.deps.runPass({});
     this.passCompletedInProcess = true;
-    logger.info({ summary, redrive }, "system migration pass complete");
+    let advancedInRun = summary.advanced > 0;
+    for (let pass = 1; summary.advanced > 0 && pass < PASSES_PER_RUN; pass++) {
+      await pauseBetweenPasses();
+      summary = await this.deps.runPass({});
+      advancedInRun ||= summary.advanced > 0;
+    }
+    const pending = (advancedInRun && summary.held > 0) || (await this.hasHeldForPendingWork());
+    logger.info({ summary, redrive, due, pending }, "system migration pass complete");
+    if (!pending) return;
+    await this.deps.requestPass({ actorUserId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER });
+  }
+
+  /** A tenant held while its queued work drains moves by itself, so it is pending, not stuck. */
+  private async hasHeldForPendingWork(): Promise<boolean> {
+    const held = await this.deps.state.findRecordsByStatus({
+      statuses: ["migrated"],
+      limit: PENDING_SCAN_LIMIT,
+    });
+    return held.some((row) => row.heldReason === "pending");
   }
 
   /** One pass of the startup convergence the tasks process drives, stopping at `signal`. */
@@ -267,7 +299,20 @@ export class SystemMigrationsService {
   }
 }
 
+/** A tenant row as the page reads it: when it last moved, as a date. */
+function onTheWire({
+  updatedAt,
+  ...row
+}: TenantStepStateRow): MigrationOverview["attention"][number] {
+  return { ...row, updatedAt: toDate(updatedAt) };
+}
+
 function refuseWhenNotFound(error: unknown): never {
   if (error instanceof SystemMigrationRecordNotFoundError) throw new MigrationStateNotFoundError();
   throw error;
+}
+
+/** A pass cannot observe its own events, so the next one waits for the folds to land. */
+function pauseBetweenPasses(): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, PASS_GAP_MS));
 }

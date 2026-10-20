@@ -152,6 +152,7 @@ require (
 	github.com/klauspost/compress v1.18.7
 	github.com/langwatch/langwatch/pkg v0.0.0-00010101000000-000000000000
 	github.com/langwatch/langwatch/sdks/go v1.0.0
+	github.com/langwatch/scenario/go v0.0.0-00010101000000-000000000000
 	github.com/maximhq/bifrost/core v1.5.17
 	github.com/oklog/ulid/v2 v2.1.1
 	github.com/open-telemetry/opentelemetry-collector-contrib/pkg/ottl v0.151.0
@@ -179,3 +180,6 @@ replace (
 	github.com/langwatch/langwatch/pkg => ../pkg
 	github.com/langwatch/langwatch/sdks/go => ../sdks/go
 )
+
+// The Go scenario SDK is vendored until it is published; then pin it and delete third_party/scenario-go.
+replace github.com/langwatch/scenario/go => ./third_party/scenario-go

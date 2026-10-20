@@ -24,6 +24,7 @@ function license(overrides: Partial<License> = {}): License {
     planType: "ENTERPRISE",
     maxMembers: 50,
     maxMembersLite: 5,
+    liteSeatsUnlimited: false,
     issuedAt: ISSUED,
     expiresAt: TERM_END,
     source: "BACKOFFICE",

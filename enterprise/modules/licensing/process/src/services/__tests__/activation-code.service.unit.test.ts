@@ -6,7 +6,7 @@ import {
   ActivationRateLimitedError,
   ConnectInstanceRequiredError,
 } from "@langwatch/enterprise-licensing-contract";
-import { ENTERPRISE_TEMPLATE } from "@langwatch/plans";
+import { ENTERPRISE_TEMPLATE, UNLIMITED } from "@langwatch/plans";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -49,6 +49,7 @@ function rowFor(
     planType: "ENTERPRISE",
     maxMembers: 25,
     maxMembersLite: 0,
+    liteSeatsUnlimited: false,
     licenseTermDays: 365,
     services: ["instant_evals"],
     expiresAt: Temporal.Instant.from("2026-02-01T00:00:00.000Z"),
@@ -421,5 +422,22 @@ describe("lite seats on an activation code", () => {
     const { row } = await service.issue(enterpriseInput({ maxMembersLite: 0 }));
 
     expect(row.maxMembersLite).toBe(0);
+    expect(row.liteSeatsUnlimited).toBe(false);
+  });
+
+  /** @scenario An activation code for a GROWTH plan stores unlimited lite seats as the flag */
+  it("stores a GROWTH code's unlimited lite seats as the flag and mints them unlimited", async () => {
+    const { service, licenses, repository } = harness({ rows: [] });
+
+    const { code, row } = await service.issue({ ...enterpriseInput(), planType: "GROWTH" });
+    expect(row).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
+    expect(await repository.findById(row.id)).toMatchObject({
+      maxMembersLite: null,
+      liteSeatsUnlimited: true,
+    });
+
+    await redeemCode(service, { code, instanceId: "install-1" });
+
+    expect(licenses.liteSeats).toEqual([UNLIMITED]);
   });
 });

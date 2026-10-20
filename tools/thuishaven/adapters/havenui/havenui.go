@@ -65,12 +65,6 @@ const (
 	Skip = "–"
 )
 
-// Keys renders a footer key hint: "space tick · enter install · q quit".
-// One separator, one style, so the bottom line of every screen matches.
-func Keys(hints ...string) string {
-	return Muted.Render("  " + strings.Join(hints, " "+Bullet+" "))
-}
-
 // Pad right-pads plain text to a column width, measured the way a terminal
 // measures it rather than in bytes.
 //
@@ -83,20 +77,4 @@ func Pad(s string, width int) string {
 		return s + strings.Repeat(" ", gap)
 	}
 	return s + " "
-}
-
-// Clamp cuts every line to the terminal width, so a long row soft-wraps
-// nowhere and cannot shift the layout under everything below it. A width of
-// zero (nothing has told us yet) leaves the text alone.
-func Clamp(s string, width int) string {
-	if width <= 0 {
-		return s
-	}
-	lines := strings.Split(s, "\n")
-	for i, line := range lines {
-		if lipgloss.Width(line) > width {
-			lines[i] = lipgloss.NewStyle().MaxWidth(width).Render(line)
-		}
-	}
-	return strings.Join(lines, "\n")
 }

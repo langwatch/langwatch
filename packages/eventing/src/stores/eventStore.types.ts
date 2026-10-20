@@ -63,6 +63,12 @@ export interface EventStoreEventReadInput {
   aggregateId: string;
 }
 
+/** One aggregate's stream key under its tenant. */
+export interface EventStoreAggregateKey {
+  tenantId: TenantId;
+  aggregateId: string;
+}
+
 /**
  * Read-only event store; enforces tenant isolation and returns readonly arrays.
  */
@@ -83,6 +89,15 @@ export interface ReadOnlyEventStore<EventType extends Event = Event> {
     context: EventStoreReadContext<EventType>;
     aggregateType: AggregateType;
     anchorOccurredAtMs?: number;
+  }): Promise<readonly EventType[]>;
+
+  /**
+   * Every event of many aggregates of one type in one read, each aggregate's oldest first and
+   * deduplicated as getEvents does. Validates every tenant; the tenants must share one server.
+   */
+  findEventsOfAggregates(request: {
+    aggregates: readonly EventStoreAggregateKey[];
+    aggregateType: AggregateType;
   }): Promise<readonly EventType[]>;
 
   /**

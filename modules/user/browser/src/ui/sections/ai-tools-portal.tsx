@@ -1,5 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import {
-  Box,
+  Button,
   Heading,
   SimpleGrid,
   Skeleton,
@@ -7,6 +8,8 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { ExternalLink } from "lucide-react";
 import { useMemo } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
@@ -14,6 +17,7 @@ import { useOrganizationTeamProject } from "../../behavior/personal-workspace-se
 import type { AiToolConfigOf } from "../../model/ai-tool-config.ts";
 import { usePersonalWorkspaceHost } from "../../model/personal-workspace-host.ts";
 import { ExternalToolTile } from "../blocks/external-tool-tile.tsx";
+import { Link } from "../elements/personal-link.tsx";
 import { CodingAssistantTile } from "./coding-assistant-tile.tsx";
 import { GovernanceGettingStartedBanner } from "./governance-getting-started-banner.tsx";
 import { ModelProviderTile } from "./model-provider-tile.tsx";
@@ -103,24 +107,22 @@ export function AiToolsPortal() {
       return <GovernanceGettingStartedBanner />;
     }
     return (
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        padding={6}
-        backgroundColor="bg.subtle"
-        width="full"
+      <Card
+        titleLevel={3}
+        title="Your AI tools portal"
+        footer={
+          <Button size="xs" variant="outline" asChild>
+            <Link href={docsUrl("/ai-governance/getting-started-developer")} isExternal gap={1}>
+              Read the developer guide <ExternalLink size={12} />
+            </Link>
+          </Button>
+        }
       >
-        <VStack align="start" gap={2}>
-          <Heading as="h3" size="md">
-            Your AI tools portal
-          </Heading>
-          <Text fontSize="sm" color="fg.muted">
-            Your admin hasn&apos;t added any AI tools to your portal yet. Check back once they
-            publish your team&apos;s coding assistants and model providers.
-          </Text>
-        </VStack>
-      </Box>
+        <Text fontSize="sm" color="fg.muted">
+          Your admin hasn&apos;t added any AI tools to your portal yet. Check back once they publish
+          your team&apos;s coding assistants and model providers.
+        </Text>
+      </Card>
     );
   }
 
@@ -131,7 +133,7 @@ export function AiToolsPortal() {
         if (items.length === 0) return null;
         return (
           <VStack key={type} align="stretch" gap={3}>
-            <Heading as="h3" size="sm" color="fg.muted">
+            <Heading as="h3" textStyle="cardTitle" color="fg.muted">
               {SECTION_LABELS[type]}
             </Heading>
             <SimpleGrid columns={{ base: 1, md: 2, lg: 3 }} gap={3}>

@@ -1,9 +1,8 @@
 import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
-import { Button, HStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Box } from "@langwatch/design-system/primitives";
 import { AnimatePresence, motion, type Variants } from "motion/react";
 import { useEffect, useRef, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
 
 import {
   EvaluatorCategoryPicker,
@@ -11,7 +10,7 @@ import {
 } from "../../blocks/evaluator-category-picker.tsx";
 import {
   EvaluatorEditorBody,
-  EvaluatorEditorFooter,
+  evaluatorEditorFooter,
   EvaluatorEditorHeading,
   useEvaluatorEditorController,
 } from "./evaluator-editor-shared.tsx";
@@ -134,111 +133,87 @@ export function EvaluatorCategorySelectorDrawer(props: EvaluatorCategorySelector
   };
 
   const showBackButton = view.step !== "category" || canGoBack;
-  const headerContent =
-    view.step === "editor" ? (
-      <EvaluatorEditorHeading controller={editorController} />
-    ) : (
-      <Drawer.Title>
-        {view.step === "type" ? categoryNames[view.category] : "Choose Evaluator Category"}
-      </Drawer.Title>
-    );
+  const title = drawerTitle({ view, editorTitle: editorController.title });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      onBack={showBackButton ? handleBack : void 0}
+      backButtonTestId="back-button"
       size="lg"
-      modal={false}
+      title={title}
+      titleContent={
+        view.step === "editor" ? <EvaluatorEditorHeading controller={editorController} /> : void 0
+      }
+      body="flush"
+      bodyScroll="content"
+      footer={
+        view.step === "editor"
+          ? evaluatorEditorFooter({ controller: editorController, onCancel: onClose })
+          : { cancel: { onClick: onClose } }
+      }
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2} minH="32px">
-            {showBackButton && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <LuArrowLeft size={20} />
-              </Button>
-            )}
-            {headerContent}
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          padding={0}
-          position="relative"
-        >
-          <AnimatePresence initial={false} custom={direction} mode="popLayout">
-            {view.step === "category" && (
-              <motion.div
-                key="category"
-                custom={direction}
-                variants={SLIDE_VARIANTS}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={SLIDE_TRANSITION}
-                style={PANEL_STYLE}
-              >
-                <EvaluatorCategoryPicker
-                  onSelectCategory={handleSelectCategory}
-                  onSelectCode={onSelectCode}
-                  onSelectWorkflow={onSelectWorkflow}
-                />
-              </motion.div>
-            )}
-            {view.step === "type" && (
-              <motion.div
-                key={`type-${view.category}`}
-                custom={direction}
-                variants={SLIDE_VARIANTS}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={SLIDE_TRANSITION}
-                style={PANEL_STYLE}
-              >
-                <EvaluatorTypeSelectorContent
-                  category={view.category}
-                  onSelect={handleSelectEvaluator(view.category)}
-                  onClose={onClose}
-                />
-              </motion.div>
-            )}
-            {view.step === "editor" && (
-              <motion.div
-                key={`editor-${view.evaluatorType}`}
-                custom={direction}
-                variants={SLIDE_VARIANTS}
-                initial="enter"
-                animate="center"
-                exit="exit"
-                transition={SLIDE_TRANSITION}
-                style={PANEL_STYLE}
-              >
-                <EvaluatorEditorBody controller={editorController} />
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </Drawer.Body>
-        <Drawer.Footer>
-          {view.step === "editor" ? (
-            <EvaluatorEditorFooter controller={editorController} onCancel={onClose} />
-          ) : (
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
+      <Box position="relative" display="flex" flexDirection="column" flex={1} overflow="hidden">
+        <AnimatePresence initial={false} custom={direction} mode="popLayout">
+          {view.step === "category" && (
+            <motion.div
+              key="category"
+              custom={direction}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={SLIDE_TRANSITION}
+              style={PANEL_STYLE}
+            >
+              <EvaluatorCategoryPicker
+                onSelectCategory={handleSelectCategory}
+                onSelectCode={onSelectCode}
+                onSelectWorkflow={onSelectWorkflow}
+              />
+            </motion.div>
           )}
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          {view.step === "type" && (
+            <motion.div
+              key={`type-${view.category}`}
+              custom={direction}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={SLIDE_TRANSITION}
+              style={PANEL_STYLE}
+            >
+              <EvaluatorTypeSelectorContent
+                category={view.category}
+                onSelect={handleSelectEvaluator(view.category)}
+                onClose={onClose}
+              />
+            </motion.div>
+          )}
+          {view.step === "editor" && (
+            <motion.div
+              key={`editor-${view.evaluatorType}`}
+              custom={direction}
+              variants={SLIDE_VARIANTS}
+              initial="enter"
+              animate="center"
+              exit="exit"
+              transition={SLIDE_TRANSITION}
+              style={PANEL_STYLE}
+            >
+              <EvaluatorEditorBody controller={editorController} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </Box>
+    </Drawer>
   );
+}
+
+function drawerTitle({ view, editorTitle }: { view: View; editorTitle: string }) {
+  if (view.step === "type") return categoryNames[view.category];
+  if (view.step === "editor") return editorTitle;
+  return "Choose Evaluator Category";
 }

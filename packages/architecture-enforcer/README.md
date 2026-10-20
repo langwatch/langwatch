@@ -29,8 +29,8 @@ Source lives under `src/policies/`, one file per policy or per small family
 sharing one concept (`frontend/browser-packages.ts`), still one registered
 entry per function. Shared tree-reading lives in `src/workspace/` (the snapshot,
 the module graph, the repository layout, the anchors); the tool that is
-not a policy (`check-feature-parity.ts`) lives in `src/tools/`. The project-reference
-writer is the Go `sync-references` subcommand of `cmd/devscripts`.
+not a policy (`check-feature-parity.ts`) lives in `src/tools/`. Project references
+are written by `nx sync` (`pnpm sync:references`) and checked by `nx sync:check`.
 
 `--no-declarations` (library: `declarations: false`) drops the `declarations`
 entry before running: it reads the `.d.ts` files `tsc -b` wrote, so it needs a

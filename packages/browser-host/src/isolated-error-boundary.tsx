@@ -84,7 +84,7 @@ const InlineError: React.FC<FallbackProps & { scope?: string }> = ({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {rawMessage || "No error message"}
+            {rawMessage || "No error message" /* no-raw-error-toast-ok — dev builds only */}
           </Alert.Description>
         )}
         <Button

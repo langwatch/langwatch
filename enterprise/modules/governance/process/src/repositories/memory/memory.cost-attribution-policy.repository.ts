@@ -29,6 +29,16 @@ export class MemoryCostAttributionPolicyRepository extends CostAttributionPolicy
     return this.enabledConfigs(organizationId);
   }
 
+  async findEnabledCodingAssistantConfigs({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<{ organizationId: string; config: unknown }[]> {
+    return organizationIds.flatMap((organizationId) =>
+      this.enabledConfigs(organizationId).map((config) => ({ organizationId, config })),
+    );
+  }
+
   async organizationsWithEnabledCodingAssistants(): Promise<string[]> {
     return [...this.configs.keys()].filter((id) => this.enabledConfigs(id).length > 0);
   }

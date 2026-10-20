@@ -1,3 +1,6 @@
+// TanStack mutates one table instance, so React Compiler caches would serve stale headers.
+"use no memo";
+
 import { Box } from "@langwatch/design-system/primitives";
 import type { Header } from "@tanstack/react-table";
 import type React from "react";

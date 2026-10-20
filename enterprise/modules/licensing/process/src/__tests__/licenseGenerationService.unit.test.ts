@@ -228,6 +228,21 @@ describe("generateLicenseKey", () => {
     });
   });
 
+  describe("when the requested end date has already passed", () => {
+    /** @scenario A license asked to end in the past is refused by name */
+    it("refuses with a handled 422 naming the past end date", () => {
+      const refusal = (() => {
+        try {
+          generateLicenseKey({ ...baseParams, expiresAt: new Date("2025-06-01T00:00:00Z") });
+        } catch (error) {
+          return error;
+        }
+      })();
+
+      expect(refusal).toMatchObject({ code: "license_expiry_in_past", httpStatus: 422 });
+    });
+  });
+
   describe("when plan type is unknown", () => {
     it("throws an error for unknown plan types", () => {
       expect(() =>

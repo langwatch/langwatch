@@ -55,7 +55,7 @@ export function WorkflowPropertySectionTitle({
       </Text>
       {tooltip && (
         <Tooltip content={tooltip}>
-          <Box marginBottom="-2px">
+          <Box marginBottom="-0.5">
             <Info size={14} />
           </Box>
         </Tooltip>
@@ -477,7 +477,7 @@ export function FieldsForm({
                   {camelCaseToTitleCase(field.identifier)}
                 </WorkflowPropertySectionTitle>
                 {field.optional && (
-                  <Text color="fg.muted" fontSize="12px">
+                  <Text color="fg.muted" textStyle="caption">
                     (optional)
                   </Text>
                 )}
@@ -535,7 +535,7 @@ function NodeNameInput({
 }) {
   return (
     <Input
-      fontSize="15px"
+      textStyle="body"
       marginLeft={1}
       fontWeight={500}
       variant="outline"
@@ -694,7 +694,7 @@ export function WorkflowBasePropertiesPanel({
                 />
               )}
             </HStack>
-            <HStack gap={0} marginRight="-4px" hidden={isEditingName}>
+            <HStack gap={0} marginRight="-1" hidden={isEditingName}>
               {!isWorkflow(node) && isExecutableComponent(node) && (
                 <ExecutionControls
                   node={node}
@@ -719,7 +719,7 @@ export function WorkflowBasePropertiesPanel({
             </HStack>
           </HStack>
           {!hideDescription && nodeDescription && (
-            <Text fontSize="12px" color="fg.muted" paddingX={2}>
+            <Text textStyle="caption" color="fg.muted" paddingX={2}>
               {nodeDescription}
             </Text>
           )}
@@ -805,7 +805,7 @@ function NodeTitle({
           },
           cursor: renamable ? "pointer" : undefined,
         }) ?? (
-          <Text fontSize="15px" fontWeight={500}>
+          <Text textStyle="body" fontWeight={500}>
             {getNodeDisplayName(node)}
           </Text>
         ))

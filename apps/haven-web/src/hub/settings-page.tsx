@@ -8,6 +8,7 @@ import { HavenTopBar } from "../shared/haven-top-bar.tsx";
 import { usePoll } from "../shared/use-poll.ts";
 import { LimitsForm } from "./limits-form.tsx";
 import { labelOf, type Change } from "./limits.ts";
+import { MachineSettingsPanel } from "./machine-settings-panel.tsx";
 
 const POLL_MS = 10_000;
 
@@ -101,6 +102,7 @@ export const SettingsPage = ({ hubStacks }: { hubStacks?: HubStack[] }) => {
         )
       ) : (
         <Stack gap={4}>
+          <MachineSettingsPanel />
           <LimitsForm
             limits={limits.limits}
             drafts={drafts}

@@ -4,7 +4,7 @@
     {
       "id": 1,
       "prompt": "Make Project.slug required. Every project should have one now.",
-      "expected_output": "Never SET NOT NULL on a populated column (set-not-null-on-populated-column, no escape hatch). Writers set slug from release A, a data step fills the gaps, and the application enforces it. If the database must enforce it, once the LTS floor is at or above A, add CHECK (\"slug\" IS NOT NULL) NOT VALID guarded by a DO $$ block, and VALIDATE CONSTRAINT in a later migration.",
+      "expected_output": "Never SET NOT NULL on a populated column (set-not-null-on-populated-column, no escape hatch). Writers set slug from release A, a data step fills the gaps, and the application enforces it. If the database must enforce it, once old writers are gone, add CHECK (\"slug\" IS NOT NULL) NOT VALID guarded by a DO $$ block, and VALIDATE CONSTRAINT in a later migration.",
       "files": []
     },
     {
@@ -22,13 +22,13 @@
     {
       "id": 4,
       "prompt": "Rename the column Monitor.name to Monitor.displayName. Prisma generated RENAME COLUMN, so just commit that.",
-      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: drop \"name\" only when the floor is at or above A, with `-- contract: retired in <release>`.",
+      "expected_output": "Refuses the generated SQL (rename-in-place) and generates with prisma migrate dev --create-only to edit it. Expand: ADD COLUMN IF NOT EXISTS \"displayName\" beside the old; migrate: dual-write from release A and copy with a background .withMigrations step (never an inline UPDATE on an existing table), readers switch or read coalesce(new, old); contract: stop reading the old column, then the drop is an operator step confirmed in Ops once old writers are gone; the migration file never contains DROP COLUMN (the drop-table-or-column guard refuses it, and a retirement note does not excuse it).",
       "files": []
     },
     {
       "id": 5,
       "prompt": "Deploy failed: upgrade exited 1 with rerunnable_migration_failed on my new migration. Should I run prisma migrate resolve --rolled-back?",
-      "expected_output": "No: a folder newer than RERUNNABLE_PRISMA_FROM is re-runnable, and upgrade already marks it rolled back and retries (3 attempts, 2 s then 4 s). Fix the cause (often a lock another session holds past lock_timeout 2 s) and run upgrade again. prisma migrate resolve is only for failed_prisma_migration, a folder at or below the marker. Also checks every statement survives a second run (IF NOT EXISTS, ON CONFLICT, DO $$ guards), which pnpm lint:architecture --policies rerunnable-migrations enforces.",
+      "expected_output": "No: a folder newer than RERUNNABLE_PRISMA_FROM is re-runnable, and upgrade already marks it rolled back and retries (3 attempts, 2 s then 4 s). Fix the cause (often a lock another session holds past lock_timeout 2 s) and run upgrade again. prisma migrate resolve is only for a failed folder at or below the marker that Retry on Ops > Upgrades does not cover. The root alias pnpm prisma:migrate goes through pnpm task upgrade, so it uses the ledger. Also checks every statement survives a second run (IF NOT EXISTS, ON CONFLICT, DO $$ guards), which pnpm lint:architecture --policies rerunnable-migrations enforces.",
       "files": []
     }
   ]

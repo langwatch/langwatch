@@ -7,7 +7,8 @@ import {
   type RecordingMeterProvider,
 } from "@langwatch/observability/metrics/testing";
 import { parseOtlpTraces } from "@langwatch/otlp";
-import type { OtlpSpan, PIIRedactionLevel, RecordSpanCommandData } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
+import type { PIIRedactionLevel, RecordSpanCommandData } from "@langwatch/trace-contract";
 import { SPAN_BACKFILL_MAX_PAST_DAYS, SPAN_MAX_PAST_MS } from "@langwatch/trace-contract";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
 import * as root from "@opentelemetry/otlp-transformer/build/src/generated/root.js";
@@ -48,6 +49,14 @@ class TestTraceSpanDedup extends TraceSpanDedupRepository {
 
   releaseOnFailure(): Promise<void> {
     return this.release();
+  }
+
+  claimUsageRecord(): Promise<SpanDedupClaim> {
+    return Promise.resolve({ outcome: "acquired" });
+  }
+
+  releaseUsageRecord(): Promise<void> {
+    return Promise.resolve();
   }
 }
 

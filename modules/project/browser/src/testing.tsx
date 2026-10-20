@@ -4,10 +4,10 @@
  * grants, plan role, and flags.
  */
 
-import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { UiHostServiceProvider } from "@langwatch/browser-host/capabilities";
 import type { ReleaseFlagToken } from "@langwatch/browser-host/declarations";
 import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";
 

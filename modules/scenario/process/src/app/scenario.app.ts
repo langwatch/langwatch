@@ -153,7 +153,6 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
-import { AgentTestTurnChildService } from "../features/child/services/agent-test-turn-child.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
@@ -271,7 +270,7 @@ export class ScenarioModule implements ScenarioApi {
   static readonly secrets = {
     voiceSessionSigning: credentialsSecret,
     voiceSessionSigningFallback: sessionSecret,
-    /** The engine hop's shared credential (ADR-132); the process holds the same handle. */
+    /** The engine hop's shared credential (ADR-132), read by the child channels' live tier. */
     nlpInternal: nlpInternalSecret,
   } as const;
 
@@ -284,7 +283,7 @@ export class ScenarioModule implements ScenarioApi {
     >,
   ): Promise<ScenarioModule> {
     const { secrets, repositories } = setup;
-    const { publicBaseUrl, nlpServiceUrl, nodeEnvironment } = setup.config;
+    const { publicBaseUrl, nlpServiceUrl } = setup.config;
     const signingSecret = await secrets.into(
       ScenarioModule.secrets.voiceSessionSigning,
       (credentials) =>
@@ -293,7 +292,6 @@ export class ScenarioModule implements ScenarioApi {
           (session) => credentials ?? session,
         ),
     );
-    const nlpInternal = await secrets.into(ScenarioModule.secrets.nlpInternal, (secret) => secret);
     // Worker only, before any voice child spawns (Alex, 2026-09-28); the first voice run opens it.
     const voice = VoicePublicUrlService.create().forRole({
       role: setup.role,
@@ -351,14 +349,7 @@ export class ScenarioModule implements ScenarioApi {
       publicBaseUrl,
     });
 
-    const childHost = {
-      voicePublicUrl: voice.acquire,
-      nlpServiceUrl,
-      nlpInternalSecret: nlpInternal,
-      isSaas: setup.config.isSaas,
-      nodeEnvironment,
-      publicBaseUrl,
-    };
+    const childHost = { voicePublicUrl: voice.acquire, nlpServiceUrl };
 
     return new ScenarioModule({
       agentTesting: AgentTestService.create({
@@ -371,9 +362,7 @@ export class ScenarioModule implements ScenarioApi {
         modelProviders: peers.modelProviders,
         simulations,
         config: prefetchConfig,
-        turns: AgentTestTurnChildService.create({
-          config: ScenarioExecutorService.childConfig({ config, host: childHost }),
-        }),
+        turns: setup.channels.agentTestTurns,
         nlpTimeouts: {
           ...config.nlpTimeouts,
           engineCodeBlockTimeoutSeconds: Number(setup.config.nlpCodeBlockTimeoutSeconds),
@@ -455,7 +444,11 @@ export class ScenarioModule implements ScenarioApi {
       lifecycle: buildScenarioLifecyclePipeline(),
       simulationCommands,
       simulationProcessing: SimulationProcessingRuntimeAdapter.create({
-        pool: { slotBudget: config.slotBudget, consumed: config.consumedResourceClasses },
+        pool: {
+          slotBudget: config.slotBudget,
+          consumed: config.consumedResourceClasses,
+          voiceRunsMaxConcurrent: config.voiceRunsMaxConcurrent,
+        },
         runs: setup.repositories.simulationRunProcessing,
         cancellations,
         traces: setup.dependencies.traces,
@@ -484,6 +477,7 @@ export class ScenarioModule implements ScenarioApi {
         milestones: { projects: setup.dependencies.projects },
         executor: ScenarioExecutorService.create({
           voiceNonces,
+          children: { node: setup.channels.nodeChildren, go: setup.channels.goChildren },
           peers: setup.dependencies,
           scenarios,
           simulations,

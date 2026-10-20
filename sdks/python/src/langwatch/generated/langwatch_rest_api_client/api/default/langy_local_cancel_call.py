@@ -15,7 +15,7 @@ def _get_kwargs(
 
     _kwargs: dict[str, Any] = {
         "method": "post",
-        "url": "/api/langy/local/calls/{call_id}/cancel".format(
+        "url": "/api/v1/langy/local/calls/{call_id}/cancel".format(
             call_id=quote(str(call_id), safe=""),
         ),
     }

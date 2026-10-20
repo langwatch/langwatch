@@ -64,9 +64,9 @@ def sync_detailed(
     client: AuthenticatedClient,
     built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> Response[ListRolesResponse200]:
-    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
-    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
-    roles, `?builtIn=false` only the custom ones.
+    """List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles
+    only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false`
+    only the custom ones.
 
     Args:
         built_in (ListRolesBuiltIn | Unset):
@@ -95,9 +95,9 @@ def sync(
     client: AuthenticatedClient,
     built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> ListRolesResponse200 | None:
-    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
-    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
-    roles, `?builtIn=false` only the custom ones.
+    """List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles
+    only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false`
+    only the custom ones.
 
     Args:
         built_in (ListRolesBuiltIn | Unset):
@@ -121,9 +121,9 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> Response[ListRolesResponse200]:
-    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
-    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
-    roles, `?builtIn=false` only the custom ones.
+    """List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles
+    only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false`
+    only the custom ones.
 
     Args:
         built_in (ListRolesBuiltIn | Unset):
@@ -150,9 +150,9 @@ async def asyncio(
     client: AuthenticatedClient,
     built_in: ListRolesBuiltIn | Unset = UNSET,
 ) -> ListRolesResponse200 | None:
-    """List the organization's roles with their permission sets: the built-in roles `admin`, `member` and
-    `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in
-    roles, `?builtIn=false` only the custom ones.
+    """List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles
+    only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false`
+    only the custom ones.
 
     Args:
         built_in (ListRolesBuiltIn | Unset):

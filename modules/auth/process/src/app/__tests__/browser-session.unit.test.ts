@@ -372,6 +372,7 @@ describe("BrowserSessionService", () => {
             id: "session-2",
             identifierId: "identifier-1",
             amr: ["pwd"],
+            startedBySignUp: false,
             ipAddress: "203.0.113.4",
             userAgent: "Mozilla/5.0",
             createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
@@ -428,6 +429,7 @@ describe("BrowserSessionService", () => {
       id: "session-1",
       identifierId: "identifier-1",
       amr: ["pwd"],
+      startedBySignUp: false,
       ipAddress: "203.0.113.4",
       userAgent: "Mozilla/5.0",
       createdAt: Temporal.Instant.from("2026-01-01T00:00:00Z"),
@@ -461,6 +463,16 @@ describe("BrowserSessionService", () => {
       expect(listed.map((entry) => entry.secondFactorProven)).toEqual([false, true, false]);
       expect(listed[1]?.identifierId).toBeNull();
       expect(Object.keys(listed[0] ?? {})).not.toContain("sessionToken");
+    });
+
+    /** @scenario "The offer waits past the sign-up session" */
+    it("says which session the account's sign-up started", async () => {
+      const sessions = new Sessions();
+      sessions.records = [record({ id: "session-2" }), record({ startedBySignUp: true })];
+
+      const listed = await service({ sessions }).service.listBrowserSessions({ userId: "user-1" });
+
+      expect(listed.map((entry) => entry.startedBySignUp)).toEqual([false, true]);
     });
 
     it("says how one of the person's own sessions signed in, and knows nothing of another's", async () => {

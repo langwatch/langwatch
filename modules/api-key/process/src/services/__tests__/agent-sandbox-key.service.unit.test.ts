@@ -7,13 +7,16 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { RedisSharedCredentialStore } from "@langwatch/redis-client/shared-credential";
+import {
+  MemorySharedCredentialStore,
+  type SharedCredentialCipher,
+  type SharedCredentialStore,
+} from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { memoryRedisDouble } from "@langwatch/test-harness/client-doubles/redis";
+import { memoryRedisDouble, memoryRedisStore } from "@langwatch/test-harness/client-doubles/redis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import type { AgentSandboxKeyCipher } from "../../repositories/agent-sandbox-key.repository.ts";
-import { MemoryAgentSandboxKeyRepository } from "../../repositories/memory/memory.agent-sandbox-key.repository.ts";
-import { RedisAgentSandboxKeyRepository } from "../../repositories/redis/redis.agent-sandbox-key.repository.ts";
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
   AGENT_SANDBOX_KEY_TTL_MS,
@@ -23,7 +26,7 @@ import { AgentSandboxKeyService } from "../agent-sandbox-key.service.ts";
 const projectId = "project-1";
 const startedAt = new Date("2026-10-06T10:00:00.000Z");
 
-const cipher: AgentSandboxKeyCipher = {
+const cipher: SharedCredentialCipher = {
   encrypt: (plaintext) => `sealed:${plaintext}`,
   decrypt: (ciphertext) => {
     if (!ciphertext.startsWith("sealed:")) throw new Error("not sealed by this cipher");
@@ -33,10 +36,10 @@ const cipher: AgentSandboxKeyCipher = {
 
 function createService({
   personal = null,
-  held = MemoryAgentSandboxKeyRepository.create(),
+  held = MemorySharedCredentialStore.create(),
 }: {
   personal?: { ownerUserId: string | null } | null;
-  held?: MemoryAgentSandboxKeyRepository | RedisAgentSandboxKeyRepository;
+  held?: SharedCredentialStore;
 } = {}) {
   const created: Parameters<ApiKeyApi["create"]>[0][] = [];
   const create = vi.fn();
@@ -136,9 +139,22 @@ describe("AgentSandboxKeyService", () => {
   describe("given a held token the platform can no longer read", () => {
     /** @scenario "A shared key the platform can no longer read is replaced" */
     it("mints a new key and shares it from then on", async () => {
-      const redis = memoryRedisDouble();
+      const store = memoryRedisStore();
+      const keyspace = memoryRedisDouble({ store });
+      // The claim's release: delete only while this caller's token still holds it.
+      const releaseIfOwned = async (
+        _script: unknown,
+        _keys: unknown,
+        key: unknown,
+        token: unknown,
+      ) => ((await keyspace.get(String(key))) === token ? keyspace.del(String(key)) : 0);
+      const redis = memoryRedisDouble({ store, script: { eval: releaseIfOwned } });
       await redis.set(`ttlcache:agent-sandbox-key:${projectId}`, JSON.stringify("damaged"));
-      const held = RedisAgentSandboxKeyRepository.create({ redis, cipher });
+      const held = RedisSharedCredentialStore.create({
+        redis,
+        cipher,
+        prefix: "ttlcache:agent-sandbox-key:",
+      });
       const { service, created } = createService({ held });
 
       const replaced = await service.mintAgentSandboxKey({ projectId });

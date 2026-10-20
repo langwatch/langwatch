@@ -42,13 +42,17 @@ describe("the armed ring stylesheet", () => {
     it("never fades a lit target to the invisible: no keyframe stop drops below legibility", () => {
       // The old trough was 0.03 alpha on a 1px hairline — invisible on a real
       // monitor, which read as "arming does nothing". Quiet is the brief;
-      // invisible is a bug. Every near/hover stop must stay at or above 0.15.
+      // invisible is a bug. Every near/hover stop mixes at least 15% of its colour in.
       const stops = [
-        ...css.matchAll(/--langy-target-(?:near|hover)-\d:\s*rgba\([^)]*,\s*([\d.]+)\)/g),
+        ...css.matchAll(
+          /--langy-target-(?:near|hover)-\d:\s*color-mix\(in srgb, var\([^)]*\) (\d+)%, transparent\)/g,
+        ),
       ];
+      const declared = [...css.matchAll(/--langy-target-(?:near|hover)-\d:/g)];
       expect(stops.length).toBeGreaterThan(0);
-      for (const [declaration, alpha] of stops) {
-        expect(Number(alpha), declaration).toBeGreaterThanOrEqual(0.15);
+      expect(stops).toHaveLength(declared.length);
+      for (const [declaration, percent] of stops) {
+        expect(Number(percent), declaration).toBeGreaterThanOrEqual(15);
       }
     });
   });

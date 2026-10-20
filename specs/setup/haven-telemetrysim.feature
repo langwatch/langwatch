@@ -8,9 +8,9 @@ Feature: telemetrysim, a seeded OTLP sender that haven drives at a stack
   seed; scrubbed recordings of real exports join them later under fixtures/.
   An OTLP gRPC sender waits for the gRPC receiver; only its seam exists.
 
-  # Bound by Go tests in services/telemetrysim (telemetrysim_test.go, runs_test.go),
+  # Bound by Go tests in services/sims/telemetrysim (telemetrysim_test.go, runs_test.go),
   # tools/thuishaven (cmd/sim_telemetry_test.go, app/plan_telemetry_test.go) and the
-  # console's tests in apps/telemetrysim-web/src/__tests__, by their @scenario annotations.
+  # console's tests in apps/sims/src/telemetry/__tests__, by their @scenario annotations.
 
   Scenario: A preset sends a seeded, reproducible batch
     Given a preset, a seed, a batch index and a run start

@@ -6,6 +6,7 @@ import {
   defaultsForSourceKind,
   filterVariablesForCadence,
 } from "@langwatch/automation-contract";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Alert,
   Badge,
@@ -202,9 +203,17 @@ function EmailConfigForm({ slice, onChange, ctx }: ConfigFormProps<EmailSlice, E
         <Field.Label>Recipients</Field.Label>
         <VStack align="stretch" gap={1}>
           {memberEmails.length === 0 ? (
-            <Text color="fg.muted" textStyle="sm">
-              No team members found.
-            </Text>
+            <NoDataInfoBlock
+              size="line"
+              title="No team members found."
+              next={[
+                {
+                  kind: "docs",
+                  label: "Add members to a team",
+                  href: "https://docs.langwatch.ai/platform/members-and-teams",
+                },
+              ]}
+            />
           ) : (
             memberEmails.map((email) => (
               <HStack key={email} as="label" cursor="pointer">

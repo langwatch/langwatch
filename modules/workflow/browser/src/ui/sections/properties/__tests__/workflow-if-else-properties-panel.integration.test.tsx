@@ -2,13 +2,12 @@
  * @vitest-environment jsdom
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { VariablesSection } from "@langwatch/design-system/variable-mapping";
 import type { Component } from "@langwatch/workflow-contract";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { Node } from "@xyflow/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-
-import { VariablesSection } from "../../prompt/variables/variables-section.tsx";
 
 const mockSetNodeParameter = vi.fn();
 const mockSetNode = vi.fn();

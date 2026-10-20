@@ -1,6 +1,10 @@
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Pagination } from "@langwatch/design-system/pagination";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * Directory sync across every customer, in the back office (ADR-122): the
@@ -11,16 +15,13 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
   SimpleGrid,
-  Spinner,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SearchInput } from "@langwatch/design-system/search-input";
-import { ChevronLeft, ChevronRight, MoreVertical } from "lucide-react";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useState, type ReactNode } from "react";
 
 import { scimApi, type OversightSyncRow } from "../../behavior/scim-api.ts";
@@ -65,7 +66,7 @@ export default function DirectorySyncView() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Directory Sync</PageLayout.Heading>
+        <PageLayout.Heading>Directory sync</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4}>
         <SearchInput
@@ -75,17 +76,24 @@ export default function DirectorySyncView() {
           width="full"
           maxWidth="480px"
         />
-        <Card.Root width="full" overflow="hidden">
-          <Card.Body paddingY={0} paddingX={0}>
-            <ListBody
-              isError={list.isError}
-              isLoading={list.isLoading}
-              syncs={list.data?.syncs}
-              onOpen={setOpenConnection}
-            />
-          </Card.Body>
-        </Card.Root>
-        {total > 0 && <Pagination page={page} total={total} onPageChange={setPage} />}
+        <Card padding="none">
+          <ListBody
+            isError={list.isError}
+            isLoading={list.isLoading}
+            syncs={list.data?.syncs}
+            onOpen={setOpenConnection}
+          />
+        </Card>
+        {total > 0 && (
+          <Pagination
+            page={page}
+            pageSize={PAGE_SIZE}
+            totalCount={total}
+            unitLabel="syncs"
+            visibleCount={list.data?.syncs.length}
+            onPageChange={setPage}
+          />
+        )}
       </VStack>
 
       <SyncDrawer connectionId={openConnectionId} onClose={() => setOpenConnection(null)} />
@@ -112,55 +120,9 @@ function ListBody({
     );
   }
   if (isLoading) {
-    return (
-      <Box paddingY={10} textAlign="center">
-        <Spinner size="md" />
-      </Box>
-    );
+    return <SkeletonRows rows={4} label="Loading the directory" />;
   }
   return <SyncsTable syncs={syncs} onOpen={onOpen} />;
-}
-
-function Pagination({
-  page,
-  total,
-  onPageChange,
-}: {
-  page: number;
-  total: number;
-  onPageChange: (page: number) => void;
-}) {
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const rangeStart = (page - 1) * PAGE_SIZE + 1;
-  const rangeEnd = Math.min(total, page * PAGE_SIZE);
-
-  return (
-    <HStack width="full" justify="end" gap={4}>
-      <Text fontSize="sm" color="fg.muted">
-        {rangeStart}–{rangeEnd} of {total}
-      </Text>
-      <HStack gap={1}>
-        <Button
-          aria-label="Previous page"
-          size="sm"
-          variant="outline"
-          disabled={page <= 1}
-          onClick={() => onPageChange(page - 1)}
-        >
-          <ChevronLeft size={14} />
-        </Button>
-        <Button
-          aria-label="Next page"
-          size="sm"
-          variant="outline"
-          disabled={page >= totalPages}
-          onClick={() => onPageChange(page + 1)}
-        >
-          <ChevronRight size={14} />
-        </Button>
-      </HStack>
-    </HStack>
-  );
 }
 
 function SyncsTable({
@@ -171,52 +133,53 @@ function SyncsTable({
   onOpen: (connectionId: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md" width="full">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Organization</Table.ColumnHeader>
-          <Table.ColumnHeader>State</Table.ColumnHeader>
-          <Table.ColumnHeader>Last push</Table.ColumnHeader>
-          <Table.ColumnHeader>Standing failure</Table.ColumnHeader>
-          <Table.ColumnHeader>Retired</Table.ColumnHeader>
-          <Table.ColumnHeader width="60px" textAlign="right" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable variant="embedded" scroll="x" scrollLabel="Directory syncs table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Organization</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>State</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last push</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Standing failure</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Retired</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {syncs?.length === 0 && (
-          <Table.Row>
-            <Table.Cell colSpan={COLUMN_COUNT}>
-              <Text color="fg.muted" textAlign="center" paddingY={6}>
-                No directory sync matches your search.
-              </Text>
-            </Table.Cell>
-          </Table.Row>
+          <ListTable.SpanRow columns={COLUMN_COUNT}>
+            <Text color="fg.muted" textAlign="center" paddingY={6}>
+              No directory sync matches your search.
+            </Text>
+          </ListTable.SpanRow>
         )}
         {syncs?.map((sync) => (
-          <Table.Row
+          <ListTable.Row
             key={sync.connectionId}
-            cursor="pointer"
-            _hover={{ backgroundColor: "bg.muted" }}
-            onClick={() => onOpen(sync.connectionId)}
+            onActivate={() => onOpen(sync.connectionId)}
             data-testid="directory-sync-row"
           >
-            <Table.Cell>
+            <ListTable.Cell>
               <VStack align="start" gap={0}>
-                <Text>{sync.organizationName ?? "—"}</Text>
+                <ListTable.RowAction
+                  label={`Open ${sync.organizationName ?? sync.connectionId}`}
+                  onActivate={() => onOpen(sync.connectionId)}
+                >
+                  {sync.organizationName ?? "—"}
+                </ListTable.RowAction>
                 <Text fontSize="xs" color="fg.muted">
                   {sync.connectionId}
                 </Text>
               </VStack>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Badge colorPalette={syncStatePalette(sync.state)}>
                 {syncStateWords(sync.state)}
               </Badge>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               {sync.lastPushedAtMs ? readableDateTime(sync.lastPushedAtMs) : "—"}
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               {sync.lastFailure ? (
                 <Text fontSize="sm">
                   {sync.lastFailure.op} · {sync.lastFailure.errorCode}
@@ -224,17 +187,15 @@ function SyncsTable({
               ) : (
                 "—"
               )}
-            </Table.Cell>
-            <Table.Cell>{sync.deadLetters.length}</Table.Cell>
-            <Table.Cell textAlign="right">
-              <Box width="full" display="flex" justifyContent="end">
-                <RowActions sync={sync} onOpen={onOpen} />
-              </Box>
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+            <ListTable.Cell>{sync.deadLetters.length}</ListTable.Cell>
+            <ListTable.ActionCell>
+              <RowActions sync={sync} onOpen={onOpen} />
+            </ListTable.ActionCell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
@@ -254,7 +215,7 @@ function RowActions({
           aria-label={`Actions for ${sync.organizationName ?? sync.connectionId}`}
           onClick={(event) => event.stopPropagation()}
         >
-          <MoreVertical size={14} />
+          <MoreVerticalIcon size={14} />
         </Button>
       </Menu.Trigger>
       <Menu.Content>
@@ -291,29 +252,20 @@ function SyncDrawer({
   const held = sync.data;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!connectionId}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
       size="xl"
+      title={held?.organizationName ?? "Directory sync"}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{held?.organizationName ?? "Directory sync"}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {held && (
-            <VStack align="stretch" gap={6}>
-              <SyncFacts sync={held} />
-              <DeadLetters sync={held} />
-              <DirectoryIdentities rows={identities.data} />
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      {held && (
+        <VStack align="stretch" gap={6}>
+          <SyncFacts sync={held} />
+          <DeadLetters sync={held} />
+          <DirectoryIdentities rows={identities.data} />
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 

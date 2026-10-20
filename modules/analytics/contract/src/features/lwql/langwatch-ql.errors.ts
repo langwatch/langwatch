@@ -103,6 +103,25 @@ export class LangWatchQLUnknownIdentifierError extends HandledError {
 }
 
 /**
+ * ClickHouse refused the statement as written (an aggregate in WHERE, a type clash) for a
+ * reason the static validator cannot see. The fault is the caller's SQL: a 400, never a 500.
+ * The refusal echoes the query, so it rides in `reasons` for the logs only.
+ */
+export class LangWatchQLInvalidQueryError extends HandledError {
+  declare readonly code: "lwql_invalid_query";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("lwql_invalid_query", "The database rejected the query as written.", {
+      httpStatus: 400,
+      fault: "customer",
+      ...remediation("lwql_invalid_query"),
+      ...options,
+    });
+    this.name = "LangWatchQLInvalidQueryError";
+  }
+}
+
+/**
  * Access denied on a provisioned executor—our grants incomplete, not customer
  * admin issue.
  */
@@ -149,6 +168,39 @@ export class LangWatchQLParameterMissingError extends HandledError {
       },
     );
     this.name = "LangWatchQLParameterMissingError";
+  }
+}
+
+/**
+ * A bound parameter's value the server could not read as the type its placeholder
+ * declares, such as an ISO `…Z` string on `{start:DateTime64(3)}`. Without this it
+ * reached the caller as an unknown 500 for a one-edit fix (WEB-18301).
+ */
+export class LangWatchQLParameterInvalidError extends HandledError {
+  declare readonly code: "lwql_parameter_invalid";
+
+  constructor({
+    parameter,
+    ...options
+  }: {
+    /** The placeholder's name, when it could be read from the server's refusal. */
+    parameter: string | undefined;
+    reasons?: readonly Error[];
+  }) {
+    super(
+      "lwql_parameter_invalid",
+      parameter === undefined
+        ? "A bound parameter's value does not match the type the query declares for it."
+        : `The value of parameter ${parameter} does not match the type the query declares for it.`,
+      {
+        httpStatus: 400,
+        fault: "customer",
+        ...(parameter === undefined ? {} : { meta: { parameter } }),
+        ...remediation("lwql_parameter_invalid"),
+        ...options,
+      },
+    );
+    this.name = "LangWatchQLParameterInvalidError";
   }
 }
 

@@ -1,10 +1,11 @@
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * Roles & access: what a role can do, and who holds one where. The Access tab keeps
  * the `?tab=assignments` address the old Role Bindings page forwards onto.
  * Spec: specs/rbac/roles-and-access-ui.feature
  */
-import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 import { AUTHZ_MANAGE_PERMISSION, type AuthzHostApi } from "../../model/authz-host.ts";
@@ -33,35 +34,32 @@ export function RolesTabs({
 
   return (
     <>
-      <PageLayout.Header>
+      <PageLayout.Header description="What a role can do, and who holds one where.">
         <PageLayout.Heading>Roles &amp; access</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack align="start" width="full" gap={6} paddingTop={4}>
-        <Text color="fg.muted">What a role can do, and who holds one where.</Text>
-
-        <Tabs.Root
-          value={tab}
-          onValueChange={(event) => selectTab(event.value)}
-          colorPalette="orange"
-          width="full"
-        >
-          <Tabs.List marginBottom={6}>
-            <Tabs.Trigger value="roles">Roles</Tabs.Trigger>
-            <Tabs.Trigger value={ASSIGNMENTS_TAB}>Access</Tabs.Trigger>
-          </Tabs.List>
-
-          {/* Only the open tab is mounted: the other holds no read open behind it. */}
-          <Tabs.Content value="roles">{tab === "roles" && roles}</Tabs.Content>
-          <Tabs.Content value={ASSIGNMENTS_TAB}>
-            {tab === ASSIGNMENTS_TAB && (
-              <AccessPanel
-                organizationId={organizationId}
-                canManage={host.hasPermission(AUTHZ_MANAGE_PERMISSION)}
-              />
-            )}
-          </Tabs.Content>
-        </Tabs.Root>
-      </VStack>
+      {/* Only the open tab is mounted: the other holds no read open behind it. */}
+      <ContentTabs
+        label="Roles and access"
+        value={tab}
+        onValueChange={({ value }) => selectTab(value)}
+        mount="active"
+        body="flush"
+        items={[
+          { value: "roles", label: "Roles", content: <Box paddingTop={4}>{roles}</Box> },
+          {
+            value: ASSIGNMENTS_TAB,
+            label: "Access",
+            content: (
+              <Box paddingTop={4}>
+                <AccessPanel
+                  organizationId={organizationId}
+                  canManage={host.hasPermission(AUTHZ_MANAGE_PERMISSION)}
+                />
+              </Box>
+            ),
+          },
+        ]}
+      />
     </>
   );
 }

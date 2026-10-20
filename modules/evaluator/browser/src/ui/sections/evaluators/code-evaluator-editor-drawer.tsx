@@ -7,8 +7,8 @@ import {
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
-import { Box, Button, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Alert, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { type Variable, VariablesSection } from "@langwatch/design-system/variable-mapping";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import {
@@ -18,7 +18,6 @@ import {
 } from "@langwatch/evaluator-contract";
 import { type FieldMapping as UIFieldMapping } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
 
 import { codeEvaluatorDisabledReason } from "../../../model/code-evaluator-disabled-reason.ts";
 import { rewriteCodeSignature } from "../../../model/workflow/code-signature.ts";
@@ -106,33 +105,28 @@ function handOffSaved({
   });
 }
 
-/** Why the button is disabled, so it explains itself; silent while saving or loading. */
-function saveAvailability({
+/** What the author still has to add, in words; null once the form is complete. */
+function missingMessage({
   name,
   code,
   inputs,
-  busy,
   isEditing,
 }: {
   name: string;
   code: string;
   inputs: EditableField[];
-  busy: boolean;
   isEditing: boolean;
 }) {
-  const hasName = !!name.trim();
-  const hasCode = code.trim() !== "";
-  const hasInput = validCodeEvaluatorFields(inputs).length > 0;
-  return {
-    canSave: hasName && hasCode && hasInput && !busy,
-    disabledReason: busy
-      ? null
-      : codeEvaluatorDisabledReason({ hasName, hasCode, hasInput, isEditing }),
-  };
+  return codeEvaluatorDisabledReason({
+    hasName: !!name.trim(),
+    hasCode: code.trim() !== "",
+    hasInput: validCodeEvaluatorFields(inputs).length > 0,
+    isEditing,
+  });
 }
 
 /** Form state and the create/update mutation behind the drawer; no JSX in here. */
-function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
+function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps, onFocusName?: () => void) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer } = useDrawer();
   const drawerParams = useDrawerParams();
@@ -221,40 +215,37 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     onError: (error) => showErrorToast({ error, fallbackTitle: "Couldn't save code evaluator" }),
   });
 
+  const [attempted, setAttempted] = useState(false);
+  const missing = missingMessage({ name, code, inputs, isEditing });
+  const isPending = createMutation.isPending || updateMutation.isPending;
+
   const handleSave = () => {
-    if (!project?.id || !name.trim()) return;
+    if (isPending || !project?.id) return;
+    if (missing) {
+      setAttempted(true);
+      if (!name.trim()) onFocusName?.();
+      return;
+    }
     const config: CodeEvaluatorConfig = {
       code,
       inputs: validCodeEvaluatorFields(inputs),
       outputs: codeEvaluatorOutputFields.map((field) => ({ ...field })),
     };
-    if (isEditing) {
-      updateMutation.mutate({
-        id: evaluatorId,
-        projectId: project.id,
-        type: "code",
-        name: name.trim(),
-        config,
-      });
-    } else {
-      createMutation.mutate({
-        projectId: project.id,
-        name: name.trim(),
-        type: "code",
-        config,
-      });
+    const trimmed = name.trim();
+    if (!evaluatorId) {
+      createMutation.mutate({ projectId: project.id, name: trimmed, type: "code", config });
+      return;
     }
+    updateMutation.mutate({
+      id: evaluatorId,
+      projectId: project.id,
+      type: "code",
+      name: trimmed,
+      config,
+    });
   };
 
-  const isPending = createMutation.isPending || updateMutation.isPending;
   const isLoadingEvaluator = isEditing && evaluatorQuery.isLoading;
-  const { canSave, disabledReason } = saveAvailability({
-    name,
-    code,
-    inputs,
-    busy: isPending || isLoadingEvaluator,
-    isEditing,
-  });
 
   return {
     name,
@@ -270,8 +261,7 @@ function useCodeEvaluatorForm(props: CodeEvaluatorEditorDrawerProps) {
     isEditing,
     isLoadingEvaluator,
     handleSave,
-    canSave,
-    disabledReason,
+    missing: attempted ? missing : null,
     isPending,
   };
 }
@@ -284,104 +274,68 @@ type CodeEvaluatorFormState = ReturnType<typeof useCodeEvaluatorForm>;
  */
 export function CodeEvaluatorEditorDrawer(props: CodeEvaluatorEditorDrawerProps) {
   const { closeDrawer, canGoBack, goBack } = useDrawer();
-  const form = useCodeEvaluatorForm(props);
-  const isOpen = props.open !== false && props.open !== undefined;
-  const showDisabledReason = !props.onRemove && !!form.disabledReason;
-  const showFooterSpacer = !props.onRemove && !form.disabledReason;
-
-  return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          props.onClose?.();
-          closeDrawer();
-        }
-      }}
-      size="lg"
-      closeOnInteractOutside={false}
-      modal={false}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <EditorHeader canGoBack={canGoBack} goBack={goBack} isEditing={form.isEditing} />
-        <Drawer.Body display="flex" flexDirection="column" gap={4}>
-          {form.isLoadingEvaluator ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
-          ) : (
-            <CodeEvaluatorFormFields form={form} />
-          )}
-          {props.gate && (
-            <EvaluatorGateSection
-              gate={props.gate}
-              required={props.gate.required}
-              onRequiredChange={props.onRequiredChange}
-            />
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full" justify="space-between" gap={3}>
-            {props.onRemove && (
-              <Button
-                variant="ghost"
-                colorPalette="red"
-                onClick={props.onRemove}
-                data-testid="evaluator-remove-button"
-              >
-                Remove evaluator
-              </Button>
-            )}
-            {showDisabledReason && (
-              <Text fontSize="sm" color="fg.muted" data-testid="code-evaluator-disabled-reason">
-                {form.disabledReason}
-              </Text>
-            )}
-            {showFooterSpacer && <Box />}
-            <Button
-              colorPalette="blue"
-              onClick={form.handleSave}
-              disabled={!form.canSave}
-              loading={form.isPending}
-              data-testid="save-code-evaluator"
-            >
-              {form.isEditing ? "Save changes" : "Create evaluator"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+  const contentRef = useRef<HTMLDivElement>(null);
+  const form = useCodeEvaluatorForm(props, () =>
+    contentRef.current?.querySelector<HTMLInputElement>("input")?.focus(),
   );
-}
+  const isOpen = props.open !== false && props.open !== undefined;
 
-function EditorHeader({
-  canGoBack,
-  goBack,
-  isEditing,
-}: {
-  canGoBack: boolean;
-  goBack: () => void;
-  isEditing: boolean;
-}) {
   return (
-    <Drawer.Header>
-      <HStack gap={2}>
-        {canGoBack && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={goBack}
-            padding={1}
-            minWidth="auto"
-            data-testid="back-button"
-          >
-            <LuArrowLeft size={20} />
-          </Button>
+    <Drawer
+      open={isOpen}
+      onClose={() => {
+        props.onClose?.();
+        closeDrawer();
+      }}
+      onBack={canGoBack ? goBack : void 0}
+      backButtonTestId="back-button"
+      size="lg"
+      title={form.isEditing ? "Edit Code Evaluator" : "New Code Evaluator"}
+      contentRef={contentRef}
+      footer={{
+        ...(props.onRemove
+          ? {
+              destructiveAction: {
+                label: "Remove evaluator",
+                onClick: props.onRemove,
+                "data-testid": "evaluator-remove-button",
+              },
+            }
+          : {}),
+        primaryAction: {
+          label: form.isEditing ? "Save changes" : "Create evaluator",
+          onClick: form.handleSave,
+          loading: form.isPending,
+          "data-testid": "save-code-evaluator",
+          ...(form.isLoadingEvaluator ? { disabledReason: "The evaluator is still loading." } : {}),
+        },
+      }}
+    >
+      <VStack gap={4} align="stretch">
+        {form.missing && (
+          <Alert.Root status="error" role="alert" data-testid="code-evaluator-disabled-reason">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>{form.missing}</Alert.Description>
+            </Alert.Content>
+          </Alert.Root>
         )}
-        <Drawer.Title>{isEditing ? "Edit Code Evaluator" : "New Code Evaluator"}</Drawer.Title>
-      </HStack>
-    </Drawer.Header>
+        {form.isLoadingEvaluator ? (
+          <HStack justify="center" paddingY={8}>
+            <Spinner size="md" />
+          </HStack>
+        ) : (
+          <CodeEvaluatorFormFields form={form} />
+        )}
+        {props.gate && (
+          <EvaluatorGateSection
+            gate={props.gate}
+            required={props.gate.required}
+            onRequiredChange={props.onRequiredChange}
+          />
+        )}
+      </VStack>
+    </Drawer>
   );
 }
 

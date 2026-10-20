@@ -9,16 +9,8 @@ import { ReplayWizardContent } from "./replay-wizard-content.tsx";
  */
 export function OpsReplayDrawer({ onClose }: { onClose: () => void }) {
   return (
-    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Projection replay</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <ReplayWizardContent />
-        </Drawer.Body>
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={onClose} size="xl" title="Projection replay">
+      <ReplayWizardContent />
+    </Drawer>
   );
 }

@@ -28,7 +28,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -44,6 +44,7 @@
     "@langwatch/plans": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
     "@langwatch/span-normalisation": "workspace:*",
+    "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@opentelemetry/core": "catalog:",
     "@opentelemetry/otlp-transformer": "catalog:",

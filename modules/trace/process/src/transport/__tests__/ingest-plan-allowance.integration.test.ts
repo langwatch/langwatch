@@ -5,11 +5,12 @@ import { canonicalErrorResponse, createRestRuntime } from "@langwatch/api/rest";
  * Spec: specs/server/api-process-plan-allowance.feature
  */
 import { type EntitlementApi, PlanLimitExceededError } from "@langwatch/entitlement-contract";
+import { type OtlpIngestCredential } from "@langwatch/otlp/door";
 import { LocalFeatureApis } from "@langwatch/process";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { restTestAuthorization } from "@langwatch/test-harness/trpc-members";
-import { TraceApi, type OtlpIngestCredential } from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 
 import { createTraceAppHarness } from "../../app/__tests__/support/trace-app.harness.ts";

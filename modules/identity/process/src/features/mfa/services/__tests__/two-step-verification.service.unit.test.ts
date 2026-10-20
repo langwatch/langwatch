@@ -1,5 +1,4 @@
 import type { AuthApi } from "@langwatch/auth-contract";
-import type { IdentityEmailResolution } from "@langwatch/identity-contract";
 /**
  * @vitest-environment node
  * The account standing and the administrator's member list (D06).
@@ -9,17 +8,16 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { MemoryOrganizationMfaRequirementMailChannel } from "../../../../channels/memory/memory.organization-mfa-requirement-mail.channel.ts";
+import { ConnectedIdentityEventing } from "../../../../eventing/identity-command-senders.store.ts";
 import { MemoryTwoStepVerificationRepository } from "../../../../repositories/memory/memory.two-step-verification.repository.ts";
 import { MemoryTwoStepVerificationStore } from "../../../../repositories/memory/memory.two-step-verification.store.ts";
-import { OrganizationMfaNotifierService } from "../organization-mfa-notifier.service.ts";
+import { TWO_STEP_REQUIREMENT_PIPELINE_NAME } from "../../eventing/two-step-requirement.intent.ts";
 import { OrganizationMfaService } from "../organization-mfa.service.ts";
 import { TwoStepAccountService } from "../two-step-account.service.ts";
 
 function deploymentOffering(offered: boolean) {
   return { offersTwoStepVerification: () => offered };
 }
-
-const KEEP_LEGACY: IdentityEmailResolution = { kind: "keep_legacy" };
 
 function accountService(
   accounts: MemoryTwoStepVerificationRepository,
@@ -43,6 +41,7 @@ function organizationService(
   } = {},
 ) {
   const entitlement = vi.fn(async () => entitled);
+  const { eventing, recorded } = requirementEventing();
   const service = OrganizationMfaService.create({
     accounts,
     auth: createApiFixture<AuthApi>({
@@ -50,14 +49,27 @@ function organizationService(
       findSessionAmr: async () => sessionAmr,
       findAssertedAmrForIdentifiers: async () => assertedAmr,
     }),
-    notifier: OrganizationMfaNotifierService.create({
-      accounts,
-      mail,
-      emails: { resolveEmail: async () => KEEP_LEGACY },
-    }),
+    eventing,
     entitled: entitlement,
   });
-  return { service, entitlement, mail };
+  return { service, entitlement, mail, recorded };
+}
+
+/** The pipeline's sender as the process connects it, recording what each change sends. */
+function requirementEventing() {
+  const recorded: unknown[] = [];
+  const eventing = ConnectedIdentityEventing.create();
+  eventing.connect({
+    pipeline: TWO_STEP_REQUIREMENT_PIPELINE_NAME,
+    commands: {
+      recordTwoStepRequirementChanged: {
+        send: async (data: unknown) => {
+          recorded.push(data);
+        },
+      },
+    },
+  });
+  return { eventing, recorded };
 }
 
 describe("two-step verification", () => {
@@ -229,11 +241,7 @@ describe("two-step verification", () => {
       const service = OrganizationMfaService.create({
         accounts,
         auth: createApiFixture<AuthApi>({ offersTwoStepVerification: () => true, findSessionAmr }),
-        notifier: OrganizationMfaNotifierService.create({
-          accounts,
-          mail: MemoryOrganizationMfaRequirementMailChannel.create(),
-          emails: { resolveEmail: async () => KEEP_LEGACY },
-        }),
+        eventing: requirementEventing().eventing,
         entitled: async () => true,
       });
 
@@ -332,9 +340,9 @@ describe("two-step verification", () => {
   });
 
   describe("given an administrator changes the requirement", () => {
-    /** @scenario "Turning the requirement on is recorded with who did it" */
-    it("turns it on and tells every active member who did it", async () => {
-      const { service, mail } = organizationService(accounts);
+    /** @scenario "Changing the requirement answers without waiting for the notices" */
+    it("saves it, records the change with who did it, and sends no notice itself", async () => {
+      const { service, mail, recorded } = organizationService(accounts);
 
       await expect(
         service.setRequirement({
@@ -346,14 +354,21 @@ describe("two-step verification", () => {
       await expect(
         accounts.getOrganizationSetting({ organizationId: "org_open" }),
       ).resolves.toMatchObject({ mfaRequired: true });
-      expect(mail.sent).toEqual([
-        { to: "ana@acme.test", organizationName: "Open", actorName: "Ana", required: true },
+      expect(recorded).toEqual([
+        {
+          tenantId: "org_open",
+          organizationId: "org_open",
+          required: true,
+          actorUserId: "user_ana",
+          occurredAt: expect.any(Number),
+        },
       ]);
+      expect(mail.sent).toEqual([]);
     });
 
     /** @scenario "Turning the requirement on without the plan is refused by the server" */
     it("refuses turning it on without the plan, leaves it where it was and tells nobody", async () => {
-      const { service, mail } = organizationService(accounts, { entitled: false });
+      const { service, mail, recorded } = organizationService(accounts, { entitled: false });
 
       await expect(
         service.setRequirement({
@@ -366,6 +381,7 @@ describe("two-step verification", () => {
         accounts.getOrganizationSetting({ organizationId: "org_open" }),
       ).resolves.toMatchObject({ mfaRequired: false });
       expect(mail.sent).toEqual([]);
+      expect(recorded).toEqual([]);
     });
 
     it("never asks the plan to turn it off", async () => {
@@ -382,7 +398,7 @@ describe("two-step verification", () => {
     });
 
     it("changes nothing and tells nobody when it is already set that way", async () => {
-      const { service, mail, entitlement } = organizationService(accounts);
+      const { service, recorded, entitlement } = organizationService(accounts);
 
       await expect(
         service.setRequirement({
@@ -391,7 +407,7 @@ describe("two-step verification", () => {
           actorUserId: "user_ana",
         }),
       ).resolves.toEqual({ previous: true, next: true });
-      expect(mail.sent).toEqual([]);
+      expect(recorded).toEqual([]);
       expect(entitlement).not.toHaveBeenCalled();
     });
 

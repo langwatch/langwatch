@@ -8,6 +8,7 @@ import {
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
   Box,
@@ -20,7 +21,6 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate, KSUID_RESOURCES } from "@langwatch/ksuid";
@@ -32,7 +32,7 @@ import {
 } from "@langwatch/scenario-contract";
 import type { CustomComponentConfig } from "@langwatch/workflow-contract";
 import { History, Lock, Play } from "lucide-react";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { type ReactNode, useCallback, useEffect, useMemo, useState } from "react";
 import { type Control, type FieldErrors, useFormState, useWatch } from "react-hook-form";
 
 import { FormServerError, HandledErrorState } from "../../../behavior/errors.tsx";
@@ -248,112 +248,114 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
     [scenario, initialFormData, props.testSuiteId],
   );
 
-  return (
-    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="xl">
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          {/* Being pointed at a scenario is enough to be editing one. Keying
-              this off the loaded record alone retitled the drawer "Create
-              Scenario" for the whole of the read. */}
-          <ScenarioDrawerHeading
-            isAgentTesting={isAgentTesting}
-            isEditing={!!(scenarioId || scenario)}
-            version={scenario?.version}
-          />
-        </Drawer.Header>
-        <Drawer.Body padding={0} overflow="hidden">
-          <Grid templateColumns="1fr 320px" height="full" overflow="hidden">
-            {/* Left: Form */}
-            <GridItem overflowY="auto" padding={6} borderRightWidth="1px" borderColor="border">
-              {hasReadFailed && (
-                <ScenarioReadError
-                  error={scenarioReadError}
-                  onRetry={() => void refetchScenario()}
-                />
-              )}
-              {showsFormSkeleton && <ScenarioFormSkeleton />}
-              {showsFormFields && (
-                <ScenarioFormFields
-                  formInstance={formInstance}
-                  staleVersion={staleVersion}
-                  onReloadStale={() => {
-                    void (async () => {
-                      await refetchScenario();
-                      setStaleVersion(null);
-                      setReloadNonce((nonce) => nonce + 1);
-                    })();
-                  }}
-                  isAgentTesting={isAgentTesting}
-                  formKey={`${scenarioId ?? "new"}-${reloadNonce}`}
-                  defaultValues={defaultValues}
-                  onControllerChange={setFormController}
-                />
-              )}
-            </GridItem>
-            {/* Right: Help Sidebar */}
-            <GridItem overflowY="auto" padding={4} bg="bg.muted">
-              <ScenarioEditorSidebar form={formInstance} variant={props.variant} />
-            </GridItem>
-          </Grid>
-        </Drawer.Body>
-        {/* Bottom Bar */}
-        <Drawer.Footer borderTopWidth="1px" justifyContent="space-between">
-          {formInstance && !isHydrating && !hasReadFailed && (
-            <HStack gap={6} flex={1} overflow="hidden" flexWrap="wrap">
-              <FooterLabels form={formInstance} />
-              <FooterParameters form={formInstance} onOpen={() => setParametersDialogOpen(true)} />
-            </HStack>
-          )}
-          <HStack gap={2} flexShrink={0}>
-            {isAgentTesting && scenarioId && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() =>
-                  openDrawer("scenarioVersionHistory", {
-                    urlParams: { scenarioId },
-                  })
-                }
-                data-testid="editor-history"
-              >
-                <History size={14} />
-                History
-              </Button>
-            )}
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            {/* There is nothing to save while the scenario is still being read,
+  const footer = (
+    <HStack width="full" gap={2} justify="space-between">
+      {formInstance && !isHydrating && !hasReadFailed && (
+        <HStack gap={6} flex={1} overflow="hidden" flexWrap="wrap">
+          <FooterLabels form={formInstance} />
+          <FooterParameters form={formInstance} onOpen={() => setParametersDialogOpen(true)} />
+        </HStack>
+      )}
+      <HStack gap={2} flexShrink={0}>
+        {isAgentTesting && scenarioId && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() =>
+              openDrawer("scenarioVersionHistory", {
+                urlParams: { scenarioId },
+              })
+            }
+            data-testid="editor-history"
+          >
+            <History size={14} />
+            History
+          </Button>
+        )}
+        <Button variant="outline" size="sm" onClick={onClose}>
+          Cancel
+        </Button>
+        {/* There is nothing to save while the scenario is still being read,
                 and nothing to save at all once the read has failed: the body
                 is an error state, not a form. `handleSave` refuses either way,
                 so this is what says so rather than what enforces it. */}
-            {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
+        {/* Agent Testing reads three plain buttons: Cancel, Save, Run.
                 The Run button uses the agent this scenario last ran against,
                 which the run dialog on the table remembers. */}
-            {!hasReadFailed && isAgentTesting && (
-              <AgentTestingActions
-                isSubmitting={isSubmitting}
-                hasTarget={!!selectedTarget}
-                isHydrating={isHydrating}
-                onSave={() => void handleSaveWithoutRunning()}
-                onRun={() => void handleSaveAndRun(selectedTarget)}
+        {!hasReadFailed && isAgentTesting && (
+          <AgentTestingActions
+            isSubmitting={isSubmitting}
+            hasTarget={!!selectedTarget}
+            isHydrating={isHydrating}
+            onSave={() => void handleSaveWithoutRunning()}
+            onRun={() => void handleSaveAndRun(selectedTarget)}
+          />
+        )}
+        {!hasReadFailed && !isAgentTesting && (
+          <SaveAndRunMenu
+            selectedTarget={selectedTarget}
+            onTargetChange={handleTargetChange}
+            onSaveAndRun={handleSaveAndRun}
+            onSaveWithoutRunning={handleSaveWithoutRunning}
+            onCreateAgent={handleCreateAgent}
+            onCreatePrompt={handleCreatePrompt}
+            isLoading={isSubmitting || isHydrating}
+          />
+        )}
+      </HStack>
+    </HStack>
+  );
+
+  const heading = scenarioDrawerHeading({
+    isAgentTesting,
+    isEditing: !!(scenarioId || scenario),
+    version: scenario?.version,
+  });
+
+  return (
+    <>
+      <Drawer
+        open={isOpen}
+        onClose={onClose}
+        size="xl"
+        title={heading.title}
+        titleContent={heading.titleContent}
+        subtitle={heading.subtitle}
+        body="flush"
+        bodyScroll="content"
+        footerContent={footer}
+      >
+        <Grid templateColumns="1fr 320px" flex={1} minHeight={0} overflow="hidden">
+          {/* Left: Form */}
+          <GridItem overflowY="auto" padding={6} borderRightWidth="1px" borderColor="border">
+            {hasReadFailed && (
+              <ScenarioReadError error={scenarioReadError} onRetry={() => void refetchScenario()} />
+            )}
+            {showsFormSkeleton && <ScenarioFormSkeleton />}
+            {showsFormFields && (
+              <ScenarioFormFields
+                formInstance={formInstance}
+                staleVersion={staleVersion}
+                onReloadStale={() => {
+                  void (async () => {
+                    await refetchScenario();
+                    setStaleVersion(null);
+                    setReloadNonce((nonce) => nonce + 1);
+                  })();
+                }}
+                isAgentTesting={isAgentTesting}
+                formKey={`${scenarioId ?? "new"}-${reloadNonce}`}
+                defaultValues={defaultValues}
+                onControllerChange={setFormController}
               />
             )}
-            {!hasReadFailed && !isAgentTesting && (
-              <SaveAndRunMenu
-                selectedTarget={selectedTarget}
-                onTargetChange={handleTargetChange}
-                onSaveAndRun={handleSaveAndRun}
-                onSaveWithoutRunning={handleSaveWithoutRunning}
-                onCreateAgent={handleCreateAgent}
-                onCreatePrompt={handleCreatePrompt}
-                isLoading={isSubmitting || isHydrating}
-              />
-            )}
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
+          </GridItem>
+          {/* Right: Help Sidebar */}
+          <GridItem overflowY="auto" padding={4} bg="bg.muted">
+            <ScenarioEditorSidebar form={formInstance} variant={props.variant} />
+          </GridItem>
+        </Grid>
+      </Drawer>
 
       {/* Parameter declarations: edited on the form, saved with the scenario.
           The form is gone while the scenario is being read and once the read
@@ -377,7 +379,7 @@ export function ScenarioFormDrawer(props: ScenarioFormDrawerProps) {
         onConfirm={confirmRunWithModels}
         isRunning={isSubmitting}
       />
-    </Drawer.Root>
+    </>
   );
 }
 
@@ -915,7 +917,7 @@ function defaultFormValuesOf({
   return initialFormData ?? undefined;
 }
 
-function ScenarioDrawerHeading({
+function scenarioDrawerHeading({
   isAgentTesting,
   isEditing,
   version,
@@ -923,22 +925,21 @@ function ScenarioDrawerHeading({
   isAgentTesting: boolean;
   isEditing: boolean;
   version: number | undefined;
-}) {
-  return (
-    <VStack align="start" gap={1}>
-      {isAgentTesting ? (
-        <HStack gap={2}>
-          <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
-          <CaseVersionChip version={version} />
-        </HStack>
-      ) : (
-        <Drawer.Title>{isEditing ? "Edit Scenario" : "Create Scenario"}</Drawer.Title>
-      )}
-      {isAgentTesting && (
-        <Drawer.Description>{AGENT_TESTING_EDITOR_DESCRIPTION}</Drawer.Description>
-      )}
-    </VStack>
-  );
+}): { title: string; titleContent?: ReactNode; subtitle?: ReactNode } {
+  if (!isAgentTesting) return { title: isEditing ? "Edit scenario" : "Create scenario" };
+  const title = isEditing ? "Edit scenario" : "New scenario";
+  return {
+    title,
+    titleContent: (
+      <HStack gap={2}>
+        <Text textStyle="md" fontWeight="semibold" letterSpacing="-0.01em">
+          {title}
+        </Text>
+        <CaseVersionChip version={version} />
+      </HStack>
+    ),
+    subtitle: AGENT_TESTING_EDITOR_DESCRIPTION,
+  };
 }
 
 /** Field errors land on the form when it has a slot for them; anything else toasts. */
@@ -1165,7 +1166,8 @@ function AgentTestingActions({
         Save
       </Button>
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         size="sm"
         loading={isSubmitting}
         disabled={!hasTarget || isHydrating}

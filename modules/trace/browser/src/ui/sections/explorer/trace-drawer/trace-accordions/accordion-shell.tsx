@@ -128,13 +128,7 @@ export function Section({
         zIndex={1}
       >
         <HStack flex={1} gap={2}>
-          <Text
-            textStyle="2xs"
-            fontWeight="semibold"
-            color="inherit"
-            textTransform="uppercase"
-            letterSpacing="wider"
-          >
+          <Text textStyle="groupLabel" fontWeight="semibold" color="inherit">
             {title}
           </Text>
           <SectionBadges commentCount={commentCount} count={count} empty={empty} />

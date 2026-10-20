@@ -15,7 +15,7 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 | `pages/authorize`         | `/authorize`         | –        | –        | –          | –     |
 | `pages/mcp/authorize`     | `/mcp/authorize`     | –        | –        | –          | –     |
 | `pages/cli/auth`          | `/cli/auth`          | –        | –        | –          | –     |
-| `pages/settings/api-keys` | `/settings/api-keys` | settings | API Keys | –          | –     |
+| `pages/settings/api-keys` | `/settings/api-keys` | settings | API keys | –          | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -25,7 +25,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/organization-client`, `@langwatch/project-client`.
+- Client packages (package.json): `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/trace-client`.
 - Host APIs it requires: `ApiKeyHostApi`, `AuthorizeHostApi`.
 
 <!-- readme:generated:end -->

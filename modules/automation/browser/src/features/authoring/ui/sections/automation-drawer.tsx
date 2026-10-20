@@ -21,17 +21,9 @@ import {
   type ReportTemplateContext,
   type TemplateContext,
 } from "@langwatch/automation-contract";
-import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Tooltip } from "@langwatch/design-system/tooltip";
+import { Card } from "@langwatch/design-system/card";
+import { Drawer, type DrawerFooterProps } from "@langwatch/design-system/drawer";
+import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import type { NamedSlackConnection } from "@langwatch/slack-contract";
 import { nowInstant } from "@langwatch/time";
@@ -550,68 +542,50 @@ export function AutomationDrawer({
 
   return (
     <>
-      <Drawer.Root
+      <Drawer
         open={section === null}
-        placement="end"
-        size="lg"
-        onOpenChange={({ open }) => {
-          if (!open && section === null) requestClose();
+        size="md"
+        title={labels.title}
+        onClose={() => {
+          if (section === null) requestClose();
         }}
+        footer={footerOf({
+          step,
+          isEdit: !!automationId,
+          draft,
+          onStep: setStep,
+          showStepNavigation,
+          showTestFire: !!channel && !editLoading && !editError,
+          configComplete,
+          onTestFire,
+          testFiring: testFire.isPending,
+          onSave,
+          saveBlockedReason: canSave ? void 0 : saveBlockedReason,
+          saving: upsert.isPending,
+          saveLabel: labels.saveButton,
+          saveTestId: `automation-save-${labels.noun}`,
+        })}
       >
-        <Drawer.Content bg="bg">
-          <Drawer.Header>
-            <Drawer.CloseTrigger />
-            <Drawer.Title>{labels.title}</Drawer.Title>
-          </Drawer.Header>
-          <Drawer.Body>
-            {source === "email-link" ? <EmailLinkLandingBanner /> : null}
-            {/* The form was visually heavy — every control at its default size.
-                Rather than thread a smaller `size` through dozens of controls
-                across every section (and drift over time), scale the whole form
-                surface down here. Contained to the drawer body, so the
-                header/footer and the rest of the app are untouched. */}
-            <DrawerBodyContent
-              editError={editError}
-              editLoading={editLoading}
-              noun={labels.noun}
-              isEdit={!!automationId}
-              isReport={isReport}
-              prefilledGraphId={prefilledGraphId}
-              projectId={projectId}
-              subjectLocked={subjectLocked}
-              graphName={graphName}
-              seriesLabel={seriesLabel}
-              onCreateNew={() => discardGuard.request("createNew")}
-            />
-          </Drawer.Body>
-          <Drawer.Footer>
-            <HStack width="full">
-              <Spacer />
-              {showStepNavigation ? (
-                <StepNavigation
-                  step={step}
-                  isEdit={!!automationId}
-                  draft={draft}
-                  onStep={setStep}
-                />
-              ) : (
-                <DrawerFooterActions
-                  showTestFire={!!channel && !editLoading && !editError}
-                  configComplete={configComplete}
-                  onTestFire={onTestFire}
-                  testFiring={testFire.isPending}
-                  saveBlockedReason={saveBlockedReason}
-                  canSave={canSave}
-                  onSave={onSave}
-                  saving={upsert.isPending}
-                  saveLabel={labels.saveButton}
-                  saveTestId={`automation-save-${labels.noun}`}
-                />
-              )}
-            </HStack>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Root>
+        {source === "email-link" ? <EmailLinkLandingBanner /> : null}
+        {/* The form was visually heavy — every control at its default size.
+            Rather than thread a smaller `size` through dozens of controls
+            across every section (and drift over time), scale the whole form
+            surface down here. Contained to the drawer body, so the
+            header/footer and the rest of the app are untouched. */}
+        <DrawerBodyContent
+          editError={editError}
+          editLoading={editLoading}
+          noun={labels.noun}
+          isEdit={!!automationId}
+          isReport={isReport}
+          prefilledGraphId={prefilledGraphId}
+          projectId={projectId}
+          subjectLocked={subjectLocked}
+          graphName={graphName}
+          seriesLabel={seriesLabel}
+          onCreateNew={() => discardGuard.request("createNew")}
+        />
+      </Drawer>
 
       <ConfigurationSecondaryDrawer
         open={section === "configuration"}
@@ -681,23 +655,17 @@ function cadenceModeOf({
  */
 function EmailLinkLandingBanner() {
   return (
-    <Box
-      mb={3}
-      padding={3}
-      borderRadius="md"
-      border="1px solid"
-      colorPalette="blue"
-      borderColor="colorPalette.muted"
-      bg="colorPalette.subtle"
-    >
-      <HStack gap={2} align="start">
-        <Box color="colorPalette.fg" flexShrink={0} mt="2px">
-          <Mail size={16} />
-        </Box>
-        <Text textStyle="sm" color="fg">
-          Opened from an email notification. You're editing the automation that sent it.
-        </Text>
-      </HStack>
+    <Box mb={3}>
+      <Card variant="nested" tone="blue" padding="sm">
+        <HStack gap={2} align="start">
+          <Box color="blue.fg" flexShrink={0} mt="0.5">
+            <Mail size={16} />
+          </Box>
+          <Text textStyle="sm" color="fg">
+            Opened from an email notification. You're editing the automation that sent it.
+          </Text>
+        </HStack>
+      </Card>
     </Box>
   );
 }
@@ -821,48 +789,6 @@ function useResetOnIdentityChange({
     baselineRef.current = null;
     setStep(automationId ? "review" : "watch");
   }, [drawerIdentity, automationId, reset, setStep, baselineRef]);
-}
-
-/** Mid-wizard, the footer moves between steps: an edit returns to the overview,
- *  a create walks forward. Saving belongs to the review overview. */
-function StepNavigation({
-  step,
-  isEdit,
-  draft,
-  onStep,
-}: {
-  step: WizardStep;
-  isEdit: boolean;
-  draft: AutomationDraft;
-  onStep: (step: WizardStep) => void;
-}) {
-  const canContinue = step !== "watch" || draft.source !== "customGraph" || !!draft.customGraphId;
-  if (isEdit) {
-    return (
-      <Button colorPalette="orange" onClick={() => onStep("review")}>
-        Done
-      </Button>
-    );
-  }
-  return (
-    <>
-      {findPreviousStep(step).map((previous) => (
-        <Button key={previous} variant="ghost" onClick={() => onStep(previous)}>
-          Back
-        </Button>
-      ))}
-      {findNextStep(step).map((next) => (
-        <Button
-          key={next}
-          colorPalette="orange"
-          disabled={!canContinue}
-          onClick={() => onStep(next)}
-        >
-          Continue
-        </Button>
-      ))}
-    </>
-  );
 }
 
 type SavedTriggerRow = NonNullable<RouterOutputs["automation"]["getTriggerById"]>;
@@ -1465,18 +1391,11 @@ function DrawerBodyContent({
 }) {
   if (editError) {
     return (
-      <Box
-        padding={3}
-        borderRadius="md"
-        border="1px solid"
-        colorPalette="red"
-        borderColor="colorPalette.muted"
-        bg="colorPalette.subtle"
-      >
+      <Card variant="nested" tone="red" padding="sm">
         <Text textStyle="sm" color="fg">
           Couldn't load this {noun}. Close the drawer and try again.
         </Text>
-      </Box>
+      </Card>
     );
   }
   if (editLoading) {
@@ -1508,58 +1427,80 @@ function DrawerBodyContent({
   );
 }
 
-/** Send test beside Save: once a channel is set up, fire the real message before committing. */
-function DrawerFooterActions({
+/**
+ * The footer. Mid-wizard it moves between steps: an edit returns to the overview, a create walks
+ * forward. On the overview Send test sits beside Save once a channel is set up. Save stays
+ * pressable while incomplete: a click toasts what is missing.
+ */
+function footerOf({
+  step,
+  isEdit,
+  draft,
+  onStep,
+  showStepNavigation,
   showTestFire,
   configComplete,
   onTestFire,
   testFiring,
-  saveBlockedReason,
-  canSave,
   onSave,
+  saveBlockedReason,
   saving,
   saveLabel,
   saveTestId,
 }: {
+  step: WizardStep;
+  isEdit: boolean;
+  draft: AutomationDraft;
+  onStep: (step: WizardStep) => void;
+  showStepNavigation: boolean;
   showTestFire: boolean;
   configComplete: boolean;
   onTestFire: () => void;
   testFiring: boolean;
-  saveBlockedReason: string;
-  canSave: boolean;
   onSave: () => void;
+  /** Why Save would only toast what is missing; omitted once the draft can be saved. */
+  saveBlockedReason: string | undefined;
   saving: boolean;
   saveLabel: string;
   saveTestId: string;
-}) {
-  return (
-    <>
-      {showTestFire ? (
-        <Tooltip content="Finish the delivery setup to send a test." disabled={configComplete}>
-          <Button
-            variant="outline"
-            onClick={onTestFire}
-            loading={testFiring}
-            disabled={!configComplete}
-          >
-            <Send size={14} /> Send test
-          </Button>
-        </Tooltip>
-      ) : null}
-      <Tooltip content={saveBlockedReason} disabled={canSave}>
-        <Button
-          colorPalette="orange"
-          data-testid={saveTestId}
-          onClick={onSave}
-          loading={saving}
-          // Pressable while incomplete: a click toasts what is still missing.
-          disabled={saving}
-        >
-          {saveLabel}
-        </Button>
-      </Tooltip>
-    </>
-  );
+}): DrawerFooterProps {
+  if (!showStepNavigation) {
+    return {
+      note: saveBlockedReason,
+      secondaryAction: showTestFire
+        ? {
+            label: "Send test",
+            icon: <Send size={14} />,
+            onClick: onTestFire,
+            loading: testFiring,
+            disabledReason: configComplete ? void 0 : "Finish the delivery setup to send a test.",
+          }
+        : void 0,
+      primaryAction: {
+        label: saveLabel,
+        "data-testid": saveTestId,
+        onClick: onSave,
+        loading: saving,
+      },
+    };
+  }
+  if (isEdit) {
+    return { primaryAction: { label: "Done", onClick: () => onStep("review") } };
+  }
+  const canContinue = step !== "watch" || draft.source !== "customGraph" || !!draft.customGraphId;
+  const [previous] = findPreviousStep(step);
+  const [next] = findNextStep(step);
+  return {
+    secondaryAction: previous ? { label: "Back", onClick: () => onStep(previous) } : void 0,
+    primaryAction: next
+      ? {
+          label: "Continue",
+          onClick: () => {
+            if (canContinue) onStep(next);
+          },
+        }
+      : void 0,
+  };
 }
 
 type PreviewContextInput = {

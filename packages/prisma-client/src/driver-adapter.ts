@@ -1,5 +1,20 @@
+import { createLogger } from "@langwatch/observability";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool, type PoolConfig } from "pg";
+
+const logger = createLogger("langwatch:postgres:pool");
+
+/**
+ * pg emits `error` on a pool when an idle client is lost; with no listener Node throws it
+ * as an uncaught exception. Warn while running, debug once the pool is ending.
+ */
+export function guardPoolErrors({ pool }: { pool: Pool }): Pool {
+  pool.on("error", (error) => {
+    const log = pool.ending ? logger.debug : logger.warn;
+    log.call(logger, { error }, "postgres pool lost an idle connection");
+  });
+  return pool;
+}
 
 export interface PrismaPgPoolConfig extends PoolConfig {
   connectionString: string;
@@ -35,7 +50,7 @@ export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
    */
   create(databaseUrl: string): PrismaDriverAdapter {
     const { schema, ...poolConfig } = this.poolConfig(databaseUrl);
-    const pool = new Pool(poolConfig);
+    const pool = guardPoolErrors({ pool: new Pool(poolConfig) });
     const adapter = new PrismaPg(pool, {
       schema,
       disposeExternalPool: false,
@@ -49,7 +64,8 @@ export class PrismaDriverAdapterService extends PrismaDriverAdapterFactory {
    */
   createOwnedAdapter(databaseUrl: string): PrismaPg {
     const { schema, ...poolConfig } = this.poolConfig(databaseUrl);
-    return new PrismaPg(poolConfig, { schema });
+    const pool = guardPoolErrors({ pool: new Pool(poolConfig) });
+    return new PrismaPg(pool, { schema, disposeExternalPool: true });
   }
 
   poolConfig(databaseUrl: string): PrismaPgPoolConfig {

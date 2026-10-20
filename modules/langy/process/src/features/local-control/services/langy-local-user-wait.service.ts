@@ -20,35 +20,49 @@ import {
   type PollWaitResponse,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
-import { turnWaitsKey, waitKey } from "../../../rules/langy-local-control-keys.rules.ts";
-import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
+import type { LangyLocalUserWaitRepository } from "../../../repositories/langy-local-user-wait.repository.ts";
 
 const logger = createLogger("langwatch:langy:local-control:waits");
 import {
   blankUserWait,
   given,
-  permissionCardEntry,
-  questionCardEntry,
   refuseSettled,
-  storedUserWaitSchema,
   toPollResponse,
   type StoredUserWait,
   type UserWaitBuffer,
   type UserWaitEvents,
   type UserWaitQuestion,
-  type UserWaitServiceOptions,
 } from "../../../rules/langy-local-user-wait-record.rules.ts";
+import { UserWaitCardsService } from "./langy-local-user-wait-cards.service.ts";
+
+interface UserWaitServiceOptions {
+  waits: LangyLocalUserWaitRepository;
+  events: UserWaitEvents;
+  buffer: UserWaitBuffer;
+  /**
+   * Sends the developer's answer to the folder holding the call. Injected, so
+   * the wait service never depends on the transport and a unit test proves the
+   * frame was asked for without a socket.
+   */
+  sendPermission?: (args: {
+    conversationId: string;
+    callId: string;
+    decision: "allow_once" | "allow_pattern" | "deny" | "expired";
+  }) => Promise<void>;
+  now?: () => number;
+  pollIntervalMs?: number;
+  keepaliveMs?: number;
+}
 
 /** One poll of a card, or `gone` once its record has expired. */
 type UserWaitPoll = { outcome: "polled"; answer: PollWaitResponse } | { outcome: "gone" };
 export class UserWaitService {
-  private readonly store: SessionStateStore;
+  private readonly waits: LangyLocalUserWaitRepository;
   private readonly events: UserWaitEvents;
-  private readonly buffer: UserWaitBuffer;
+  private readonly cards: UserWaitCardsService;
   private readonly sendPermission: NonNullable<UserWaitServiceOptions["sendPermission"]>;
   private readonly pollIntervalMs: number;
   private readonly keepaliveMs: number;
@@ -59,13 +73,13 @@ export class UserWaitService {
   }
 
   private constructor(options: UserWaitServiceOptions) {
-    this.store = options.store;
+    this.waits = options.waits;
     this.events = options.events;
-    this.buffer = options.buffer;
     this.sendPermission = options.sendPermission ?? (async () => undefined);
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
     this.keepaliveMs = options.keepaliveMs ?? LIVE_STREAM_KEEPALIVE_MS;
+    this.cards = UserWaitCardsService.create({ buffer: options.buffer, now: this.now });
   }
 
   /** Raises a permission card for one local command. */
@@ -94,7 +108,7 @@ export class UserWaitService {
     await this.persist(wait);
     // The live entry first, so the card is on screen while the event store
     // catches up. Same order as `end` below, and for the same reason.
-    await this.publishPermission(wait);
+    await this.cards.publishPermission(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -136,7 +150,7 @@ export class UserWaitService {
       budgetMs: QUESTION_WAIT_BUDGET_MS,
     });
     await this.persist(wait);
-    await this.publishQuestion(wait);
+    await this.cards.publishQuestion(wait);
     await this.events.startUserWait({
       tenantId: wait.projectId,
       occurredAt: wait.createdAt,
@@ -167,7 +181,7 @@ export class UserWaitService {
     signal?: AbortSignal;
   }): Promise<UserWaitPoll> {
     const until = this.now() + holdMs;
-    const beat = this.beater();
+    const beat = this.cards.beater();
     const look = async (): Promise<StoredUserWait | null> => {
       const wait = await this.readSettlingExpiry(waitId);
       if (wait?.state === "pending") {
@@ -182,30 +196,6 @@ export class UserWaitService {
       wait = await look();
     }
     return wait ? { outcome: "polled", answer: toPollResponse(wait) } : { outcome: "gone" };
-  }
-
-  /**
-   * The liveness gate of one poll request: it refreshes on the first pass,
-   * then once per heartbeat interval for as long as the request holds. The
-   * request is the worker's own, so a worker that stopped stops refreshing.
-   */
-  private beater(): (wait: StoredUserWait) => Promise<void> {
-    let lastBeatAt: number | null = null;
-
-    return async (wait) => {
-      const now = this.now();
-      const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) {
-        return;
-      }
-
-      lastBeatAt = now;
-      await this.buffer.heartbeat({
-        conversationId: wait.conversationId,
-        turnId: wait.turnId,
-        now,
-      });
-    };
   }
 
   /**
@@ -297,7 +287,7 @@ export class UserWaitService {
     conversationId: string;
     turnId: string;
   }): Promise<StoredUserWait[]> {
-    const ids = await this.store.zrangebyscore(turnWaitsKey(conversationId, turnId), 0);
+    const ids = await this.waits.findPendingIds({ conversationId, turnId });
     const pending: StoredUserWait[] = [];
     for (const id of ids) {
       let wait: StoredUserWait;
@@ -329,18 +319,15 @@ export class UserWaitService {
    * under a code that tells the person at the command line to ask for the change again.
    */
   async getWait(waitId: string): Promise<StoredUserWait> {
-    const raw = await this.store.tryGet(waitKey(waitId));
-    if (!raw) {
+    const lookup = await this.waits.find(waitId);
+    if (lookup.kind === "miss") {
       throw new LangyLocalRecordNotFoundError();
     }
-
-    try {
-      return storedUserWaitSchema.parse(JSON.parse(raw));
-    } catch (error) {
-      throw new LangyLocalRecordUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
+    if (lookup.kind === "unreadable") {
+      throw new LangyLocalRecordUnreadableError({ reasons: lookup.reasons });
     }
+
+    return lookup.value;
   }
 
   /** The wait, with its budget applied: a card past its time reads expired. */
@@ -385,9 +372,9 @@ export class UserWaitService {
     outcome: "answered" | "expired" | "cancelled",
   ): Promise<void> {
     if (wait.kind === "permission") {
-      await this.publishPermission(wait);
+      await this.cards.publishPermission(wait);
     } else {
-      await this.publishQuestion(wait);
+      await this.cards.publishQuestion(wait);
     }
 
     await this.events.endUserWait({
@@ -412,7 +399,11 @@ export class UserWaitService {
           }
         : {}),
     });
-    await this.store.zrem(turnWaitsKey(wait.conversationId, wait.turnId), wait.waitId);
+    await this.waits.untrackPending({
+      conversationId: wait.conversationId,
+      turnId: wait.turnId,
+      waitId: wait.waitId,
+    });
   }
 
   /**
@@ -427,46 +418,20 @@ export class UserWaitService {
     }
 
     await this.persist({ ...wait, lastKeepaliveAt: now });
-    await this.buffer.appendStatus({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      status:
-        wait.kind === "permission"
-          ? "Waiting for your answer on the permission card"
-          : "Waiting for your answer",
-    });
-  }
-
-  private async publishPermission(wait: StoredUserWait): Promise<void> {
-    if (!wait.callId) {
-      return;
-    }
-
-    await this.buffer.appendLocalPermission({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      entry: permissionCardEntry({ wait, callId: wait.callId }),
-    });
-  }
-
-  private async publishQuestion(wait: StoredUserWait): Promise<void> {
-    await this.buffer.appendQuestion({
-      conversationId: wait.conversationId,
-      turnId: wait.turnId,
-      entry: questionCardEntry(wait),
-    });
+    await this.cards.appendWaitingStatus(wait);
   }
 
   private async persist(wait: StoredUserWait): Promise<void> {
     // The record outlives its budget so a late answer can be told the card is
     // over, rather than that it never existed.
     const ttlSeconds = Math.max(60, Math.ceil((wait.expiresAt - this.now()) / 1000) + 300);
-    await this.store.set(waitKey(wait.waitId), JSON.stringify(wait), ttlSeconds);
+    await this.waits.save({ wait, ttlSeconds });
     if (wait.state === "pending") {
-      await this.store.zadd({
-        key: turnWaitsKey(wait.conversationId, wait.turnId),
-        score: wait.expiresAt,
-        member: wait.waitId,
+      await this.waits.trackPending({
+        conversationId: wait.conversationId,
+        turnId: wait.turnId,
+        waitId: wait.waitId,
+        expiresAt: wait.expiresAt,
         ttlSeconds,
       });
     }

@@ -150,3 +150,25 @@ describe("pollUntilHealthy", () => {
     });
   });
 });
+
+describe("pollUntilHealthy", () => {
+  describe("when the supervised process crashes before it answers", () => {
+    /** @scenario "A service that dies during initial boot is not restarted" */
+    it("stops waiting instead of running out the timeout", async () => {
+      const handle = { crashed: false };
+      let probes = 0;
+      const check = async () => {
+        probes += 1;
+        if (probes === 2) handle.crashed = true;
+        return { ok: false as const, durationMs: 0, reason: "connection refused" };
+      };
+
+      const result = await pollUntilHealthy({ check, timeoutMs: 60_000, intervalMs: 5, handle });
+
+      expect(result.ok).toBe(false);
+      if (result.ok) throw new Error("expected the wait to fail");
+      expect(result.reason).toBe("its process exited before it became healthy");
+      expect(result.durationMs).toBeLessThan(5_000);
+    });
+  });
+});

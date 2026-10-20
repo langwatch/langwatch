@@ -81,3 +81,16 @@ Feature: Enterprise SSO package boundary
     When a SAML connection is registered through the SSO connection procedure
     Then the registration is handed to the ledger
     And the ledger refuses it by name
+
+  # ADR-179: a cross-module fact is an event; licensing answers the gate status from it.
+  @unit
+  Scenario: Mounting the sign-in providers records which provider mounted
+    Given a deployment configured with a federation provider
+    When sso shapes its sign-in providers for Better Auth to mount
+    Then it records the provider and whether it mounted as one fact on its own pipeline
+
+  @unit
+  Scenario: A fact that cannot be sent never stops sign-in mounting
+    Given the sign-in provider fact cannot be sent
+    When sso shapes its sign-in providers for Better Auth to mount
+    Then the providers are still answered and the failure is logged

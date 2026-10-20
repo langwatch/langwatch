@@ -1,14 +1,6 @@
 import type { DatasetColumns, DatasetRecordEntry } from "@langwatch/dataset-contract";
-import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Button,
-  Field,
-  HStack,
-  Input,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Dialog, type FrameAction } from "@langwatch/design-system/dialog";
+import { Field, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Component, Entry } from "@langwatch/workflow-contract";
 import type { Node } from "@xyflow/react";
 import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
@@ -160,64 +152,68 @@ export function WorkflowRunUntilHereDialog({
     if (row) runWithValues(rowRunValues(fields, row));
   };
 
+  const backToFields = () => {
+    setView("fields");
+    setSelectedRowIndex(void 0);
+  };
+  const canPickDatasetValue = !!dataset && datasetRows.length > 0;
+  const inTable = view === "table";
+  const rowAction: FrameAction | undefined =
+    selectedRowIndex === void 0
+      ? undefined
+      : {
+          label: "Run with selected row",
+          onClick: runWithSelectedRow,
+          "data-testid": "run-with-selected-row",
+        };
+  const selectDatasetAction: FrameAction[] = canPickDatasetValue
+    ? [
+        {
+          label: "Select dataset value",
+          onClick: () => setView("table"),
+          "data-testid": "select-dataset-value",
+        },
+      ]
+    : [];
+
   return (
-    <Dialog.Root
+    <Dialog
       open={!!untilNodeId}
-      onOpenChange={({ open }) => {
-        if (!open) close();
-      }}
-      size={view === "table" ? "xl" : "md"}
+      onClose={close}
+      title="Run until here"
+      description={dialogDescription({ view, targetNode })}
+      size={inTable ? "md" : "sm"}
+      data-testid="run-until-here-dialog"
+      secondaryAction={inTable ? { label: "Cancel", onClick: backToFields } : void 0}
+      secondaryActions={inTable ? void 0 : selectDatasetAction}
+      primaryAction={
+        inTable
+          ? rowAction
+          : {
+              label: "Run",
+              onClick: () => runWithValues(values),
+              "data-testid": "run-until-here-run",
+            }
+      }
     >
-      <Dialog.Content data-testid="run-until-here-dialog">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <VStack align="start" gap={1}>
-            <Dialog.Title>Run until here</Dialog.Title>
-            <Text fontSize="13px" color="fg.muted">
-              {dialogDescription({ view, targetNode })}
-            </Text>
-          </VStack>
-        </Dialog.Header>
-        <Dialog.Body>
-          {view === "table" ? (
-            renderDatasetPreview({
-              rows: previewRowsOf(datasetRows, selectedRowIndex),
-              columns: datasetColumns,
-              onRowClick: setSelectedRowIndex,
-            })
-          ) : (
-            <RunUntilHereFields
-              fields={fields}
-              values={values}
-              onEdit={(identifier, value) => {
-                userEditedValues.current = true;
-                setValues((current) => ({ ...current, [identifier]: value }));
-              }}
-              onSubmit={() => runWithValues(values)}
-            />
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          {view === "table" ? (
-            <TableViewFooter
-              hasSelection={selectedRowIndex !== void 0}
-              onCancel={() => {
-                setView("fields");
-                setSelectedRowIndex(void 0);
-              }}
-              onRunWithSelectedRow={runWithSelectedRow}
-            />
-          ) : (
-            <FieldsViewFooter
-              canPickDatasetValue={!!dataset && datasetRows.length > 0}
-              onPickDatasetValue={() => setView("table")}
-              onCancel={close}
-              onRun={() => runWithValues(values)}
-            />
-          )}
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      {inTable ? (
+        renderDatasetPreview({
+          rows: previewRowsOf(datasetRows, selectedRowIndex),
+          columns: datasetColumns,
+          onRowClick: setSelectedRowIndex,
+        })
+      ) : (
+        <RunUntilHereFields
+          fields={fields}
+          values={values}
+          onEdit={(identifier, value) => {
+            userEditedValues.current = true;
+            setValues((current) => ({ ...current, [identifier]: value }));
+          }}
+          onSubmit={() => runWithValues(values)}
+        />
+      )}
+    </Dialog>
   );
 }
 
@@ -254,7 +250,7 @@ function RunUntilHereFields({
 }) {
   if (fields.length === 0) {
     return (
-      <Text fontSize="13px" color="fg.muted">
+      <Text textStyle="bodySm" color="fg.muted">
         The entry point has no inputs, the run starts with an empty entry.
       </Text>
     );
@@ -263,7 +259,7 @@ function RunUntilHereFields({
     <VStack width="full" align="start" gap={3}>
       {fields.map((field) => (
         <Field.Root key={field.identifier} width="full">
-          <Field.Label fontSize="12px" fontFamily="mono" color="fg.muted">
+          <Field.Label textStyle="monoSm" color="fg.muted">
             {field.identifier}
           </Field.Label>
           <Input
@@ -280,69 +276,6 @@ function RunUntilHereFields({
         </Field.Root>
       ))}
     </VStack>
-  );
-}
-
-function TableViewFooter({
-  hasSelection,
-  onCancel,
-  onRunWithSelectedRow,
-}: {
-  hasSelection: boolean;
-  onCancel: () => void;
-  onRunWithSelectedRow: () => void;
-}) {
-  return (
-    <HStack width="full">
-      <Spacer />
-      <Button variant="ghost" size="sm" onClick={onCancel}>
-        Cancel
-      </Button>
-      {hasSelection && (
-        <Button
-          colorPalette="orange"
-          size="sm"
-          data-testid="run-with-selected-row"
-          onClick={onRunWithSelectedRow}
-        >
-          Run with selected row
-        </Button>
-      )}
-    </HStack>
-  );
-}
-
-function FieldsViewFooter({
-  canPickDatasetValue,
-  onPickDatasetValue,
-  onCancel,
-  onRun,
-}: {
-  canPickDatasetValue: boolean;
-  onPickDatasetValue: () => void;
-  onCancel: () => void;
-  onRun: () => void;
-}) {
-  return (
-    <HStack width="full">
-      {canPickDatasetValue && (
-        <Button
-          variant="outline"
-          size="sm"
-          data-testid="select-dataset-value"
-          onClick={onPickDatasetValue}
-        >
-          Select dataset value
-        </Button>
-      )}
-      <Spacer />
-      <Button variant="ghost" size="sm" onClick={onCancel}>
-        Cancel
-      </Button>
-      <Button colorPalette="orange" size="sm" data-testid="run-until-here-run" onClick={onRun}>
-        Run
-      </Button>
-    </HStack>
   );
 }
 

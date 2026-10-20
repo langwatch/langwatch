@@ -60,7 +60,7 @@ export const skipTenantCheckReasonRule = defineRule({
     missingReason: {
       what: "`SKIP_TENANT_CHECK: true` has no real reason in the comment directly above it.",
       why: "A skipped tenant check can read every tenant's rows; the reason is what a reviewer audits.",
-      fix: "Write a comment on the line directly above the flag saying why this statement spans tenants (at least 20 characters, not a placeholder such as TODO, n/a, skip, temp or tests), or scope the statement to its tenant instead.",
+      fix: "Write a comment on the line directly above the flag saying why this statement spans tenants (at least 20 characters, not a placeholder such as TODO, n/a, skip, temp or tests), or scope the statement to its tenant instead. See the `authorization` skill.",
     },
     retiredUnscoped: {
       what: "`unscoped` is the retired ClickHouse opt-out from the tenant check.",

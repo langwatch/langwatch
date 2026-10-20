@@ -92,7 +92,7 @@ export function EditorStatusBar({
       paddingRight={2}
       paddingY={1}
       minHeight="32px"
-      fontSize="11px"
+      textStyle="micro"
       fontFamily="mono"
       gap={3}
       borderBottomRadius="md"
@@ -117,7 +117,7 @@ export function EditorStatusBar({
         </Button>
         <Button
           size="xs"
-          colorPalette="blue"
+          colorPalette="orange"
           variant="solid"
           onClick={onSaveAndClose}
           data-testid="code-editor-save-and-close"
@@ -174,7 +174,7 @@ function useModifierKeyLabel(): string {
  */
 function ShortcutHint({ children }: { children: React.ReactNode }) {
   return (
-    <Box as="span" ml={1.5} fontFamily="mono" fontSize="10px" letterSpacing="tight" opacity={0.6}>
+    <Box as="span" ml={1.5} fontFamily="mono" textStyle="micro" letterSpacing="tight" opacity={0.6}>
       {children}
     </Box>
   );

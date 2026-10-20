@@ -6,8 +6,9 @@
 
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
 import { Ban, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
@@ -35,35 +36,20 @@ export function PersonDrawer({ open = true, userId }: UiPersonDrawerProps) {
   const organizationId = organization?.id ?? "";
 
   return (
-    <Drawer.Root
-      open={open}
-      placement="end"
-      size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
-      }}
-    >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Person</Drawer.Title>
-          <Drawer.CloseTrigger onClick={closeDrawer} />
-        </Drawer.Header>
-        <Drawer.Body paddingBottom={8}>
-          {userId && organizationId ? (
-            <PersonDetail
-              organizationId={organizationId}
-              userId={userId}
-              canManage={host.hasPermission("organization:manage")}
-              onDone={closeDrawer}
-            />
-          ) : (
-            <Text color="fg.muted" fontSize="sm">
-              This link does not name anybody. Open a person from the members list.
-            </Text>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={open} onClose={closeDrawer} title="Person" size="lg">
+      {userId && organizationId ? (
+        <PersonDetail
+          organizationId={organizationId}
+          userId={userId}
+          canManage={host.hasPermission("organization:manage")}
+          onDone={closeDrawer}
+        />
+      ) : (
+        <Text color="fg.muted" fontSize="sm">
+          This link does not name anybody. Open a person from the members list.
+        </Text>
+      )}
+    </Drawer>
   );
 }
 
@@ -98,7 +84,7 @@ function PersonDetail({
     return <HandledErrorAlert error={member.error} fallbackTitle="Couldn't open this person" />;
   }
   const person = member.data;
-  if (!person) return <Spinner />;
+  if (!person) return <SkeletonRows rows={2} />;
   const disabled = !!person.disabledAt;
 
   return (

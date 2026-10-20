@@ -3,6 +3,7 @@ import {
   breakGlassIsLive,
   normalizeDomain,
   isConfiguredLegacySsoRoute,
+  legacySsoDomainsToMove,
   qualifySsoDomainOwnership,
   type SsoConnectionState,
   type SsoSetupConnectionView,
@@ -14,6 +15,7 @@ import {
 } from "@langwatch/identity-contract";
 import { nowInstant } from "@langwatch/time";
 
+import type { LegacySsoOrganizationRepository } from "../../sso-arrival/repositories/legacy-sso-organization.repository.ts";
 import type { SsoBreakGlassRepository } from "../../sso-arrival/repositories/sso-break-glass.repository.ts";
 import type { SsoMigrationEvidenceRepository } from "../../sso-arrival/repositories/sso-migration-evidence.repository.ts";
 import type {
@@ -35,6 +37,8 @@ interface SsoSetupServiceDeps {
    *  the test sign-in happened. */
   activity: SsoMigrationEvidenceRepository;
   migrations: SsoMigrationProgressService;
+  /** The legacy columns, for the domain still to move onto the organization's own connection. */
+  legacy: Pick<LegacySsoOrganizationRepository, "getLegacySso">;
   /** Whether the organization's plan carries single sign-on (Enterprise). */
   entitled: (args: { organizationId: string }) => Promise<boolean>;
   now?: () => number;
@@ -57,7 +61,7 @@ export class SsoSetupService {
   }
 
   async getSetup({ organizationId }: { organizationId: string }): Promise<SsoSetupView> {
-    const [held, { migration }, entitled] = await Promise.all([
+    const [held, { migration }, entitled, legacySso] = await Promise.all([
       this.deps.connections.findForOrganization({ organizationId }),
       this.deps.migrations.getProgress({
         organizationId,
@@ -65,6 +69,7 @@ export class SsoSetupService {
         limit: MIGRATION_PAGE_SIZE,
       }),
       this.deps.entitled({ organizationId }),
+      this.legacySsoDomainOf({ organizationId }),
     ]);
     const open = held.filter((connection) => !CLOSED_STATES.has(connection.state));
     const legacy = open.find(
@@ -98,9 +103,29 @@ export class SsoSetupService {
             provider: legacy.idpMetadata.providerId,
           }
         : null,
+      legacyDomainsToMove: legacySsoDomainsToMove({
+        legacySsoDomain: legacySso,
+        connections: held,
+      }),
       migration,
       enterpriseRequired: !entitled,
     };
+  }
+
+  /** The legacy pin's domain; undefined when the organization carries none. */
+  private async legacySsoDomainOf({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<string | undefined> {
+    const legacy = await this.deps.legacy
+      .getLegacySso({ organizationId })
+      .catch((error: unknown) => {
+        if (HandledError.isHandled(error) && error.code === "sso_connection_not_found")
+          return undefined;
+        throw error;
+      });
+    return legacy?.ssoDomain;
   }
 
   /** The cutover, paged. `getSetup` carries the first page; the section

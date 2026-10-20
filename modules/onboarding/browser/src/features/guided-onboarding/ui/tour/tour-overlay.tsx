@@ -94,8 +94,8 @@ export function TourSpotlight({
         width: spot.w,
         height: spot.h,
         boxShadow: handoff
-          ? "0 0 0 200vmax var(--chakra-colors-bg-scrim)"
-          : "0 0 0 200vmax var(--chakra-colors-bg-scrim)",
+          ? "0 0 0 200vmax var(--chakra-colors-takeover-tour-dim-lit)"
+          : "0 0 0 200vmax var(--chakra-colors-takeover-tour-dim)",
         opacity: handoff === "fading" ? 0 : 1,
         transition,
       }}
@@ -153,12 +153,12 @@ export function TourCursor({
         background="accent.solid"
         paddingX={2}
         paddingY={0.5}
-        fontSize="10.5px"
+        textStyle="micro"
         fontWeight="semibold"
         color="orange.contrast"
         boxShadow="md"
       >
-        (langy)
+        Langy
       </HStack>
       {step?.click && (
         <Box
@@ -226,9 +226,7 @@ export function TourCaption({
         >
           <LogoIcon height={22} />
         </Box>
-        <Text fontSize="13px" lineHeight="1.6">
-          {step.text}
-        </Text>
+        <Text textStyle="bodySm">{step.text}</Text>
       </HStack>
       <HStack marginTop={3} justify="space-between">
         <chakra.button
@@ -242,7 +240,7 @@ export function TourCaption({
           borderRadius="md"
           paddingX={1}
           paddingY={0.5}
-          fontSize="10.5px"
+          textStyle="micro"
           color="fg.subtle"
           cursor={stepIndex > 0 ? "pointer" : "default"}
           _hover={stepIndex > 0 ? { background: "bg.muted", color: "fg.muted" } : undefined}
@@ -258,7 +256,7 @@ export function TourCaption({
             borderRadius="lg"
             paddingX={2.5}
             paddingY={1.5}
-            fontSize="12px"
+            textStyle="caption"
             fontWeight="medium"
             color="fg.muted"
             _hover={{ background: "bg.muted", color: "fg" }}
@@ -277,7 +275,7 @@ export function TourCaption({
             color="fg.inverted"
             paddingX={3}
             paddingY={1.5}
-            fontSize="12px"
+            textStyle="caption"
             fontWeight="semibold"
             _hover={{ opacity: 0.9 }}
           >

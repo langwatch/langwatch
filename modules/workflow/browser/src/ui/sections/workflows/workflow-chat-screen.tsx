@@ -4,9 +4,10 @@
  * gate, since this app never renders on a server.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { FullLogo } from "@langwatch/design-system/full-logo";
 import { LoadingScreen } from "@langwatch/design-system/loading-screen";
-import { Box, Card as ChakraCard } from "@langwatch/design-system/primitives";
+import { Box } from "@langwatch/design-system/primitives";
 import { parseStudioWorkflow } from "@langwatch/workflow-contract";
 
 import { workflowApi } from "../../../behavior/workflow-api.ts";
@@ -43,9 +44,11 @@ export default function WorkflowChatScreen() {
     <Box height="100vh">
       <Box height="full" bg="bg.muted" padding={16} paddingTop={4}>
         <FullLogo />
-        <ChakraCard.Root height="90%" bg="bg.panel" padding={5} marginTop={4}>
-          <WorkflowChatBox workflowId={workflowId} nodes={parsed?.nodes} edges={parsed?.edges} />
-        </ChakraCard.Root>
+        <Box height="90%" marginTop={4}>
+          <Card variant="panel-fill" padding="lg" bodyLayout="stack">
+            <WorkflowChatBox workflowId={workflowId} nodes={parsed?.nodes} edges={parsed?.edges} />
+          </Card>
+        </Box>
       </Box>
     </Box>
   );

@@ -55,3 +55,5 @@ export function renderWithDesignSystem(
 export function DesignSystemTestProvider({ children }: { children: ReactNode }) {
   return <ChakraProvider value={system}>{children}</ChakraProvider>;
 }
+
+export { installTestColourVariables, type TestColourVariables } from "./colour-variables.ts";

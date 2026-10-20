@@ -27,7 +27,7 @@ export function LangyGitHubConnectCard({
   headline = "Install the LangWatch GitHub App to open this PR",
   onConnected,
 }: LangyGitHubConnectCardProps) {
-  const { connect } = useGitHubConnectPopup();
+  const popup = useGitHubConnectPopup();
   const router = useRouter();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function LangyGitHubConnectCard({
     setBusy(true);
     setError(null);
     setPopupBlocked(false);
-    const result = await connect(organizationId);
+    const result = await popup.connect(organizationId);
     setBusy(false);
     if (result.ok) {
       onConnected?.(result.login);

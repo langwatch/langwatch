@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
- * ADR-177 block E end to end over stateful doubles: a fact or the sweep enqueues through the real
+ * ADR-177 block E end to end over stateful doubles: a fact enqueues through the real
  * outbox, the real reconcile intent runs, and the ledger double keeps revoked rows as main does.
  * @see specs/governance/aggregate-project.feature
  */
-import type { AuthzApi } from "@langwatch/authz-contract";
+import type { AuthzApi, AuthzSharedProjectGrant } from "@langwatch/authz-contract";
 import type { JsonValue, ProcessStore } from "@langwatch/eventing";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { AggregateRule, ProjectApi } from "@langwatch/project-contract";
@@ -14,7 +14,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   OutboxAggregateReconcile,
   runAggregateReconcile,
-  runAggregateSweep,
 } from "../../eventing/aggregate-reconcile.intent.ts";
 import { aggregateReconcileIntentSchema } from "../../eventing/aggregate-reconcile.process.ts";
 import {
@@ -27,7 +26,12 @@ import { AggregateReconcilerService } from "../aggregate-reconciler.service.ts";
 const ORG = "org_1";
 const AGG = "agg_1";
 
-type GrantRow = { id: string; memberProjectId: string; revokedAt: string | null };
+type GrantRow = {
+  id: string;
+  memberProjectId: string;
+  revokedAt: string | null;
+  condition: AuthzSharedProjectGrant["condition"];
+};
 
 /** One organisation: personal projects by owner, members by department, one aggregate. */
 function world({ rule }: { rule: AggregateRule }) {
@@ -40,18 +44,13 @@ function world({ rule }: { rule: AggregateRule }) {
   };
   const projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   > = {
     findAggregate: async ({ aggregateProjectId }) =>
       aggregateProjectId === AGG
         ? [{ id: AGG, organizationId: ORG, archived: false, rule: state.rule }]
         : [],
     findLiveAggregateIds: async () => [AGG],
-    findAllLiveAggregates: async () => [{ id: AGG, organizationId: ORG }],
     findPersonalProjectIds: async ({ ownerUserIds }) =>
       [...state.personal]
         .filter(([, owner]) => ownerUserIds === undefined || ownerUserIds.includes(owner))
@@ -78,12 +77,21 @@ function world({ rule }: { rule: AggregateRule }) {
     | "revokeSharedProjectGrants"
   > = {
     findLiveSharedProjectGrants: async () =>
-      live().map((row) => ({ memberProjectId: row.memberProjectId, grantId: row.id })),
+      live().map((row) => ({
+        memberProjectId: row.memberProjectId,
+        grantId: row.id,
+        condition: row.condition,
+      })),
     attachSharedProjectGrant: vi.fn<AuthzApi["attachSharedProjectGrant"]>(
-      async ({ memberProjectId }) => {
+      async ({ memberProjectId, condition }) => {
         const held = live().find((row) => row.memberProjectId === memberProjectId);
         if (held) return { grantId: held.id, wasAttached: false };
-        const row = { id: `grant_${state.rows.length}`, memberProjectId, revokedAt: null };
+        const row = {
+          id: `grant_${state.rows.length}`,
+          memberProjectId,
+          revokedAt: null,
+          condition: condition ?? null,
+        };
         state.rows.push(row);
         return { grantId: row.id, wasAttached: true };
       },
@@ -157,37 +165,6 @@ describe("the reconciler keeps an aggregate's members current", () => {
         expect(liveMembers()).toEqual(["p_ana", "p_newcomer"]);
       });
     });
-
-    describe("when the nightly sweep runs after a project was created while no trigger fired", () => {
-      /** @scenario "A nightly sweep catches a missed trigger" */
-      it("makes that personal project a member", async () => {
-        const { state, reconciler, outbox, drain, liveMembers } = world({
-          rule: { kind: "all-personal" },
-        });
-        state.personal.set("p_missed", "u_missed");
-        state.departments.set("u_missed", null);
-
-        await runAggregateSweep({
-          reconciler,
-          outbox,
-          deleteDispatchedBefore: async () => 0,
-          now: () => 1,
-        })(
-          { scheduledFor: 1 },
-          {
-            processName: "aggregateProjectReconcile",
-            projectId: ORG,
-            processKey: "sweep",
-            tenantId: ORG,
-            messageKey: "sweep:1",
-            attempt: 1,
-          },
-        );
-        await drain();
-
-        expect(liveMembers()).toEqual(["p_missed"]);
-      });
-    });
   });
 
   describe("given an aggregate over Engineering's personal projects", () => {
@@ -255,7 +232,13 @@ describe("the reconciler keeps an aggregate's members current", () => {
 
         const again = await reconciler.reconcile({ aggregateProjectId: AGG });
 
-        expect(again).toEqual({ attached: [], revoked: [], unchanged: ["p_a", "p_b"], failed: [] });
+        expect(again).toEqual({
+          attached: [],
+          reattached: [],
+          revoked: [],
+          unchanged: ["p_a", "p_b"],
+          failed: [],
+        });
         expect(state.rows).toEqual(before);
         expect(grants.attachSharedProjectGrant).toHaveBeenCalledTimes(2);
       });

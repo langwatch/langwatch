@@ -4,12 +4,11 @@
  * @see specs/features/agent-testing/suites-rail.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Box } from "@langwatch/design-system/primitives";
+import { Text } from "@langwatch/design-system/primitives";
 import { FlaskConical, FolderCode, Plus, FolderPlus, Plug } from "lucide-react";
-
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 
 export type EmptyStateActionProps = {
   canManage: boolean;
@@ -30,7 +29,7 @@ export function ConnectAgentEmptyState({
   return (
     <NoDataInfoBlock
       testId="agent-testing-connect-agent-empty"
-      title="Setup agent"
+      title="Set up agent"
       description="Connect the agent you want to test. LangWatch plays your scenarios against it and a judge says whether each criterion was met."
       icon={<Plug size={24} />}
     >
@@ -40,7 +39,7 @@ export function ConnectAgentEmptyState({
           onClick={onConnectAgent}
           data-testid="agent-testing-connect-agent-setup"
         >
-          <Plug size={16} /> Setup agent
+          <Plug size={16} /> Set up agent
         </PageLayout.HeaderButton>
       )}
     </NoDataInfoBlock>
@@ -109,19 +108,11 @@ export function FirstCaseEmptyState({ canManage, onNewTestCase }: EmptyStateActi
  */
 export function NoCasesHereEmptyState() {
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      background="bg.panel"
-      paddingX={4}
-      paddingY={4}
-      fontSize="12px"
-      color={FG_MUTED}
-      data-testid="agent-testing-empty-suite"
-    >
-      Empty suite. Add a scenario, or move one here from another suite.
-    </Box>
+    <Card variant="panel" padding="md" data-testid="agent-testing-empty-suite">
+      <Text textStyle="caption" color="fg.muted">
+        Empty suite. Add a scenario, or move one here from another suite.
+      </Text>
+    </Card>
   );
 }
 

@@ -51,7 +51,7 @@ export function OrganizationSelect({ activeProductId }: { activeProductId: Produ
         maxWidth={ORG_NAME_MAX_WIDTH}
       >
         <Building2 size={13} aria-hidden style={NO_SHRINK} />
-        <Text fontSize="13px" fontWeight="medium" color="fg" truncate title={organization.name}>
+        <Text textStyle="label" fontWeight="medium" color="fg" truncate title={organization.name}>
           {organization.name}
         </Text>
       </HStack>
@@ -105,7 +105,7 @@ function OrganizationMenu({
         <Button
           variant="ghost"
           aria-label="Switch organization"
-          fontSize="13px"
+          textStyle="bodySm"
           fontWeight="normal"
           paddingX={2}
           height="32px"
@@ -124,7 +124,12 @@ function OrganizationMenu({
         <Menu.Content minWidth="220px" maxWidth="min(360px, 90vw)">
           <Menu.ItemGroup title="Organizations">
             {organizations.map((org) => (
-              <Menu.Item key={org.id} value={org.id} onClick={() => onSelect(org)} fontSize="13px">
+              <Menu.Item
+                key={org.id}
+                value={org.id}
+                onClick={() => onSelect(org)}
+                textStyle="bodySm"
+              >
                 <Text flex={1} minWidth={0} truncate title={org.name}>
                   {org.name}
                 </Text>

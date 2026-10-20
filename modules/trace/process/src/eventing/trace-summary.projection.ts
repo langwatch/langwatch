@@ -185,6 +185,8 @@ export class TraceSummaryFoldProjection
       models: [],
       totalCost: null,
       nonBilledCost: null,
+      unpricedSpanCount: 0,
+      unpricedModels: [],
       tokensEstimated: false,
       totalPromptTokenCount: null,
       totalCompletionTokenCount: null,
@@ -649,6 +651,7 @@ export class TraceSummaryFoldProjection
       outputSource: io.outputSource,
       inputIsFallback: io.inputIsFallback,
       outputIsFallback: io.outputIsFallback,
+      inputSpanStartTimeMs: io.inputSpanStartTimeMs,
       inputMediaRefs: io.inputMediaRefs,
       outputMediaRefs: io.outputMediaRefs,
     });

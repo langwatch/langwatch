@@ -1,5 +1,12 @@
 # Chakra UI Component Decision Tree
 
+> **Product components first.** This tree covers raw Chakra, for work inside `packages/design-system`.
+> Modules and apps choose from the design system instead (`design-system` skill and
+> `references/component-apis.md`): `Drawer`, `Dialog` and `Card` are callable shapes (a dialog
+> defaults to top placement, not centred); `Banner`/`Alert` for notices, `ScopeChipPicker`,
+> `ListPage` and `ListTable`, `ResourceTile`, `ActionRow` for footer buttons, `NoDataInfoBlock`
+> for empty states. Not every Chakra component below is exported by `/primitives`.
+
 When the user hasn't specified a component, choose the most appropriate one
 based on the guidelines below. Prefer an existing Chakra component over a custom
 implementation. Match the interaction model first, then the visual treatment.
@@ -279,7 +286,7 @@ specific primitive exists.
 - Use `FocusTrap` to constrain keyboard focus within a region (custom modals,
   custom drawers).
 - Use `Presence` to animate components on mount and unmount.
-- Use `Show` / `Hide` for responsive conditional rendering based on breakpoints.
+- Use `Show` for responsive conditional rendering based on breakpoints (there is no `Hide` in the installed Chakra: use the `hideFrom` / `hideBelow` style props).
 - Use `For` as a typed loop utility when rendering lists of components.
 - Use `ClientOnly` to prevent SSR hydration mismatches for browser-only content.
 - Use `FormatNumber` / `FormatByte` for locale-aware number and file-size

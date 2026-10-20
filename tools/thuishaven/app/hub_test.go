@@ -17,12 +17,13 @@ import (
 // --- fakes -------------------------------------------------------------------
 
 type fakeStore struct {
-	stacks     []domain.Stack
-	removed    []string
-	slugCache  map[string]string
-	dbActivity map[string]time.Time
-	selection  map[string]domain.Selection
-	touched    []string
+	waiterClaims []domain.SlotClaim
+	stacks       []domain.Stack
+	removed      []string
+	slugCache    map[string]string
+	dbActivity   map[string]time.Time
+	selection    map[string]domain.Selection
+	touched      []string
 
 	pressure           domain.PressureRecord
 	hasWrittenPressure bool
@@ -34,6 +35,20 @@ type fakeStore struct {
 	appendHistoryErr   error
 	prereqSkips        map[string]bool
 	containerPosture   string
+	machineSettings    domain.MachineSettings
+	focus              string
+}
+
+func (f *fakeStore) ReadFocus() string { return f.focus }
+func (f *fakeStore) WriteFocus(slug string) error {
+	f.focus = slug
+	return nil
+}
+
+func (f *fakeStore) ReadMachineSettings() domain.MachineSettings { return f.machineSettings }
+func (f *fakeStore) WriteMachineSettings(s domain.MachineSettings) error {
+	f.machineSettings = s
+	return nil
 }
 
 func (f *fakeStore) SaveStack(domain.Stack) error { return nil }
@@ -101,6 +116,7 @@ func (f *fakeStore) WritePressure(rec domain.PressureRecord) error {
 	f.pressure, f.hasWrittenPressure = rec, true
 	return nil
 }
+func (f *fakeStore) WaiterClaims(string) []domain.SlotClaim { return f.waiterClaims }
 func (f *fakeStore) ReadPressure() (domain.PressureRecord, bool) {
 	return f.pressure, f.hasWrittenPressure
 }
@@ -137,27 +153,19 @@ func (f *fakeStore) AppendRunHistory(rec domain.RunRecord) error {
 }
 func (f *fakeStore) RunHistory() []domain.RunRecord { return f.runHistory }
 
-// fakeClaudeSettings records what `haven self setup` asked to install.
-type fakeClaudeSettings struct {
-	root    string
-	command string
-}
-
-func (f *fakeClaudeSettings) EnsureHook(repoRoot, command string) (bool, error) {
-	f.root, f.command = repoRoot, command
-	return true, nil
-}
-
 type fakeSystem struct {
 	alive           map[int]bool
 	starts          map[int]string
 	terminated      []int
 	reloaded        []int
+	replanned       []int
+	nextPort        int // FreePorts counts up from it; 0 hands out zeros
 	groupTerminated []int
 	groupKilled     []int
 	pidsByPort      map[int][]int
 	now             time.Time
 	memStat         domain.MemStat
+	loadAverage     float64
 	demoted         []int
 	restored        []int
 	orphans         []int
@@ -166,6 +174,7 @@ type fakeSystem struct {
 	// matches every process on the machine and group-kills the result.
 	orphanMarker string
 	procSamples  []ProcessSample
+	cwds         map[int]string
 	killed       []int
 	totalMemory  uint64
 	portsInUse   map[int]bool
@@ -181,10 +190,19 @@ type spawnCall struct {
 	Dir  string
 }
 
-func (f *fakeSystem) FreePorts(n int) ([]int, error) { return make([]int, n), nil }
-func (f *fakeSystem) PortInUse(port int) bool        { return f.portsInUse[port] }
-func (f *fakeSystem) ProcessAlive(pid int) bool      { return f.alive[pid] }
-func (f *fakeSystem) ProcessStart(pid int) string    { return f.starts[pid] }
+func (f *fakeSystem) FreePorts(n int) ([]int, error) {
+	ports := make([]int, n)
+	for i := range ports {
+		if f.nextPort != 0 {
+			f.nextPort++
+			ports[i] = f.nextPort
+		}
+	}
+	return ports, nil
+}
+func (f *fakeSystem) PortInUse(port int) bool     { return f.portsInUse[port] }
+func (f *fakeSystem) ProcessAlive(pid int) bool   { return f.alive[pid] }
+func (f *fakeSystem) ProcessStart(pid int) string { return f.starts[pid] }
 func (f *fakeSystem) Terminate(pid int) {
 	f.terminated = append(f.terminated, pid)
 	// A terminated launcher dies with its process group; reflect that so the
@@ -194,6 +212,7 @@ func (f *fakeSystem) Terminate(pid int) {
 	}
 }
 func (f *fakeSystem) Reload(pid int)         { f.reloaded = append(f.reloaded, pid) }
+func (f *fakeSystem) Replan(pid int)         { f.replanned = append(f.replanned, pid) }
 func (f *fakeSystem) TerminateGroup(pid int) { f.groupTerminated = append(f.groupTerminated, pid) }
 func (f *fakeSystem) KillGroup(pid int) {
 	f.groupKilled = append(f.groupKilled, pid)
@@ -211,6 +230,7 @@ func (f *fakeSystem) Getpid() int             { return 1 }
 func (f *fakeSystem) TotalMemory() uint64     { return f.totalMemory }
 func (f *fakeSystem) GroupRSS(int) uint64     { return 0 }
 func (f *fakeSystem) MemStat() domain.MemStat { return f.memStat }
+func (f *fakeSystem) LoadAverage() float64    { return f.loadAverage }
 func (f *fakeSystem) DemoteGroup(pid int)     { f.demoted = append(f.demoted, pid) }
 func (f *fakeSystem) RestoreGroup(pid int)    { f.restored = append(f.restored, pid) }
 func (f *fakeSystem) OrphanedWorkers(marker string) []int {
@@ -219,6 +239,15 @@ func (f *fakeSystem) OrphanedWorkers(marker string) []int {
 }
 func (f *fakeSystem) ProcessSamples() []ProcessSample { return f.procSamples }
 func (f *fakeSystem) Kill(pid int)                    { f.killed = append(f.killed, pid) }
+func (f *fakeSystem) ProcessCwds(pids []int) map[int]string {
+	out := map[int]string{}
+	for _, pid := range pids {
+		if dir, ok := f.cwds[pid]; ok {
+			out[pid] = dir
+		}
+	}
+	return out
+}
 
 // fakeProxy is safe for concurrent calls: provision and teardown route in parallel.
 type fakeProxy struct {
@@ -246,6 +275,38 @@ type fakeDBServer struct {
 	mu        sync.Mutex // guards dropped: the bulk delete drops concurrently
 	dropped   []string
 	dropErr   error // when set, DropDatabase records the attempt then fails
+	// access and weights record EnsureStackAccess and SetStackWeight; accessErr
+	// and weightErr fail them.
+	access    map[string]string
+	weights   map[string]int
+	accessErr error
+	weightErr error
+}
+
+func (f *fakeDBServer) EnsureStackAccess(_ context.Context, db, password string) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.accessErr != nil {
+		return f.accessErr
+	}
+	if f.access == nil {
+		f.access = map[string]string{}
+	}
+	f.access[db] = password
+	return nil
+}
+
+func (f *fakeDBServer) SetStackWeight(_ context.Context, db string, weight int) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	if f.weightErr != nil {
+		return f.weightErr
+	}
+	if f.weights == nil {
+		f.weights = map[string]int{}
+	}
+	f.weights[db] = weight
+	return nil
 }
 
 func (f *fakeDBServer) Ensure(context.Context) (int, error)               { return 1, nil }
@@ -326,7 +387,7 @@ func (f *fakeHygiene) MergedIntoMain(dir, _ string) bool { return f.mergedDirs[d
 
 // LastTouched is the directory's own mtime. The fake keeps a separate map so a
 // test can make a worktree's HEAD look ancient while the directory is fresh —
-// the exact shape a diff drive has, and the one the temporary rule must survive.
+// the exact shape a scratch worktree at an old ref has, and the one the temporary rule must survive.
 func (f *fakeHygiene) LastTouched(dir string) (time.Time, bool) {
 	if f.lastTouched == nil {
 		return f.LastActivity(dir)

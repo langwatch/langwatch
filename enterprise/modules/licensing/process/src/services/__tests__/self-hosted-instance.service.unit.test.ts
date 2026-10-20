@@ -84,6 +84,49 @@ function report(overrides: Partial<IncomingUsageReport> = {}): IncomingUsageRepo
   };
 }
 
+/** Writes a row straight into the registry, first seen and last seen where asked. */
+async function place(
+  repository: MemorySelfHostedInstanceRepository,
+  {
+    instanceId,
+    firstSeenDaysAgo = 0,
+    lastSeenDaysAgo = 0,
+    traces,
+    organizationId = null,
+    signals = [],
+    version = "3.4.0",
+  }: {
+    instanceId: string;
+    firstSeenDaysAgo?: number;
+    lastSeenDaysAgo?: number;
+    traces?: number;
+    organizationId?: string | null;
+    signals?: string[];
+    version?: string;
+  },
+) {
+  const row = {
+    instanceId,
+    version,
+    installMethod: "helm",
+    chartVersion: null,
+    hostname: null,
+    environment: null,
+    installedAt: null,
+    reportSchemaVersion: 2,
+    organizationId,
+    issuedLicenseId: null,
+    userEmailDomains: null,
+    latestReport: traces === undefined ? {} : { traces_28d: traces },
+    optionalMetricsReported: true,
+    hostnameReported: false,
+    lastUnknownFields: 0,
+    raisedSignals: signals,
+  };
+  await repository.upsert({ ...row, lastSeenAt: NOW.subtract({ hours: 24 * firstSeenDaysAgo }) });
+  await repository.upsert({ ...row, lastSeenAt: NOW.subtract({ hours: 24 * lastSeenDaysAgo }) });
+}
+
 async function bindLicense(licenses: MemoryIssuedLicenseRepository) {
   const row = await licenses.create({
     licenseId: "lic-1",
@@ -94,6 +137,7 @@ async function bindLicense(licenses: MemoryIssuedLicenseRepository) {
     planType: "ENTERPRISE",
     maxMembers: 50,
     maxMembersLite: 0,
+    liteSeatsUnlimited: false,
     issuedAt: NOW.subtract({ hours: 24 * 300 }),
     expiresAt: NOW.add({ hours: 24 * 30 }),
     source: "BACKOFFICE",
@@ -210,6 +254,105 @@ describe("SelfHostedInstanceService", () => {
       const byDomain = await service.list({ page: 0, pageSize: 10, search: "acme.com" });
       expect(byHost.instances.map((row) => row.instanceId)).toEqual(["instance-1"]);
       expect(byDomain.instances.map((row) => row.instanceId)).toEqual(["instance-1"]);
+    });
+
+    /** @scenario "An operator sorts installs by when they first appeared or by how much they use" */
+    it("sorts by newest arrival and by traces, with an install that reported none last", async () => {
+      const { service, repository } = registry();
+      await place(repository, { instanceId: "old-busy", firstSeenDaysAgo: 60, traces: 9000 });
+      await place(repository, { instanceId: "new-light", firstSeenDaysAgo: 1, traces: 10 });
+      await place(repository, { instanceId: "mid-none", firstSeenDaysAgo: 20 });
+
+      const newest = await service.list({ page: 0, pageSize: 10, sort: "newest" });
+      const busiest = await service.list({ page: 0, pageSize: 10, sort: "traces_28d" });
+
+      expect(newest.instances.map((row) => row.instanceId)).toEqual([
+        "new-light",
+        "mid-none",
+        "old-busy",
+      ]);
+      expect(busiest.instances.map((row) => row.instanceId)).toEqual([
+        "old-busy",
+        "new-light",
+        "mid-none",
+      ]);
+    });
+
+    /** @scenario "An operator narrows the list by license, activity or raised signal" */
+    it("keeps only the installs that match the licence, activity and signal asked for", async () => {
+      const { service, repository } = registry();
+      await place(repository, {
+        instanceId: "licensed",
+        organizationId: "org-1",
+        signals: ["sustained_ingestion"],
+      });
+      await place(repository, { instanceId: "open", signals: ["sustained_ingestion"] });
+      await place(repository, { instanceId: "quiet", lastSeenDaysAgo: 5 });
+      const ids = async (filters: Parameters<typeof service.list>[0]) =>
+        (await service.list(filters)).instances.map((row) => row.instanceId).toSorted();
+
+      await expect(ids({ page: 0, pageSize: 10, license: "open_source" })).resolves.toEqual([
+        "open",
+        "quiet",
+      ]);
+      await expect(ids({ page: 0, pageSize: 10, activity: "reporting" })).resolves.toEqual([
+        "licensed",
+        "open",
+      ]);
+      await expect(ids({ page: 0, pageSize: 10, activity: "quiet" })).resolves.toEqual(["quiet"]);
+      await expect(ids({ page: 0, pageSize: 10, signal: "sustained_ingestion" })).resolves.toEqual([
+        "licensed",
+        "open",
+      ]);
+    });
+
+    /** @scenario "The summary counts installs by activity, license, arrival and signal" */
+    it("counts states, licences, arrivals per week, signals, the busiest open source and releases", async () => {
+      const { service, repository } = registry();
+      await place(repository, {
+        instanceId: "busy-open",
+        firstSeenDaysAgo: 3,
+        traces: 7000,
+        signals: ["sustained_ingestion"],
+        version: "3.20.1",
+      });
+      await place(repository, {
+        instanceId: "licensed",
+        firstSeenDaysAgo: 20,
+        traces: 100,
+        organizationId: "org-1",
+        version: "3.20.1",
+      });
+      await place(repository, { instanceId: "idle-open", firstSeenDaysAgo: 40, traces: 0 });
+      await place(repository, {
+        instanceId: "quiet",
+        firstSeenDaysAgo: 50,
+        lastSeenDaysAgo: 5,
+        version: "3.20.1",
+      });
+      await place(repository, { instanceId: "gone", firstSeenDaysAgo: 200, lastSeenDaysAgo: 30 });
+
+      const summary = await service.summarize();
+
+      expect(summary).toMatchObject({
+        total: 5,
+        reporting: 3,
+        quiet: 1,
+        gone: 1,
+        licensed: 1,
+        newLast7Days: 1,
+        newLast30Days: 2,
+        traces28d: 7100,
+        signals: [{ signal: "sustained_ingestion", count: 1 }],
+        releases: [
+          { version: "3.20.1", count: 3 },
+          { version: "3.4.0", count: 1 },
+        ],
+      });
+      expect(summary.newPerWeek).toHaveLength(12);
+      expect(summary.newPerWeek.reduce((sum, week) => sum + week.count, 0)).toBe(4);
+      expect(summary.newPerWeek.at(-1)?.count).toBe(1);
+      expect(summary.busiestOpenSource.map((row) => row.instanceId)).toEqual(["busy-open"]);
     });
 
     it("refuses an unknown row by code", async () => {

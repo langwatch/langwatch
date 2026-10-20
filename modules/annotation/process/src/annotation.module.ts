@@ -6,7 +6,6 @@ import { AnnotationModule } from "#app/annotation.app";
 import { annotationLifecycleEventing } from "#eventing/annotation-lifecycle.pipeline";
 import { annotationRepositories } from "#repositories/annotation-repositories.registry";
 import { AnnotationTraceBackfillService } from "#services/annotation-trace-backfill.service";
-import { AnnotationTraceBackfillTask } from "#tasks/annotation-trace-backfill.task";
 import { annotationScoreTrpcTransport } from "#transport/annotation-score.trpc";
 import { annotationRest } from "#transport/annotation.rest";
 import { annotationTrpcTransport } from "#transport/annotation.trpc";
@@ -48,13 +47,5 @@ export const annotationProcessModule: PublishedProcessModule<"annotation", Annot
           });
           return { ...report, dryRun };
         },
-      }),
-    ])
-    .withTasks(({ app, dependencies }) => [
-      AnnotationTraceBackfillTask.create({
-        annotations: app,
-        traces: dependencies.traces,
-        projects: dependencies.projects,
-        organizations: dependencies.organizations,
       }),
     ]);

@@ -151,15 +151,18 @@ Feature: Online Evaluation Drawer
   Scenario: Cannot save without evaluator
     Given the online evaluation drawer is open
     And no evaluator is selected
-    Then the Save button should be disabled
-    And a message should indicate "Select an evaluator to continue"
+    When I press Save
+    Then a message should indicate "Select an evaluator."
+    And nothing is saved
 
   @unimplemented
   Scenario: Cannot save without name
     Given the online evaluation drawer is open
     And an evaluator is selected
     But the name field is empty
-    Then the Save button should be disabled
+    When I press Save
+    Then a message should indicate "Enter a name for this online evaluation."
+    And nothing is saved
 
   @unimplemented
   Scenario: Clear selected evaluator
@@ -167,4 +170,4 @@ Feature: Online Evaluation Drawer
     When I click the X button on the evaluator box
     Then the evaluator should be removed
     And the box should show "Select Evaluator"
-    And the Save button should be disabled
+    And pressing Save says "Select an evaluator."

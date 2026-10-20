@@ -57,7 +57,6 @@ export const upgradeRunSchema = z.object({
   id: z.string(),
   kind: upgradeRunKindSchema,
   release: z.string().nullable(),
-  floor: z.string().nullable(),
   startedAt: z.date(),
   finishedAt: z.date().nullable(),
   outcome: upgradeRunOutcomeSchema.nullable(),

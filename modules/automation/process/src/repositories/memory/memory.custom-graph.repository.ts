@@ -13,7 +13,7 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
   }
 
   findById(input: { customGraphId: string; projectId: string }): Promise<CustomGraph | null> {
-    const row = this.memory.customGraphs.find(
+    const row = this.reachable().find(
       (graph) => graph.id === input.customGraphId && graph.projectId === input.projectId,
     );
     return Promise.resolve(row ?? null);
@@ -28,7 +28,7 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
     projectId: string;
   }): Promise<CustomGraphNameRef[]> {
     return Promise.resolve(
-      this.memory.customGraphs
+      this.reachable()
         .filter(
           (graph) => graph.projectId === input.projectId && input.customGraphIds.includes(graph.id),
         )
@@ -39,9 +39,17 @@ export class MemoryCustomGraphRepository extends CustomGraphRepository {
   /** Every panel on one dashboard, in the order it was added to the store. */
   findAllByDashboardId(input: { dashboardId: string; projectId: string }): Promise<CustomGraph[]> {
     return Promise.resolve(
-      this.memory.customGraphs.filter(
+      this.reachable().filter(
         (graph) => graph.projectId === input.projectId && graph.dashboardId === input.dashboardId,
       ),
+    );
+  }
+
+  /** Every graph but those on an Only me board, which automation reads as not there. */
+  private reachable() {
+    const hidden = this.memory.privateDashboardIds;
+    return this.memory.customGraphs.filter(
+      (graph) => graph.dashboardId === null || !hidden.has(graph.dashboardId),
     );
   }
 }

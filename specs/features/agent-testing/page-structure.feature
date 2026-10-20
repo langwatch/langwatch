@@ -5,7 +5,7 @@ Feature: The Agent Testing page
 
   Background: the shape of the page.
     Agent Testing is one page behind a release flag. Its header holds the page
-    title on the left and the tabs in the middle, on one line. The content of
+    title on the far left and the tabs in the middle, on one line. The content of
     the selected tab starts directly under that line. With a run plan open the
     title reads the name of that plan instead.
 
@@ -29,6 +29,12 @@ Feature: The Agent Testing page
     Given the Agent Testing release flag is on
     When the Agent Testing address is opened
     Then the page is shown with its header and its tabs
+
+  @integration
+  Scenario: While the flag is still being read the page shows it is loading
+    Given the Agent Testing release flag has not been read yet
+    When the Agent Testing address is opened
+    Then a loading screen is shown, never an empty page
 
   @integration
   Scenario: With the flag on the main menu shows one Agent Testing item
@@ -82,7 +88,7 @@ Feature: The Agent Testing page
   Scenario: The header holds the title and the tabs on one line
     Given the Agent Testing page is open
     When the header is read
-    Then the selected suite name, or "Results" on the results tab, is on the far left
+    Then "Agent Testing" is on the far left
     And the tabs "Scenarios" and "Results" are in the middle
     And the header spans the full width of the page
 
@@ -94,7 +100,7 @@ Feature: The Agent Testing page
     And what the plan is reads small and muted beside it
     And the tabs are still in the middle
     When the plan is left
-    Then "Results" is on the far left again
+    Then "Agent Testing" is on the far left again
 
   @integration
   Scenario: A long run plan name stays on one line
@@ -144,14 +150,14 @@ Feature: The Agent Testing page
     Given the Agent Testing page is open on a wide window
     When the scenarios and the results are read one after the other
     Then the content of each is held to one readable column
-    And the column is centred on the whole page, not on the space beside the rail
-    And the column does not move when the tab changes
+    And the column is centred in the space beside the rail
+    And no blank strip is reserved on the right
 
   @integration
   Scenario: A surface with no rail takes the width the rail would have used
     Given the Agent Testing page is open on the Results tab
     Then the list of run plans reserves no space for a rail
-    And it is centred on the whole page
+    And it is centred on the page
     And it is held to a wider column than a surface that has a rail beside it
 
   # --- Addresses ---

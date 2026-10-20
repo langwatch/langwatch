@@ -141,7 +141,7 @@ const Row: React.FC<{ label: string; value: string; mono?: boolean }> = ({
     paddingY={0.5}
     _notLast={{ borderBottomWidth: "1px", borderColor: "border.subtle" }}
   >
-    <Text textStyle="2xs" color="fg.muted" fontWeight="500" width="32px" flexShrink={0}>
+    <Text textStyle="2xs" color="fg.muted" fontWeight="medium" width="32px" flexShrink={0}>
       {label}
     </Text>
     <Text textStyle="xs" color="fg" fontFamily={mono ? "mono" : undefined} lineHeight="1.6">

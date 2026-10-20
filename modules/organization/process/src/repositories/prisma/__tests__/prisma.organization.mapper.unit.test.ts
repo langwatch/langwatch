@@ -44,8 +44,12 @@ describe("organizationFromRecord", () => {
     const organization = organizationFromRecord({
       id: "organization_1",
       name: "Acme",
+      kind: "customer",
       phoneNumber: null,
       slug: "acme",
+      privateClickHouseLabel: null,
+      privateS3Label: null,
+      privateDataplaneSeenAt: null,
       createdAt: at,
       updatedAt: at,
       usageSpendingMaxLimit: null,

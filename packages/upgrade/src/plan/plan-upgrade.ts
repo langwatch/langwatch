@@ -3,7 +3,7 @@ import { z } from "zod";
 
 import type { UpgradeStep } from "../ledger.ts";
 import { compareReleases, releaseVersionSchema, SCHEMA_STEP_KINDS } from "../manifest/manifest.ts";
-import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 
 /** One release the upgrade steps through; the virtual one (no version) holds unreleased steps. */
 export const plannedReleaseSchema = z.object({
@@ -16,23 +16,12 @@ export const plannedReleaseSchema = z.object({
 });
 export type PlannedRelease = z.infer<typeof plannedReleaseSchema>;
 
-export const upgradeRefusalCodeSchema = z.enum(["below_lts_floor", "image_below_ledger_floor"]);
-export type UpgradeRefusalCode = z.infer<typeof upgradeRefusalCodeSchema>;
-
-export const upgradePlanSchema = z.discriminatedUnion("outcome", [
-  z.object({
-    outcome: z.literal("planned"),
-    fresh: z.boolean(),
-    releases: z.array(plannedReleaseSchema),
-    notNeeded: z.array(z.string()),
-  }),
-  z.object({
-    outcome: z.literal("refused"),
-    code: upgradeRefusalCodeSchema,
-    stopAt: releaseVersionSchema.nullable(),
-    message: z.string(),
-  }),
-]);
+export const upgradePlanSchema = z.object({
+  outcome: z.literal("planned"),
+  fresh: z.boolean(),
+  releases: z.array(plannedReleaseSchema),
+  notNeeded: z.array(z.string()),
+});
 export type UpgradePlan = z.infer<typeof upgradePlanSchema>;
 
 /** The kinds a fresh install has nothing to move for (rethink 6.4). */
@@ -63,44 +52,21 @@ function plannedRelease({
 }
 
 /**
- * Plans an upgrade from the ledger and the shipped manifests (rethink 6.4, blitz 3.2): refusals
- * first, then release by release, then unreleased steps as one virtual release. Settled steps are
- * left out; specs/upgrade/release-manifests.feature is the behaviour.
+ * Plans from the ledger and the manifests (rethink 6.4): each release above
+ * `installed` or with a schema or blocking step open, then unreleased steps as one virtual one.
+ * Specs: specs/upgrade/release-manifests.feature, packages/upgrade/specs/unfinished-steps.feature.
  */
 export function planUpgrade({
   installed,
   image,
-  floor,
   manifests,
   ledger,
 }: {
   installed: string | null;
   image: { release: string | null; steps: readonly ManifestStep[] };
-  floor: LtsFloor;
   manifests: readonly ReleaseManifest[];
-  ledger: { floor: string | null; steps: readonly Pick<UpgradeStep, "id" | "status">[] };
+  ledger: { steps: readonly Pick<UpgradeStep, "id" | "status">[] };
 }): UpgradePlan {
-  if (
-    image.release &&
-    ledger.floor &&
-    compareReleases({ left: image.release, right: ledger.floor }) < 0
-  ) {
-    return {
-      outcome: "refused",
-      code: "image_below_ledger_floor",
-      stopAt: null,
-      message: `this image is ${image.release}; the database was upgraded with LTS floor ${ledger.floor}, so it needs an image of ${ledger.floor} or newer`,
-    };
-  }
-  if (installed && compareReleases({ left: installed, right: floor.release }) < 0) {
-    return {
-      outcome: "refused",
-      code: "below_lts_floor",
-      stopAt: floor.release,
-      message: `this installation is on ${installed}; upgrade to ${floor.release} (LTS) first, then to this image`,
-    };
-  }
-
   const settled = new Set(
     ledger.steps
       .filter((step) => step.status === "done" || step.status === "not-needed")
@@ -129,8 +95,14 @@ export function planUpgrade({
     };
   }
 
+  const gating = (step: ManifestStep) =>
+    SCHEMA_STEP_KINDS.has(step.kind) || step.mode === "blocking";
   const releases = shipped
-    .filter((manifest) => compareReleases({ left: manifest.release, right: installed }) > 0)
+    .filter(
+      (manifest) =>
+        compareReleases({ left: manifest.release, right: installed }) > 0 ||
+        open(manifest.steps).some(gating),
+    )
     .map((manifest) => plannedRelease({ release: manifest.release, steps: open(manifest.steps) }));
   const pendingUnreleased = open(unreleased);
   if (pendingUnreleased.length > 0) {
@@ -188,70 +160,4 @@ export function orderAfter({
   };
   for (const step of steps) visit(step.id);
   return ordered;
-}
-
-/** A step and, ahead of it, every unsettled step it runs after that no earlier release ran. */
-function pullDue({
-  id,
-  after,
-  skip,
-  due,
-}: {
-  id: string;
-  after: ReadonlyMap<string, readonly string[]>;
-  skip: (id: string) => boolean;
-  due: Set<string>;
-}): void {
-  if (skip(id) || due.has(id)) return;
-  due.add(id);
-  for (const named of after.get(id) ?? []) pullDue({ id: named, after, skip, due });
-}
-
-/**
- * Before a contract's release, every unfinished background step an earlier release shipped runs
- * inline (UPGRADE-FIXES), and so does each step a contract's `-- after:` note names (STEP-AFTER-2);
- * each runs after every step it names, released or not (STEP-AFTER). Per planned release, the ids.
- */
-export function inlineBeforeContracts({
-  releases,
-  contracts,
-  background,
-  settled,
-}: {
-  releases: readonly Pick<PlannedRelease, "release" | "schema">[];
-  contracts: ReadonlyMap<string, readonly string[]>;
-  background: readonly (OrderedStep & { release: string | null })[];
-  settled: ReadonlySet<string>;
-}): string[][] {
-  const order = orderAfter({ steps: background, settled });
-  const after = new Map(background.map((step) => [step.id, step.after ?? []]));
-  for (const [contract, named] of contracts) {
-    const unknown = named.find((id) => !after.has(id));
-    if (unknown) {
-      throw new StepOrderError({
-        code: "step_after_unknown",
-        message: `contract step ${contract} runs after ${unknown}, which is not a background code step of this image`,
-      });
-    }
-  }
-  const inlined = new Set<string>();
-  const skip = (id: string) => settled.has(id) || inlined.has(id);
-  return releases.map(({ release, schema }) => {
-    const held = schema.filter((id) => contracts.has(id));
-    if (held.length === 0) return [];
-    const due = new Set<string>();
-    for (const step of background.filter((each) => releasedBefore(each.release, release))) {
-      pullDue({ id: step.id, after, skip, due });
-    }
-    for (const id of held.flatMap((contract) => contracts.get(contract) ?? [])) {
-      pullDue({ id, after, skip, due });
-    }
-    for (const id of due) inlined.add(id);
-    return order.filter((id) => due.has(id));
-  });
-}
-
-function releasedBefore(left: string | null, right: string | null): boolean {
-  if (left === null) return false;
-  return right === null || compareReleases({ left, right }) < 0;
 }

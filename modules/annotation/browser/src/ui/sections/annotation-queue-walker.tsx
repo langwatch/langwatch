@@ -4,7 +4,8 @@
  * Behaviour is main's my-queue page; see modules/annotation/specs.
  */
 
-import { Alert, Box, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { useCallback, useEffect, useMemo, useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
@@ -308,9 +309,15 @@ function WalkedItemBody({
 /** The scope is resolving or the first step is in flight: nothing is said of the queue yet. */
 function QueueLoadingState() {
   return (
-    <VStack height="100%" width="full" justify="center" gap={3} aria-busy>
-      <Spinner />
-      <Text color="fg.muted">Loading your queue</Text>
+    <VStack
+      height="100%"
+      width="full"
+      justify="center"
+      padding={6}
+      aria-busy
+      aria-label="Loading your queue"
+    >
+      <SkeletonRows rows={4} />
     </VStack>
   );
 }
@@ -336,9 +343,7 @@ function QueueReadFailedState() {
 function ScopeUnavailableState() {
   return (
     <VStack height="100%" width="full" justify="center" gap={2} paddingX={6} textAlign="center">
-      <Text fontSize="lg" fontWeight="500">
-        This project is not available
-      </Text>
+      <Text textStyle="sectionTitle">This project is not available</Text>
       <Text color="fg.muted" maxWidth="480px">
         Your queue cannot be opened because this project could not be loaded. Check that you still
         have access to it, or choose another project.

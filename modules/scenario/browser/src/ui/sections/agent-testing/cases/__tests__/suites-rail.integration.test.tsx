@@ -200,8 +200,8 @@ describe("the test suites rail", () => {
       externalSets: [{ setId: "nightly-ci", lastRunTimestamp: 1 }],
     });
 
-    expect(screen.getByText("Agent Testing")).toBeInTheDocument();
-    expect(screen.getByText("From Code")).toBeInTheDocument();
+    expect(screen.getByText("Test suites")).toBeInTheDocument();
+    expect(screen.getByText("From code")).toBeInTheDocument();
     expect(railEntries()).toEqual([
       "suite-rail-item-Refunds",
       "suite-rail-item-Checkout",
@@ -225,8 +225,8 @@ describe("the test suites rail", () => {
     expect(screen.queryByTestId("suite-rail-item-All scenarios")).not.toBeInTheDocument();
     expect(screen.queryByText("All scenarios")).not.toBeInTheDocument();
     // The headings are plain labels: their destination is gone.
-    expect(screen.getByText("Agent Testing").tagName).not.toBe("BUTTON");
-    expect(screen.getByText("From Code").tagName).not.toBe("BUTTON");
+    expect(screen.getByText("Test suites").tagName).not.toBe("BUTTON");
+    expect(screen.getByText("From code").tagName).not.toBe("BUTTON");
   });
 
   /** @scenario "The Default suite is listed first" */
@@ -308,7 +308,7 @@ describe("the test suites rail", () => {
   it("hides the From Code heading when the project has none", () => {
     renderRail({ externalSets: [] });
 
-    expect(screen.queryByText("From Code")).not.toBeInTheDocument();
+    expect(screen.queryByText("From code")).not.toBeInTheDocument();
   });
 
   /** @scenario "The rail offers to create a test suite" */
@@ -316,7 +316,7 @@ describe("the test suites rail", () => {
     const user = userEvent.setup();
     const { props, view } = renderRail({ suites: [] });
 
-    await user.click(screen.getByRole("button", { name: "New Test Suite" }));
+    await user.click(screen.getByRole("button", { name: "New test suite" }));
     expect(props.onNewSuite).toHaveBeenCalled();
 
     view.rerender(<SuiteRail {...props} suites={[makeSuite()]} />);
@@ -453,7 +453,7 @@ describe("the test suites rail", () => {
 
     const items = (await screen.findAllByRole("menuitem")).map((item) => item.textContent);
     expect(items).toEqual(["Open recent runs"]);
-    expect(screen.queryByRole("button", { name: "New Test Suite" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "New test suite" })).not.toBeInTheDocument();
   });
 
   // --- Selection ---
@@ -618,8 +618,8 @@ describe("the test suites rail", () => {
     expect(screen.getByText("Last 1 year")).toBeInTheDocument();
     // A free start and end date, so windows older than thirty days can be
     // read too.
-    expect(screen.getByLabelText("Start Date")).toBeInTheDocument();
-    expect(screen.getByLabelText("End Date")).toBeInTheDocument();
+    expect(screen.getByLabelText("Start date")).toBeInTheDocument();
+    expect(screen.getByLabelText("End date")).toBeInTheDocument();
     expect(screen.queryByText(/cold storage/i)).not.toBeInTheDocument();
   });
 
@@ -629,7 +629,7 @@ describe("the test suites rail", () => {
     const { props } = renderRail();
 
     await user.click(screen.getByTestId("results-period-picker"));
-    fireEvent.change(await screen.findByLabelText("Start Date"), {
+    fireEvent.change(await screen.findByLabelText("Start date"), {
       target: { value: "2026-01-15T09:30" },
     });
 

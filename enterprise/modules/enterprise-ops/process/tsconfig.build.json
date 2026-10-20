@@ -24,25 +24,33 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
+      "path": "../../../../packages/process/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/ops/contract/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/process/tsconfig.build.json"
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/audit-log/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/module",
+        "@langwatch/process-stores",
+        "@langwatch/test-harness",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

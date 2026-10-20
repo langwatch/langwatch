@@ -23,34 +23,29 @@
  * connection or let a duplicate through — both worse than asking again.
  */
 
-import {
-  createSsrfUrlValidator,
-  fetchValidatedDestination,
-  type FencedFetchOptions,
-} from "@langwatch/egress";
 import { createLogger } from "@langwatch/observability";
 
 import { credentialsOf } from "../../features/ingestion-pull/rules/ingestion-credentials.rules.ts";
+import {
+  exemptOriginsOf,
+  REAL_VENDOR_BASES,
+  type VendorBases,
+} from "../../rules/vendor-bases.rules.ts";
 import { ProviderAccountChannel } from "../provider-account.channel.ts";
+import { createSsrfSafeFetch } from "./http.governance-http.channel.ts";
 
 const logger = createLogger("langwatch:governance:provider-account-lookup");
 
-const ANTHROPIC_ORGANIZATION_URL = "https://api.anthropic.com/v1/organizations/me";
+const ANTHROPIC_ORGANIZATION_PATH = "/v1/organizations/me";
 const ANTHROPIC_VERSION = "2023-06-01";
 
-const OPENAI_PROJECTS_URL = "https://api.openai.com/v1/organization/projects?limit=1";
+const OPENAI_PROJECTS_PATH = "/v1/organization/projects?limit=1";
 /** OpenAI names the billed organisation on every response in this header. */
 const OPENAI_ORGANIZATION_HEADER = "openai-organization";
 
 const REQUEST_TIMEOUT_MS = 15_000;
 
-const validateDestination = createSsrfUrlValidator({ blockLocal: true, allowedHosts: [] });
-
-async function ssrfSafeFetch(url: string, init: FencedFetchOptions) {
-  return fetchValidatedDestination(await validateDestination(url), init, {
-    rejectUnauthorized: true,
-  });
-}
+type AccountFetch = ReturnType<typeof createSsrfSafeFetch>;
 
 /** The administrator key on a config, whether this save sent it or carried the stored one. */
 function readAdminKey(parserConfig: Record<string, unknown>): string {
@@ -62,8 +57,16 @@ function readAdminKey(parserConfig: Record<string, unknown>): string {
   return token;
 }
 
-async function readAnthropicAccount(apiKey: string): Promise<string> {
-  const response = await ssrfSafeFetch(ANTHROPIC_ORGANIZATION_URL, {
+async function readAnthropicAccount({
+  apiKey,
+  fetch,
+  base,
+}: {
+  apiKey: string;
+  fetch: AccountFetch;
+  base: string;
+}): Promise<string> {
+  const response = await fetch(`${base}${ANTHROPIC_ORGANIZATION_PATH}`, {
     method: "GET",
     headers: {
       "x-api-key": apiKey,
@@ -88,8 +91,16 @@ async function readAnthropicAccount(apiKey: string): Promise<string> {
   return id;
 }
 
-async function readOpenAiAccount(apiKey: string): Promise<string> {
-  const response = await ssrfSafeFetch(OPENAI_PROJECTS_URL, {
+async function readOpenAiAccount({
+  apiKey,
+  fetch,
+  base,
+}: {
+  apiKey: string;
+  fetch: AccountFetch;
+  base: string;
+}): Promise<string> {
+  const response = await fetch(`${base}${OPENAI_PROJECTS_PATH}`, {
     method: "GET",
     headers: {
       Authorization: `Bearer ${apiKey}`,
@@ -117,12 +128,22 @@ async function readOpenAiAccount(apiKey: string): Promise<string> {
  * or a response body, and losing the cause entirely is the other failure.
  */
 export class HttpProviderAccountChannel extends ProviderAccountChannel {
-  private constructor() {
+  private constructor(
+    private readonly fetch: AccountFetch,
+    private readonly bases: VendorBases,
+  ) {
     super();
   }
 
-  static create(): HttpProviderAccountChannel {
-    return new HttpProviderAccountChannel();
+  /** The strict fence, with a configured vendor base the one local origin it lets through. */
+  static create({
+    vendorBases = REAL_VENDOR_BASES,
+  }: { vendorBases?: VendorBases } = {}): HttpProviderAccountChannel {
+    const fetch = createSsrfSafeFetch(
+      { blockLocal: true, allowedHosts: [] },
+      { exemptOrigins: exemptOriginsOf({ bases: vendorBases }) },
+    );
+    return new HttpProviderAccountChannel(fetch, vendorBases);
   }
 
   async getAccountId({
@@ -135,10 +156,18 @@ export class HttpProviderAccountChannel extends ProviderAccountChannel {
     try {
       const apiKey = readAdminKey(parserConfig);
       if (sourceType === "anthropic_admin") {
-        return await readAnthropicAccount(apiKey);
+        return await readAnthropicAccount({
+          apiKey,
+          fetch: this.fetch,
+          base: this.bases.anthropicAdmin,
+        });
       }
       if (sourceType === "openai_admin") {
-        return await readOpenAiAccount(apiKey);
+        return await readOpenAiAccount({
+          apiKey,
+          fetch: this.fetch,
+          base: this.bases.openAiAdmin,
+        });
       }
       throw new Error(`no account read is published for ${sourceType}`);
     } catch (error) {

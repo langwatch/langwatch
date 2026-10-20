@@ -11,102 +11,71 @@ Feature: Entitlement's meters, decisions and who learns them
   Background:
     Given an organization with two projects on a plan capped at 1,000 traces a month
 
-  # --- The trace meter ---------------------------------------------------------
+  # --- Trace usage -------------------------------------------------------------
+  # Ruling (Alex, 2026-10-11): trace usage is the number of distinct trace ids per project per
+  # month. Entitlement writes one row per trace and month keyed so that writing the same trace
+  # twice collapses. Live rows come from trace's span-received event, one debounced job per trace;
+  # trace's upgrade step sends this month's trace ids as events. Entitlement never asks trace.
 
   @unit @usage
-  Scenario: The trace meter counts each trace once a month however many spans it has
-    Given three spans of one trace and one span of another arrive for a project this month
+  Scenario: A trace's spans settle into one job per trace
+    When the usage pipeline registers its trace usage subscriber on trace's span-received event
+    Then its jobs are grouped per project and trace and debounced for 30 seconds
+    And the job keeps the window's first span
+
+  @unit @usage
+  Scenario: A trace's span writes one usage row for its project and month
+    Given a span of a trace in a project
+    When the span-received job runs
+    Then one row names the organization, the project, the month the span was appended and the trace
+
+  @unit @usage
+  Scenario: The upgrade's trace ids write one row per trace
+    Given trace's upgrade sends a page of a project's trace ids for a month
+    When the page is delivered
+    Then one row is written per trace id for that project and month
+
+  @unit @usage
+  Scenario: The month counts distinct traces, however often each was written
+    Given the same trace written by live jobs, a redelivery and the upgrade's page
     When the month's trace count is read for the organization
-    Then the count is 2
+    Then each trace counts once
 
   @unit @usage
-  Scenario: A replayed span does not count its trace twice
-    Given a span of a trace was metered this month
-    When the same span_received event is delivered again
-    Then the month's trace count is unchanged
+  Scenario: A trace counts in the first month it was seen
+    Given a trace seen last month and again this month, and a trace first seen this month
+    When this month's trace count is read
+    Then only the trace first seen this month counts
 
   @unit @usage
-  Scenario: A trace counts in the month its first span arrived
-    Given a trace whose first span arrived on the last day of last month
-    And whose second span arrived on the first day of this month
-    When last month's and this month's trace counts are read
-    Then the trace counts in last month and not in this month
-
-  @unit @usage
-  Scenario: The month's count reads only the organization's own projects
-    Given another organization's project sent traces this month
-    When the month's trace count is read for the organization
-    Then the other organization's traces are not counted
-
-  @unit @usage
-  Scenario: A span from a project in no organization is skipped, loudly
+  Scenario: A trace from a project in no organization is skipped, loudly
     Given a project that belongs to no organization
-    When a span arrives for it
-    Then no trace meter row is written
+    When a trace usage job runs for it
+    Then no row is written
     And a warning is logged naming the project
 
-  # Round 22 (2026-10-07): meter everywhere; the billable-events meter stays SaaS only.
+  # Round 22 (2026-10-07): count everywhere; the billable-events meter stays SaaS only.
   @unit @usage
-  Scenario: The trace meter registers on every deployment, the billable-events meter on SaaS only
+  Scenario: Trace usage registers on every deployment, the billable-events meter on SaaS only
     When the usage pipeline registers its global projections
-    Then the trace meter is registered as the peer lane "entitlement.usageTraceMeter" on every deployment
+    Then the trace usage subscribers "entitlement.traceUsageSpan" and "entitlement.traceUsageMonthIds" register on every deployment
     And only a SaaS deployment registers the billable-events meter
 
   @unit @usage
-  Scenario: A self-hosted deployment appends the trace meter as each trace arrives
-    Given a self-hosted deployment
-    When a span arrives for a project in an organization
-    Then a trace meter row is written for its trace in the month it arrived
-
-  @unit @usage
-  Scenario: The trace meter parses only trace's narrow metering schema
-    Given a self-hosted deployment
-    When a span arrives whose payload carries only its trace id and start time
-    Then a trace meter row is written for its trace in the month it arrived
-
-  @unit @usage
-  Scenario: The trace meter is seeded at deploy by replaying trace's spans
-    Given traces recorded before the trace meter was appended on this deployment
-    When the deploy's background steps run
-    Then the trace meter lane is replayed from trace's log
-    And each trace counts once, in the month its first span arrived
-
-  # Seeding at cloud scale (E3, round 47): the month to date, tenant by tenant, after old writers.
-  @unit @usage
-  Scenario: The trace meter seed replays from the first of the current month at deploy
-    Given a deploy on the 8th of October
-    When the trace meter seed runs for the first time
-    Then it replays trace's spans received since 1 October 00:00 UTC
-    And the months before stay as they were counted before the deploy
-
-  @unit @usage
-  Scenario: The trace meter seed waits until no old writer remains
-    Given a rollout where pods of the previous image may still append spans
-    Then the trace meter seed is a background step that needs the old writers gone
-
-  @unit @usage
-  Scenario: The trace meter seed replays one tenant at a time and saves each tenant it completes
-    Given trace's span log holds spans of two tenants this month
-    When the trace meter seed runs
-    Then each tenant is replayed on its own
-    And each completed tenant is saved with the cursor the run completes through
-
-  @unit @usage
-  Scenario: The trace meter seed takes a trailing pass from the cursor its first pass completed
-    Given a span an old pod appended that became readable after the first pass discovered its tenant
-    When the trace meter seed's first pass completes through its cursor
-    Then a second pass replays the lane from that cursor
-    And the span counts once, in the month it arrived
+  Scenario: The month's trace count is read off the organization-keyed rows
+    Given trace usage rows are routed by organization
+    When the month is counted
+    Then distinct traces are counted on the organization's cluster, grouped by trace and never with FINAL
 
   @integration @usage @unimplemented
-  Scenario: A seeded month's trace meter count equals trace's own count for that month
-    Given ClickHouse holding a month of trace's spans and no trace meter rows
-    When the trace meter seed runs
-    Then each project's trace meter count for the month equals its distinct traces in trace's log
+  Scenario: A month's trace count equals trace's own count for that month
+    Given ClickHouse holding a month of trace summaries and no trace usage rows
+    When trace's upgrade sends the month's trace ids and new traces arrive live
+    Then each project's trace count equals its traces first seen in the month
 
   @unit @usage
-  Scenario: The trace meter decides a limit as the live trace count did, over the same traces
-    Given an organization metered in traces whose projects' traces this month are on the trace meter
+  Scenario: The trace count decides a limit as the live trace count did, over the same traces
+    Given an organization metered in traces whose projects' traces this month are on the trace count
     When the limit is checked and the month is counted per project
     Then the decision and the per-project counts equal those over a live count of the same traces
 

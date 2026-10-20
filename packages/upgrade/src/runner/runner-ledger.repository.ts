@@ -7,6 +7,9 @@ import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
 const SETTLED: ReadonlySet<UpgradeStepStatus> = new Set(["done", "not-needed", "failed"]);
 
+/** The key a Prisma step's report holds while an operator's Retry waits to be spent. */
+export const OPERATOR_RETRY_KEY = "operatorRetryAt";
+
 /** A step the runner registers: a manifest step with the release that shipped it. */
 export type RegisteredStep = ManifestStep & { release: string | null };
 
@@ -35,6 +38,26 @@ export class UpgradeRunnerRepository {
           AND to_regclass('${t.run}') IS NOT NULL AS present`,
     );
     return rows[0]?.present === true;
+  }
+
+  /**
+   * Whether this role may create the ledger (`createLedgerTablesSql`): CREATE on the ledger schema
+   * when an operator pre-created it, else CREATE on the database (Alex, 2026-10-10, option a).
+   */
+  async ledgerCreatable(): Promise<boolean> {
+    const { rows } = await this.postgres.query<{ creatable: boolean }>(
+      `SELECT COALESCE(
+          (SELECT has_schema_privilege(n."oid", 'CREATE') FROM pg_namespace n WHERE n."nspname" = $1),
+          has_database_privilege(current_database(), 'CREATE')
+        ) AS "creatable"`,
+      [await this.ledgerSchema()],
+    );
+    return rows[0]?.creatable === true;
+  }
+
+  /** The ledger's own Postgres schema for this installation, as `<schema>_upgrade_ledger`. */
+  async ledgerSchema(): Promise<string> {
+    return (await ledgerTables({ postgres: this.postgres })).schema;
   }
 
   async prismaHistoryExists(): Promise<boolean> {
@@ -146,6 +169,26 @@ export class UpgradeRunnerRepository {
     );
   }
 
+  /** Stamps steps with the instants (ISO 8601 UTC) of the run phase that applied them. */
+  async stampTiming({
+    ids,
+    startedAt,
+    finishedAt,
+  }: {
+    ids: readonly string[];
+    startedAt: string;
+    finishedAt: string;
+  }): Promise<void> {
+    if (ids.length === 0) return;
+    await this.query(
+      (t) => `UPDATE ${t.step}
+          SET "started_at" = ($2::timestamptz AT TIME ZONE 'UTC'),
+              "finished_at" = ($3::timestamptz AT TIME ZONE 'UTC'), "updated_at" = ${NOW_UTC}
+        WHERE "id" = ANY($1::text[])`,
+      [ids, startedAt, finishedAt],
+    );
+  }
+
   /**
    * Level-triggers a tenant step's row: `done` once no tenant is held or parked, `pending` when one
    * is again. Rows in any other status are the runner's or the operator's and stay as they are.
@@ -198,16 +241,18 @@ export class UpgradeRunnerRepository {
   }
 
   /**
-   * Reopens done steps as pending, checkpoint cleared so the re-run is whole, except a projection
-   * replay's cursor, which a re-run continues from. Answers the ids this call reopened: one
-   * already reopened, here or concurrently, is not reopened twice.
+   * Reopens done steps (or, for the holder whose run a rollback overtook, running ones) as pending,
+   * checkpoint cleared so the re-run is whole, except a projection replay's cursor, which a re-run
+   * continues from. Answers the ids this call reopened: none is reopened twice.
    */
   async reopenDoneSteps({
     ids,
     reason,
+    from = "done",
   }: {
     ids: readonly string[];
     reason: string;
+    from?: Extract<UpgradeStepStatus, "done" | "running">;
   }): Promise<string[]> {
     if (ids.length === 0) return [];
     const { rows } = await this.query<{ id: string }>(
@@ -215,27 +260,41 @@ export class UpgradeRunnerRepository {
           SET "status" = 'pending', "last_error" = $2, "inferred" = false, "finished_at" = NULL,
               "report" = CASE WHEN "report" ? $3 THEN "report" END,
               "updated_at" = ${NOW_UTC}
-        WHERE "id" = ANY($1::text[]) AND "status" = 'done'
+        WHERE "id" = ANY($1::text[]) AND "status" = $4
        RETURNING "id"`,
-      [ids, reason, PROJECTION_REPLAY_CURSOR],
+      [ids, reason, PROJECTION_REPLAY_CURSOR, from],
     );
     return rows.map((row) => row.id).toSorted();
   }
 
   /**
    * Sets one failed step pending in a single conditional write, error cleared and checkpoint kept.
+   * A Prisma step's report records the retry: the operator's consent to re-run the folder.
    * Answers false when the step is not failed, so of two concurrent retries only one wins.
    */
   async retryFailedStep({ id }: { id: string }): Promise<boolean> {
     const { rows } = await this.query<{ id: string }>(
       (t) => `UPDATE ${t.step}
           SET "status" = 'pending', "last_error" = NULL, "inferred" = false, "finished_at" = NULL,
+              "report" = CASE WHEN "id" LIKE 'prisma:%'
+                THEN COALESCE("report", '{}'::jsonb) || jsonb_build_object($2::text, ${NOW_UTC})
+                ELSE "report" END,
               "updated_at" = ${NOW_UTC}
         WHERE "id" = $1 AND "status" = 'failed'
        RETURNING "id"`,
-      [id],
+      [id, OPERATOR_RETRY_KEY],
     );
     return rows.length > 0;
+  }
+
+  /** Spends the operator's retry on these steps, so a later failure needs a new one. */
+  async clearOperatorRetry({ ids }: { ids: readonly string[] }): Promise<void> {
+    if (ids.length === 0) return;
+    await this.query(
+      (t) => `UPDATE ${t.step} SET "report" = NULLIF("report" - $2::text, '{}'::jsonb)
+        WHERE "id" = ANY($1::text[]) AND "report" ? $2::text`,
+      [ids, OPERATOR_RETRY_KEY],
+    );
   }
 
   /** Sets failed steps of one mode pending again, error and checkpoint kept; answers their ids. */

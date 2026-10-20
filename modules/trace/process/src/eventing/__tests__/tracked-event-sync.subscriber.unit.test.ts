@@ -1,9 +1,9 @@
 import { createTenantId, type TriggerContext } from "@langwatch/eventing";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import type {
   TraceSummaryData,
   SpanReceivedEvent,
   TopicAssignedEvent,
-  OtlpSpan,
 } from "@langwatch/trace-contract";
 import {
   SPAN_RECEIVED_EVENT_TYPE,

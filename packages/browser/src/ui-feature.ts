@@ -72,6 +72,8 @@ export type UiFeatureInstall = {
   hosts?: readonly UiModuleHostMount[];
   /** Drawn once inside the host services, beside the open drawer; saas's analytics block. */
   footer?: ComponentType;
+  /** Wraps the routed page, the open drawer and the footer alike; a provider, drawing nothing. */
+  presentation?: ComponentType<{ children?: ReactNode }>;
 };
 
 /** One feature package's whole contribution to the browser application. */

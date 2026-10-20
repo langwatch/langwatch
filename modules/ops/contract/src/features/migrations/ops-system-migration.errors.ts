@@ -169,23 +169,6 @@ export class MigrationNotAvailableOnInstallationError extends HandledError {
   }
 }
 
-/**
- * Enrollment paces the cloud rollout only - off cloud, released migrations
- * already run for everyone and unreleased ones run for nobody regardless of
- * rows, so both enrollment actions refuse outright.
- */
-export class MigrationEnrollmentCloudOnlyError extends HandledError {
-  declare readonly code: "migration_enrollment_cloud_only";
-
-  constructor() {
-    super("migration_enrollment_cloud_only", "Enrollment does not apply to this installation", {
-      httpStatus: 400,
-      fault: "customer",
-    });
-    this.name = "MigrationEnrollmentCloudOnlyError";
-  }
-}
-
 /** An enrollment naming an organization id that does not exist. */
 export class MigrationEnrollmentOrganizationNotFoundError extends HandledError {
   declare readonly code: "organization_not_found";

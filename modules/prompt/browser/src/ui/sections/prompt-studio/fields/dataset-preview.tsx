@@ -59,8 +59,7 @@ export function DatasetPreview({
           <button type="button" aria-label="Edit dataset" onClick={onClick}>
             <HStack
               gap={2}
-              fontSize="18px"
-              fontWeight="bold"
+              textStyle="sectionTitle"
               color="fg"
               background="bg.emphasized"
               paddingY={2}

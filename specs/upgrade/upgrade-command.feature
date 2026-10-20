@@ -2,10 +2,12 @@
 # (sections 6.4, 6.6, 6.7, 6.10 and 6.11) and dev/docs/plans/migrations-blitz-2026-10-06.md (section
 # 5.2, row mig-s3-runner; deltas D4 and D6).
 #
-# `pnpm task upgrade` is the one command that changes the schema. It takes the runner lease, plans
-# from the ledger and the shipped manifests, refuses an installation below the LTS floor, applies the
-# plan release by release, records every step and every ClickHouse target in the ledger, runs the
-# reconcilers last and records the run. Exit codes: 0 done, 1 failed, 2 refused, 3 lease not taken.
+# `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker, which runs the
+# same in-process upgrade its gate runs, and answers its exit code. The run takes the lease, plans
+# from the ledger and the shipped manifests, applies the plan release by release from whatever
+# release the installation is on (no required stop; Alex, 2026-10-11), records every step and every
+# ClickHouse target in the ledger, runs the reconcilers last and records the run. Exit codes: 0 done,
+# 1 failed, 3 lease not taken.
 # Every integration scenario runs in its own scratch Postgres schema; the schema applier is a fake
 # that records what it was asked to apply.
 
@@ -45,24 +47,107 @@ Feature: The upgrade command
     Then it exits with code 1 before the schema applier is called
     And its message names "20261001000000_broken"
     And its message gives the command "prisma migrate resolve --rolled-back 20261001000000_broken"
+    And its message says to run it in packages/prisma-client with DATABASE_URL set
+    And its message says a waiting worker runs the upgrade again by itself once the row is resolved
+
+  # T9-F1: the command the refusal names works in the image as written.
+  @unit
+  Scenario: The Prisma config where the refusal sends the operator carries DATABASE_URL
+    Given DATABASE_URL is set in the operator's shell
+    When packages/prisma-client/prisma.config.ts loads
+    Then its datasource url is DATABASE_URL, so "prisma migrate resolve" runs there
+
+  # T9-F3: an index of another definition under a migration's index name is never accepted in
+  # silence and never dropped automatically; a matching pre-built index (ops pre-build) passes.
+  @integration
+  Scenario: A pre-built index that differs from a pending migration's stops the upgrade by name
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds an index "Widget_key_key" on "Widget" ("createdAt")
+    When the upgrade runs
+    Then it exits with code 1 and code "prebuilt_index_differs" before the schema applier is called
+    And its message names the index, the table, the definition it should have and the one it has
+    And its message says to drop or rename the index, and the index is left in place
 
   @integration
-  Scenario: A failing private ClickHouse target fails the run and is recorded per target
-    Given a ClickHouse step the image declares and two targets, "shared" and "private:org_1"
-    And the applier applies it on "shared" and fails on "private:org_1"
+  Scenario: A pre-built index that matches a pending migration's passes
+    Given a pending migration creates "Widget_key_key" UNIQUE on "Widget" ("key") if it does not exist
+    And the database already holds the same unique index, built ahead as the ops pre-build note says
+    When the upgrade runs
+    Then it completes with code 0
+
+  @unit
+  Scenario: An invalid pre-built index under a migration's index name is refused
+    Given a pending migration creates an index if it does not exist
+    And an index of that name exists but a build that never finished left it invalid
+    When the pending folders are checked
+    Then the index is named as differing
+
+  @unit
+  Scenario: An index a pending migration drops before it creates it again is not compared
+    Given a pending migration drops "Widget_key_key" and a later pending one creates it if it does not exist
+    And the database holds an index "Widget_key_key" of another definition
+    When the pending folders are checked
+    Then nothing is named as differing
+
+  # Each ClickHouse target upgrades on its own (Alex, 2026-10-11, T7-F1): a private target that
+  # fails holds only its organizations; the shared target and the release go on.
+  @integration
+  Scenario: A failing private ClickHouse target is held while the release goes on
+    Given two ClickHouse steps the image declares and two targets, "shared" and "private:org_1"
+    And the applier applies them on "shared" and fails on "private:org_1"
+    When the upgrade runs with retries allowed
+    Then it exits with code 0
+    And the ledger records both steps on "shared" as done
+    And on "private:org_1" the first step failed with the error and the second pending
+    And both steps themselves are recorded done, so the serving gate admits the image
+    And "private:org_1" was asked once, never retried in the same run
+    And the installation reads "needs attention" with one failed target
+
+  @integration
+  Scenario: A held private ClickHouse target catches up on the next pass
+    Given an upgrade that held "private:org_1"
+    And "private:org_1" answers again
+    When the upgrade runs again with nothing else to apply
+    Then it applies the image's ClickHouse steps on "private:org_1"
+    And every step reads done on both targets and no target is behind
+    And the installation no longer counts a failed target
+
+  @integration
+  Scenario: A held private ClickHouse target still down stays held and the pass succeeds
+    Given an upgrade that held "private:org_1", still down
+    When the upgrade runs again with nothing else to apply
+    Then it asks the applier once for every shipped step and exits with code 0
+    And the private target's rows stay failed
+
+  # T7-F16: only the shared target delays ready by the full connect wait.
+  @unit
+  Scenario: A private ClickHouse target is waited for briefly before it is held
+    Given CLICKHOUSE_MIGRATE_WAIT_SECONDS is 180
+    When goose is run for the shared target and for "private:org_1"
+    Then the shared target is waited for 180 seconds
+    And "private:org_1" is waited for 5 seconds at most
+    And a wait of 0 stays 0 on both
+
+  @integration
+  Scenario: A failing shared ClickHouse target fails the run
+    Given a ClickHouse step and two targets, "shared" and "private:org_1"
+    And the applier fails on "shared"
     When the upgrade runs
     Then it exits with code 1
-    And the ledger records the step on "shared" as done and on "private:org_1" as failed with the error
-    And the step itself is recorded failed
-    And the run is recorded failed
+    And the step and the run are recorded failed
+
+  @unit
+  Scenario: Every ClickHouse target failing fails the run as before
+    Given only private ClickHouse targets, every one failing
+    When the runner decides which targets to hold
+    Then it holds none, so the failure fails the run
 
   @integration
-  Scenario: An installation below the LTS floor is refused before any schema change
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
-    When the upgrade runs
-    Then it exits with code 2
-    And its message says to upgrade to 3.20.1 (LTS) first
-    And the schema applier is never called
+  Scenario: An installation on any older release rolls through every step to the image
+    Given the ledger records a succeeded upgrade to 3.16.0, older than every manifest
+    When the upgrade runs from a 3.21.0 image
+    Then it exits with code 0
+    And the schema applier applies every shipped release up to 3.21.0
 
   @integration
   Scenario: A fresh install applies the schema and marks every non-schema step not-needed
@@ -71,7 +156,7 @@ Feature: The upgrade command
     Then the schema applier is called once
     And every schema step is recorded done
     And every data and tenant step is recorded not-needed
-    And the run is recorded succeeded with the image's release and the LTS floor
+    And the run is recorded succeeded with the image's release
 
   # The ledger has its own Postgres schema, `<installation schema>_upgrade_ledger` (round 21), so
   # it exists before Prisma's first deploy, which refuses a non-empty schema it has no record of
@@ -170,10 +255,24 @@ Feature: The upgrade command
     When the upgrade runs
     Then the run is recorded failed naming the reconciler "langwatchql"
 
+  @unit
+  Scenario: pnpm task upgrade runs the upgrade as a run-once worker and answers its exit code
+    Given the tasks app is asked to run the upgrade
+    When it starts the worker with "upgrade"
+    Then the worker runs the upgrade once in its own process and exits 0, 1 or 3
+    And the tasks app answers that exit code; status, plan and steps stay reads in the tasks app
+
+  @unit
+  Scenario: The worker's upgrade provisions LangWatchQL through the tasks app under its own lease
+    Given the worker runs the upgrade in-process
+    When its reconcilers run
+    Then it runs "pnpm task upgrade lwql-provision", which takes no lease of its own
+    And a provisioning that exits non-zero fails the reconciler "langwatchql"
+
   @integration
   Scenario: Running an older image marks completed background steps pending again
     Given the ledger records a succeeded upgrade to 3.22.0 with a done background step of 3.22.0
-    When the upgrade runs from a 3.21.0 image at or above the floor
+    When the upgrade runs from a 3.21.0 image
     Then the 3.22.0 background step is recorded pending
 
   # Run phases (round 9, U2-PHASES): in the run report, a fixed shape the reader parses.
@@ -185,18 +284,18 @@ Feature: The upgrade command
     And every phase is succeeded with a start and a finish
 
   @integration
+  Scenario: A schema step recorded done carries the start and finish of its schema phase
+    Given an empty database and a 3.21.0 image
+    When the upgrade runs
+    Then each Prisma step row's start and finish are the Postgres schema phase's
+    And each ClickHouse step row's start and finish are the ClickHouse schema phase's
+
+  @integration
   Scenario: A run whose schema fails records the failed phase and no later one
     Given the ClickHouse target fails to apply
     When the upgrade runs
     Then the run's report ends with a failed ClickHouse schema phase
     And no reconcile phase is recorded
-
-  @integration
-  Scenario: A refused upgrade is recorded as a failed run whose report names the refusal
-    Given the ledger records a succeeded upgrade to 3.16.0 and the LTS floor is 3.20.1
-    When the upgrade runs
-    Then the run is recorded failed with the report's refused naming "below_lts_floor"
-    And its only phase is a failed preflight
 
   # Live status (round 8, U2-LIVE): the runner raises a read hint; the api relays it.
   @integration
@@ -205,6 +304,13 @@ Feature: The upgrade command
     When the upgrade runs through preflight, one schema release and reconcile
     Then a hint is published as each phase starts and ends, and once when the run finishes
     And each hint names the run, the phase and its outcome under the platform upgrade scope
+
+  @unit
+  Scenario: A worker's in-process run publishes its read hints on the worker's Redis
+    Given the worker runs the upgrade in its own process with REDIS_URL set
+    When the run changes phase
+    Then its read hint is published on the worker's Redis, resolved as its stores resolve it
+    And the connection opened for the run is closed when the run ends
 
   @integration
   Scenario: A hint that cannot be published does not fail the run

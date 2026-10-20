@@ -8,11 +8,8 @@ import {
   parseOtlpMetrics,
   type OtlpDoorRequest,
 } from "@langwatch/otlp";
-import {
-  DEFAULT_PII_REDACTION_LEVEL,
-  type OtlpIngestCredential,
-  type TraceApi,
-} from "@langwatch/trace-contract";
+import { type OtlpIngestCredential } from "@langwatch/otlp/door";
+import { DEFAULT_PII_REDACTION_LEVEL, type TraceApi } from "@langwatch/trace-contract";
 import { SpanKind, type Span } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 

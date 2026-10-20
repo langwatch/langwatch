@@ -100,8 +100,7 @@ export function CodeBlockEditor({
       >
         <HStack
           gap={2}
-          fontSize="18px"
-          fontWeight="bold"
+          textStyle="sectionTitle"
           color="fg"
           background="bg.card"
           paddingY={2}

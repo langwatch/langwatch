@@ -13,6 +13,7 @@ class KeyMap extends LangWatchQLProvisioningRepository {
   inventoryConfigStore = vi.fn();
   probeOwner = vi.fn();
   queryRows = vi.fn();
+  readInventory = vi.fn();
   close = vi.fn(async () => undefined);
 
   async findKeyMapHashes({ tenantId }: { table: string; tenantId: string }): Promise<string[]> {

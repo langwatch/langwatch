@@ -43,6 +43,8 @@ const heavyRow = {
   Models: [],
   TotalCost: null,
   NonBilledCost: null,
+  UnpricedSpanCount: 0,
+  UnpricedModels: [],
   TokensEstimated: false,
   TotalPromptTokenCount: null,
   TotalCompletionTokenCount: null,
@@ -70,18 +72,22 @@ function makeRepo(responder: (sql: string) => unknown[]) {
   const parameters: Record<string, unknown>[] = [];
   const resolvedFor: (string | undefined)[] = [];
   const boundTenants: string[] = [];
+  const declaredFullScans: string[] = [];
   const client = clickHouseQueryClientDouble({
     query: vi.fn(
       async ({
         sql,
         params,
         tenantId,
+        SKIP_COLD_SCAN_CHECK,
       }: {
         sql: string;
         params?: Record<string, unknown>;
         tenantId: string;
+        SKIP_COLD_SCAN_CHECK?: true;
       }) => {
         queries.push(sql);
+        if (SKIP_COLD_SCAN_CHECK === true) declaredFullScans.push(sql);
         parameters.push(params ?? {});
         boundTenants.push(tenantId);
         return { rows: responder(sql) };
@@ -99,6 +105,7 @@ function makeRepo(responder: (sql: string) => unknown[]) {
       }),
     }),
     boundTenants,
+    declaredFullScans,
     queries,
     parameters,
     resolvedFor,
@@ -161,6 +168,27 @@ describe("TraceSummaryClickHouseRepository.findByTraceId (unit)", () => {
     const heavy = queries.find((q) => q.includes("ComputedInput"));
     expect(heavy).toBeDefined();
     expect(heavy!).toContain("OccurredAt >=");
+  });
+
+  it("declares the timeless resolve a full scan and no windowed read", async () => {
+    const { repo, queries, declaredFullScans } = makeRepo((sql) =>
+      isResolve(sql) ? [{ rowCount: "1", occurredAtMs: String(Date.now()) }] : [heavyRow],
+    );
+
+    await repo.findByTraceId({ authorization, traceId: "t1" });
+    await repo.findByTraceId({
+      authorization,
+      traceId: "t1",
+      window: { fromMs: 1_000, toMs: 2_000 },
+    });
+
+    expect(declaredFullScans).toHaveLength(1);
+    expect(isResolve(declaredFullScans[0]!)).toBe(true);
+    expect(
+      queries
+        .filter((q) => q.includes("ComputedInput"))
+        .every((q) => !declaredFullScans.includes(q)),
+    ).toBe(true);
   });
 
   it("skips the heavy read and returns null when the resolve finds no row", async () => {

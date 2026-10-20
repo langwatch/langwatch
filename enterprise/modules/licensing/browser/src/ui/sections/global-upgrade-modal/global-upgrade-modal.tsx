@@ -15,27 +15,22 @@ export function GlobalUpgradeModal({ isSaaS }: { isSaaS: boolean }) {
   const SeatProrationPreview = useLent(SeatProrationPreviewToken);
   if (!variant) return null;
 
+  if (variant.mode === "limit") {
+    return <LimitContent open={isOpen} variant={variant} isSaaS={isSaaS} onClose={close} />;
+  }
+  if (variant.mode === "liteMemberRestriction") {
+    return <LiteMemberRestrictionContent open={isOpen} onClose={close} />;
+  }
+  if (SeatProrationPreview) {
+    return (
+      <Suspense fallback={null}>
+        <SeatProrationPreview variant={variant} open={isOpen} onClose={close} />
+      </Suspense>
+    );
+  }
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(event) => !event.open && close()}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        {variant.mode === "limit" && (
-          <LimitContent variant={variant} isSaaS={isSaaS} onClose={close} />
-        )}
-        {variant.mode === "seats" &&
-          (SeatProrationPreview ? (
-            <Suspense fallback={null}>
-              <SeatProrationPreview variant={variant} open={isOpen} onClose={close} />
-            </Suspense>
-          ) : (
-            <Dialog.Body>
-              <Text>Seat management is not available in this deployment.</Text>
-            </Dialog.Body>
-          ))}
-        {variant.mode === "liteMemberRestriction" && (
-          <LiteMemberRestrictionContent onClose={close} />
-        )}
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog open={isOpen} onClose={close} title="Seat management" cancelLabel={null}>
+      <Text>Seat management is not available in this deployment.</Text>
+    </Dialog>
   );
 }

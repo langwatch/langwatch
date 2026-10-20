@@ -139,7 +139,7 @@ function FlatBody({
         <Text
           textStyle="2xs"
           color={palette.fg}
-          fontWeight="600"
+          fontWeight="semibold"
           textTransform="uppercase"
           letterSpacing="0.06em"
           lineHeight={1.4}
@@ -159,7 +159,7 @@ function FlatBody({
       </chakra.button>
       {/* Padding-left aligns the body with the role text, not the
           avatar circle. 32px ≈ 24px avatar + 8px gap. */}
-      <Box paddingLeft="32px" paddingTop={1.5}>
+      <Box paddingLeft="8" paddingTop={1.5}>
         {children}
       </Box>
     </Box>

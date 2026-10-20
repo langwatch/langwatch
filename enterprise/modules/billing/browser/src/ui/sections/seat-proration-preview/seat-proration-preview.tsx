@@ -1,14 +1,7 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { Dialog } from "@langwatch/design-system/dialog";
-import {
-  Box,
-  Button,
-  HStack,
-  Separator,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Alert, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-client";
 import { Crown } from "lucide-react";
 import { useState } from "react";
@@ -114,9 +107,9 @@ function PreviewBody({
 }
 
 /**
- * What a seat change costs, and the button that confirms it. Lent to the
- * upgrade dialog by `SeatProrationPreviewToken` — licensing owns the dialog,
- * billing the price. specs/licensing/proration-preview.feature.
+ * What a seat change costs, and the dialog that confirms it. Lent to the
+ * upgrade gate by `SeatProrationPreviewToken` — licensing decides when it
+ * opens, billing draws the price and the dialog. specs/licensing/proration-preview.feature.
  */
 export function SeatProrationPreview({ variant, open, onClose }: SeatProrationPreviewProps) {
   const [isConfirming, setIsConfirming] = useState(false);
@@ -142,51 +135,51 @@ export function SeatProrationPreview({ variant, open, onClose }: SeatProrationPr
   const isPreviewError = !isPreviewLoading && preview.isError;
   const isPreviewReady = !isPreviewLoading && !preview.isError;
 
+  const primaryDisabledReason = isPreviewLoading
+    ? "Loading the cost preview"
+    : disabledReasonOfError(isPreviewError);
+
   return (
-    <>
-      <Dialog.Header>
-        <Crown />
-        <Dialog.Title>Confirm seat update</Dialog.Title>
-      </Dialog.Header>
-      <Dialog.Body>
-        {isPreviewLoading && (
-          <HStack justify="center" width="100%" paddingY={6}>
-            <Spinner />
-          </HStack>
-        )}
-        {isPreviewError && (
-          <Box role="alert" borderWidth="1px" borderColor="red.solid" borderRadius="md" padding={3}>
-            <Text>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      icon={<Crown />}
+      title="Confirm seat update"
+      busy={isConfirming}
+      primaryAction={{
+        label: "Confirm & Update",
+        onClick: () => void confirm(),
+        loading: isConfirming,
+        disabledReason: primaryDisabledReason,
+      }}
+    >
+      {isPreviewLoading && <SkeletonRows rows={3} label="Loading the cost preview" />}
+      {isPreviewError && (
+        <Alert.Root status="error" role="alert">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description>
               {describeError({
                 error: preview.error,
                 fallbackTitle: "Couldn't load the price preview",
               })}
-            </Text>
-          </Box>
-        )}
-        {isPreviewReady && (
-          <PreviewBody
-            quote={quoteOf(preview.data)}
-            currentSeats={variant.currentSeats}
-            newSeats={variant.newSeats}
-          />
-        )}
-      </Dialog.Body>
-      <Dialog.Footer>
-        <Button variant="ghost" onClick={onClose} disabled={isConfirming}>
-          Cancel
-        </Button>
-        <Button
-          colorPalette="blue"
-          onClick={() => void confirm()}
-          loading={isConfirming}
-          disabled={preview.isLoading || preview.isError}
-        >
-          Confirm & Update
-        </Button>
-      </Dialog.Footer>
-    </>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert.Root>
+      )}
+      {isPreviewReady && (
+        <PreviewBody
+          quote={quoteOf(preview.data)}
+          currentSeats={variant.currentSeats}
+          newSeats={variant.newSeats}
+        />
+      )}
+    </Dialog>
   );
+}
+
+function disabledReasonOfError(failed: boolean): string | undefined {
+  return failed ? "The price preview did not load" : void 0;
 }
 
 /**

@@ -144,6 +144,7 @@ func TestLocaleCompareMatchesICU(t *testing.T) {
 
 // fixture writes a small repository that exercises every report section.
 func fixture(t *testing.T, passing bool) (string, Lists) {
+	t.Helper()
 	dir := t.TempDir()
 	files := map[string]string{
 		"pnpm-workspace.yaml":                "",
@@ -174,10 +175,10 @@ func fixture(t *testing.T, passing bool) (string, Lists) {
 	}
 	for name, body := range files {
 		p := filepath.Join(dir, name)
-		if err := os.MkdirAll(filepath.Dir(p), 0o755); err != nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0o750); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(p, []byte(body), 0o644); err != nil {
+		if err := os.WriteFile(p, []byte(body), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -261,9 +262,9 @@ func TestFixtureMatchesNodeTool(t *testing.T) {
 			}
 			script = script[:s] + strings.Join(quoted, ", ") + script[e:]
 		}
-		path := filepath.Join(repo, "tool/check.ts")
-		_ = os.MkdirAll(filepath.Dir(path), 0o755)
-		if err := os.WriteFile(path, []byte(script), 0o644); err != nil {
+		path := filepath.Join(repo, "tool", "check.ts")
+		_ = os.MkdirAll(filepath.Dir(path), 0o750)
+		if err := os.WriteFile(path, []byte(script), 0o600); err != nil { //nolint:gosec // G703: path is under the test's own temp dir
 			t.Fatal(err)
 		}
 		for _, args := range [][]string{nil, {"--json"}} {

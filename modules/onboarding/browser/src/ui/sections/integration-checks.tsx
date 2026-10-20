@@ -73,7 +73,7 @@ export const IntegrationChecks = () => {
   );
 
   return (
-    <VStack align="start" fontSize="15px">
+    <VStack align="start" textStyle="body">
       <List.Root gap={4}>
         <List.Item className="group" display="block" asChild>
           <Link href={`/settings/teams`}>

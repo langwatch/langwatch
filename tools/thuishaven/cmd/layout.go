@@ -55,15 +55,15 @@ func buildTable() []commandSpec {
 	up.rewrite, down.rewrite = retireUpSpellings, retireShortForce("down")
 	top := []commandSpec{
 		hidden("simulator"), hidden("static"), hidden("go-watch"), hidden("ui-watch"), hidden("keep"), hidden("daemon"), hidden("gate"),
-		up, down, take("restart"), take("reload"), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
+		up, down, take("restart"), take("reload"), serviceCommand(), statusCommand(take("status")), take("logs"), take("errors"), take("env"),
 		browserCommand(take("browser"), take("auth"), take("mfa")),
-		take("pr"), take("switch"), waitSpec(), defaultsSpec(),
+		take("pr"), take("switch"), take("focus"), waitSpec(), defaultsSpec(),
 		{name: "sim", args: "[<name> <verb>]", summary: "every simulator: bare lists them; sim <name> <verb> drives one", run: runSims, flags: simFlags(), subs: sims},
 		{name: "obs", summary: "this stack's own telemetry: traces, metrics, profiles, raw queries", subs: []commandSpec{take("traces"), take("metrics"), take("profiles"), take("query")}},
 		{name: "orb", summary: "what the haven orb on the app page saw and was sent", subs: []commandSpec{take("feedback"), pageVerb("console"), pageVerb("network")}},
 		dbCommand(take("db"), take("seed")),
 		apiCommand(take("api"), take("gateway")),
-		{name: "machine", summary: "this machine: limits, slotted runs, typecheck, cleanup", subs: []commandSpec{take("limits"), take("run"), take("slot"), take("typecheck"), take("clean")}},
+		{name: "machine", summary: "this machine: limits, settings, slotted runs, typecheck, cleanup", subs: []commandSpec{take("limits"), machineSettingsSpec(), take("run"), take("slot"), take("typecheck"), take("clean"), take("history")}},
 		{name: "self", summary: "haven itself: install, setup, upgrade, doctor, the shell function", subs: []commandSpec{take("install"), take("setup"), take("upgrade"), doctorSpec(take("install")), take("shell-init")}},
 		{name: "hub", summary: "the interactive hub: every stack, health, RAM and actions (a terminal only)", run: func(ctx context.Context, d deps, _ invocation) error {
 			if d.isAgent {

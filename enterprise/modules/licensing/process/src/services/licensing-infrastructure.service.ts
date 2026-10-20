@@ -74,9 +74,6 @@ export class LicensingInfrastructureService {
         getMemberCount: (organizationId) => options.getMemberCount(organizationId),
         getMembersLiteCount: (organizationId) => options.getMembersLiteCount(organizationId),
       },
-      configuredAuthProvider: () => null,
-      platformSsoAllowed: () => Promise.resolve(false),
-      authProviderIsMounted: () => false,
       reportSigningFailure: () => void 0,
     };
   }

@@ -1,8 +1,14 @@
-import { createTenantId, REHYDRATION_WINDOW_MS } from "@langwatch/eventing";
+import {
+  createTenantId,
+  REHYDRATION_WINDOW_MS,
+  type StateProjectionStore,
+} from "@langwatch/eventing";
 import { HandledError } from "@langwatch/handled-error";
 import {
   cursorHasReachedEvent,
   LANGY_CONVERSATION_TURN_EVENT_TYPES,
+  type LangyConversationTurnData,
+  makeConversationTurnKey,
   type LangyConversationTurnWireEvent,
   type LangyEventCursor,
   type LangyLocalRecord,
@@ -61,6 +67,7 @@ const conversationServiceLogger = createLogger("langwatch:langy:conversation-ser
 type LangyConversationReadOptions = {
   repository: LangyConversationRepository;
   events: LangyConversationEventsReader | null;
+  turnStates: StateProjectionStore<LangyConversationTurnData> | null;
 };
 
 export class LangyConversationReadService {
@@ -226,6 +233,37 @@ export class LangyConversationReadService {
       cursor: last ? { acceptedAt: last.createdAt, eventId: last.id } : after,
       truncated,
     };
+  }
+
+  /** One turn's projected state, authorized like `getById`; empty until its first event folds. */
+  async findTurn({
+    projectId,
+    conversationId,
+    turnId,
+    userId,
+  }: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+  }): Promise<LangyConversationTurnData[]> {
+    const visible = await this.findVisibleToleratingDispatchLag({
+      id: conversationId,
+      projectId,
+      userId,
+    });
+    if (!visible) {
+      throw new LangyConversationNotFoundError(conversationId);
+    }
+    if (!this.deps.turnStates) {
+      return [];
+    }
+
+    const read = await this.deps.turnStates.get(makeConversationTurnKey(conversationId, turnId), {
+      tenantId: createTenantId(projectId),
+      aggregateId: conversationId,
+    });
+    return read.kind === "folded" ? [read.projection.state] : [];
   }
 
   /**

@@ -67,7 +67,7 @@ const PassRateCoverageChip = ({
  * Summary statistics tooltip content.
  */
 const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregate }) => (
-  <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
+  <VStack align="stretch" gap={0} textStyle="caption" minWidth="230px" color="fg">
     <VStack align="stretch" gap={2} padding={2}>
       {/* Progress */}
       <HStack justify="space-between">
@@ -184,18 +184,18 @@ const SummaryTooltipContent = ({ aggregates }: { aggregates: BatchTargetAggregat
                 {evaluator.passRate !== null && (
                   <HStack gap={1}>
                     <PassRateCircle passRate={evaluator.passRate} size="8px" />
-                    <Text fontSize="11px" color={getPassRateGradientColor(evaluator.passRate)}>
+                    <Text textStyle="micro" color={getPassRateGradientColor(evaluator.passRate)}>
                       {formatPassRate(evaluator.passRate)}
                     </Text>
                   </HStack>
                 )}
                 {evaluator.averageScore !== null && (
-                  <Text fontSize="11px" color="fg.muted">
+                  <Text textStyle="micro" color="fg.muted">
                     {formatScore(evaluator.averageScore)}
                   </Text>
                 )}
                 {evaluator.errors > 0 && (
-                  <Text fontSize="11px" color="red.fg">
+                  <Text textStyle="micro" color="red.fg">
                     {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
                   </Text>
                 )}
@@ -237,7 +237,7 @@ const SummaryBadge = memo(function SummaryBadge({
     >
       <HStack
         gap={2}
-        fontSize="11px"
+        textStyle="micro"
         color="fg.muted"
         paddingX={2}
         paddingY={0.5}
@@ -335,8 +335,8 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
 
   /** Palettes follow the studio node kinds in workflow-icons.tsx. */
   const getTargetPalette = (): StudioPalette => {
-    if (target.type === "prompt") return "blue";
-    if (target.type === "agent") return "pink";
+    if (target.type === "prompt") return "green";
+    if (target.type === "agent") return "cyan";
     if (target.type === "evaluator") return "green";
     return "gray";
   };
@@ -349,7 +349,7 @@ export const BatchTargetHeader = memo(function BatchTargetHeader({
           <Box width="10px" height="10px" borderRadius="sm" bg={colorIndicator} flexShrink={0} />
         )}
         <ColorfulBlockIcon colorPalette={getTargetPalette()} size="xs" icon={getTargetIcon()} />
-        <Text fontSize="13px" fontWeight="medium" truncate>
+        <Text textStyle="label" truncate>
           {target.displayName ?? target.name}
         </Text>
       </HStack>

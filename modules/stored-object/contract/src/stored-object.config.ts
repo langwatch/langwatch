@@ -19,12 +19,21 @@ const confirmationSchema = z
         (typeof value === "string" && ["1", "true"].includes(value.toLowerCase())),
   );
 
-/** Object storage's own settings belong to the stores owner (ADR-158 §7). */
-export const storedObjectConfig = Config.define((c) => ({
-  /** The operator states every oversized-payload prefix has its lifecycle rule (ADR-172). */
+/**
+ * The operator's statement that every oversized-payload prefix has its lifecycle rule (ADR-172).
+ * Stored-object owns the leaves; trace holds the same instances, since its spool is one of those
+ * prefixes, so each variable keeps one meaning.
+ */
+export const { objectRetentionConfirmed, legacySpoolRetentionConfirmed } = Config.define((c) => ({
   objectRetentionConfirmed: c.env("OBJECT_RETENTION_CONFIRMED", confirmationSchema),
-  /** The earlier spool-only spelling of the same statement, honoured until the LTS floor. */
+  /** The earlier spool-only spelling; stops being read in 3.23 (two after 3.21). */
   legacySpoolRetentionConfirmed: c.env("AZURE_BLOB_SPOOL_RETENTION_CONFIRMED", confirmationSchema),
+}));
+
+/** Object storage's own settings belong to the stores owner (ADR-158 §7). */
+export const storedObjectConfig = Config.define(() => ({
+  objectRetentionConfirmed,
+  legacySpoolRetentionConfirmed,
   /** The address fence the image proxy judges an outbound picture by. */
   blockLocalHttpCalls,
   allowedProxyHosts,

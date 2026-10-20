@@ -13,28 +13,13 @@ export function ProvisioningSetupDrawer({
   const organizationId = host.organizationId();
 
   return (
-    <Drawer.Root
-      open={open}
-      placement="end"
-      size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) host.closeOverlay();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>SCIM Provisioning</Drawer.Title>
-          <Drawer.CloseTrigger onClick={() => host.closeOverlay()} />
-        </Drawer.Header>
-        <Drawer.Body>
-          {organizationId && (
-            <ScimSettingsContent
-              organizationId={organizationId}
-              lede="Let your identity provider create and remove accounts here as people join and leave."
-            />
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={open} size="lg" onClose={() => host.closeOverlay()} title="SCIM Provisioning">
+      {organizationId && (
+        <ScimSettingsContent
+          organizationId={organizationId}
+          lede="Let your identity provider create and remove accounts here as people join and leave."
+        />
+      )}
+    </Drawer>
   );
 }

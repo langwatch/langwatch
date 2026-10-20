@@ -202,11 +202,11 @@ function PendingVerdictLine({ message }: { message: string }) {
     <VStack
       align="center"
       justify="flex-start"
-      paddingTop="64px"
+      paddingTop="16"
       paddingX={14}
       data-testid="run-verdict-pending"
     >
-      <Text fontSize="12px" color="fg.muted" textAlign="center">
+      <Text textStyle="caption" color="fg.muted" textAlign="center">
         {message}
       </Text>
     </VStack>

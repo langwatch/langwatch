@@ -13,13 +13,12 @@ Feature: TypeScript 7 is the compiler
   ADR: dev/docs/adr/099-typescript-7-is-the-compiler.md
 
   @unit
-  Scenario: Production and full checks stay two configurations, and only one runs as the check
-    Given API, worker, and UI each keep a production TypeScript configuration and a full one that adds tests
-    When either configuration checks an application
-    Then the production configuration's diagnostics exclude test directories and colocated test files
-    And the full configuration's diagnostics include them
-    And a test file imported by production code is still checked under the production configuration
-    But only the full configuration runs as the application's own typecheck script
+  Scenario: An application checks its sources and its tests in one configuration
+    Given API, worker, and UI each keep a solution tsconfig.json and one check configuration, tsconfig.app.json
+    When the check configuration checks an application
+    Then its diagnostics include test directories and colocated test files
+    And the solution tsconfig.json compiles no file of its own
+    And the application's own typecheck script builds the solution, which references only that configuration
 
   @unit
   Scenario: A package's adopted dependencies are checked before its own source

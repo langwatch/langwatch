@@ -6,6 +6,7 @@ import {
   GraphTriggerSentRepository,
   type OpenGraphTriggerSent,
 } from "../graph-trigger-sent.repository.ts";
+import { GRAPH_AUTOMATION_REACHES } from "./prisma.custom-graph.repository.ts";
 
 /** Prisma-backed graph-alert incident ledger, private to Automation server. */
 /**
@@ -77,6 +78,7 @@ export class PrismaGraphTriggerSentRepository extends GraphTriggerSentRepository
         id: input.customGraphId,
         projectId: input.projectId,
         kind: "builder",
+        ...GRAPH_AUTOMATION_REACHES,
       },
       select: { graph: true },
     });

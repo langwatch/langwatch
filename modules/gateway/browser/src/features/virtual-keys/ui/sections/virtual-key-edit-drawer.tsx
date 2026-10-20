@@ -1,13 +1,11 @@
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
-  Button,
   Field,
   HStack,
   Input,
   NativeSelect,
   Separator,
-  Spacer,
   Text,
   Textarea,
   VStack,
@@ -19,7 +17,7 @@ import {
   type VirtualKeyConfig,
   virtualKeyConfigSchema,
 } from "@langwatch/gateway-contract";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/gateway-api.ts";
 import { useGatewayToaster } from "../../../../behavior/gateway-feedback.ts";
@@ -159,6 +157,27 @@ function cannotSaveReasonFor(input: {
   const providerReason = providerAccessInvalidReason(input.providerAccess, input.eligible);
   if (providerReason) return providerReason;
   return expiryIncompleteReason({ preset: input.expiration.preset, expiresAt: input.expiresAt });
+}
+
+/** A refused save names the name field and focuses it; any other reason is a toast. */
+function refuseSave(input: {
+  reason: string;
+  nameMissing: boolean;
+  focusName: () => void;
+  toast: (title: string) => void;
+}): void {
+  if (input.nameMissing) input.focusName();
+  else input.toast(input.reason);
+}
+
+/** The footer says why a save was refused only once the reader has tried. */
+function noteAfterAttempt(input: { attempted: boolean; reason: string | null | undefined }) {
+  return input.attempted ? input.reason : void 0;
+}
+
+/** Providers still loading is the one genuine unavailability: the save waits for the list. */
+function loadingReason(loading: boolean): string | undefined {
+  return loading ? "Loading providers…" : void 0;
 }
 
 /**
@@ -322,7 +341,7 @@ function VirtualKeyLimitsFields({
           Rate limits
         </Text>
         <FieldInfoTooltip
-          description="Per-VK caps on the gateway hot path, blank = unlimited. Enforced in-memory on every gateway replica; on breach the gateway returns HTTP 429 with Retry-After and X-LangWatch-RateLimit-Dimension. Changes propagate to all replicas within ~60s."
+          description="Set request limits for this key, leave a field blank for no limit, and allow up to one minute for changes to apply."
           docHref="/ai-gateway/rate-limits"
         />
       </HStack>
@@ -341,11 +360,11 @@ function VirtualKeyLimitsFields({
           <Field.Label>
             tpm
             <FieldInfoTooltip
-              description="Tokens / minute; requires pre-request token estimation and ships with Redis-coordinated cluster counters (v1.1)."
+              description="Token limits are not available."
               docHref="/ai-gateway/rate-limits"
             />
           </Field.Label>
-          <Input value={tpm} placeholder="deferred" inputMode="numeric" disabled />
+          <Input value={tpm} placeholder="Not available" inputMode="numeric" disabled />
           <Field.HelperText>Tokens / minute</Field.HelperText>
         </Field.Root>
         <Field.Root flex={1}>
@@ -395,6 +414,8 @@ export function VirtualKeyEditDrawer({
   const toaster = useGatewayToaster();
   const { organization } = useOrganizationTeamProject();
   const [name, setName] = useState("");
+  const [attempted, setAttempted] = useState(false);
+  const nameInput = useRef<HTMLInputElement>(null);
   const [description, setDescription] = useState("");
   const [tagsCsv, setTagsCsv] = useState<string>("");
   const [budget, setBudget] = useState<VirtualKeyBudgetValue>(EMPTY_BUDGET);
@@ -417,6 +438,7 @@ export function VirtualKeyEditDrawer({
   useEffect(() => {
     if (!vk) return;
     setName(vk.name);
+    setAttempted(false);
     setDescription(vk.description ?? "");
     const config = storedConfig(vk.config);
     setTagsCsv((config.metadata?.tags ?? []).join(", "));
@@ -548,8 +570,14 @@ export function VirtualKeyEditDrawer({
 
   const submit = async () => {
     if (!vk) return;
+    setAttempted(true);
     if (cannotSaveReason) {
-      toaster.create({ title: cannotSaveReason, type: "error" });
+      refuseSave({
+        reason: cannotSaveReason,
+        nameMissing: !name,
+        focusName: () => nameInput.current?.focus(),
+        toast: (title) => toaster.create({ title, type: "error" }),
+      });
       return;
     }
     setExpiryFieldError(null);
@@ -585,145 +613,134 @@ export function VirtualKeyEditDrawer({
   };
 
   return (
-    <Drawer.Root open={!!vk} onOpenChange={() => close()} placement="end" size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Edit virtual key</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <Field.Root required>
-              <Field.Label>
-                Name
-                <FieldInfoTooltip
-                  description="Human-readable identifier shown in the list and audit log. Must be unique within the organization. Rename is non-breaking: the VK id + secret remain the same."
-                  docHref="/ai-gateway/virtual-keys#creating-a-vk"
-                />
-              </Field.Label>
-              <Input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
-            </Field.Root>
-            <Field.Root>
-              <Field.Label>
-                Tags
-                <FieldInfoTooltip
-                  description={VK_TAGS_FIELD_DESCRIPTION}
-                  docHref="/ai-gateway/cache-control#cache-rules"
-                  testId="vk-tags-info"
-                />
-              </Field.Label>
-              <Input
-                value={tagsCsv}
-                onChange={(e) => setTagsCsv(e.target.value)}
-                placeholder="e.g. tier=enterprise, team=ml"
-                maxLength={TAGS_CSV_MAX_LENGTH}
-              />
-              {tagsNotice && <Field.HelperText color="orange.fg">{tagsNotice}</Field.HelperText>}
-            </Field.Root>
-
-            {vk && (
-              <>
-                <Separator />
-                <VirtualKeyOwnershipReadOnly
-                  scopes={vk.scopes}
-                  principal={vk.principalUserId && vk.principalUser ? vk.principalUser : undefined}
-                  traceProjectId={vk.traceProjectId ?? null}
-                  traceProjectArchived={vk.traceProjectArchived ?? false}
-                  viewTracesHref={viewTracesHref}
-                  ctx={{
-                    organizationName: organization?.name,
-                    availableTeams,
-                    availableProjects,
-                  }}
-                />
-
-                <Separator />
-                <VirtualKeyBudgetSection
-                  value={budget}
-                  onChange={(next) => {
-                    setIsBudgetDirty(true);
-                    setBudget(next);
-                  }}
-                  organizationId={organizationId}
-                  scopes={vk.scopes}
-                  traceProjectId={vk.traceProjectId ?? null}
-                  principalUserId={vk.principalUserId ?? null}
-                  virtualKeyId={vk.id}
-                />
-
-                <Separator />
-                <VirtualKeyProviderAccessSection
-                  value={providerAccess}
-                  onChange={setProviderAccess}
-                  scopes={vk.scopes}
-                  organizationId={organizationId}
-                  organizationName={organization?.name}
-                  availableTeams={availableTeams}
-                  availableProjects={availableProjects}
-                  providers={providers}
-                  isLoading={orgProvidersQuery.isLoading}
-                />
-
-                <Separator />
-                <VirtualKeyRoutingSection
-                  value={routing}
-                  onChange={setRouting}
-                  policies={policies}
-                />
-              </>
-            )}
-
-            <VirtualKeyLimitsFields
-              cacheMode={cacheMode}
-              cacheTtlS={cacheTtlS}
-              rpm={rpm}
-              tpm={tpm}
-              rpd={rpd}
-              maxOpenSessions={maxOpenSessions}
-              onCacheModeChange={setCacheMode}
-              onCacheTtlSChange={setCacheTtlS}
-              onRpmChange={setRpm}
-              onRpdChange={setRpd}
-              onMaxOpenSessionsChange={setMaxOpenSessions}
+    <Drawer
+      open={!!vk}
+      onClose={close}
+      title="Edit virtual key"
+      size="md"
+      busy={updateMutation.isPending}
+      footer={{
+        note: noteAfterAttempt({ attempted, reason: cannotSaveReason }),
+        cancel: { label: "Cancel", onClick: close },
+        primaryAction: {
+          label: "Save changes",
+          loading: updateMutation.isPending,
+          disabledReason: loadingReason(orgProvidersQuery.isLoading),
+          onClick: () => void submit(),
+        },
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Field.Root required invalid={attempted && !name}>
+          <Field.Label>
+            Name
+            <FieldInfoTooltip
+              description="A name to help you recognize this key in the list and audit log. Renaming it changes nothing else: the key and its secret stay the same."
+              docHref="/ai-gateway/virtual-keys#creating-a-vk"
             />
-            {vk && (
-              <>
-                <Separator />
-                <VirtualKeyExpirationSection
-                  value={expiration}
-                  onChange={setExpiration}
-                  fieldError={expiryFieldError}
-                />
-              </>
-            )}
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            {cannotSaveReason && (
-              <Text fontSize="xs" color="fg.muted">
-                {cannotSaveReason}
-              </Text>
-            )}
-            <Spacer />
-            <Button variant="ghost" onClick={close} disabled={updateMutation.isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              onClick={submit}
-              loading={updateMutation.isPending}
-              disabled={!!cannotSaveReason}
-            >
-              Save changes
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          </Field.Label>
+          <Input
+            ref={nameInput}
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            maxLength={128}
+          />
+          <Field.ErrorText>Name is required.</Field.ErrorText>
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>Description</Field.Label>
+          <Textarea value={description} onChange={(e) => setDescription(e.target.value)} />
+        </Field.Root>
+        <Field.Root>
+          <Field.Label>
+            Tags
+            <FieldInfoTooltip
+              description={VK_TAGS_FIELD_DESCRIPTION}
+              docHref="/ai-gateway/cache-control#cache-rules"
+              testId="vk-tags-info"
+            />
+          </Field.Label>
+          <Input
+            value={tagsCsv}
+            onChange={(e) => setTagsCsv(e.target.value)}
+            placeholder="e.g. tier=enterprise, team=ml"
+            maxLength={TAGS_CSV_MAX_LENGTH}
+          />
+          {tagsNotice && <Field.HelperText color="orange.fg">{tagsNotice}</Field.HelperText>}
+        </Field.Root>
+
+        {vk && (
+          <>
+            <Separator />
+            <VirtualKeyOwnershipReadOnly
+              scopes={vk.scopes}
+              principal={vk.principalUserId && vk.principalUser ? vk.principalUser : undefined}
+              traceProjectId={vk.traceProjectId ?? null}
+              traceProjectArchived={vk.traceProjectArchived ?? false}
+              viewTracesHref={viewTracesHref}
+              ctx={{
+                organizationName: organization?.name,
+                availableTeams,
+                availableProjects,
+              }}
+            />
+
+            <Separator />
+            <VirtualKeyBudgetSection
+              value={budget}
+              onChange={(next) => {
+                setIsBudgetDirty(true);
+                setBudget(next);
+              }}
+              organizationId={organizationId}
+              scopes={vk.scopes}
+              traceProjectId={vk.traceProjectId ?? null}
+              principalUserId={vk.principalUserId ?? null}
+              virtualKeyId={vk.id}
+            />
+
+            <Separator />
+            <VirtualKeyProviderAccessSection
+              value={providerAccess}
+              onChange={setProviderAccess}
+              scopes={vk.scopes}
+              organizationId={organizationId}
+              organizationName={organization?.name}
+              availableTeams={availableTeams}
+              availableProjects={availableProjects}
+              providers={providers}
+              isLoading={orgProvidersQuery.isLoading}
+            />
+
+            <Separator />
+            <VirtualKeyRoutingSection value={routing} onChange={setRouting} policies={policies} />
+          </>
+        )}
+
+        <VirtualKeyLimitsFields
+          cacheMode={cacheMode}
+          cacheTtlS={cacheTtlS}
+          rpm={rpm}
+          tpm={tpm}
+          rpd={rpd}
+          maxOpenSessions={maxOpenSessions}
+          onCacheModeChange={setCacheMode}
+          onCacheTtlSChange={setCacheTtlS}
+          onRpmChange={setRpm}
+          onRpdChange={setRpd}
+          onMaxOpenSessionsChange={setMaxOpenSessions}
+        />
+        {vk && (
+          <>
+            <Separator />
+            <VirtualKeyExpirationSection
+              value={expiration}
+              onChange={setExpiration}
+              fieldError={expiryFieldError}
+            />
+          </>
+        )}
+      </VStack>
+    </Drawer>
   );
 }

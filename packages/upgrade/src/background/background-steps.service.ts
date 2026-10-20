@@ -1,5 +1,8 @@
+import type { ListedRun, ListedWork } from "@langwatch/eventing";
+import { generate } from "@langwatch/ksuid";
+
 import type { UpgradeStep } from "../ledger.ts";
-import type { MigrationStep, MigrationStepReport } from "../step/migration-step.ts";
+import type { MigrationStep } from "../step/migration-step.ts";
 
 /** The ledger writes a background run needs; the two upgrade repositories answer them as built. */
 export interface BackgroundStepsLedger {
@@ -22,6 +25,8 @@ export interface BackgroundStepsLedger {
     report?: Record<string, unknown>;
   }): Promise<void>;
   saveReport(input: { id: string; report: Record<string, unknown> }): Promise<void>;
+  /** Sets a running step pending with its checkpoint cleared, as a rollback reopens a done one. */
+  reopen(input: { ids: readonly string[]; reason: string }): Promise<string[]>;
 }
 
 export type BackgroundStepsLog = (
@@ -63,6 +68,9 @@ export const BACKGROUND_STEP_RETRY: BackgroundStepRetry = {
 /** A swept run past this aborts, keeps its checkpoint and is pending again (ARCHITECTURE.md §7). */
 export const BACKGROUND_STEP_DEADLINE_MS = 15 * 60_000;
 
+/** How many background steps one worker runs side by side; each still holds its own lease. */
+export const BACKGROUND_STEP_CONCURRENCY = 3;
+
 /** How often the worker looks for a background step to run. */
 export const BACKGROUND_SWEEP_EVERY_MS = 30_000;
 
@@ -84,16 +92,34 @@ export interface BackgroundStepsOptions {
   renewEveryMs?: number;
   retry?: BackgroundStepRetry;
   deadlineMs?: number;
-  /** A monotonic clock in milliseconds, for the retry backoff. */
+  /** A monotonic clock in milliseconds, for the retry backoff and the lease's last renewal. */
   now?: () => number;
+  /** Where a step's queue work runs ahead of any backlog and is waited for (Alex, 2026-10-11). */
+  queue?: BackgroundStepsQueue;
+  /** How many steps run side by side; defaults to `BACKGROUND_STEP_CONCURRENCY`. */
+  concurrency?: number;
 }
+
+/** The job queue's listed runs: a run's jobs, and the jobs they cause, run ahead of any backlog. */
+export interface BackgroundStepsQueue {
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result>;
+}
+
+/** How long a step waits for its queue work unless it declares `queueWaitMs`. */
+export const BACKGROUND_STEP_QUEUE_WAIT_MS = 5 * 60_000;
+
+/**
+ * A step's own jobs left waiting or running before its next checkpoint saves: the page it sent
+ * must mostly run first, so a backfill never floods the queue ahead of live work (2026-10-12).
+ */
+export const BACKGROUND_STEP_MAX_OUTSTANDING_JOBS = 1_000;
 
 type StepOutcome = "done" | "failed" | "retrying" | "held" | "waiting" | "skipped";
 
 /**
- * Runs the background steps the worker's modules declare (ADR-173 §1, round 14: the framework
- * runs). One step at a time under its own lease, only while the process serves, and a step that
- * needs old writers gone only once the serving roster says so. Spec: background-steps.feature.
+ * Runs the background steps the worker's modules declare (ADR-173 §1), a few side by side under
+ * their own leases while the process serves; an `after` step waits for its predecessors, and one
+ * needing old writers gone waits for the serving roster. Spec: background-steps.feature.
  */
 export class BackgroundStepsService {
   /** This worker's failed attempts per step, and when the next may start. */
@@ -105,7 +131,11 @@ export class BackgroundStepsService {
     return new BackgroundStepsService(options);
   }
 
-  /** One pass over the declared steps in declaration order; never throws for a step's failure. */
+  /**
+   * One pass, steps started in declaration order a few at a time; never throws for a step's
+   * failure. `after` reads the pass's snapshot, so a prerequisite done mid-pass frees its
+   * dependants on the next pass, never beside it.
+   */
   async sweep({ signal }: { signal: AbortSignal }): Promise<BackgroundSweep> {
     const sweep = { ran: [] as string[], failed: [] as string[], waiting: [] as string[] };
     const retrying: string[] = [];
@@ -115,25 +145,36 @@ export class BackgroundStepsService {
     );
     if (declared.length === 0) return { paused: false, ...sweep, retrying };
     const rows = new Map((await this.options.ledger.findSteps()).map((row) => [row.id, row]));
+    const outcomes = new Map<string, StepOutcome>();
+    let paused = false;
+    let thrown: { error: unknown } | undefined;
+    await eachInLanes({
+      items: declared,
+      width: Math.max(1, this.options.concurrency ?? BACKGROUND_STEP_CONCURRENCY),
+      stop: () => signal.aborted || paused || thrown !== undefined,
+      each: async (step) => {
+        if (!this.options.serving()) {
+          paused = true;
+          return;
+        }
+        try {
+          outcomes.set(
+            step.id,
+            await this.sweepOne({ step, row: rows.get(step.id), rows, signal }),
+          );
+        } catch (error) {
+          // A ledger read or lease call that throws ends the pass, as it did one step at a time.
+          thrown ??= { error };
+        }
+      },
+    });
+    if (thrown) throw thrown.error;
     const by = { done: sweep.ran, failed: sweep.failed, waiting: sweep.waiting, retrying };
     for (const step of declared) {
-      if (signal.aborted) break;
-      if (!this.options.serving()) return { paused: true, ...sweep, retrying };
-      const outcome = await this.sweepOne({ step, row: rows.get(step.id), rows, signal });
-      if (outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
+      const outcome = outcomes.get(step.id);
+      if (outcome && outcome !== "skipped" && outcome !== "held") by[outcome].push(step.id);
     }
-    return { paused: false, ...sweep, retrying };
-  }
-
-  /**
-   * Runs one step now, as `upgrade` does before a contract step (Alex, 2026-10-09): forced, so
-   * neither serving nor the serving roster is asked. A step not pending or running is skipped.
-   */
-  async runNow({ id, signal }: { id: string; signal: AbortSignal }): Promise<StepOutcome> {
-    const step = this.options.steps.find((each) => each.id === id);
-    const row = (await this.options.ledger.findSteps()).find((each) => each.id === id);
-    if (!step || !row || !RUNNABLE.has(row.status)) return "skipped";
-    return this.runLeased({ step, resumeFrom: row.report ?? null, signal });
+    return { paused, ...sweep, retrying };
   }
 
   private now(): number {
@@ -160,22 +201,20 @@ export class BackgroundStepsService {
       !step.needsOldWritersGone || (await this.options.oldWritersGoneFor({ stepId: step.id }));
     if (!gone) return "waiting";
     const deadlineMs = this.options.deadlineMs ?? BACKGROUND_STEP_DEADLINE_MS;
-    return this.runLeased({ step, resumeFrom: row.report ?? null, signal, deadlineMs });
+    return this.runLeased({ step, signal, deadlineMs });
   }
 
   /**
    * Runs one step under its lease, renewed on a timer; a refused renewal aborts the run. A run
    * that ends aborted is never recorded done or failed: its checkpoint stays for the next attempt.
-   * Past `deadlineMs` the run is no longer awaited, so a step that ignores its signal cannot stall.
+   * Past `deadlineMs` the run is no longer awaited, but its lease is renewed until it settles.
    */
   private async runLeased({
     step,
-    resumeFrom,
     signal,
     deadlineMs,
   }: {
     step: MigrationStep;
-    resumeFrom: MigrationStepReport | null;
     signal: AbortSignal;
     deadlineMs?: number;
   }): Promise<StepOutcome> {
@@ -187,28 +226,39 @@ export class BackgroundStepsService {
     const module = moduleOf(step.id);
     const runId = `background:${identity.owner}`;
     const held = this.holdLease({ name, ttlMs, signal, step: step.id, deadlineMs });
+    let run: ReturnType<MigrationStep["run"]> | undefined;
     try {
-      // Another worker may have finished it between the read and the lease.
+      // Another worker may have finished it, or moved its checkpoint, since the sweep read it.
       const current = (await ledger.findSteps()).find((row) => row.id === step.id);
       if (!current || !RUNNABLE.has(current.status)) return "held";
+      const resumeFrom = current.report ?? null;
       await ledger.markRunning({ id: step.id, runId });
       log("info", "background step started", { step: step.id, module, resumed: !!resumeFrom });
-      const run = step.run({
-        checkpoint: {
-          resumeFrom,
-          save: async ({ report: saved }) => {
-            if (held.lost())
-              throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
-            if (held.expired())
-              throw new Error(`${step.id} passed its deadline; checkpoint refused`);
-            await ledger.saveReport({ id: step.id, report: saved });
-          },
-        },
-        dryRun: false,
-        signal: held.signal,
+      run = this.runQueueWork({
+        step,
+        work: (list) =>
+          step.run({
+            checkpoint: {
+              resumeFrom,
+              save: async ({ report: saved }) => {
+                await list?.waitForRoom({
+                  maxOutstanding: BACKGROUND_STEP_MAX_OUTSTANDING_JOBS,
+                  signal: held.signal,
+                });
+                if (held.lost())
+                  throw new Error(`the lease of ${step.id} was lost; checkpoint refused`);
+                if (held.expired())
+                  throw new Error(`${step.id} passed its deadline; checkpoint refused`);
+                await ledger.saveReport({ id: step.id, report: saved });
+              },
+            },
+            dryRun: false,
+            signal: held.signal,
+          }),
       });
       const report = await Promise.race([run, held.deadline]);
       if (held.signal.aborted) return await this.suspend({ step, runId, held });
+      if (await this.reopenedByRollback({ step })) return "waiting";
       await ledger.setStatus({ ids: [step.id], status: "done", runId, report });
       this.failures.delete(step.id);
       log("info", "background step done", { step: step.id, module });
@@ -217,12 +267,67 @@ export class BackgroundStepsService {
       if (held.signal.aborted) return await this.suspend({ step, runId, held });
       return await this.recordFailure({ step, runId, error });
     } finally {
-      held.stop();
-      if (!held.lost()) await ledger.releaseLease({ name, owner: identity.owner });
+      await this.releaseWhenSettled({ step: step.id, held, run });
     }
   }
 
-  /** Renews the lease on a timer; the sweep, a lost lease or the deadline abort the run. */
+  /**
+   * A step's run on a queue list of its own: done only once every job it sent, and every job
+   * those caused, has run. A failed or blocked job, or the wait running out, fails this run alone.
+   */
+  private runQueueWork<Result>({
+    step,
+    work,
+  }: {
+    step: MigrationStep;
+    work: (list?: ListedRun) => Promise<Result>;
+  }): Promise<Result> {
+    const queue = this.options.queue;
+    if (!queue) return work();
+    return queue.runListedWork({
+      name: `upgrade-step:${step.id}:${generate("steprun").toString()}`,
+      timeoutMs: step.queueWaitMs ?? BACKGROUND_STEP_QUEUE_WAIT_MS,
+      work,
+    });
+  }
+
+  /** A run cut at its deadline may still write: no second copy starts until it settles. */
+  private async releaseWhenSettled({
+    step,
+    held,
+    run,
+  }: {
+    step: string;
+    held: { expired: () => boolean; release: () => Promise<void> };
+    run: Promise<unknown> | undefined;
+  }): Promise<void> {
+    if (!held.expired() || !run) return held.release();
+    const release = () => held.release();
+    void run.then(release, release).catch((error: unknown) => {
+      this.options.log("warn", "background step lease not released", {
+        step,
+        error: messageOf(error),
+      });
+    });
+  }
+
+  /** A rollback while it ran (an older image serving again) reopens it, never recording it done. */
+  private async reopenedByRollback({ step }: { step: MigrationStep }): Promise<boolean> {
+    if (!step.needsOldWritersGone) return false;
+    if (await this.options.oldWritersGoneFor({ stepId: step.id })) return false;
+    const reason = `an older image started serving while ${step.id} ran; it runs again once old writers are gone`;
+    await this.options.ledger.reopen({ ids: [step.id], reason });
+    this.options.log("warn", "background step reopened: an older image serves again", {
+      step: step.id,
+      module: moduleOf(step.id),
+    });
+    return true;
+  }
+
+  /**
+   * Renews the lease on a timer; the sweep, a lost lease or the deadline abort the run. A renewal
+   * that never answers loses the lease once the time to live less one interval has passed.
+   */
   private holdLease({
     name,
     ttlMs,
@@ -237,6 +342,7 @@ export class BackgroundStepsService {
     deadlineMs?: number;
   }) {
     const { ledger, identity, log } = this.options;
+    const everyMs = this.options.renewEveryMs ?? BACKGROUND_STEP_RENEW_EVERY_MS;
     const controller = new AbortController();
     const onStop = () => controller.abort(signal.reason);
     signal.addEventListener("abort", onStop, { once: true });
@@ -247,22 +353,30 @@ export class BackgroundStepsService {
       log("warn", "background step lease lost; stopping the step", { step, reason });
       controller.abort(new Error(reason));
     };
+    let renewedAt = this.now();
+    let renewing = false;
     const renew = async () => {
+      if (this.now() - renewedAt >= ttlMs - everyMs)
+        return lose("the lease was not renewed in time");
+      if (renewing) return;
+      renewing = true;
+      const sentAt = this.now();
       try {
         const renewed = await ledger.renewLease({ name, owner: identity.owner, ttlMs });
-        if (!renewed) lose("another worker holds the lease");
+        if (renewed) renewedAt = Math.max(renewedAt, sentAt);
+        else lose("another worker holds the lease");
       } catch (error) {
         lose(`the lease could not be renewed: ${messageOf(error)}`);
+      } finally {
+        renewing = false;
       }
     };
-    const timer = setInterval(
-      () => void renew(),
-      this.options.renewEveryMs ?? BACKGROUND_STEP_RENEW_EVERY_MS,
-    );
+    const timer = setInterval(() => void renew(), everyMs);
     timer.unref?.();
     let expired = false;
     let expire: (reason: Error) => void = () => undefined;
     const deadline = new Promise<never>((_, reject) => (expire = reject));
+    deadline.catch(() => undefined);
     const deadlineTimer =
       deadlineMs === undefined
         ? undefined
@@ -279,16 +393,20 @@ export class BackgroundStepsService {
             expire(reason);
           }, deadlineMs);
     deadlineTimer?.unref?.();
+    let released: Promise<void> | undefined;
     return {
       signal: controller.signal,
       deadline,
       lost: () => lost,
       expired: () => expired,
-      stop: () => {
-        clearInterval(timer);
-        clearTimeout(deadlineTimer);
-        signal.removeEventListener("abort", onStop);
-      },
+      /** Stops renewing and releases the lease, once; a lost lease is another holder's. */
+      release: () =>
+        (released ??= (async () => {
+          clearInterval(timer);
+          clearTimeout(deadlineTimer);
+          signal.removeEventListener("abort", onStop);
+          if (!lost) await ledger.releaseLease({ name, owner: identity.owner });
+        })()),
     };
   }
 
@@ -348,6 +466,28 @@ export class BackgroundStepsService {
     });
     return "failed";
   }
+}
+
+/** Runs `each` over the items in order, at most `width` at once, taking none once `stop` says. */
+async function eachInLanes<Item>({
+  items,
+  width,
+  stop,
+  each,
+}: {
+  items: readonly Item[];
+  width: number;
+  stop: () => boolean;
+  each: (item: Item) => Promise<void>;
+}): Promise<void> {
+  const pending = [...items];
+  const lane = async (): Promise<void> => {
+    while (pending.length > 0 && !stop()) {
+      const item = pending.shift();
+      if (item !== undefined) await each(item);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, lane));
 }
 
 /** The worker's loop over one service: a pass now, then one every `everyMs`, stopped by `stop`. */

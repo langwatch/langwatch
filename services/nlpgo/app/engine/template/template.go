@@ -19,11 +19,13 @@ package template
 import (
 	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
 
 	"github.com/osteele/liquid"
+	"github.com/osteele/liquid/render"
 )
 
 // Render replaces {{ variable.path }} placeholders in template using
@@ -176,9 +178,23 @@ func nthOf(v any, i int) any {
 	return arr[i]
 }
 
-// liquidEngine is the singleton osteele/liquid engine used by RenderFull.
-// Created lazily so package init stays lightweight.
-var liquidEngine = liquid.NewEngine()
+// liquidEngine is the singleton osteele/liquid engine used by RenderFull
+// and EvaluateCondition. Templates are customer input, so tags that read
+// files from the server (`include`, `render`) refuse instead of running.
+var liquidEngine = newSandboxedEngine()
+
+// errFileTagRefused is what a template using a file-reading tag gets.
+var errFileTagRefused = errors.New("templates cannot include or render files")
+
+func newSandboxedEngine() *liquid.Engine {
+	engine := liquid.NewEngine()
+	for _, tag := range []string{"include", "render"} {
+		engine.RegisterTag(tag, func(render.Context) (string, error) {
+			return "", errFileTagRefused
+		})
+	}
+	return engine
+}
 
 // liquidControlFlowOrFilterRE matches templates that use Liquid features
 // beyond simple `{{ var }}` interpolation — `{% tag %}` blocks or

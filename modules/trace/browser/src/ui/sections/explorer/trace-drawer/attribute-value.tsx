@@ -226,7 +226,7 @@ function FormatToggle({
         color="fg.muted"
         letterSpacing="0.06em"
         textTransform="uppercase"
-        fontWeight="600"
+        fontWeight="semibold"
       >
         Format
       </Text>
@@ -315,7 +315,7 @@ function ChatRow({ message }: { message: ChatMessage }) {
         <Icon as={RoleIcon} boxSize={3} color={known ? "fg.muted" : "fg.subtle"} />
         <Text
           textStyle="2xs"
-          fontWeight="700"
+          fontWeight="semibold"
           color={known ? "fg" : "fg.muted"}
           textTransform="uppercase"
           letterSpacing="0.08em"

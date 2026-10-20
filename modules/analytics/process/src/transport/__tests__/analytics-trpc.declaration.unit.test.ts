@@ -4,14 +4,37 @@
  * @vitest-environment node
  */
 import { analyticsLwqlTrpc, analyticsTrpc } from "@langwatch/analytics-contract";
+import type { TrpcProcedureFactory } from "@langwatch/api/trpc";
 import { describe, expect, it } from "vitest";
 
 import { analyticsLwqlTrpcTransport } from "../analytics-lwql.trpc.ts";
 import { analyticsTrpcTransport } from "../analytics.trpc.ts";
 
+type ProcedureAccess = Parameters<TrpcProcedureFactory<object>["procedure"]>[0]["access"];
+
+/** Records the permission each declared procedure asked for, in declaration order. */
+function permissionsDeclaredBy(declaration: {
+  router(runtime: TrpcProcedureFactory<object>, app: (ctx: object) => never): unknown;
+}): (string | ProcedureAccess)[] {
+  const declared: (string | ProcedureAccess)[] = [];
+  declaration.router(
+    {
+      procedure: ({ access }) => {
+        declared.push(access.kind === "permission" ? access.permission : access);
+        return {};
+      },
+      router: (record) => record,
+    },
+    () => {
+      throw new Error("This test mounts but never handles a request");
+    },
+  );
+  return declared;
+}
+
 describe("given the analytics tRPC contract", () => {
   describe("when its members are read", () => {
-    it("declares the four charted reads the analytics pages call", () => {
+    it("declares the charted reads and the paged feedbacks read the analytics pages call", () => {
       expect(
         Object.entries(analyticsTrpc.members).map(([name, member]) => [name, member.kind]),
       ).toEqual([
@@ -19,6 +42,26 @@ describe("given the analytics tRPC contract", () => {
         ["dataForFilter", "query"],
         ["topUsedDocuments", "query"],
         ["feedbacks", "query"],
+        ["feedbacksPage", "query"],
+      ]);
+    });
+
+    /** @scenario "The feedback page read needs the same permission as the feedback read" */
+    it("guards the feedback page read with the permission the feedback read has", () => {
+      const declared = permissionsDeclaredBy(analyticsTrpcTransport);
+
+      expect(
+        Object.entries(analyticsTrpc.members).map(([name, member], index) => [
+          name,
+          member.kind,
+          declared[index],
+        ]),
+      ).toEqual([
+        ["getTimeseries", "query", "analytics:view"],
+        ["dataForFilter", "query", "analytics:view"],
+        ["topUsedDocuments", "query", "cost:view"],
+        ["feedbacks", "query", "cost:view"],
+        ["feedbacksPage", "query", "cost:view"],
       ]);
     });
 

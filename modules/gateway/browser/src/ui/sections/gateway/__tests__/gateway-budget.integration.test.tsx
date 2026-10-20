@@ -100,7 +100,7 @@ describe("budget detail page", () => {
       renderPage(MANAGE);
 
       expect(screen.getAllByText("Engineering monthly").length).toBeGreaterThan(0);
-      expect(screen.getByRole("button", { name: /Audit history/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Audit history/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Reset period/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Edit/ })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /Archive/ })).toBeInTheDocument();
@@ -111,7 +111,7 @@ describe("budget detail page", () => {
     it("offers only the audit history", () => {
       renderPage([]);
 
-      expect(screen.getByRole("button", { name: /Audit history/ })).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /Audit history/ })).toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Reset period/ })).not.toBeInTheDocument();
       expect(screen.queryByRole("button", { name: /Archive/ })).not.toBeInTheDocument();
     });

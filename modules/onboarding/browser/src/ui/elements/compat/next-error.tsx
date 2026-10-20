@@ -1,3 +1,5 @@
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
+
 /**
  * Replacement for next/error — simple error page component.
  */
@@ -16,7 +18,7 @@ export default function ErrorPage({ statusCode, title }: { statusCode?: number; 
         {statusCode && (
           <h1
             style={{
-              fontSize: "2rem",
+              fontSize: TYPE_SCALE_PX.pageTitle,
               fontWeight: 700,
               margin: "0 0 0.5rem",
             }}
@@ -24,7 +26,7 @@ export default function ErrorPage({ statusCode, title }: { statusCode?: number; 
             {statusCode}
           </h1>
         )}
-        <p style={{ fontSize: "1rem", color: "var(--chakra-colors-fg-muted)" }}>
+        <p style={{ fontSize: TYPE_SCALE_PX.body, color: "var(--chakra-colors-fg-muted)" }}>
           {title ?? "An error occurred"}
         </p>
       </div>

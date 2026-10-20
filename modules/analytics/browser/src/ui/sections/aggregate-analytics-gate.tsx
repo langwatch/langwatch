@@ -1,10 +1,10 @@
+import { Link } from "@langwatch/browser-host/link";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert } from "@langwatch/design-system/primitives";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import type { ComponentType } from "react";
 
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { Link } from "../elements/analytics-link.tsx";
 
 /**
  * The page an analytics address renders on an aggregate project (ADR-177): the heading and a
@@ -17,18 +17,17 @@ function AggregateAnalyticsPage({ title, projectSlug }: { title: string; project
         <PageLayout.Heading>{title}</PageLayout.Heading>
       </PageLayout.Header>
       <PageLayout.Container>
-        <Alert.Root status="info" size="sm" variant="subtle" width="full">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              Analytics across member projects is not available yet.{" "}
-              <Link href={`/${projectSlug}/traces`} color="fg">
-                Open Trace Explorer
-              </Link>{" "}
-              to see member traces.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner
+          status="info"
+          title="Analytics across member projects is not available yet"
+          action={
+            <BannerAction asChild>
+              <Link href={`/${projectSlug}/traces`}>Open Trace Explorer</Link>
+            </BannerAction>
+          }
+        >
+          Open Trace Explorer to see member traces.
+        </Banner>
       </PageLayout.Container>
     </>
   );

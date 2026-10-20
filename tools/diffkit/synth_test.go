@@ -25,7 +25,7 @@ func TestSynthesizePayloadEmitsRequiredFieldsOnly(t *testing.T) {
 
 func TestSynthesizePayloadIsFormatAware(t *testing.T) {
 	if got := SynthesizePayload(map[string]any{"type": "string", "format": "email"}, 0); got != synthEmail {
-		t.Fatalf("email format not honoured: %v", got)
+		t.Fatalf("email format not honored: %v", got)
 	}
 }
 

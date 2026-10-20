@@ -22,43 +22,47 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/api-key/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/auth/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/otlp/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
+      "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/secrets/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/time/tsconfig.build.json"
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/otlp/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/api-key/contract/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/api",
+        "@langwatch/model-provider-contract",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

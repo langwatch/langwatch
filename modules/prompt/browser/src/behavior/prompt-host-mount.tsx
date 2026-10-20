@@ -15,6 +15,7 @@ import {
 } from "@langwatch/browser-host/capabilities";
 import { readerUiStorage } from "@langwatch/browser-host/storage";
 import type { UiScopeHost } from "@langwatch/browser-host/use-organization-team-project";
+import { createLogger } from "@langwatch/observability/browser";
 import { useMemo, type ReactNode } from "react";
 
 import type { PromptBrowserLogger, PromptTabsCapabilities } from "../model/browser-capabilities.ts";
@@ -30,11 +31,7 @@ import {
   type PromptSuccessNotice,
 } from "../model/prompt-host.ts";
 
-const promptBrowserLogger: PromptBrowserLogger = {
-  info: (...args: unknown[]) => console.info(...args),
-  warn: (...args: unknown[]) => console.warn(...args),
-  error: (...args: unknown[]) => console.error(...args),
-};
+const promptBrowserLogger: PromptBrowserLogger = createLogger("langwatch:prompt:host");
 
 /** The reader's own storage, so open tabs are theirs alone and sign-out forgets them. */
 const promptTabsCapabilities: PromptTabsCapabilities = {

@@ -84,4 +84,16 @@ describe("InstanceDetailDrawer", () => {
       expect(screen.getByText("1.2K")).toBeTruthy();
     });
   });
+
+  describe("given an install that has stored no reports", () => {
+    it("tells the operator what to check", () => {
+      renderDrawer(instance());
+
+      expect(
+        screen.getByText(
+          "No reports stored yet. Ask the instance administrator to check that usage reporting is configured and the instance can reach LangWatch.",
+        ),
+      ).toBeTruthy();
+    });
+  });
 });

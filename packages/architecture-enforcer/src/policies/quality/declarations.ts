@@ -179,31 +179,14 @@ function compiles(project: ts.ParsedCommandLine, pkg: ClassifiedPackage): boolea
   return project.fileNames.some((file) => file.startsWith(`${pkg.root}${sep}`));
 }
 
-/**
- * The project that emits a package's declarations: its own build configuration,
- * or — for the web packages, whose build configuration carries no sources of its
- * own — the shared declaration group it references.
- */
+/** The project that emits a package's declarations: its own build configuration. */
 function emittingProject(
   pkg: ClassifiedPackage,
   parsed: ParsedProjects,
 ): ts.ParsedCommandLine | undefined {
   const build = parseProject(join(pkg.root, "tsconfig.build.json"), parsed);
-  if (!build) return void 0;
 
-  if (compiles(build, pkg)) return build;
-
-  for (const reference of build.projectReferences ?? []) {
-    const configPath = reference.path.endsWith(".json")
-      ? reference.path
-      : join(reference.path, "tsconfig.json");
-
-    const referenced = parseProject(configPath, parsed);
-
-    if (referenced && compiles(referenced, pkg)) return referenced;
-  }
-
-  return void 0;
+  return build && compiles(build, pkg) ? build : void 0;
 }
 
 /** Each of the package's sources against the declaration the build writes for it. */

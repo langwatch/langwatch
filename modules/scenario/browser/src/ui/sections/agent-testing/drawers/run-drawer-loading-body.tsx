@@ -5,7 +5,6 @@
  */
 
 import { Box, Grid, Skeleton, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 
 /** How wide the results column reads beside the conversation. */
 const RESULTS_COLUMN_WIDTH = "310px";
@@ -49,18 +48,16 @@ function ResultsColumnSkeleton() {
 
 export function RunDrawerLoadingBody() {
   return (
-    <Drawer.Body
-      paddingY={0}
-      paddingX={0}
+    <Box
       display="flex"
       flexDirection="column"
+      flex={1}
+      minHeight={0}
       width="full"
-      height="full"
       overflow="hidden"
-      bg={"bg.card"}
+      bg="bg.card"
       data-testid="run-drawer-loading"
     >
-      <Drawer.CloseTrigger />
       <Grid
         templateColumns={`minmax(0, 1fr) minmax(0, ${RESULTS_COLUMN_WIDTH})`}
         flex={1}
@@ -73,6 +70,6 @@ export function RunDrawerLoadingBody() {
           <ResultsColumnSkeleton />
         </Box>
       </Grid>
-    </Drawer.Body>
+    </Box>
   );
 }

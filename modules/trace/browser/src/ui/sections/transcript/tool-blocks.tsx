@@ -115,7 +115,7 @@ function ToolPairHeader({
       {isError && (
         <Text
           textStyle="2xs"
-          fontWeight="600"
+          fontWeight="semibold"
           color="red.fg"
           textTransform="uppercase"
           letterSpacing="0.06em"

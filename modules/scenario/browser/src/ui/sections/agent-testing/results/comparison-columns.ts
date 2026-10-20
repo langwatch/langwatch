@@ -21,14 +21,30 @@ export function targetColumnWidth(targets: readonly { label: string }[]): number
   return Math.min(Math.max(TARGET_COLUMN_MIN_WIDTH, needed), TARGET_COLUMN_MAX_WIDTH);
 }
 
-/** The grid template the header and every row of the table are drawn on. */
+/** The scenario column's share of the width, against one share per target column. */
+const SCENARIO_SHARE = 1.2;
+/** The padding a table cell holds beside its content, both sides together. */
+const CELL_PADDING = 28;
+
+/**
+ * How the table lays its columns out: each column a share of the width (the scenario 1.2,
+ * each target 1), and the width under which it scrolls rather than squeezing a column
+ * below its smallest width.
+ */
 export function comparisonColumns(targets: readonly { label: string }[]): {
-  template: string;
-  minWidth: string;
+  scenarioWidth: `${number}%`;
+  targetWidth: `${number}%`;
+  minWidth: `${number}px`;
 } {
   const width = targetColumnWidth(targets);
+  const shares = SCENARIO_SHARE + targets.length;
+  const perShare = Math.max(
+    (SCENARIO_COLUMN_WIDTH + CELL_PADDING) / SCENARIO_SHARE,
+    width + CELL_PADDING,
+  );
   return {
-    template: `minmax(${SCENARIO_COLUMN_WIDTH}px, 1.2fr) repeat(${targets.length}, minmax(${width}px, 1fr))`,
-    minWidth: `${SCENARIO_COLUMN_WIDTH + targets.length * width}px`,
+    scenarioWidth: `${Number(((SCENARIO_SHARE / shares) * 100).toFixed(3))}%`,
+    targetWidth: `${Number(((1 / shares) * 100).toFixed(3))}%`,
+    minWidth: `${Math.ceil(perShare * shares)}px`,
   };
 }

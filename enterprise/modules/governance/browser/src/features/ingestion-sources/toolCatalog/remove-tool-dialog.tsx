@@ -1,15 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
-import { Button, Text } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Text } from "@langwatch/design-system/primitives";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 
 /** Removing a tool is permanent, so it asks first and names the reversible alternative. */
@@ -25,36 +17,25 @@ export function RemoveToolDialog({
   onConfirm: () => void;
 }) {
   return (
-    <DialogRoot
+    <Dialog
       open={pending !== null}
-      onOpenChange={({ open }) => {
-        if (!open) onCancel();
-      }}
+      onClose={onCancel}
       placement="center"
+      role="alertdialog"
+      title={`Remove ${pending?.displayName ?? "tool"}?`}
+      busy={isRemoving}
+      primaryAction={{
+        label: "Remove tool",
+        onClick: onConfirm,
+        loading: isRemoving,
+        danger: true,
+      }}
     >
-      {pending && (
-        <DialogContent background="bg">
-          <DialogCloseTrigger />
-          <DialogHeader>
-            <DialogTitle>Remove {pending.displayName}?</DialogTitle>
-          </DialogHeader>
-          <DialogBody>
-            <Text fontSize="sm" color="fg.muted">
-              This removes the tool from the catalog and from every member&apos;s tools page, and it
-              cannot be undone. To take it off their page without losing how it is set up, unpublish
-              it instead.
-            </Text>
-          </DialogBody>
-          <DialogFooter>
-            <Button variant="outline" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button colorPalette="red" loading={isRemoving} onClick={onConfirm}>
-              Remove tool
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      )}
-    </DialogRoot>
+      <Text fontSize="sm" color="fg.muted">
+        This removes the tool from the catalog and from every member&apos;s tools page, and it
+        cannot be undone. To take it off their page without losing how it is set up, unpublish it
+        instead.
+      </Text>
+    </Dialog>
   );
 }

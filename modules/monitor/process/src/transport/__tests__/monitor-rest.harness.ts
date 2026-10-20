@@ -54,6 +54,7 @@ export function mountMonitorRest(
 
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: {
       authenticate: () => ({
         actor: { type: "user", id: "user-1" },

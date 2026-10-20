@@ -6,8 +6,10 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+
+import { GUIDED_MODEL_PROMPT_LINE } from "../panel/langy-panel-guided-model-prompt.tsx";
 
 const PROJECT_ID = "project-demo";
 
@@ -50,6 +52,19 @@ vi.mock("@langwatch/browser-host/drawer", () => ({
   }),
 }));
 
+const tour = vi.hoisted(() => ({
+  running: false,
+  replay: () => undefined,
+  putOff: vi.fn<(input: { organizationId: string }) => void>(),
+}));
+vi.mock("../../../behavior/use-guided-tour.ts", () => ({
+  useGuidedTour: () => ({
+    useRunning: () => tour.running,
+    useReplay: () => tour.replay,
+    usePutOffModelPrompt: () => tour.putOff,
+  }),
+}));
+
 vi.mock("../../elements/langy-model-pill.tsx", () => ({
   LangyModelPill: () => <div data-testid="model-pill" />,
 }));
@@ -85,10 +100,36 @@ vi.mock("../../../../../behavior/lent-edit-model-provider-form.tsx", () => ({
   ),
 }));
 
-/** Drives the gate query the inline model-setup branch reads. */
-const resolvedDefaultRef: {
-  current: { data: { model: string | null } | undefined; isLoading: boolean; isError: boolean };
-} = { current: { data: undefined, isLoading: false, isError: false } };
+type ResolvedDefault = {
+  data: { model: string | null } | undefined;
+  isLoading: boolean;
+  isError: boolean;
+};
+
+/**
+ * Drives the gate query the inline model-setup branch reads. Setting `current`
+ * notifies subscribers, as a real query does, so the compiled panel re-reads.
+ */
+const resolvedDefaultRef = vi.hoisted(() => {
+  let value: ResolvedDefault = { data: undefined, isLoading: false, isError: false };
+  let version = 0;
+  const listeners = new Set<() => void>();
+  return {
+    get current(): ResolvedDefault {
+      return value;
+    },
+    set current(next: ResolvedDefault) {
+      value = next;
+      version += 1;
+      listeners.forEach((listener) => listener());
+    },
+    subscribe: (listener: () => void) => {
+      listeners.add(listener);
+      return () => void listeners.delete(listener);
+    },
+    snapshot: () => version,
+  };
+});
 
 /**
  * Saving writes the provider key and the project default; the next
@@ -130,16 +171,20 @@ vi.mock("../../../../../behavior/langy-api.ts", async () => {
     useContext: () => trpcUtils,
     modelProvider: {
       getResolvedDefault: {
-        useQuery: () => ({
-          data: resolvedDefaultRef.current.data,
-          isLoading: resolvedDefaultRef.current.isLoading,
-          // Mirrors react-query's own relationship between the three fields:
-          // an errored query also reports isLoading false with data
-          // undefined, so the panel gates on isSuccess rather than !isLoading.
-          isSuccess: !resolvedDefaultRef.current.isLoading && !resolvedDefaultRef.current.isError,
-          isError: resolvedDefaultRef.current.isError,
-          refetch: refetchResolvedDefault,
-        }),
+        useQuery: () => {
+          "use no memo";
+          useSyncExternalStore(resolvedDefaultRef.subscribe, resolvedDefaultRef.snapshot);
+          return {
+            data: resolvedDefaultRef.current.data,
+            isLoading: resolvedDefaultRef.current.isLoading,
+            // Mirrors react-query's own relationship between the three fields:
+            // an errored query also reports isLoading false with data
+            // undefined, so the panel gates on isSuccess rather than !isLoading.
+            isSuccess: !resolvedDefaultRef.current.isLoading && !resolvedDefaultRef.current.isError,
+            isError: resolvedDefaultRef.current.isError,
+            refetch: refetchResolvedDefault,
+          };
+        },
       },
       listAllForProjectForFrontend: {
         useQuery: () => ({ data: [], isLoading: false }),
@@ -230,7 +275,14 @@ beforeEach(() => {
   resolvedDefaultRef.current = { data: undefined, isLoading: false, isError: false };
   refetchResolvedDefault.mockClear();
   sendMessage.mockClear();
-  useLangyStore.setState({ isOpen: true, panelMode: "floating", pendingPrompt: null });
+  tour.running = false;
+  tour.putOff.mockClear();
+  useLangyStore.setState({
+    isOpen: true,
+    panelMode: "floating",
+    pendingPrompt: null,
+    pendingKickoff: null,
+  });
 });
 
 afterEach(() => {
@@ -323,7 +375,7 @@ describe("given a project with no model and a question handed to Langy from a pa
     /** @scenario "A question handed to Langy waits for a model instead of failing" */
     it("holds the question behind the setup prompt and sends it once a model resolves", async () => {
       resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
-      const rendered = renderPanel();
+      renderPanel();
       act(() => {
         useLangyStore.getState().askLangy("Set up my first evaluator");
       });
@@ -334,12 +386,13 @@ describe("given a project with no model and a question handed to Langy from a pa
       expect(screen.getByText("Set up my first evaluator")).toBeInTheDocument();
       expect(screen.getByText("Langy sends this once a model is set up.")).toBeInTheDocument();
 
-      resolvedDefaultRef.current = {
-        data: { model: "gpt-5-mini" },
-        isLoading: false,
-        isError: false,
-      };
-      rendered.rerender(<LangySidecar />);
+      act(() => {
+        resolvedDefaultRef.current = {
+          data: { model: "gpt-5-mini" },
+          isLoading: false,
+          isError: false,
+        };
+      });
 
       await waitFor(() => {
         expect(sendMessage).toHaveBeenCalledTimes(1);
@@ -357,17 +410,13 @@ describe("given the Langy panel is showing the inline model setup", () => {
       const user = userEvent.setup();
       resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
 
-      const rendered = renderPanel();
+      renderPanel();
       expect(await screen.findByText("Langy needs a model to get started")).toBeInTheDocument();
 
       await user.type(screen.getByLabelText("Provider API Key"), "sk-test-key");
       await user.click(screen.getByRole("button", { name: "Save and continue" }));
 
       expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
-      // The real refetch notifies subscribers; this mutable query double needs
-      // an explicit rerender to model that update.
-      rendered.rerender(<LangySidecar />);
-
       await waitFor(() => {
         expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
       });
@@ -410,6 +459,100 @@ describe("given the project's model resolver fails to answer", () => {
       await waitFor(() => {
         expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
       });
+    });
+  });
+});
+
+const KICKOFF_BRIEF = "Guided onboarding kickoff.\nPath: llmops";
+const GUIDED_LINE = GUIDED_MODEL_PROMPT_LINE;
+
+/** The tour has ended: the host queues the kickoff, which waits on a model. */
+function queueKickoff() {
+  act(() => {
+    useLangyStore.getState().queueGuidedKickoff({
+      brief: KICKOFF_BRIEF,
+      parts: [
+        {
+          type: "guided-onboarding-kickoff",
+          path: "llmops",
+          paths: ["llmops"],
+          orgName: "ACME",
+          tourStatus: "completed",
+        },
+        { type: "text", text: KICKOFF_BRIEF },
+      ],
+      conversationId: null,
+    });
+  });
+}
+
+describe("given a guided onboarding whose provider step was skipped", () => {
+  beforeEach(() => {
+    resolvedDefaultRef.current = { data: { model: null }, isLoading: false, isError: false };
+  });
+
+  describe("when the panel renders while the tour plays", () => {
+    /** @scenario "The model setup waits while the guided tour plays" */
+    it("shows the running tour card and no model setup", async () => {
+      tour.running = true;
+      renderPanel();
+
+      expect(await screen.findByText("Doing guided tour")).toBeInTheDocument();
+      expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
+      expect(screen.queryByText(GUIDED_LINE)).not.toBeInTheDocument();
+      expect(screen.queryByTestId("edit-model-provider-form")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when the tour has ended and the kickoff waits to send", () => {
+    /** @scenario "After the tour Langy asks for a model inline, below the tour card" */
+    it("asks for a model in the conversation, below the tour card", async () => {
+      renderPanel();
+      queueKickoff();
+
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+      const card = screen.getByTestId("guided-tour-card");
+      expect(card.compareDocumentPosition(prompt) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+      expect(within(prompt).getByText(GUIDED_LINE)).toBeInTheDocument();
+      expect(within(prompt).getByRole("button", { name: "Later" })).toBeInTheDocument();
+      expect(within(prompt).getByTestId("edit-model-provider-form")).toBeInTheDocument();
+      expect(screen.queryByText("Langy needs a model to get started")).not.toBeInTheDocument();
+      expect(sendMessage).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the user connects a provider from the prompt", () => {
+    /** @scenario "Connecting a provider from the guided prompt sends the kickoff" */
+    it("drops the prompt and sends the kickoff once", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      queueKickoff();
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+
+      await user.click(within(prompt).getByRole("button", { name: "Save and continue" }));
+
+      expect(refetchResolvedDefault).toHaveBeenCalledTimes(1);
+      await waitFor(() => expect(sendMessage).toHaveBeenCalledTimes(1));
+      expect(JSON.stringify(sendMessage.mock.calls[0]?.[0])).toContain("guided-onboarding-kickoff");
+      expect(screen.queryByTestId("langy-guided-model-prompt")).not.toBeInTheDocument();
+      expect(useLangyStore.getState().pendingKickoff).toBeNull();
+    });
+  });
+
+  describe("when the user presses Later", () => {
+    /** @scenario "Later puts the guided model prompt away for good" */
+    it("records it on the organization, drops the kickoff unsent and closes the panel", async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      queueKickoff();
+      const prompt = await screen.findByTestId("langy-guided-model-prompt");
+
+      await user.click(within(prompt).getByRole("button", { name: "Later" }));
+
+      expect(tour.putOff).toHaveBeenCalledWith({ organizationId: "org-1" });
+      expect(useLangyStore.getState().pendingKickoff).toBeNull();
+      expect(useLangyStore.getState().isOpen).toBe(false);
+      expect(sendMessage).not.toHaveBeenCalled();
     });
   });
 });

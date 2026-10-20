@@ -92,12 +92,15 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       flexShrink={0}
       onClick={isGated ? undefined : onClick}
       color="purple.contrast"
-      fontWeight="600"
+      fontWeight="semibold"
       position="relative"
       overflow="hidden"
-      bg="transparent"
+      // Solid ground under the shader: with no WebGL/GPU the canvas paints
+      // nothing, and the contrast label would sit on the page background.
+      bg="purple.solid"
       boxShadow="0 1px 4px color-mix(in srgb, var(--chakra-colors-purple-fg) 25%, transparent), 0 0 0 1px color-mix(in srgb, var(--chakra-colors-accent-solid) 12%, transparent)"
       _dark={{
+        bg: "transparent",
         boxShadow:
           "0 1px 4px color-mix(in srgb, var(--chakra-colors-accent-solid) 16%, transparent)",
       }}
@@ -117,7 +120,16 @@ const AskAiButtonImpl: React.FC<AskAiButtonProps> = ({
       opacity={isGated ? 0.7 : 1}
       filter={isGated ? "saturate(0.7)" : undefined}
     >
-      <Box position="absolute" inset={0} zIndex={0} pointerEvents="none" _dark={{ opacity: 0.7 }}>
+      <Box
+        position="absolute"
+        inset={0}
+        zIndex={0}
+        pointerEvents="none"
+        _dark={{ opacity: 0.7 }}
+        // The same ramp in plain CSS under the shader: without WebGL the canvas stays
+        // transparent, and the label still sits on its gradient.
+        bgImage={`linear-gradient(120deg, ${palette.join(", ")})`}
+      >
         <MeshGradient
           colors={palette}
           distortion={0.5}

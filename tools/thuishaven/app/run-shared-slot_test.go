@@ -158,6 +158,12 @@ func (unavailableSemaphore) TryAcquire(string, int) (func(), int, bool, error) {
 	return nil, 0, false, errors.New("lock directory unavailable")
 }
 
+func (unavailableSemaphore) Holders(string) []domain.SlotClaim { return nil }
+
+func (unavailableSemaphore) TryAcquireUnits(string, int, domain.SlotClaim) (func(), bool, error) {
+	return nil, false, errors.New("lock directory unavailable")
+}
+
 func TestHookRunProceedsWhenSemaphoreStorageFails(t *testing.T) {
 	o, _ := sharedRunOrch(t)
 	o.sem = unavailableSemaphore{}
@@ -166,5 +172,34 @@ func TestHookRunProceedsWhenSemaphoreStorageFails(t *testing.T) {
 	}
 	if got := o.sup.(*fakeSupervisor).shells; len(got) != 1 || got[0] != "pnpm typecheck worker" {
 		t.Fatalf("failed queue storage blocked the command: %v", got)
+	}
+}
+
+// @scenario "The gate and haven machine typecheck take two units of the same budget"
+func TestGateTakesTwoUnitsOfTheSlotRunBudget(t *testing.T) {
+	o, sem := sharedRunOrch(t)
+	o.cfg.CheckEnv = domain.CheckEnv{CheckSlots: "4"} // 8 units
+	slotRun, ok, err := sem.TryAcquireUnits("checks", 8, domain.SlotClaim{PID: 4242, Class: "test", Units: 6})
+	if err != nil || !ok {
+		t.Fatalf("slot run take: ok=%v err=%v", ok, err)
+	}
+	defer slotRun()
+
+	_, queued, release, err := o.acquireCheckSlot(context.Background(), 2*time.Second)
+	if err != nil || queued {
+		t.Fatalf("the gate must take the 2 free units at once: queued=%v err=%v", queued, err)
+	}
+	holders := sem.Holders("checks")
+	if len(holders) != 2 || holders[1].Class != "check" || holders[1].Units != 2 {
+		t.Fatalf("holders = %+v, want the slot run's 6 and the gate's 2", holders)
+	}
+	if _, ok, _ := sem.TryAcquireUnits("checks", 8, domain.SlotClaim{PID: 4243, Units: 1}); ok {
+		t.Fatal("a full budget must admit nothing more")
+	}
+	release()
+	if _, queued, fallback, _ := o.acquireCheckSlot(context.Background(), 2*time.Second); queued {
+		t.Fatal("released gate units must be free again")
+	} else {
+		fallback()
 	}
 }

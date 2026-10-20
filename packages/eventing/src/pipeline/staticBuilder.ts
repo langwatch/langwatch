@@ -12,7 +12,11 @@ import {
 } from "../commands/sealedCommand.ts";
 import type { CommandType } from "../domain/commandType.ts";
 import { type AggregateDefinition, aggregateWithEvents } from "../domain/definitions.ts";
-import { indexEventSchemas, type PipelineEventSchema } from "../domain/eventSchemas.ts";
+import {
+  indexEventSchemas,
+  type ParsingSchema,
+  type PipelineEventSchema,
+} from "../domain/eventSchemas.ts";
 import type { Event, Projection } from "../domain/types.ts";
 import type {
   CommandHandlerOptions,
@@ -211,7 +215,7 @@ export class PipelineBuilder<
    * wherever either registers. Lane `<this pipeline>.<name>`, with its declared delay, dedup and
    * group; the handler gets the contract-parsed data, the event's instant, id and idempotency key.
    */
-  withPeerSubscriber<Data extends z.ZodType>(
+  withPeerSubscriber<Data extends ParsingSchema>(
     name: string,
     subscriber: PeerSubscriberDefinition<Data>,
   ): this {
@@ -770,7 +774,7 @@ export class PipelineDeclaration {
 }
 
 /** A peer subscriber's options on its lane, its data filter lifted to the staged event. */
-function peerSubscriberOptions<Data extends z.ZodType>(
+function peerSubscriberOptions<Data extends ParsingSchema>(
   subscriber: PeerSubscriberDefinition<Data>,
 ): EventSubscriberOptions | undefined {
   const { enqueue, ...options } = subscriber.options ?? {};

@@ -30,8 +30,7 @@ export function SessionPathInput({ value, onChange }: HttpSessionPathInputProps)
         value={value}
         onChange={(event) => onChange(event.target.value)}
         placeholder="$.conversation_id"
-        fontFamily="mono"
-        fontSize="13px"
+        textStyle="mono"
       />
     </Field.Root>
   );

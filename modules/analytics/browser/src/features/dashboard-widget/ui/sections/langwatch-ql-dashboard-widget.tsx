@@ -87,7 +87,7 @@ export function LangWatchQLDashboardWidget({
     return (
       <HStack gap={2} color="fg.muted" padding={4}>
         <Spinner size="sm" />
-        <Text fontSize="13px">Loading the chart</Text>
+        <Text textStyle="bodySm">Loading the chart</Text>
       </HStack>
     );
   }
@@ -123,7 +123,7 @@ function WidgetBody({
           as="output"
           display="block"
           data-testid="lwql-widget-coarsened-notice"
-          fontSize="12px"
+          textStyle="caption"
           color="fg.muted"
         >
           {widgetCoarsenedNotice({
@@ -150,7 +150,7 @@ export const LazyLangWatchQLWidgetChart = lazyBoundary<LangWatchQLWidgetChartPro
   () => (
     <HStack gap={2} color="fg.muted" padding={4}>
       <Spinner size="sm" />
-      <Text fontSize="13px">Loading the chart</Text>
+      <Text textStyle="bodySm">Loading the chart</Text>
     </HStack>
   ),
 );

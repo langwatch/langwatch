@@ -238,6 +238,36 @@ describe("given a shared link that carries a policy", () => {
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
   });
 
+  describe("when no page handed the editor a close action", () => {
+    const linkQuery = {
+      "drawer.open": "routingPolicy",
+      "drawer.policyId": "rp-1",
+      view: "all",
+    };
+    const renderFromLink = () => {
+      const host = adminHost(linkQuery);
+      renderWithGatewayHost(<RoutingPolicyDrawer policyId="rp-1" />, { host });
+      return host;
+    };
+
+    /** @scenario "An editor opened from a pasted link closes back to the page under it" */
+    it("clears the drawer from the address and keeps the rest of the query", async () => {
+      const user = userEvent.setup();
+      const host = renderFromLink();
+
+      await screen.findByText("Edit routing policy");
+      await user.keyboard("{Escape}");
+
+      await waitFor(() => {
+        expect(host.recording.queries.at(-1)?.next).toEqual({
+          "drawer.open": undefined,
+          "drawer.policyId": undefined,
+          view: "all",
+        });
+      });
+    });
+  });
+
   /** @scenario "A tier name cannot be set twice" */
   it("refuses to save a name mapping that reuses a reserved tier name", async () => {
     const user = userEvent.setup();
@@ -250,6 +280,6 @@ describe("given a shared link that carries a policy", () => {
     await waitFor(() => {
       expect(screen.getByText(/is a model tier/)).toBeInTheDocument();
     });
-    expect(screen.getByRole("button", { name: "Save changes" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Save changes" })).toBeEnabled();
   });
 });

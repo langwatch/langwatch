@@ -7,17 +7,11 @@ import {
 import { Link } from "@langwatch/browser-host/link";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { CronSchedule } from "@langwatch/design-system/cron-schedule";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
@@ -65,7 +59,6 @@ import { AutomationHistory } from "../../features/overview/ui/elements/automatio
 import {
   AlertRuleCell,
   EmailList,
-  EmptyHint,
   FiringStatus,
   GraphWatchCell,
   LastFiredCell,
@@ -73,7 +66,6 @@ import {
   ReportRunCells,
   ReportSubjectCell,
   SectionHeader,
-  TableShell,
   TraceFilterCell,
 } from "../../features/overview/ui/elements/automation-table-cells.tsx";
 import { AutomationUseCaseStrip } from "../../features/overview/ui/elements/automation-use-case-strip.tsx";
@@ -436,20 +428,8 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     />
   );
 
-  const sharedRowProps = (trigger: EnhancedTrigger) => ({
-    "data-trigger-id": trigger.id,
-    cursor: "pointer",
-    _hover: { bg: "bg.muted" },
-    onClick: () => openView(trigger.id),
-  });
-
   const activeCell = (trigger: EnhancedTrigger) => (
-    <Table.Cell
-      textAlign="center"
-      onClick={(event) => {
-        event.stopPropagation();
-      }}
-    >
+    <ListTable.Cell align="center" stopRowActivation>
       <VStack gap={1} align="center">
         <Switch
           checked={trigger.active}
@@ -466,7 +446,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
           cap: capStatus.data?.cap ?? 0,
         })}
       </VStack>
-    </Table.Cell>
+    </ListTable.Cell>
   );
 
   const overview = useMemo(
@@ -484,7 +464,7 @@ export function AutomationsPage({ section = "overview" }: { section?: Automation
     statsByTriggerId,
     actionItems,
     triggerActionName,
-    sharedRowProps,
+    openView,
     activeCell,
     rowActionsMenu,
   };
@@ -793,73 +773,87 @@ function ReportsSection({
         onAdd={() => openCreate({ initialSource: "report" })}
       />
       {reports.length === 0 ? (
-        <EmptyHint>No reports yet. Create one for a recurring Slack or email digest.</EmptyHint>
+        <NoDataInfoBlock
+          size="inline"
+          icon={<Calendar size={20} />}
+          title="No reports yet"
+          description="Create one to send a dashboard, graph or trace table to Slack or email on a schedule."
+          next={[
+            {
+              kind: "docs",
+              label: "Read about automations",
+              href: "https://docs.langwatch.ai/features/automations",
+            },
+          ]}
+        />
       ) : (
-        <TableShell>
-          <Table.Root variant="line" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="20%">Name</Table.ColumnHeader>
-                <Table.ColumnHeader width="17%">Sends</Table.ColumnHeader>
-                <Table.ColumnHeader width="16%">Schedule</Table.ColumnHeader>
-                <Table.ColumnHeader width="12%">
-                  <MetricHeader
-                    label="Next run"
-                    help="When this next goes out, straight from the scheduler. A paused report has no next run."
+        <ListTable
+          scroll="x"
+          scrollLabel="Reports"
+          tableLayout="fixed"
+          minWidth="880px"
+          headerLayout="content"
+        >
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader width="20%">Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="17%">Sends</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="16%">Schedule</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="12%">
+                <MetricHeader
+                  label="Next run"
+                  help="When this next goes out, straight from the scheduler. A paused report has no next run."
+                />
+              </ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="12%">
+                <MetricHeader label="Last run" help="The last time this was sent." />
+              </ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="9%">Delivery</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="7%">Active</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="7%" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {reports.map((trigger) => {
+              const actionParams = trigger.actionParams as TriggerActionParams;
+              const schedule = (actionParams as { schedule?: { cron?: string; timezone?: string } })
+                .schedule;
+              return (
+                <ListTable.Row
+                  key={trigger.id}
+                  data-trigger-id={trigger.id}
+                  onActivate={() => openEdit(trigger.id)}
+                >
+                  <ListTable.Cell>
+                    <Text as="span" fontWeight="medium">
+                      {trigger.name}
+                    </Text>
+                  </ListTable.Cell>
+                  <ListTable.Cell>
+                    <ReportSubjectCell actionParams={actionParams} graphNameById={graphNameById} />
+                  </ListTable.Cell>
+                  <ListTable.Cell maxWidth="240px">
+                    {schedule?.cron ? (
+                      <CronSchedule cron={schedule.cron} timezone={schedule.timezone ?? "UTC"} />
+                    ) : (
+                      <Text textStyle="sm">Not set</Text>
+                    )}
+                  </ListTable.Cell>
+                  <ReportRunCells
+                    schedule={scheduleByTriggerId.get(trigger.id)}
+                    loading={isScheduleLoading}
+                    formatTimeAgo={formatTimeAgo}
                   />
-                </Table.ColumnHeader>
-                <Table.ColumnHeader width="12%">
-                  <MetricHeader label="Last run" help="The last time this was sent." />
-                </Table.ColumnHeader>
-                <Table.ColumnHeader width="9%">Delivery</Table.ColumnHeader>
-                <Table.ColumnHeader width="7%">Active</Table.ColumnHeader>
-                <Table.ColumnHeader width="7%" />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {reports.map((trigger) => {
-                const actionParams = trigger.actionParams as TriggerActionParams;
-                const schedule = (
-                  actionParams as { schedule?: { cron?: string; timezone?: string } }
-                ).schedule;
-                return (
-                  <Table.Row
-                    key={trigger.id}
-                    data-trigger-id={trigger.id}
-                    cursor="pointer"
-                    _hover={{ bg: "bg.muted" }}
-                    onClick={() => openEdit(trigger.id)}
-                  >
-                    <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
-                    <Table.Cell>
-                      <ReportSubjectCell
-                        actionParams={actionParams}
-                        graphNameById={graphNameById}
-                      />
-                    </Table.Cell>
-                    <Table.Cell maxWidth="240px">
-                      {schedule?.cron ? (
-                        <CronSchedule cron={schedule.cron} timezone={schedule.timezone ?? "UTC"} />
-                      ) : (
-                        <Text textStyle="sm">Not set</Text>
-                      )}
-                    </Table.Cell>
-                    <ReportRunCells
-                      schedule={scheduleByTriggerId.get(trigger.id)}
-                      loading={isScheduleLoading}
-                      formatTimeAgo={formatTimeAgo}
-                    />
-                    <Table.Cell>
-                      {trigger.action === "SEND_SLACK_MESSAGE" ? "Slack" : "Email"}
-                    </Table.Cell>
-                    {activeCell(trigger)}
-                    <Table.Cell>{rowActionsMenu(trigger)}</Table.Cell>
-                  </Table.Row>
-                );
-              })}
-            </Table.Body>
-          </Table.Root>
-        </TableShell>
+                  <ListTable.Cell>
+                    {trigger.action === "SEND_SLACK_MESSAGE" ? "Slack" : "Email"}
+                  </ListTable.Cell>
+                  {activeCell(trigger)}
+                  <ListTable.Cell>{rowActionsMenu(trigger)}</ListTable.Cell>
+                </ListTable.Row>
+              );
+            })}
+          </ListTable.Body>
+        </ListTable>
       )}
     </VStack>
   );
@@ -871,7 +865,7 @@ interface RowCells {
   statsByTriggerId: Map<string, TriggerStats>;
   actionItems: (action: TriggerAction, actionParams: TriggerActionParams) => React.ReactNode;
   triggerActionName: (action: TriggerAction) => string;
-  sharedRowProps: (trigger: EnhancedTrigger) => React.ComponentProps<typeof Table.Row>;
+  openView: (automationId: string) => void;
   activeCell: (trigger: EnhancedTrigger) => React.ReactNode;
   rowActionsMenu: (trigger: EnhancedTrigger) => React.ReactNode;
 }
@@ -903,42 +897,46 @@ function AutomationsSection({
           <AutomationUseCaseStrip kind="alert" showLabel={false} onOpen={openCreate} />
         </VStack>
       ) : (
-        <TableShell>
-          <Table.Root variant="line" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader width="19%">Name</Table.ColumnHeader>
-                <Table.ColumnHeader width="20%">Watches</Table.ColumnHeader>
-                <Table.ColumnHeader width="14%">Delivery</Table.ColumnHeader>
-                <Table.ColumnHeader width="12%">
-                  <MetricHeader
-                    label="Last fired"
-                    help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
-                  />
-                </Table.ColumnHeader>
-                <Table.ColumnHeader width="11%">
-                  <MetricHeader
-                    label="Fires (30 days)"
-                    help="Times this automation fired in the last 30 days."
-                  />
-                </Table.ColumnHeader>
-                <Table.ColumnHeader width="10%">
-                  <MetricHeader
-                    label="Status"
-                    help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
-                  />
-                </Table.ColumnHeader>
-                <Table.ColumnHeader width="7%">Active</Table.ColumnHeader>
-                <Table.ColumnHeader width="7%" />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {automations.map((trigger) => (
-                <AutomationRow key={trigger.id} trigger={trigger} cells={rowCells} />
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </TableShell>
+        <ListTable
+          scroll="x"
+          scrollLabel="Automations"
+          tableLayout="fixed"
+          minWidth="880px"
+          headerLayout="content"
+        >
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader width="19%">Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="20%">Watches</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="14%">Delivery</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="12%">
+                <MetricHeader
+                  label="Last fired"
+                  help="When this automation last fired and ran its delivery. Automations on a digest schedule also show when the next bundled send is due."
+                />
+              </ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="11%">
+                <MetricHeader
+                  label="Fires (30 days)"
+                  help="Times this automation fired in the last 30 days."
+                />
+              </ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="10%">
+                <MetricHeader
+                  label="Status"
+                  help="A graph-watching automation is firing while its metric is past the threshold, and back to OK when it recovers."
+                />
+              </ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="7%">Active</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width="7%" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {automations.map((trigger) => (
+              <AutomationRow key={trigger.id} trigger={trigger} cells={rowCells} />
+            ))}
+          </ListTable.Body>
+        </ListTable>
       )}
     </VStack>
   );
@@ -949,9 +947,13 @@ function AutomationRow({ trigger, cells }: { trigger: EnhancedTrigger; cells: Ro
   const actionParams = trigger.actionParams as TriggerActionParams;
   const stats = cells.statsByTriggerId.get(trigger.id);
   return (
-    <Table.Row {...cells.sharedRowProps(trigger)}>
-      <Table.Cell fontWeight="medium">{trigger.name}</Table.Cell>
-      <Table.Cell>
+    <ListTable.Row data-trigger-id={trigger.id} onActivate={() => cells.openView(trigger.id)}>
+      <ListTable.Cell>
+        <Text as="span" fontWeight="medium">
+          {trigger.name}
+        </Text>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {trigger.customGraphId ? (
           <VStack gap={0} align="start" minWidth={0}>
             <GraphWatchCell
@@ -964,8 +966,8 @@ function AutomationRow({ trigger, cells }: { trigger: EnhancedTrigger; cells: Ro
         ) : (
           <TraceWatchCell trigger={trigger} />
         )}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={0} minWidth={0}>
           <Text textStyle="sm" fontWeight="medium">
             {cells.triggerActionName(trigger.action)}
@@ -981,17 +983,17 @@ function AutomationRow({ trigger, cells }: { trigger: EnhancedTrigger; cells: Ro
             {cells.actionItems(trigger.action, actionParams)}
           </ClampedText>
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <LastFiredCell trigger={trigger} stats={stats} formatTimeAgo={formatTimeAgo} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text as="span" color="fg.muted">
           {stats?.recentFireCount ?? 0}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
       {/* Only a threshold rule has something to be firing or recovered from. */}
-      <Table.Cell whiteSpace="nowrap">
+      <ListTable.Cell nowrap>
         {trigger.customGraphId ? (
           <FiringStatus firing={!!stats?.currentlyFiring} />
         ) : (
@@ -999,10 +1001,10 @@ function AutomationRow({ trigger, cells }: { trigger: EnhancedTrigger; cells: Ro
             —
           </Text>
         )}
-      </Table.Cell>
+      </ListTable.Cell>
       {cells.activeCell(trigger)}
-      <Table.Cell>{cells.rowActionsMenu(trigger)}</Table.Cell>
-    </Table.Row>
+      <ListTable.Cell>{cells.rowActionsMenu(trigger)}</ListTable.Cell>
+    </ListTable.Row>
   );
 }
 

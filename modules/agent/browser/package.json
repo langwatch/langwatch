@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -27,6 +27,7 @@
     "@langwatch/design-system": "workspace:*",
     "@langwatch/feature-flag-contract": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/prompt-client": "workspace:*",
     "@langwatch/scenario-client": "workspace:*",
     "@langwatch/scenario-contract": "workspace:*",
     "@langwatch/time": "workspace:*",

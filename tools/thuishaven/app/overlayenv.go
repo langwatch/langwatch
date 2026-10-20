@@ -76,12 +76,31 @@ func (o *Orchestrator) stackByWorktree(worktreeDir string) (domain.Stack, bool) 
 	return domain.Stack{}, false
 }
 
+// ownStack is the stack `haven up` in this checkout would name, when it is
+// registered here: the branch's slug in the primary checkout, the slug cache in
+// a linked worktree. Other stacks started from the same checkout (LANGWATCH_SLUG)
+// share its directory, so matching on the directory alone picks the newest beat.
+func (o *Orchestrator) ownStack(p UpParams) (domain.Stack, bool) {
+	slug := ""
+	if !p.IsLinkedWorktree {
+		slug = domain.SlugFromBranch(p.Branch)
+	}
+	if slug == "" {
+		slug, _ = o.store.ReadSlugCache(p.WorktreeDir)
+	}
+	st, ok := o.stackBySlug(slug)
+	return st, ok && slug != "" && st.WorktreeDir == p.WorktreeDir
+}
+
 // StackEnv returns the resolved overlay for this worktree's registered stack —
 // the exact KEY=VALUE set every supervised child is started with.
 func (o *Orchestrator) StackEnv(p UpParams) ([]string, error) {
-	// A named slug wins: one checkout can run several stacks (visualdiff's
-	// check stack beside the developer's), and a tool reading one names it.
+	// A named slug wins: one checkout can run several stacks (the shared check
+	// stack beside the developer's), and a tool reading one names it.
 	if st, ok := o.stackBySlug(p.ExplicitSlug); ok && p.ExplicitSlug != "" {
+		return o.toolEnv(st), nil
+	}
+	if st, ok := o.ownStack(p); ok {
 		return o.toolEnv(st), nil
 	}
 	if st, ok := o.stackByWorktree(p.WorktreeDir); ok {

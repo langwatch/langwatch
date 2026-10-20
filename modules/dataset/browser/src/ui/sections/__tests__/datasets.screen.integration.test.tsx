@@ -1,26 +1,49 @@
 /**
  * @vitest-environment jsdom
- * Datasets list screen (listing, search, navigation, states). Moved from
- * platform; fixtures use recordCount.
+ * Datasets list screen (listing, search, navigation, states). Entry counts
+ * are a second read, mocked apart from the list.
  */
 
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
 import type { DatasetSummary } from "@langwatch/dataset-contract";
-import { screen, waitFor } from "@testing-library/react";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithDatasetHost } from "../../../testing.tsx";
 
-const { datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
+const { countsQuery, datasetsQuery, mockDeleteMutate } = vi.hoisted(() => ({
+  countsQuery: {
+    current: { data: undefined } as {
+      data: { datasetId: string; recordCount: number }[] | undefined;
+      isError?: boolean;
+    },
+    asked: [] as { input: unknown; options: unknown }[],
+  },
   datasetsQuery: {
     current: { data: undefined, isLoading: false, refetch: vi.fn() } as {
       data: unknown;
       isLoading: boolean;
+      isError?: boolean;
       refetch: () => void;
     },
   },
   mockDeleteMutate: vi.fn(),
 }));
+
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
+  const { uiDeclarations: none } = await import("@langwatch/browser-host/declarations");
+  const nothingLent = none([]);
+  return {
+    ...(await importOriginal<object>()),
+    useUiDeclarations: () => declarations.current ?? nothingLent,
+  };
+});
 
 vi.mock("../../../behavior/dataset-api.ts", () => ({
   datasetApi: {
@@ -38,6 +61,12 @@ vi.mock("@langwatch/dataset-client", () => ({
     }),
     dataset: {
       getAll: { useQuery: () => datasetsQuery.current },
+      recordCounts: {
+        useQuery: (input: unknown, options: unknown) => {
+          countsQuery.asked.push({ input, options });
+          return countsQuery.current;
+        },
+      },
       deleteById: { useMutation: () => ({ mutate: mockDeleteMutate, isPending: false }) },
     },
   },
@@ -59,9 +88,8 @@ vi.mock("../../../ui/sections/copy-dataset-dialog.tsx", () => ({
 
 const { default: DatasetsScreen } = await import("../datasets.screen.tsx");
 
-const makeDataset = (id: string, name: string, records: number): DatasetSummary => ({
+const makeDataset = (id: string, name: string): DatasetSummary => ({
   id,
-  projectId: "proj-1",
   name,
   slug: id,
   columnTypes: [
@@ -70,30 +98,21 @@ const makeDataset = (id: string, name: string, records: number): DatasetSummary 
   ],
   createdAt: new Date("2026-01-01T10:00:00Z"),
   updatedAt: new Date("2026-02-02T10:00:00Z"),
-  archivedAt: null,
-  mapping: null,
-  useS3: false,
-  s3RecordCount: null,
-  contentLayout: "postgres",
   status: "ready",
-  statusError: null,
-  stagingKey: null,
-  uploadFilename: null,
-  rowCount: null,
-  sizeBytes: null,
-  chunkCount: null,
-  chunkOffsets: null,
-  recordCount: records,
 });
 
 describe("Datasets list screen", () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    datasetsQuery.current = {
+    countsQuery.asked = [];
+    countsQuery.current = {
       data: [
-        makeDataset("ds-1", "offline evals", 12),
-        makeDataset("ds-2", "production samples", 3),
+        { datasetId: "ds-1", recordCount: 12 },
+        { datasetId: "ds-2", recordCount: 3 },
       ],
+    };
+    datasetsQuery.current = {
+      data: [makeDataset("ds-1", "offline evals"), makeDataset("ds-2", "production samples")],
       isLoading: false,
       refetch: vi.fn(),
     };
@@ -111,8 +130,47 @@ describe("Datasets list screen", () => {
       expect(screen.getByText("12")).toBeInTheDocument();
       expect(screen.getByText("3")).toBeInTheDocument();
       // Last update uses updatedAt, not createdAt.
-      const expected = new Date("2026-02-02T10:00:00Z").toLocaleString();
-      expect(screen.getAllByText(expected)).toHaveLength(2);
+      expect(screen.getAllByText(/Feb/)).toHaveLength(2);
+      expect(screen.queryByText(/Jan/)).not.toBeInTheDocument();
+    });
+
+    describe("given the entry counts are still being counted", () => {
+      /** @scenario "The list shows before entry counts arrive" */
+      it("shows every row at once, with a muted placeholder for each count", () => {
+        countsQuery.current = { data: undefined };
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(screen.getByText("offline evals")).toBeInTheDocument();
+        expect(screen.getByText("production samples")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Counting entries")).toHaveLength(2);
+      });
+    });
+
+    describe("given reading the entry counts failed", () => {
+      /** @scenario "A failed entry count read shows the counts as unavailable" */
+      it("shows each count as unavailable instead of loading", () => {
+        countsQuery.current = { data: undefined, isError: true };
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(screen.getByText("offline evals")).toBeInTheDocument();
+        expect(screen.getAllByLabelText("Entry count unavailable")).toHaveLength(2);
+        expect(screen.queryByLabelText("Counting entries")).not.toBeInTheDocument();
+      });
+    });
+
+    describe("when their entry counts arrive", () => {
+      /** @scenario "Entry counts arrive after the list" */
+      it("asks for the listed datasets' counts and shows each one in its row", () => {
+        renderWithDatasetHost(<DatasetsScreen />);
+
+        expect(countsQuery.asked.at(-1)).toMatchObject({
+          input: { datasetIds: ["ds-1", "ds-2"] },
+          options: { enabled: true },
+        });
+        expect(within(screen.getByTestId("dataset-row-ds-1")).getByText("12")).toBeInTheDocument();
+        expect(within(screen.getByTestId("dataset-row-ds-2")).getByText("3")).toBeInTheDocument();
+        expect(screen.queryByLabelText("Counting entries")).not.toBeInTheDocument();
+      });
     });
 
     describe("when the reader searches", () => {
@@ -129,13 +187,31 @@ describe("Datasets list screen", () => {
         expect(screen.getByText("offline evals")).toBeInTheDocument();
       });
 
-      it("shows a no-results hint when the search matches nothing", async () => {
+      it("shows a no-results hint when the search matches nothing, and clears it", async () => {
         const user = userEvent.setup();
         renderWithDatasetHost(<DatasetsScreen />);
 
         await user.type(screen.getByTestId("datasets-search"), "zzz");
 
         expect(await screen.findByText(/No datasets match "zzz"/i)).toBeInTheDocument();
+        await user.click(screen.getByRole("button", { name: /clear filters/i }));
+
+        expect(await screen.findByText("offline evals")).toBeInTheDocument();
+        expect(screen.getByTestId("datasets-search")).toHaveValue("");
+      });
+    });
+
+    describe("when a dataset's name is chosen with the keyboard", () => {
+      it("opens it from the name, which is a real link", async () => {
+        const user = userEvent.setup();
+        const { host } = renderWithDatasetHost(<DatasetsScreen />);
+
+        const link = screen.getByRole("link", { name: "offline evals" });
+        expect(link).toHaveAttribute("href", "/test-project/datasets/ds-1");
+        link.focus();
+        await user.keyboard("{Enter}");
+
+        expect(host.navigations).toEqual(["/test-project/datasets/ds-1"]);
       });
     });
 
@@ -162,10 +238,56 @@ describe("Datasets list screen", () => {
       const { container } = renderWithDatasetHost(<DatasetsScreen />);
 
       expect(container.querySelectorAll("[class*='chakra-skeleton']").length).toBeGreaterThan(0);
+      expect(container.querySelector("[aria-busy='true']")).not.toBeNull();
       expect(screen.queryByText("No datasets yet")).not.toBeInTheDocument();
-      // The table's own scaffolding is up, so the page does not jump when the
-      // rows land.
-      expect(screen.getByText("Entries")).toBeInTheDocument();
+      // The header action stays, so the reader can start a dataset while the list loads.
+      expect(screen.getByTestId("upload-or-create-dataset")).toBeInTheDocument();
+    });
+  });
+
+  describe("given the datasets could not be loaded", () => {
+    it("explains the failure with a retry and a next step", async () => {
+      const refetch = vi.fn();
+      datasetsQuery.current = { data: undefined, isLoading: false, isError: true, refetch };
+      const user = userEvent.setup();
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("Couldn't load the datasets")).toBeInTheDocument();
+      expect(screen.getByRole("link", { name: /read about datasets/i })).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: /try again/i }));
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("given the datasets loaded", () => {
+    /** @scenario The datasets list shows no error when the read succeeded */
+    it("shows the rows with no error notice", () => {
+      datasetsQuery.current = {
+        data: [makeDataset("ds-1", "offline evals")],
+        isLoading: false,
+        isError: false,
+        refetch: vi.fn(),
+      };
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("offline evals")).toBeInTheDocument();
+      expect(screen.queryByText("Couldn't load the datasets")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("given a refresh fails after the datasets loaded", () => {
+    /** @scenario A failed refresh keeps the datasets I already see */
+    it("keeps the rows with the error as a notice over them", () => {
+      datasetsQuery.current = {
+        data: [makeDataset("ds-1", "offline evals")],
+        isLoading: false,
+        isError: true,
+        refetch: vi.fn(),
+      };
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(screen.getByText("offline evals")).toBeInTheDocument();
+      expect(screen.getByText("Couldn't load the datasets")).toBeInTheDocument();
     });
   });
 
@@ -174,24 +296,56 @@ describe("Datasets list screen", () => {
       datasetsQuery.current = { data: [], isLoading: false, refetch: vi.fn() };
     });
 
+    /** @scenario Every empty surface offers its own skill */
+    it("offers trace's set-up-with-AI control for datasets", async () => {
+      declarations.current = uiDeclarations([
+        {
+          name: "trace",
+          installation: {
+            capabilities: {},
+            lends: [
+              {
+                token: SetupWithAgentButtonToken,
+                load: async () => ({
+                  default: ({ surface }: { surface: string }) => (
+                    <button>Setup via Agent ({surface})</button>
+                  ),
+                }),
+              },
+            ],
+          },
+        },
+      ]);
+      renderWithDatasetHost(<DatasetsScreen />);
+
+      expect(
+        await screen.findByRole("button", { name: "Setup via Agent (datasets)" }),
+      ).toBeInTheDocument();
+      declarations.current = undefined;
+    });
+
     /** @scenario Empty project shows a helpful empty state */
-    it("shows the empty state with an upload-or-create CTA", async () => {
+    it("shows the empty state, with upload-or-create in the header", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
       expect(screen.getByText("No datasets yet")).toBeInTheDocument();
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      expect(screen.getByRole("link", { name: /read about datasets/i })).toHaveAttribute(
+        "href",
+        "https://docs.langwatch.ai/datasets/overview",
+      );
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       // The CTA is a dropdown: "Create empty dataset" opens the create drawer.
       await user.click(await screen.findByText("Create empty dataset"));
       expect(await screen.findByTestId("add-edit-dataset-drawer")).toBeInTheDocument();
     });
 
     /** @scenario Empty-state CTA can launch the bulk upload flow */
-    it("opens the bulk upload drawer from the empty-state CTA", async () => {
+    it("opens the bulk upload drawer from the header action", async () => {
       const user = userEvent.setup();
       renderWithDatasetHost(<DatasetsScreen />);
 
-      await user.click(screen.getByTestId("empty-state-create-dataset"));
+      await user.click(screen.getByTestId("upload-or-create-dataset"));
       await user.click(await screen.findByText("Upload datasets"));
       expect(await screen.findByTestId("bulk-upload-drawer")).toBeInTheDocument();
     });

@@ -336,6 +336,63 @@ Feature: Automation ownership
     When it runs again from its checkpoint
     Then it starts after the last claim it finished and pages the rest by cursor
 
+  # An earlier release stored Trigger.filters and Trigger.actionParams as JSON text inside the
+  # jsonb column. Reads unwrap that text on the fly; the background step
+  # "automation:unwrap-trigger-json-text" rewrites the rows once older images stop serving.
+
+  @unit
+  Scenario: A trigger whose filters or action params are stored as JSON text reads as the object
+    Given a trigger row whose filters and action params hold a JSON object as JSON text
+    When the trigger is read
+    Then it carries the objects that text encodes
+    And text that is not a JSON object reads as an empty object
+
+  @unit @integration
+  Scenario: The JSON-text step unwraps text that encodes a JSON object
+    Given triggers whose filters or action params hold a JSON object as JSON text
+    When the background step "automation:unwrap-trigger-json-text" runs
+    Then those columns hold the objects, with numbers as precise as they were written
+    And the triggers' last-updated time is unchanged
+
+  @unit
+  Scenario: The JSON-text step leaves text that is not a JSON object
+    Given a trigger whose filters hold JSON text for an array, and one whose text does not parse
+    When the JSON-text step runs
+    Then both columns keep their text and are counted as left alone
+    And a column already holding an object is not touched
+
+  @unit
+  Scenario: Running the JSON-text step twice unwraps nothing the second time
+    Given the JSON-text step has run
+    When it runs again
+    Then it reports nothing unwrapped
+
+  @unit
+  Scenario: The JSON-text step's dry run writes nothing
+    Given a trigger whose filters hold a JSON object as JSON text
+    When the JSON-text step runs as a dry run
+    Then the column keeps its text, no checkpoint is saved, and the report counts it as one to unwrap
+
+  @unit
+  Scenario: The JSON-text step works in pages and resumes after the last page it finished
+    Given more triggers with JSON text than one page holds
+    When the JSON-text step runs
+    Then it saves a checkpoint after each page
+    And a run from a saved checkpoint starts after that page's last trigger
+
+  @unit @integration
+  Scenario: The JSON-text step leaves a row another writer changed
+    Given the step read a trigger's JSON text
+    And another writer saved that column before the step wrote it
+    When the step writes
+    Then the other writer's value stays and the column is counted as changed
+
+  @unit @integration
+  Scenario: The JSON-text step leaves text the database cannot store as an object
+    Given a trigger whose JSON text parses but holds a NUL escape Postgres jsonb refuses
+    When the JSON-text step runs
+    Then the column keeps its text, the step goes on, and the column is counted as unparseable
+
   @unit
   Scenario: The Slack channel picker lists a bot connection's channels
     Given a process composed with a Slack transport
@@ -386,3 +443,52 @@ Feature: Automation ownership
     When the author test-fires it
     Then the test fire is refused as test_fire_unavailable with the token remediation, not an internal error
 
+  @unit
+  Scenario: A test fire to a revoked Slack webhook names the remediation
+    Given an automation delivering through a Slack incoming webhook Slack has revoked
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the webhook remediation, not an internal error
+
+  @unit
+  Scenario: A webhook test fire the endpoint or the fence refuses names why
+    Given a webhook automation whose endpoint answers non-2xx, or whose URL the webhook module refuses
+    When the author test-fires it
+    Then the test fire is refused as test_fire_unavailable with the reason, not an internal error
+
+  @unit
+  Scenario: A webhook graph alert reads back with its delivery and its rule
+    Given a graph alert that delivers by webhook, its rule stored beside the delivery
+    When the automation is read or its alert is dispatched
+    Then the delivery and the alert rule are both returned, with the secrets redacted
+
+  @unit
+  Scenario: A graph alert queries its series without the chart's display fields
+    Given a graph alert on a saved chart whose series carries its display name and colour set
+    When the alert is evaluated
+    Then analytics is asked with only the series' query fields, and the evaluation runs
+
+  @unit
+  Scenario: A graph alert on a chart that stored its time scale as text still evaluates
+    Given a graph alert on a saved chart whose time scale was stored as the text "60"
+    When the alert is evaluated
+    Then analytics is asked with a 60-minute bucket, which its input schema accepts
+
+  @unit
+  Scenario: A graph alert on a chart saved without a time scale queries hourly
+    Given a graph alert on a saved chart whose stored time scale is empty
+    When the alert is evaluated
+    Then analytics is asked with a 60-minute bucket, as every other chart reader does
+
+  @unit
+  Scenario: A graph alert on a chart with an unreadable time scale is skipped as incomplete
+    Given a graph alert on a saved chart whose time scale is neither "full" nor a number of minutes
+    When the alert is evaluated
+    Then the evaluation is skipped as an incomplete configuration, recorded on the trigger
+    And no analytics query is attempted, so nothing fails and nothing is redelivered
+
+  @unit
+  Scenario: A graph alert whose delivery fails retryably is sent again on the retry
+    Given a graph alert crossed its threshold and its delivery failed with a retryable error
+    When the evaluation is retried
+    Then the alert's open claim was rolled back, so the retry delivers it
+    And a terminal failure keeps the claim, as main does

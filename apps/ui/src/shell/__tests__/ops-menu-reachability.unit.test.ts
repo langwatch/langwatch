@@ -8,10 +8,19 @@ import { describe, expect, it } from "vitest";
 
 import { uiRouteDescriptors, uiRouteTable } from "../ui-route-table";
 
-const { cloudAdminGroup, instanceGroup, isSettingsMenuItemActive, opsGroup } =
+const { adminMenu, isSettingsMenuItemActive } =
   await navigationWeb.installation.capabilities.chrome.load();
 
-type SettingsMenuGroup = ReturnType<typeof opsGroup>;
+type SettingsMenuGroup = ReturnType<typeof adminMenu>[number];
+
+/** The Admin console's menu with every gate open: every ops page an operator may reach. */
+const FULL_ADMIN_MENU = adminMenu({
+  hasCloudOps: true,
+  hosting: "cloud",
+  hasOpsAccess: true,
+  isPlatformAdmin: true,
+});
+const ALL_ENTRIES = FULL_ADMIN_MENU.flatMap((group) => group.items);
 
 /**
  * Every `/ops` page the route table registers; a detail page drops to its parent, reached
@@ -46,11 +55,7 @@ function isClaimedBy({
 
 describe("given the internal ops pages the route table registers", () => {
   const addresses = registeredOpsRoutes();
-  const menu = [
-    opsGroup({ hasCloudOps: true, hosting: "cloud" }),
-    instanceGroup(),
-    cloudAdminGroup(),
-  ];
+  const menu = FULL_ADMIN_MENU;
 
   // Both readings are of hand-maintained tables, so a rename that stops one
   // matching would otherwise leave a test passing on nothing at all.
@@ -61,7 +66,7 @@ describe("given the internal ops pages the route table registers", () => {
   });
 
   describe("when each address is matched against the settings menu", () => {
-    /** @scenario The settings menu reaches every internal ops page */
+    /** @scenario The Admin menu reaches every internal ops page */
     it.each(addresses)("%s is claimed by a menu entry", (address) => {
       expect(isClaimedBy({ address, groups: menu })).toBe(true);
     });
@@ -73,7 +78,7 @@ describe("given the internal ops pages the route table registers", () => {
     /** @scenario "The connections page is reachable from the operator menu" */
     it("resolves to a route registered for that exact path", () => {
       // The menu offers it...
-      const offered = instanceGroup().items.find((item) => item.href === CONNECTIONS);
+      const offered = ALL_ENTRIES.find((item) => item.href === CONNECTIONS);
       expect(offered).toBeDefined();
 
       // ...and the route table registers that exact path, rather than the
@@ -89,12 +94,7 @@ describe("given the internal ops pages the route table registers", () => {
 
     /** @scenario "Every page this surface adds opens from the operator menu" */
     it("resolves to a route registered for that exact path", () => {
-      const groups = [
-        opsGroup({ hasCloudOps: true, hosting: "cloud" }),
-        instanceGroup(),
-        cloudAdminGroup(),
-      ];
-      const offered = groups.flatMap((group) => group.items).find((item) => item.href === LOOKUP);
+      const offered = ALL_ENTRIES.find((item) => item.href === LOOKUP);
       expect(offered).toBeDefined();
 
       expect(addresses).toContain(LOOKUP);
@@ -111,19 +111,13 @@ describe("given the internal ops pages the route table registers", () => {
       // address through `alsoActiveAt` is how a workspace owns a page that
       // does not sit under its prefix — an entry of its own here would put
       // the tool back in the menu, which is what this change removed.
-      expect(
-        opsGroup({ hasCloudOps: true, hosting: "cloud" }).items.some(
-          (item) => item.href === address,
-        ),
-      ).toBe(false);
+      expect(ALL_ENTRIES.some((item) => item.href === address)).toBe(false);
     });
 
     /** @scenario The event-sourcing tools are offered inside their workspace */
-    it.each(TOOLS)("%s is claimed by the Event Sourcing entry", (address) => {
-      const eventSourcing = opsGroup({ hasCloudOps: true, hosting: "cloud" }).items.find(
-        (item) => item.label === "Event Sourcing",
-      );
-      if (!eventSourcing) throw new Error("no Event Sourcing menu entry");
+    it.each(TOOLS)("%s is claimed by the Event sourcing entry", (address) => {
+      const eventSourcing = ALL_ENTRIES.find((item) => item.label === "Event sourcing");
+      if (!eventSourcing) throw new Error("no Event sourcing menu entry");
 
       expect(eventSourcing.alsoActiveAt).toContain(address);
     });

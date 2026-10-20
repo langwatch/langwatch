@@ -98,6 +98,8 @@ import {
   trpcFailureTraceIds,
   type TrpcFailureTraceIds,
 } from "./audit.ts";
+import { refuseOutdatedClient } from "./client-outdated.ts";
+import { doorInputSchema } from "./infinite-input.ts";
 import { trpcThrottle, type TrpcThrottle } from "./throttle.ts";
 
 const logger = createLogger("langwatch:trpc");
@@ -321,20 +323,27 @@ type TrpcMiddlewareContextValues<Contexts extends readonly MiddlewareContext[]> 
   [Index in keyof Contexts]: z.output<Contexts[Index]["schema"]>;
 };
 
-type ValueResult<Output extends z.ZodType> = z.input<Output> | Promise<z.input<Output>>;
-type StreamResult<Output extends z.ZodType> =
+type ValueResult<Output> = z.input<Output> | Promise<z.input<Output>>;
+type StreamResult<Output> =
   | AsyncIterable<z.input<Output>>
   | Promise<AsyncIterable<z.input<Output>>>;
 
+/**
+ * Any contract `build()` returned, accepted by its stamp: constraining on `TrpcContract` would
+ * compare every member's schemas to `z.ZodType` again, for each router declared.
+ */
+// oxlint-disable-next-line typescript/no-explicit-any -- the stamp, not the members, is the check
+export type BuiltTrpcContract<Namespace extends string = string> = TrpcContract<Namespace, any>;
+
+/** The answer a declared output asks for, read without relating its schema to `z.ZodType`. */
+type AnswerOf<Kind, Output> = Output extends undefined
+  ? void | Promise<void>
+  : Kind extends "subscription"
+    ? StreamResult<Output>
+    : ValueResult<Output>;
+
 /** What a handler may answer: the declared output, one stream value, or nothing. */
-type DeclaredResult<Member extends TrpcContractMember> =
-  Member extends TrpcContractMember<infer Kind, z.ZodType, infer Output>
-    ? Output extends z.ZodType
-      ? Kind extends "subscription"
-        ? StreamResult<Output>
-        : ValueResult<Output>
-      : void | Promise<void>
-    : never;
+type DeclaredResult<Member extends TrpcContractMember> = AnswerOf<Member["kind"], Member["output"]>;
 
 /** Names the procedures `build()` is still waiting for. */
 export type TrpcProceduresNotImplemented<Names extends string> = Readonly<{
@@ -342,14 +351,13 @@ export type TrpcProceduresNotImplemented<Names extends string> = Readonly<{
 }>;
 
 /** What the CLIENT sends, and what it receives — the declaration's own two sides. */
-type MemberOutput<Member extends TrpcContractMember> =
-  Member extends TrpcContractMember<infer Kind, z.ZodType, infer Output>
-    ? Output extends z.ZodType
-      ? Kind extends "subscription"
-        ? AsyncIterable<z.output<Output>>
-        : z.output<Output>
-      : void
-    : never;
+type MemberOutput<Member extends TrpcContractMember> = OutputOf<Member["kind"], Member["output"]>;
+
+type OutputOf<Kind, Output> = Output extends undefined
+  ? void
+  : Kind extends "subscription"
+    ? AsyncIterable<z.output<Output>>
+    : z.output<Output>;
 
 type MemberDefinition<Member extends TrpcContractMember> = {
   input: z.input<Member["input"]>;
@@ -364,7 +372,7 @@ type MemberProcedure<Member extends TrpcContractMember> = Member["kind"] extends
     : TRPCSubscriptionProcedure<MemberDefinition<Member>>;
 
 /** The record the mounted router publishes, derived from the declaration alone. */
-export type TrpcContractProcedures<Contract extends TrpcContract> = {
+export type TrpcContractProcedures<Contract extends BuiltTrpcContract> = {
   [Name in keyof Contract["members"]]: MemberProcedure<Contract["members"][Name]>;
 };
 
@@ -427,7 +435,7 @@ export interface TrpcProcedureFactory<TContext extends object> {
 }
 
 /** A host invokes this with its own runtime and the application slice to bind. */
-export type TrpcRouterMount<Api, Contract extends TrpcContract> = <TContext extends object>(
+export type TrpcRouterMount<Api, Contract extends BuiltTrpcContract> = <TContext extends object>(
   runtime: TrpcProcedureFactory<TContext>,
   app: (ctx: TContext) => Api,
 ) => TRPCBuiltRouter<
@@ -440,7 +448,7 @@ export type TrpcRouterMount<Api, Contract extends TrpcContract> = <TContext exte
  * contract it was built from, so composition and the sweeps can both ask what it declares
  * without importing the contract a second time.
  */
-export type TrpcRouterDeclaration<Api, Contract extends TrpcContract> = Readonly<{
+export type TrpcRouterDeclaration<Api, Contract extends BuiltTrpcContract> = Readonly<{
   readonly protocol: "trpc";
   readonly api: TrpcFeatureApiWitness<Api>;
   readonly namespace: Contract["namespace"];
@@ -448,13 +456,17 @@ export type TrpcRouterDeclaration<Api, Contract extends TrpcContract> = Readonly
   readonly router: TrpcRouterMount<Api, Contract>;
 }>;
 
-type Undeclared<Contract extends TrpcContract, Implemented extends string> = Exclude<
+type Undeclared<Contract extends BuiltTrpcContract, Implemented extends string> = Exclude<
   keyof Contract["members"] & string,
   Implemented
 >;
 
 /** Select the next declared procedure, or build once every one is implemented. */
-export interface TrpcRouterBuilder<Api, Contract extends TrpcContract, Implemented extends string> {
+export interface TrpcRouterBuilder<
+  Api,
+  Contract extends BuiltTrpcContract,
+  Implemented extends string,
+> {
   procedure<Name extends Undeclared<Contract, Implemented>>(
     name: Name,
   ): TrpcRouterAccess<Api, Contract, Implemented, Name, []>;
@@ -471,7 +483,7 @@ export interface TrpcRouterBuilder<Api, Contract extends TrpcContract, Implement
  */
 export interface TrpcRouterAccess<
   Api,
-  Contract extends TrpcContract,
+  Contract extends BuiltTrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
   Contexts extends readonly MiddlewareContext[],
@@ -583,7 +595,7 @@ export interface TrpcRouterAccess<
 /** The handler, over the contract's parsed input and declared answer. */
 export interface TrpcRouterImplementation<
   Api,
-  Contract extends TrpcContract,
+  Contract extends BuiltTrpcContract,
   Implemented extends string,
   Name extends keyof Contract["members"] & string,
   Contexts extends readonly MiddlewareContext[] = [],
@@ -608,7 +620,7 @@ type Implementation = Readonly<{
   handle(args: never, ...contexts: never[]): unknown;
 }>;
 
-function mountRouter<Api, Contract extends TrpcContract>(
+function mountRouter<Api, Contract extends BuiltTrpcContract>(
   contract: Contract,
   implementations: ReadonlyMap<string, Implementation>,
 ): TrpcRouterMount<Api, Contract> {
@@ -617,8 +629,9 @@ function mountRouter<Api, Contract extends TrpcContract>(
     app: (ctx: TContext) => Api,
   ) => {
     const record: Record<string, unknown> = {};
+    const declared: TrpcContract = contract;
 
-    for (const [name, member] of Object.entries(contract.members)) {
+    for (const [name, member] of Object.entries(declared.members)) {
       const implementation = implementations.get(name);
 
       if (!implementation) {
@@ -713,7 +726,7 @@ function enforcedFields(enforces: EnforcedScopeFields | undefined): {
   return enforces === undefined ? {} : { enforces };
 }
 
-function routerBuilder<Api, Contract extends TrpcContract, Implemented extends string>(
+function routerBuilder<Api, Contract extends BuiltTrpcContract, Implemented extends string>(
   api: TrpcFeatureApiWitness<Api>,
   contract: Contract,
   implementations: ReadonlyMap<string, Implementation>,
@@ -1081,7 +1094,7 @@ function assertUnimplemented(
  * Opens the server side of one declared namespace. Every procedure the
  * contract names must be implemented exactly once before `build()` compiles.
  */
-export function defineTrpcRouter<Api, Contract extends TrpcContract>(
+export function defineTrpcRouter<Api, Contract extends BuiltTrpcContract>(
   api: TrpcFeatureApiWitness<Api>,
   contract: Contract,
 ): TrpcRouterBuilder<Api, Contract, never> {
@@ -1165,7 +1178,7 @@ export type TrpcMountOptions<TContext> = Readonly<{
 
 /** Mounts declared namespaces on one process's root. */
 export interface TrpcRuntime<TContext extends object> extends TrpcProcedureFactory<TContext> {
-  mount<Api, Contract extends TrpcContract>(
+  mount<Api, Contract extends BuiltTrpcContract>(
     declaration: TrpcRouterDeclaration<Api, Contract>,
     app: (ctx: TContext) => Api,
     options?: TrpcMountOptions<TContext>,
@@ -1221,7 +1234,8 @@ export function createTrpcRuntime<
     // The parser FIRST, then the check: a check installed ahead of `.input()`
     // reads `undefined` and silently authorizes nothing.
     const checked = doorOf({ anonymous, procedure, anonymousProcedure, request })
-      .input(request.member.input)
+      .use(refuseOutdatedClient)
+      .input(doorInputSchema(request.member))
       .use(trace)
       .use(requestLog(members, { anonymous }))
       .use(handledError)

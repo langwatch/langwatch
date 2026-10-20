@@ -54,6 +54,19 @@ export interface SystemMigration {
   readonly enrolledAutomatically: boolean;
 
   /**
+   * True for a step that reports `migrated` on every pass by design and never finalizes, so its
+   * `migrated` tenants are kept in step, not held (Alex, 2026-10-12). Omitted means false.
+   */
+  readonly migratedIsSteady?: boolean;
+
+  /**
+   * Pacing: a pass starts no new page of tenants while more than this many of its own jobs wait or
+   * run; without a queue list, of the whole queue's (Alex, 2026-10-12). Omitted, a pass on a queue
+   * list still waits at `DEFAULT_PAUSE_WHILE_QUEUED_ABOVE` of its own jobs; without, unpaced.
+   */
+  readonly pauseWhileQueuedAbove?: number;
+
+  /**
    * Safe to re-run every boot: idempotent and self-proving (`finalized`
    * only once verified without the legacy path). `migrated` is not
    * failed - proof disagreed, so it stays on the legacy path to retry.
@@ -68,5 +81,10 @@ export interface SystemMigration {
      * rather than short-circuit on "nothing left to write".
      */
     previous?: TenantMigrationRecord | null;
+    /**
+     * Pacing inside one tenant: a migration that sends many commands awaits this between pages of
+     * them. It resolves once the pass is back under its bound, or as soon as the signal aborts.
+     */
+    waitForRoom?: () => Promise<void>;
   }): Promise<TenantMigrationOutcome>;
 }

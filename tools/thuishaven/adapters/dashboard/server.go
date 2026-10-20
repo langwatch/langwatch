@@ -1,5 +1,5 @@
 // Package dashboard implements app.Dashboard: the daemon's HTTP surface — the
-// dashboard page (which worktree runs what), the registry API, and the telemetry
+// dashboard page (which worktree runs what) and the telemetry
 // fan-out that broadcasts one OTLP export to every running stack.
 package dashboard
 
@@ -58,6 +58,9 @@ type Config struct {
 	// Limits reads and edits the machine resource limits. Zero-valued leaves
 	// the routes answering 501.
 	Limits Limits
+	// MachineSettings reads and flips the machine switches. Zero-valued leaves
+	// the routes answering 501.
+	MachineSettings MachineSettings
 	// Naming reads a Host header as a stack's home and names a stopped
 	// stack's hosts; StackURL builds a routed URL through the live proxy.
 	Naming   domain.Naming
@@ -87,7 +90,6 @@ func New(config Config) *Server {
 func (s *Server) routes() *http.ServeMux {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/healthz", func(w http.ResponseWriter, _ *http.Request) { _, _ = io.WriteString(w, "ok") })
-	mux.HandleFunc("/api/registry", s.handleRegistry)
 	mux.HandleFunc("GET /api/logs", s.handleLogs)
 	mux.HandleFunc("GET /api/hub", s.handleHub)
 	mux.HandleFunc("GET /api/stacks/{slug}", s.handleStackHome)
@@ -102,7 +104,7 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("/api/stacks/{slug}/down", s.handleDown)
 	mux.HandleFunc("/api/stacks/{slug}/destroy", s.handleDestroy)
 	mux.HandleFunc("/api/stacks/{slug}/start-service", s.handleStartService)
-	mux.HandleFunc("/api/stacks/{slug}/reset-databases", s.handleResetDatabases)
+	mux.HandleFunc("/api/stacks/{slug}/stop-service", s.handleStopService)
 	mux.HandleFunc("/api/stacks/{slug}/seed", s.handleSeed)
 	mux.HandleFunc("GET /api/stacks/{slug}/cli/{name}", s.handleCLIRead)
 	mux.HandleFunc("/api/stacks/{slug}/feedback/{id}/resolve", s.handleFeedbackResolve)
@@ -112,6 +114,9 @@ func (s *Server) routes() *http.ServeMux {
 	mux.HandleFunc("GET /api/limits", s.handleLimits)
 	mux.HandleFunc("PUT /api/limits/{name}", s.handleSetLimit)
 	mux.HandleFunc("DELETE /api/limits/{name}", s.handleUnsetLimit)
+	mux.HandleFunc("GET /api/machine-settings", s.handleMachineSettings)
+	mux.HandleFunc("PUT /api/machine-settings/{name}", s.handleSetMachineSetting)
+	mux.HandleFunc("DELETE /api/machine-settings/{name}", s.handleSetMachineSetting)
 	mux.HandleFunc("/v1/", s.handleTelemetry) // OTLP: /v1/traces, /v1/metrics, /v1/logs
 	mux.HandleFunc("/", s.handleIndex)
 	return mux
@@ -179,56 +184,6 @@ func (s *Server) hostAllowed(host string) bool {
 // host, a stack's home on <slug>.langwatch.localhost, and every client route.
 func (s *Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	s.console.ServeHTTP(w, r)
-}
-
-// registryStack mirrors domain.Stack for the unauthenticated /api/registry
-// response, dropping LocalAPIKey — any local process can hit this endpoint, and
-// the dev API key must not leak to it.
-type registryStack struct {
-	Slug               string           `json:"slug"`
-	WorktreeDir        string           `json:"worktreeDir"`
-	Branch             string           `json:"branch"`
-	LauncherPID        int              `json:"launcherPid"`
-	RedisDB            int              `json:"redisDb"`
-	APIPort            int              `json:"apiPort"`
-	WorkerMetricsPort  int              `json:"workerMetricsPort"`
-	ClickHouseHTTPPort int              `json:"clickhouseHttpPort"`
-	ClickHouseDatabase string           `json:"clickhouseDatabase"`
-	Baseline           bool             `json:"baseline,omitempty"`
-	Services           []domain.Service `json:"services"`
-	UpdatedAt          time.Time        `json:"updatedAt"`
-}
-
-func toRegistryStack(st domain.Stack) registryStack {
-	return registryStack{
-		Slug:               st.Slug,
-		WorktreeDir:        st.WorktreeDir,
-		Branch:             st.Branch,
-		LauncherPID:        st.LauncherPID,
-		RedisDB:            st.RedisDB,
-		APIPort:            st.APIPort,
-		WorkerMetricsPort:  st.WorkerMetricsPort,
-		ClickHouseHTTPPort: st.ClickHouseHTTPPort,
-		ClickHouseDatabase: st.ClickHouseDatabase,
-		Baseline:           st.IsBaseline,
-		Services:           st.Services,
-		UpdatedAt:          st.UpdatedAt,
-	}
-}
-
-func (s *Server) handleRegistry(w http.ResponseWriter, _ *http.Request) {
-	stacks := s.config.Stacks()
-	out := make([]registryStack, len(stacks))
-	for i, st := range stacks {
-		out[i] = toRegistryStack(st)
-	}
-	w.Header().Set("Content-Type", "application/json")
-	_ = json.NewEncoder(w).Encode(map[string]any{
-		"stacks":        out,
-		"dashboard":     s.config.SharedURL("langwatch"),
-		"observability": s.config.SharedURL("observability"),
-		"telemetry":     s.config.SharedURL("telemetry"),
-	})
 }
 
 // handleTelemetry broadcasts an incoming OTLP export to every running stack, so

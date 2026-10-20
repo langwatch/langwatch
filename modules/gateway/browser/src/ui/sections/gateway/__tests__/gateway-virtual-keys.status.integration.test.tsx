@@ -149,14 +149,30 @@ describe("virtual keys status column", () => {
 
     /** @scenario "A key past its expiration date is badged Expired" */
     it("reports the stored stop first for a revoked key that also ran out", async () => {
-      // Chakra's tabs switch on a real click, which fake timers stall.
+      // The status chips switch on a real click, which fake timers stall.
       vi.useRealTimers();
       renderPage();
 
-      // The row lives on the Revoked tab, so the badge only proves the
-      // precedence once that tab is the one on screen.
+      // The row lives under the Revoked chip, so the badge only proves the
+      // precedence once that status is the one on screen.
       expect(screen.queryByTestId("vk-status-vk-gone")).not.toBeInTheDocument();
-      await userEvent.click(screen.getByRole("tab", { name: /Revoked/ }));
+      expect(screen.getByRole("button", { name: /Active/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /Revoked/ })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
+      await userEvent.click(screen.getByRole("button", { name: /Revoked/ }));
+      expect(screen.getByRole("button", { name: /Revoked/ })).toHaveAttribute(
+        "aria-pressed",
+        "true",
+      );
+      expect(screen.getByRole("button", { name: /Active/ })).toHaveAttribute(
+        "aria-pressed",
+        "false",
+      );
 
       await waitFor(() =>
         expect(screen.getByTestId("vk-status-vk-gone")).toHaveTextContent("Revoked"),
@@ -170,9 +186,9 @@ describe("virtual keys status column", () => {
     it("lists it with the live keys, badged disabled", () => {
       renderPage();
       expect(screen.getByTestId("vk-status-vk-paused")).toHaveTextContent("Disabled");
-      // Four live keys, one revoked: the counts are what the tabs claim.
-      expect(screen.getByRole("tab", { name: /Active/ })).toHaveTextContent("4");
-      expect(screen.getByRole("tab", { name: /Revoked/ })).toHaveTextContent("1");
+      // Four live keys, one revoked: the counts are what the chips claim.
+      expect(screen.getByRole("button", { name: /Active/ })).toHaveTextContent("4");
+      expect(screen.getByRole("button", { name: /Revoked/ })).toHaveTextContent("1");
     });
 
     /** @scenario "A disabled key is listed with the active keys and keeps its actions" */

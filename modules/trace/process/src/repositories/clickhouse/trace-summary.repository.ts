@@ -57,6 +57,8 @@ interface TraceSummaryFieldsBase {
   Models: string[];
   TotalCost: number | null;
   NonBilledCost: number | null;
+  UnpricedSpanCount: number;
+  UnpricedModels: string[];
   TokensEstimated: boolean;
   TotalPromptTokenCount: number | null;
   TotalCompletionTokenCount: number | null;
@@ -169,6 +171,8 @@ const summaryReadRowSchema = z.looseObject({
   Models: z.array(chString),
   TotalCost: chNumber.nullable(),
   NonBilledCost: chNumber.nullable(),
+  UnpricedSpanCount: chNumber,
+  UnpricedModels: z.array(chString),
   TokensEstimated: chBoolean,
   TotalPromptTokenCount: chNumber.nullable(),
   TotalCompletionTokenCount: chNumber.nullable(),
@@ -501,6 +505,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       `,
       query_params: { traceId },
       format: "JSONEachRow",
+      // Reached only by callers holding no time (settlement digests, evaluation alerts).
+      SKIP_COLD_SCAN_CHECK: true,
     });
     const rows = occurredAtCountRowsSchema.parse(await result.json());
     const rowCountRaw = rows[0]?.rowCount;
@@ -575,6 +581,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
           t.Models AS Models,
           t.TotalCost AS TotalCost,
           t.NonBilledCost AS NonBilledCost,
+          t.UnpricedSpanCount AS UnpricedSpanCount,
+          t.UnpricedModels AS UnpricedModels,
           t.TokensEstimated AS TokensEstimated,
           t.TotalPromptTokenCount AS TotalPromptTokenCount,
           t.TotalCompletionTokenCount AS TotalCompletionTokenCount,
@@ -637,6 +645,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       models: record.Models,
       totalCost: record.TotalCost,
       nonBilledCost: record.NonBilledCost ?? null,
+      unpricedSpanCount: record.UnpricedSpanCount,
+      unpricedModels: record.UnpricedModels,
       tokensEstimated: !!record.TokensEstimated,
       totalPromptTokenCount: record.TotalPromptTokenCount,
       totalCompletionTokenCount: record.TotalCompletionTokenCount,
@@ -715,6 +725,8 @@ export class TraceSummaryClickHouseRepository implements TraceSummaryRepository 
       Models: data.models,
       TotalCost: data.totalCost,
       NonBilledCost: data.nonBilledCost,
+      UnpricedSpanCount: data.unpricedSpanCount ?? 0,
+      UnpricedModels: data.unpricedModels ?? [],
       TokensEstimated: data.tokensEstimated,
       TotalPromptTokenCount: data.totalPromptTokenCount,
       TotalCompletionTokenCount: data.totalCompletionTokenCount,

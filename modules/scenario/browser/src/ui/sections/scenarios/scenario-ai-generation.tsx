@@ -1,10 +1,10 @@
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Card } from "@langwatch/design-system/card";
 import {
   Alert,
   Box,
   Button,
-  Card,
   HStack,
   Icon,
   Link,
@@ -185,117 +185,115 @@ export function ScenarioAIGeneration({ form }: ScenarioAIGenerationProps) {
 
   // "Input" view - AI generation interface
   return (
-    <Card.Root overflow="hidden">
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack justify="space-between">
-            <HStack gap={3}>
-              <Box
-                display="grid"
-                placeItems="center"
-                width="34px"
-                height="34px"
-                bg="bg.card"
-                borderWidth="1px"
-                borderColor="border"
-                borderRadius="10px"
-              >
-                <Sparkles size={18} />
-              </Box>
-              <Box>
-                <Text fontWeight="semibold" fontSize="sm">
-                  AI draft
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  {hasHistory ? "Refine this draft" : "Draft this scenario"}
-                </Text>
-              </Box>
-            </HStack>
-            <Button variant="ghost" size="xs" onClick={() => setViewMode("prompt")}>
-              <ArrowLeft size={14} />
-              Back
-            </Button>
-          </HStack>
-
-          <Text fontSize="xs" color="fg.muted">
-            {hasHistory
-              ? "Describe what should change. The form stays editable."
-              : "Describe what your agent does and the behavior you want to test."}
-          </Text>
-
-          <ScenarioGenerationModelError defaultModelState={defaultModelState} />
-
-          {status === "done" && hasHistory && (
-            <HStack
-              gap={2}
-              padding={2}
-              bg="green.subtle"
-              borderRadius="md"
-              fontSize="xs"
-              color="green.fg"
-            >
-              <Icon as={Check} boxSize={3} />
-              <Text>Generated! Review and edit the form on the left.</Text>
-            </HStack>
-          )}
-
-          {/* Keep refinement context without turning the sidebar into a full transcript. */}
-          {hasHistory && (
+    <Card padding="lg">
+      <VStack align="stretch" gap={3}>
+        <HStack justify="space-between">
+          <HStack gap={3}>
             <Box
-              borderWidth="1px"
-              borderColor="border.subtle"
-              borderRadius="md"
+              display="grid"
+              placeItems="center"
+              width="34px"
+              height="34px"
               bg="bg.card"
-              padding={2.5}
+              borderWidth="1px"
+              borderColor="border"
+              borderRadius="10px"
             >
-              <Text
-                fontSize="10px"
-                fontWeight="bold"
-                color="fg.muted"
-                letterSpacing="0.08em"
-                textTransform="uppercase"
-                marginBottom={1}
-              >
-                Latest request · {history.length} {history.length === 1 ? "turn" : "turns"}
+              <Sparkles size={18} />
+            </Box>
+            <Box>
+              <Text fontWeight="semibold" fontSize="sm">
+                AI draft
               </Text>
-              <Text fontSize="xs" color="fg.muted" lineClamp={2}>
-                {history.at(-1)}
+              <Text fontSize="xs" color="fg.muted">
+                {hasHistory ? "Refine this draft" : "Draft this scenario"}
               </Text>
             </Box>
-          )}
-
-          <Textarea
-            placeholder={
-              hasHistory
-                ? "Refine: e.g., Add more edge cases about escalation"
-                : "e.g., A customer support agent that handles refund requests. Test an angry customer who was charged twice."
-            }
-            value={input}
-            onChange={(e) => setInput(e.target.value)}
-            onKeyDown={handleKeyDown}
-            disabled={status === "generating" || isDefaultModelDisabled}
-            rows={PROMPT_INPUT_ROWS}
-            fontSize="sm"
-          />
-
-          <Button colorPalette="orange" size="sm" onClick={handleGenerate} disabled={!canGenerate}>
-            {status === "generating" ? (
-              <>
-                <Spinner size="sm" />
-                Drafting…
-              </>
-            ) : (
-              <>
-                <Sparkles size={14} />
-                {hasHistory ? "Refine with AI" : "Draft with AI"}
-              </>
-            )}
+          </HStack>
+          <Button variant="ghost" size="xs" onClick={() => setViewMode("prompt")}>
+            <ArrowLeft size={14} />
+            Back
           </Button>
+        </HStack>
 
-          <ResolvedModelCaption model={resolvedDefault.data?.model} />
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        <Text fontSize="xs" color="fg.muted">
+          {hasHistory
+            ? "Describe what should change. The form stays editable."
+            : "Describe what your agent does and the behavior you want to test."}
+        </Text>
+
+        <ScenarioGenerationModelError defaultModelState={defaultModelState} />
+
+        {status === "done" && hasHistory && (
+          <HStack
+            gap={2}
+            padding={2}
+            bg="green.subtle"
+            borderRadius="md"
+            fontSize="xs"
+            color="green.fg"
+          >
+            <Icon as={Check} boxSize={3} />
+            <Text>Generated! Review and edit the form on the left.</Text>
+          </HStack>
+        )}
+
+        {/* Keep refinement context without turning the sidebar into a full transcript. */}
+        {hasHistory && (
+          <Box
+            borderWidth="1px"
+            borderColor="border.subtle"
+            borderRadius="md"
+            bg="bg.card"
+            padding={2.5}
+          >
+            <Text
+              textStyle="micro"
+              fontWeight="bold"
+              color="fg.muted"
+              letterSpacing="0.08em"
+              textTransform="uppercase"
+              marginBottom={1}
+            >
+              Latest request · {history.length} {history.length === 1 ? "turn" : "turns"}
+            </Text>
+            <Text fontSize="xs" color="fg.muted" lineClamp={2}>
+              {history.at(-1)}
+            </Text>
+          </Box>
+        )}
+
+        <Textarea
+          placeholder={
+            hasHistory
+              ? "Refine: e.g., Add more edge cases about escalation"
+              : "e.g., A customer support agent that handles refund requests. Test an angry customer who was charged twice."
+          }
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          disabled={status === "generating" || isDefaultModelDisabled}
+          rows={PROMPT_INPUT_ROWS}
+          fontSize="sm"
+        />
+
+        <Button colorPalette="orange" size="sm" onClick={handleGenerate} disabled={!canGenerate}>
+          {status === "generating" ? (
+            <>
+              <Spinner size="sm" />
+              Drafting…
+            </>
+          ) : (
+            <>
+              <Sparkles size={14} />
+              {hasHistory ? "Refine with AI" : "Draft with AI"}
+            </>
+          )}
+        </Button>
+
+        <ResolvedModelCaption model={resolvedDefault.data?.model} />
+      </VStack>
+    </Card>
   );
 }
 
@@ -311,7 +309,7 @@ function DefaultModelErrorBanner({ children }: { children: React.ReactNode }) {
       </Alert.Indicator>
       <Alert.Content gap={2}>
         <Alert.Description>{children}</Alert.Description>
-        <Button colorPalette="blue" color="blue.contrast" asChild size="sm" alignSelf="flex-start">
+        <Button colorPalette="orange" variant="solid" asChild size="sm" alignSelf="flex-start">
           <a
             data-testid="scenario-ai-configure-default-model-button"
             href="/settings/model-providers"
@@ -364,89 +362,85 @@ function ScenarioGenerationPrompt({
   // Show warning when no model providers are configured
   if (!hasEnabledProviders) {
     return (
-      <Card.Root>
-        <Card.Body>
-          <VStack align="stretch" gap={3}>
-            <HStack gap={3}>
-              <Box p={2} bg="orange.subtle" borderRadius="md" color="orange.fg">
-                <Icon as={AlertTriangle} boxSize={4} />
-              </Box>
-              <Text fontWeight="semibold" fontSize="sm">
-                Model Provider Required
-              </Text>
-            </HStack>
-
-            <Text fontSize="xs" color="fg.muted">
-              Scenarios require a model provider to run.{" "}
-              <Link
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-                color="blue.fg"
-                fontWeight="medium"
-              >
-                Configure model provider
-              </Link>
+      <Card padding="lg">
+        <VStack align="stretch" gap={3}>
+          <HStack gap={3}>
+            <Box p={2} bg="orange.subtle" borderRadius="md" color="orange.fg">
+              <Icon as={AlertTriangle} boxSize={4} />
+            </Box>
+            <Text fontWeight="semibold" fontSize="sm">
+              Model provider required
             </Text>
+          </HStack>
 
-            <Button colorPalette="blue" asChild size="sm">
-              <a
-                data-testid="scenario-ai-configure-model-provider-button"
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Configure model provider
-              </a>
-            </Button>
-          </VStack>
-        </Card.Body>
-      </Card.Root>
+          <Text fontSize="xs" color="fg.muted">
+            Scenarios require a model provider to run.{" "}
+            <Link
+              href="/settings/model-providers"
+              target="_blank"
+              rel="noopener noreferrer"
+              color="blue.fg"
+              fontWeight="medium"
+            >
+              Configure model provider
+            </Link>
+          </Text>
+
+          <Button colorPalette="orange" variant="solid" asChild size="sm">
+            <a
+              data-testid="scenario-ai-configure-model-provider-button"
+              href="/settings/model-providers"
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              Configure model provider
+            </a>
+          </Button>
+        </VStack>
+      </Card>
     );
   }
 
   return (
-    <Card.Root overflow="hidden">
-      <Card.Body>
-        <VStack align="stretch" gap={3}>
-          <HStack gap={3}>
-            <Box
-              display="grid"
-              placeItems="center"
-              width="34px"
-              height="34px"
-              bg="bg.card"
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="10px"
-            >
-              <Sparkles size={18} />
-            </Box>
-            <Box>
-              <Text fontWeight="semibold" fontSize="sm">
-                {hasHistory ? "Refine with AI" : "Draft with AI"}
-              </Text>
-              <Text fontSize="xs" color="fg.muted">
-                {hasHistory ? "Your draft is ready to shape." : "Start from an idea, not a form."}
-              </Text>
-            </Box>
-          </HStack>
+    <Card padding="lg">
+      <VStack align="stretch" gap={3}>
+        <HStack gap={3}>
+          <Box
+            display="grid"
+            placeItems="center"
+            width="34px"
+            height="34px"
+            bg="bg.card"
+            borderWidth="1px"
+            borderColor="border"
+            borderRadius="10px"
+          >
+            <Sparkles size={18} />
+          </Box>
+          <Box>
+            <Text fontWeight="semibold" fontSize="sm">
+              {hasHistory ? "Refine with AI" : "Draft with AI"}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              {hasHistory ? "Your draft is ready to shape." : "Start from an idea, not a form."}
+            </Text>
+          </Box>
+        </HStack>
 
-          <Text fontSize="xs" color="fg.muted">
-            {hasHistory
-              ? "Ask for harder edge cases, clearer criteria, or a different persona."
-              : "Describe the behavior you care about and AI will draft the situation and criteria."}
-          </Text>
+        <Text fontSize="xs" color="fg.muted">
+          {hasHistory
+            ? "Ask for harder edge cases, clearer criteria, or a different persona."
+            : "Describe the behavior you care about and AI will draft the situation and criteria."}
+        </Text>
 
-          <Button colorPalette="orange" size="sm" onClick={onStart} aria-label="Generate with AI">
-            <Sparkles size={14} />
-            {hasHistory ? "Refine the draft" : "Start a draft"}
-          </Button>
+        <Button colorPalette="orange" size="sm" onClick={onStart} aria-label="Generate with AI">
+          <Sparkles size={14} />
+          {hasHistory ? "Refine the draft" : "Start a draft"}
+        </Button>
 
-          <ResolvedModelCaption model={model} />
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        <ResolvedModelCaption model={model} />
+      </VStack>
+    </Card>
   );
 }
 

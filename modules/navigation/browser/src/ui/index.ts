@@ -14,6 +14,7 @@ export { AppHeaderUserMenu } from "./sections/app-header-user-menu.tsx";
 export { NavigationLink } from "./elements/navigation-link.tsx";
 export { SideMenuDensityProvider, useSideMenuDensity } from "./elements/side-menu-density.tsx";
 export { ProductSwitcherMenu } from "./sections/product-switcher-menu.tsx";
+export { ProductAccentScope } from "./sections/product-accent-scope.tsx";
 export { ProjectSwitcherCombobox } from "./blocks/project-switcher-combobox.tsx";
 export { ProjectAvatar } from "./elements/project-avatar.tsx";
 export {
@@ -37,9 +38,10 @@ export { useSettingsMenu } from "../behavior/use-settings-menu.ts";
 export {
   settingsMenu,
   isSettingsMenuItemActive,
-  opsGroup,
+  adminMenu,
   instanceGroup,
   cloudAdminGroup,
+  type AdminMenuGates,
   type SettingsMenuGates,
   type SettingsMenuGroup,
   type SettingsMenuItem,

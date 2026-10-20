@@ -1,15 +1,8 @@
 import type { WireOf } from "@langwatch/api/web";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import {
-  Box,
-  Button,
-  Center,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Box, Center, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
 import type {
   ProcessInstanceDetail as StoredProcessInstanceDetail,
@@ -36,7 +29,7 @@ function InstanceStatusRow({ detail, now }: { detail: ProcessInstanceDetail; now
   return (
     <SummaryList>
       <SummaryListItem label="Revision">
-        <Text textStyle="sm" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {detail.revision}
         </Text>
       </SummaryListItem>
@@ -100,26 +93,6 @@ function InstanceOutboxSection({
         <Text textStyle="xs" color="fg.muted">
           Outbox {total > 0 ? `(${first}–${last} of ${total})` : "(0)"}
         </Text>
-        {onPageChange && pageCount > 1 && (
-          <HStack gap={1} marginLeft="auto">
-            <Button
-              size="2xs"
-              variant="outline"
-              disabled={page <= 1}
-              onClick={() => onPageChange(page - 1)}
-            >
-              Previous
-            </Button>
-            <Button
-              size="2xs"
-              variant="outline"
-              disabled={page >= pageCount}
-              onClick={() => onPageChange(page + 1)}
-            >
-              Next
-            </Button>
-          </HStack>
-        )}
       </HStack>
       {outboxLoading && <Spinner size="xs" />}
       {!outboxLoading && hasOutboxMessages ? (
@@ -139,6 +112,16 @@ function InstanceOutboxSection({
           ))}
         </VStack>
       ) : null}
+      {onPageChange && pageCount > 1 && (
+        <Pagination
+          page={page}
+          pageSize={pageSize}
+          totalCount={total}
+          visibleCount={outbox?.messages.length}
+          isLoading={outboxLoading}
+          onPageChange={onPageChange}
+        />
+      )}
       {!outboxLoading && !hasOutboxMessages && (
         <Text textStyle="xs" color="fg.muted">
           No outbox messages.

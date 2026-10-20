@@ -80,6 +80,13 @@ Feature: Enterprise governance package boundary
     And the application supplies the SSRF-safe HTTP adapter
 
   @unit
+  Scenario: A pull source reaches the private network unless the operator blocks local calls
+    Given the pull fetch is built from BLOCK_LOCAL_HTTP_CALLS and ALLOWED_PROXY_HOSTS
+    When local calls are not blocked, a pull to a loopback or private address is fetched
+    And when they are blocked, it is refused unless its host is on the allowlist
+    And a pull to the cloud metadata address is refused either way
+
+  @unit
   Scenario: Spend spike evaluation does not expose storage syntax
     Given an active spend spike rule targets a source or source type
     When Governance reads the current and baseline spend windows
@@ -286,3 +293,74 @@ Feature: Enterprise governance package boundary
       Given a member of the organization
       When the CLI asks for its bootstrap
       Then governance resolves the bootstrap for that member
+
+  Rule: Main's trace-side governance lanes are retired for one release
+
+    @unit
+    Scenario: Governance KPI and OCSF jobs the previous release queued on trace are acknowledged
+      Given the previous release queued jobs under "trace_processing:reactor:governanceKpisSync" and "trace_processing:reactor:governanceOcsfEventsSync"
+      When governance's activity monitor pipeline is built
+      Then it tombstones both keys for one release, naming the trace-facts pull that took their work
+      And a worker of the new release acknowledges those jobs with one log line instead of blocking their group
+
+  Rule: Each pulled vendor is reached at a configured base, the real vendor unless the deployment names another
+
+    @unit
+    Scenario: A vendor base that is unset or blank reaches the real vendor
+      Given the vendor base setting is unset or exported blank
+      When governance builds the address of a vendor call
+      Then the call goes to the real vendor
+
+    @unit
+    Scenario: A pulled vendor is reached at the base the deployment configures
+      Given a vendor base setting names a URL
+      When governance builds the address of a vendor call
+      Then the call goes to that base and a value that is not a URL is refused at boot
+
+    @unit
+    Scenario: Databricks accepts the configured workspace base and nothing wider
+      Given DATABRICKS_WORKSPACE_BASE names an origin
+      When an admin saves a Genie source
+      Then a workspace URL equal to that origin is accepted
+      And a different origin, a path, a port change or credentials in the URL are still refused
+
+    @unit
+    Scenario: Dataverse accepts the configured environment base and nothing wider
+      Given DATAVERSE_ENVIRONMENT_BASE names an address
+      When an admin saves a Copilot Studio Dataverse source
+      Then an environment URL equal to that address is accepted and the source reads from it
+      And a different port, host or scheme, a longer path or credentials in the URL are still refused
+      And with no base configured only a real Dynamics environment is accepted
+      And a next-page link is followed only when it leads to the configured origin
+
+    @unit
+    Scenario: The OpenAI admin API is reached at the configured base
+      Given OPENAI_ADMIN_API_BASE names a base
+      When the cost report, the member list or the account lookup is read
+      Then each request goes to that base
+
+    @unit
+    Scenario: The Anthropic admin API is reached at the configured base
+      Given ANTHROPIC_ADMIN_API_BASE names a base
+      When the usage report, the member list, the audit log or the account lookup is read
+      Then each request goes to that base
+
+    @unit
+    Scenario: Microsoft sign-in is reached at the configured login base
+      Given MICROSOFT_LOGIN_BASE names a base
+      When a Copilot Studio source or a Microsoft listing signs in
+      Then the token request goes to that base
+
+    @unit
+    Scenario: Microsoft Graph is reached at the configured Graph base
+      Given MICROSOFT_GRAPH_API_BASE names a base
+      When the directory, the seats or the audit log is read
+      Then each request, and each next-page link it follows, stays on that base
+
+    @unit
+    Scenario: Only the configured vendor base is exempt from the local-address fence
+      Given local addresses are refused
+      And a vendor base names a local origin
+      When a request is made to that origin
+      Then it is allowed
+      And a request to any other local address is still refused

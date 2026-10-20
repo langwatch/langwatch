@@ -44,6 +44,7 @@ export interface LwqlPrismaRows {
     readonly userAgent: "String?";
     readonly identifierId: "String?";
     readonly amr: "String[]";
+    readonly startedBySignUp: "Boolean";
     readonly impersonating: "Json?";
     readonly actorUserId: "String?";
     readonly subjectUserId: "String?";
@@ -101,6 +102,14 @@ export interface LwqlPrismaRows {
     readonly detachedAt: "DateTime?";
     readonly lastUsedAt: "DateTime?";
     readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly IdentitySignInSwitch: {
+    readonly userId: "String";
+    readonly onIdentifiers: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
     readonly updatedAt: "DateTime";
   };
   readonly IdentifierReservation: {
@@ -331,12 +340,16 @@ export interface LwqlPrismaRows {
   readonly Organization: {
     readonly id: "String";
     readonly name: "String";
+    readonly kind: "String";
     readonly phoneNumber: "String?";
     readonly slug: "String";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
     readonly usageSpendingMaxLimit: "Int?";
     readonly datasetAttachmentMaxMb: "Int?";
+    readonly privateClickHouseLabel: "String?";
+    readonly privateS3Label: "String?";
+    readonly privateDataplaneSeenAt: "DateTime?";
     readonly maxSessionDurationDays: "Int";
     readonly mfaRequired: "Boolean";
     readonly lockoutAfterFailedAttempts: "Int";
@@ -386,7 +399,8 @@ export interface LwqlPrismaRows {
     readonly email: "String";
     readonly planType: "String";
     readonly maxMembers: "Int";
-    readonly maxMembersLite: "Int";
+    readonly maxMembersLite: "Int?";
+    readonly liteSeatsUnlimited: "Boolean";
     readonly issuedAt: "DateTime";
     readonly expiresAt: "DateTime";
     readonly source: "IssuedLicenseSource";
@@ -430,7 +444,8 @@ export interface LwqlPrismaRows {
     readonly email: "String";
     readonly planType: "String";
     readonly maxMembers: "Int";
-    readonly maxMembersLite: "Int";
+    readonly maxMembersLite: "Int?";
+    readonly liteSeatsUnlimited: "Boolean";
     readonly licenseTermDays: "Int";
     readonly services: "String[]";
     readonly expiresAt: "DateTime";
@@ -713,8 +728,120 @@ export interface LwqlPrismaRows {
     readonly projectId: "String";
     readonly name: "String";
     readonly order: "Int";
+    readonly description: "String?";
+    readonly createdById: "String?";
+    readonly scope: "DashboardScope";
+    readonly organizationId: "String?";
     readonly createdAt: "DateTime";
     readonly updatedAt: "DateTime";
+  };
+  readonly DashboardFavourite: {
+    readonly id: "String";
+    readonly userId: "String";
+    readonly dashboardId: "String?";
+    readonly templateId: "String?";
+    readonly projectId: "String";
+    readonly position: "Int";
+    readonly createdAt: "DateTime";
+  };
+  readonly DashboardsV2: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly name: "String";
+    readonly description: "String?";
+    readonly createdById: "String?";
+    readonly scope: "DashboardScope";
+    readonly organizationId: "String?";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly DashboardWidget: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly dashboardId: "String?";
+    readonly name: "String";
+    readonly definition: "Json";
+    readonly gridColumn: "Int";
+    readonly gridRow: "Int";
+    readonly colSpan: "Int";
+    readonly rowSpan: "Int";
+    readonly createdAt: "DateTime";
+    readonly updatedAt: "DateTime";
+  };
+  readonly InsightProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly title: "String";
+    readonly body: "String";
+    readonly tone: "String";
+    readonly topic: "String?";
+    readonly validDays: "Int";
+    readonly lwql: "String?";
+    readonly sourceConversationId: "String?";
+    readonly sourceMessageId: "String?";
+    readonly filedByUserId: "String?";
+    readonly filedAt: "Float";
+    readonly renewedAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+    readonly boardId: "String?";
+    readonly boardName: "String?";
+    readonly widgetId: "String?";
+    readonly widgetName: "String?";
+    readonly filedVia: "String";
+    readonly replayStart: "Float?";
+    readonly replayEnd: "Float?";
+    readonly replayGranularitySeconds: "Int?";
+    readonly replayContext: "Json?";
+    readonly ownerUserId: "String?";
+    readonly findingKey: "String?";
+  };
+  readonly InsightReaderProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly insightId: "String";
+    readonly userId: "String";
+    readonly seenAt: "Float?";
+    readonly archivedAt: "Float?";
+    readonly keptAt: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
+  };
+  readonly InsightDailyScheduleProjection: {
+    readonly id: "String";
+    readonly projectId: "String";
+    readonly userId: "String";
+    readonly boardKind: "String";
+    readonly boardId: "String";
+    readonly boardName: "String";
+    readonly state: "String";
+    readonly offReason: "String?";
+    readonly hour: "Int?";
+    readonly timezone: "String?";
+    readonly maxInsights: "Int?";
+    readonly lastRunId: "String?";
+    readonly lastRunAt: "Float?";
+    readonly lastRunOutcome: "String?";
+    readonly lastRunReason: "String?";
+    readonly lastRunFiled: "Int?";
+    readonly lastRunRenewed: "Int?";
+    readonly lastRunConversationId: "String?";
+    readonly consecutiveSkips: "Int";
+    readonly skipStreakSlot: "Float?";
+    readonly createdAt: "Float";
+    readonly updatedAt: "Float";
+    readonly occurredAt: "Float";
+    readonly acceptedAt: "Float";
+    readonly lastEventId: "String";
+    readonly projectionVersion: "String";
   };
   readonly SavedView: {
     readonly id: "String";
@@ -1011,6 +1138,7 @@ export interface LwqlPrismaRows {
     readonly UserId: "String";
     readonly Title: "String?";
     readonly TitleSource: "LangyProjectionTitleSource";
+    readonly Origin: "String";
     readonly Status: "String";
     readonly IsShared: "Boolean";
     readonly SharedAt: "Float?";
@@ -1541,6 +1669,14 @@ export interface LwqlPrismaRows {
     readonly deactivatedAt: "DateTime?";
     readonly erasedAt: "DateTime?";
     readonly standingChangedAt: "DateTime";
+  };
+  readonly AuthzEngineSwitch: {
+    readonly organizationId: "String";
+    readonly onEngine: "Boolean";
+    readonly pinned: "Boolean";
+    readonly switchedAt: "DateTime";
+    readonly lastAppliedEventId: "String?";
+    readonly updatedAt: "DateTime";
   };
   readonly RoleBinding: {
     readonly id: "String";
@@ -2342,5 +2478,12 @@ export interface LwqlPrismaRows {
     readonly publicKey: "String";
     readonly privateKeyEncrypted: "String";
     readonly createdAt: "DateTime";
+  };
+  readonly SignInProviderMount: {
+    readonly id: "String";
+    readonly provider: "String?";
+    readonly mounted: "Boolean";
+    readonly lastAppliedEventId: "String";
+    readonly updatedAt: "DateTime";
   };
 }

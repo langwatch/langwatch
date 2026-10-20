@@ -74,7 +74,7 @@ export function TagPill({ label, onRemove, tone = "neutral" }: TagPillProps) {
       fontFamily={colors ? "mono" : undefined}
       data-testid={`tag-pill-${label}`}
     >
-      <Text fontSize={colors ? "10px" : "xs"} fontWeight={colors ? "medium" : undefined}>
+      <Text textStyle={colors ? "micro" : "caption"} fontWeight={colors ? "medium" : undefined}>
         {label}
       </Text>
       {onRemove && (

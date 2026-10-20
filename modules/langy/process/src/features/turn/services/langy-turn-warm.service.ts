@@ -71,7 +71,7 @@ export class LangyTurnWarmService {
   }): Promise<{ conversationId: string | null; warmed: boolean }> {
     const { worker } = this.deps;
     const userId = session.user.id;
-    const { speculativeConversation, credentials, resolvedModel } =
+    const { speculativeConversation, credentials, resolvedModel, readOnly } =
       await LangyTurnBaseDependenciesService.create().resolve({
         deps: this.deps,
         projectId,
@@ -128,7 +128,15 @@ export class LangyTurnWarmService {
       return { conversationId, warmed: true };
     }
 
-    await this.startWarm({ worker, session, projectId, conversationId, credentials, warmModel });
+    await this.startWarm({
+      worker,
+      session,
+      projectId,
+      conversationId,
+      credentials,
+      warmModel,
+      readOnly,
+    });
     return { conversationId, warmed: true };
   }
 
@@ -140,6 +148,7 @@ export class LangyTurnWarmService {
     conversationId,
     credentials,
     warmModel,
+    readOnly,
   }: {
     worker: NonNullable<LangyTurnServiceDependencies["worker"]>;
     session: { user: { id: string } };
@@ -147,11 +156,14 @@ export class LangyTurnWarmService {
     conversationId: string;
     credentials: WarmCredentials;
     warmModel: string;
+    /** A run conversation's worker is warmed with the ceiling its turns keep. */
+    readOnly: boolean;
   }): Promise<void> {
     const minted = await this.deps.sessionKeys.mint({
       session,
       projectId,
       organizationId: credentials.organizationId,
+      ...(readOnly ? { ceiling: "unattended" as const } : {}),
     });
     credentials.langwatchApiKey = minted.token;
     credentials.langwatchApiKeyId = minted.apiKeyId;

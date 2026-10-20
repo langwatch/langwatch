@@ -102,3 +102,36 @@ describe("viewStore last-used lens persistence", () => {
     });
   });
 });
+
+describe("viewStore drafts when device storage arrives after the store", () => {
+  beforeEach(() => {
+    localStorage.clear();
+  });
+  afterEach(() => {
+    vi.resetModules();
+  });
+
+  describe("given an All lens draft holding an eval column", () => {
+    /** @scenario "Eval column survives a reload" */
+    it("restores the column once the reader is answered", async () => {
+      localStorage.setItem(
+        "langwatch:traces-v2:drafts:v1",
+        JSON.stringify({ "all-traces": { columns: ["time", "trace", "eval:score:faithfulness"] } }),
+      );
+      vi.resetModules();
+      const { useViewStore } = await import("../explorer.store.ts");
+      expect(useViewStore.getState().columnOrder).not.toContain("eval:score:faithfulness");
+
+      const storage = await import("@langwatch/browser-host/storage");
+      storage.setUiStorage(new storage.BrowserUiStorage());
+      storage.setUiStorageReader("reader-1");
+
+      expect(useViewStore.getState().columnOrder).toEqual([
+        "time",
+        "trace",
+        "eval:score:faithfulness",
+      ]);
+      expect(useViewStore.getState().isDraft("all-traces")).toBe(true);
+    });
+  });
+});

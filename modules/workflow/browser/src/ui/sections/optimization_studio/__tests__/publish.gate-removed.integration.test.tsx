@@ -172,7 +172,7 @@ vi.mock("@langwatch/design-system/menu", () => ({
   },
 }));
 
-vi.mock("@langwatch/design-system/studio-dialog", () => ({
+vi.mock("@langwatch/design-system/dialog", () => ({
   Dialog: {
     Root: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
       open ? <div>{children}</div> : null,

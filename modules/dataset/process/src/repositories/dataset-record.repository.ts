@@ -2,6 +2,11 @@ import type { DatasetRecord, DatasetRecordInput } from "@langwatch/dataset-contr
 
 export interface DatasetRecordRepository {
   count(input: { datasetId: string; projectId: string }): Promise<number>;
+  /** One grouped count for these datasets; a dataset holding no entries is absent. */
+  countByDataset(input: {
+    projectId: string;
+    datasetIds: readonly string[];
+  }): Promise<{ datasetId: string; recordCount: number }[]>;
   findPage(input: {
     datasetId: string;
     projectId: string;

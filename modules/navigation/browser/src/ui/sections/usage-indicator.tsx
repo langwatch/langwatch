@@ -124,12 +124,12 @@ export const UsageIndicator = ({ showLabel = true }: UsageIndicatorProps) => {
             <VStack width="full" gap={1} align="start">
               <HStack width="full" justifyContent="space-between">
                 <HStack gap={1}>
-                  <Text fontSize="12px" color="nav.fgMuted">
+                  <Text textStyle="caption" color="nav.fgMuted">
                     Usage
                   </Text>
                   <Info size={12} color="var(--chakra-colors-fg-muted)" />
                 </HStack>
-                <Text fontSize="12px" color="fg.muted">
+                <Text textStyle="caption" color="fg.muted">
                   {Math.round(percentage)}%
                 </Text>
               </HStack>

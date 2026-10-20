@@ -6,6 +6,8 @@
  * resolved only through its handle, never read from `process.env`.
  */
 import {
+  allowedProxyHosts,
+  blockLocalHttpCalls,
   Config,
   gatewayAddressOf,
   gatewayInternalUrl,
@@ -18,6 +20,12 @@ import {
 import { Secret } from "@langwatch/secrets/secret";
 import { gatewayInternalSecret, virtualKeyPepper } from "@langwatch/secrets/shared-secrets";
 import { z } from "zod";
+
+/** A vendor base that is unset or blank reads as the real vendor; a value that is set must be a URL. */
+const optionalVendorBase = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().url().optional(),
+);
 
 /** Every stored erasure digest is a function of this value: set it once, never change it. */
 export const governanceSecrets = {
@@ -33,6 +41,18 @@ export const governanceConfig = Config.define((c) => ({
   gatewayPublicUrl,
   gatewayInternalUrl,
   gatewayLegacyUrl,
+  /** The address fence a pull source's fetch is judged by, as main's pullers read it. */
+  blockLocalHttpCalls,
+  allowedProxyHosts,
+  /** Where each pulled vendor is reached; unset or blank is the vendor itself, haven's +outbound names outboundsim. */
+  openAiAdminApiBase: c.env("OPENAI_ADMIN_API_BASE", optionalVendorBase),
+  anthropicAdminApiBase: c.env("ANTHROPIC_ADMIN_API_BASE", optionalVendorBase),
+  microsoftLoginBase: c.env("MICROSOFT_LOGIN_BASE", optionalVendorBase),
+  microsoftGraphApiBase: c.env("MICROSOFT_GRAPH_API_BASE", optionalVendorBase),
+  /** The one Databricks workspace origin accepted beside the three vendor clouds. */
+  databricksWorkspaceBase: c.env("DATABRICKS_WORKSPACE_BASE", optionalVendorBase),
+  /** The one Dataverse environment address accepted beside the real Dynamics clouds. */
+  dataverseEnvironmentBase: c.env("DATAVERSE_ENVIRONMENT_BASE", optionalVendorBase),
   /** The hosted product, whose default gateway is the SaaS one rather than the local one. */
   isSaas,
   /** This deployment's public origin (`BASE_HOST`), absent where it named none; the CLI's links lead back to it. */

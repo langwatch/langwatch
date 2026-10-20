@@ -182,5 +182,25 @@ func (t *JobsTab) Key(k string) bool {
 // Rows is the run list as plain data.
 func (t *JobsTab) Rows() any { return t.runs }
 
+// LatestRuns is the run list an agent reads: the newest run of each job, in
+// the order those runs happened, holding only the last tail lines of output.
+func (t *JobsTab) LatestRuns(tail int) []sources.JobRun {
+	newest := make(map[string]int, len(t.runs))
+	for i, run := range t.runs {
+		newest[run.Name] = i
+	}
+	out := make([]sources.JobRun, 0, len(newest))
+	for i, run := range t.runs {
+		if newest[run.Name] != i {
+			continue
+		}
+		if len(run.Output) > tail {
+			run.Output = run.Output[len(run.Output)-tail:]
+		}
+		out = append(out, run)
+	}
+	return out
+}
+
 // Open is the run drilled into, empty on the list.
 func (t *JobsTab) Open() string { return t.openJob }

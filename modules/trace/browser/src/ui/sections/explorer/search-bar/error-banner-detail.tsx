@@ -21,7 +21,7 @@ export const DetailRow: React.FC<{
       minWidth="60px"
       textTransform="uppercase"
       letterSpacing="0.04em"
-      fontWeight="600"
+      fontWeight="semibold"
       paddingTop={0.5}
     >
       {label}

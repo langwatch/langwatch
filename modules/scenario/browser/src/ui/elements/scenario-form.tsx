@@ -170,7 +170,7 @@ export function ScenarioForm({
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <ScenarioSectionHeader>Situation</ScenarioSectionHeader>
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             Describe the user, their context, and what they're trying to accomplish. Think about a
             critical path or a complex edge case.
           </Text>
@@ -189,7 +189,7 @@ export function ScenarioForm({
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <ScenarioSectionHeader>Criteria</ScenarioSectionHeader>
-          <Text fontSize="13px" color="fg.muted">
+          <Text textStyle="bodySm" color="fg.muted">
             What must the agent DO or NOT DO? e.g. "Must remain empathetic", "Must NOT offer refund
             without manager approval"
           </Text>
@@ -288,8 +288,8 @@ function CustomizeSection({
         <VStack align="stretch" gap={3} pt={3}>
           <HStack gap={4} align="start">
             <Field.Root invalid={!!errors.maxTurns} flex={1}>
-              <Text fontSize="13px" fontWeight="medium">
-                Max Turns
+              <Text textStyle="bodySm" fontWeight="medium">
+                Max turns
               </Text>
               <Input
                 {...register("maxTurns", {
@@ -301,8 +301,8 @@ function CustomizeSection({
               <Field.ErrorText>{errors.maxTurns?.message}</Field.ErrorText>
             </Field.Root>
             <Field.Root invalid={!!errors.minTurns} flex={1}>
-              <Text fontSize="13px" fontWeight="medium">
-                Min Turns
+              <Text textStyle="bodySm" fontWeight="medium">
+                Min turns
               </Text>
               <Input
                 {...register("minTurns", {
@@ -314,7 +314,7 @@ function CustomizeSection({
               <Field.ErrorText>{errors.minTurns?.message}</Field.ErrorText>
             </Field.Root>
           </HStack>
-          <Text fontSize="12px" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             Max Turns caps the conversation length. Min Turns prevents the judge from ending the
             test early.
           </Text>

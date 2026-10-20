@@ -4,10 +4,16 @@ import { DeleteConfirmationDialog } from "./delete-confirmation-dialog.tsx";
 
 const meta = {
   title: "Overlays/Delete confirmation dialog",
-  parameters: { usage: { use: "Confirming a destructive delete." } },
+  parameters: {
+    usage: {
+      use: "Confirming a destructive delete. The title is required and names the act: Delete dataset?",
+      avoid: "A reversible or routine action: ConfirmDialog. Never a generic Are you sure?",
+    },
+  },
   component: DeleteConfirmationDialog,
   tags: ["autodocs"],
   args: {
+    title: "Delete dataset?",
     open: true,
     onClose: () => void 0,
     onConfirm: () => void 0,

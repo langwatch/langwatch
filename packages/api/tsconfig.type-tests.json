@@ -2,30 +2,14 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "rootDir": ".",
-    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.type-tests.tsbuildinfo",
+    "composite": false,
+    "noEmit": true
   },
-  "include": ["src/**/*", "type-tests/**/*"],
+  "include": ["type-tests/**/*"],
   "references": [
     {
-      "path": "tsconfig.build.json"
-    },
-    {
-      "path": "../authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../module/tsconfig.build.json"
-    },
-    {
-      "path": "../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     }
   ]
 }

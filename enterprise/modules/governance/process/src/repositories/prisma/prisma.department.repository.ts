@@ -1,6 +1,6 @@
 import { departmentSchema, type Department } from "@langwatch/enterprise-governance-contract";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
-import { toDate, type Instant } from "@langwatch/time";
+import { type Instant, nowInstant, toDate } from "@langwatch/time";
 
 import { DepartmentRepository } from "../department.repository.ts";
 
@@ -73,7 +73,7 @@ export class PrismaDepartmentRepository extends DepartmentRepository {
   async archive(input: { id: string; organizationId: string }): Promise<boolean> {
     const result = await this.prisma.department.updateMany({
       where: input,
-      data: { archivedAt: new Date() },
+      data: { archivedAt: toDate(nowInstant()) },
     });
     return result.count > 0;
   }

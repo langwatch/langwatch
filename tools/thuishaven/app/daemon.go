@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"runtime"
 	"slices"
 	"strconv"
 	"time"
@@ -149,6 +150,7 @@ func (o *Orchestrator) RestartDaemon(dir string) (int, error) {
 	}
 	for deadline := time.Now().Add(successorWait); time.Now().Before(deadline); time.Sleep(100 * time.Millisecond) {
 		if info, ok := o.store.Daemon(); ok && info.PID != old.PID && o.daemonAlive() {
+			o.keepProxyForOtherStacks()
 			return info.PID, nil
 		}
 	}
@@ -204,10 +206,18 @@ func (o *Orchestrator) monitorLoop(ctx context.Context) {
 				o.reapReclaimableWorktrees(ctx)
 				o.reapJobScratch()
 			}
+			if cycles%clickHousePressureCycles == 0 {
+				o.pruneUnderClickHousePressure(ctx)
+			}
 			o.reapDeadStacks()
 			o.governPressure()
+			o.weightFocusedWorkload(ctx)
+			endSamples := o.shareCycleSamples()
 			o.governProcesses()
 			o.reapOrphanNxDaemons()
+			o.sweepRepoOrphans()
+			o.sweepDuplicates(ctx)
+			endSamples()
 			o.refreshObservability(ctx)
 			o.reapClickHouse()
 			o.stopColimaIfIdle(ctx)
@@ -237,9 +247,28 @@ func (o *Orchestrator) reapDeadStacks() {
 		}
 		dead := s.LauncherPID != 0 && !o.launcherIsOurs(s)
 		if stale := s.Stale(now, o.cfg.IdleTTL); dead || stale {
-			o.reapStack(s, dead, stale)
+			o.reapIfUnchanged(s, dead, stale)
 		}
 	}
+}
+
+// reapIfUnchanged reaps s only while no up or down holds its slug and the
+// record still names the launcher this tick judged. The tick's list can predate
+// an up that re-registered the slug, and removal is by slug, so reaping the old
+// record would take the new stack's entry and plan ("unknown stack" at hand-over).
+func (o *Orchestrator) reapIfUnchanged(s domain.Stack, dead, stale bool) {
+	if o.sem != nil {
+		release, _, ok, err := o.sem.TryAcquire("up-"+s.Slug, 1)
+		if err != nil || !ok {
+			return
+		}
+		defer release()
+	}
+	cur, ok := o.stackBySlug(s.Slug)
+	if !ok || cur.LauncherPID != s.LauncherPID || cur.LauncherStart != s.LauncherStart {
+		return
+	}
+	o.reapStack(cur, dead, stale)
 }
 
 // reapStack takes one stack off the machine: its routes first, then its
@@ -286,8 +315,9 @@ const vitestWorkerMarker = "vitest/dist/workers"
 // when the machine is at its worst. Publishing on a bounded path keeps the
 // record fresh however long the slow half takes.
 func (o *Orchestrator) governPressure() {
-	level := domain.ClassifyPressure(o.sys.MemStat())
-	o.publishPressure(level)
+	mem := o.sys.MemStat()
+	level := domain.ClassifyPressure(mem)
+	o.publishPressure(level, o.capacityReading(mem))
 
 	if o.isGoverning.Swap(true) {
 		// The previous tick's work is still going. Skipping is right rather than
@@ -329,14 +359,27 @@ func (o *Orchestrator) applyGovernance(level domain.Pressure) {
 // even if the demotion does nothing. A failure to publish is not worth a tick:
 // readers treat a missing record as green, which disables narrowing and refusal
 // and leaves slot counting exactly as it was.
-func (o *Orchestrator) publishPressure(level domain.Pressure) {
+func (o *Orchestrator) publishPressure(level domain.Pressure, capacity domain.CapacityReading) {
 	if err := o.store.WritePressure(domain.PressureRecord{
 		Version:   domain.PressureRecordVersion,
 		Level:     level.String(),
 		WrittenAt: o.sys.Now(),
+		Capacity:  capacity,
 	}); err != nil {
 		o.log.Warn("could not publish memory pressure", zap.Error(err))
 	}
+}
+
+// capacityReading samples the load and steps the capacity tier from the one
+// this daemon published last, which is what makes the hysteresis hold across
+// ticks (domain.NextCapacityTier).
+func (o *Orchestrator) capacityReading(mem domain.MemStat) domain.CapacityReading {
+	rec, ok := o.store.ReadPressure()
+	prev, fresh := domain.ReadCapacity(rec, ok, o.sys.Now())
+	if !fresh {
+		prev.Tier = domain.CapacityNormal
+	}
+	return domain.MeasureCapacity(prev.Tier, domain.SampleLoad(o.sys.LoadAverage(), runtime.NumCPU(), mem))
 }
 
 // governable reports whether a stack's launcher is a pid worth signaling.
@@ -358,12 +401,14 @@ func (o *Orchestrator) restoreDemoted(stacks []domain.Stack) {
 	}
 }
 
-// demoteUnfocused slows every live stack except the head of Stacks(), which is
-// ordered most-recently-updated first — the head is the worktree being worked
-// in, and demoting that one would slow down exactly the thing the developer is
-// watching.
+// demoteUnfocused slows every live stack except the focused one (FocusedSlug),
+// the worktree being worked in; demoting it would slow exactly the thing the
+// developer is watching. With no focus nobody is demoted.
 func (o *Orchestrator) demoteUnfocused(stacks []domain.Stack) {
-	focused := stacks[0].Slug
+	focused := o.FocusedSlug()
+	if focused == "" {
+		return
+	}
 	for _, s := range stacks {
 		if s.Slug == focused || !o.governable(s) {
 			continue
@@ -547,9 +592,15 @@ func (o *Orchestrator) refreshObservability(ctx context.Context) {
 	if o.obs == nil {
 		return
 	}
+	if o.isObservabilityOff() {
+		o.stopObservabilitySwitchedOff(ctx)
+		return
+	}
 	if o.obs.IsRunning(ctx) {
 		o.routeObservability()
 		return
 	}
-	o.proxy.Remove(domain.ObservabilityService, "")
+	if o.hasRoute(domain.ObservabilityService) {
+		o.proxy.Remove(domain.ObservabilityService, "")
+	}
 }

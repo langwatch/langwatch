@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
@@ -47,6 +47,7 @@
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-client": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@opentelemetry/api": "catalog:",

@@ -6,7 +6,7 @@ The server half of [annotation](../README.md). Annotations on traces: comments, 
 
 ## Installation
 
-`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withMigrations(…).withTasks(…)`, `src/annotation.module.ts:20`.
+`defineProcessModule("annotation").withRepositories(annotationRepositories).withApi(AnnotationModule).withTransports(annotationRest, annotationTrpcTransport, annotationScoreTrpcTransport).withEventing(annotationLifecycleEventing).withMigrations(…)`, `src/annotation.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -231,11 +231,11 @@ Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:16`
 Answers at `/api/annotations`, `/api/v1/annotations`; also, undocumented, `/api/annotations/2026-08-07`, `/api/v1/annotations/2026-08-07`, `/api/annotations/latest`, `/api/v1/annotations/latest`.
 
 ```typescript
-// Query: annotationRestQuerySchema, ../contract/src/annotation-rest.schemas.ts:8
+// Query: annotationRestQuerySchema, ../contract/src/annotation-rest.schemas.ts:21
 interface Query {
   anchor?: "trace" | "all";
 }
-type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:30
+type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:63
 ```
 
 #### `GET /:id` · `getAnnotation`
@@ -247,11 +247,11 @@ Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:33`
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
 ```typescript
-// Params: annotationRestParamsSchema, ../contract/src/annotation-rest.schemas.ts:6
+// Params: annotationRestParamsSchema, ../contract/src/annotation-rest.schemas.ts:12
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:55
 ```
 
 #### `PATCH /:id` · `updateAnnotation`
@@ -263,27 +263,27 @@ Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:5
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
-// Body: annotationRestWriteSchema, ../contract/src/annotation-rest.schemas.ts:12
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+// Body: annotationRestWriteSchema, ../contract/src/annotation-rest.schemas.ts:32
 interface Body {
   comment: string;
   isThumbsUp: boolean;
   email?: string | null;
 }
-type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:55
 ```
 
 #### `DELETE /:id` · `deleteAnnotation`
 
 Delete an annotation in the caller’s project
 
-Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:68`.
+Permission `annotations:manage`. Declared at `src/transport/annotation.rest.ts:69`.
 
 Answers at `/api/annotations/:id`, `/api/v1/annotations/:id`; also, undocumented, `/api/annotations/2026-08-07/:id`, `/api/v1/annotations/2026-08-07/:id`, `/api/annotations/latest/:id`, `/api/v1/annotations/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
-// Response: annotationRestDeletedSchema, ../contract/src/annotation-rest.schemas.ts:35
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+// Response: annotationRestDeletedSchema, ../contract/src/annotation-rest.schemas.ts:74
 interface Response {
   status: string;
   message: string;
@@ -294,35 +294,35 @@ interface Response {
 
 List annotations on a trace in the caller’s project
 
-Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:82`.
+Permission `annotations:view`. Declared at `src/transport/annotation.rest.ts:84`.
 
 Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
 
 ```typescript
-type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
-type Query = z.infer<typeof annotationRestQuerySchema>; // ../contract/src/annotation-rest.schemas.ts:8
-type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:30
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+type Query = z.infer<typeof annotationRestQuerySchema>; // ../contract/src/annotation-rest.schemas.ts:21
+type Response = z.infer<typeof annotationRestListResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:63
 ```
 
 #### `POST /trace/:id` · `createTraceAnnotation`
 
 Create an unattributed annotation on a trace
 
-Permission `annotations:create`. Declared at `src/transport/annotation.rest.ts:101`.
+Permission `annotations:create`. Declared at `src/transport/annotation.rest.ts:103`.
 
 Answers at `/api/annotations/trace/:id`, `/api/v1/annotations/trace/:id`; also, undocumented, `/api/annotations/2026-08-07/trace/:id`, `/api/v1/annotations/2026-08-07/trace/:id`, `/api/annotations/latest/trace/:id`, `/api/v1/annotations/latest/trace/:id`.
 
 ```typescript
-type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:6
-type Body = z.infer<typeof annotationRestWriteSchema>; // ../contract/src/annotation-rest.schemas.ts:12
-type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:29
+type Params = z.infer<typeof annotationRestParamsSchema>; // ../contract/src/annotation-rest.schemas.ts:12
+type Body = z.infer<typeof annotationRestWriteSchema>; // ../contract/src/annotation-rest.schemas.ts:32
+type Response = z.infer<typeof annotationRestResponseSchema>; // ../contract/src/annotation-rest.schemas.ts:55
 ```
 
 ## tRPC transport
 
 ### `annotationScore`
 
-Contract `../contract/src/annotation-score.trpc.ts:43`, router `src/transport/annotation-score.trpc.ts:24`.
+Contract `../contract/src/annotation-score.trpc.ts:58`, router `src/transport/annotation-score.trpc.ts:24`.
 
 | Procedure                      | Kind     | Gate                            | Input                              | Output                  |
 | ------------------------------ | -------- | ------------------------------- | ---------------------------------- | ----------------------- |
@@ -335,45 +335,45 @@ Contract `../contract/src/annotation-score.trpc.ts:43`, router `src/transport/an
 
 ```typescript
 // annotationScore.upsert
-type Input = z.infer<typeof annotationScoreUpsertInputSchema>; // ../contract/src/annotation-score.trpc.ts:16
-type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:29
+type Input = z.infer<typeof annotationScoreUpsertInputSchema>; // ../contract/src/annotation-score.trpc.ts:33
+type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:57
 
 // annotationScore.getAll
-// Input: annotationApiProjectScopeSchema, ../contract/src/annotation-trpc.schemas.ts:66
+// Input: annotationApiProjectScopeSchema, ../contract/src/annotation-trpc.schemas.ts:102
 interface Input {
   projectId: string;
 }
-// Output: annotationScoreSchema.array() (inline, ../contract/src/annotation-score.trpc.ts:50)
+// Output: annotationScoreSchema.array() (inline, ../contract/src/annotation-score.trpc.ts:65)
 
 // annotationScore.getAllActive
-type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:66
-// Output: annotationScoreSchema.array() (inline, ../contract/src/annotation-score.trpc.ts:55)
+type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:102
+// Output: annotationScoreSchema.array() (inline, ../contract/src/annotation-score.trpc.ts:70)
 
 // annotationScore.getById
-// Input: annotationScoreScopeSchema, ../contract/src/annotation-score.trpc.ts:31
+// Input: annotationScoreScopeSchema, ../contract/src/annotation-score.trpc.ts:44
 interface Input {
   projectId: string;
   scoreId: string;
 }
-type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:29
+type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:57
 
 // annotationScore.toggle
-// Input: annotationScoreToggleInputSchema, ../contract/src/annotation-score.trpc.ts:37
+// Input: annotationScoreToggleInputSchema, ../contract/src/annotation-score.trpc.ts:56
 interface Input {
   scoreId: string;
   active: boolean;
   projectId: string;
 }
-type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:29
+type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:57
 
 // annotationScore.delete
-type Input = z.infer<typeof annotationScoreScopeSchema>; // ../contract/src/annotation-score.trpc.ts:31
-type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:29
+type Input = z.infer<typeof annotationScoreScopeSchema>; // ../contract/src/annotation-score.trpc.ts:44
+type Output = z.infer<typeof annotationScoreSchema>; // ../contract/src/annotation-score.schemas.ts:57
 ```
 
 ### `annotation`
 
-Contract `../contract/src/annotation.trpc.ts:53`, router `src/transport/annotation.trpc.ts:10`.
+Contract `../contract/src/annotation.trpc.ts:60`, router `src/transport/annotation.trpc.ts:10`.
 
 | Procedure                                 | Kind     | Gate                            | Input                                        | Output                              |
 | ----------------------------------------- | -------- | ------------------------------- | -------------------------------------------- | ----------------------------------- |
@@ -399,54 +399,54 @@ Contract `../contract/src/annotation.trpc.ts:53`, router `src/transport/annotati
 
 ```typescript
 // annotation.create
-type Input = z.infer<typeof annotationApiCreateInputSchema>; // ../contract/src/annotation-trpc.schemas.ts:22
-type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
+type Input = z.infer<typeof annotationApiCreateInputSchema>; // ../contract/src/annotation-trpc.schemas.ts:43
+type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:51
 
 // annotation.updateByTraceId
-type Input = z.infer<typeof annotationApiUpdateInputSchema>; // ../contract/src/annotation-trpc.schemas.ts:35
-type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
+type Input = z.infer<typeof annotationApiUpdateInputSchema>; // ../contract/src/annotation-trpc.schemas.ts:59
+type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:51
 
 // annotation.getByTraceId
-// Input: annotationApiByTraceIdInputSchema, ../contract/src/annotation-trpc.schemas.ts:46
+// Input: annotationApiByTraceIdInputSchema, ../contract/src/annotation-trpc.schemas.ts:71
 interface Input {
   traceId: string;
   projectId: string;
   anchor?: "trace" | "all";
 }
-// Output: annotationWithUserSummarySchema.array() (inline, ../contract/src/annotation.trpc.ts:65)
+// Output: annotationWithUserSummarySchema.array() (inline, ../contract/src/annotation.trpc.ts:72)
 
 // annotation.getByTraceIds
-// Input: annotationApiByTraceIdsInputSchema, ../contract/src/annotation-trpc.schemas.ts:53
+// Input: annotationApiByTraceIdsInputSchema, ../contract/src/annotation-trpc.schemas.ts:83
 interface Input {
   traceIds: string[];
   projectId: string;
   anchor?: "trace" | "all";
 }
-// Output: annotationWithUserSummarySchema.array() (inline, ../contract/src/annotation.trpc.ts:70)
+// Output: annotationWithUserSummarySchema.array() (inline, ../contract/src/annotation.trpc.ts:77)
 
 // annotation.getById
-// Input: annotationApiAnnotationScopeSchema, ../contract/src/annotation-trpc.schemas.ts:60
+// Input: annotationApiAnnotationScopeSchema, ../contract/src/annotation-trpc.schemas.ts:94
 interface Input {
   annotationId: string;
   projectId: string;
 }
-type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
+type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:51
 
 // annotation.deleteById
-type Input = z.infer<typeof annotationApiAnnotationScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:60
-type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:31
+type Input = z.infer<typeof annotationApiAnnotationScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:94
+type Output = z.infer<typeof annotationSchema>; // ../contract/src/annotation.schemas.ts:51
 
 // annotation.getAll
-// Input: annotationApiListAllInputSchema, ../contract/src/annotation-trpc.schemas.ts:75
+// Input: annotationApiListAllInputSchema, ../contract/src/annotation-trpc.schemas.ts:125
 interface Input {
   projectId: string;
   startDate?: unknown;
   endDate?: unknown;
 }
-// Output: annotationWithFullUserSchema.array() (inline, ../contract/src/annotation.trpc.ts:83)
+// Output: annotationWithFullUserSchema.array() (inline, ../contract/src/annotation.trpc.ts:90)
 
 // annotation.createOrUpdateQueue
-// Input: annotationApiQueueConfigurationInputSchema, ../contract/src/annotation-trpc.schemas.ts:82
+// Input: annotationApiQueueConfigurationInputSchema, ../contract/src/annotation-trpc.schemas.ts:140
 interface Input {
   projectId: string;
   name: string;
@@ -455,7 +455,7 @@ interface Input {
   scoreTypeIds: string[];
   queueId?: string;
 }
-// Output: annotationQueueRecordSchema, ../contract/src/annotation-response.schemas.ts:16
+// Output: annotationQueueRecordSchema, ../contract/src/annotation-response.schemas.ts:40
 interface Output {
   id: string;
   name: string;
@@ -467,12 +467,12 @@ interface Output {
 }
 
 // annotation.getQueues
-// Input: annotationApiQueueListInputSchema, ../contract/src/annotation-trpc.schemas.ts:68
+// Input: annotationApiQueueListInputSchema, ../contract/src/annotation-trpc.schemas.ts:112
 interface Input {
   projectId: string;
   reachableOnly?: boolean;
 }
-// Output: inline, ../contract/src/annotation.trpc.ts:91
+// Output: inline, ../contract/src/annotation.trpc.ts:98
 type Output = {
   id: string;
   name: string;
@@ -480,23 +480,23 @@ type Output = {
 }[];
 
 // annotation.getQueueItems
-type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:66
-// Output: annotationQueueItemWithTraceSchema.array() (inline, ../contract/src/annotation.trpc.ts:95)
+type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:102
+// Output: annotationQueueItemWithTraceSchema.array() (inline, ../contract/src/annotation.trpc.ts:102)
 
 // annotation.getPendingItemsCount
-type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:66
-// Output: annotationCountSchema, ../contract/src/annotation.trpc.ts:45
+type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:102
+// Output: annotationCountSchema, ../contract/src/annotation.trpc.ts:47
 interface Output {
   count: number;
 }
 
 // annotation.getAssignedItemsCount
-type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:66
-type Output = z.infer<typeof annotationCountSchema>; // ../contract/src/annotation.trpc.ts:45
+type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:102
+type Output = z.infer<typeof annotationCountSchema>; // ../contract/src/annotation.trpc.ts:47
 
 // annotation.getQueueItemsCounts
-type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:66
-// Output: inline, ../contract/src/annotation.trpc.ts:107
+type Input = z.infer<typeof annotationApiProjectScopeSchema>; // ../contract/src/annotation-trpc.schemas.ts:102
+// Output: inline, ../contract/src/annotation.trpc.ts:114
 type Output = {
   id: string;
   name: string;
@@ -505,36 +505,36 @@ type Output = {
 }[];
 
 // annotation.createQueueItem
-// Input: annotationApiCreateQueueItemInputSchema, ../contract/src/annotation-trpc.schemas.ts:94
+// Input: annotationApiCreateQueueItemInputSchema, ../contract/src/annotation-trpc.schemas.ts:154
 interface Input {
   traceIds: string[];
   projectId: string;
   annotators: string[];
 }
-// Output: annotationQueuedTracesSchema, ../contract/src/annotation.trpc.ts:48
+// Output: annotationQueuedTracesSchema, ../contract/src/annotation.trpc.ts:58
 interface Output {
   created: number;
   skipped: number;
 }
 
 // annotation.deleteQueueItems
-// Input: annotationApiDeleteQueueItemsInputSchema, ../contract/src/annotation-trpc.schemas.ts:103
+// Input: annotationApiDeleteQueueItemsInputSchema, ../contract/src/annotation-trpc.schemas.ts:167
 interface Input {
   projectId: string;
   queueItemIds: string[];
 }
-// Output: annotationQueueItemsDeletedSchema, ../contract/src/annotation-response.schemas.ts:45
+// Output: annotationQueueItemsDeletedSchema, ../contract/src/annotation-response.schemas.ts:81
 interface Output {
   deleted: number;
 }
 
 // annotation.markQueueItemDone
-// Input: annotationApiMarkQueueItemDoneInputSchema, ../contract/src/annotation-trpc.schemas.ts:111
+// Input: annotationApiMarkQueueItemDoneInputSchema, ../contract/src/annotation-trpc.schemas.ts:180
 interface Input {
   queueItemId: string;
   projectId: string;
 }
-// Output: annotationQueueItemSchema, ../contract/src/annotation-queue.schemas.ts:13
+// Output: annotationQueueItemSchema, ../contract/src/annotation-queue.schemas.ts:30
 interface Output {
   id: string;
   annotationQueueId: string | null;
@@ -549,16 +549,16 @@ interface Output {
 }
 
 // annotation.getQueueBySlugOrId
-// Input: annotationApiQueueBySlugOrIdInputSchema, ../contract/src/annotation-trpc.schemas.ts:119
+// Input: annotationApiQueueBySlugOrIdInputSchema, ../contract/src/annotation-trpc.schemas.ts:194
 interface Input {
   projectId: string;
   slug?: string;
   queueId?: string;
 }
-type Output = z.infer<typeof annotationQueueDetailSchema>; // ../contract/src/annotation-response.schemas.ts:32
+type Output = z.infer<typeof annotationQueueDetailSchema>; // ../contract/src/annotation-response.schemas.ts:62
 
 // annotation.getOptimizedAnnotationQueues
-// Input: annotationApiOptimizedQueuesInputSchema, ../contract/src/annotation-trpc.schemas.ts:128
+// Input: annotationApiOptimizedQueuesInputSchema, ../contract/src/annotation-trpc.schemas.ts:215
 interface Input {
   projectId: string;
   selectedAnnotations: "pending" | "completed" | "all";
@@ -571,15 +571,15 @@ interface Input {
   startDate?: unknown;
   endDate?: unknown;
 }
-type Output = z.infer<typeof annotationOptimizedQueuesSchema>; // ../contract/src/annotation-review.schemas.ts:36
+type Output = z.infer<typeof annotationOptimizedQueuesSchema>; // ../contract/src/annotation-review.schemas.ts:61
 
 // annotation.getQueueWalkStep
-// Input: annotationApiQueueWalkStepInputSchema, ../contract/src/annotation-trpc.schemas.ts:145
+// Input: annotationApiQueueWalkStepInputSchema, ../contract/src/annotation-trpc.schemas.ts:229
 interface Input {
   projectId: string;
   queueItemId?: string;
 }
-type Output = z.infer<typeof annotationQueueWalkStepSchema>; // ../contract/src/annotation-review.schemas.ts:42
+type Output = z.infer<typeof annotationQueueWalkStepSchema>; // ../contract/src/annotation-review.schemas.ts:75
 ```
 
 ## Sockets
@@ -599,14 +599,6 @@ Declared at `src/eventing/annotation-lifecycle.pipeline.ts:26`. Events: `annotat
 | command | `recordAnnotationDeleted` | –       | `src/eventing/annotation-lifecycle.pipeline.ts:39` |
 | command | `recordScoreDefined`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:40` |
 | command | `recordScoreRenamed`      | –       | `src/eventing/annotation-lifecycle.pipeline.ts:41` |
-
-### Tasks
-
-Run by the tasks process, before serve.
-
-| Task                                 | Class                         | Declared at                                      |
-| ------------------------------------ | ----------------------------- | ------------------------------------------------ |
-| `backfill-annotations-to-clickhouse` | `AnnotationTraceBackfillTask` | `src/tasks/annotation-trace-backfill.task.ts:12` |
 
 ## Configuration
 

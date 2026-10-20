@@ -149,7 +149,8 @@ export class InstantEvalFreeBudgetService {
     const organizationId = await this.#boundOrganizationOf(projectId);
     if (organizationId === undefined) return;
 
-    const spentNanoUsd = await this.#spentNanoUsd(organizationId);
+    // Read past the cache: the worker that released a finished run's hold cleared only its own.
+    const spentNanoUsd = await this.#readSpentNanoUsd(organizationId);
     const outcome = await this.reservations.reserve({
       organizationId,
       reservationId,
@@ -207,6 +208,11 @@ export class InstantEvalFreeBudgetService {
     const cached = this.#spent.get(organizationId);
     if (cached && cached.expiresAt > nowMs) return cached.nanoUsd;
 
+    return this.#readSpentNanoUsd(organizationId);
+  }
+
+  async #readSpentNanoUsd(organizationId: string): Promise<number> {
+    const nowMs = this.now().epochMilliseconds;
     const nanoUsd = await this.peers.sumSpendNanoUsdByRequestType({
       tenantIds: await this.peers.listProjectIds({ organizationId }),
       requestType: INSTANT_EVAL_REQUEST_TYPE,

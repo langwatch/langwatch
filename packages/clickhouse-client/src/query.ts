@@ -41,6 +41,11 @@ export interface QueryRequest {
    * gives the reason (`langwatch/skip-tenant-check-reason`).
    */
   SKIP_TENANT_CHECK?: true | undefined;
+  /**
+   * Declares a read that must walk every partition (an upgrade step, a replay, an install-wide
+   * sweep), so the cold-scan warning stays for accidental ones. A comment above gives the reason.
+   */
+  SKIP_COLD_SCAN_CHECK?: true | undefined;
 }
 
 /**
@@ -57,6 +62,11 @@ export interface InsertRequest {
   tenantId: string;
   /** Route to the known billing organisation without changing the rows' tenant. */
   organizationId?: string;
+  /**
+   * A declared tenant set, one organisation's tenants: the rows' TenantIds must be exactly these,
+   * `tenantId` among them, and the router refuses a set that spans organisations, as for a read.
+   */
+  tenantIds?: readonly string[] | undefined;
   /** The table the rows are written to. */
   table: string;
   /**

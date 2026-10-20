@@ -12,7 +12,8 @@ const meta = {
   parameters: {
     usage: {
       use: "Any date or time: in the viewer's zone, as a date, a time, both, a live relative age, or `auto` for lists. The hover lists the age, every zone, ISO and Unix, each copied on click.",
-      avoid: "Never `toLocaleString` or a hand-built format at the call site.",
+      avoid:
+        'Never `toLocaleString`, `toLocaleDateString` or a hand-built format at the call site: pick a preset, `display="date"`, `"datetime"` or `"relative"`. No date: Empty value (it is the fallback).',
     },
   },
   component: FormattedDate,

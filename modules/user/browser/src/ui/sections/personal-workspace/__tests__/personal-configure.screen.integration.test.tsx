@@ -59,7 +59,6 @@ vi.mock("../../../../behavior/use-personal-context.ts", () => ({
 vi.mock("../../personal-workspace-layout.tsx", () => ({
   PersonalWorkspaceLayout: ({ children }: { children: ReactNode }) => children,
 }));
-vi.mock("../../avatar-upload-control.tsx", () => ({ AvatarUploadControl: () => null }));
 vi.mock("../../devices-panel.tsx", () => ({
   DevicesPanel: () => <div data-testid="devices-panel" />,
 }));
@@ -189,32 +188,81 @@ function renderScreen(query: Record<string, string> = {}) {
 }
 
 describe("PersonalConfigureScreen", () => {
+  describe("when the page opens", () => {
+    it("names the page and links once to the profile that owns the editing", async () => {
+      const host = renderScreen();
+
+      expect(screen.getByRole("heading", { name: "Personal configuration" })).toBeInTheDocument();
+      const links = screen.getAllByRole("link", { name: "Edit profile" });
+      expect(links).toHaveLength(1);
+      expect(links[0]).toHaveAttribute("href", "/settings/profile");
+
+      await userEvent.click(links[0]!);
+      expect(host.recording.navigations).toEqual(["/settings/profile"]);
+    });
+
+    it("summarises the identity without editing it or claiming IT manages the email", () => {
+      state.ctx = personalContext({ routingPolicyName: "Engineering default" });
+      renderScreen();
+
+      expect(screen.getByText("Jane")).toBeInTheDocument();
+      expect(screen.getByText("jane@acme.dev")).toBeInTheDocument();
+      expect(screen.getByText("2024-01-01")).toBeInTheDocument();
+      expect(screen.getByText("Engineering default")).toBeInTheDocument();
+      expect(screen.getByText("managed by your org")).toBeInTheDocument();
+      expect(screen.queryByText(/Managed by/)).not.toBeInTheDocument();
+      expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
+    });
+  });
+
   describe("when the address names the devices tab", () => {
     it("opens the devices inventory and hides the add-key action", async () => {
       renderScreen({ tab: "devices" });
 
       expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
-      expect(screen.queryByRole("button", { name: "+ Add a new key" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "Add a new key" })).not.toBeInTheDocument();
     });
   });
 
   describe("when the reader switches tabs", () => {
     it("moves between the keys and devices tabs", async () => {
-      renderScreen();
-      expect(screen.getByRole("button", { name: "+ Add a new key" })).toBeInTheDocument();
+      const host = renderScreen();
+      expect(screen.getByRole("button", { name: "Add a new key" })).toBeInTheDocument();
+      expect(screen.queryByTestId("devices-panel")).not.toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("tab", { name: "Devices and keys" }));
       expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
+      expect(host.recording.queries).toEqual([{ next: { tab: "devices" }, replace: true }]);
 
       await userEvent.click(screen.getByRole("tab", { name: "Virtual keys" }));
-      expect(await screen.findByRole("button", { name: "+ Add a new key" })).toBeInTheDocument();
+      expect(await screen.findByRole("button", { name: "Add a new key" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader arrows onto the devices tab", () => {
+    it("moves focus without reading the inventory, and Enter opens it", async () => {
+      renderScreen();
+      screen.getByRole("tab", { name: "Virtual keys" }).focus();
+
+      await userEvent.keyboard("{ArrowRight}");
+      await waitFor(() =>
+        expect(screen.getByRole("tab", { name: "Devices and keys" })).toHaveFocus(),
+      );
+      expect(screen.queryByTestId("devices-panel")).not.toBeInTheDocument();
+      expect(screen.getByRole("tab", { name: "Virtual keys" })).toHaveAttribute(
+        "aria-selected",
+        "true",
+      );
+
+      await userEvent.keyboard("{Enter}");
+      expect(await screen.findByTestId("devices-panel")).toBeInTheDocument();
     });
   });
 
   describe("when a key is issued", () => {
     async function issueKey() {
-      await userEvent.click(screen.getByRole("button", { name: "+ Add a new key" }));
-      await userEvent.type(screen.getByPlaceholderText("e.g. jane-laptop-2"), "  jane-laptop ");
+      await userEvent.click(screen.getByRole("button", { name: "Add a new key" }));
+      await userEvent.type(screen.getByLabelText("Name"), "  jane-laptop ");
       await userEvent.click(screen.getByRole("button", { name: "Create key" }));
     }
 
@@ -257,10 +305,89 @@ describe("PersonalConfigureScreen", () => {
   });
 
   describe("when there are no keys", () => {
-    it("points at the CLI login", () => {
+    it("offers to add one and describes the CLI login as connecting a device", () => {
       renderScreen();
 
-      expect(screen.getByText(/No personal keys yet/)).toBeInTheDocument();
+      expect(screen.getByText(/No virtual keys yet\. Add a key for a tool/)).toBeInTheDocument();
+      expect(screen.getByText(/to connect a device\./)).toBeInTheDocument();
+      expect(screen.getByText("langwatch login").tagName).toBe("CODE");
+      expect(screen.getByRole("button", { name: "Add a new key" })).toBeInTheDocument();
+    });
+  });
+
+  describe("when the reader submits the new key without a name", () => {
+    it("shows a field error, focuses the name and sends nothing, until they type", async () => {
+      renderScreen();
+      await userEvent.click(screen.getByRole("button", { name: "Add a new key" }));
+
+      const name = screen.getByLabelText("Name");
+      await userEvent.click(screen.getByRole("button", { name: "Create key" }));
+      expect(screen.getByText("Give the key a name.")).toBeInTheDocument();
+      expect(name).toHaveFocus();
+      expect(name).toBeInvalid();
+      expect(calls.mutations).toEqual([]);
+
+      await userEvent.type(name, "a");
+      expect(screen.queryByText("Give the key a name.")).not.toBeInTheDocument();
+    });
+
+    it("treats a name of only spaces as blank", async () => {
+      renderScreen();
+      await userEvent.click(screen.getByRole("button", { name: "Add a new key" }));
+
+      await userEvent.type(screen.getByLabelText("Name"), "   ");
+      await userEvent.click(screen.getByRole("button", { name: "Create key" }));
+
+      expect(screen.getByText("Give the key a name.")).toBeInTheDocument();
+      expect(calls.mutations).toEqual([]);
+    });
+  });
+
+  describe("when the secret of a new key is copied", () => {
+    async function revealSecret() {
+      const user = userEvent.setup();
+      const host = renderScreen();
+      await user.click(screen.getByRole("button", { name: "Add a new key" }));
+      await user.type(screen.getByLabelText("Name"), "jane-laptop");
+      await user.click(screen.getByRole("button", { name: "Create key" }));
+      await screen.findByText("New key 'jane-laptop' created");
+      return { user, host };
+    }
+
+    it("copies the whole secret and only then says so", async () => {
+      const { user, host } = await revealSecret();
+      host.recording.successes.length = 0;
+
+      await user.click(screen.getByRole("button", { name: /Copy/ }));
+
+      await waitFor(() =>
+        expect(host.recording.successes).toEqual([
+          expect.objectContaining({ title: "Secret copied to clipboard" }),
+        ]),
+      );
+      expect(await navigator.clipboard.readText()).toBe("sk-lw-secret");
+    });
+
+    it("keeps the secret on screen and never claims a copy the clipboard refused", async () => {
+      const { user, host } = await revealSecret();
+      host.recording.successes.length = 0;
+      const refused = vi
+        .spyOn(navigator.clipboard, "writeText")
+        .mockRejectedValue(new Error("denied"));
+
+      await user.click(screen.getByRole("button", { name: /Copy/ }));
+
+      expect(await screen.findByRole("alert")).toHaveTextContent("Couldn't copy to the clipboard");
+      expect(screen.getByRole("alert")).not.toHaveTextContent("sk-lw-secret");
+      expect(screen.getByText("sk-lw-secret")).toBeInTheDocument();
+      expect(host.recording.successes).toEqual([]);
+
+      refused.mockRestore();
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+      await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
+      expect(host.recording.successes).toEqual([
+        expect.objectContaining({ title: "Secret copied to clipboard" }),
+      ]);
     });
   });
 
@@ -279,6 +406,22 @@ describe("PersonalConfigureScreen", () => {
       await waitFor(() =>
         expect(screen.getByRole("button", { name: "Revoke" })).toBeInTheDocument(),
       );
+    });
+
+    it("shows the key's device, last use and creation, and drops the question on cancel", async () => {
+      state.ctx = personalContext({ apiKeys: [KEY] });
+      renderScreen();
+
+      expect(screen.getByText("old-laptop")).toBeInTheDocument();
+      expect(screen.getByText(/Personal device · Last used/)).toBeInTheDocument();
+      expect(screen.getByText(/^Created /)).toBeInTheDocument();
+
+      await userEvent.click(screen.getByRole("button", { name: "Revoke" }));
+      expect(screen.getByText(/Any tool using it will start failing immediately/)).toBeVisible();
+
+      await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      expect(screen.queryByRole("button", { name: "Confirm revoke" })).not.toBeInTheDocument();
+      expect(calls.mutations).toEqual([]);
     });
   });
 
@@ -344,7 +487,7 @@ describe("PersonalConfigureScreen", () => {
     it("says none apply once the answer is in and empty", () => {
       renderScreen();
 
-      expect(screen.getByText("No budgets apply to your usage yet.")).toBeInTheDocument();
+      expect(screen.getByText(/^No budgets apply to your usage yet\./)).toBeInTheDocument();
     });
 
     it("says nothing before the answer arrives", () => {

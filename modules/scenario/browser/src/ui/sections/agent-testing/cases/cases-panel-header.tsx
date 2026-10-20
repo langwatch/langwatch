@@ -7,7 +7,6 @@
 import { HStack, Icon, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Folder, FolderCode, Pencil, Play, Plus } from "lucide-react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { FromCodeBadge } from "../../../elements/agent-testing/shared/from-code-badge.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import {
@@ -64,11 +63,11 @@ function hasRunInPeriod(props: CasesPanelHeaderProps): boolean {
 function CasesPanelIdentity(props: CasesPanelHeaderProps) {
   return (
     <>
-      <Icon as={props.isExternal ? FolderCode : Folder} boxSize="15px" color={FG_MUTED} />
-      <Text fontSize="14px" fontWeight="semibold" color="fg" truncate>
+      <Icon as={props.isExternal ? FolderCode : Folder} boxSize="15px" color="fg.muted" />
+      <Text textStyle="body" fontWeight="semibold" color="fg" truncate>
         {props.title}
       </Text>
-      <Text fontSize="11.5px" color={FG_MUTED} data-testid="cases-panel-count-line">
+      <Text textStyle="caption" color="fg.muted" data-testid="cases-panel-count-line">
         {declarationsCountLine({
           caseCount: props.caseCount,
           fieldCount: props.suite?.fields.length ?? 0,

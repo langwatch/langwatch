@@ -9,7 +9,7 @@ import { createUpgradeReader } from "../reader.service.ts";
 
 /** A database holding no ledger tables: every row the reader lists is one the image declares. */
 const readerOf = ({ image }: { image: UpgradeImage }) =>
-  createUpgradeReader({ postgres: { query: async () => ({ rows: [] }) }, image, floor: null });
+  createUpgradeReader({ postgres: { query: async () => ({ rows: [] }) }, image });
 
 const steps: UpgradeImage["steps"] = [
   { id: "prisma:2", kind: "postgres-schema", mode: "blocking", release: null },

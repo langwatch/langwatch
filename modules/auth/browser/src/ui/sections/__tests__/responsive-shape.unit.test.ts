@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { createDesignSystem } from "@langwatch/design-system/system";
 import { describe, expect, it } from "vitest";
 
 /** Pins responsive prop contract to source; jsdom cannot see compiled Chakra props. */
@@ -18,12 +19,14 @@ describe("given the front door on a small viewport", () => {
      * would pass while checking nothing.
      */
     it("asks for at least 16px, and a target big enough to hit", () => {
+      // The design system's `md` step is the 16px that keeps a phone from zooming.
+      expect(createDesignSystem().token("fontSizes.md")).toBe("1rem");
       for (const file of [
         "ui/sections/identifier-step-form.tsx",
         "ui/elements/password-input.tsx",
       ]) {
         const source = sourceOf(file);
-        expect(source).toContain('fontSize={{ base: "16px", md: "14px" }}');
+        expect(source).toContain('fontSize={{ base: "md", md: "sm" }}');
         expect(source).toContain('minHeight="44px"');
       }
     });
@@ -69,47 +72,35 @@ describe("given the front door in either colour mode", () => {
     });
 
     /**
-     * Colours moved out of the stylesheet and into the theme, letting a
-     * component write `bg="frontDoor.action"`. These tests read the token
-     * source now, since that's where the pair is declared.
+     * The front door inherits the product palette: each token names a product
+     * role, and the product role carries the pair for both grounds. A literal
+     * here would be one ground's value pinned to both.
      */
-    it("declares both grounds where the brand values are written down", () => {
+    it("declares every brand value as a product role, which carries both grounds", () => {
       const theme = sourceOf("model/front-door-theme.ts");
 
       expect(theme).toContain("semanticTokens");
       expect(theme).toContain("frontDoor:");
-      // The helper every token goes through. A token written as a bare string
-      // would be one ground's value pinned to both.
-      expect(theme).toMatch(/_light:[\s\S]{0,40}_dark:/);
+      const values = [...theme.matchAll(/^\s+\w+: \{ value: "([^"]+)" \}/gm)].map(
+        ([, value]) => value,
+      );
+      expect(values.length).toBeGreaterThan(0);
+      for (const value of values) expect(value).toMatch(/\{colors\.[\w.]+\}/);
     });
 
-    it("gives the refusal red and the accent details a dark step of their own", () => {
+    it("gives the refusal red and the accent details the product's own roles", () => {
       const theme = sourceOf("model/front-door-theme.ts");
 
-      for (const token of ["danger", "detail"]) {
-        const declaration = theme.split(new RegExp(`\\b${token}: mode\\(`))[1]?.split(")")[0];
-        expect(declaration).toBeTruthy();
-
-        // The two grounds must not agree: a red that reads on white is the red
-        // that fails on a dark ground, which is the whole reason for the pair.
-        const [light, dark] = (declaration ?? "").split(",").map((part) => part.trim());
-        expect(light).toBeTruthy();
-        expect(dark).toBeTruthy();
-        expect(dark).not.toBe(light);
-      }
+      expect(theme).toContain('danger: { value: "{colors.fg.error}" }');
+      expect(theme).toContain('detail: { value: "{colors.orange.fg}" }');
     });
 
-    /**
-     * The wide-gamut block upgrades the theme's OWN emitted variables. A
-     * rename in the theme would silently lose the P3 colours (no build
-     * error), so the two are pinned to each other here.
-     */
-    it("upgrades the same variables the theme emits, on a display that can show them", () => {
+    /** Colour lives in the theme: the stylesheet re-declares none of its variables. */
+    it("leaves the theme's emitted colour variables to the theme", () => {
       const styles = sourceOf("ui/elements/auth-front-door.css");
 
-      expect(styles).toContain("@media (color-gamut: p3)");
-      expect(styles).toContain("--chakra-colors-front-door-detail:");
-      expect(styles).toContain("color(display-p3");
+      expect(styles).toContain("var(--chakra-colors-front-door-detail)");
+      expect(styles).not.toMatch(/--chakra-colors-front-door-[\w-]+\s*:/);
     });
   });
 });

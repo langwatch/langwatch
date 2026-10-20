@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -26,7 +26,6 @@
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
-    "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
     "zod": "catalog:"
   },

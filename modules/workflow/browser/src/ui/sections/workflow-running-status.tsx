@@ -25,7 +25,7 @@ export function WorkflowRunningStatus({
       <Box paddingLeft={2}>
         <HStack>
           <Spinner size="xs" />
-          <Text fontSize="13px">Running...</Text>
+          <Text textStyle="bodySm">Running...</Text>
           <Button size="xs" onClick={() => onStop({ traceId: executionState?.trace_id ?? "" })}>
             Stop
           </Button>
@@ -39,7 +39,7 @@ export function WorkflowRunningStatus({
       {isWaiting ? (
         <HStack>
           <Spinner size="xs" />
-          <Text fontSize="13px">Waiting for runtime...</Text>
+          <Text textStyle="bodySm">Waiting for runtime...</Text>
         </HStack>
       ) : null}
     </Box>

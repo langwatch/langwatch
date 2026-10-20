@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -33,7 +33,6 @@
     "@langwatch/enterprise-governance-contract": "workspace:*",
     "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
-    "@langwatch/identity-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/mail": "workspace:*",
     "@langwatch/module": "workspace:*",
@@ -42,7 +41,6 @@
     "@langwatch/organization-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
-    "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/redis-client": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
@@ -57,6 +55,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/process-stores": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/bcrypt": "catalog:",

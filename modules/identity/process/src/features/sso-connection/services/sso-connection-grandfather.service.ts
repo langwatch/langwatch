@@ -2,6 +2,7 @@ import { HandledError } from "@langwatch/handled-error";
 import {
   compareConnectionRouting,
   type ConnectionRoutingComparison,
+  grandfatheredSsoConnectionId,
   normalizeDomain,
   type SsoConnectionType,
   type SsoIdpMetadata,
@@ -9,10 +10,9 @@ import {
 
 import type { SignInDomainRouting } from "../../signin/services/signin-router.service.ts";
 import type { LegacySsoOrganizationRepository } from "../../sso-arrival/repositories/legacy-sso-organization.repository.ts";
-import {
-  grandfatherCommandId,
-  grandfatheredSsoConnectionId,
-} from "../rules/sso-connection-id.rules.ts";
+import { isTerminalSsoConnection } from "../../sso-domain/rules/sso-domain-ownership.rules.ts";
+import type { SsoConnectionReadRepository } from "../repositories/sso-connection.repository.ts";
+import { grandfatherCommandId } from "../rules/sso-connection-id.rules.ts";
 import type { SsoConnectionService } from "./sso-connection.service.ts";
 
 /**
@@ -41,10 +41,16 @@ type SsoConnectionGrandfatherOutcome =
           comparison: ConnectionRoutingComparison;
         }[];
       };
+    }
+  | {
+      status: "finalized";
+      report: { kind: "legacy_route_beside_connection"; domains: string[] };
     };
 
 interface SsoConnectionGrandfatherDeps {
   connections: SsoConnectionService;
+  /** The connections the organization already holds, read before stating its history. */
+  connectionReads: Pick<SsoConnectionReadRepository, "findForOrganization">;
   /** Where the legacy strings are read from. */
   legacy: Pick<LegacySsoOrganizationRepository, "getLegacySso">;
   /** The string-based lookup — what decides sign-in today. */
@@ -90,6 +96,11 @@ export class SsoConnectionGrandfatherService {
 
     const domains = [normalizeDomain(legacy.ssoDomain)];
     const connectionId = grandfatheredSsoConnectionId({ organizationId });
+    // ADR-124 §7: beside its own live connection the pin stays on the legacy door, as on main.
+    // Not an upgrade issue: the org finishes, and the settings read shows the domain to move.
+    if (await this.holdsCompetingConnection({ organizationId, connectionId })) {
+      return { status: "finalized", report: { kind: "legacy_route_beside_connection", domains } };
+    }
     const facts = await this.deps.connections.grandfatherConnection({
       tenantId: organizationId,
       organizationId,
@@ -111,6 +122,19 @@ export class SsoConnectionGrandfatherService {
     });
 
     return this.prove({ organizationId, connectionId, domains, facts: facts.length });
+  }
+
+  /** Another live connection, unless the grandfathered one exists: a replacement sits beside it. */
+  private async holdsCompetingConnection({
+    organizationId,
+    connectionId,
+  }: {
+    organizationId: string;
+    connectionId: string;
+  }): Promise<boolean> {
+    const held = await this.deps.connectionReads.findForOrganization({ organizationId });
+    if (held.some((connection) => connection.connectionId === connectionId)) return false;
+    return held.some((connection) => !isTerminalSsoConnection(connection.state));
   }
 
   /**

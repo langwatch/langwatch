@@ -10,21 +10,21 @@ import (
 	"github.com/langwatch/langwatch/tools/internal/collate"
 )
 
-func writeTree(t testing.TB, root string, tree map[string]string) {
-	t.Helper()
+func writeTree(tb testing.TB, root string, tree map[string]string) {
+	tb.Helper()
 	for path, content := range tree {
 		full := filepath.Join(root, path)
-		if err := os.MkdirAll(filepath.Dir(full), 0o755); err != nil {
-			t.Fatal(err)
+		if err := os.MkdirAll(filepath.Dir(full), 0o750); err != nil {
+			tb.Fatal(err)
 		}
-		if err := os.WriteFile(full, []byte(content), 0o644); err != nil {
-			t.Fatal(err)
+		if err := os.WriteFile(full, []byte(content), 0o600); err != nil {
+			tb.Fatal(err)
 		}
 	}
 }
 
-func run(t testing.TB, args ...string) (int, string, string) {
-	t.Helper()
+func run(tb testing.TB, args ...string) (int, string, string) {
+	tb.Helper()
 	var stdout, stderr bytes.Buffer
 	code := Run(args, &stdout, &stderr)
 	return code, stdout.String(), stderr.String()
@@ -67,14 +67,6 @@ func TestContainsWord(t *testing.T) {
 	}
 }
 
-func TestRenderReferences(t *testing.T) {
-	for _, c := range renderReferencesCases {
-		if got := RenderReferences(c.in, c.refs); got != c.want {
-			t.Errorf("%s: RenderReferences =\n%q\nwant\n%q", c.name, got, c.want)
-		}
-	}
-}
-
 func TestGenerateModulesMatchesTheNodeScript(t *testing.T) {
 	root := t.TempDir()
 	writeTree(t, root, generateModulesFixture)
@@ -103,27 +95,8 @@ func TestGenerateModulesDryRunWritesNothing(t *testing.T) {
 	if code != 0 || !strings.HasPrefix(stdout, "Would generate apps/api/src/process-modules.generated.ts (") {
 		t.Fatalf("exit %d, stdout %q", code, stdout)
 	}
-	if exists(filepath.Join(root, "apps/api/src")) {
+	if exists(filepath.Join(root, "apps", "api", "src")) {
 		t.Error("dry run wrote a file")
-	}
-}
-
-func TestSyncReferencesMatchesTheNodeScript(t *testing.T) {
-	root := t.TempDir()
-	writeTree(t, root, syncReferencesFixture)
-	code, stdout, stderr := run(t, "sync-references", "--root", root)
-	if code != syncReferencesCheckCode || stdout != syncReferencesCheckStdout {
-		t.Fatalf("check: exit %d, stdout %q, stderr %q", code, stdout, stderr)
-	}
-	code, stdout, _ = run(t, "sync-references", "--root", root, "--write")
-	if code != 0 || stdout != syncReferencesWriteStdout {
-		t.Fatalf("write: exit %d, stdout %q", code, stdout)
-	}
-	for path, want := range syncReferencesGolden {
-		got, err := os.ReadFile(filepath.Join(root, path))
-		if err != nil || string(got) != want {
-			t.Errorf("%s = %q (%v), want %q", path, got, err, want)
-		}
 	}
 }
 
@@ -137,26 +110,11 @@ func BenchmarkGenerateModules(b *testing.B) {
 	}
 }
 
-func BenchmarkSyncReferences(b *testing.B) {
-	root := ensureRepoRoot(b)
-	members, err := ReadWorkspaceMembers(root)
-	if err != nil {
-		b.Fatal(err)
-	}
-	b.ReportAllocs()
-	for range b.N {
-		for _, project := range DeriveProjects(root, members) {
-			text, _ := os.ReadFile(project.File)
-			RenderReferences(string(text), project.References)
-		}
-	}
-}
-
-func ensureRepoRoot(b testing.TB) string {
-	b.Helper()
+func ensureRepoRoot(tb testing.TB) string {
+	tb.Helper()
 	root, err := filepath.Abs("../..")
 	if err != nil || !exists(filepath.Join(root, "pnpm-workspace.yaml")) {
-		b.Skip("not inside the repository")
+		tb.Skip("not inside the repository")
 	}
 	return root
 }

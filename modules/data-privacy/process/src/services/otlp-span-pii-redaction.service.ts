@@ -7,6 +7,12 @@ import type { ResolvedDataPrivacy } from "@langwatch/data-privacy-contract";
 import { PRIVACY_PII_INCOMPLETE_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { TenantId } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import type {
+  OtlpAnyValue,
+  OtlpKeyValue,
+  OtlpResource,
+  OtlpSpan,
+} from "@langwatch/otlp/trace-request";
 import {
   isHeldOutIdentifierAttribute,
   redactAttributeNative,
@@ -14,13 +20,7 @@ import {
   reservesModelOrToolName,
 } from "@langwatch/redaction/pii";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
-import type {
-  PIIRedactionLevel,
-  OtlpAnyValue,
-  OtlpKeyValue,
-  OtlpResource,
-  OtlpSpan,
-} from "@langwatch/trace-contract";
+import type { PIIRedactionLevel } from "@langwatch/trace-contract";
 
 import { OtlpRecordPiiRedactionService } from "./otlp-record-pii-redaction.service.ts";
 import {

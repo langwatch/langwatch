@@ -32,10 +32,13 @@ const REQUEST_TIMEOUT_MS = 30_000;
 
 /** One page of an Anthropic Admin API report, fetched over the vendor's HTTP and mapped to events. */
 export class AnthropicAdminReportPageService {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly apiBase: string,
+  ) {}
 
-  static create(http: GovernanceHttpClient): AnthropicAdminReportPageService {
-    return new AnthropicAdminReportPageService(http);
+  static create(http: GovernanceHttpClient, apiBase: string): AnthropicAdminReportPageService {
+    return new AnthropicAdminReportPageService(http, apiBase);
   }
 
   /**
@@ -124,7 +127,7 @@ export class AnthropicAdminReportPageService {
       throw new Error("anthropic admin puller requires an admin API key in credentials.token");
     }
 
-    const url = reportUrl({ config, startingAt, page });
+    const url = reportUrl({ config, startingAt, page, apiBase: this.apiBase });
     const signal = options.signal
       ? AbortSignal.any([options.signal, AbortSignal.timeout(REQUEST_TIMEOUT_MS)])
       : AbortSignal.timeout(REQUEST_TIMEOUT_MS);

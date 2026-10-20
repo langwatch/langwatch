@@ -2,11 +2,11 @@ import type { WireOf } from "@langwatch/api/web";
 import { setFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Link } from "@langwatch/browser-host/link";
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import { langwatchEndpoint } from "@langwatch/design-system/langwatch-endpoint-env";
-import { Box, Button, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Box, NativeSelect, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Evaluator } from "@langwatch/evaluator-contract";
 import { ExternalLink } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -293,94 +293,84 @@ EOF
   const apiKeyLink = "/settings/api-keys";
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && handleClose()} size="lg">
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <Drawer.Title>New Guardrail</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={0} align="stretch">
-            {/* Evaluator Selection */}
-            <HorizontalFormControl
-              label="Evaluator"
-              helper="Select an evaluator to use as a guardrail"
-            >
-              <EvaluatorSelectionBox
-                selectedEvaluator={selectedEvaluator}
-                onSelectClick={handleSelectEvaluator}
-                placeholder="Select Evaluator"
-                showSlug={true}
-              />
-            </HorizontalFormControl>
+    <Drawer
+      open={isOpen}
+      onClose={handleClose}
+      size="lg"
+      title="New Guardrail"
+      footer={{ cancel: { label: "Close", onClick: handleClose } }}
+    >
+      <VStack gap={0} align="stretch">
+        {/* Evaluator Selection */}
+        <HorizontalFormControl label="Evaluator" helper="Select an evaluator to use as a guardrail">
+          <EvaluatorSelectionBox
+            selectedEvaluator={selectedEvaluator}
+            onSelectClick={handleSelectEvaluator}
+            placeholder="Select Evaluator"
+            showSlug={true}
+          />
+        </HorizontalFormControl>
 
-            {/* Code Integration - only shown when evaluator is selected */}
-            {selectedEvaluator && (
-              <HorizontalFormControl
-                label="Integration Code"
-                helper="Use the code below to integrate this guardrail into your application"
-                direction="vertical"
-                align="start"
-                labelProps={{
-                  paddingLeft: 0,
-                }}
-              >
-                <VStack align="stretch" gap={4} width="full">
-                  <NativeSelect.Root width="170px">
-                    <NativeSelect.Field
-                      value={activeLanguage}
-                      onChange={(e) => setActiveLanguage(e.target.value)}
-                    >
-                      <option value="python-async">Python (async)</option>
-                      <option value="python">Python</option>
-                      <option value="typescript">TypeScript</option>
-                      <option value="go">Go</option>
-                      <option value="bash">cURL</option>
-                    </NativeSelect.Field>
-                    <NativeSelect.Indicator />
-                  </NativeSelect.Root>
+        {/* Code Integration - only shown when evaluator is selected */}
+        {selectedEvaluator && (
+          <HorizontalFormControl
+            label="Integration Code"
+            helper="Use the code below to integrate this guardrail into your application"
+            direction="vertical"
+            align="start"
+            labelProps={{
+              paddingLeft: 0,
+            }}
+          >
+            <VStack align="stretch" gap={4} width="full">
+              <NativeSelect.Root width="170px">
+                <NativeSelect.Field
+                  value={activeLanguage}
+                  onChange={(e) => setActiveLanguage(e.target.value)}
+                >
+                  <option value="python-async">Python (async)</option>
+                  <option value="python">Python</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="go">Go</option>
+                  <option value="bash">cURL</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
 
-                  <Box borderRadius="md" overflow="hidden" width="full">
-                    <CodePreview code={getCode()} language={getLanguageForHighlight()} />
-                  </Box>
+              <Box borderRadius="md" overflow="hidden" width="full">
+                <CodePreview code={getCode()} language={getLanguageForHighlight()} />
+              </Box>
 
-                  <Text fontSize="sm" color="fg.muted">
-                    Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with
-                    your API key.{" "}
-                    <Link
-                      href={apiKeyLink}
-                      color="blue.fg"
-                      display="inline-flex"
-                      alignItems="center"
-                      gap={1}
-                    >
-                      Find your API key <ExternalLink size={12} />
-                    </Link>
-                  </Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    Learn more about running guardrails in our{" "}
-                    <Link
-                      href="https://langwatch.ai/docs/evaluations/guardrails/overview"
-                      color="blue.fg"
-                      display="inline-flex"
-                      alignItems="center"
-                      gap={1}
-                      target="_blank"
-                    >
-                      documentation <ExternalLink size={12} />
-                    </Link>
-                  </Text>
-                </VStack>
-              </HorizontalFormControl>
-            )}
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={handleClose}>
-            Close
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+              <Text fontSize="sm" color="fg.muted">
+                Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with your
+                API key.{" "}
+                <Link
+                  href={apiKeyLink}
+                  color="blue.fg"
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={1}
+                >
+                  Find your API key <ExternalLink size={12} />
+                </Link>
+              </Text>
+              <Text fontSize="sm" color="fg.muted">
+                Learn more about running guardrails in our{" "}
+                <Link
+                  href="https://docs.langwatch.ai/evaluations/guardrails/overview"
+                  color="blue.fg"
+                  display="inline-flex"
+                  alignItems="center"
+                  gap={1}
+                  target="_blank"
+                >
+                  documentation <ExternalLink size={12} />
+                </Link>
+              </Text>
+            </VStack>
+          </HorizontalFormControl>
+        )}
+      </VStack>
+    </Drawer>
   );
 }

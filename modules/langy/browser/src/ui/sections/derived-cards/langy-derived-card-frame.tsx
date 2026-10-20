@@ -46,7 +46,7 @@ export function LangyDerivedCardFrame({
       borderColor="purple.emphasized"
       borderRadius="langyCard"
       background="bg.subtle"
-      paddingX="12px"
+      paddingX="3"
       paddingY="11px"
       opacity={superseded ? 0.65 : 1}
       as="fieldset"

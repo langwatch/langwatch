@@ -113,21 +113,21 @@ describe("given an administrator on the Authentication page", () => {
   });
 
   describe("when the page renders", () => {
-    /** @scenario "The Authentication pages share main's rail" */
-    it("frames it in main's Authentication rail with Overview as the current entry", () => {
+    /** @scenario "The Authentication pages share one row of header tabs" */
+    it("titles the header Authentication with Overview as the current tab", () => {
       renderWithOrganizationHost(
         <AuthenticationSettingsScreen />,
         hostWith({ grants: ["sso:view", "organization:manage"] }),
       );
 
-      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-      const links = within(rail).getAllByRole("link");
+      const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+      const links = within(tabs).getAllByRole("link");
       expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
         ["Overview", "/settings/authentication"],
         ["Identity provider", "/settings/authentication/provider"],
         ["Connectors", "/settings/authentication/connectors"],
       ]);
-      expect(within(rail).getByRole("link", { name: "Overview" })).toHaveAttribute(
+      expect(within(tabs).getByRole("link", { name: "Overview" })).toHaveAttribute(
         "aria-current",
         "page",
       );
@@ -135,16 +135,16 @@ describe("given an administrator on the Authentication page", () => {
   });
 
   describe("when the page renders its title", () => {
-    it("sits in the content column beside the rail, not inside it", () => {
+    it("names the area once, with the tabs after it in the header", () => {
       renderWithOrganizationHost(
         <AuthenticationSettingsScreen />,
         hostWith({ grants: ["sso:view", "organization:manage"] }),
       );
 
-      const title = screen.getByRole("heading", { level: 1, name: "Overview" });
-      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-      expect(rail.contains(title)).toBe(false);
-      expect(title.compareDocumentPosition(rail) & Node.DOCUMENT_POSITION_PRECEDING).toBeTruthy();
+      const title = screen.getByRole("heading", { level: 1, name: "Authentication" });
+      const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+      expect(screen.getAllByRole("heading", { level: 1 })).toHaveLength(1);
+      expect(title.compareDocumentPosition(tabs) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     });
   });
 

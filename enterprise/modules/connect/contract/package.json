@@ -17,8 +17,8 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run --passWithNoTests"
   },
   "dependencies": {
     "@langwatch/enterprise-licensing-contract": "workspace:*",

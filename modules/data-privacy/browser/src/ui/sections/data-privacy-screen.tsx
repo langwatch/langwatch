@@ -8,15 +8,9 @@ import type {
   DataPrivacyRule,
   DataPrivacySnapshot,
 } from "@langwatch/data-privacy-contract";
+import { Card } from "@langwatch/design-system/card";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Card,
-  Skeleton,
-  SkeletonText,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Skeleton, SkeletonText, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   ScopeChipPicker,
   type ScopeChipPickerScopeType,
@@ -209,15 +203,13 @@ function DataPrivacyLoading() {
       </PageLayout.Header>
       <VStack gap={6} width="full" align="start" paddingTop={4} aria-busy="true">
         <SkeletonText noOfLines={1} width="md" />
-        <Card.Root width="full">
-          <Card.Body>
-            <VStack gap={4} align="stretch">
-              {[0, 1, 2].map((row) => (
-                <Skeleton key={row} height="5" />
-              ))}
-            </VStack>
-          </Card.Body>
-        </Card.Root>
+        <Card padding="lg">
+          <VStack gap={4} align="stretch">
+            {[0, 1, 2].map((row) => (
+              <Skeleton key={row} height="5" />
+            ))}
+          </VStack>
+        </Card>
       </VStack>
     </>
   );

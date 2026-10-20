@@ -99,7 +99,7 @@ describe("<TracesOverview /> presentation", () => {
     it("draws no curve through one or two points", () => {
       for (const days of [1, 2, 3]) {
         period.daysDifference = days;
-        renderWithProviders(<TracesOverview variant="strip" />);
+        renderWithProviders(<TracesOverview />);
 
         expect(screen.queryByTestId("traces-overview-trend")).toBeNull();
         expect(screen.queryByText(/Show the trend/)).toBeNull();
@@ -112,7 +112,7 @@ describe("<TracesOverview /> presentation", () => {
     /** @scenario Every figure says what window it covers */
     it("names the window on the control that opens the chart", () => {
       period.daysDifference = 7;
-      renderWithProviders(<TracesOverview variant="strip" />);
+      renderWithProviders(<TracesOverview />);
 
       expect(
         screen.getByRole("button", { name: "Show the trend over the last 7 days" }),
@@ -123,7 +123,7 @@ describe("<TracesOverview /> presentation", () => {
   /** @scenario Every figure says what window it covers */
   it("always states the window the figures cover", () => {
     period.daysDifference = 7;
-    renderWithProviders(<TracesOverview variant="strip" />);
+    renderWithProviders(<TracesOverview />);
 
     expect(screen.getByText("Last 7 days")).toBeDefined();
   });

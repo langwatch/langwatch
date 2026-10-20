@@ -11,6 +11,7 @@ import {
   instantEvalJudgeKind,
   instantEvalJudgeRoute,
   isInstantEvalJudgeChosenOnFirstCall,
+  isInstantEvalJudgedThroughConnect,
 } from "../instant-eval-judge-choice.rules.ts";
 
 describe("isInstantEvalJudgeChosenOnFirstCall", () => {
@@ -23,6 +24,38 @@ describe("isInstantEvalJudgeChosenOnFirstCall", () => {
     for (const classifier of ["connect", "null", "memory"] as const) {
       expect(isInstantEvalJudgeChosenOnFirstCall({ classifier })).toBe(false);
     }
+  });
+});
+
+describe("isInstantEvalJudgedThroughConnect", () => {
+  it("judges through Connect on a self-hosted production install with no classifier named", () => {
+    expect(
+      isInstantEvalJudgedThroughConnect({
+        classifier: undefined,
+        isLangWatchHost: false,
+        isProduction: true,
+      }),
+    ).toBe(true);
+  });
+
+  it("does not on an install LangWatch runs with no classifier named", () => {
+    expect(
+      isInstantEvalJudgedThroughConnect({
+        classifier: undefined,
+        isLangWatchHost: true,
+        isProduction: false,
+      }),
+    ).toBe(false);
+  });
+
+  it("does on a development checkout whose classifier setting names Connect", () => {
+    expect(
+      isInstantEvalJudgedThroughConnect({
+        classifier: "connect",
+        isLangWatchHost: true,
+        isProduction: false,
+      }),
+    ).toBe(true);
   });
 });
 

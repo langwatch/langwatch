@@ -45,7 +45,10 @@ export function useSuiteRunFreshness({
     {
       enabled: !!project && enabled,
       ...(adaptivePolling && !sseConnected
-        ? { refetchInterval: getAdaptivePollingInterval({ runs }) }
+        ? {
+            refetchInterval: getAdaptivePollingInterval({ runs }),
+            trpc: { context: { background: true } },
+          }
         : {}),
     },
   );

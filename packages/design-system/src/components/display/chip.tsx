@@ -129,7 +129,7 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
       _hover={isInteractive ? { bg: style.hoverBg } : undefined}
       aria-label={ariaLabel}
       minWidth={0}
-      className="chip-root"
+      className="chip-root group"
     >
       {dot && <Circle size="8px" bg={dot} flexShrink={0} />}
       {icon && <Icon as={icon} boxSize={3} color={style.fg} flexShrink={0} />}
@@ -158,9 +158,8 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
           value
         )}
       </Box>
-      {/* Filter affordance — always visible so the chip clearly advertises
-          that it's a filter handle. Stops propagation so it never triggers
-          the chip's primary onClick (e.g. opening a drawer). */}
+      {/* Filter affordance: shows on hover or keyboard focus, so a strip of chips
+          does not read as a row of funnels. Stops propagation of the chip click. */}
       {onFilter && (
         <Tooltip content={filterLabel} positioning={{ placement: "top" }}>
           <Box
@@ -177,8 +176,10 @@ export const Chip = forwardRef<HTMLDivElement, ChipProps>(function Chip(
             marginLeft={0.5}
             borderRadius="sm"
             cursor="pointer"
-            opacity={0.55}
+            opacity={0}
             transition="opacity 0.12s ease, background 0.12s ease"
+            _groupHover={{ opacity: 0.55 }}
+            _focusVisible={{ opacity: 1 }}
             _hover={{ opacity: 1, bg: "bg.hover" }}
           >
             <Icon as={LuFilter} boxSize={3} color={style.fg} />

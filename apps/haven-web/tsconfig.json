@@ -6,22 +6,16 @@
     "jsx": "react-jsx",
     "types": ["node"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": [
-    "src/**/*.ts",
-    "src/**/*.tsx",
-    "scripts/**/*.ts",
-    "vite.config.ts",
-    "vitest.config.ts"
-  ],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "../../packages/design-system-internal/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/time/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

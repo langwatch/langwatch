@@ -8,7 +8,6 @@ import type { UiAuthClient } from "@langwatch/auth-contract";
 import type { UiActor } from "@langwatch/browser-host/capabilities";
 import { clearPersistedUiQueries } from "@langwatch/browser-host/query-persistence";
 import { clearReaderUiStorage, clearSessionUiStorage } from "@langwatch/browser-host/storage";
-import { HandledError } from "@langwatch/handled-error";
 import { createAuthClient } from "better-auth/react";
 
 /** The session endpoint, relative to the auth client's own base URL. */
@@ -92,66 +91,17 @@ export async function signOutUi(client: UiAuthClient = uiAuthClient()): Promise<
   await Promise.all([client.signOut(), clearPersistedUiQueries()]);
 }
 
-/**
- * Named rather than thrown as a plain Error because the reader is about to
- * be treated as signed out and is owed the reason — `session_read_failed`
- * carries the words they read.
- */
-export class SessionReadFailedError extends HandledError {
-  declare readonly code: "session_read_failed";
-
-  constructor(cause: unknown) {
-    super("session_read_failed", "The session endpoint refused the read.", {
-      httpStatus: 503,
-      fault: "platform",
-      retryable: true,
-      ...(cause instanceof Error ? { reasons: [cause] } : {}),
-    });
-    this.name = "SessionReadFailedError";
-  }
-}
-
-/** The statuses a proxy answers with when it could not reach what it fronts. */
-const GATEWAY_STATUSES: ReadonlySet<number> = new Set([500, 502, 503, 504]);
-
-type ReadRefusal = {
-  status?: unknown;
-  code?: unknown;
-};
+/** The one status that answers "nobody is signed in" by refusing the read. */
+const NOT_SIGNED_IN_STATUS = 401;
 
 /**
- * Whether this failed read means nothing answered, not a refusal — a scoped
- * copy of the app's own `isUiApiUnreachable`: a module may not import an
- * application's private behavior.
- */
-function isUiSessionUnreachable(error: unknown): boolean {
-  if (error === null || error === void 0) return false;
-  if (!(typeof error === "object")) return false;
-
-  const refusal = error as ReadRefusal;
-  if (typeof refusal.code === "string" && refusal.code.length > 0) return false;
-
-  const status = refusal.status;
-  if (status === void 0 || status === null) return true;
-  if (typeof status !== "number") return false;
-  if (status === 0) return true;
-  return GATEWAY_STATUSES.has(status);
-}
-
-/**
- * One session read. A refusal resolves to signed out with the failure
- * attached rather than rejecting: an unanswered session is what leaves the
- * shell on an empty document, and "we could not tell" has to route somewhere.
+ * One session read. Only an answer signs a reader out: a 401, or a reply naming
+ * no user. Any other failure answered nothing, so the shell's reconnecting
+ * screen holds the reader and reads again (specs/auth/session-failure.feature).
  */
 export type UiSessionReading = {
   readonly actor: UiActor | null;
-  /**
-   * The refusal, when there was one — always null while `unreachable` is
-   * true: an API that never answered refused nothing, and reporting it as a
-   * refusal is what signed a reader out of a stack that was merely booting.
-   */
-  readonly failure: SessionReadFailedError | null;
-  /** Nothing answered on the API's address. The reader waits rather than leaves. */
+  /** Nothing answered who is here. The reader waits rather than leaves. */
   readonly unreachable: boolean;
   /** The keys the shell seals mirrored reads under; in memory only, as this read never mirrors. */
   readonly cacheKey: string | null;
@@ -160,21 +110,25 @@ export type UiSessionReading = {
 
 const UNREACHABLE: UiSessionReading = {
   actor: null,
-  failure: null,
   unreachable: true,
   cacheKey: null,
   previousCacheKey: null,
 };
 
-function refused(cause: unknown): UiSessionReading {
-  if (isUiSessionUnreachable(cause)) return UNREACHABLE;
-  return {
-    actor: null,
-    failure: new SessionReadFailedError(cause),
-    unreachable: false,
-    cacheKey: null,
-    previousCacheKey: null,
-  };
+const SIGNED_OUT: UiSessionReading = {
+  actor: null,
+  unreachable: false,
+  cacheKey: null,
+  previousCacheKey: null,
+};
+
+function failedRead(cause: unknown): UiSessionReading {
+  const isNotSignedIn =
+    typeof cause === "object" &&
+    cause !== null &&
+    "status" in cause &&
+    cause.status === NOT_SIGNED_IN_STATUS;
+  return isNotSignedIn ? SIGNED_OUT : UNREACHABLE;
 }
 
 export async function readUiActor(
@@ -182,14 +136,29 @@ export async function readUiActor(
 ): Promise<UiSessionReading> {
   try {
     const response = await client.$fetch(UI_SESSION_PATH);
-    if (response.error) return refused(response.error);
+    if (response.error) return failedRead(response.error);
     return {
       actor: toUiActor(response.data),
-      failure: null,
       unreachable: false,
       ...toUiCacheKeys(response.data),
     };
   } catch (error) {
-    return refused(error);
+    return failedRead(error);
   }
+}
+
+/**
+ * A re-read that fails keeps the answer already given, as main's session
+ * cache did (`if (!res.ok) return _cachedSession`): a 403 elsewhere re-reads
+ * the session, and a hiccup on that re-read must not sign anybody out.
+ */
+export function keepAnsweredReaderOnFailedReread({
+  reading,
+  previous,
+}: {
+  reading: UiSessionReading;
+  previous: UiSessionReading | undefined;
+}): UiSessionReading {
+  if (!reading.unreachable || !previous || previous.unreachable) return reading;
+  return previous;
 }

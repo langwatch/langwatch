@@ -1,5 +1,5 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseColumns, ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 
 type SimulationEventingClickHouseClient = {
   query(input: {
@@ -14,6 +14,8 @@ type SimulationEventingClickHouseClient = {
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<unknown>;
+  /** Absent on a bare driver client (tests): every column is then named. */
+  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 };
 
 export type SimulationEventingClickHouseResolver = (
@@ -42,6 +44,11 @@ export class ClickHouseSimulationSession implements SimulationEventingClickHouse
     };
 
     return { json: async <Row>() => (await this.clickhouse.query<Row>(request)).rows };
+  }
+
+  /** A select list naming only the columns this tenant's target has, the rest as defaults. */
+  select(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string> {
+    return this.clickhouse.columns({ tenantId: this.tenantId }).select(input);
   }
 
   async insert(input: Parameters<SimulationEventingClickHouseClient["insert"]>[0]): Promise<void> {

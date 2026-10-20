@@ -1,4 +1,6 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import {
   Badge,
@@ -8,30 +10,33 @@ import {
   HStack,
   Input,
   Skeleton,
-  Table,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { AdminSsoConnection, SsoSetupMigration } from "@langwatch/enterprise-sso-contract";
-import { MoreVertical } from "lucide-react";
+import { MoreVertical, ShieldCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
-import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { useOpsHost } from "../../../../model/ops-host.ts";
+import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import {
   ConnectionDomains,
-  ConnectionHeader,
+  ConnectionHeaderBadges,
   ConnectionSummary,
   METHOD_LABEL,
   STATE_TONE,
 } from "./sso-connection-details.tsx";
 import { ConnectionHistory } from "./sso-connection-history.tsx";
+
+/** The controls a failed submit can land on; wrappers that carry the state are skipped. */
+const INVALID_CONTROL =
+  'input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"]';
 const PAGE_SIZE = 25;
 const COLUMN_COUNT = 6;
 
@@ -100,63 +105,67 @@ function ConnectionsTable({
   onOpen: (connectionId: string) => void;
 }) {
   return (
-    <Table.Root variant="line" size="md" width="full">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Organization</Table.ColumnHeader>
-          <Table.ColumnHeader>State</Table.ColumnHeader>
-          <Table.ColumnHeader>Domains</Table.ColumnHeader>
-          <Table.ColumnHeader>Proved by</Table.ColumnHeader>
-          <Table.ColumnHeader>Last change</Table.ColumnHeader>
-          <Table.ColumnHeader width="60px" textAlign="right" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact" scroll="x" scrollLabel="Single sign-on connections table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Organization</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>State</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Domains</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Proved by</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last change</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {connections?.length === 0 && (
-          <Table.Row>
-            <Table.Cell colSpan={COLUMN_COUNT}>
-              <Text color="fg.muted" textAlign="center" paddingY={6}>
-                No single sign-on connections match your search.
-              </Text>
-            </Table.Cell>
-          </Table.Row>
+          <ListTable.SpanRow columns={COLUMN_COUNT}>
+            <Text color="fg.muted" textAlign="center" paddingY={6}>
+              No single sign-on connections match your search.
+            </Text>
+          </ListTable.SpanRow>
         )}
         {connections?.map((connection) => (
-          <Table.Row
+          <ListTable.Row
             key={connection.connectionId}
-            cursor="pointer"
-            _hover={{ backgroundColor: "bg.muted" }}
-            onClick={() => onOpen(connection.connectionId)}
+            onActivate={() => onOpen(connection.connectionId)}
           >
-            <Table.Cell>
+            <ListTable.Cell>
               <VStack align="start" gap={0}>
-                <Text>{connection.organizationName ?? <EmptyCell />}</Text>
+                {connection.organizationName ? (
+                  <ListTable.RowAction onActivate={() => onOpen(connection.connectionId)}>
+                    {connection.organizationName}
+                  </ListTable.RowAction>
+                ) : (
+                  <EmptyCell />
+                )}
                 <Text fontSize="xs" color="fg.muted">
                   {connection.providerId}
                 </Text>
               </VStack>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Badge colorPalette={STATE_TONE[connection.state] ?? "gray"}>
                 {connection.state.replace(/_/g, " ").toLowerCase()}
               </Badge>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <DomainSummary connection={connection} />
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <ProvedBy connection={connection} />
-            </Table.Cell>
-            <Table.Cell>{formatDateTime(connection.updatedAtMs)}</Table.Cell>
-            <Table.Cell textAlign="right">
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <AdminDate value={connection.updatedAtMs} display="datetime" />
+            </ListTable.Cell>
+            <ListTable.Cell align="end">
               <Box width="full" height="full" display="flex" justifyContent="end">
                 <RowActions connection={connection} onOpen={onOpen} />
               </Box>
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
@@ -362,61 +371,72 @@ function AttestDomainDialog({
 }) {
   const [evidenceRef, setEvidenceRef] = useState("");
   const [note, setNote] = useState("");
+  const [attempts, setAttempts] = useState(0);
+  const formRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (domain) {
       setEvidenceRef("");
       setNote("");
+      setAttempts(0);
     }
   }, [domain]);
 
-  const complete = evidenceRef.trim().length > 0 && note.trim().length > 0;
+  const problems = {
+    evidenceRef: evidenceRef.trim() === "" ? "Say what evidence proves the domain." : void 0,
+    note: note.trim() === "" ? "Explain why this evidence proves domain control." : void 0,
+  };
+
+  useEffect(() => {
+    if (attempts === 0) return;
+    formRef.current?.querySelector<HTMLElement>(INVALID_CONTROL)?.focus();
+  }, [attempts]);
+
+  const submit = () => {
+    if (problems.evidenceRef || problems.note) {
+      setAttempts((count) => count + 1);
+      return;
+    }
+    onConfirm({ evidenceRef: evidenceRef.trim(), note: note.trim() });
+  };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={domain !== null}
-      onOpenChange={({ open: next }) => {
-        if (!next) onClose();
-      }}
+      onClose={onClose}
+      title={`Vouch for ${domain ?? ""}?`}
+      onSubmit={submit}
+      primaryAction={{ label: "Vouch for domain", type: "submit" }}
     >
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>{`Vouch for ${domain ?? ""}?`}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={3}>
-            <Text>
-              Vouching confirms the customer controls {domain} without asking them to publish a
-              record. Say what proved it, so anyone reading this connection later can check.
-            </Text>
-            <Field.Root required>
-              <Field.Label>Evidence reference</Field.Label>
-              <Input
-                value={evidenceRef}
-                onChange={(event) => setEvidenceRef(event.target.value)}
-                placeholder="Ticket, contract, or verification record"
-              />
-            </Field.Root>
-            <Field.Root required>
-              <Field.Label>Why does this evidence prove domain control?</Field.Label>
-              <Textarea rows={3} value={note} onChange={(event) => setNote(event.target.value)} />
-            </Field.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            disabled={!complete}
-            onClick={() => onConfirm({ evidenceRef: evidenceRef.trim(), note: note.trim() })}
-          >
-            Vouch for domain
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="stretch" gap={3} ref={formRef}>
+        <Text>
+          Vouching confirms the customer controls {domain} without asking them to publish a record.
+          Say what proved it, so anyone reading this connection later can check.
+        </Text>
+        <Field.Root invalid={attempts > 0 && problems.evidenceRef !== undefined}>
+          <Field.Label>Evidence reference</Field.Label>
+          <Input
+            value={evidenceRef}
+            onChange={(event) => setEvidenceRef(event.target.value)}
+            placeholder="Ticket, contract, or verification record"
+            aria-required
+            aria-invalid={(attempts > 0 && problems.evidenceRef !== undefined) || undefined}
+          />
+          <Field.ErrorText>{problems.evidenceRef}</Field.ErrorText>
+        </Field.Root>
+        <Field.Root invalid={attempts > 0 && problems.note !== undefined}>
+          <Field.Label>Why does this evidence prove domain control?</Field.Label>
+          <Textarea
+            rows={3}
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            aria-required
+            aria-invalid={(attempts > 0 && problems.note !== undefined) || undefined}
+          />
+          <Field.ErrorText>{problems.note}</Field.ErrorText>
+        </Field.Root>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -437,60 +457,50 @@ function RemoveConnectionDialog({
   const resolvable = Boolean(connection.organizationName);
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={({ open: next }) => {
-        if (!next) onClose();
-      }}
+      onClose={onClose}
+      title={
+        resolvable
+          ? `Remove single sign-on for ${connection.organizationName}?`
+          : "This organization cannot be identified"
+      }
+      primaryAction={
+        resolvable
+          ? {
+              label: "Remove",
+              danger: true,
+              onClick: () => onConfirm(reason.trim() || null),
+            }
+          : void 0
+      }
     >
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>
-            {resolvable
-              ? `Remove single sign-on for ${connection.organizationName}?`
-              : "This organization cannot be identified"}
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          {resolvable ? (
-            <VStack align="stretch" gap={3}>
-              <Text>
-                Everyone at {connection.organizationName} who signs in through{" "}
-                {connection.verifiedDomains.join(", ")} loses that way in when the removal
-                completes. Anyone who has no other verified sign-in method cannot get in at all, and
-                the removal is refused until they do.
-              </Text>
-              <Text color="fg.muted" fontSize="sm">
-                The connection stays reversible for seven days. Pausing it instead stops sign-ins
-                immediately and can be undone at any time.
-              </Text>
-              <Textarea
-                value={reason}
-                onChange={(event) => setReason(event.target.value)}
-                placeholder="Why is this being removed?"
-                aria-label="Reason for removal"
-              />
-            </VStack>
-          ) : (
-            <Text>
-              The organization behind this connection could not be resolved, so there is no way to
-              confirm which customer this would affect. Removal is unavailable until it can be.
-            </Text>
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          {resolvable && (
-            <Button colorPalette="red" onClick={() => onConfirm(reason.trim() || null)}>
-              Remove
-            </Button>
-          )}
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      {resolvable ? (
+        <VStack align="stretch" gap={3}>
+          <Text>
+            Everyone at {connection.organizationName} who signs in through{" "}
+            {connection.verifiedDomains.join(", ")} loses that way in when the removal completes.
+            Anyone who has no other verified sign-in method cannot get in at all, and the removal is
+            refused until they do.
+          </Text>
+          <Text color="fg.muted" fontSize="sm">
+            The connection stays reversible for seven days. Pausing it instead stops sign-ins
+            immediately and can be undone at any time.
+          </Text>
+          <Textarea
+            value={reason}
+            onChange={(event) => setReason(event.target.value)}
+            placeholder="Why is this being removed?"
+            aria-label="Reason for removal"
+          />
+        </VStack>
+      ) : (
+        <Text>
+          The organization behind this connection could not be resolved, so there is no way to
+          confirm which customer this would affect. Removal is unavailable until it can be.
+        </Text>
+      )}
+    </Dialog>
   );
 }
 
@@ -567,53 +577,46 @@ function ConnectionDrawer({
   const contentRef = useRef<HTMLDivElement>(null);
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!connectionId}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      size="2xl"
+      onClose={onClose}
+      size="detail"
+      title={held?.providerId ?? "SSO connection"}
+      eyebrow={{ label: "SSO connection", icon: <ShieldCheck size={14} aria-hidden /> }}
+      badges={held ? <ConnectionHeaderBadges connection={held} /> : void 0}
+      contentRef={contentRef}
       initialFocusEl={() => contentRef.current}
     >
-      <Drawer.Content ref={contentRef} tabIndex={-1} width="calc(100vw - 16px)">
-        <Drawer.Header
-          borderBottomWidth="1px"
-          borderColor="border.muted"
-          padding={6}
-          paddingEnd={14}
-        >
-          {held ? (
-            <ConnectionHeader connection={held} />
-          ) : (
-            <Drawer.Title>SSO connection</Drawer.Title>
+      {connection.isLoading && <Skeleton height="32" />}
+      {connection.error && <Text color="fg.error">This connection could not be loaded.</Text>}
+      {!connection.isLoading && !connection.error && !held && (
+        <Text color="fg.muted">This connection could not be found.</Text>
+      )}
+      {held && (
+        <VStack align="stretch" gap={6}>
+          <ConnectionSummary connection={held} />
+          <ConnectionDomains connection={held} />
+          {held.source === "legacy-grandfathered" && (
+            <MigrationInventory connection={held} migration={migration.data ?? null} />
           )}
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body padding={6}>
-          {connection.isLoading && <Skeleton height="32" />}
-          {connection.error && <Text color="fg.error">This connection could not be loaded.</Text>}
-          {!connection.isLoading && !connection.error && !held && (
-            <Text color="fg.muted">This connection could not be found.</Text>
-          )}
-          {held && (
-            <VStack align="stretch" gap={6}>
-              <ConnectionSummary connection={held} />
-              <ConnectionDomains connection={held} />
-              {held.source === "legacy-grandfathered" && (
-                <MigrationInventory migration={migration.data ?? null} />
-              )}
-              {held.state === "VERIFIED" && <ActivationPanel connection={held} />}
-              <ConnectionHistory connectionId={held.connectionId} />
-            </VStack>
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+          {held.state === "VERIFIED" && <ActivationPanel connection={held} />}
+          <ConnectionHistory connectionId={held.connectionId} />
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
 /** A carried-over connection's replacement, and how far the cutover has come. */
-function MigrationInventory({ migration }: { migration: SsoSetupMigration | null }) {
+function MigrationInventory({
+  connection,
+  migration,
+}: {
+  connection: ConnectionRow;
+  migration: SsoSetupMigration | null;
+}) {
+  // Sso lends the import form (§10.1): ops draws it, sso owns it.
+  const ImportReplacement = useOpsHost().ssoReplacementImport();
   return (
     <Box>
       <Text fontWeight="semibold" marginBottom={2}>
@@ -636,10 +639,18 @@ function MigrationInventory({ migration }: { migration: SsoSetupMigration | null
             )}
           </>
         ) : (
-          <Text fontSize="sm" color="fg.muted">
-            No replacement is registered. Import the customer's supplied OIDC or SAML configuration
-            to begin the guarded migration.
-          </Text>
+          <>
+            <Text fontSize="sm" color="fg.muted">
+              No replacement is registered. Import the customer's supplied OIDC or SAML
+              configuration to begin the guarded migration.
+            </Text>
+            {ImportReplacement && (
+              <ImportReplacement
+                organizationId={connection.organizationId}
+                replacesConnectionId={connection.connectionId}
+              />
+            )}
+          </>
         )}
       </VStack>
     </Box>

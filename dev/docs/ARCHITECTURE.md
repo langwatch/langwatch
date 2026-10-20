@@ -102,8 +102,8 @@ eventing, so a contract keys a map by an event table without naming it (Alex, 20
   vocabulary: `Server` (signals, fatal handlers, ordered teardown, hosted
   components, `/healthz`, `/metrics`), `GracefulShutdown`, the container
   (§4), boot and transport hosting — plus
-  `defineProcessModule`, `defineRepositories`, `FeatureSetup`,
-  `definePipeline` and the channel registry types. A module's process half
+  `defineProcessModule`, `defineRepositories`, `FeatureSetup` and the
+  channel registry types (`definePipeline` is `@langwatch/eventing`'s). A module's process half
   imports its vocabulary from the thing that installs it. Depends on
   `module`.
 - **`@langwatch/process-stores`** — materializes storage from config:
@@ -598,7 +598,9 @@ closed: a table is refused if any of its projects lacks it. Filtering per projec
 is a tracked gap (`@unimplemented` in `specs/lwql/catalogue-grants.feature`).
 
 **Authority fails closed, tooling fails open** (Alex, 2026-09-30). A failed authz check is a plain 500
-with no rows, never a partial answer. The LWQL editor still edits without a schema (grammar only), a
+with no rows, never a partial answer. The hosted MCP endpoint answers a grant or credential re-check
+that could not run as a 503 with `Retry-After` (`mcp_store_unavailable`), because MCP clients read a
+401 as "sign in again" and a 500 as fatal (Alex, 2026-10-14). The LWQL editor still edits without a schema (grammar only), a
 failed validation clears its markers, and Run always asks the server. Its markers come from the
 `analytics.lwql.validate` query (Alex, 2026-09-30), the server's own validator, which never executes;
 the browser never validates.
@@ -856,7 +858,7 @@ readings and publishes them to shared state; each process's gauge reads that sta
 never repeat the query and every gauge agrees (Alex, 2026-09-29).
 Traces and logs compose through the `langwatch` SDK's own observability
 setup where its API fits — the platform dogfoods its SDK.
-`hostedStores(stores)` from process-stores, `hostedRuntime({ name, runtime,
+`hostedStores({ source, drainTimeoutMs })` from process-stores, `hostedRuntime({ name, runtime,
 drain })` from the process package. A raw `{ name, start, stop }` object
 literal at a call site is banned — if a component has no spoken factory,
 write the factory. Transport/route discovery is likewise built in at the
@@ -1393,12 +1395,17 @@ repositories whose tier nobody stated refuses boot by name (Alex, 2026-10-05). P
 live stores; a test or dev harness hands `memoryStores()` directly and never touches env.
 
 **Migrations are not the api's job.** The worker runs every upgrade step under the runner's lease:
-at boot, while the ledger is behind its image, its gate runs `pnpm task upgrade` (the tasks app's
-runner, in its own process), waits while another runner holds the lease, takes no job until the
-ledger is current, and after a failed run waits for a Retry that returns the step to `pending`
-(Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker never does"). `pnpm
-task upgrade` stays a runner under the same lease for development, CI and an operator (apps/api
-`start:prepare:db`: upgrade alone; no system-migrations pass); the root `prisma:migrate` and
+at boot, while the ledger is behind its image, its gate runs the upgrade in the worker's own
+process (Alex, 2026-10-11: the runner composed once in `packages/upgrade`, `runImageUpgrade`;
+Prisma and goose still run as their own programs), waits while another runner holds the lease,
+takes no job until the ledger is current, and after a failed run waits for a Retry that returns
+the step to `pending` (Alex, 2026-10-09, UPGRADE-IN-WORKER, superseding UPGRADE-FIXES' "the worker
+never does"). The worker takes jobs once the blocking part is done (the schema and the blocking
+steps), while LangWatchQL setup and the system-migrations pass request finish alongside, their
+outcome recorded on the run (Alex, 2026-10-11, T0-F11). `pnpm task upgrade` is a run-once worker (Alex, 2026-10-11): it starts the worker,
+which runs the same upgrade once under the same lease and exits 0, 1 or 3; `status`, `plan` and
+`steps` stay reads in the tasks app (apps/api `start:prepare:db`: upgrade alone; no
+system-migrations pass); the root `prisma:migrate` and
 `clickhouse:migrate` scripts are aliases of it, so no script applies schema outside the ledger
 (Alex, 2026-10-09); the Helm pre-roll Job renders only
 with `serializeUpgrades`, and the compose `migrate` service is gone. The api never runs a step,
@@ -1412,18 +1419,27 @@ per-target column list refreshed every 30 s, which answers the column's typed de
 column exists. A Postgres query the schema is not ready for (Prisma P2021/P2022, SQLSTATE
 42P01/42703) fails and says retry: `promoteStoreFailure` in `packages/api` maps it, once for every
 transport, to the handled `upgrade_in_progress` (503, Retry-After 10 s on REST, the same code over
-tRPC and SSE), and the browser's query client keeps retrying it with backoff. Ingestion is
+tRPC and SSE), and the browser's query client keeps retrying it with backoff. Each ClickHouse
+target upgrades on its own: a private target that is down holds only its own organisations, which
+answer upgrade_in_progress until it catches up (Alex, 2026-10-11). The worker's catch-up pass
+writes those targets' organisations to Redis under a short expiry, every process reads the list
+every few seconds, and a schema-behind ClickHouse failure the routing driver tags with one of them
+answers upgrade_in_progress after admission too; Redis unreadable falls back to the 500 (Alex,
+2026-10-11, T7-F18: "store it in Redis, because it's short term"). Ingestion is
 unaffected: it only enqueues for the worker, and a blocking step never touches a sign-in or ingest
 table. Cloud's rolling deploys keep the old pods serving through expand steps, since a new pod is
-not ready until the ledger is current. A failed step of either store shows on Ops > Upgrades with
+not ready until the ledger is current. What a waiting browser sees splits by deployment (Alex,
+2026-10-10, UPGRADE-FACE): self-hosted shows the upgrading frame with phase and progress; cloud
+names no upgrade at all, only the branded logo-on-gradient page, at most with one light line
+("Migrating the vibes, back soon"), no loader, step count or version. A failed step of either store shows on Ops > Upgrades with
 Retry; only a failed first install, which nobody can sign in to follow, opens the api's token
 console. A blocking step never touches a table the sign-in or ingest doors read or write
 (auth, user, organization, authz, identity, api-key, project, evaluation, evaluator,
 model-provider, monitor, experiment, governance); `lint:architecture` refuses one that does
 (UIW-1..11). A blocking data step touches only tables created in its own release; anything older
 ships as a background step (Alex, 2026-10-09). A background step names the background steps it runs after by their step
-values (`after: [step]`, STEP-AFTER); the worker waits on them, the upgrade inlines them before a
-contract, and an unknown id or a cycle refuses the plan. A fact old images never recorded is
+values (`after: [step]`, STEP-AFTER); the worker waits on them, and an unknown id or a cycle
+refuses the plan. A fact old images never recorded is
 recorded by its owner's background data step with `needsOldWritersGone`; `project:record-created-facts`
 runs after `instant-eval:copy-judge-spend` (ADR-174 decision 17). Prisma migrations live with the schema;
 ClickHouse migrations are goose SQL files. A serving process holding DDL locks is how deploys die.
@@ -1454,7 +1470,10 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   name process packages (Alex, 2026-09-27), and so may `lwql-provision.ts` and
   `lwql-render-access-config.ts`: LangWatchQL provisioning reads both schemas under the same upgrade
   lease, before serve, and the access-config render runs from env alone in its Helm job (Alex,
-  2026-09-28). SQL migrations stay central, and each is attributed to the owner of the table it
+  2026-09-28). Before it serves, the worker boots its installed modules in the tasks role, in its
+  own process, to collect and run the blocking steps; it names no process package, and runs
+  LangWatchQL provisioning as the tasks app's `upgrade lwql-provision` under its own lease (Alex,
+  2026-10-11; the preamble hands the gate `bootModules`). SQL migrations stay central, and each is attributed to the owner of the table it
   touches; a check refuses a migration touching two owners' tables (Alex, 2026-10-06, round 7, D3). A
   migration main has released keeps main's bytes even when it touches two owners: installs hold its
   checksum, so a later idempotent migration carries the split instead, and the check names it as
@@ -1463,7 +1482,7 @@ tags fails the guards rather than passing (Alex, 2026-10-09).
   Operator-started jobs (re-sealing credentials after a `CREDENTIALS_SECRET` rotation, moving object
   storage to another provider) are not release steps: they stay named tasks an operator starts, safe to
   run again, outside the ledger (Alex, 2026-10-09). Main's virtual-key config backfill is deleted, not
-  ported: its strip migration shipped in 3.19.0, below the 3.20.1 floor (Alex, 2026-10-09). Each serving
+  ported: its strip migration shipped in 3.19.0 (Alex, 2026-10-09). Each serving
   process's roster row records `credentialKeyFingerprint` of every credential key it accepts, never the
   key, and `credentials-reseal` refuses to apply while any live row lacks the current or the previous
   key (Alex, 2026-10-09). Governance's anomaly destination migration passes a migration-only `idempotencyKey` on
@@ -1483,20 +1502,26 @@ step's per-tenant state lives in one framework-owned table beside the ledger,
 tenant steps as a framework input, as it hands a migration binder its `replayer`; the api builds tenant
 steps only, for ops' targeted run, and ops builds the state repository in its own registry. Worker boot
 accepts a tenant step and the background runner skips it; its ledger row is `done` when a pass leaves no
-tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A finished upgrade run asks ops for one
+tenant held or parked and reopens when one appears (Alex, 2026-10-09, S6-WIRE). A step that reports `migrated` on every pass by design declares `migratedIsSteady`: its migrated tenants are kept in step, never held, and Ops lists only its parked ones as needing attention (Alex, 2026-10-12, SWB-F5). A finished upgrade run asks ops for one
 system-migrations pass, so tenant steps settle at upgrade rather than at the hourly re-drive (Alex,
-2026-10-09, UPG-008 D2). A step that must read every tenant reads through its owner's repository with
+2026-10-09, UPG-008 D2); the request's queue jobs run ahead of any backlog (Alex, 2026-10-11). A step that must read every tenant reads through its owner's repository with
 raw SQL that interpolates `skipTenantCheck({ SKIP_TENANT_CHECK: true })` under a comment giving the reason, as the trigger claim does (Alex, 2026-10-09, UPG-008 D1; the flag replaced the `-- @tenancy:` comment, Alex, 2026-10-10). Stored-object's ClickHouse import is a `project` tenant step with
 `needsOldWritersGone` in place of a writer-drain proof; its legacy reads stay (Alex, 2026-10-09). Ops keeps the pass for
 now, fed that one list, paging tenant ids through the framework's `TenantSource`, and composes the
 migrations page, enrolment, the targeted run and the pass over its Redis lease, never importing a peer's
-process package. Until their owners move, identity, authz and automation still answer
-`registeredMigrations()` (identity's `userMigrations()` beside it) over ops' `SystemMigration*` tables;
-before an owner moves, its `finalized` and `rolled_back` rows are copied, never moved, into the
-framework table by a one-time expand step. The api serves the page and awaits a targeted run
+process package. Identity, authz and automation have moved: each declares its tenant steps, and ops
+reads its old `SystemMigration*` tables only to copy them; when an owner moved, its `finalized` and
+`rolled_back` rows and enrolments were copied, never moved, into the framework table by a background
+step, and copied again once no older image writes the old table, withdrawn enrolments included (Alex, 2026-10-12). Until a later release stops it, ops also writes each moved step's finished and rolled-back tenants, enrolments and withdrawals to the old tables under the old names, so a rollback to the older image reads them (expand then contract; Alex, 2026-10-12). The api serves the page and awaits a targeted run
 in-request, as main did; passes run on a worker (§9); apps/tasks keeps the startup convergence
 (Alex, 2026-09-28). Automation's Slack connection migration is one such pass per organization, with
 no manual task (Alex, 2026-09-30).
+
+**Upgrades fail forward when it is safe** (Alex, 2026-10-11): each step is locked and only moves
+through safe states (expand, copy, switch readers, retire the old, record done in the ledger, unlock
+the next). A step that stops mid-way never rolls back and never leaves a half state: the old data is
+still there and served, and it resumes or retries from its checkpoint. Where going forward could be
+unsafe it stops, safely, and names what a person must do; otherwise no operator needs a shell.
 
 **Upgrades run on deploy** (ADR-173, which carries every ruling of rounds 8 to 17). One ledger keyed by
 step id (and target) serves cloud and self-hosted, and presence says when old writers are gone. A
@@ -1512,7 +1537,7 @@ the row's; an unrelated organization update inside the mirror lag makes stale co
 host clocks differ, which is the accepted ceiling (Alex, 2026-10-09).
 A step that moves a stored value to a new shape annotates the old shape (an inline anomaly webhook
 destination gains an optional `endpointId`) so a rolled-back image still reads it, and a contract step
-after the floor rewrites it to the new shape (Alex, 2026-10-09, D1-A).
+rewrites it to the new shape once old writers are gone (Alex, 2026-10-09, D1-A).
 An image is the newest stamped release (`packages/upgrade/releases/`) only when it ships no step
 beyond the stamped ones; otherwise it names itself "unreleased", and its unstamped steps show under
 the Unreleased row (Alex, 2026-10-10, IMAGE-IDENTITY).
@@ -1525,12 +1550,12 @@ or marks the contract step failed and applies nothing. A re-run copies only a st
 plan` reports what would be archived. Only Postgres contracts archive so far; a goose contract that
 asks fails. Every Postgres contract carries `-- archive: <table>` or `-- archive: none (<reason>)`; the migration-safety guard refuses one without (`contract-without-archive-note`).
 
-**An LTS is an upgrade stop, never a maintained line** (Alex, 2026-10-09, LTS-SCHEDULE). An LTS is
-named every April and October; the first is 3.20.1 (2026-10-06), the next April 2027. Only the
-latest release gets fixes: no LTS or older line is ever patched. Naming an LTS moves the floor
-(`packages/upgrade/releases/lts-floor.json`) to the previous LTS, so the newest LTS always upgrades
-straight to head, a stale installation stops at most once a year, and dead schema lives about 12
-months before its contract step (ADR-173 D8) may ship.
+**No release is a required stop on the way to the latest** (Alex, 2026-10-11). Any install, of any release, pulls the
+latest image and the worker rolls it through every step from the release it is on; an install older
+than the first manifest's `previous` (the 3.18.1 baseline) plans from the baseline. Only the latest
+release gets fixes. So every step, alias and upcast is kept: a DROP or contract waits until old
+writers are gone (`needsOldWritersGone`), and the step that drops is kept, like every step.
+2026-10-11: nothing is deleted automatically; a drop is an operator step confirmed in Ops once safe; every step runs after old writers are gone (ADR-173 amendment; the migration-safety guards refuse a new DROP TABLE or DROP COLUMN above the newest release tag).
 
 **A framework package takes module values by injection, never by import** (Alex, 2026-10-06, rounds 5
 and 6, Q211). `packages/group-queue` takes a `mintUri` function and a generic destination type for its
@@ -1564,7 +1589,7 @@ a shrink-only baseline and Postgres RLS is deferred.
 **Main's byte intakes stay for now** (Alex, 2026-09-30). The user avatar and AI tool icon
 data URLs, the deprecated multipart dataset routes, bug-report transcripts and inline scenario
 media keep main's shapes; each moves to createUpload, PUT and confirmUpload only by its own
-ruling. main's signal-focused home and briefing are restored behind `release_ui_home_signal_focused_enabled` (Alex, 2026-10-09);
+ruling. the project home is one composition for every reader, the Langy home; without Langy its field is the command bar (Alex, 2026-10-11);
 automation email previews render in the browser, as on main.
 
 **Every Redis cache key expires, and expiry is the only sweeper** (Alex, 2026-10-01). One Redis is the default: one
@@ -1578,6 +1603,18 @@ the source's own expiry (a GitHub token caches for min(its expiry − 60 s, 60 s
 stays. `packages/architecture-enforcer/tests/redis-cache-ttl.unit.test.ts` refuses a write without one.
 A deployment may split cache from durable queues when measured pressure warrants it: expiry bounds a
 key's age, not the key count or memory, so headroom alerts are required either way (Alex, 2026-10-01).
+
+**A credential every server hands out is minted once and shared sealed** (Alex, 2026-10-12: "exactly one
+key per run across all api servers, never an extra key", "make this a shared design thing"). `mintOnce` in
+`@langwatch/secrets/shared-credential` is the one way: the first caller claims the address (`SET NX PX`,
+held longer than any mint runs), mints, and holds the value sealed with the stores' `encryption` client under
+`<prefix><tenantId>[:<contentKey>]`, never longer than the credential lives; every other caller on every
+server waits up to the 10 s read-your-writes window (§9) for that same value, then answers pending. A
+half-done value (a key whose grants have not folded) is held before the slow step, so a retry on any server
+resumes it instead of minting another. A module reaches it only as a repository: its `repositories/redis/`
+builds `RedisSharedCredentialStore` (`@langwatch/redis-client/shared-credential`) from `redis` and
+`encryption`, `MemorySharedCredentialStore` is the twin, and a service passes that repository to `mintOnce`,
+never seeing Redis. Api-key's agent sandbox keys and run keys use it; a table of pending mints is not the way.
 
 **Object storage is a store, like the other three** (ruled 2026-09-24,
 ADR-158). The `objectStorage` member is one client over S3, Azure Blob and the
@@ -1639,7 +1676,10 @@ answered on that organization's server, never a skipped tenant check (Alex, 2026
 also be one `Array(String)` parameter holding exactly that set, as the proof fence binds it, and an `OR`
 bracketed beneath that set does not weaken it (M8487-GUARD-ARRAY, Alex, 2026-10-09); an `OR` in a
 subquery beneath the set, and a `NOT` in front of any tenant predicate, are refused (GUARD-FOLLOWUPS,
-Alex, 2026-10-09). Eventing's replay
+Alex, 2026-10-09). An insert declares a tenant set the same way (Alex, 2026-10-12): its rows'
+`TenantId`s are exactly the set, its `tenantId` among them, and the router refuses a set spanning
+organisations; eventing folds event appends waiting on one organisation's server into such
+inserts, each still flushed before it answers, and retries a failed one as each append alone. Eventing's replay
 reads through the member's own surface (`query`, `stream`, `command`); `stream` yields a large read
 batch by batch under the tenant guard and the route, holding no slot and never retried.
 
@@ -1662,6 +1702,13 @@ composes (Alex, 2026-10-06, round 4, Q205). One stored event's payload (trace's 
 read through a narrow single-event read seat beside the producer-only store, within main's 2-day
 window; the producer-only rule stands for everything else (Alex, 2026-10-06, round 3, Q209).
 2026-10-10: identity reads one aggregate's history through the read seat; WEB-9103.
+
+**A trace summary lookup is anchored on its event's time** (Alex, 2026-10-10): a summary is filed
+under its trace's start, which never moves, so a lookup reads windows widening back from the span's
+own occurredAt (3, 7, 21, 30 days, plus 1 day forward), stops at the first hit, and never scans every
+partition. Next: per-owner id index tables (unpartitioned, filled by a materialised view) for one
+exact read by id (`dev/docs/plans/id-index-2026-10-10.md`), replacing this ladder; parked: a
+default retention-period bound on every ClickHouse read.
 
 **A ClickHouse table has one owner, and others read it through that owner** (Alex, 2026-10-06,
 round 3, Q207). A plain read of another module's table is a query operation on its owner's `*Api`
@@ -1731,7 +1778,7 @@ Only ops and identity grant or revoke; listing takes no caller, and user reads i
 seed runs once behind a marker, never again because the live list is empty. Authz learns who is
 deactivated or erased from user's and identity's facts into its own table, never from the User table
 (Alex, 2026-10-01). A standing change an old image made without its fact is repaired by user's
-`user:record-standing-facts` step: each deactivated account re-stated at its stored stamp, and each
+`user:record-created-facts` step: each deactivated account re-stated at its stored stamp, and each
 active account its own log still holds deactivated recorded reactivated at the run's start
 (Alex, 2026-10-09). The page reaches them through three OpsApi pass-throughs (`listPlatformOperators`,
 `grantPlatformOperator`, `revokePlatformOperator`) gated `ops:manage`; the seed does not latch while the
@@ -1741,9 +1788,12 @@ overview and the impersonation limit override take `ops:view`; onboard, addCommi
 markPaidOutOfBand take `ops:manage`. A view-only operator reads and is refused on every write.
 **Operator bootstrap** (Alex, 2026-10-01): a one-time upgrade migration grants users named by a still-set
 `ADMIN_EMAILS`, else the oldest active org admin on a one-organization install, else nobody (logged; recovery
-task). Cloud never bootstraps: staff are seeded at cutover. A set `ADMIN_EMAILS` after that only warns.
+task). Cloud never bootstraps: staff are seeded at cutover. On a self-hosted install the first user to sign up is recorded as the seed's decision (`first-user`) from user's `lw.user.created` fact, whatever `ADMIN_EMAILS` says, while nobody holds the grant and they are the only user; the seed's one-key record and latch grant at most one (Alex, 2026-10-10).
 A set `ADMIN_EMAILS` never falls back to an org admin: the seed waits, unlatched, until a named verified
 user exists. Users with no organization yet also wait; only a decision latches (Alex, 2026-10-01).
+On a deployment LangWatch runs (the seed's `cloud`, a developer's local stack excepted) the page and the
+recovery task grant only an account whose verified address is on `langwatch.ai`; the task, like the page,
+grants verified accounts only, everywhere. `can()` asks nothing more than the live grant (Alex, 2026-10-14).
 Deactivating a user ends their sessions and CLI tokens before user's fact is sent, without an outbox;
 user's lifecycle facts carry the database clock. The back office refuses bulk user writes, a deliberate
 difference from main (Alex, 2026-10-01).
@@ -1774,7 +1824,7 @@ office deactivates only through user, so it keeps no picked date (Alex, 2026-10-
   publishes in `docs/api-reference/openapiLangWatch.json` keeps the names it published (Alex, 2026-09-23),
   `{id}` included: a semantic rename of a main route is drift and is reverted (Alex, 2026-09-25).
   The rest-route rule reads that docs copy as it stands after a spec sync; drift against main is
-  apidiff's to catch, not a frozen copy's (Alex, 2026-09-29).
+  checked against main itself, not a frozen copy (Alex, 2026-09-29).
 - `/api/<x>` is the main path; `/v1` is optional; `/latest/` and `/<version>/` are supported but hidden from the
   published docs (Alex, 2026-09-25).
 - A REST namespace (the first segment after `/api/` or `/api/v1/`) has one owner, named in
@@ -2107,16 +2157,16 @@ pipeline declares `.withUpcasts({ events: [{ from: { type, aggregateType? }, to,
 drain? })` after `.withEvents`, `to` one of its declared types and `data` a pure payload transform.
 Its queued-event parse, its event-store reads (the renamed aggregate type read beside its own) and
 replay apply it, so consumers and type filters see only the current type; `drain: { pipeline,
-jobNames?, removeAfter }` routes jobs a previous release queued under the former pipeline's keys into the current
-lanes for one release. Each upcast is an `event-upcast` background step in the upgrade ledger, and
+jobNames? }` routes jobs an older release queued under the former pipeline's keys into the current
+lanes, and is kept like every alias (Alex, 2026-10-11). Each upcast is an `event-upcast` background step in the upgrade ledger, and
 `EventUpcastReader` answers the stored events it still covers (`packages/eventing/specs/event-upcast.feature`).
 The eventing member builds it over the raw event log, the booted process answers it as `upcastReader()`, and every
 `pnpm task upgrade` run records each upcast's step (Alex, 2026-10-09).
 An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite copies corrected events into
-`event_log`, and a renamed aggregate's originals are deleted only by a contract step at the LTS floor; a
-lint names any drain older than one release (`langwatch/upcast-drain-window`, against `removeAfter`); a fresh install plans upcast steps by their mode (Alex,
-2026-10-06, rounds 15 and 16).
-A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data?, removeAfter }])` on its pipeline: jobs the previous release queued under `from` run on that lane, its own or its peer lane, for one release. They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone, removeAfter }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries. The worker installation test refuses an alias once its `removeAfter` release has been cut (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
+`event_log`, and a renamed aggregate's originals are deleted only by a contract step that waits until old writers
+are gone; a fresh install plans upcast steps by their mode (Alex, 2026-10-06, rounds 15 and 16;
+no floor, Alex, 2026-10-11).
+A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data? }])` on its pipeline: jobs an older release queued under `from` run on that lane, its own or its peer lane; the alias is kept like every step (Alex, 2026-10-11). They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and
@@ -2214,6 +2264,16 @@ reacts to trace's span and origin events and evaluation's completed and reported
 keeping main's settle windows and reading fold state through `TraceApi.findSummary` and
 `EvaluationApi.findRunByEvaluationId`; neither owner knows automation (Alex, 2026-10-01).
 Coding-agent reacts to log's received-record and metric's received-point events the same way.
+**A cross-module fact is always an event; the receiver keeps the applied event id** (Alex,
+2026-10-11; [ADR-179](adr/179-cross-module-facts-are-events-the-receiver-versions.md)). "Something
+happened" reaches another module as the owner's fact event and the receiver's peer subscriber, never a
+new `*Api` call. A subscriber is best-effort (stores nothing: SSE, read hints, live views) or durable
+(changes a row it owns). A durable receiver's guarantee is its own: it stores `lastAppliedEventId` on
+the row it changes and skips an event its stored id has already passed (`freshnessOf`, never a string
+compare), so redelivery is idempotent and a late older event never overwrites a newer state; a receiver
+that accumulates dedupes by `idempotencyKey ?? eventId`. That id is the row's version: a read over the
+row carries it as its cursor, for read hints and the client's cache version alike, and still answers in
+full. Existing outboxes and intents stay; new code adds no per-event delivery table for a fact.
 A delivery is not a reaction: a producer still calls a destination kind's `requestDelivery`, and the
 destination holds no producer code (Alex, 2026-10-01; [ADR-167](adr/167-outbound-delivery.md)). The runtime's own maintenance
 pipelines (blob sweep, process-manager retention) are built by the eventing member where a Redis and a
@@ -2244,26 +2304,40 @@ retries with backoff without blocking neighbours; a group waiting out its backof
 soft-cap slot and keeps its active lock, so its order holds while it runs nothing (Alex, 2026-09-30);
 projections fold from the
 same ordered stream; every consumer registers drain-first on the server.
+There is one kind of event: an event an upgrade step records goes to every projection, subscriber
+and process manager like any other, whatever its data says (a `backfilled` field is data a consumer
+may read, never routing); the queue carries the volume (Alex, 2026-10-12).
+A request that needs its own write folded (a grant before a run key is issued) waits at most
+10 seconds for the projection, the same wait everywhere, then answers pending and the caller retries;
+no write jumps the queue and no projection is folded inline (Alex, 2026-10-12).
 The hand-off from an append to its projections, subscribers and process managers is durable: a
 lane that cannot be staged is recorded in the process store's outbox and re-driven, a fold or state
 projection by a rebuild job in the aggregate's own ordered lane, so it cannot race live folds, never
 logged and dropped (Alex, 2026-09-29). A command job
 keys the events it appends on its stable queue job id, so a crash replay collapses onto the first
 append (Alex, 2026-09-29).
+An outbox delivery's lease is renewed while its handler shows progress: any call through its
+module's dependencies (repositories, channels, peers' `*Api`, store clients), which a worker hands
+out tracked, so business code never calls a heartbeat. Past `outbox.maxSilenceMs` (default 5 minutes)
+without one, renewal stops with a warning, the lease lapses and the message is redelivered, dead after
+its attempts. Only a single call that may run longer raises the limit (Alex, 2026-10-12).
 `packages/group-queue` owns the per-tenant enqueue-rate counter, taken at enqueue, and ops reads it
 through the framework; no module scans queues or reads the `gq:parked-tenants` keys directly (Alex,
 2026-09-29). A tenant is parked only while
 the system is under load; otherwise a tenant may burst past the others (Alex, 2026-09-29).
 
-A dequeued event whose type no pipeline on that worker declares is retried, not refused (Alex,
-2026-10-08, round 24): mid rolling deploy an older worker can take a newer release's event, and the
-queue's retry budget (25 attempts with backoff) is the drain window in which a worker declaring it
-takes the job. Still undeclared once spent, it exhausts on its lane's outcome with a reason naming
-the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
+A dequeued event whose type no pipeline on that worker declares is handed back without using an
+attempt, not refused (Alex, 2026-10-08, round 24; 2026-10-12, G1-F1): mid rolling deploy an older
+worker can take a newer release's event, and a worker declaring it takes the job. Handed back for
+over 30 minutes it spends attempts; still undeclared once spent, it exhausts on its lane's outcome
+with a reason naming the type; a job with no type is still refused (`packages/eventing/specs/undeclared-event-drain.feature`).
 
 **A spent trace job dead-letters instead of blocking its group** (Alex, 2026-09-30): order within
 a trace is not load-bearing, so trace registrations set `onExhausted: "dead-letter"`; every other
-registration blocks. The group queue owns and writes the dead-letter layout; ops lists, redrives
+registration blocks. A queued job no registration or alias routes is dead-lettered once its
+attempts run out (Alex, 2026-10-10). A worker with no handler for a job hands it back without
+using an attempt or counting a group failure; handed back for over 30 minutes it spends attempts
+and surfaces at error (Alex, 2026-10-12, G1-F1). The group queue owns and writes the dead-letter layout; ops lists, redrives
 and discards it through the queue's exported helpers. A span that cannot be scrubbed is never
 stored unredacted, and disabled DLP never skips redaction: it fails and, on a trace pipeline,
 dead-letters, redrivable once analysis is back.
@@ -2386,7 +2460,9 @@ closes the top one and a reload restores the stack. No module-level drawer store
 whole browser.
 
 How a screen is laid out (titles, header actions, containers, drawers, empty and loading
-states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4.
+states, front door, chrome placement) is ruled in `dev/docs/design/guidelines.md` §4. Drawers,
+dialogs and cards are prop-driven shapes, not assembled parts (ADR-002 in
+`packages/design-system/adrs/`, ruled 2026-10-11).
 
 **An in-app link is `@langwatch/browser-host/link`** (ruled 2026-09-29), or a design-system element handed `onNavigate`; a bare anchor or Chakra `Link` with an in-app address reloads the document. specs/ui/in-app-links.feature.
 
@@ -2975,6 +3051,8 @@ accepts it. A class declaring `fault: "customer"` at a 5xx keeps its body, in `p
 Transient 503 refusals keep their code: `clickhouse_overloaded` and `service_unavailable` go on the wire
 unmasked, so a caller can tell a retryable refusal from a fault (Alex, 2026-10-06, round 9, CH-1,
 amending the masking ruling).
+`clickhouse_unavailable` (a ClickHouse connection that dropped or was refused) joins them: the code shows,
+and the raw connection error stays a logged reason, never in the body (Alex, 2026-10-11).
 A relayed herr error with no fault and no status stays `customer`: `presumed_platform` applies only when a
 status of 500 or more is known (coordinator, citing the ruling's "at a 5xx status", 2026-10-05).
 `LangWatchQLFilterRefusal` is a trace contract error (coordinator, citing Alex's ingestion-key approval,
@@ -3180,9 +3258,7 @@ the left, the target.
 | host services (`@langwatch/browser-host`: session, navigation, storage, toasts, drawers)                                    | "capabilities" (§3.5 reserves the word for the four layers)                                                                                                                                        |
 | `enterprise/modules/audit-log` (§4)                                                                                         | `modules/audit-log`                                                                                                                                                                                |
 | `processFacts` in `@langwatch/config`, picked by each slice (§6)                                                            | single leaves in `deployment-facts.ts` picked by name (`publicBaseUrl`, `isSaas`, `nlpServiceUrl`, `serviceVersion`, `otelResourceAttributes`, `nodeEnvironment`, `outboundProxy`; §6, 2026-10-05) |
-| store clients reach registries only; every channel registry installed by `.withChannels(registry)` (§5)                     | registries' `.live.create` called by hand in billing, nurturing and 14 more modules (round 33 ST-1)                                                                                                |
 | `secrets.into({ … }, build)` (§6)                                                                                           | nested `secrets.into(handle, …)`                                                                                                                                                                   |
-| `hostedStores(stores)` (§4)                                                                                                 | `hostedMembers(stores)`                                                                                                                                                                            |
 | "store client" (`the clickhouse client`)                                                                                    | "member" in §7, §9 and §13 prose, and `bootInstalledProcess({ members })`                                                                                                                          |
 | "Admin" (`ssoAdmin()`; Alex 2026-10-08, round 39 DS-A)                                                                      | the "backoffice" spelling §15 deletes, still in the UI shell route table and billing                                                                                                               |
 | the licence in a licensing-owned table, cleared through `LicensingApi.removeLicense` (Alex 2026-10-08, rounds 37 D6 and 42) | `OrganizationApi.setLicense` / `clearLicense` over organization's columns (`organization.api.ts:565-574`)                                                                                          |

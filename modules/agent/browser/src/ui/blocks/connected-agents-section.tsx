@@ -80,7 +80,7 @@ function PresenceMark({ agent }: { agent: ConnectedAgentBrowser }) {
           borderRadius="full"
           background={isOnline ? "green.solid" : "fg.subtle"}
         />
-        <Text fontSize="12px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           {isOnline ? "Online" : "Offline"}
         </Text>
       </HStack>
@@ -93,8 +93,8 @@ function EnvironmentLabel({ environment }: { environment: string }) {
   const tone = environmentTone(environment);
   return (
     <Text
-      fontSize="11px"
-      fontWeight={500}
+      textStyle="micro"
+      fontWeight="medium"
       paddingX={1.5}
       paddingY={0.5}
       borderRadius="sm"
@@ -131,7 +131,7 @@ function ScopeChip({ agent }: { agent: ConnectedAgentBrowser }) {
         aria-label={agent.selectable ? undefined : ownerOnlyCopy(agent.owner?.name)}
       >
         {scope.kind === "owner" ? <User size={10} /> : <Laptop size={10} />}
-        <Text fontSize="11px" truncate>
+        <Text textStyle="micro" truncate>
           {scope.label}
         </Text>
       </HStack>
@@ -227,7 +227,6 @@ export function ConnectedAgentCard({
   return (
     <AgentCardShell
       agentId={agent.id}
-      agentName={agent.name}
       onClick={onOpen}
       testId={`connected-agent-card-${agent.id}`}
       leading={<AgentCardIcon icon={Bot} />}
@@ -235,27 +234,14 @@ export function ConnectedAgentCard({
       menu={
         <ConnectedAgentMenu agent={agent} onOpen={onOpen} onDelete={onDelete} onTest={onTest} />
       }
-      title={
-        <HStack gap={2} width="full" minWidth={0}>
-          <Text color="fg.muted" fontSize="sm" fontWeight={500} truncate>
-            {agent.name}
-          </Text>
+      title={agent.name}
+      badges={
+        <>
           {agent.environment && <EnvironmentLabel environment={agent.environment} />}
-        </HStack>
-      }
-      info={
-        <HStack
-          gap={2}
-          width="full"
-          minWidth={0}
-          overflow="hidden"
-          color="fg.subtle"
-          fontSize="12px"
-        >
-          {facts.length > 0 && <Text truncate>{facts.join(" · ")}</Text>}
           <ScopeChip agent={agent} />
-        </HStack>
+        </>
       }
+      meta={facts.length > 0 ? facts.join(" · ") : null}
     />
   );
 }

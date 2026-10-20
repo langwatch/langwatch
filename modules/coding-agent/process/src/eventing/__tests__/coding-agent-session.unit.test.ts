@@ -2427,4 +2427,16 @@ describe("a codex helper thread's session", () => {
       expect(codingAgentSessionSchema.parse(beforeTheMark).auxiliary).toBe(false);
     });
   });
+
+  describe("given a session whose committed row the read window misses", () => {
+    /** @scenario "A session's read-window miss widens back to 30 days, then rebuilds from the log" */
+    it("widens back to 30 days, never unbounded, and rebuilds from the log after", () => {
+      const { options } = makeProjection();
+      const steps = options.readWindow?.fallbackLookbackStepsMs ?? [];
+
+      expect(steps.at(-1)).toBe(30 * 24 * 60 * 60 * 1000);
+      expect([...steps].toSorted((a, b) => a - b)).toEqual(steps);
+      expect(options.refoldOnStoreMiss).toBe(true);
+    });
+  });
 });

@@ -7,6 +7,17 @@ import type {
   TenantMigrationRecord,
   TenantMigrationStatus,
 } from "@langwatch/system-migrations";
+import type { CodeStepId } from "@langwatch/upgrade/step";
+import type { TenantStepStateRow } from "@langwatch/upgrade/step/tenant-state";
+
+/** The identity and authz migrations ops held, now their owners' steps. Never edit (S6-COPY). */
+export const MOVED_TO_OWNERS = {
+  "authz-engine": "authz:engine",
+  "identity-d01-identifier-backfill": "identity:identifier-backfill",
+  "identity-d01-secret-heal": "identity:secret-heal",
+  "identity-d04-connection-grandfather": "identity:connection-grandfather",
+  "identity-sso-domain-ownership-backfill": "identity:sso-domain-ownership-backfill",
+} as const satisfies Record<string, CodeStepId>;
 
 /**
  * The statuses a tenant may be rolled back from. What `migrated` means is each migration's own
@@ -61,16 +72,17 @@ export interface SystemMigrationEnrollmentStore {
   delete(args: { organizationId: string; migrationName: string }): Promise<void>;
 }
 
+/** The declared tenant steps' state, the framework's table beside the ledger. */
 export interface SystemMigrationStateReader {
   findStatusCounts(args: { migrationName: string }): Promise<Record<TenantMigrationStatus, number>>;
 
-  /** Newest movement first; no `migrationName` reads every migration's rows. */
+  /** Newest movement first; no `migrationName` reads every step's rows. */
   findRecordsByStatus(args: {
     migrationName?: string | undefined;
     statuses: TenantMigrationStatus[];
     limit: number;
     offset?: number;
-  }): Promise<OpsMigrationOverview["attention"]>;
+  }): Promise<TenantStepStateRow[]>;
 
   getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 
@@ -96,6 +108,8 @@ export type SystemMigrationsServiceDependencies = {
     enrolledAutomatically: boolean;
     /** Organization or user axis; omitted means organization. See ADR-101 §6. */
     tenant?: "organization" | "user";
+    /** Its `migrated` tenants are kept in step, never held (Alex, 2026-10-12); omitted, false. */
+    migratedIsSteady?: boolean;
   }[];
   /** Read per call, so the answer is never a boot-time capture. */
   isSaaS: () => boolean;
@@ -116,7 +130,7 @@ export type SystemMigrationsServiceDependencies = {
   /** One full pass over both axes, where a worker executes it. */
   runPass: (input: { signal?: AbortSignal }) => Promise<MigrationPassSummary>;
   /** Asks a worker for one pass, sent as the operator; resolves once the request is recorded. */
-  requestPass: (args: { actorUserId: string }) => Promise<void>;
+  requestPass: (args: { actorUserId: string; delayMs?: number }) => Promise<void>;
   /** Whether a pass on this installation could still move a tenant: the re-drive's gate. */
   hasTenantAwaitingRedrive: () => Promise<boolean>;
   /** One migration for one organization; composition scopes runner to (tenant, migration) pair. */
@@ -126,6 +140,13 @@ export type SystemMigrationsServiceDependencies = {
   }) => Promise<MigrationPassSummary>;
   /** Checks if report means WAITED vs held; only migration composition can distinguish. */
   waitingReports?: Record<string, (report: unknown) => boolean>;
+  /** Records the rollback as ops' fact for the step's owner, after the pin (Alex, 2026-10-12). */
+  recordRolledBack?: (args: {
+    migrationName: string;
+    tenantId: string;
+    actorUserId: string;
+    decidedAt: string;
+  }) => Promise<void>;
   /**
    * What else a rollback has to DO, per migration name. The generic rollback is a state write; a
    * migration whose finalization changed how the running fleet behaves needs that undone too, and

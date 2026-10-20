@@ -2,6 +2,7 @@
  * @vitest-environment jsdom
  */
 import { cleanup, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { fakeAutomationHost, renderWithAutomationHost } from "../../../testing.tsx";
@@ -201,6 +202,24 @@ describe("ViewAutomationDrawer history", () => {
         expect(screen.getByText("Fired 3 times")).toBeDefined();
         expect(screen.getByText(/6 minutes ago/)).toBeDefined();
         expect(screen.queryByText(/has not fired yet/)).toBeNull();
+      });
+    });
+  });
+  describe("given more fires than one page holds", () => {
+    describe("when the author asks for more", () => {
+      it("offers Load more and keeps the rows already shown", async () => {
+        const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+        viewDrawerState.trigger = TRACE_AUTOMATION_ROW;
+        viewDrawerState.fires = [
+          { id: "sent_0", triggerId: "trigger_1", createdAt: ago(6 * MINUTE_MS), resolvedAt: null },
+        ];
+        viewDrawerState.hasNextFirePage = true;
+        renderDrawer();
+
+        await user.click(screen.getByRole("button", { name: "Load more" }));
+
+        expect(viewDrawerState.fetchNextFirePage).toHaveBeenCalledOnce();
+        expect(screen.getByText("Fired once")).toBeDefined();
       });
     });
   });

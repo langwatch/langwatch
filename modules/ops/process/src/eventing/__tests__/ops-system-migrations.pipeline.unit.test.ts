@@ -14,7 +14,10 @@ import { describe, expect, it, vi } from "vitest";
 import { SystemMigrationPassRequestsService } from "../../features/system-migrations/services/system-migration-pass-requests.service.ts";
 import { SystemMigrationsService } from "../../features/system-migrations/services/system-migrations.service.ts";
 import { opsProcessModule } from "../../ops.module.ts";
-import type { SystemMigrationsServiceDependencies } from "../../rules/system-migration-support.rules.ts";
+import type {
+  SystemMigrationStateReader,
+  SystemMigrationsServiceDependencies,
+} from "../../rules/system-migration-support.rules.ts";
 import { SYSTEM_MIGRATION_PASS_PROCESS_NAME } from "../ops-system-migrations.intent.ts";
 import {
   SYSTEM_MIGRATIONS_PIPELINE_NAME,
@@ -22,12 +25,16 @@ import {
   systemMigrationsEventing,
 } from "../ops-system-migrations.pipeline.ts";
 import {
+  SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
+  SYSTEM_MIGRATION_PASS_INITIAL_STATE,
+  SYSTEM_MIGRATION_WAKE_INTERVAL_MS,
   systemMigrationPassRequested,
   systemMigrationRedriveWake,
 } from "../ops-system-migrations.process.ts";
 
 const NOW = Date.parse("2026-09-28T12:00:00Z");
-const HOUR = 60 * 60_000;
+const MINUTE = 60_000;
+const HOUR = 60 * MINUTE;
 
 const PASS: MigrationPassSummary = {
   tenantsSeen: 1,
@@ -45,14 +52,59 @@ const intent = intentAccessorOf({
   runPass: (messageKey, payload) => ({ messageKey, intentType: "runPass", payload }),
 });
 
-/** The console over only the two pass collaborators these scenarios reach. */
-function passes(deps: Partial<SystemMigrationsServiceDependencies>) {
-  return SystemMigrationsService.create(
-    createApiFixture<SystemMigrationsServiceDependencies>(deps, "system migration deps"),
+type PassState = Parameters<typeof systemMigrationRedriveWake>[0];
+
+function wake({ state, at }: { state: PassState; at: number }) {
+  return systemMigrationRedriveWake(state, {
+    at,
+    now: at,
+    key: SYSTEM_MIGRATION_PASS_PROCESS_NAME,
+    projectId: "__global__",
+    intent,
+  });
+}
+
+function dueOf(woken: ReturnType<typeof wake>): unknown {
+  const payload = woken.intents?.[0]?.payload;
+  return typeof payload === "object" && payload !== null && "due" in payload
+    ? payload.due
+    : undefined;
+}
+
+/** The state after a pass says it left work pending, as the singleton's request handler has it. */
+function pendingAfterRequest({ state, at }: { state: PassState; at: number }) {
+  return systemMigrationPassRequested(
+    state,
+    {},
+    {
+      at,
+      now: at,
+      key: "system_migration_pass_requests",
+      projectId: SYSTEM_MIGRATION_FOLLOW_UP_REQUESTER,
+      intent,
+    },
   );
 }
 
-function built(executeSystemMigrationPass: (input: { redrive: boolean }) => Promise<void>) {
+/** The console over the pass collaborators these scenarios reach; nothing is held pending. */
+function passes(deps: Partial<SystemMigrationsServiceDependencies>) {
+  return SystemMigrationsService.create(
+    createApiFixture<SystemMigrationsServiceDependencies>(
+      {
+        state: createApiFixture<SystemMigrationStateReader>(
+          { findRecordsByStatus: async () => [] },
+          "system migration state",
+        ),
+        ...deps,
+      },
+      "system migration deps",
+    ),
+  );
+}
+
+function built(
+  executeSystemMigrationPass: (input: { redrive: boolean; due: boolean }) => Promise<void>,
+) {
   const definition = buildSystemMigrations({
     participation: "consume",
     repositories: undefined,
@@ -64,9 +116,9 @@ function built(executeSystemMigrationPass: (input: { redrive: boolean }) => Prom
   return { definition, process };
 }
 
-async function deliver(process: ReturnType<typeof built>["process"], redrive: boolean) {
+async function deliver(process: ReturnType<typeof built>["process"], redrive: boolean, due = true) {
   await process.config.intents!.runPass!.run(
-    { redrive, requestedAt: NOW },
+    { redrive, due, requestedAt: NOW },
     {
       processName: SYSTEM_MIGRATION_PASS_PROCESS_NAME,
       projectId: "__global__",
@@ -106,7 +158,7 @@ function producer() {
 
 describe("given ops's system-migrations declaration", () => {
   /** @scenario "The hourly re-drive runs as a scheduled process once across the fleet" */
-  it("is installed with the module and wakes its singleton hourly", () => {
+  it("is installed with the module and wakes its singleton every minute", () => {
     const { definition, process } = built(async () => undefined);
 
     expect(systemMigrationsEventing.pipeline).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
@@ -114,25 +166,89 @@ describe("given ops's system-migrations declaration", () => {
       SYSTEM_MIGRATIONS_PIPELINE_NAME,
     );
     expect(definition.metadata.name).toBe(SYSTEM_MIGRATIONS_PIPELINE_NAME);
-    expect(process.config.schedule?.everyMs).toBe(HOUR);
+    expect(process.config.schedule?.everyMs).toBe(SYSTEM_MIGRATION_WAKE_INTERVAL_MS);
+    expect(SYSTEM_MIGRATION_WAKE_INTERVAL_MS).toBe(MINUTE);
+  });
+
+  /** @scenario "A pass whose worker died is taken again within one short lease" */
+  it("runs its pass on the outbox's short renewed lease instead of an hour-long one", () => {
+    const { process } = built(async () => undefined);
+
+    // No override: the dispatcher's default lease, renewed while the pass runs.
+    expect(process.config.outbox?.leaseDurationMs).toBeUndefined();
+    expect(process.config.outbox?.maxAttempts).toBe(3);
   });
 
   /** @scenario "The hourly re-drive runs as a scheduled process once across the fleet" */
-  it("asks for one gated pass per wake, keyed by the wake", () => {
-    const wake = (at: number) =>
-      systemMigrationRedriveWake(
-        { lastRequestedAt: null },
-        { at, now: at, key: SYSTEM_MIGRATION_PASS_PROCESS_NAME, projectId: "__global__", intent },
-      );
+  it("asks for one pass per wake, keyed by the wake", () => {
+    const first = wake({ state: SYSTEM_MIGRATION_PASS_INITIAL_STATE, at: NOW });
+    const later = wake({ state: first.state, at: NOW + MINUTE });
 
-    expect(wake(NOW).intents).toEqual([
+    expect(first.intents).toEqual([
       {
         messageKey: `redrive:${NOW}`,
         intentType: "runPass",
-        payload: { redrive: true, requestedAt: NOW },
+        payload: { redrive: true, due: true, requestedAt: NOW },
       },
     ]);
-    expect(wake(NOW + HOUR).intents?.[0]?.messageKey).not.toBe(wake(NOW).intents?.[0]?.messageKey);
+    expect(later.intents?.[0]?.messageKey).not.toBe(first.intents?.[0]?.messageKey);
+  });
+
+  describe("when the scheduled process wakes", () => {
+    /** @scenario "The first wake in a state runs a pass" */
+    it("is due when no pass has been requested in its state", () => {
+      const woken = wake({ state: SYSTEM_MIGRATION_PASS_INITIAL_STATE, at: NOW });
+
+      expect(dueOf(woken)).toBe(true);
+      expect(woken.state).toEqual({ lastRequestedAt: NOW, pending: false });
+    });
+
+    /** @scenario "A pending pass runs on each short wake" */
+    it("is due on the wake after a pass left work pending, and clears the flag", () => {
+      const woken = wake({ state: { lastRequestedAt: NOW, pending: true }, at: NOW + MINUTE });
+
+      expect(dueOf(woken)).toBe(true);
+      expect(woken.state).toEqual({ lastRequestedAt: NOW + MINUTE, pending: false });
+    });
+
+    /** @scenario "A fleet with nothing pending re-drives hourly" */
+    it("is not due within the hour of the last pass, and due once the hour is up", () => {
+      const idle = { lastRequestedAt: NOW, pending: false };
+
+      const within = wake({ state: idle, at: NOW + 59 * MINUTE });
+      const hourOn = wake({ state: idle, at: NOW + HOUR });
+
+      expect(dueOf(within)).toBe(false);
+      expect(within.state).toEqual(idle);
+      expect(dueOf(hourOn)).toBe(true);
+    });
+
+    /** @scenario "Pending work speeds the cadence up again" */
+    it("is due every wake while a pass says pending, then idles again", () => {
+      let state: typeof SYSTEM_MIGRATION_PASS_INITIAL_STATE = {
+        lastRequestedAt: NOW,
+        pending: false,
+      };
+      expect(dueOf(wake({ state, at: NOW + MINUTE }))).toBe(false);
+
+      state = pendingAfterRequest({ state, at: NOW + 2 * MINUTE }).state;
+      const fast = wake({ state, at: NOW + 3 * MINUTE });
+      expect(dueOf(fast)).toBe(true);
+
+      expect(dueOf(wake({ state: fast.state, at: NOW + 4 * MINUTE }))).toBe(false);
+    });
+  });
+
+  describe("when a pass is requested", () => {
+    /** @scenario "An operator's kick runs at once and the pass's pending request only flags" */
+    it("flags the next wake and asks for no pass when the scheduled singleton asks", () => {
+      const state = { lastRequestedAt: NOW, pending: false };
+
+      const asked = pendingAfterRequest({ state, at: NOW + MINUTE });
+
+      expect(asked.state).toEqual({ lastRequestedAt: NOW, pending: true });
+      expect(asked.intents ?? []).toEqual([]);
+    });
   });
 
   describe("when the re-drive comes round with a tenant parked after startup", () => {
@@ -202,7 +318,10 @@ describe("given ops's system-migrations declaration", () => {
 
       const registered = eventing.register(built(async () => undefined).definition);
 
-      expect(Object.keys(registered.commands)).toEqual(["requestSystemMigrationPass"]);
+      expect(Object.keys(registered.commands)).toEqual([
+        "requestSystemMigrationPass",
+        "recordTenantMigrationRolledBack",
+      ]);
       expect(() => eventing.processRuntime).toThrow(/producer-only/);
     });
   });
@@ -219,7 +338,7 @@ describe("given ops's system-migrations declaration", () => {
 
       await requests.request({ actorUserId: "user_operator" });
       const asked = systemMigrationPassRequested(
-        { lastRequestedAt: null },
+        SYSTEM_MIGRATION_PASS_INITIAL_STATE,
         {},
         {
           at: NOW,

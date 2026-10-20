@@ -19,15 +19,17 @@ import {
   type ResultFrame,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
+import type {
+  LangyLocalWorkspaceChannel,
+  Unsubscribe,
+} from "../../../channels/langy-local-workspace.channel.ts";
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
 import type {
   LangyLocalPresenceRepository,
   PresenceHeartbeat,
 } from "../../../repositories/langy-local-presence.repository.ts";
-import { workspaceChannel } from "../../../rules/langy-local-control-keys.rules.ts";
 import {
   type AuthenticateOutcome,
   type ControlBuffer,
@@ -69,7 +71,7 @@ interface LocalControlSessionCoreOptions {
   actors: LangyActorUserReader;
   /** This deployment's own origin, for the follow-along link. */
   baseHost: string | undefined;
-  store: SessionStateStore;
+  workspace: LangyLocalWorkspaceChannel;
   presence: LangyLocalPresenceRepository;
   dispatcher: LocalCallDispatcherService;
   waits: UserWaitService;
@@ -87,7 +89,7 @@ export class LocalControlSessionCoreService {
   private readonly apiKeys: ApiKeyApi;
   private readonly readCredential: ControlCredentialReader;
   private readonly baseHost: string | undefined;
-  private readonly store: SessionStateStore;
+  private readonly workspace: LangyLocalWorkspaceChannel;
   private readonly turns: ControlTurnStarter;
   private readonly skipGate: ControlSkipGate;
   private readonly conversations: () => ControlConversations;
@@ -140,7 +142,7 @@ export class LocalControlSessionCoreService {
     this.apiKeys = options.apiKeys;
     this.readCredential = options.readCredential;
     this.baseHost = options.baseHost;
-    this.store = options.store;
+    this.workspace = options.workspace;
     this.presence = options.presence;
     this.dispatcher = options.dispatcher;
     this.waits = options.waits;
@@ -348,10 +350,10 @@ export class LocalControlSessionCoreService {
     session: ControlSession,
     send: (frame: PlatformFrame) => void,
   ): Promise<Unsubscribe> {
-    return this.store.subscribe(
-      workspaceChannel(session.conversationId),
-      (raw) => void this.lifecycle.onNudge(session, raw, send),
-    );
+    return this.workspace.listen({
+      conversationId: session.conversationId,
+      onNudge: (nudge) => void this.lifecycle.onNudge(session, nudge, send),
+    });
   }
 
   /**

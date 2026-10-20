@@ -55,6 +55,7 @@ function harness() {
     findExplorerEvalRuns,
     readFacetValues,
     updateTraceMetadata,
+    resolveViewerProtections: async () => VIEWER_PROTECTIONS,
   });
 
   const trpc = initTRPC.context<TestContext>().create();
@@ -73,6 +74,9 @@ function harness() {
   };
 }
 
+/** The viewer's protections, handed on so free text follows their content visibility. */
+const VIEWER_PROTECTIONS = { canSeeCapturedInput: false, canSeeCapturedOutput: true } as const;
+
 describe("given the sidebar's facet read", () => {
   describe("when it asks with or without a query", () => {
     it("hands the request to the app's discover read and answers its payload", async () => {
@@ -84,6 +88,7 @@ describe("given the sidebar's facet read", () => {
       expect(readDiscoverForQuery).toHaveBeenCalledWith({
         projectId: PROJECT_ID,
         authorization: PROOF,
+        protections: VIEWER_PROTECTIONS,
         timeRange: TIME_RANGE,
         query: "status:error",
         evalRuns: undefined,

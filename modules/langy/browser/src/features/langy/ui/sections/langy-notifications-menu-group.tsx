@@ -47,7 +47,7 @@ export function LangyNotificationsMenuGroup() {
         onClick={toggle}
       >
         <HStack gap={2.5} width="full" align="start">
-          <Box paddingTop="2px">
+          <Box paddingTop="0.5">
             {blocked || unsupported ? <BellOff size={14} /> : <Bell size={14} />}
           </Box>
           <Box flex={1}>
@@ -57,7 +57,7 @@ export function LangyNotificationsMenuGroup() {
             </Text>
           </Box>
           {on ? (
-            <Box color="orange.fg" paddingTop="2px" data-testid="langy-notifications-on">
+            <Box color="orange.fg" paddingTop="0.5" data-testid="langy-notifications-on">
               <Check size={13} />
             </Box>
           ) : null}

@@ -4,6 +4,7 @@
  */
 
 import { EVENT_TABLES } from "@langwatch/eventing/server";
+import { HandledError, isTransientRefusal } from "@langwatch/handled-error";
 import type { Logger } from "@langwatch/observability";
 import { toEpochMs } from "@langwatch/time";
 
@@ -73,7 +74,9 @@ export class StorageStatsCollectionService {
       try {
         await this.collectInstance(instance);
       } catch (error) {
-        this.options.logger.error(
+        // An overloaded or briefly unreachable ClickHouse refuses for now; the next tick reads it.
+        const transient = error instanceof HandledError && isTransientRefusal(error);
+        this.options.logger[transient ? "warn" : "error"](
           { error, instance: instance.target },
           "failed to collect ClickHouse storage stats",
         );

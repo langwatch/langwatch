@@ -1,3 +1,4 @@
+import { Tabs } from "@chakra-ui/react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 
 import { TabCount } from "./tab-count.tsx";
@@ -23,3 +24,23 @@ export const Default: Story = {};
 export const Zero: Story = { args: { value: 0 } };
 
 export const Loading: Story = { args: { value: undefined } };
+
+/** On a tab the hidden space makes the name "People 5" (zero: "People 0"; unknown: "People"). */
+export const OnATab: Story = {
+  render: () => (
+    <Tabs.Root defaultValue="five" size="sm" variant="line">
+      <Tabs.List aria-label="Counted tabs">
+        {[
+          { value: "five", label: "People", count: 5 },
+          { value: "zero", label: "Teams", count: 0 },
+          { value: "unknown", label: "Audit", count: undefined },
+        ].map(({ value, label, count }) => (
+          <Tabs.Trigger key={value} value={value}>
+            {label}
+            <TabCount value={count} />
+          </Tabs.Trigger>
+        ))}
+      </Tabs.List>
+    </Tabs.Root>
+  ),
+};

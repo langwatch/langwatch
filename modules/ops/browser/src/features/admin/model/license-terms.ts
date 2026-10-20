@@ -1,6 +1,7 @@
 /** A registry row as Cloud admin reads it (ADR-156). Declared here, not
  * derived from `RouterOutputs`: model stays pure and behavior depends on it,
  * never the reverse. */
+
 export interface License {
   id: string;
   licenseId: string;
@@ -9,7 +10,8 @@ export interface License {
   email: string;
   planType: string;
   maxMembers: number;
-  maxMembersLite: number;
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   issuedAt: string;
   expiresAt: string;
   source: string;
@@ -31,6 +33,9 @@ export interface License {
   status: "active" | "revoked" | "superseded" | "expired";
   hasPendingDelivery: boolean;
 }
+
+/** What each list filter choice would show, the other applied; `all`: the search alone. */
+export type LicenseCounts = Record<"active" | "inactive" | "customer" | "internal" | "all", number>;
 
 /** The hosted services an operator can put on a license (ADR-156); kept a
  * plain array here since a core browser package names no enterprise one. */

@@ -1,6 +1,8 @@
 // What the role will do while it is written, in sentences; the scope picker is a
 // lens, since organization-tier grants do nothing from a team (ADR-021; main's RoleEffectPreview).
 
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   ScopeChipPicker,
@@ -69,9 +71,10 @@ export function RoleEffectPreview({
       />
 
       {permissions.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          Nothing yet. Choose what this role should reach, and it will be described here.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="Nothing yet. Choose what this role should reach, and it will be described here."
+        />
       ) : (
         <VStack align="stretch" gap={4}>
           <Text fontSize="xs" color="fg.muted">
@@ -100,26 +103,20 @@ export function RoleEffectPreview({
           ))}
 
           {inert.length > 0 && (
-            <VStack
-              align="stretch"
-              gap={1.5}
-              borderWidth="1px"
-              borderColor="border"
-              borderRadius="md"
-              padding={3}
-              data-testid="role-preview-inert"
-            >
-              <Text fontSize="xs" color="fg.muted">
-                {inert.length === 1
-                  ? "This permission grants nothing here. It takes effect only where the role is assigned on the organization."
-                  : "These permissions grant nothing here. They take effect only where the role is assigned on the organization."}
-              </Text>
-              <HStack gap={1.5} flexWrap="wrap">
-                {inert.map((permission) => (
-                  <PermissionToken key={permission} permission={permission} muted />
-                ))}
-              </HStack>
-            </VStack>
+            <Card variant="frame" padding="sm" data-testid="role-preview-inert">
+              <VStack align="stretch" gap={1.5}>
+                <Text fontSize="xs" color="fg.muted">
+                  {inert.length === 1
+                    ? "This permission grants nothing here. It takes effect only where the role is assigned on the organization."
+                    : "These permissions grant nothing here. They take effect only where the role is assigned on the organization."}
+                </Text>
+                <HStack gap={1.5} flexWrap="wrap">
+                  {inert.map((permission) => (
+                    <PermissionToken key={permission} permission={permission} muted />
+                  ))}
+                </HStack>
+              </VStack>
+            </Card>
           )}
         </VStack>
       )}

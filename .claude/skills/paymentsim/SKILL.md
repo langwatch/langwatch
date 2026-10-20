@@ -9,7 +9,7 @@ user-invocable: true
 Fakes exactly the Stripe surface `enterprise/modules/billing` calls, in Stripe's wire shapes
 (form bodies, list/search/error envelopes, `Idempotency-Key` replay), and signs webhooks with
 `Stripe-Signature: t=<unix>,v1=<hmac>` so billing's real `constructEvent` verifies them. Ids
-are counters (`cus_sim000001`); catalog prices keep their real ids. Code: `services/paymentsim`;
+are counters (`cus_sim000001`); catalog prices keep their real ids. Code: `services/sims/paymentsim`;
 spec: `specs/setup/payment-simulator.feature`. State is in memory: a restart forgets it.
 
 ## Run it
@@ -43,6 +43,7 @@ Events fired: `checkout.session.completed`, `customer.subscription.created|updat
 | seed catalog file             | `POST catalog?mode=test` (stripe-catalog.json body)      |                                            |
 | seed a (tiered) price/meter   | `POST prices` / `POST meters` (JSON)                     |                                            |
 | finish a checkout             | `POST checkout/{id}/complete`, or open the session `url` |                                            |
+| finish as a named buyer       | `POST checkout/{id}/complete {"email","name"}`           |                                            |
 | advance the test clock        | `POST clock/advance {"seconds"}` or `{"to"}`             | `haven sim payment advance --seconds N`    |
 | decline the next charges      | `POST payment-failures {"customer","times"}`             | `haven sim payment fault --customer cus_…` |
 | retry an open invoice         | `POST invoices/{id}/retry`                               |                                            |
@@ -51,6 +52,12 @@ Events fired: `checkout.session.completed`, `customer.subscription.created|updat
 | queue without delivering      | `POST webhooks/hold {"held":true}`                       | `haven sim payment hold` / `release`       |
 | exact metered totals          | `GET usage?customer=&event_name=&from=&to=`              | `haven sim payment usage --customer …`     |
 | forget everything but catalog | `DELETE state`                                           | `haven sim payment clear`                  |
+
+A licence purchase is a checkout carrying a payment link: create the session with
+`payment_link=plink_…` and `customer_email=…` (paymentsim accepts both on create), then complete it
+with the buyer's name. `checkout.session.completed` then names the link and carries
+`customer_details` {email, name}; billing routes it as a licence purchase only when
+`STRIPE_LICENSE_PAYMENT_LINK_ID` equals that link.
 
 Duplicate = the same id twice in `deliver`; out of order = ids reversed; bad signature =
 `signingSecret` other than the configured one. The signature timestamp is the wall clock,

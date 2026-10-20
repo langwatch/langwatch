@@ -241,23 +241,18 @@ func TestStartServiceFromTheBrowser(t *testing.T) {
 	}
 }
 
-// @scenario "A stack whose database is below the upgrade floor can reset its databases from the stack home"
-func TestResetDatabasesFromTheBrowser(t *testing.T) {
-	var reset string
-	s := actionServer(Actions{ResetDatabases: func(sl string) error { reset = sl; return nil }})
-
-	if rec := post(s, "/api/stacks/portless/reset-databases", `{"confirm":"portless"}`); rec.Code != http.StatusBadRequest || reset != "" {
-		t.Errorf("reset with the slug instead of the database name: status %d, reset %q", rec.Code, reset)
+// @scenario "Each optional service has an on and off switch on its row"
+func TestStopServiceFromTheBrowser(t *testing.T) {
+	var slug, service string
+	s := actionServer(Actions{StopService: func(sl, svc string) error { slug, service = sl, svc; return nil }})
+	if rec := post(s, "/api/stacks/portless/stop-service?service=app", ""); rec.Code != http.StatusOK || slug != "portless" || service != "app" {
+		t.Errorf("stop-service: status %d, slug %q, service %q", rec.Code, slug, service)
 	}
-	confirm := `{"confirm":"` + domain.DatabaseForSlug("portless") + `"}`
-	if rec := post(s, "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusOK || reset != "portless" {
-		t.Errorf("reset with the database name: status %d, reset %q", rec.Code, reset)
-	}
-	if rec := post(s, "/api/stacks/nosuch/reset-databases", confirm); rec.Code != http.StatusNotFound {
+	if rec := post(s, "/api/stacks/nosuch/stop-service?service=mail", ""); rec.Code != http.StatusNotFound {
 		t.Errorf("unknown stack: status %d, want 404", rec.Code)
 	}
-	if rec := post(actionServer(Actions{}), "/api/stacks/portless/reset-databases", confirm); rec.Code != http.StatusNotImplemented {
-		t.Errorf("unwired reset: status %d, want 501", rec.Code)
+	if rec := post(actionServer(Actions{}), "/api/stacks/portless/stop-service?service=mail", ""); rec.Code != http.StatusNotImplemented {
+		t.Errorf("unwired stop-service: status %d, want 501", rec.Code)
 	}
 }
 

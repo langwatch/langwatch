@@ -253,3 +253,31 @@ Feature: Variables section UI
     Given canAddRemove is false
     And a variable "question" exists
     Then the delete button is not visible for any variable
+
+  # ============================================================================
+  # Keyboard and focus
+  # ============================================================================
+
+  @integration
+  Scenario: Name edit keys do not submit or close the containing drawer
+    Given a variable name is being edited inside a form
+    When I press Enter
+    Then the name is committed once and the form is not submitted
+    When I edit the name again and press Escape
+    Then the old name is restored, the form is not submitted and no later blur commits
+
+  @integration
+  Scenario: Deleting a variable keeps keyboard focus in the section
+    Given three variables "a", "b" and "c"
+    When I remove "b"
+    Then focus moves to the name of "c"
+    When I remove the last remaining variable
+    Then focus moves to the Add button
+
+  @integration
+  Scenario: Workflow uses the prompt variables editor without changing mappings
+    Given the variables editor lent by the prompt module with two-line literal values
+    When I rename a mapped variable, retype it and delete another
+    Then the callbacks carry the same variables and mapping changes the workflow node expects
+    And a literal value opens two lines tall
+

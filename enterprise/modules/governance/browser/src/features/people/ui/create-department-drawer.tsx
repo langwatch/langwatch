@@ -2,7 +2,7 @@
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, Field, HStack, Input, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Field, Input, VStack } from "@langwatch/design-system/primitives";
 import { useRef, useState } from "react";
 
 import { api } from "../../../behavior/governance-api.ts";
@@ -56,69 +56,52 @@ export function CreateDepartmentDrawer() {
   };
 
   return (
-    <Drawer.Root
-      open
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) close();
-      }}
-      placement="end"
+    <Drawer
+      onClose={close}
       size="md"
+      title="Add department"
+      busy={createMutation.isPending}
       initialFocusEl={() => nameInputRef.current}
+      footer={{
+        cancel: { onClick: close },
+        primaryAction: canManage
+          ? {
+              label: "Create",
+              onClick: () => void submit(),
+              loading: createMutation.isPending,
+            }
+          : void 0,
+      }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Add department</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {!canManage ? (
-            <PermissionRequiredNotice
-              permission="governance:manage"
-              detail="Creating a department needs this grant."
+      {!canManage ? (
+        <PermissionRequiredNotice
+          permission="governance:manage"
+          detail="Creating a department needs this grant."
+        />
+      ) : (
+        <VStack align="stretch" gap={4}>
+          <Field.Root invalid={nameError !== null} required>
+            <Field.Label>Department name</Field.Label>
+            <Input
+              ref={nameInputRef}
+              aria-label="Department name"
+              value={name}
+              onChange={(e) => {
+                setName(e.target.value);
+                setNameError(null);
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter") void submit();
+              }}
+              placeholder="Engineering"
             />
-          ) : (
-            <VStack align="stretch" gap={4}>
-              <Field.Root invalid={nameError !== null} required>
-                <Field.Label>Department name</Field.Label>
-                <Input
-                  ref={nameInputRef}
-                  aria-label="Department name"
-                  value={name}
-                  onChange={(e) => {
-                    setName(e.target.value);
-                    setNameError(null);
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") void submit();
-                  }}
-                  placeholder="Engineering"
-                />
-                <Field.HelperText>
-                  Spend rolls up by department, including personal AI use.
-                </Field.HelperText>
-                <Field.ErrorText>{nameError}</Field.ErrorText>
-              </Field.Root>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={close} disabled={createMutation.isPending}>
-              Cancel
-            </Button>
-            {canManage ? (
-              <Button
-                colorPalette="orange"
-                onClick={() => void submit()}
-                loading={createMutation.isPending}
-              >
-                Create
-              </Button>
-            ) : null}
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+            <Field.HelperText>
+              Spend rolls up by department, including personal AI use.
+            </Field.HelperText>
+            <Field.ErrorText>{nameError}</Field.ErrorText>
+          </Field.Root>
+        </VStack>
+      )}
+    </Drawer>
   );
 }

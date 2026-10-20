@@ -17,7 +17,7 @@ export function InvitingOrganization({
   return (
     <HStack
       gap={3}
-      padding="12px"
+      padding="3"
       borderWidth="1px"
       borderColor="frontDoor.fieldBorder"
       borderRadius={SHAPE.field}
@@ -34,10 +34,10 @@ export function InvitingOrganization({
         <Avatar.Fallback name={organizationName} />
       </Avatar.Root>
       <VStack align="start" gap={0} minWidth={0}>
-        <Text fontSize="14px" fontWeight={600} lineHeight="1.4" overflowWrap="anywhere">
+        <Text textStyle="cardTitle" overflowWrap="anywhere">
           {organizationName}
         </Text>
-        <Text fontSize="13px" color="fg.muted" lineHeight="1.4">
+        <Text textStyle="bodySm" color="fg.muted">
           {inviterName ? (
             <>
               Invited by{" "}

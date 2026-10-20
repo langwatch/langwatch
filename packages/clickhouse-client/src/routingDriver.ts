@@ -7,6 +7,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { ClickHouseCloseableClient, ClickHouseConnection } from "./connection.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import { inbandExceptionOf } from "./statementShape.ts";
 
 /**
  * Anything a routed connection can run a statement against. Method shorthand
@@ -74,34 +75,112 @@ function queryParams(request: QueryRequest): Record<string, unknown> {
   return params;
 }
 
+/**
+ * A server before 25.11 that fails after its 200 writes the failure as a last `{"exception"}`
+ * row, which the vendor client hands over as data; read it as the failure it is, with the
+ * server's code, as VendorClientResilience does (specs/clickhouse/single-client-access.feature).
+ */
+function refuseInbandException(rows: readonly unknown[]): void {
+  const exception = inbandExceptionOf(rows[rows.length - 1]);
+  if (exception === undefined) return;
+  const error = new Error(exception);
+  const code = /Code:\s*(\d+)/.exec(exception)?.[1];
+  if (code) Object.assign(error, { code });
+  throw error;
+}
+
+/** UNKNOWN_TABLE (60) and NO_SUCH_COLUMN_IN_TABLE (16): a target whose migrations are behind. */
+const SCHEMA_BEHIND_TYPES: readonly unknown[] = ["UNKNOWN_TABLE", "NO_SUCH_COLUMN_IN_TABLE"];
+const SCHEMA_BEHIND_CODES: readonly unknown[] = ["60", "16", 60, 16];
+
+/**
+ * A schema-behind failure from a private target, named by its organisation, so the boundary
+ * answers upgrade_in_progress while that target catches up (T7-F18). Keeps the code and cause.
+ */
+export class PrivateTargetSchemaError extends Error {
+  readonly privateTarget: string;
+  readonly code: unknown;
+  readonly type: unknown;
+
+  constructor({ privateTarget, cause }: { privateTarget: string; cause: Error }) {
+    super(cause.message, { cause });
+    this.name = "PrivateTargetSchemaError";
+    this.privateTarget = privateTarget;
+    this.code = "code" in cause ? cause.code : undefined;
+    this.type = "type" in cause ? cause.type : undefined;
+  }
+}
+
+function isSchemaBehind(error: Error): boolean {
+  return (
+    ("type" in error && SCHEMA_BEHIND_TYPES.includes(error.type)) ||
+    ("code" in error && SCHEMA_BEHIND_CODES.includes(error.code))
+  );
+}
+
+/** Runs one statement on `vendor`, naming its private target on a schema-behind failure. */
+async function onTarget<Client extends RoutableStatementClient, Result>(
+  connection: ClickHouseConnection<Client>,
+  vendor: Client,
+  run: () => Promise<Result>,
+): Promise<Result> {
+  try {
+    return await run();
+  } catch (error) {
+    throw targetTagged(connection, vendor, error);
+  }
+}
+
+function targetTagged<Client extends RoutableStatementClient>(
+  connection: ClickHouseConnection<Client>,
+  vendor: Client,
+  error: unknown,
+): unknown {
+  if (!(error instanceof Error) || !isSchemaBehind(error)) return error;
+  const privateTarget = connection.privateTargetOf(vendor);
+  return privateTarget === undefined
+    ? error
+    : new PrivateTargetSchemaError({ privateTarget, cause: error });
+}
+
 export function routingDriver<Client extends RoutableStatementClient>(
   connection: ClickHouseConnection<Client>,
 ): QueryDriver {
   return {
     async insert(request: InsertRequest): Promise<void> {
       const vendor = await serverFor(connection, request);
-      await vendor.insert(insertParams(request));
+      await onTarget(connection, vendor, () => vendor.insert(insertParams(request)));
     },
 
     async command(request: QueryRequest): Promise<void> {
       const vendor = await serverFor(connection, request);
-      await vendor.command(queryParams(request));
+      await onTarget(connection, vendor, () => vendor.command(queryParams(request)));
     },
 
     async execute<Row>(request: QueryRequest): Promise<QueryResult<Row>> {
       const vendor = await serverFor(connection, request);
 
       const started = nowInstant().epochMilliseconds;
-      const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
-      const rows = (await resultSet.json()) as Row[];
+      const rows = await onTarget(connection, vendor, async () => {
+        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        const read = (await resultSet.json()) as Row[];
+        refuseInbandException(read);
+        return read;
+      });
       return { rows, stats: { durationMs: nowInstant().epochMilliseconds - started } };
     },
 
     async *stream<Row>(request: QueryRequest): AsyncGenerator<Row[]> {
       const vendor = await serverFor(connection, request);
-      const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
-      for await (const batch of resultSet.stream<Row>()) {
-        yield batch.map((row) => row.json());
+      try {
+        const resultSet = await vendor.query({ ...queryParams(request), format: "JSONEachRow" });
+        for await (const batch of resultSet.stream<Row>()) {
+          const rows = batch.map((row) => row.json());
+          refuseInbandException(rows);
+          yield rows;
+        }
+      } catch (error) {
+        throw targetTagged(connection, vendor, error);
       }
     },
   };

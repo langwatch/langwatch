@@ -5,6 +5,8 @@ import { type ClickHouseClient, createClient } from "@clickhouse/client";
 import {
   LangWatchQLAppFunctionUnavailableError,
   LangWatchQLBusyError,
+  LangWatchQLInvalidQueryError,
+  LangWatchQLParameterInvalidError,
   LangWatchQLProvisioningIncompleteError,
   LangWatchQLResultTooLargeError,
   LangWatchQLUnavailableError,
@@ -24,6 +26,9 @@ import {
   LangWatchQLExecutorRepository,
 } from "../langwatch-ql-executor.repository.ts";
 import {
+  extractBadQueryParameter,
+  isClickHouseBadQueryParameterError,
+  isClickHouseInvalidQueryError,
   isClickHouseObjectAccessDeniedError,
   isClickHouseObjectMissingError,
   isClickHouseResultTooLargeError,
@@ -81,6 +86,13 @@ function refusalFor({
     });
   }
 
+  if (isClickHouseBadQueryParameterError(error)) {
+    return new LangWatchQLParameterInvalidError({
+      parameter: extractBadQueryParameter(error),
+      reasons: [toError(error)],
+    });
+  }
+
   // The profile's `max_result_rows` / `max_result_bytes` backstop fired: a bound-parameter
   // LIMIT the static validator cannot read still cannot outrun the row cap.
   if (isClickHouseResultTooLargeError(error)) {
@@ -100,6 +112,12 @@ function refusalFor({
   // server is too old for, which "extraction functions unavailable" misnames.
   if (namesAnAppFunction(sql) && isClickHouseUnknownFunctionError(error)) {
     return new LangWatchQLAppFunctionUnavailableError({ reasons: [toError(error)] });
+  }
+
+  // Last of the specific checks: a code here is a fault in the caller's SQL that the static
+  // validator could not see, so it is theirs to fix rather than an unknown 500.
+  if (isClickHouseInvalidQueryError(error)) {
+    return new LangWatchQLInvalidQueryError({ reasons: [toError(error)] });
   }
 
   return translateClickHouseQueryError(error, durationMs);

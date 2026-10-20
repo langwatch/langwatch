@@ -573,7 +573,7 @@ function NoVerdictMicroBadge({ icon, label }: { icon: typeof LuCircleSlash; labe
       lineHeight="1"
     >
       <Icon as={icon} boxSize={2.5} color="fg.muted" />
-      <Text textStyle="2xs" fontWeight="bold" color="fg.muted" letterSpacing="0.04em">
+      <Text textStyle="2xs" fontWeight="semibold" color="fg.muted" letterSpacing="0.04em">
         {label}
       </Text>
     </HStack>

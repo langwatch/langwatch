@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The platform's own browser telemetry, proxied to its collector (ADR-058).
 
-Peers call these through the token, declared at `../contract/src/rum.api.ts:22`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/rum.api.ts:24`; nothing else in this package is public.
 
 #### `ingestBrowserTraces`
 
@@ -44,9 +44,9 @@ Public: browser telemetry ingest; the browser has no credential to present and t
 Answers at `/api/rum/v1/traces`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/rum.rest.ts:25)
-type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:6
-// Response: inline, src/transport/rum.rest.ts:38
+// Rawbody: "text" (inline, src/transport/rum.rest.ts:26)
+type Headers = z.infer<typeof rumReportHeadersSchema>; // ../contract/src/rum.api.ts:11
+// Response: inline, src/transport/rum.rest.ts:39
 type Response = unknown;
 ```
 
@@ -67,9 +67,9 @@ None: rum declares no pipeline, process manager, subscriber or task.
 | Kind   | Leaf                | Environment variable          | Declared at                        |
 | ------ | ------------------- | ----------------------------- | ---------------------------------- |
 | secret | `–`                 | `RUM_COLLECTOR_HEADERS`       | `src/app/rum.app.ts:29`            |
-| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:14` |
-| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:21` |
-| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:25` |
-| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:29` |
+| config | `enabled`           | `RUM_ENABLED`                 | `../contract/src/rum.config.ts:19` |
+| config | `sampleRatio`       | `RUM_SAMPLE_RATIO`            | `../contract/src/rum.config.ts:26` |
+| config | `collectorEndpoint` | `RUM_COLLECTOR_ENDPOINT`      | `../contract/src/rum.config.ts:30` |
+| config | `telemetryEndpoint` | `OTEL_EXPORTER_OTLP_ENDPOINT` | `../contract/src/rum.config.ts:34` |
 
 <!-- readme:generated:end -->

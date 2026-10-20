@@ -19,7 +19,3 @@ Feature: langevals as an opt-in haven service
     Then a langevals lane runs the checkout's services/langevals with uv on a port haven allocated
     And the overlay sets LANGEVALS_ENDPOINT to that port on loopback for the api and go lanes
     And a later plain "haven up" in this worktree still runs it
-
-  Scenario: A diffsuite stack can run langevals
-    When diffsuite is run with "-up -langevals"
-    Then the branch stack it starts is brought up with "+langevals"

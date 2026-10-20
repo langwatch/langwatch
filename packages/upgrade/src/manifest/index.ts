@@ -1,6 +1,5 @@
 export {
   compareReleases,
-  ltsFloorSchema,
   ManifestLoadError,
   manifestLoadErrorCodes,
   manifestStepIdSchema,
@@ -9,14 +8,8 @@ export {
   releaseVersionSchema,
   SCHEMA_STEP_KINDS,
 } from "./manifest.ts";
-export type { LtsFloor, ManifestStep, ReleaseManifest, ReleaseVersion } from "./manifest.ts";
-export {
-  loadReleases,
-  LTS_FLOOR_FILE,
-  parseLtsFloor,
-  parseManifests,
-  RELEASES_DIRECTORY,
-} from "./manifest-loader.ts";
+export type { ManifestStep, ReleaseManifest, ReleaseVersion } from "./manifest.ts";
+export { loadReleases, parseManifests, RELEASES_DIRECTORY } from "./manifest-loader.ts";
 export {
   gooseStepId,
   ownerFromTables,
@@ -26,6 +19,13 @@ export {
   treeStepIds,
 } from "./stamp.ts";
 export type { DeclaredStepSource, ReleaseTreeSteps } from "./stamp.ts";
+export {
+  loadReleaseBaseline,
+  parseReleaseBaseline,
+  RELEASE_BASELINE_FILE,
+  releaseBaselineSchema,
+} from "./baseline.ts";
+export type { ReleaseBaseline } from "./baseline.ts";
 export {
   DEPRECATIONS_FILE,
   deprecationSchema,

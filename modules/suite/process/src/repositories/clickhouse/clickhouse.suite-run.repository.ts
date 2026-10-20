@@ -82,6 +82,8 @@ export class ClickHouseSuiteRunRepository implements ProjectionStore<
       params: { tenantId, statuses: [...OPEN_SUITE_RUN_STATUSES] },
       table: TABLE_NAME,
       kind: "read",
+      // A run started in any week can still be open, so the sweep has no lower time bound.
+      SKIP_COLD_SCAN_CHECK: true,
     });
     return rows.map((row) => ClickHouseSuiteRunRepository.mapRowToState(row));
   }

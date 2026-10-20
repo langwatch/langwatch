@@ -31,6 +31,7 @@ import type {
   PeopleListing,
 } from "../../features/identity/rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../../features/identity/rules/people-listing.rules.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { AdminApiUsersChannel } from "../admin-api-users.channel.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 
@@ -43,8 +44,8 @@ const PAGE_SIZE = 100;
  */
 const MAX_PAGES = 100;
 
-const ANTHROPIC_USERS_URL = "https://api.anthropic.com/v1/organizations/users";
-const OPENAI_USERS_URL = "https://api.openai.com/v1/organization/users";
+const ANTHROPIC_USERS_PATH = "/v1/organizations/users";
+const OPENAI_USERS_PATH = "/v1/organization/users";
 
 const ANTHROPIC_VERSION = "2023-06-01";
 
@@ -200,10 +201,19 @@ async function listAdminApiPeople(params: {
 
 /** The admin lists, over the process's HTTP client. */
 export class HttpAdminApiUsersChannel implements AdminApiUsersChannel {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly bases: VendorBases,
+  ) {}
 
-  static create({ http }: { http: GovernanceHttpClient }): HttpAdminApiUsersChannel {
-    return new HttpAdminApiUsersChannel(http);
+  static create({
+    http,
+    vendorBases = REAL_VENDOR_BASES,
+  }: {
+    http: GovernanceHttpClient;
+    vendorBases?: VendorBases;
+  }): HttpAdminApiUsersChannel {
+    return new HttpAdminApiUsersChannel(http, vendorBases);
   }
 
   /** Every member of an Anthropic organization one admin key can enumerate. */
@@ -213,7 +223,7 @@ export class HttpAdminApiUsersChannel implements AdminApiUsersChannel {
   }): Promise<PeopleListing> {
     return listAdminApiPeople({
       http: this.http,
-      baseUrl: ANTHROPIC_USERS_URL,
+      baseUrl: `${this.bases.anthropicAdmin}${ANTHROPIC_USERS_PATH}`,
       headers: {
         "x-api-key": params.apiKey,
         "anthropic-version": ANTHROPIC_VERSION,
@@ -227,7 +237,7 @@ export class HttpAdminApiUsersChannel implements AdminApiUsersChannel {
   async listOpenAiPeople(params: { apiKey: string; signal?: AbortSignal }): Promise<PeopleListing> {
     return listAdminApiPeople({
       http: this.http,
-      baseUrl: OPENAI_USERS_URL,
+      baseUrl: `${this.bases.openAiAdmin}${OPENAI_USERS_PATH}`,
       headers: { Authorization: `Bearer ${params.apiKey}` },
       cursorParam: "after",
       signal: params.signal,

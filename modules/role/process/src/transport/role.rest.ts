@@ -64,13 +64,13 @@ export const roleRest = defineRestRouter(RoleApi)
   .withDocs({
     tags: ["Roles"],
     description:
-      "List the organization's roles with their permission sets: the built-in roles `admin`, `member` and `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in roles, `?builtIn=false` only the custom ones.",
+      "List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false` only the custom ones.",
   })
   .withMiddlewareContext(roleRestContext)
   .handle(async ({ app, input }, organization) => {
     const roles = await app.listRoles({
       organizationId: organization.organizationId,
-      ...(input.builtIn === undefined ? {} : { builtIn: input.builtIn }),
+      builtIn: input.builtIn ?? false,
     });
 
     return { roles: roles.map(wire) };

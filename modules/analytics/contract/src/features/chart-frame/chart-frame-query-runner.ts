@@ -4,10 +4,14 @@
  * function is SELF-CONTAINED and in plain syntax: the shim embeds `.toString()`.
  */
 
-/** What the hook renders from. `refetchError` is a failed refresh over kept data. */
+/**
+ * What the hook renders from. `refetchError` is a failed refresh over kept data; `completeness`
+ * is the server's report on what the rows are missing, kept and dropped together with them.
+ */
 export interface ChartQueryState {
   status: "pending" | "success" | "error";
   data: unknown;
+  completeness: unknown;
   error: unknown;
   refetchError: unknown;
   isFetching: boolean;
@@ -15,7 +19,7 @@ export interface ChartQueryState {
 
 export type ChartQueryEvent =
   | { type: "fetching" }
-  | { type: "rows"; rows: unknown }
+  | { type: "rows"; rows: unknown; completeness: unknown }
   | { type: "failed"; error: unknown };
 
 /**
@@ -35,6 +39,7 @@ export function reduceChartQueryState({
     return {
       status: "success",
       data: event.rows,
+      completeness: event.completeness,
       error: null,
       refetchError: null,
       isFetching: false,
@@ -43,23 +48,33 @@ export function reduceChartQueryState({
   if (previous.status === "success") {
     return Object.assign({}, previous, { refetchError: event.error, isFetching: false });
   }
-  return { status: "error", data: null, error: event.error, refetchError: null, isFetching: false };
+  return {
+    status: "error",
+    data: null,
+    completeness: null,
+    error: event.error,
+    refetchError: null,
+    isFetching: false,
+  };
 }
 
 export type ChartQueryRetryPlan = { retry: true; delayMs: number } | { retry: false };
 
 /**
  * Whether to try again, and after how long: only a rejection marked retryable,
- * at most three times. Half the exponential ceiling plus jitter, so widgets
+ * at most `maxRetries` times. Half the exponential ceiling plus jitter, so widgets
  * refused together do not return together.
  */
 export function planChartQueryRetry({
   rejection,
   retriesUsed,
+  maxRetries,
   random,
 }: {
   rejection: unknown;
   retriesUsed: number;
+  /** CHART_QUERY_MAX_RETRIES; passed in because the shim embeds this function's source. */
+  maxRetries: number;
   /** Uniform in [0, 1). */
   random: () => number;
 }): ChartQueryRetryPlan {
@@ -67,14 +82,14 @@ export function planChartQueryRetry({
     typeof rejection === "object" &&
     rejection !== null &&
     (rejection as { retryable?: unknown }).retryable === true;
-  if (!retryable || retriesUsed >= 3) return { retry: false };
+  if (!retryable || retriesUsed >= maxRetries) return { retry: false };
   const ceiling = Math.min(5000, 400 * Math.pow(2, retriesUsed));
   return { retry: true, delayMs: Math.round(ceiling * (0.5 + random() * 0.5)) };
 }
 
 export interface ChartQueryRunnerOptions {
   /** One attempt at the query. */
-  query: () => Promise<{ rows: unknown }>;
+  query: () => Promise<{ rows: unknown; completeness?: unknown }>;
   emit: (event: ChartQueryEvent) => void;
   /** Shapes a rejection into what the widget reads as an error. */
   toError: (rejection: unknown) => unknown;
@@ -103,7 +118,10 @@ export function createChartQueryRunner(options: ChartQueryRunnerOptions): ChartQ
   const attempt = (mine: number, retriesUsed: number): Promise<void> =>
     options.query().then(
       (result) => {
-        if (mine === generation) options.emit({ type: "rows", rows: result.rows });
+        if (mine !== generation) return;
+        // Absent (a failed or unwindowed run) reads as null, the same as before any load.
+        const completeness = result.completeness === undefined ? null : result.completeness;
+        options.emit({ type: "rows", rows: result.rows, completeness: completeness });
       },
       (rejection: unknown) => {
         if (mine !== generation) return;

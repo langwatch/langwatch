@@ -273,6 +273,23 @@ export async function removeSignedUpRows({
   userIds: readonly string[];
   organizationIds: readonly string[];
 }): Promise<void> {
+  if (organizationIds.length > 0) await removeOrganizationRows({ prisma, organizationIds });
+  for (const userId of userIds) {
+    await prisma.session.deleteMany({ where: { userId } });
+    await prisma.account.deleteMany({ where: { userId } });
+    await prisma.identifier.deleteMany({ where: { userId } });
+    await prisma.user.deleteMany({ where: { id: userId } });
+  }
+}
+
+/** The organizations' rows; never asked with none, which the tenancy guard rightly refuses. */
+async function removeOrganizationRows({
+  prisma,
+  organizationIds,
+}: {
+  prisma: PrismaClient;
+  organizationIds: readonly string[];
+}): Promise<void> {
   const teams = await prisma.team.findMany({
     where: { organizationId: { in: [...organizationIds] } },
     select: { id: true },
@@ -295,12 +312,6 @@ export async function removeSignedUpRows({
   await prisma.project.deleteMany({ where: { teamId: { in: teams.map(({ id }) => id) } } });
   await prisma.team.deleteMany({ where });
   await prisma.organizationUser.deleteMany({ where });
-  for (const userId of userIds) {
-    await prisma.session.deleteMany({ where: { userId } });
-    await prisma.account.deleteMany({ where: { userId } });
-    await prisma.identifier.deleteMany({ where: { userId } });
-    await prisma.user.deleteMany({ where: { id: userId } });
-  }
   await prisma.organization.deleteMany({ where: { id: { in: [...organizationIds] } } });
 }
 

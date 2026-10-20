@@ -4,11 +4,17 @@
  * sits outside retry — a slot must survive a retry, or a small overload turns persistent.
  */
 
-import type { ClickHouseStatementAdmission } from "./managed-client.ts";
+import type {
+  ClickHouseOverloadErrorFactory,
+  ClickHouseStatementAdmission,
+} from "./managed-client.ts";
+import { CLICKHOUSE_COLUMNS_QUERY, ClickHouseColumns } from "./present-columns.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
+import { TRANSIENT_NETWORK_CODES } from "./resilience.ts";
 import type { RetryPolicy } from "./retry.ts";
 import type { StatementOperation, StatementReporter } from "./statementReporting.ts";
 import { extractQueryType, extractTableName } from "./statementShape.ts";
+import type { PrivateRouteVariable } from "./tenancy.ts";
 import type { TenantGuard } from "./tenantGuard.ts";
 import type { QueryTracer } from "./tracing.ts";
 
@@ -27,9 +33,50 @@ export interface ClickHouseQueryClientOptions {
   reporter?: StatementReporter | undefined;
   /** The routing table's private routes, organization id to endpoint; none by default. */
   privateRoutes?: ReadonlyMap<string, string> | undefined;
+  /** Every private route variable this process parsed, usable or not; none by default. */
+  privateRouteVariables?: readonly PrivateRouteVariable[] | undefined;
+  /** Builds the handled refusal for a read whose server stopped answering; raw by default. */
+  unavailableErrorFactory?: ClickHouseUnavailableErrorFactory | undefined;
+  /** Builds the handled refusal for a read the server refused as overloaded; raw by default. */
+  overloadErrorFactory?: ClickHouseOverloadErrorFactory | undefined;
+}
+
+/** The handled refusal for a read whose server did not answer once retries ran out. */
+export abstract class ClickHouseUnavailableErrorFactory {
+  abstract create(input: { cause: Error }): unknown;
+}
+
+/** A connection that failed or dropped (`socket hang up` is ECONNRESET), never a server error. */
+function isConnectionFailure(error: unknown): error is Error {
+  const code = (error as { code?: unknown } | null)?.code;
+  return error instanceof Error && typeof code === "string" && TRANSIENT_NETWORK_CODES.has(code);
+}
+
+/** ClickHouse's own overload refusal: TOO_MANY_SIMULTANEOUS_QUERIES (202). */
+const SERVER_OVERLOAD_CODES: ReadonlySet<string> = new Set(["202"]);
+
+function isServerOverload(error: unknown): error is Error {
+  const code = (error as { code?: unknown } | null)?.code;
+  return error instanceof Error && typeof code === "string" && SERVER_OVERLOAD_CODES.has(code);
 }
 
 const now = (): number => globalThis.performance.now();
+
+/**
+ * A refused connection is the one insert failure that provably sent nothing: no socket opened,
+ * so no row can have landed. Anything later (a reset, a hang up, a cancelled query, a timeout)
+ * may have written the batch, and with no insert dedup token a retry in place would write it twice.
+ */
+function wasRefusedBeforeSending(error: unknown): boolean {
+  return (error as { code?: unknown } | null)?.code === "ECONNREFUSED";
+}
+
+/** Carries an insert failure past the retry policy untouched, so it is not retried in place. */
+class InsertNotRetriedInPlace extends Error {
+  constructor(readonly failure: unknown) {
+    super("insert not retried in place");
+  }
+}
 
 export class ClickHouseQueryClient {
   private readonly driver: QueryDriver;
@@ -39,6 +86,10 @@ export class ClickHouseQueryClient {
   private readonly retries: RetryPolicy | undefined;
   private readonly reporter: StatementReporter | undefined;
   private readonly routes: ReadonlyMap<string, string>;
+  private readonly routeVariables: readonly PrivateRouteVariable[];
+  private readonly columnLists = new Map<string, ClickHouseColumns>();
+  private readonly unavailable: ClickHouseUnavailableErrorFactory | undefined;
+  private readonly overloaded: ClickHouseOverloadErrorFactory | undefined;
 
   constructor({
     driver,
@@ -48,6 +99,9 @@ export class ClickHouseQueryClient {
     retries,
     reporter,
     privateRoutes,
+    privateRouteVariables,
+    unavailableErrorFactory,
+    overloadErrorFactory,
   }: ClickHouseQueryClientOptions) {
     this.driver = driver;
     this.tenantGuard = tenantGuard;
@@ -56,6 +110,9 @@ export class ClickHouseQueryClient {
     this.retries = retries;
     this.reporter = reporter;
     this.routes = privateRoutes ?? new Map();
+    this.routeVariables = privateRouteVariables ?? [];
+    this.unavailable = unavailableErrorFactory;
+    this.overloaded = overloadErrorFactory;
   }
 
   /**
@@ -64,6 +121,35 @@ export class ClickHouseQueryClient {
    */
   privateRoutes(): ReadonlyMap<string, string> {
     return this.routes;
+  }
+
+  /** Each private route variable by name and label, and whether it parsed; never its value. */
+  privateRouteVariables(): readonly PrivateRouteVariable[] {
+    return this.routeVariables;
+  }
+
+  /**
+   * The column list of the target `tenantId` routes to, for a read naming a column a pending
+   * ClickHouse step adds (NO-HOLDS, ARCHITECTURE.md section 7). Kept per tenant, since only the
+   * driver knows a tenant's target; each list refreshes on the helper's own interval.
+   */
+  columns({ tenantId }: { tenantId: string }): ClickHouseColumns {
+    const known = this.columnLists.get(tenantId);
+    if (known !== undefined) return known;
+    const columns = ClickHouseColumns.over({
+      read: async () =>
+        (
+          await this.query<{ table: string; name: string }>({
+            tenantId,
+            sql: CLICKHOUSE_COLUMNS_QUERY,
+            table: "system.columns",
+            // The schema's column list describes the server, which no tenant owns.
+            SKIP_TENANT_CHECK: true,
+          })
+        ).rows,
+    });
+    this.columnLists.set(tenantId, columns);
+    return columns;
   }
 
   /**
@@ -83,7 +169,12 @@ export class ClickHouseQueryClient {
     const withReport = () =>
       this.reported({
         operation: "query",
-        params: { query: request.sql, query_params: request.params, table: request.table },
+        params: {
+          query: request.sql,
+          query_params: request.params,
+          table: request.table,
+          SKIP_COLD_SCAN_CHECK: request.SKIP_COLD_SCAN_CHECK,
+        },
         task: withRetries,
       });
 
@@ -93,7 +184,17 @@ export class ClickHouseQueryClient {
         ? withReport()
         : this.limiter.run({ operation: "query", task: withReport, signal: request.signal });
 
-    return this.tracer === undefined ? withSlot() : this.tracer.trace({ request, task: withSlot });
+    try {
+      return await (this.tracer === undefined
+        ? withSlot()
+        : this.tracer.trace({ request, task: withSlot }));
+    } catch (error) {
+      if (this.overloaded !== undefined && isServerOverload(error)) {
+        throw this.overloaded.create({ cause: error });
+      }
+      if (this.unavailable === undefined || !isConnectionFailure(error)) throw error;
+      throw this.unavailable.create({ cause: error });
+    }
   }
 
   /**
@@ -128,27 +229,39 @@ export class ClickHouseQueryClient {
   }
 
   /**
-   * Writes one batch under every policy this client was given, same order as
-   * {@link query}: the guard refuses a multi-tenant batch before it costs a
-   * slot or socket, and a retrying insert keeps its slot.
+   * Writes one batch under every policy, in {@link query}'s order. Retried in place only when
+   * the connection was refused before anything was sent; other failures go to the caller.
+   * Spec: specs/background/worker-graceful-shutdown.feature
    */
   async insert(request: InsertRequest): Promise<void> {
     this.tenantGuard.assertInsert(request);
     if (request.rows.length === 0) return;
 
     const runOnce = () => this.driver.insert(request);
-    const withRetries = () =>
-      this.retries === undefined
-        ? runOnce()
-        : this.retries.run(runOnce, {
-            signal: request.signal,
-            request: {
-              tenantId: request.tenantId,
-              sql: `INSERT INTO ${request.table}`,
-              table: request.table,
-              kind: "write",
-            },
-          });
+    const refusedOnly = async (): Promise<void> => {
+      try {
+        await runOnce();
+      } catch (error) {
+        if (wasRefusedBeforeSending(error)) throw error;
+        throw new InsertNotRetriedInPlace(error);
+      }
+    };
+    const withRetries = async (): Promise<void> => {
+      if (this.retries === undefined) return runOnce();
+      try {
+        await this.retries.run(refusedOnly, {
+          signal: request.signal,
+          request: {
+            tenantId: request.tenantId,
+            sql: `INSERT INTO ${request.table}`,
+            table: request.table,
+            kind: "write",
+          },
+        });
+      } catch (error) {
+        throw error instanceof InsertNotRetriedInPlace ? error.failure : error;
+      }
+    };
     const withReport = () =>
       this.reported({ operation: "insert", params: { table: request.table }, task: withRetries });
 

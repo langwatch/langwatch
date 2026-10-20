@@ -13,10 +13,9 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 
 const DEFAULT_PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 
-export interface PaginationProps {
+interface PaginationCommon {
   page: number;
   pageSize: number;
-  totalCount: number;
   onPageChange: (page: number) => void;
   onPageSizeChange?: (size: number) => void;
   pageSizeOptions?: readonly number[];
@@ -34,6 +33,36 @@ export interface PaginationProps {
    * the data ends; omitted or zero, a full page is assumed, capped by total.
    */
   visibleCount?: number;
+  /** `center` puts the navigation in the middle, the summary yielding first. Default "end". */
+  layout?: "end" | "center";
+  /** `card` paints the bar on the card ground. Default "transparent". */
+  ground?: "transparent" | "card";
+  /** `subtle` keeps the quieter summary colour of the trace table. Default "muted". */
+  summaryTone?: "muted" | "subtle";
+}
+
+const NARROW = "@media (max-width: 30rem)";
+
+function barLook({
+  layout = "end",
+  ground = "transparent",
+}: Pick<PaginationCommon, "layout" | "ground">) {
+  const center = layout === "center";
+  return {
+    templateColumns: center
+      ? "minmax(max-content, 1fr) auto minmax(0, 1fr)"
+      : { base: "minmax(0, 1fr)", md: "1fr auto" },
+    ...(ground === "card" ? { background: "bg.card" } : {}),
+    ...(center ? { [NARROW]: { templateColumns: "minmax(0, 1fr)", justifyItems: "center" } } : {}),
+  } as const;
+}
+
+/** A source that knows its total: numbered pages, the count and the range. */
+export interface KnownTotalPaginationProps extends PaginationCommon {
+  totalCount: number;
+  /** Replaces only the "<total> <unitLabel>" part of the summary; empty keeps the default. */
+  totalSummary?: string;
+  hasMore?: never;
   /**
    * Whether a page number can be opened at all. A cursor-only data source can
    * reach the pages it has already walked and the one after the current batch,
@@ -47,6 +76,19 @@ export interface PaginationProps {
    */
   canGoNext?: boolean;
 }
+
+/**
+ * A source that cannot count: Back, "Page N" and Next, enabled while the source says there is
+ * more. No total, no numbered jumps; the range shows only when `visibleCount` is given.
+ */
+export interface OpenEndedPaginationProps extends PaginationCommon {
+  totalCount?: never;
+  hasMore: boolean;
+  isPageReachable?: never;
+  canGoNext?: never;
+}
+
+export type PaginationProps = KnownTotalPaginationProps | OpenEndedPaginationProps;
 
 function PageSizeField({
   pageSize,
@@ -84,6 +126,8 @@ function PageSizeField({
 function PageSummary({
   totalCount,
   unitLabel,
+  totalSummary,
+  tone = "muted",
   rangeStart,
   rangeEnd,
   pageSize,
@@ -93,6 +137,8 @@ function PageSummary({
 }: {
   totalCount: number;
   unitLabel?: string;
+  totalSummary?: string;
+  tone?: "muted" | "subtle";
   rangeStart: number;
   rangeEnd: number;
   pageSize: number;
@@ -100,13 +146,22 @@ function PageSummary({
   disabled: boolean;
   onPageSizeChange?: (size: number) => void;
 }) {
-  const segments = unitLabel ? [`${totalCount.toLocaleString()} ${unitLabel}`] : [];
+  const counted = unitLabel ? `${totalCount.toLocaleString()} ${unitLabel}` : null;
+  const total = totalSummary || counted;
+  const segments = total ? [total] : [];
   segments.push(`showing ${rangeStart}–${rangeEnd}`);
   if (onPageSizeChange) segments.push("per page");
 
   return (
-    <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
-      <Text textStyle="xs" color="fg.muted" flexShrink={0}>
+    <HStack
+      gap={1.5}
+      rowGap={1}
+      flexWrap="wrap"
+      justifySelf="start"
+      minWidth={0}
+      data-testid="pagination-indicator"
+    >
+      <Text textStyle="xs" color={tone === "subtle" ? "fg.subtle" : "fg.muted"} flexShrink={0}>
         {segments.join(" · ")}
       </Text>
       {onPageSizeChange && (
@@ -175,7 +230,7 @@ function PageNavigator({
       siblingCount={2}
       onPageChange={(details) => onPageChange(details.page)}
     >
-      <HStack gap={0.5}>
+      <HStack gap={0.5} flexWrap="wrap" justifyContent={{ base: "start", md: "end" }}>
         <ChakraPagination.PrevTrigger asChild>
           <Button
             variant="ghost"
@@ -234,7 +289,13 @@ function PageNavigator({
   );
 }
 
-export function Pagination({
+/** A known total pages by number; an open-ended source steps with Back and Next. */
+export function Pagination(props: PaginationProps) {
+  if (props.totalCount === void 0) return <OpenEndedPagination {...props} />;
+  return <KnownTotalPagination {...props} />;
+}
+
+function KnownTotalPagination({
   page,
   pageSize,
   totalCount,
@@ -247,7 +308,11 @@ export function Pagination({
   visibleCount,
   isPageReachable,
   canGoNext = true,
-}: PaginationProps) {
+  totalSummary,
+  layout,
+  ground,
+  summaryTone,
+}: KnownTotalPaginationProps) {
   const totalPages = Math.max(1, Math.ceil(totalCount / pageSize));
   const currentPage = Math.min(Math.max(1, page), totalPages);
   const rangeStart = (currentPage - 1) * pageSize + 1;
@@ -260,8 +325,9 @@ export function Pagination({
 
   return (
     // The count on the left, the pages on the right, on whatever ground the list sits on.
+    // A phone stacks the count above the pages, so neither runs into the other.
     <Grid
-      templateColumns="1fr auto"
+      {...barLook({ layout, ground })}
       alignItems="center"
       gap={3}
       paddingX={2}
@@ -282,6 +348,8 @@ export function Pagination({
         <PageSummary
           totalCount={totalCount}
           unitLabel={unitLabel}
+          totalSummary={totalSummary}
+          tone={summaryTone}
           rangeStart={rangeStart}
           rangeEnd={rangeEnd}
           pageSize={pageSize}
@@ -300,6 +368,106 @@ export function Pagination({
         isPageReachable={isPageReachable ?? (() => true)}
         onPageChange={onPageChange}
       />
+    </Grid>
+  );
+}
+
+function OpenEndedPagination({
+  page,
+  pageSize,
+  hasMore,
+  onPageChange,
+  onPageSizeChange,
+  pageSizeOptions = DEFAULT_PAGE_SIZE_OPTIONS,
+  isLoading = false,
+  navDisabled = false,
+  visibleCount,
+  layout,
+  ground,
+  summaryTone,
+}: OpenEndedPaginationProps) {
+  const currentPage = Math.max(1, page);
+  const rangeStart = (currentPage - 1) * pageSize + 1;
+  const disabled = isLoading || navDisabled;
+  if (!isLoading && currentPage === 1 && visibleCount === 0 && !hasMore) return null;
+
+  return (
+    <Grid
+      {...barLook({ layout, ground })}
+      alignItems="center"
+      gap={3}
+      paddingX={2}
+      paddingY={1.5}
+      borderTopWidth="1px"
+      borderColor="border.muted"
+      flexShrink={0}
+      data-testid="pagination"
+    >
+      {isLoading ? (
+        <Skeleton
+          height="14px"
+          width="240px"
+          borderRadius="sm"
+          data-testid="pagination-placeholder"
+        />
+      ) : (
+        <HStack gap={1.5} justifySelf="start" data-testid="pagination-indicator">
+          {visibleCount !== void 0 && visibleCount > 0 && (
+            <Text
+              textStyle="xs"
+              color={summaryTone === "subtle" ? "fg.subtle" : "fg.muted"}
+              flexShrink={0}
+            >
+              {`showing ${rangeStart}–${rangeStart + visibleCount - 1}`}
+              {onPageSizeChange ? " · per page" : ""}
+            </Text>
+          )}
+          {onPageSizeChange && (
+            <PageSizeField
+              pageSize={pageSize}
+              pageSizeOptions={pageSizeOptions}
+              disabled={navDisabled}
+              onPageSizeChange={onPageSizeChange}
+            />
+          )}
+        </HStack>
+      )}
+      <HStack gap={0.5}>
+        <Button
+          variant="ghost"
+          size="xs"
+          color="fg.subtle"
+          paddingX={1.5}
+          disabled={disabled || currentPage <= 1}
+          onClick={() => onPageChange(currentPage - 1)}
+          data-testid="pagination-prev"
+        >
+          <ChevronLeft size={14} />
+          Back
+        </Button>
+        <Text
+          textStyle="xs"
+          color="fg"
+          fontWeight="semibold"
+          paddingX={1.5}
+          aria-current="page"
+          data-testid="pagination-current"
+        >
+          Page {currentPage}
+        </Text>
+        <Button
+          variant="ghost"
+          size="xs"
+          color="fg.subtle"
+          paddingX={1.5}
+          disabled={disabled || !hasMore}
+          onClick={() => onPageChange(currentPage + 1)}
+          data-testid="pagination-next"
+        >
+          Next
+          <ChevronRight size={14} />
+        </Button>
+      </HStack>
     </Grid>
   );
 }

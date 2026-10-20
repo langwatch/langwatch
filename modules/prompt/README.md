@@ -18,7 +18,7 @@ Prompts: versioned prompt configurations, their tags and handles, syncing from t
 
 | Kind                           | Name                                                                                       | Declared at                                                              |
 | ------------------------------ | ------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| Postgres, accessed not claimed | `LlmPromptConfig`, `LlmPromptConfigVersion`, `Project`, `PromptTag`, `PromptTagAssignment` | `process/src/repositories/prisma/prisma.prompt-version.repository.ts:31` |
+| Postgres, accessed not claimed | `LlmPromptConfig`, `LlmPromptConfigVersion`, `Project`, `PromptTag`, `PromptTagAssignment` | `process/src/repositories/prisma/prisma.prompt-version.repository.ts:32` |
 | Stores required                | prisma, rateLimiter                                                                        | `process/src/repositories/prisma/prisma.prompt.repositories.ts:22`       |
 | Config                         | `publicBaseUrl` (BASE_HOST)                                                                | `contract/src/prompt.config.ts:5`                                        |
 

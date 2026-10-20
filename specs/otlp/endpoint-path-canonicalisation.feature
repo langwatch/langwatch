@@ -122,3 +122,11 @@ Feature: OTLP endpoint path canonicalisation
     Scenario: A caller cannot claim its path was corrected
       When a request arrives on the canonical path claiming a corrected origin
       Then the claim is discarded
+
+    # A browser bundle reaches this module; over plain http it has no crypto.randomUUID.
+    @unit
+    Scenario: The marker's secret is minted on first use, not on load
+      Given a runtime without crypto.randomUUID, such as a browser page over plain http
+      When the module that stamps the corrected path loads
+      Then it mints no secret
+      And a path it stamps later still reads back as corrected

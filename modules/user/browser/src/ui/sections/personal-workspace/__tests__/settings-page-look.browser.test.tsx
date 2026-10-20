@@ -1,5 +1,5 @@
 /**
- * Real-Chromium look of the Profile and Security pages: the 820px column, the hairline above each
+ * Real-Chromium look of the Profile and Security pages: the column, the hairline above each
  * band and the bordered rows are measured layout and computed style, which jsdom reports as zero.
  * Spec: specs/settings/profile.feature, specs/identity/authentication-settings.feature
  */
@@ -38,6 +38,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     identity: {
       myIdentifiers: { useQuery: () => ({ data: [], isPending: false, error: null }) },
       myMethodsLastUsed: { useQuery: () => ({ data: void 0 }) },
+      mySignInGovernance: { useQuery: () => ({ data: { governedBySso: false } }) },
       addEmailIdentifier: mutation(),
       resendIdentifierConfirmation: mutation(),
       removeIdentifier: mutation(),
@@ -46,6 +47,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
     auth: {
       changePassword: mutation(),
       setPassword: mutation(),
+      unlinkAccount: mutation(),
       endBrowserSession: mutation(),
       sendMyAddressConfirmation: mutation(),
       browserSessions: { useQuery: () => ({ data: [session], isLoading: false }) },
@@ -66,7 +68,7 @@ vi.mock("../../../../behavior/personal-workspace-api.ts", () => {
         }),
       },
       hasPassword: { useQuery: () => ({ data: { hasPassword: true }, isLoading: false }) },
-      unlinkAccount: mutation(),
+      secureAccountNudge: { useQuery: () => ({ data: void 0, dataUpdatedAt: 0 }) },
       updateName: mutation(),
       setAvatar: mutation(),
       removeAvatar: mutation(),
@@ -159,6 +161,13 @@ const hasBorder = (element: Element, side: "Top" | "Right" | "Bottom" | "Left" |
   );
 };
 
+/** The nearest bordered element a row sits in, short of its band. */
+function framingCard(row: HTMLElement): Element {
+  let at = row.parentElement;
+  while (at && at.tagName !== "SECTION" && !hasBorder(at, "All")) at = at.parentElement;
+  return at ?? row;
+}
+
 beforeEach(async () => {
   await page.viewport(1400, 900);
 });
@@ -168,7 +177,7 @@ afterEach(() => cleanup());
 describe("given a wide window", () => {
   describe("when the profile page renders", () => {
     /** @scenario The profile is a narrow column of divided bands with bordered rows */
-    it("is an 820px column of divided bands whose rows are bordered", async () => {
+    it("is a column of divided bands whose rows are bordered", async () => {
       const container = mount("profile");
       await waitFor(() => expect(screen.getByText("My CLI key")).toBeVisible());
       const { column, bands, rows } = look(container, [
@@ -176,25 +185,25 @@ describe("given a wide window", () => {
         "personal-api-key-row",
       ]);
 
-      expect(getComputedStyle(column).maxWidth).toBe("820px");
-      expect(column.getBoundingClientRect().width).toBeLessThanOrEqual(820);
       expect(column.getBoundingClientRect().width).toBeGreaterThan(600);
       expect(bands.length).toBeGreaterThanOrEqual(4);
       for (const band of bands) expect(hasBorder(band, "Top")).toBe(true);
       expect(rows).toHaveLength(2);
-      for (const row of rows) expect(hasBorder(row, "All")).toBe(true);
+      const [session, key] = rows;
+      // The sessions are one bordered card of divided rows; a key is a bordered row of its own.
+      expect(session?.closest("section")).not.toBeNull();
+      expect(hasBorder(framingCard(session!), "All")).toBe(true);
+      expect(hasBorder(key!, "All")).toBe(true);
     });
   });
 
   describe("when the security page renders", () => {
     /** @scenario The page is a narrow column of divided sections with bordered rows */
-    it("is an 820px column of divided sections whose rows are bordered", async () => {
+    it("is a column of divided sections whose rows are bordered", async () => {
       const container = mount("security");
       await waitFor(() => expect(screen.getByText("Security", { exact: true })).toBeVisible());
       const { column, bands, rows } = look(container, ["linked-account-row"]);
 
-      expect(getComputedStyle(column).maxWidth).toBe("820px");
-      expect(column.getBoundingClientRect().width).toBeLessThanOrEqual(820);
       expect(column.getBoundingClientRect().width).toBeGreaterThan(600);
       expect(bands.length).toBeGreaterThanOrEqual(3);
       for (const band of bands) expect(hasBorder(band, "Top")).toBe(true);

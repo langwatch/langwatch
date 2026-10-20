@@ -17,6 +17,8 @@ import {
   createTestSlackConnections,
   createTestSlackDestinations,
 } from "../../__tests__/testing.ts";
+import { MemoryAutomationStore } from "../../repositories/memory/memory.automation.store.ts";
+import { MemoryCustomGraphRepository } from "../../repositories/memory/memory.custom-graph.repository.ts";
 import { AutomationAuthoringService } from "../automation-authoring.service.ts";
 import { AutomationProviderRegistryService } from "../automation-provider-registry.service.ts";
 import { AutomationRulesService } from "../automation-rules.service.ts";
@@ -89,6 +91,45 @@ describe("given the daily persist ceiling", () => {
       const result = await service.readDailyCapStatus({ projectId: "project-1" });
 
       expect(result.counts["trigger-1"]).toMatchObject({ skipped: 4 });
+    });
+  });
+});
+
+describe("given an alert on a graph whose board its author set to Only me", () => {
+  describe("when the automations list is read", () => {
+    /** @scenario "AC187 Scope: an alert or a scheduled report reads nothing from an Only me board" */
+    it("lists the alert without the graph's name, and names a graph the project shares", async () => {
+      const store = MemoryAutomationStore.create();
+      const graph = (id: string, name: string, dashboardId: string) =>
+        store.customGraphs.push({
+          id,
+          projectId: "project-1",
+          name,
+          graph: {},
+          filters: {},
+          dashboardId,
+        });
+      graph("graph-only-me", "Secret revenue", "board-only-me");
+      graph("graph-project", "Traces per hour", "board-project");
+      store.privateDashboardIds.add("board-only-me");
+      const graphs = MemoryCustomGraphRepository.create(store);
+      const alertOn = (customGraphId: string): Trigger => ({
+        ...resumedTrigger(),
+        id: `alert-on-${customGraphId}`,
+        triggerKind: "ALERT",
+        customGraphId,
+      });
+      const service = authoring({
+        getAllForProject: async () => [alertOn("graph-only-me"), alertOn("graph-project")],
+        getCustomGraphNamesByIds: (input) => graphs.findAllNamesByIds(input),
+      });
+
+      const rows = await service.listRows({ projectId: "project-1" });
+
+      expect(rows.map((row) => row.customGraph)).toEqual([
+        null,
+        { id: "graph-project", name: "Traces per hour" },
+      ]);
     });
   });
 });

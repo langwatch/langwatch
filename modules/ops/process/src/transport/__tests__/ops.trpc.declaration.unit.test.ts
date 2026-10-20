@@ -104,6 +104,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   listScheduledJobs: "query",
   listPausedSchedules: "query",
   listSchedulerActions: "query",
+  listInsightSchedules: "query",
   setScheduleActive: "mutation",
   clearScheduleSlot: "mutation",
   runScheduleNow: "mutation",
@@ -162,6 +163,7 @@ const OPS_PROCEDURES: Readonly<Record<string, "query" | "mutation" | "subscripti
   searchTenants: "query",
   dryRunReplay: "mutation",
   getReplayHistory: "query",
+  getReplayHistoryPage: "query",
   getReplayRun: "query",
   startReplay: "mutation",
   getReplayStatus: "query",
@@ -267,6 +269,14 @@ describe("the ops tRPC declarations", () => {
 
       expect(relaxed).toEqual([ANSWERING_PROBE]);
       expect(access[ANSWERING_PROBE]).toBe("no-permission");
+    });
+
+    /** @scenario "The list is a read behind the operator's view permission" */
+    it("declares the daily insight schedules list as a query that asks ops:view", () => {
+      const access = boundAccess(opsDashboardTrpcTransport);
+
+      expect(OPS_PROCEDURES.listInsightSchedules).toBe("query");
+      expect(access.listInsightSchedules).toBe("permission-platform:ops:view");
     });
 
     it("asks ops:manage of every mutation", () => {

@@ -1,23 +1,27 @@
 /**
- * How the Upgrades pages colour and word what the reader answers (UI plan section 4). The reader
- * already labels states and step statuses; this adds the tone of a status, the command a state
- * asks for, and the page's grouping. Unknown values pass through raw in a neutral tone.
+ * How the Upgrades pages colour and word what the reader answers (UI plan section 4, ADR-173
+ * section 7). The reader labels states and step statuses; this adds tones, the version and state
+ * lines, and the page's grouping. Unknown values pass through raw in a neutral tone.
  */
+import type { UpgradeStatusView, UpgradeVersionView } from "./upgrade-view.ts";
 
 export type UpgradeTone = "neutral" | "info" | "warning" | "danger" | "success";
 
 export type UpgradeLabel = { label: string; tone: UpgradeTone };
 
-/** The command that runs a release upgrade in the image (UI plan section 6.3). */
-export const UPGRADE_COMMAND = "pnpm task upgrade";
+/** What a build that is not a release is called; the page has no other word for it. */
+export const DEVELOPMENT_BUILD = "Development build";
 
-/** The reader's reasons whose fix is to run the release upgrade. */
-const REASONS_FIXED_BY_UPGRADING = new Set([
-  "image-newer",
-  "no-upgrade-recorded",
-  "blocking-steps-pending",
-  "failed-run",
-]);
+/** How many characters of a commit the page shows, as git abbreviates it. */
+const SHORT_COMMIT_LENGTH = 7;
+
+/** The run that imported the ledger's history from before upgrade tracking. */
+const SEED_RUN_KIND = "seed";
+
+const RUN_KINDS: Record<string, string> = {
+  [SEED_RUN_KIND]: "Imported history",
+  upgrade: "Upgrade",
+};
 
 const STATUS_TONES: Record<string, UpgradeTone> = {
   pending: "neutral",
@@ -117,9 +121,122 @@ export function modeLabel(mode: string): string {
   return Object.hasOwn(MODE_LABELS, mode) ? MODE_LABELS[mode]! : mode;
 }
 
-/** The command the installation's state asks the operator to run, if any. */
-export function upgradeCommandFor({ reason }: { reason: string }): string | null {
-  return REASONS_FIXED_BY_UPGRADING.has(reason) ? UPGRADE_COMMAND : null;
+/** A run's kind in words; the seed run reads "Imported history". */
+export function runKindLabel(kind: string): string {
+  return Object.hasOwn(RUN_KINDS, kind) ? RUN_KINDS[kind]! : kind;
+}
+
+export function isImportedHistory(run: { kind: string }): boolean {
+  return run.kind === SEED_RUN_KIND;
+}
+
+/** A release field in words: no release means a development build. */
+export function releaseName(release: string | null): string {
+  return release ?? DEVELOPMENT_BUILD;
+}
+
+/** "Running 3.21.0", or "Development build 3.20.1+abc1234" for a build that is not a release. */
+export function versionLine(version: UpgradeVersionView): string {
+  if (version.kind === "release") return `Running ${version.release}`;
+  const commit = version.commit?.slice(0, SHORT_COMMIT_LENGTH) ?? null;
+  const build =
+    version.containsRelease && commit
+      ? `${version.containsRelease}+${commit}`
+      : (version.containsRelease ?? commit);
+  return build ? `${DEVELOPMENT_BUILD} ${build}` : DEVELOPMENT_BUILD;
+}
+
+/** The Steps tab's group name; the oldest release holds everything stamped before manifests. */
+export function releaseGroupName({
+  release,
+  oldest,
+}: {
+  release: string | null;
+  oldest: boolean;
+}): string {
+  if (release === null) return DEVELOPMENT_BUILD;
+  return oldest ? `${release} and earlier` : release;
+}
+
+/** `organizations` is set when the line names held organizations and links to their tab. */
+export type UpgradeStateLine = {
+  text: string;
+  tone: UpgradeTone;
+  retry: boolean;
+  organizations?: true;
+};
+
+/** The states in which the worker is still carrying the upgrade through. */
+const UPGRADING_STATES = new Set([
+  "upgrading",
+  "behind",
+  "never-upgraded",
+  "finishing-in-background",
+]);
+
+function plural({ count, one, many }: { count: number; one: string; many: string }): string {
+  return `${count} ${count === 1 ? one : many}`;
+}
+
+/** The overview's one state line: up to date, upgrading n of m, needs attention, or refused. */
+export function upgradeStateLine(
+  status: Pick<UpgradeStatusView, "state" | "label" | "tone" | "summary" | "counts"> & {
+    failedStepIds: readonly string[];
+    /** Organizations a tenant step holds or parks; they turn Up to date into needs attention. */
+    heldOrganizations?: number;
+  },
+): UpgradeStateLine {
+  if (status.state === "up-to-date") {
+    const held = status.heldOrganizations ?? 0;
+    if (held === 0) return { text: "Up to date", tone: "success", retry: false };
+    return {
+      text: `Needs attention: ${plural({ count: held, one: "organization held", many: "organizations held" })}`,
+      tone: "warning",
+      retry: false,
+      organizations: true,
+    };
+  }
+  if (status.state === "needs-attention") {
+    const failed = status.failedStepIds.length;
+    return failed > 0
+      ? {
+          text: `Needs attention: ${plural({ count: failed, one: "failed step", many: "failed steps" })}`,
+          tone: "danger",
+          retry: true,
+        }
+      : { text: `Needs attention: ${status.summary}`, tone: "danger", retry: false };
+  }
+  if (UPGRADING_STATES.has(status.state)) {
+    const total = Object.values(status.counts).reduce((sum, count) => sum + count, 0);
+    const settled = total - remainingCount(status.counts);
+    const text =
+      total > 0 ? `Upgrading: step ${Math.min(settled + 1, total)} of ${total}` : "Upgrading";
+    return { text, tone: "info", retry: false };
+  }
+  return { text: `${status.label}: ${status.summary}`, tone: toneOf(status.tone), retry: false };
+}
+
+/**
+ * Organizations a tenant step holds or parks, each counted once however many steps hold it. A
+ * user-rooted step's holds are users, listed on the Organizations tab but never counted here.
+ */
+export function heldOrganizationCount(
+  migrations: readonly {
+    tenant: "organization" | "user";
+    migratedIsSteady: boolean;
+    attention: readonly { tenantId: string; status: string }[];
+  }[],
+): number {
+  return new Set(
+    migrations
+      .filter((migration) => migration.tenant === "organization")
+      .flatMap((migration) =>
+        migration.attention
+          // A step whose `migrated` is its steady state keeps those tenants in step, not held.
+          .filter((row) => !(migration.migratedIsSteady && row.status === "migrated"))
+          .map((row) => row.tenantId),
+      ),
+  ).size;
 }
 
 /** Steps grouped by release in the reader's order; a step with no release goes last. */
@@ -156,7 +273,7 @@ function releaseParts(release: string): number[] {
   return release.split(/[.-]/).map((part) => Number.parseInt(part, 10) || 0);
 }
 
-/** Unreleased first (cloud tracks main), then newest release first. */
+/** The development build first (cloud tracks main), then newest release first. */
 export function orderReleasesNewestFirst<Release extends { release: string | null }>(
   releases: readonly Release[],
 ): Release[] {

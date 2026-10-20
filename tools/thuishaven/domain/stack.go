@@ -68,15 +68,22 @@ type Stack struct {
 	WorkerMetricsPort int `json:"workerMetricsPort"`
 	// VoiceSocketPort is the worker's raw voice socket (VOICE_WS_PORT); each
 	// stack needs its own or two stacks collide on the default 3300.
-	VoiceSocketPort    int    `json:"voiceSocketPort"`
+	VoiceSocketPort int `json:"voiceSocketPort"`
+	// OutboundTLSPort is outboundsim's https listener on 127.0.0.1, under a certificate the
+	// portless CA signs: the push-service stand-in the product reaches over https by IP.
+	OutboundTLSPort    int    `json:"outboundTlsPort,omitempty"`
 	ClickHouseHTTPPort int    `json:"clickhouseHttpPort"` // shared managed CH server's HTTP port (0 = unmanaged)
 	ClickHouseDatabase string `json:"clickhouseDatabase"` // this stack's isolated CH database (lw_<slug>)
 	// ClickHousePostgresHost is how that server reaches host Postgres for
 	// LangWatchQL; "" on a stack recorded before native ClickHouse (colima's route).
 	ClickHousePostgresHost string `json:"clickhousePostgresHost,omitempty"`
-	PostgresPort           int    `json:"postgresPort"`     // shared managed Postgres's port (0 = unmanaged)
-	PostgresDatabase       string `json:"postgresDatabase"` // this stack's isolated PG database (lw_<slug>)
-	RedisPort              int    `json:"redisPort"`        // shared managed Redis's port (0 = unmanaged)
+	// ClickHouseUser/ClickHousePassword are the stack's own login (its workload
+	// and memory cap ride on it); empty keeps the shared admin login.
+	ClickHouseUser     string `json:"clickhouseUser,omitempty"`
+	ClickHousePassword string `json:"clickhousePassword,omitempty"`
+	PostgresPort       int    `json:"postgresPort"`     // shared managed Postgres's port (0 = unmanaged)
+	PostgresDatabase   string `json:"postgresDatabase"` // this stack's isolated PG database (lw_<slug>)
+	RedisPort          int    `json:"redisPort"`        // shared managed Redis's port (0 = unmanaged)
 	// ObservabilityOTLPPort is the shared LGTM collector's OTLP/HTTP port when the
 	// stack is up, and 0 when it is not. Non-zero is what makes OverlayEnv emit the
 	// OTel wiring, so a worktree exports its logs/traces/metrics the moment the
@@ -123,6 +130,11 @@ type Stack struct {
 	ModeEnv          []string `json:"modeEnv,omitempty"`
 	ModeOverriddenBy []string `json:"modeOverriddenBy,omitempty"`
 	EffectiveMode    string   `json:"effectiveMode,omitempty"`
+	// AppOff marks a stack whose ui, api and worker are stopped (`haven up -app`).
+	AppOff bool `json:"appOff,omitempty"`
+	// KeeperReplans marks a keeper that applies a rewritten plan on SIGHUP, so
+	// a ±service starts or stops only the lanes it changes (app/keeper_live.go).
+	KeeperReplans bool `json:"keeperReplans,omitempty"`
 	// Refresh is the mode this stack was brought up in: still, watch or hmr.
 	Refresh RefreshMode `json:"refresh,omitempty"`
 	// MockInstantEvalJudge injects INSTANT_EVAL_CLASSIFIER=memory, so Instant
@@ -200,6 +212,8 @@ var PerWorktreeServices = []struct{ Name, Role string }{
 	{PaymentService, "Stripe (paymentsim)"},
 	{TelemetryService, "OTLP sender (telemetrysim)"},
 	{LambdaService, "NLP Lambda fleet (lambdasim)"},
+	{GithubService, "GitHub App, API and webhooks (githubsim)"},
+	{McpService, "MCP clients against hosted MCP (mcpsim)"},
 	{DesignSystemService, "Design system — Storybook"},
 	{MailRoomService, "Mail studio — transactional message preview"},
 	{LangevalsService, "Evaluators (Python)"},

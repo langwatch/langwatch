@@ -9,7 +9,9 @@ import type {
 } from "../sso-registrant.repository.ts";
 
 const HELD_STATES = new Set(["VERIFIED", "PRIMARY"]);
-const folded = (value: string | null | undefined): string => (value ?? "").trim().toLowerCase();
+/** Exact, as Postgres compares: identity stores its values normalized. */
+const holdsValue = (value: string | null, email: string): boolean =>
+  value === normalizeIdentifierValue(email);
 
 /** The same two questions over the store's own user, identifier and account rows. */
 export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepository {
@@ -60,7 +62,7 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
 
   async findUsersByEmail({ email }: { email: string }): Promise<SsoResolutionCandidate[]> {
     return [...this.store.users.values()]
-      .filter((user) => user.email !== null && folded(user.email) === folded(email))
+      .filter((user) => user.email !== null && user.email === email.trim().toLowerCase())
       .slice(0, 2)
       .map((user) => ({
         id: user.id,
@@ -114,7 +116,7 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
       (identifier) =>
         identifier.userId !== userId &&
         isLiveIdentifierState(identifier.state) &&
-        (folded(identifier.value) === folded(email) ||
+        (holdsValue(identifier.value, email) ||
           (identifier.issuer === accountKey.issuer &&
             identifier.providerAccountId === accountKey.accountId)),
     );
@@ -141,8 +143,7 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
       const pendingDirectoryAddress =
         identifier.userId === userId &&
         identifier.provider === "email" &&
-        identifier.value !== null &&
-        folded(identifier.value) === folded(email) &&
+        holdsValue(identifier.value, email) &&
         identifier.state === "ATTACHED" &&
         identifier.verifiedAtMs === null &&
         identifier.accountId === null &&
@@ -154,7 +155,7 @@ export class MemorySsoRegistrantReadRepository implements SsoRegistrantReadRepos
         identifier.userId === userId ||
         (identifier.issuer === accountKey.issuer &&
           identifier.providerAccountId === accountKey.accountId) ||
-        folded(identifier.value) === folded(email)
+        holdsValue(identifier.value, email)
       );
     });
   }

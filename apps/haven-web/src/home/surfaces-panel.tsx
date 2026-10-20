@@ -1,4 +1,5 @@
 import {
+  Checkbox,
   ConfirmButton,
   Link,
   Panel,
@@ -13,12 +14,20 @@ import { surfaceState } from "../shared/surfaces.ts";
 export type RowRestart = {
   /** Undefined when the stack is not running, so no row offers it. */
   onRestart?: (surface: Surface) => void;
-  /** Undefined when the stack is not running, so no not-selected row offers a start. */
+  /** Undefined when the stack is not running, so no row's switch turns a service on. */
   onStart?: (surface: Surface) => void;
+  /** Undefined when the stack is not running, so no row's switch turns a service off. */
+  onStop?: (surface: Surface) => void;
   busy?: string;
 };
 
-const columnsFor = ({ onRestart, onStart, busy }: RowRestart): TableColumn<Surface>[] => [
+/** The app row's switch is the ui, api and worker together. */
+const switchLabel = ({ surface, isOn }: { surface: Surface; isOn: boolean }) => {
+  if (surface.switch === "app") return "LangWatch app";
+  return isOn ? "On" : "Off";
+};
+
+const columnsFor = ({ onRestart, onStart, onStop, busy }: RowRestart): TableColumn<Surface>[] => [
   {
     key: "status",
     header: "Status",
@@ -66,22 +75,29 @@ const columnsFor = ({ onRestart, onStart, busy }: RowRestart): TableColumn<Surfa
     cell: (surface) => surface.reason,
   },
   {
+    key: "switch",
+    header: "Runs",
+    width: "152px",
+    cell: (surface) => {
+      if (surface.switch === "") return null;
+      const isOn = surface.status !== "not-selected";
+      const flip = isOn ? onStop : onStart;
+      return (
+        <Checkbox
+          label={switchLabel({ surface, isOn })}
+          checked={isOn}
+          disabled={flip === undefined || busy !== undefined}
+          onChange={() => flip?.(surface)}
+        />
+      );
+    },
+  },
+  {
     key: "restart",
     header: "",
     width: "112px",
     align: "end",
     cell: (surface) => {
-      if (onStart !== undefined && surface.start !== "") {
-        return (
-          <ConfirmButton
-            variant="secondary"
-            label={busy === surface.name ? "Starting" : "Start"}
-            confirmLabel={`Start ${surface.start}?`}
-            disabled={busy !== undefined}
-            onConfirm={() => onStart(surface)}
-          />
-        );
-      }
       return onRestart === undefined || surface.restart === "" ? null : (
         <ConfirmButton
           variant="secondary"
@@ -100,6 +116,7 @@ export const SurfacesPanel = ({
   surfaces,
   onRestart,
   onStart,
+  onStop,
   busy,
 }: RowRestart & { surfaces: Surface[] }) => {
   const selected = surfaces.filter((surface) => surface.status !== "not-selected");
@@ -107,7 +124,7 @@ export const SurfacesPanel = ({
   return (
     <Panel title="Surfaces" meta={`${live} of ${selected.length} live`}>
       <Table
-        columns={columnsFor({ onRestart, onStart, busy })}
+        columns={columnsFor({ onRestart, onStart, onStop, busy })}
         rows={surfaces}
         rowKey={(surface) => surface.name}
         caption="Surfaces of this stack"

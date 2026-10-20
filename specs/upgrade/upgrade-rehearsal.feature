@@ -5,7 +5,7 @@
 
 Feature: The upgrade is rehearsed from real images before it ships
   As the maintainer merging a release that migrates stored data
-  I want the real upgrade replayed from the floor and from main, with old and new processes overlapping
+  I want the real upgrade replayed from the previous release and from main, with old and new processes overlapping
   So that a first-deploy failure is found on a rehearsal and not on an installation
 
   @unit

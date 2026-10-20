@@ -42,12 +42,18 @@ import { OrganizationService } from "../organization.service.ts";
 import type { TeamIdentity } from "../team-identity.service.ts";
 
 class StubRepository extends OrganizationRepository {
+  async recordPrivateDataplaneSeen(): Promise<void> {}
+
   async findBySsoDomain(): Promise<null> {
     return null;
   }
 
   async listAllIds(): Promise<OrganizationIdPage> {
     return { ids: [], next: null };
+  }
+
+  async findPresenceSettingPage(): Promise<[]> {
+    return [];
   }
 
   async countUsage(): Promise<{ members: number; teams: number; ssoProviders: string[] }> {
@@ -696,7 +702,7 @@ describe("OrganizationService", () => {
     await expect(
       createService(new StubRepository("team"), new RecordingGrants(), teams).createTeam({
         organizationId: "org",
-        name: "Shared",
+        name: "Platform",
       }),
     ).resolves.toMatchObject({ id: "team", slug: "team" });
   });

@@ -1,17 +1,10 @@
-import {
-  Box,
-  EmptyState,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { FlaskConical, Plus } from "lucide-react";
 
 import type { RunPlan } from "../../../../behavior/agent-testing/results/run-plans.ts";
 import type { AgentTestingRoutingState } from "../../../../behavior/agent-testing/use-agent-testing-routing.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 /**
  * The Results tab list: the filter row, the charts it drives, and the table.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -27,7 +20,12 @@ import { nextWiderWindow } from "../run-plan-results/run-plan-results-states.tsx
 import { useRunPlanArchive } from "../run-plan-results/use-run-plan-archive.ts";
 import { FlatRowsTable, GroupedRowsTable } from "./grouped-rows-table.tsx";
 import { PlanRowsTable } from "./plan-rows-table.tsx";
-import type { ResultGrouping, ResultRow } from "./result-atoms.ts";
+import {
+  EMPTY_RESULT_FILTERS,
+  isNarrowed,
+  type ResultGrouping,
+  type ResultRow,
+} from "./result-atoms.ts";
 import { ResultsChartsBlock } from "./results-charts-block.tsx";
 import { ResultsFilterRow } from "./results-filter-row.tsx";
 import { type UseResultGroupsResult, useResultGroups } from "./use-result-groups.ts";
@@ -47,11 +45,11 @@ function ResultsHeader({
       {/* The count sits on the title's baseline. Centred, a smaller line beside
           a larger one reads as lifted off it. */}
       <HStack gap={2} alignItems="baseline" minWidth={0}>
-        <Text fontSize="14px" fontWeight="semibold" color="fg">
-          Test Runs
+        <Text textStyle="body" fontWeight="semibold" color="fg">
+          Test runs
         </Text>
         {executionCount !== undefined && (
-          <Text fontSize="11.5px" color={FG_MUTED}>
+          <Text textStyle="caption" color="fg.muted">
             {executionCount === 1 ? "1 execution" : `${executionCount} executions`}
           </Text>
         )}
@@ -89,20 +87,25 @@ function NoRunsYet({
   const wider = nextWiderWindow(period);
 
   return (
-    <EmptyState.Root paddingY={12}>
-      <EmptyState.Content>
-        <EmptyState.Indicator>
-          <FlaskConical size={28} />
-        </EmptyState.Indicator>
-        <EmptyState.Title>No runs yet</EmptyState.Title>
-        <EmptyState.Description>
-          Run a test suite or a single scenario and the results land here.
-        </EmptyState.Description>
+    <NoDataInfoBlock
+      size="inline"
+      bordered={false}
+      icon={<FlaskConical aria-hidden />}
+      title="No runs yet"
+      description="Run a test suite or a single scenario and the results land here."
+      primaryAction={
         <SmallButton onClick={() => setRelativePeriod(wider.key)} data-testid="widen-period-button">
           {wider.label}
         </SmallButton>
-      </EmptyState.Content>
-    </EmptyState.Root>
+      }
+      next={[
+        {
+          kind: "docs",
+          label: "Read about results",
+          href: "https://docs.langwatch.ai/agent-testing/results",
+        },
+      ]}
+    />
   );
 }
 
@@ -118,6 +121,7 @@ function ResultsTable({
   onArchivePlan,
   isArchivingPlan,
   onOpenRun,
+  onClearFilters,
 }: {
   grouping: ResultGrouping;
   results: UseResultGroupsResult;
@@ -129,6 +133,7 @@ function ResultsTable({
   onArchivePlan: (plan: RunPlan) => void;
   isArchivingPlan: boolean;
   onOpenRun: (row: ResultRow) => void;
+  onClearFilters: (() => void) | undefined;
 }) {
   if (grouping === "plan") {
     return (
@@ -142,6 +147,7 @@ function ResultsTable({
         onEditPlan={onEditPlan}
         onArchivePlan={onArchivePlan}
         isArchiving={isArchivingPlan}
+        onClearFilters={onClearFilters}
       />
     );
   }
@@ -157,6 +163,7 @@ function ResultsTable({
         resolveTargetName={results.resolveTargetName}
         resolveTargetKind={results.resolveTargetKind}
         onOpenRun={onOpenRun}
+        onClearFilters={onClearFilters}
       />
     );
   }
@@ -167,6 +174,7 @@ function ResultsTable({
       resolveTargetName={results.resolveTargetName}
       onOpenRun={onOpenRun}
       hasMore={results.hasMore}
+      onClearFilters={onClearFilters}
     />
   );
 }
@@ -232,6 +240,9 @@ function ResultsBody({
         onArchivePlan={onArchivePlan}
         isArchivingPlan={isArchivingPlan}
         onOpenRun={onOpenRun}
+        onClearFilters={
+          isNarrowed(view.filters) ? () => view.onFiltersChange(EMPTY_RESULT_FILTERS) : void 0
+        }
       />
     </>
   );

@@ -14,29 +14,25 @@ import { LuCalendarClock } from "react-icons/lu";
 
 // The serif display face (Sentient) is declared once in apps/ui globals.scss.
 import { homeApi } from "../../../behavior/home-api.ts";
-import { GuidedOnboardingOffer, PendingJoinRequests } from "../../../behavior/lent-peers.tsx";
+import { PendingJoinRequests, UpgradeActionNeeded } from "../../../behavior/lent-peers.tsx";
 import { useProjectHomeHost } from "../../../model/project-home-host.ts";
 import { safeReturnToPath } from "../../../model/project-switch.ts";
-import { HomeBriefingSection, SetupHairline } from "./briefing/index.ts";
 import { DocsGuides } from "./components/docs-guides.tsx";
-import { HomeFortune } from "./components/home-fortune.tsx";
 import { HomePageBanners } from "./components/home-page-banners.tsx";
 import { LangyHomeHero } from "./components/langy-home-hero.tsx";
 import { LearningResources } from "./components/learning-resources.tsx";
 import { OnboardingProgress } from "./components/onboarding-progress.tsx";
 import { RecentItemsSection } from "./components/recent-items-section.tsx";
 import { TracesOverview } from "./components/traces-overview.tsx";
-import { useHomeComposition } from "./components/use-home-composition.ts";
 import { useProjectReach } from "./components/use-project-reach.ts";
-import { WelcomeHeader } from "./components/welcome-header.tsx";
 
 /**
- * The application shell is not this page's — chrome layout draws it. A
- * briefing for the returning user, not a lobby. Three compositions resolve
- * in strict order (SIGNAL-FOCUSED, LANGY, CLASSIC); signal-focused wins outright.
+ * The application shell is not this page's: chrome layout draws it. One home for every
+ * reader; Langy's gate only decides what the hero offers, so the page waits for it rather
+ * than drawing a hero that changes under the reader. Spec: specs/home/langy-home.feature
  */
 export function HomePage() {
-  const composition = useHomeComposition();
+  const langyResolving = useProjectHomeHost().langyVisibility().isResolving;
 
   return (
     <>
@@ -49,45 +45,21 @@ export function HomePage() {
             lantern's zIndex -1 light sits in, above the layout's page fill. */}
         <Container maxW="7xl" padding={5} position="relative" zIndex={1}>
           <VStack gap={4} width="full" align="start">
+            {/* The greeting lives in the hero, where the question is asked. The one
+                sales-y ask sits here: the line and the demo pill, together or not at all. */}
             <HStack width="full" align="center" gap={2}>
-              {/* The Langy home greets from the centre of its own hero, where
-                  the question is being asked. Rendering the greeting here as
-                  well would put it on the page twice. */}
-              {composition === "langy" ? null : <WelcomeHeader />}
               <Spacer />
-              {/* The one sales-y ask: the friendly line, small and quiet, with
-                  the demo link as a compact pill beside it. Shown to people who
-                  might still buy, and to nobody else.
-
-                  The line and the pill go together or not at all: the pill is
-                  the ask and the line is what sets it up, so hiding one would
-                  leave a bare "Request a demo" with nothing explaining it. */}
               <ConsideringLangWatch />
             </HStack>
 
-            {/* Above every composition: whoever can answer a join request sees the
-                wait wherever the home opens. Organization draws nothing for anyone else. */}
+            {/* First, ops' unfinished operator steps for whoever holds ops:view. */}
+            <UpgradeActionNeeded />
+            {/* Whoever can answer a join request sees the wait wherever the home
+                opens. Organization draws nothing for anyone else. */}
             <PendingJoinRequests />
 
-            {/* The Langy home carries the offer inside its hero, under the ask field;
-                the classic home carries it here, under the header. */}
-            {composition === "classic" && <ClassicGuidedOffer />}
+            {langyResolving ? <HomeSkeleton /> : <LangyHome />}
 
-            {composition === "undecided" && <HomeCompositionSkeleton />}
-            {composition === "signal-focused" && <SignalFocusedHome />}
-            {composition === "langy" && <LangyHome />}
-            {composition === "classic" && (
-              <>
-                <HomePageBanners variant="legacy" />
-                <TracesOverview />
-                <RecentItemsSection />
-                <OnboardingProgress />
-              </>
-            )}
-
-            {/* Dev-only chrome (the briefing mock switcher and the Langy
-                home's state switcher) belongs with the footer links, not next
-                to the greeting. */}
             <LearningResources />
           </VStack>
         </Container>
@@ -117,7 +89,7 @@ function ConsideringLangWatch() {
   return (
     <HStack gap={2.5} align="center">
       <chakra.span
-        fontSize="12px"
+        textStyle="caption"
         color="fg.subtle"
         whiteSpace="nowrap"
         display={{ base: "none", md: "inline" }}
@@ -131,15 +103,14 @@ function ConsideringLangWatch() {
         display="inline-flex"
         alignItems="center"
         gap={1.5}
-        fontFamily="mono"
-        fontSize="11.5px"
+        textStyle="caption"
         whiteSpace="nowrap"
         color="fg.muted"
         borderWidth="1px"
         borderColor="border.muted"
         borderRadius="full"
         paddingX={2.5}
-        paddingY="4px"
+        paddingY="1"
         transition="color 130ms ease, border-color 130ms ease"
         _hover={{
           color: "orange.fg",
@@ -153,52 +124,8 @@ function ConsideringLangWatch() {
   );
 }
 
-/**
- * The signal-focused home: the briefing sheet leads, then a two-column chrome
- * grid whose cards stagger (the first in each column at natural height, the
- * second filling the rest), then recent work.
- */
-function SignalFocusedHome() {
-  return (
-    <>
-      <HomeBriefingSection />
-      <Grid
-        templateColumns={{ base: "1fr", lg: "1fr 1fr" }}
-        gap={4}
-        width="full"
-        alignItems="stretch"
-      >
-        <VStack gap={4} align="stretch" minWidth={0}>
-          <HomePageBanners />
-          <Box flex="1" display="flex" minHeight="120px">
-            <DocsGuides />
-          </Box>
-        </VStack>
-        <VStack gap={4} align="stretch" minWidth={0}>
-          <SetupHairline />
-          <Box flex="1" display="flex" minHeight="100px">
-            <HomeFortune />
-          </Box>
-        </VStack>
-      </Grid>
-      <RecentItemsSection />
-    </>
-  );
-}
-
-/** The guided offer for the classic home: hidden until the project's reach says it is new. */
-function ClassicGuidedOffer() {
-  const reach = useProjectReach();
-  const spaceInUse = reach.isLoading ? null : !reach.isNewProject;
-  return <GuidedOnboardingOffer space="project" spaceInUse={spaceInUse} />;
-}
-
-/**
- * What the page shows before it knows which home it is. Flags used to
- * resolve to classic, paint it, then swap, so the home visibly changed
- * shape on cold load. This commits to nothing: just the shape all three share.
- */
-function HomeCompositionSkeleton() {
+/** What the page shows while Langy's gate answers: the shape of the home, committing to nothing. */
+function HomeSkeleton() {
   return (
     <VStack gap={4} width="full" align="stretch" aria-busy="true" aria-label="Loading your home">
       <Skeleton height="180px" borderRadius="xl" />
@@ -221,23 +148,20 @@ function LangyHome() {
 
   return (
     <>
-      <HomePageBanners variant="lantern">
+      <HomePageBanners>
         <LangyHomeHero />
       </HomePageBanners>
       {isNewProject ? (
         <OnboardingProgress />
       ) : (
         <>
-          <TracesOverview variant="strip" />
+          <TracesOverview />
           <RecentItemsSection />
           <OnboardingProgress />
         </>
       )}
-      {/* The route into the docs — not the footer's quiet link list (that renders
-          below for every composition): this is the guided one, for a reader who'd
-          rather read docs first than ask a question in plain language.
-          Onboarding control is off here because it moved UP into the lit block —
-          two of the same on one page would just leave one unclicked. */}
+      {/* The guided route into the docs, beside the footer's quiet link list: for a
+          reader who'd rather read the docs first than ask in plain language. */}
       <DocsGuides />
     </>
   );

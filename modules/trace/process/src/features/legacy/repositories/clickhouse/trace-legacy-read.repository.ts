@@ -876,6 +876,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           return traces;
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -942,6 +943,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const rows = traceIdRowsSchema.parse(await result.json());
           return rows.map((r) => r.TraceId);
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1009,6 +1011,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             retentionDays,
           });
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1093,6 +1096,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             retentionDays,
           });
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1611,6 +1615,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           return aggregateTopicCounts(rows);
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId: input.projectId,
@@ -1698,6 +1703,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             labels: Array.from(labelsSet),
           };
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId: input.projectId,
@@ -1761,6 +1767,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           const rows = promptStudioSpanRowsSchema.parse(await queryResult.json());
           return derivePromptStudioSpan({ rows, spanId }) ?? null;
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -1879,6 +1886,7 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           return { spanNames, metadataKeys, evaluationNames };
         } catch (error) {
+          if (HandledError.isHandled(error)) throw error;
           this.logger.warn(
             {
               projectId,
@@ -2379,6 +2387,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           traceIds: ids,
         },
         format: "JSONEachRow",
+        // As on main: a trace's evaluations by id, kept unbounded so none is dropped.
+        SKIP_COLD_SCAN_CHECK: true,
       });
       return evaluationRunRowsSchema.parse(await result.json());
     };

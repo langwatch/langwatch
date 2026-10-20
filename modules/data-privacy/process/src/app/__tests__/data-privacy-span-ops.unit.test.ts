@@ -1,8 +1,8 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { type DataPrivacyApi, PRIVACY_DROPPED_MARKER_ATTR } from "@langwatch/data-privacy-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { OtlpSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { createDataPrivacyTestApp, dataPrivacyTestGraph } from "./data-privacy.fixture.ts";

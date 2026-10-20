@@ -14,17 +14,20 @@
     "declaration": true,
     "emitDeclarationOnly": true,
     "outDir": "./dist",
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
+  "files": [],
+  "include": [],
   // Tests run via vitest (`pnpm test`), which provides the `vitest` module and
   // its types at runtime; the declaration build must not require them.
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -11,16 +11,16 @@ import { HStack, Skeleton, Spacer, Text, VStack } from "@langwatch/design-system
 import { Activity, Plus, Shield } from "lucide-react";
 import { useState } from "react";
 
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
 import { monitorApi } from "../../behavior/monitor-api.ts";
 import { useOnlineEvaluations } from "../../behavior/use-online-evaluations.ts";
 import { useMonitorHost } from "../../model/monitor-host.ts";
 import { onlineEvaluationListState } from "../../model/online-evaluation-list-state.ts";
 import { OnlineEvaluationsTable } from "../blocks/online-evaluations-table.tsx";
 import { FullWidthListPageContent } from "../elements/full-width-list-page-content.tsx";
-import { MonitorLink } from "../elements/monitor-link.tsx";
 import { MonitorReplicateDialog } from "./monitor-replicate-dialog.tsx";
 
-const DOCS_URL = "https://langwatch.ai/docs/evaluations/online-evaluation/overview";
+const DOCS_URL = "https://docs.langwatch.ai/evaluations/online-evaluation/overview";
 
 type MonitorRef = { id: string; name: string };
 
@@ -32,12 +32,11 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
   return (
     <>
       <PageLayout.HeaderButton
-        background="bg"
         data-testid="monitor-guardrail-open"
         onClick={() => host.openOverlay({ drawer: "guardrails" })}
       >
         <Shield size={16} />
-        Set up Guardrail
+        Set up guardrail
       </PageLayout.HeaderButton>
       <PageLayout.HeaderButton
         primary
@@ -45,7 +44,7 @@ function HeaderActions({ canManage }: { canManage: boolean }) {
         onClick={() => host.openOverlay({ drawer: "onlineEvaluation" })}
       >
         <Plus size={16} />
-        New Online Evaluation
+        New online evaluation
       </PageLayout.HeaderButton>
     </>
   );
@@ -110,7 +109,7 @@ export default function OnlineEvaluationsScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Online Evaluations</PageLayout.Heading>
+        <PageLayout.Heading>Online evaluations</PageLayout.Heading>
         <Spacer />
         <HStack gap={2}>
           <HeaderActions canManage={canManage} />
@@ -132,25 +131,9 @@ export default function OnlineEvaluationsScreen() {
           title="No online evaluations yet"
           description="Score live traces and threads as they arrive, or set up a synchronous guardrail that can block unsafe traffic."
           icon={<Activity size={24} />}
-          docsInfo={
-            <Text>
-              Learn more in the{" "}
-              <MonitorLink
-                href={DOCS_URL}
-                target="_blank"
-                rel="noreferrer"
-                style={{ color: "inherit", textDecoration: "underline" }}
-              >
-                online evaluations documentation
-              </MonitorLink>
-              .
-            </Text>
-          }
-        >
-          <HStack marginTop={4}>
-            <HeaderActions canManage={canManage} />
-          </HStack>
-        </NoDataInfoBlock>
+          docsHref={DOCS_URL}
+          secondaryAction={<SetupWithAgentButton surface="onlineEvaluations" />}
+        />
       )}
       {listState === "list" && (
         <FullWidthListPageContent>

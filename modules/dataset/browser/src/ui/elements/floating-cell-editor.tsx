@@ -166,7 +166,7 @@ export function FloatingCellEditor({
           resize="vertical"
           border="none"
           borderRadius="0"
-          fontSize="13px"
+          textStyle="bodySm"
           padding={2}
           _focus={{ outline: "none", boxShadow: "none" }}
         />
@@ -229,7 +229,9 @@ function useEditorPosition({
 
   useLayoutEffect(() => {
     const intended = intendedPositionRef.current;
-    if (!isEditing || !intended || offsetCorrectedRef.current) {
+    // Measure only once the placed style is on the editor; the render that
+    // opens it still holds the empty style and would read a bogus miss.
+    if (!isEditing || !intended || offsetCorrectedRef.current || style.position !== "fixed") {
       return;
     }
 
@@ -329,7 +331,7 @@ function EditorFooter({
     <Box
       paddingX={2}
       paddingY={1}
-      fontSize="10px"
+      textStyle="micro"
       color={validationError ? "red.fg" : "fg.muted"}
       borderTop="1px solid"
       borderColor={validationError ? "red.muted" : "border.muted"}

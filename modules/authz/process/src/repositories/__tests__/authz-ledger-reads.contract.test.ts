@@ -6,6 +6,7 @@
  */
 import { randomUUID } from "node:crypto";
 
+import { PROJECT_READER_ROLE_KEY, STORED_PRINCIPAL_KIND } from "@langwatch/authz-contract";
 import { createTenantId } from "@langwatch/eventing";
 import { PrismaDriverAdapterService } from "@langwatch/prisma-client";
 import { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -335,6 +336,36 @@ describe.each(backends)("given the ledger reads on the $name backend", (backend)
       expect(
         await ledgerReads.findLiveGrantRoleKey({ grantId: live.id, organizationId: id("org") }),
       ).toBeNull();
+    });
+
+    it("lists a reader's shared reads with their window, and a window that no longer parses as null", async () => {
+      const fixture = await open();
+      const { organizationId, repositories } = fixture;
+      const readerProjectId = id("project");
+      const sharedRead = (input: { scopeId: string; condition: unknown }) =>
+        grantRow({
+          organizationId,
+          principalType: STORED_PRINCIPAL_KIND.project,
+          principalId: readerProjectId,
+          roleKey: PROJECT_READER_ROLE_KEY,
+          scopeType: "PROJECT",
+          ...input,
+        });
+      const condition = { type: "trace", from: "1970-01-01T00:00:00Z" };
+      const windowed = sharedRead({ scopeId: "member_a", condition });
+      const malformed = sharedRead({ scopeId: "member_b", condition: { type: "not-a-store" } });
+      await attach(fixture, windowed);
+      await attach(fixture, malformed);
+
+      expect(
+        await repositories.ledgerReads.findLiveSharedProjectGrants({
+          organizationId,
+          readerProjectId,
+        }),
+      ).toEqual([
+        { grantId: windowed.id, memberProjectId: "member_a", condition },
+        { grantId: malformed.id, memberProjectId: "member_b", condition: null },
+      ]);
     });
 
     it("confirms a resource grant only in its own project", async () => {

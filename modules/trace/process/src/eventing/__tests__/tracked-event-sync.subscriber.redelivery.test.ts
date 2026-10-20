@@ -1,4 +1,4 @@
-import type { OtlpKeyValue, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpKeyValue, OtlpSpan } from "@langwatch/otlp/trace-request";
 /**
  * @vitest-environment node
  * @unit

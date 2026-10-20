@@ -58,30 +58,30 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/connect/instant-evals-classify`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:70)
-type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:48
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:71)
+type Response = z.infer<typeof hostedClassifyAnswerSchema>; // ../contract/src/connect-hosted.ts:65
 ```
 
 #### `POST /api/internal/gateway/connect/usage` · `getHostedUsage`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:84`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:85`.
 
 Answers at `/api/internal/gateway/connect/usage`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:85)
-type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../contract/src/connect-hosted.ts:83
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:87)
+type Response = z.infer<typeof hostedUsageAnswerSchema>; // ../contract/src/connect-hosted.ts:104
 ```
 
 #### `POST /api/internal/gateway/connect/budget` · `setHostedBudgetCap`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:92`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and the hosted Connect door verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/connect-hosted.rest.ts:94`.
 
 Answers at `/api/internal/gateway/connect/budget`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:93)
-// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:56
+// Rawbody: "text" (inline, src/transport/connect-hosted.rest.ts:96)
+// Response: hostedCapAnswerSchema, ../contract/src/connect-hosted.ts:72
 interface Response {
   cap_usd: number;
   maximum_cap_usd: number;

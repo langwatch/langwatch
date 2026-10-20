@@ -218,6 +218,7 @@ describe("Authz binding management reads", () => {
             scopeId: "team-1",
             scopeName: "Shared",
             permissions: ["traces:view"],
+            cappedBySeat: false,
           },
         ],
       },

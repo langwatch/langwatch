@@ -37,7 +37,7 @@ function lifecycleSenders({
     recordPersonalWorkspaceArchived: accepts,
     recordPersonalWorkspaceRevived: accepts,
     recordPersonalWorkspaceFeaturesChanged: accepts,
-    recordPresenceSettingChanged: accepts,
+    recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
     recordMemberDisabled: accepts,
     recordMemberEnabled: accepts,
     recordMemberRemoved: accepts,

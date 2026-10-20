@@ -4,17 +4,9 @@
  * @see specs/features/agents/connected-agents-ui.feature
  */
 
-import {
-  Box,
-  Button,
-  HStack,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import type { ReactNode } from "react";
 
@@ -33,63 +25,34 @@ export interface ConnectedAgentDrawerProps {
 export function ConnectedAgentDrawer(props: ConnectedAgentDrawerProps) {
   const agent = props.agent;
   return (
-    <Drawer.Root open={true} onOpenChange={({ open }) => !open && props.onClose()}>
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <AgentTitle agent={agent} />
-        </Drawer.Header>
-        <Drawer.Body>
-          <AgentBody
-            agent={agent}
-            isLoading={props.isLoading}
-            projectId={props.projectId}
-            inputs={props.inputs}
-          />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button colorPalette="blue" onClick={props.onClose} data-testid="connected-agent-close">
-              Close
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
-  );
-}
-
-/** The agent name, with its presence line under it. */
-function AgentTitle({ agent }: { agent: ConnectedAgentBrowser | null | undefined }) {
-  return (
-    <VStack align="start" gap={1}>
-      <Drawer.Title>{agent?.name ?? "Agent"}</Drawer.Title>
-      {agent ? <PresenceLine agent={agent} /> : null}
-    </VStack>
+    <Drawer
+      onClose={props.onClose}
+      title={agent?.name ?? "Agent"}
+      subtitle={agent ? <PresenceLine agent={agent} /> : void 0}
+      loading={props.isLoading}
+      footer={{
+        primaryAction: {
+          label: "Close",
+          onClick: props.onClose,
+          "data-testid": "connected-agent-close",
+        },
+      }}
+    >
+      <AgentBody agent={agent} projectId={props.projectId} inputs={props.inputs} />
+    </Drawer>
   );
 }
 
 /** The sections of the drawer, or the state that stands in for them. */
 function AgentBody({
   agent,
-  isLoading,
   projectId,
   inputs,
 }: {
   agent: ConnectedAgentBrowser | null | undefined;
-  isLoading: boolean;
   projectId: string;
   inputs?: ReactNode;
 }) {
-  if (isLoading) {
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner />
-      </HStack>
-    );
-  }
-
   if (!agent) {
     return <Text color="fg.muted">This agent is no longer in the project.</Text>;
   }
@@ -124,13 +87,14 @@ function PresenceLine({ agent }: { agent: ConnectedAgentBrowser }) {
     ...(sdk ? [sdk] : []),
   ];
   return (
-    <HStack gap={2} data-testid="connected-agent-presence">
+    <HStack as="span" gap={2} data-testid="connected-agent-presence">
       <Box
+        as="span"
         boxSize="8px"
         borderRadius="full"
         background={agent.status === "online" ? "green.solid" : "fg.subtle"}
       />
-      <Text fontSize="sm" color="fg.muted">
+      <Text as="span" fontSize="sm" color="fg.muted">
         {parts.join(" · ")}
       </Text>
     </HStack>
@@ -147,32 +111,32 @@ function ParametersTable({ agent }: { agent: ConnectedAgentBrowser }) {
           This agent declares no run parameters.
         </Text>
       ) : (
-        <Table.Root size="sm" variant="outline">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Type</Table.ColumnHeader>
-              <Table.ColumnHeader>Options</Table.ColumnHeader>
-              <Table.ColumnHeader>Default</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Parameters">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Type</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Options</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Default</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {agent.parameters.map((parameter) => (
-              <Table.Row key={parameter.name}>
-                <Table.Cell fontFamily="mono">{parameter.name}</Table.Cell>
-                <Table.Cell>{parameter.type ?? "string"}</Table.Cell>
-                <Table.Cell>
+              <ListTable.Row key={parameter.name}>
+                <ListTable.Cell mono>{parameter.name}</ListTable.Cell>
+                <ListTable.Cell>{parameter.type ?? "string"}</ListTable.Cell>
+                <ListTable.Cell>
                   {parameter.options?.length
                     ? parameter.options.map(String).join(", ")
                     : "any value"}
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   {parameter.defaultValue === undefined ? "none" : String(parameter.defaultValue)}
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
-        </Table.Root>
+          </ListTable.Body>
+        </ListTable>
       )}
     </VStack>
   );
@@ -188,30 +152,30 @@ function InstancesTable({ agent }: { agent: ConnectedAgentBrowser }) {
           No process is connected right now.
         </Text>
       ) : (
-        <Table.Root size="sm" variant="outline">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Hostname</Table.ColumnHeader>
-              <Table.ColumnHeader>Label</Table.ColumnHeader>
-              <Table.ColumnHeader>Process id</Table.ColumnHeader>
-              <Table.ColumnHeader>Connected</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Instances">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Hostname</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Label</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Process id</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Connected</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {agent.instances.map((instance) => (
-              <Table.Row key={instance.instanceId}>
-                <Table.Cell>{instance.hostname}</Table.Cell>
-                <Table.Cell>{instance.label ?? "none"}</Table.Cell>
-                <Table.Cell>{instance.pid}</Table.Cell>
-                <Table.Cell>
+              <ListTable.Row key={instance.instanceId}>
+                <ListTable.Cell>{instance.hostname}</ListTable.Cell>
+                <ListTable.Cell>{instance.label ?? "none"}</ListTable.Cell>
+                <ListTable.Cell>{instance.pid}</ListTable.Cell>
+                <ListTable.Cell>
                   {formatDistanceToNow(toEpochMs(instance.connectedAt), {
                     addSuffix: true,
                   })}
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
-        </Table.Root>
+          </ListTable.Body>
+        </ListTable>
       )}
     </VStack>
   );

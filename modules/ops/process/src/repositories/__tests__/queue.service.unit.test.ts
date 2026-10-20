@@ -32,6 +32,7 @@ function createGroup(overrides: Partial<GroupInfo> = {}): GroupInfo {
 function createMockRepo(overrides: Partial<QueueRepository> = {}): QueueRepository {
   return {
     discoverQueueNames: vi.fn().mockResolvedValue([]),
+    countWaitingJobs: vi.fn().mockResolvedValue(0),
     scanQueues: vi.fn().mockResolvedValue([]),
     getGroupJobs: vi.fn().mockResolvedValue({ jobs: [], total: 0 }),
     getBlockedSummary: vi.fn().mockResolvedValue({ totalBlocked: 0, clusters: [] }),
@@ -823,7 +824,7 @@ describe("QueueService", () => {
     });
   });
 
-  describe("unblockAll() given the queue name as the Ops UI shows it", () => {
+  describe("when unblockAll() is given the queue name as the Ops UI shows it", () => {
     it("unblocks the braced registered queue", async () => {
       const repo = createMockRepo({
         discoverQueueNames: vi.fn().mockResolvedValue(["{event-sourcing/jobs}"]),

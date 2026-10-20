@@ -17,10 +17,12 @@ import {
   themeCommands,
 } from "../model/command-catalogue.ts";
 import { getPageCommands } from "../model/command-page-commands.ts";
+import { withLlmOpsProductLabel } from "../model/product-commands.ts";
 import {
   useCommandFeatureFlags,
   useCommandProjectNavigation,
 } from "./use-command-feature-flags.ts";
+import { useProductCommands } from "./use-product-commands.ts";
 
 export interface FilteredCommands {
   navigation: Command[];
@@ -84,16 +86,22 @@ export function useFilteredCommands({
   const hasOpsAccess = host.opsAccess().hasAccess;
   const commandFeatureFlags = useCommandFeatureFlags();
   const projectNavigation = useCommandProjectNavigation();
+  const productCommands = useProductCommands();
 
   const availableNavCommands = useMemo(() => {
     const commands = hasOpsAccess
       ? navigationCommands
       : navigationCommands.filter((cmd) => !cmd.id.startsWith("nav-ops"));
-    return filterCommandsByProjectNavigation({
-      commands: filterCommandsByFeatureFlags({ commands, flags: commandFeatureFlags }),
-      navigation: projectNavigation,
-    });
-  }, [hasOpsAccess, commandFeatureFlags, projectNavigation]);
+    return [
+      ...withLlmOpsProductLabel(
+        filterCommandsByProjectNavigation({
+          commands: filterCommandsByFeatureFlags({ commands, flags: commandFeatureFlags }),
+          navigation: projectNavigation,
+        }),
+      ),
+      ...productCommands,
+    ];
+  }, [hasOpsAccess, commandFeatureFlags, projectNavigation, productCommands]);
 
   const filteredNavigation = useMemo(
     () =>

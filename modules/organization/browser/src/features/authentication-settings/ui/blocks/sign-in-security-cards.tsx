@@ -1,10 +1,10 @@
 import type { SignInSecuritySettings } from "@langwatch/auth-contract";
+import { Banner } from "@langwatch/design-system/banner";
 /**
  * The two sign-in security cards (GAC-09, GAC-10). Presentational: each is
  * handed the saved settings and a save callback, and keeps its own draft.
  */
 import {
-  Alert,
   Button,
   HStack,
   Input,
@@ -116,11 +116,11 @@ function NumberField({
           onChange={(event) => onChange(Number(event.target.value || 0))}
           data-testid={testId}
         />
-        <Text fontSize="12px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           {suffix}
         </Text>
       </HStack>
-      <Text color="fg.muted" fontSize="11.5px">
+      <Text textStyle="caption" color="fg.muted">
         {hint}
       </Text>
     </VStack>
@@ -274,18 +274,14 @@ export function SessionLimitCard({ settings, saving, onSave }: CardProps) {
       </RadioGroup.Root>
 
       {maximumIsUnreachable && (
-        <Alert.Root size="sm" status="warning" data-testid="session-limit-unreachable">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
-              A maximum shorter than the inactivity limit would never be reached.
-            </Alert.Title>
-            <Alert.Description>
-              Everyone would be signed out for inactivity first. Raise the maximum above the
-              inactivity limit, or leave it empty.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner
+          status="warning"
+          data-testid="session-limit-unreachable"
+          title={<>A maximum shorter than the inactivity limit would never be reached.</>}
+        >
+          Everyone would be signed out for inactivity first. Raise the maximum above the inactivity
+          limit, or leave it empty.
+        </Banner>
       )}
 
       {bounded && (

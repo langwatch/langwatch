@@ -4,7 +4,8 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  */
 
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, chakra } from "@langwatch/design-system/primitives";
 import { useCallback, useState } from "react";
 
 import { useVoiceAgentsEnabled } from "../../../../behavior/use-voice-agents-enabled.ts";
@@ -96,23 +97,6 @@ function withOpenList({
   if (isOpen) next.add(id);
   else next.delete(id);
   return next;
-}
-
-function RunDialogHeader({ subject }: { subject: RunDialogSubject }) {
-  return (
-    <Dialog.Header
-      borderBottomWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3.5}
-      display="block"
-    >
-      <Dialog.Title fontSize="14px" fontWeight="semibold">
-        {dialogTitle(subject)}
-      </Dialog.Title>
-      <Dialog.CloseTrigger />
-    </Dialog.Header>
-  );
 }
 
 /**
@@ -209,38 +193,29 @@ function RunDialogContent({
   const voiceAgentsEnabled = useVoiceAgentsEnabled();
   const voiceCall = voiceAgentsEnabled ? voiceCallTargetOf({ form, subject }) : null;
 
+  const showsCall = isCalling && voiceCall;
+
   return (
-    <Dialog.Root
-      open={!!subject}
-      onOpenChange={({ open }) => {
-        if (!open && !controller.isBusy) onClose();
-      }}
-      placement="center"
-      closeOnEscape={!isNameListOpen && openLists.size === 0}
-      // The evaluator list and the evaluator editor open as drawers over the
-      // dialog; a click inside them must not read as a click outside it.
-      closeOnInteractOutside={!form.isEvaluatorFlowOpen}
-    >
-      <Dialog.Content
-        bg="bg.panel"
-        maxWidth="600px"
-        onClick={(event) => event.stopPropagation()}
+    // Portal clicks must not reach a clickable ancestor (a table row).
+    <chakra.div display="contents" onClick={(event) => event.stopPropagation()}>
+      <Dialog
+        open={!!subject}
+        onClose={onClose}
+        title={dialogTitle(subject)}
+        size="detail"
+        placement="center"
+        ground="panel"
+        body="flush"
+        bodyScroll="content"
+        footerDivider
+        busy={controller.isBusy}
+        closeOnEscape={!isNameListOpen && openLists.size === 0}
+        // The evaluator list and the evaluator editor open as drawers over the
+        // dialog; a click inside them must not read as a click outside it.
+        closeOnInteractOutside={!form.isEvaluatorFlowOpen}
         data-testid={subject.kind === "case" ? "run-case-dialog" : "run-dialog"}
-      >
-        <RunDialogHeader subject={subject} />
-        {isCalling && voiceCall ? (
-          <RunDialogCallBody voiceCall={voiceCall} onBack={() => setIsCalling(false)} />
-        ) : (
-          <>
-            <Dialog.Body paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
-              <OpenListContext.Provider value={reportOpenList}>
-                <RunDialogFields
-                  form={form}
-                  isBusy={controller.isBusy}
-                  onNameListOpenChange={setIsNameListOpen}
-                />
-              </OpenListContext.Provider>
-            </Dialog.Body>
+        footerContent={
+          showsCall ? null : (
             <RunDialogFooter
               controller={controller}
               isRunBlocked={isRunBlocked({ form, controller })}
@@ -256,10 +231,24 @@ function RunDialogContent({
               targetCount={form.runTargets.length}
               onClose={onClose}
             />
-          </>
+          )
+        }
+      >
+        {showsCall ? (
+          <RunDialogCallBody voiceCall={voiceCall} onBack={() => setIsCalling(false)} />
+        ) : (
+          <Box paddingX={5} paddingY={4} maxHeight="58vh" overflowY="auto">
+            <OpenListContext.Provider value={reportOpenList}>
+              <RunDialogFields
+                form={form}
+                isBusy={controller.isBusy}
+                onNameListOpenChange={setIsNameListOpen}
+              />
+            </OpenListContext.Provider>
+          </Box>
         )}
-      </Dialog.Content>
-    </Dialog.Root>
+      </Dialog>
+    </chakra.div>
   );
 }
 

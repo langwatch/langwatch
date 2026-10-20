@@ -1,6 +1,6 @@
 import { evaluationReportedEventSchema } from "@langwatch/evaluation-contract";
 
-/** Copied from visualdiff-check's retrying groups (2026-09-30), trace parents scrubbed. */
+/** Copied from a local check stack's retrying groups (2026-09-30), trace parents scrubbed. */
 export const monitorReportedEvent = evaluationReportedEventSchema.parse({
   id: "event_0008XTx1qwzk3zbsSwDKyby8xNFke",
   version: "2025-01-14",

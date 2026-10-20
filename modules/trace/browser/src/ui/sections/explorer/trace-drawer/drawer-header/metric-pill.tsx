@@ -1,8 +1,7 @@
 import { Chip, type ChipTone } from "@langwatch/design-system/chip";
 import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { useCallback } from "react";
-import { LuArrowUpRight, LuFilter, LuPin, LuSparkles } from "react-icons/lu";
+import { LuArrowUpRight, LuFilter, LuPin } from "react-icons/lu";
 
 import type { PinnedAttribute } from "../../../../../features/facet/behavior/pinned-attributes.store.ts";
 import { useCopyToClipboard } from "../../../../../index.ts";
@@ -25,9 +24,9 @@ export function MetricPill({
 }
 
 /**
- * MetricPill-shaped pill for a pinned (or auto-pinned) attribute. Sits inline with
- * Duration/Cost/Tokens so the user sees their pinned attrs exactly where they expect
- * scannable data — not as a separate strip up top.
+ * A pinned (or auto-pinned) attribute in the same anatomy as every other header chip:
+ * neutral pill, muted label, value. A user pin leads with the pin that unpins it; the
+ * jump and filter actions show on hover or focus only.
  */
 export function PinnedMetricPill({
   pin,
@@ -56,10 +55,10 @@ export function PinnedMetricPill({
   const display = value ?? "—";
   const label = pin.label ?? pin.key;
 
-  const handleCopy = useCallback(() => {
+  const handleCopy = () => {
     if (value == null) return;
     copy(value);
-  }, [copy, value]);
+  };
 
   const pinSourceLabel = pin.source === "resource" ? "Resource" : "Attribute";
   const sourceLabel = auto ? "Auto-pinned" : pinSourceLabel;
@@ -77,54 +76,40 @@ export function PinnedMetricPill({
     </VStack>
   );
 
-  const fg = auto ? "purple.fg" : "blue.fg";
-  const bg = auto ? "purple.solid/8" : "blue.solid/8";
-  const border = auto ? "purple.solid/30" : "blue.solid/30";
-
   return (
     <Tooltip content={tooltipBody} positioning={{ placement: "top" }}>
       <HStack
+        className="group"
         gap={1.5}
-        paddingX={2.5}
+        paddingX={2}
         paddingY={0.5}
         borderRadius="full"
         borderWidth="1px"
-        borderColor={border}
-        bg={bg}
+        borderColor="border.control"
+        bg="bg.control"
         maxWidth="260px"
         minWidth={0}
         overflow="hidden"
-        transition="filter 0.12s ease"
-        _hover={{ filter: "brightness(1.05)" }}
       >
-        {/* Pin icon — non-auto pins click here to unpin. Auto pins are
-            non-removable, so the icon is decorative only. */}
-        <Box
-          as={auto ? "span" : "button"}
-          onClick={
-            auto
-              ? undefined
-              : (e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  onUnpin(pin.source, pin.key);
-                }
-          }
-          aria-label={auto ? undefined : `Unpin ${pin.key}`}
-          cursor={auto ? "default" : "pointer"}
-          display="inline-flex"
-          alignItems="center"
-          flexShrink={0}
-        >
-          <Icon as={auto ? LuSparkles : LuPin} boxSize={3} color={fg} flexShrink={0} />
-        </Box>
-        {/* Mixed-case + no letter-spacing so pinned-attribute labels
-            (e.g. "User", "Conversation") read at the same rhythm as
-            the neutral Chip labels above ("Duration", "Origin"). The
-            previous uppercase + tracked-out treatment made auto-pins
-            stand out as a separate visual language for no reason. */}
+        {!auto && (
+          <Box
+            as="button"
+            onClick={(e: React.MouseEvent) => {
+              e.stopPropagation();
+              onUnpin(pin.source, pin.key);
+            }}
+            aria-label={`Unpin ${pin.key}`}
+            cursor="pointer"
+            display="inline-flex"
+            alignItems="center"
+            flexShrink={0}
+          >
+            <Icon as={LuPin} boxSize={3} color="fg.muted" flexShrink={0} />
+          </Box>
+        )}
         <Text
           textStyle="2xs"
-          color={fg}
+          color="fg.muted"
           fontWeight="medium"
           truncate
           flexShrink={0}
@@ -132,11 +117,7 @@ export function PinnedMetricPill({
         >
           {label}
         </Text>
-        {/* Value: click copies. The chip body itself is the affordance —
-            the dedicated copy icon was dropped to claim back the
-            horizontal space (every pin previously ate ~14px of icon
-            chrome). Tooltip + the "copied" text replacing the value on
-            click are now the cue. */}
+        {/* Value: click copies; the "copied" text replacing the value is the cue. */}
         <Box
           as="button"
           onClick={(e: React.MouseEvent) => {
@@ -172,15 +153,9 @@ export function PinnedMetricPill({
                 onNavigate();
               }}
               aria-label={navigateLabel ?? `Open ${pin.key}`}
-              cursor="pointer"
-              display="inline-flex"
-              alignItems="center"
-              flexShrink={0}
-              opacity={0.55}
-              _hover={{ opacity: 1 }}
-              transition="opacity 0.12s ease"
+              {...HOVER_ACTION_PROPS}
             >
-              <Icon as={LuArrowUpRight} boxSize={2.5} color={fg} />
+              <Icon as={LuArrowUpRight} boxSize={3} color="fg.muted" />
             </Box>
           </Tooltip>
         )}
@@ -192,18 +167,26 @@ export function PinnedMetricPill({
               onFilter();
             }}
             aria-label={`Filter table by ${pin.key}`}
-            cursor="pointer"
-            display="inline-flex"
-            alignItems="center"
-            flexShrink={0}
-            opacity={0.55}
-            _hover={{ opacity: 1 }}
-            transition="opacity 0.12s ease"
+            {...HOVER_ACTION_PROPS}
           >
-            <Icon as={LuFilter} boxSize={2.5} color={fg} />
+            <Icon as={LuFilter} boxSize={3} color="fg.muted" />
           </Box>
         )}
       </HStack>
     </Tooltip>
   );
 }
+
+// A chip's secondary actions keep their room but show only while the chip is hovered,
+// or while the action itself has keyboard focus.
+const HOVER_ACTION_PROPS = {
+  cursor: "pointer",
+  display: "inline-flex",
+  alignItems: "center",
+  flexShrink: 0,
+  opacity: 0,
+  transition: "opacity 0.12s ease",
+  _groupHover: { opacity: 0.7 },
+  _hover: { opacity: 1 },
+  _focusVisible: { opacity: 1 },
+} as const;

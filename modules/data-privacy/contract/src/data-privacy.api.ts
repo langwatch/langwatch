@@ -1,5 +1,5 @@
 import { moduleApi } from "@langwatch/module";
-import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 
 import type { DataPrivacySnapshot } from "./data-privacy.snapshot.ts";
 import type {

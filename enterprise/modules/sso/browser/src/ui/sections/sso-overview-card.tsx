@@ -6,7 +6,9 @@ import { UpgradeRequired } from "@langwatch/design-system/access-state";
  * read, or what a connection would do before there is one. Declared through
  * `withCapabilities`. Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { OverviewCard, OverviewDetail, StatusChip } from "@langwatch/design-system/settings-card";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
 import { ArrowRight, ExternalLink, RefreshCw, Settings2 } from "lucide-react";
@@ -26,6 +28,7 @@ import { updateChipFor } from "../../model/migration-route.ts";
 import { setupProgressFor } from "../../model/setup-progress.ts";
 import { domainClaimsOf, goLiveFactsOf, routedDomainEvidenceOf } from "../../model/setup-view.ts";
 import { useSsoHost } from "../../model/sso-host.ts";
+import { LegacyDomainToMoveNotice } from "../elements/legacy-domain-to-move-notice.tsx";
 import { AvailabilityRefusalNotice, LoadFailure } from "../elements/refusals.tsx";
 import { TestSignInFailureNotice } from "../elements/test-sign-in-failure-notice.tsx";
 
@@ -53,6 +56,9 @@ export function SsoOverviewCard({ organizationId }: { organizationId: string }) 
   return (
     <VStack align="stretch" gap={3} width="full" height="full">
       {refusal && <AvailabilityRefusalNotice refusal={refusal} />}
+      {canManage && view && view.legacyDomainsToMove.length > 0 && (
+        <LegacyDomainToMoveNotice domains={view.legacyDomainsToMove} settingsHref={PROVIDER_PAGE} />
+      )}
       {view && connection?.state === "ACTIVE" ? (
         <SingleSignOnCard view={view} connection={connection} canManage={canOffer} />
       ) : (
@@ -100,9 +106,11 @@ function DomainsDetail({ view, canManage }: { view: SsoSetupPageView; canManage:
     <OverviewDetail label="Domains">
       <VStack align="start" gap={2}>
         {rows.length === 0 ? (
-          <Text color="fg.muted" data-testid="domains-empty">
-            No domain has been claimed yet.
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No domain has been claimed yet."
+            testId="domains-empty"
+          />
         ) : (
           <HStack gap={1} flexWrap="wrap">
             {rows.map((row) => {
@@ -249,15 +257,9 @@ function UpdateNotice({
   if (connection.source !== "legacy-grandfathered") return null;
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.emphasized"
-      borderRadius="md"
-      padding={3}
-      data-testid="sso-update-notice"
-    >
+    <Card variant="nested" data-testid="sso-update-notice">
       <VStack align="stretch" gap={2}>
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           {canManage
             ? "LangWatch set this single sign-on up for your organization. Connect your own identity provider to run it yourself."
             : "LangWatch set this single sign-on up for your organization. An organization administrator can connect your own identity provider to run it yourselves."}
@@ -271,7 +273,7 @@ function UpdateNotice({
           </Button>
         )}
       </VStack>
-    </Box>
+    </Card>
   );
 }
 

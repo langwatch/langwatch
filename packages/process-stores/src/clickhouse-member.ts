@@ -1,6 +1,11 @@
 /** One ClickHouse client that routes itself. Modules never resolve endpoints
  * because every statement carries tenantId filtering, enforced by this driver. */
-import { createClient, type ClickHouseClient, type ClickHouseSettings } from "@clickhouse/client";
+import {
+  createClient,
+  type ClickHouseClient,
+  type ClickHouseClientConfigOptions,
+  type ClickHouseSettings,
+} from "@clickhouse/client";
 import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
@@ -10,13 +15,16 @@ import {
   ClickHouseQueryClient,
   ClickHouseShutdownService,
   ClickHouseStatementAdmission,
+  ClickHouseUnavailableErrorFactory,
   detectColdScan,
   RetryPolicy,
   routingDriver,
   setWindowedReadMetrics,
   StatementReporter,
   TenantGuard,
+  vendorLoggerClassFor,
   type StatementMetrics,
+  type VendorLogSink,
   type WindowedReadMetrics,
   type ClickHouseClientCreationInput,
   type ClickHouseLaneStats,
@@ -31,23 +39,43 @@ import { counter, histogram, observableGauge } from "@langwatch/observability/me
 
 import type { ClickHouseConfig } from "./config.ts";
 import type { BuiltMember } from "./datastore-members.ts";
+import { PrivateDataplaneRefusals } from "./private-dataplane-refusal.ts";
 
 /** The vendor client, built once per physical endpoint this process reaches. */
 class VendorClickHouseClientFactory extends ClickHouseClientFactory<ClickHouseClient> {
+  private readonly logSink = createLogger("langwatch:clickhouse:driver");
+
   constructor(private readonly config: ClickHouseConfig) {
     super();
   }
 
   create(input: ClickHouseClientCreationInput): ClickHouseClient {
-    return createClient({
-      url: input.url,
-      max_open_connections: input.maxOpenConnections,
-      ...(this.config.requestTimeoutMs === undefined
-        ? {}
-        : { request_timeout: this.config.requestTimeoutMs }),
-      clickhouse_settings: vendorClickHouseSettings(this.config.settings),
-    });
+    return createClient(
+      vendorClickHouseClientOptions({ config: this.config, input, logSink: this.logSink }),
+    );
   }
+}
+
+/**
+ * The driver logs through the process's logger, whose policy drops the driver's own error: the
+ * retry wrapper warns per attempt, and only the final failure reaches the caller.
+ */
+export function vendorClickHouseClientOptions({
+  config,
+  input,
+  logSink,
+}: {
+  config: ClickHouseConfig;
+  input: Pick<ClickHouseClientCreationInput, "url" | "maxOpenConnections">;
+  logSink: VendorLogSink;
+}): ClickHouseClientConfigOptions {
+  return {
+    url: input.url,
+    max_open_connections: input.maxOpenConnections,
+    ...(config.requestTimeoutMs === undefined ? {} : { request_timeout: config.requestTimeoutMs }),
+    clickhouse_settings: vendorClickHouseSettings(config.settings),
+    log: { LoggerClass: vendorLoggerClassFor(logSink) },
+  };
 }
 
 /** JS Dates travel as ISO strings, which ClickHouse parses only best-effort, as main always set. */
@@ -127,6 +155,27 @@ class ClickHouseOverloadedError extends HandledError {
 export class OverloadedRefusal extends ClickHouseOverloadErrorFactory {
   create({ cause }: { cause: unknown }): unknown {
     return new ClickHouseOverloadedError({ reasons: cause instanceof Error ? [cause] : [] });
+  }
+}
+
+/** Main's refusal for a read whose ClickHouse did not answer (analytics-contract's twin). */
+class ClickHouseUnavailableError extends HandledError {
+  declare readonly code: "clickhouse_unavailable";
+
+  constructor(options: { reasons?: readonly Error[] } = {}) {
+    super("clickhouse_unavailable", "Database temporarily unavailable", {
+      httpStatus: 503,
+      fault: "platform",
+      ...remediation("clickhouse_unavailable"),
+      reasons: options.reasons,
+    });
+    this.name = "ClickHouseUnavailableError";
+  }
+}
+
+export class UnavailableRefusal extends ClickHouseUnavailableErrorFactory {
+  create({ cause }: { cause: Error }): unknown {
+    return new ClickHouseUnavailableError({ reasons: [cause] });
   }
 }
 
@@ -227,12 +276,14 @@ export function buildClickHouse(options: {
       // only name this process knows that is safe to print.
       cluster: route.organizationId,
     })),
+    malformedPrivateRoutes: config.malformedRoutes ?? [],
     ...(config.poolSizing === undefined ? {} : { poolSizing: config.poolSizing }),
   });
 
   const connection = ClickHouseConnectionService.create({
     directory: options.directory,
     clientFactory: new VendorClickHouseClientFactory(config),
+    refusal: PrivateDataplaneRefusals.create().forClickHouse(),
     ...(config.maxTenantCacheEntries === undefined
       ? {}
       : { maxTenantCacheEntries: config.maxTenantCacheEntries }),
@@ -278,9 +329,22 @@ export function buildClickHouse(options: {
     }),
     reporter,
     limiter: admission,
+    unavailableErrorFactory: new UnavailableRefusal(),
+    overloadErrorFactory: new OverloadedRefusal(),
     privateRoutes: new Map(
       (config.privateRoutes ?? []).map((route) => [route.organizationId, route.url]),
     ),
+    privateRouteVariables: [
+      ...(config.privateRoutes ?? []).flatMap(({ organizationId, label, variable }) =>
+        variable === undefined
+          ? []
+          : [{ organizationId, label: label ?? "", variable, state: "present" as const }],
+      ),
+      ...(config.malformedRoutes ?? []).map((route) => ({
+        ...route,
+        state: "malformed" as const,
+      })),
+    ],
   });
 
   return {

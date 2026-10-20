@@ -9,7 +9,6 @@ import type { Instant } from "@langwatch/time";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import {
   DIALOG_FIELD_STYLE,
   FieldLabel,
@@ -169,15 +168,15 @@ function RunNameOptions({ list }: { list: RunNameList }) {
           data-testid={`run-dialog-name-option-${option.key}`}
         >
           <HStack gap={2} alignItems="baseline">
-            <Text fontSize="12.5px" fontWeight="medium" truncate>
+            <Text textStyle="bodySm" fontWeight="medium" truncate>
               {option.name}
             </Text>
-            <Text fontSize="11px" color={FG_MUTED} whiteSpace="nowrap">
+            <Text textStyle="micro" color="fg.muted" whiteSpace="nowrap">
               {lastRunLabel(option.lastRunAt)}
             </Text>
           </HStack>
           {option.detail && (
-            <Text fontSize="11px" color={FG_MUTED} truncate>
+            <Text textStyle="micro" color="fg.muted" truncate>
               {option.detail}
             </Text>
           )}
@@ -275,7 +274,7 @@ export function RunNameField({
             justifyContent="center"
             boxSize="24px"
             borderRadius="md"
-            color={FG_MUTED}
+            color="fg.muted"
             cursor="pointer"
             boxShadow="none"
             _hover={{ background: "bg.muted", color: "fg" }}

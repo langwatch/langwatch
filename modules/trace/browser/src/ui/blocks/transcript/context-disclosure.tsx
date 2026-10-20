@@ -26,7 +26,7 @@ export function ContextDisclosure({ context }: { context: string }) {
       >
         <Icon as={open ? LuChevronDown : LuChevronRight} boxSize={3} marginEnd={1} />
         <Icon as={LuFileText} boxSize={3} marginEnd={1.5} />
-        <Text textStyle="xs" fontWeight="500">
+        <Text textStyle="xs" fontWeight="medium">
           {open ? "Hide additional context" : "Hidden additional context"}
         </Text>
       </Button>

@@ -1,4 +1,6 @@
-import { Box, Button, Card, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Button } from "@langwatch/design-system/primitives";
 import type { PipelineNode } from "@langwatch/ops-contract";
 import { useState } from "react";
 
@@ -79,77 +81,71 @@ export function PipelineTreeCard({
   }
 
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
-          <Text textStyle="sm" fontWeight="medium">
-            Pipeline Tree
-          </Text>
-          <Spacer />
-          {pipelineTree.length > 0 && (
-            <PipelineTreeFilter
-              filter={filter}
-              onFilterChange={setFilter}
-              onExpandAll={handleExpandAll}
-              onCollapseAll={() => setExpandedPaths(new Set())}
-            />
-          )}
-        </HStack>
-
-        {pipelineTree.length === 0 && (
-          <Box padding={4}>
-            <Text textStyle="xs" color="fg.muted">
-              No pipelines discovered yet.
-            </Text>
-          </Box>
-        )}
-        {pipelineTree.length > 0 && filteredTree === null && (
-          <Box padding={4}>
-            <Text textStyle="xs" color="fg.muted">
-              No pipelines match &quot;{filter}&quot;
-            </Text>
-          </Box>
-        )}
-        {pipelineTree.length > 0 && filteredTree !== null && (
-          <>
-            {filteredTree.map((node) => (
-              <Box
-                key={node.name}
-                // Revealed idle pipelines stay distinguishable from working
-                // ones rather than padding the list back out again.
-                opacity={idleNames.has(node.name) ? 0.55 : 1}
-                data-idle={idleNames.has(node.name) ? "true" : "false"}
+    <Card
+      padding="none"
+      title="Pipeline Tree"
+      actions={
+        pipelineTree.length > 0 ? (
+          <PipelineTreeFilter
+            filter={filter}
+            onFilterChange={setFilter}
+            onExpandAll={handleExpandAll}
+            onCollapseAll={() => setExpandedPaths(new Set())}
+          />
+        ) : (
+          void 0
+        )
+      }
+    >
+      {pipelineTree.length === 0 && (
+        <Box paddingX={4} paddingBottom={2}>
+          <NoDataInfoBlock size="line" title="No pipelines discovered yet." />
+        </Box>
+      )}
+      {pipelineTree.length > 0 && filteredTree === null && (
+        <Box paddingX={4} paddingBottom={2}>
+          <NoDataInfoBlock size="line" title={`No pipelines match "${filter}"`} />
+        </Box>
+      )}
+      {pipelineTree.length > 0 && filteredTree !== null && (
+        <>
+          {filteredTree.map((node) => (
+            <Box
+              key={node.name}
+              // Revealed idle pipelines stay distinguishable from working
+              // ones rather than padding the list back out again.
+              opacity={idleNames.has(node.name) ? 0.55 : 1}
+              data-idle={idleNames.has(node.name) ? "true" : "false"}
+            >
+              <PipelineTreeNode
+                node={node}
+                parentPath=""
+                depth={0}
+                pausedKeys={pausedKeySet}
+                expandedPaths={expandedPaths}
+                onToggleExpand={handleToggleExpand}
+                onPause={handlePause}
+                onUnpause={handleUnpause}
+                hasAccess={hasAccess}
+              />
+            </Box>
+          ))}
+          {idle.length > 0 && (
+            <Box paddingX={4} paddingY={2}>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowIdle((prior) => !prior)}
+                data-testid="ops-idle-pipelines-toggle"
               >
-                <PipelineTreeNode
-                  node={node}
-                  parentPath=""
-                  depth={0}
-                  pausedKeys={pausedKeySet}
-                  expandedPaths={expandedPaths}
-                  onToggleExpand={handleToggleExpand}
-                  onPause={handlePause}
-                  onUnpause={handleUnpause}
-                  hasAccess={hasAccess}
-                />
-              </Box>
-            ))}
-            {idle.length > 0 && (
-              <Box paddingX={4} paddingY={2}>
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowIdle((prior) => !prior)}
-                  data-testid="ops-idle-pipelines-toggle"
-                >
-                  {showIdle
-                    ? `Hide ${idle.length} idle pipelines`
-                    : `Show ${idle.length} idle pipelines`}
-                </Button>
-              </Box>
-            )}
-          </>
-        )}
-      </Card.Body>
-    </Card.Root>
+                {showIdle
+                  ? `Hide ${idle.length} idle pipelines`
+                  : `Show ${idle.length} idle pipelines`}
+              </Button>
+            </Box>
+          )}
+        </>
+      )}
+    </Card>
   );
 }

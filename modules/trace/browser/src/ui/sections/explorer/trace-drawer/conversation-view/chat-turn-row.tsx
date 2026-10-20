@@ -436,7 +436,7 @@ function RedactedTurnLine({
         <Box flex={1} minWidth={0}>
           <Text
             textStyle="2xs"
-            fontWeight="600"
+            fontWeight="semibold"
             color={palette.fg}
             textTransform="uppercase"
             letterSpacing="0.06em"
@@ -456,7 +456,12 @@ function RedactedTurnLine({
       <VStack align={side === "right" ? "flex-end" : "flex-start"} gap={1} maxWidth="78%">
         <HStack gap={1.5} color={palette.fg}>
           <Icon boxSize="13px">{icon}</Icon>
-          <Text textStyle="2xs" fontWeight="600" textTransform="uppercase" letterSpacing="0.06em">
+          <Text
+            textStyle="2xs"
+            fontWeight="semibold"
+            textTransform="uppercase"
+            letterSpacing="0.06em"
+          >
             {label}
           </Text>
         </HStack>
@@ -579,7 +584,7 @@ function ThreadMessage({
         <HStack gap={1.5} marginBottom={1} align="center">
           <Text
             textStyle="2xs"
-            fontWeight="600"
+            fontWeight="semibold"
             color={isError ? "red.fg" : palette.fg}
             textTransform="uppercase"
             letterSpacing="0.06em"
@@ -599,7 +604,7 @@ function ThreadMessage({
               }${annotation!.hasCorrection ? ", includes correction" : ""}`}
             >
               <Icon as={MessageSquare} boxSize="10px" />
-              <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+              <Text textStyle="2xs" fontWeight="semibold" lineHeight="1">
                 {annotation!.count}
               </Text>
               {annotation!.hasCorrection && (
@@ -625,7 +630,7 @@ function ThreadMessage({
           <Box
             color={isError ? "red.fg" : "fg"}
             css={{
-              "& > div": { fontSize: "13.5px", lineHeight: "1.6" },
+              "& > div": { textStyle: "bodySm", lineHeight: "1.6" },
               "& h1": { fontSize: "1.15em !important" },
               "& h2": { fontSize: "1.1em !important" },
               "& h3": { fontSize: "1.05em !important" },
@@ -708,7 +713,7 @@ function TurnLedger({
       <Text
         textStyle="2xs"
         color={isHighlighted ? "blue.fg" : "fg.subtle"}
-        fontWeight="600"
+        fontWeight="semibold"
         textTransform="uppercase"
         letterSpacing="0.06em"
       >
@@ -728,7 +733,7 @@ function TurnLedger({
           <Text
             textStyle="2xs"
             color="red.fg"
-            fontWeight="600"
+            fontWeight="semibold"
             textTransform="uppercase"
             letterSpacing="0.06em"
           >

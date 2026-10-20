@@ -482,6 +482,63 @@ describe("the scenario-events REST declaration", () => {
     });
   });
 
+  describe("when a stored event reaches live viewers", () => {
+    /** @scenario "Storing a message snapshot broadcasts a reset frame" */
+    it("stores it, then broadcasts a structural reset frame for the run", async () => {
+      const calls: string[] = [];
+      const messageSnapshot = vi.fn(async () => {
+        calls.push("stored");
+      });
+      const publishProjectEvent = vi.fn(async () => {
+        calls.push("broadcast");
+      });
+      const family = await buildEventFamily({
+        simulations: { messageSnapshot },
+        presence: { publishProjectEvent },
+      });
+
+      const response = await postJson(family, "/api/scenario-events", {
+        type: "SCENARIO_MESSAGE_SNAPSHOT",
+        timestamp: 1,
+        batchRunId: "batch-a",
+        scenarioId: "scenario-a",
+        scenarioRunId: "run-a",
+        scenarioSetId: "default",
+        messages: [{ id: "m0", role: "user", content: "hi" }],
+      });
+
+      expect(response.status).toBe(201);
+      expect(publishProjectEvent).toHaveBeenCalledWith({
+        projectId: PROJECT_ID,
+        channel: "simulation_updated",
+        event: JSON.stringify({ e: "R", r: "run-a", b: "batch-a" }),
+        tier: "structural",
+      });
+      expect(calls).toEqual(["stored", "broadcast"]);
+    });
+
+    it("leaves a finished run to the debounced update, without a live frame", async () => {
+      const publishProjectEvent = vi.fn(async () => {});
+      const family = await buildEventFamily({
+        simulations: { finishRun: vi.fn(async () => {}) },
+        presence: { publishProjectEvent },
+      });
+
+      const response = await postJson(family, "/api/scenario-events", {
+        type: "SCENARIO_RUN_FINISHED",
+        timestamp: 1,
+        batchRunId: "batch-a",
+        scenarioId: "scenario-a",
+        scenarioRunId: "run-a",
+        scenarioSetId: "default",
+        status: "SUCCESS",
+      });
+
+      expect(response.status).toBe(201);
+      expect(publishProjectEvent).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when ingesting inline media", () => {
     /** @scenario "Storage put failure aborts the entire event with a 5xx and no partial state" */
     it("dispatches no event after extraction fails", async () => {

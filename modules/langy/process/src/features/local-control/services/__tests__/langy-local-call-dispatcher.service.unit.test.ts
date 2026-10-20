@@ -8,9 +8,11 @@ import type { SessionStateStore } from "@langwatch/redis-client/session-state";
  */
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
+import { LangyLocalCallRedisRepository } from "../../../../repositories/redis/redis.langy-local-call.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import type { WorkspaceNudge } from "../../../../rules/langy-local-call-record.rules.ts";
-import { callKey, workspaceChannel } from "../../../../rules/langy-local-control-keys.rules.ts";
+import { callKey } from "../../../../rules/langy-local-control-keys.rules.ts";
 import type { LocalCallLookup } from "../langy-local-call-dispatcher.service.ts";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
@@ -20,6 +22,8 @@ const turnId = "turn_1";
 
 let now = 1_700_000_000_000;
 let store: SessionStateStore;
+let calls: LangyLocalCallRedisRepository;
+let channel: MemoryLangyLocalWorkspaceChannel;
 let presence: LangyLocalPresenceRedisRepository;
 let dispatcher: LocalCallDispatcherService;
 
@@ -48,18 +52,19 @@ function listCall() {
 /** Every nudge published on the conversation's channel, in order. */
 async function collectNudges(): Promise<WorkspaceNudge[]> {
   const seen: WorkspaceNudge[] = [];
-  await store.subscribe(workspaceChannel(conversationId), (raw) => {
-    seen.push(JSON.parse(raw) as WorkspaceNudge);
-  });
+  await channel.listen({ conversationId, onNudge: (nudge) => seen.push(nudge) });
   return seen;
 }
 
 beforeEach(() => {
   now = 1_700_000_000_000;
   store = memorySessionState({ now: () => now });
+  calls = LangyLocalCallRedisRepository.create({ store });
+  channel = MemoryLangyLocalWorkspaceChannel.create();
   presence = LangyLocalPresenceRedisRepository.create({ store, now: () => now });
   dispatcher = LocalCallDispatcherService.create({
-    store,
+    calls,
+    workspace: channel,
     presence,
     now: () => now,
     offlineWaitMs: 0,
@@ -107,7 +112,8 @@ describe("given a folder connected to the conversation", () => {
     /** @scenario "A call and its socket can be on different pods" */
     it("is delivered from the store, so another replica can serve the socket", async () => {
       const otherPod = LocalCallDispatcherService.create({
-        store,
+        calls,
+        workspace: channel,
         presence: LangyLocalPresenceRedisRepository.create({ store, now: () => now }),
         now: () => now,
         offlineWaitMs: 0,
@@ -138,7 +144,8 @@ describe("given a folder connected to the conversation", () => {
   describe("when the poll request is aborted while the call is still running", () => {
     it("stops waiting at once and answers with the call's current state", async () => {
       const slowDispatcher = LocalCallDispatcherService.create({
-        store,
+        calls,
+        workspace: channel,
         presence,
         now: () => now,
         offlineWaitMs: 0,
@@ -310,7 +317,8 @@ describe("given a folder connected to the conversation", () => {
         },
       };
       const brokenDispatcher = LocalCallDispatcherService.create({
-        store: brokenStore,
+        calls: LangyLocalCallRedisRepository.create({ store: brokenStore }),
+        workspace: channel,
         presence,
         now: () => now,
         offlineWaitMs: 0,

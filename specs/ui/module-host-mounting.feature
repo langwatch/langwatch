@@ -44,6 +44,14 @@ Feature: A module mounts the host its screens read
     # left every scenario drawer throwing on its missing ScenarioHostProvider.
 
   @integration
+  Scenario: Every host mount loads at once, not one after another
+    Given several installed modules that each mount a host
+    When the shell first renders
+    Then every mount's module is asked for before any of them has loaded
+    # Nested one lazy provider per mount, ~40 chunks loaded in series and the
+    # sign-in page stayed behind the loading screen for half a minute or more.
+
+  @integration
   Scenario: The composition's footer reads the capabilities a screen does
     Given a composition that installs a footer reading a capability
     When the shell renders

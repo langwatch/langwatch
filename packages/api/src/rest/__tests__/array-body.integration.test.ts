@@ -4,7 +4,6 @@
  * packages/api/specs/transport-conventions.feature.
  */
 import { moduleApi } from "@langwatch/module";
-import { generateSpecs } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -12,6 +11,7 @@ import { authorizationPort } from "../../__tests__/api-double.ts";
 import { createErrorHandler } from "../../errors.ts";
 import { defineRestRouter } from "../declaration.ts";
 import { createRestRuntime } from "../runtime.ts";
+import { generateSpecs } from "./generate-specs.ts";
 
 const VERSION = "2026-10-05";
 const JSON_TYPE = { "content-type": "application/json" };

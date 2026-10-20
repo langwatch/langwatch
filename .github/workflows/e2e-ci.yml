@@ -74,6 +74,10 @@ jobs:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' && needs.changes.outputs.heavy == 'true'
     runs-on: ubuntu-latest
+    # Read the checkout; write only to prune this pull request's older cache copies.
+    permissions:
+      contents: read
+      actions: write
     env:
       # App configuration
       DATABASE_URL: "postgresql://prisma:prisma@localhost:5433/testdb?schema=testdb"
@@ -225,17 +229,7 @@ jobs:
       - name: Load the deployment mode
         run: grep -E '^[A-Z_]+=' dev/tests/modes/sh-free.env >> "$GITHUB_ENV"
 
-      - name: Setup pnpm
-        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
-        with:
-          version: 12.6.0
-
-      - name: Setup Node
-        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v6
-        with:
-          node-version: 24
-          cache: "pnpm"
-          cache-dependency-path: pnpm-lock.yaml
+      - uses: ./.github/actions/setup-pnpm-node
 
       # node-pty@1.1.0 only ships prebuilds for darwin/win32, so on Linux
       # its postinstall always falls back to `node-gyp rebuild`, which pnpm

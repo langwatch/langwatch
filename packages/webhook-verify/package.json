@@ -68,7 +68,7 @@
   },
   "scripts": {
     "build": "tsup && tsc -p tsconfig.publish.json",
-    "typecheck": "pnpm -w exec tsc -b packages/webhook-verify",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB pnpm -w exec tsc -b packages/webhook-verify",
     "test": "vitest run",
     "prepublishOnly": "pnpm build"
   },

@@ -2,6 +2,7 @@ package snapshot
 
 import (
 	"bufio"
+	"bytes"
 	"context"
 	"errors"
 	"fmt"
@@ -173,7 +174,7 @@ func TestRedisStreamsRoundTrip(t *testing.T) {
 		t.Fatalf("restored %d keys, err %v", len(target), err)
 	}
 	for name, dump := range source {
-		if string(target[name]) != string(dump) {
+		if !bytes.Equal(target[name], dump) {
 			t.Fatalf("%s differs after round trip", name)
 		}
 	}

@@ -35,3 +35,8 @@ export const Shortcut: Story = {
     </HStack>
   ),
 };
+
+/** Static: no key listener, no timer, never pulses. Use it for hints beside an action. */
+export const Static: Story = {
+  args: { interaction: "static" },
+};

@@ -28,6 +28,9 @@ type Stores struct {
 	Private                      []string       // private ClickHouse labels (hybrid)
 	S3                           map[string]int // storagesim port per object target: "" shared, else a private label
 	IDP                          int            // idpsim port, for profiles that sign in through an identity provider
+	IDPPublic, IDPCA             string         // legacy SSO: idpsim behind the cell's TLS proxy, and the CA the releases trust
+	Gates                        map[string]int // private-down drill: the gate port in front of each private target
+	Cluster                      string         // CLICKHOUSE_CLUSTER: the server is a replicated cluster of this name; empty: one node
 }
 
 // DatabaseURL is the Prisma URL both releases share; schema mydb matches the tenancy SQL.
@@ -57,6 +60,24 @@ func (stores Stores) queryURL(label string) string {
 
 // RedisURL is the cell's own redis-server; the branch reads no db index, so no shared server is safe.
 func (stores Stores) RedisURL() string { return "redis://127.0.0.1:" + stores.RedisPort }
+
+// withHavenServers fills only the server URLs no flag named, so -clickhouse-base alone keeps its replica.
+func withHavenServers(ctx context.Context, options Options) (Options, error) {
+	if options.PostgresBase != "" && options.ClickHouseBase != "" {
+		return options, nil
+	}
+	postgres, clickhouse, err := HavenServers(ctx)
+	if err != nil {
+		return options, err
+	}
+	if options.PostgresBase == "" {
+		options.PostgresBase = postgres
+	}
+	if options.ClickHouseBase == "" {
+		options.ClickHouseBase = clickhouse
+	}
+	return options, nil
+}
 
 // HavenServers reads `haven db url`: this checkout's native Postgres and ClickHouse, database stripped.
 func HavenServers(ctx context.Context) (postgres, clickhouse string, err error) {
@@ -113,10 +134,10 @@ func (stores Stores) Fresh(ctx context.Context) error {
 		}
 	}
 	for _, database := range stores.clickHouseDatabases() {
-		if err := clickhouseExec(ctx, stores.ClickHouseBase, "DROP DATABASE IF EXISTS "+database); err != nil {
+		if err := clickhouseExec(ctx, stores.ClickHouseBase, stores.dropDatabase(database)); err != nil {
 			return err
 		}
-		if err := clickhouseExec(ctx, stores.ClickHouseBase, "CREATE DATABASE "+database); err != nil {
+		if err := clickhouseExec(ctx, stores.ClickHouseBase, stores.createDatabase(database)); err != nil {
 			return err
 		}
 	}
@@ -130,9 +151,27 @@ func (stores Stores) Drop(ctx context.Context) error {
 	}
 	_, err := psql(ctx, stores.PostgresBase+"/postgres", `DROP DATABASE IF EXISTS "`+stores.Name+`" WITH (FORCE)`)
 	for _, database := range stores.clickHouseDatabases() {
-		err = errors.Join(err, clickhouseExec(ctx, stores.ClickHouseBase, "DROP DATABASE IF EXISTS "+database))
+		err = errors.Join(err, clickhouseExec(ctx, stores.ClickHouseBase, stores.dropDatabase(database)))
 	}
 	return err
+}
+
+// createDatabase is a plain database on one node; on a cluster, the Replicated engine on every
+// replica at the Keeper path the app's migration bootstrap uses, as a clustered cloud install has it.
+func (stores Stores) createDatabase(database string) string {
+	if stores.Cluster == "" {
+		return "CREATE DATABASE " + database
+	}
+	return fmt.Sprintf("CREATE DATABASE %s ON CLUSTER %s ENGINE = Replicated('/clickhouse/databases/%s', '{shard}', '{replica}')",
+		database, stores.Cluster, database)
+}
+
+// dropDatabase drops on every replica of a cluster, SYNC so the Keeper path is free for the next create.
+func (stores Stores) dropDatabase(database string) string {
+	if stores.Cluster == "" {
+		return "DROP DATABASE IF EXISTS " + database
+	}
+	return "DROP DATABASE IF EXISTS " + database + " ON CLUSTER " + stores.Cluster + " SYNC"
 }
 
 func (stores Stores) clickHouseDatabases() []string {
@@ -222,6 +261,17 @@ func (proc *Proc) Signal(sig syscall.Signal) {
 	_ = syscall.Kill(-proc.command.Process.Pid, sig)
 }
 
+// Kill sends SIGKILL to the group and to every descendant (pnpm starts node in a group of its own)
+// and returns every pid it signaled, the leader first.
+func (proc *Proc) Kill() []int {
+	pids := append([]int{proc.command.Process.Pid}, proc.descendants()...)
+	proc.Signal(syscall.SIGKILL)
+	for _, pid := range pids[1:] {
+		_ = syscall.Kill(pid, syscall.SIGKILL)
+	}
+	return pids
+}
+
 // Exited answers whether the process ended, and how.
 func (proc *Proc) Exited() (bool, error) {
 	select {
@@ -244,18 +294,71 @@ func (proc *Proc) Wait(ctx context.Context) error {
 	}
 }
 
-// Stop resumes a paused group, asks it to end, and kills it after grace.
+// Stop resumes a paused group, asks it to end, and kills it after grace. It returns once every
+// descendant is gone too: pnpm puts node in a group of its own and exits before it, while node
+// still talks to Redis on its way out.
 func (proc *Proc) Stop(grace time.Duration) {
-	if exited, _ := proc.Exited(); exited {
+	descendants := proc.descendants()
+	if exited, _ := proc.Exited(); exited && len(alive(descendants)) == 0 {
 		return
 	}
 	proc.Signal(syscall.SIGCONT)
 	proc.Signal(syscall.SIGTERM)
 	ctx, cancel := context.WithTimeout(context.Background(), grace)
 	defer cancel()
-	if proc.Wait(ctx) != nil {
-		proc.Signal(syscall.SIGKILL)
+	_ = proc.Wait(ctx)
+	for len(alive(descendants)) > 0 && ctx.Err() == nil {
+		select {
+		case <-ctx.Done():
+		case <-time.After(100 * time.Millisecond):
+		}
 	}
+	if ctx.Err() != nil {
+		proc.Signal(syscall.SIGKILL)
+		for _, pid := range alive(descendants) {
+			_ = syscall.Kill(pid, syscall.SIGKILL)
+		}
+	}
+}
+
+// descendants lists every process below the group's leader, read from ps before any signal.
+func (proc *Proc) descendants() []int {
+	out, err := exec.CommandContext(context.Background(), "ps", "-A", "-o", "pid=,ppid=").Output()
+	if err != nil {
+		return nil
+	}
+	children := map[int][]int{}
+	for _, line := range strings.Split(string(out), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		pid, errPid := strconv.Atoi(fields[0])
+		parent, errParent := strconv.Atoi(fields[1])
+		if errPid == nil && errParent == nil {
+			children[parent] = append(children[parent], pid)
+		}
+	}
+	var found []int
+	queue := []int{proc.command.Process.Pid}
+	for len(queue) > 0 {
+		next := queue[0]
+		queue = queue[1:]
+		found = append(found, children[next]...)
+		queue = append(queue, children[next]...)
+	}
+	return found
+}
+
+// alive keeps the pids that still run.
+func alive(pids []int) []int {
+	var running []int
+	for _, pid := range pids {
+		if syscall.Kill(pid, 0) == nil {
+			running = append(running, pid)
+		}
+	}
+	return running
 }
 
 // Env renders a map as KEY=value lines, sorted for a stable log.
@@ -281,7 +384,7 @@ var (
 
 // headBuildScript is the release image's install and build steps (infra/docker/Dockerfile), run in head's
 // checkout; the install keeps node_modules in step with packages head added.
-const headBuildScript = `pnpm install --frozen-lockfile --prefer-offline && pnpm start:prepare:files && pnpm ensure:built && pnpm exec tsc -b --builders 16 tsconfig.build.json && pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
+const headBuildScript = `export NX_DAEMON=false && pnpm install --frozen-lockfile --prefer-offline && pnpm start:prepare:files && pnpm ensure:built && NODE_OPTIONS=--max-old-space-size=4096 pnpm exec tsc -b --builders 16 modules/*/contract/tsconfig.build.json && NODE_OPTIONS=--max-old-space-size=4096 pnpm --filter "@langwatch/ui..." --filter "@langwatch/platform-api..." --filter "@langwatch/worker..." run build`
 
 // BuildStamp sits in node_modules, which git ignores, so a build never dirties the checkout.
 const BuildStamp = "node_modules/.upgradelab-build"

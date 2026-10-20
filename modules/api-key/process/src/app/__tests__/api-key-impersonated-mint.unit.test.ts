@@ -3,6 +3,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
+import { MemorySharedCredentialStore } from "@langwatch/secrets/shared-credential";
 /**
  * No API key is minted while an operator acts as another member (F05).
  *
@@ -11,7 +12,6 @@ import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
-import { MemoryAgentSandboxKeyRepository } from "../../repositories/memory/memory.agent-sandbox-key.repository.ts";
 import { MemoryApiKeyAnswerCacheRepository } from "../../repositories/memory/memory.api-key-answer-cache.repository.ts";
 import { MemoryApiKeyDatabase } from "../../repositories/memory/memory.api-key.database.ts";
 import { MemoryApiKeyRepository } from "../../repositories/memory/memory.api-key.repository.ts";
@@ -29,7 +29,8 @@ async function appOver() {
     repositories: {
       apiKeys,
       answers: MemoryApiKeyAnswerCacheRepository.create(),
-      sandboxKeys: MemoryAgentSandboxKeyRepository.create(),
+      sandboxKeys: MemorySharedCredentialStore.create(),
+      runKeys: MemorySharedCredentialStore.create(),
     },
     dependencies: {
       authorization: createApiFixture<AuthzApi>({ hasPermission }),

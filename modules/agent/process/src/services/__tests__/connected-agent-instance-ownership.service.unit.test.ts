@@ -1,9 +1,9 @@
 import { PROTOCOL_VERSION, type RegisterFrame } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
-import { type SessionStateStore } from "@langwatch/redis-client";
 import { describe, expect, it } from "vitest";
 
+import { MemoryConnectedAgentRelayChannel } from "../../channels/memory/memory.connected-agent-relay.channel.ts";
 import { MemoryAgentRepository } from "../../repositories/memory/memory.agent.repository.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { AgentService } from "../agent.service.ts";
 import { LongPollTransportService } from "../connected-agent-long-poll.service.ts";
 import { ConnectedAgentRegistrationService } from "../connected-agent-registration.service.ts";
@@ -29,10 +29,11 @@ function resolved(principalId: string, projectId = "project") {
   return { principalId, userId: principalId, project: { id: projectId, slug: projectId } };
 }
 
-function fixture(store: SessionStateStore = memorySessionState()) {
+function fixture(state = MemoryConnectedAgentStateRepository.create()) {
+  const relay = MemoryConnectedAgentRelayChannel.create();
   const agents = AgentService.create(MemoryAgentRepository.create());
-  const runtime = ConnectedAgentRuntimeService.create({ store, podId: "pod-a" });
-  const otherRuntime = ConnectedAgentRuntimeService.create({ store, podId: "pod-b" });
+  const runtime = ConnectedAgentRuntimeService.create({ state, relay, podId: "pod-a" });
+  const otherRuntime = ConnectedAgentRuntimeService.create({ state, relay, podId: "pod-b" });
   const registration = (peer: typeof runtime) =>
     ConnectedAgentRegistrationService.create({
       runtime: peer,
@@ -41,7 +42,7 @@ function fixture(store: SessionStateStore = memorySessionState()) {
       now: () => Date.now(),
     });
   return {
-    store,
+    relay,
     agents,
     runtime,
     first: registration(runtime),
@@ -98,8 +99,8 @@ describe("connected instance ownership", () => {
   /** @scenario "An expired session cannot overwrite a new instance owner" */
   it("rejects stale presence and retirement after another principal acquires an expired claim", async () => {
     let now = Date.now();
-    const store = memorySessionState({ now: () => now });
-    const { first, second, agents, runtime } = fixture(store);
+    const state = MemoryConnectedAgentStateRepository.create({ now: () => now });
+    const { first, second, agents, runtime } = fixture(state);
     const original = await first.registerInstance({
       frame,
       resolved: resolved("alice"),
@@ -132,7 +133,7 @@ describe("connected instance ownership", () => {
 
   /** @scenario "An HTTP instance token cannot be reused by another principal" */
   it("refuses another principal's poll while allowing the owner to resume", async () => {
-    const { store, agents, runtime } = fixture();
+    const { relay, agents, runtime } = fixture();
     const session = AgentSessionService.create({
       runtime,
       agents,
@@ -163,7 +164,7 @@ describe("connected instance ownership", () => {
       ]);
     } finally {
       await polling.close();
-      await store.close();
+      await relay.close();
     }
   });
 });

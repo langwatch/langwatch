@@ -70,6 +70,7 @@ describe("the topic tRPC declaration", () => {
         ["getTopicCounts", "query", "traces:view"],
         ["getClusteringStatus", "query", "project:view"],
         ["getClusteringRunHistory", "query", "project:view"],
+        ["getClusteringRunHistoryPage", "query", "project:view"],
         ["triggerTopicClustering", "mutation", "project:update"],
       ]);
     });

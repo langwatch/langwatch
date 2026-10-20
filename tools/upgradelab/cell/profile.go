@@ -27,6 +27,12 @@ type Profile struct {
 	NoAdminEmails bool
 	// SSO: the cell runs its own idpsim and the deployment signs in through it (E6).
 	SSO bool
+	// LegacySSO: the deployment-wide provider is Auth0 (main's NEXTAUTH_PROVIDER), idpsim behind a TLS proxy;
+	// one organization adds a SAML connection beside the seed organization's OIDC one (E8 to E10, trial T3).
+	LegacySSO bool
+	// SCIM: idpsim provisions users and a group into the seed organization's connection on main (E14), plus a
+	// custom role (E13) and a governed password probe (E12); trial T5.
+	SCIM bool
 }
 
 // Profiles are the deployments a cell runs; a new deployment is one entry here.
@@ -35,6 +41,10 @@ var Profiles = map[string]Profile{
 	"hybrid": {Shape: "hybrid", Extra: cloudBilling, Objects: true},
 	// Cloud with main's instance-wide sign-in (NEXTAUTH_PROVIDER) on the cell's idpsim; passwords kept for the seed account.
 	"cloud-sso": {Shape: "saas", Extra: cloudBilling, SSO: true},
+	// Cloud on main's deployment-wide Auth0 (UM-26), plus per-organization OIDC and SAML connections.
+	"cloud-legacy-sso": {Shape: "saas", Extra: cloudBilling, SSO: true, LegacySSO: true},
+	// Self-hosted on the same legacy Auth0 and connections (UM-27, T5); SCIM is not driven yet.
+	"self-hosted-legacy-sso": {Shape: "sh-licensed", StopStart: true, SSO: true, LegacySSO: true, SCIM: true},
 	// Self-hosted from origin/main like the others; 3.20.1 stays a cell of its own (-from-dir a 3.20.1 tree).
 	"self-hosted":      {Shape: "sh-licensed", StopStart: true},
 	"self-hosted-free": {Shape: "sh-free", StopStart: true}, // the ADMIN_EMAILS-unset variant sets NoAdminEmails on it
@@ -43,10 +53,10 @@ var Profiles = map[string]Profile{
 // cloudBilling: main's SaaS runtime refuses to boot without a Stripe key; this one never reaches Stripe.
 var cloudBilling = map[string]string{"STRIPE_SECRET_KEY": "sk_test_upgradelab_never_sent"}
 
-// Tiers and shapes a cell accepts today; L and XL wait for the scale generator (lane L4).
+// Tiers and shapes a cell accepts today; L (the cloud long tail) runs from a produce snapshot only; XL waits for lane L4.
 var (
-	Tiers      = []string{"S", "M"}
-	DataShapes = []string{"typical"}
+	Tiers      = []string{"S", "M", "L"}
+	DataShapes = []string{"typical", EmptyShape}
 )
 
 // processKeys are the only parent variables a child sees: never a provider key or a store URL.
@@ -54,10 +64,13 @@ var processKeys = []string{"PATH", "HOME", "USER", "TMPDIR", "LANG", "SHELL"}
 
 // EnvInput is what a release's processes share: the profile, the stores and the public address.
 type EnvInput struct {
-	Profile Profile
-	Stores  Stores
-	APIPort int
-	Admin   string
+	PrivateTargets map[string]string // label -> organization; nil reads the shape file
+	Profile        Profile
+	Stores         Stores
+	APIPort        int
+	Admin          string
+	// LicensePublicKey verifies the test license on both releases (licensed shapes only).
+	LicensePublicKey string
 }
 
 // BuildEnv is the whole environment of every process in a cell, both releases alike.
@@ -73,6 +86,7 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 			env[key] = value
 		}
 	}
+	env["LOG_LEVEL"] = "info" // as cloud runs head; main reads PINO_LOG_LEVEL (fromEnvWith), head warns on it
 	maps.Copy(env, operator)
 	maps.Copy(env, map[string]string{
 		"NODE_ENV": "production", "SKIP_ENV_VALIDATION": "true", // as the release image sets them
@@ -85,9 +99,19 @@ func BuildEnv(input EnvInput) (map[string]string, error) {
 	if err != nil {
 		return nil, err
 	}
-	routePrivateTargets(env, input.Stores, shape.PrivateTargets())
+	targets := input.PrivateTargets
+	if targets == nil {
+		targets = shape.PrivateTargets()
+	}
+	if input.Stores.Cluster != "" {
+		env["CLICKHOUSE_CLUSTER"] = input.Stores.Cluster
+	}
+	routePrivateTargets(env, input.Stores, targets)
 	routeObjects(env, input.Stores, shape.PrivateObjectTargets())
-	routeIdentityProvider(env, input.Stores)
+	routeIdentityProvider(env, input.Stores, input.Profile)
+	if input.Profile.Shape == licensedShape && input.LicensePublicKey != "" {
+		env["LANGWATCH_LICENSE_PUBLIC_KEY"] = input.LicensePublicKey
+	}
 	return env, nil
 }
 
@@ -122,7 +146,11 @@ func routePrivateTargets(env map[string]string, stores Stores, targets map[strin
 		}
 	}
 	for label, organization := range targets {
-		env["CLICKHOUSE_URL__"+label+"__"+organization] = stores.ClickHouseURL(label)
+		url := stores.ClickHouseURL(label)
+		if port, ok := stores.Gates[label]; ok {
+			url = GatedURL(url, port)
+		}
+		env["CLICKHOUSE_URL__"+label+"__"+organization] = url
 	}
 }
 
@@ -144,13 +172,24 @@ func routeObjects(env map[string]string, stores Stores, targets map[string]strin
 
 // routeIdentityProvider is idpsim's own `legacy env` for a generic tenant: main's NEXTAUTH_PROVIDER, which head
 // still applies (deprecated), so the operator's .env stays as it was across the upgrade.
-func routeIdentityProvider(env map[string]string, stores Stores) {
+func routeIdentityProvider(env map[string]string, stores Stores, profile Profile) {
 	if stores.IDP == 0 {
 		return
 	}
-	idp := stores.IDPURL()
+	idp := stores.IDPIssuer()
 	maps.Copy(env, map[string]string{"NEXTAUTH_PROVIDER": "oidc", "OIDC_ISSUER": idp + "/t/" + ssoTenant, "OIDC_CLIENT_ID": "langwatch-upgradelab",
 		"OIDC_CLIENT_SECRET": "idpsim-accepts-any-secret-for-an-unregistered-client", "LOCAL_PASSWORDS_ENABLED": "on", "SSO_TRUSTED_IDP_ORIGINS": idp})
+	if stores.IDPCA != "" {
+		env["NODE_EXTRA_CA_CERTS"] = stores.IDPCA // the issuer is https behind the cell's own CA, for both releases
+	}
+	// AUTH_PROVIDER (common.env's email) outranks NEXTAUTH_PROVIDER on both releases; the operator set only the latter.
+	delete(env, "AUTH_PROVIDER")
+	if profile.LegacySSO {
+		for _, key := range []string{"OIDC_ISSUER", "OIDC_CLIENT_ID", "OIDC_CLIENT_SECRET"} {
+			delete(env, key)
+		}
+		maps.Copy(env, legacyAuth0Env(stores))
+	}
 	// The operator's lever for self-serve SSO setup (E7), read by both releases.
 	env["FEATURE_FLAG_FORCE_ENABLE"] = strings.Trim(env["FEATURE_FLAG_FORCE_ENABLE"]+",self_serve_sso", ",")
 }

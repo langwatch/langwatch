@@ -1,23 +1,14 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  Heading,
-  HStack,
-  NativeSelect,
-  Skeleton,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Badge, Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { nowInstant, toEpochMs, readableDate } from "@langwatch/time";
 import { Fragment, type ReactNode, useState } from "react";
 
 import type { SourceEventsPager } from "../../behavior/use-source-events-pager.ts";
-import { EventDetailRow } from "./source-event-detail-panels.tsx";
+import { detailRowId, EventDetailRow } from "./source-event-detail-panels.tsx";
 
 /**
  * The events section of the ingestion-source detail page: a cursor-walked
@@ -50,8 +41,6 @@ export type SourceEventRowData = {
 
 export type SourceEventsTablePresentation = {
   renderError?: (input: { error: unknown; title: string }) => ReactNode;
-  renderTable?: (input: { header: ReactNode; body: ReactNode }) => ReactNode;
-  renderPagination?: (pager: SourceEventsPager<SourceEventRowData>) => ReactNode;
 };
 
 const fmtUsd = (raw: string) => {
@@ -80,30 +69,26 @@ const formatTimeAgo = (timestampMs: number): string => {
 };
 
 function ErrorAlert({ title }: { title: string }) {
-  return (
-    <Alert.Root status="error">
-      <Alert.Indicator />
-      <Alert.Title>{title}</Alert.Title>
-    </Alert.Root>
-  );
+  return <Banner status="error">{title}</Banner>;
 }
 
 const COLUMNS = ["Time", "Type", "Actor", "Action", "Target", "Cost", "Tokens"] as const;
 
 function EventsTableHeader() {
   return (
-    <Table.Header>
-      <Table.Row>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader width={40} label="Details" />
         {COLUMNS.map((column) => (
-          <Table.ColumnHeader
+          <ListTable.ColumnHeader
             key={column}
-            textAlign={column === "Cost" || column === "Tokens" ? "end" : undefined}
+            align={column === "Cost" || column === "Tokens" ? "end" : undefined}
           >
             {column}
-          </Table.ColumnHeader>
+          </ListTable.ColumnHeader>
         ))}
-      </Table.Row>
-    </Table.Header>
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
@@ -138,135 +123,52 @@ function EventDataRow({
 }) {
   const hasTokens = event.tokensInput > 0 || event.tokensOutput > 0;
   return (
-    <Table.Row
-      data-testid="source-event-row"
-      cursor="pointer"
-      onClick={onToggle}
-      // A <tr> is not focusable or activatable on its own; the row is a
-      // disclosure control, so it gets the keyboard affordances too.
-      tabIndex={0}
-      aria-expanded={isExpanded}
-      onKeyDown={(keyEvent) => {
-        if (keyEvent.key !== "Enter" && keyEvent.key !== " ") return;
-        keyEvent.preventDefault();
-        onToggle();
-      }}
-      _hover={{ bg: "bg.subtle" }}
-      _focusVisible={{ bg: "bg.subtle", outline: "none" }}
-      bg={isExpanded ? "bg.subtle" : undefined}
-    >
-      <Table.Cell whiteSpace="nowrap">
+    <ListTable.Row data-testid="source-event-row" expanded={isExpanded} onActivate={onToggle}>
+      <ListTable.ExpandCell
+        expanded={isExpanded}
+        onToggle={onToggle}
+        label={`Show details for event ${event.eventId}`}
+        panelId={detailRowId(event.eventId)}
+      />
+      <ListTable.Cell nowrap>
         <EventTimeCell iso={event.eventTimestampIso} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge size="sm" variant="surface">
           {event.eventType}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="sm" fontWeight="medium" lineClamp={1}>
           {event.actor || "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="sm" color="fg.muted" lineClamp={1}>
           {event.action || "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="sm" color="fg.muted" lineClamp={1}>
           {event.target || "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end" whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell align="end" nowrap>
         <Text textStyle="sm" color="fg.muted">
           {fmtUsd(event.costUsd)}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end" whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell align="end" nowrap>
         <Text textStyle="sm" color="fg.muted">
           {hasTokens ? `${fmtInteger(event.tokensInput)} → ${fmtInteger(event.tokensOutput)}` : "—"}
         </Text>
-      </Table.Cell>
-    </Table.Row>
-  );
-}
-
-function SourceEventsPagination({ pager }: { pager: SourceEventsPager<SourceEventRowData> }) {
-  const pageCount = Math.max(1, Math.ceil(pager.totalCount / pager.pageSize));
-  const start = (pager.page - 1) * pager.pageSize + 1;
-  const end = start + Math.max(0, pager.rows.length - 1);
-  return (
-    <HStack data-testid="pagination" justify="space-between" marginTop={3}>
-      <Text data-testid="pagination-indicator" fontSize="sm" color="fg.muted">
-        showing {start}–{end}
-      </Text>
-      <HStack>
-        <NativeSelect.Root size="sm" width="90px">
-          <NativeSelect.Field
-            aria-label="Rows per page"
-            data-testid="pagination-page-size"
-            value={pager.pageSize}
-            onChange={(event) => pager.setPageSize(Number(event.target.value))}
-          >
-            {[10, 25, 50, 100].map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
-            ))}
-          </NativeSelect.Field>
-          <NativeSelect.Indicator />
-        </NativeSelect.Root>
-        <Button
-          data-testid="pagination-prev"
-          size="sm"
-          variant="outline"
-          disabled={pager.page <= 1 || pager.isFetching}
-          onClick={() => pager.goToPage(pager.page - 1)}
-        >
-          Previous
-        </Button>
-        {Array.from({ length: pageCount }, (_, index) => index + 1).map((page) => (
-          <Button
-            key={page}
-            data-testid={`pagination-page-${page}`}
-            size="sm"
-            variant={pager.page === page ? "solid" : "ghost"}
-            disabled={!pager.isPageReachable(page) || pager.isFetching}
-            onClick={() => pager.goToPage(page)}
-          >
-            {page}
-          </Button>
-        ))}
-        <Button
-          data-testid="pagination-next"
-          size="sm"
-          variant="outline"
-          disabled={!pager.canGoNext || pager.isFetching}
-          onClick={() => pager.goToPage(pager.page + 1)}
-        >
-          Next
-        </Button>
-      </HStack>
-    </HStack>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
 function SkeletonRows({ pageSize }: { pageSize: number }) {
-  const rowCount = Math.min(pageSize, 5);
-  return (
-    <>
-      {Array.from({ length: rowCount }, (_, index) => (
-        <Table.Row key={index} data-testid="source-event-skeleton-row">
-          {COLUMNS.map((column) => (
-            <Table.Cell key={column}>
-              <Skeleton height="14px" maxWidth="120px" borderRadius="sm" />
-            </Table.Cell>
-          ))}
-        </Table.Row>
-      ))}
-    </>
-  );
+  return <ListTable.LoadingRows rows={Math.min(pageSize, 5)} columns={COLUMNS.length + 1} />;
 }
 
 function EventsTableBody({ pager }: { pager: SourceEventsPager<SourceEventRowData> }) {
@@ -286,7 +188,7 @@ function EventsTableBody({ pager }: { pager: SourceEventsPager<SourceEventRowDat
             }
           />
           {expandedEventId === event.eventId && (
-            <EventDetailRow event={event} colSpan={COLUMNS.length} />
+            <EventDetailRow event={event} columns={COLUMNS.length + 1} />
           )}
         </Fragment>
       ))}
@@ -319,9 +221,9 @@ export function SourceEventsTable({
     presentation?.renderError?.({ error, title }) ?? <ErrorAlert title={title} />;
   const tableHeader = <EventsTableHeader />;
   const tableBody = (
-    <Table.Body>
+    <ListTable.Body>
       <EventsTableBody pager={pager} />
-    </Table.Body>
+    </ListTable.Body>
   );
   // "Click a row for the raw and normalised records" describes rows that are
   // not there in the empty state, and the empty pane says its own piece.
@@ -333,7 +235,7 @@ export function SourceEventsTable({
     <VStack align="stretch" gap={3}>
       <VStack align="start" gap={1}>
         <HStack gap={1}>
-          <Heading as="h3" size="sm">
+          <Heading as="h3" textStyle="cardTitle">
             Events
           </Heading>
           {headerAside}
@@ -356,18 +258,22 @@ export function SourceEventsTable({
           {pager.error != null && (
             <Box marginBottom={2}>{renderError(pager.error, "Couldn't load more events")}</Box>
           )}
-          {presentation?.renderTable?.({
-            header: tableHeader,
-            body: tableBody,
-          }) ?? (
-            <Box overflowX="auto">
-              <Table.Root size="sm">
-                {tableHeader}
-                {tableBody}
-              </Table.Root>
-            </Box>
-          )}
-          {presentation?.renderPagination?.(pager) ?? <SourceEventsPagination pager={pager} />}
+          <ListTable density="compact" scroll="x" scrollLabel="Source events">
+            {tableHeader}
+            {tableBody}
+          </ListTable>
+          <Pagination
+            page={pager.page}
+            pageSize={pager.pageSize}
+            totalCount={pager.totalCount}
+            visibleCount={pager.rows.length}
+            onPageChange={pager.goToPage}
+            onPageSizeChange={pager.setPageSize}
+            isLoading={pager.status === "loading"}
+            navDisabled={pager.isFetching}
+            isPageReachable={pager.isPageReachable}
+            canGoNext={pager.canGoNext}
+          />
         </Box>
       )}
     </VStack>

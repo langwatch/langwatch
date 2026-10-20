@@ -7,30 +7,18 @@
     "lib": ["es2023"],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "types": ["node"]
+    "types": ["node"],
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../api/tsconfig.build.json"
-    },
-    {
-      "path": "../authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

@@ -1,5 +1,6 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { useDisclosure, VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { useDisclosure } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
 import { useState } from "react";
 
@@ -8,7 +9,6 @@ import { useAnnotationQueues } from "../../../behavior/reads/use-annotation-read
 import { useOrganizationTeamProject } from "../../../behavior/use-organization-team-project.ts";
 import { useCreateQueueItem } from "../../../behavior/writes/use-trace-writes.ts";
 import { AddAnnotationQueueDrawer } from "../add-annotation-queue-drawer.tsx";
-import { Dialog } from "../dialog.tsx";
 import { showErrorToast } from "../errors/index.ts";
 import { AddParticipants } from "../traces/add-participants.tsx";
 
@@ -114,24 +114,6 @@ function toastQueued({
   });
 }
 
-/** The dialog's words, keyed to what the sender is doing. */
-function QueueDialogHeader({ intent }: { intent: "add" | "move" }) {
-  return (
-    <Dialog.Header paddingBottom={0}>
-      <VStack align="start" gap={1}>
-        <Dialog.Title>
-          {intent === "move" ? "Move to queue" : "Add to annotation queue"}
-        </Dialog.Title>
-        <Dialog.Description color="fg.muted" fontSize="sm">
-          {intent === "move"
-            ? "Change which people or queues these traces are queued for"
-            : "Send the selected traces to people or queues for annotation"}
-        </Dialog.Description>
-      </VStack>
-    </Dialog.Header>
-  );
-}
-
 /**
  * Sends traces to people or annotation queues for review.
  * Spec: specs/traces-v2/bulk-actions.feature ("Send selected traces to an
@@ -195,21 +177,25 @@ export function AddToAnnotationQueueDialog({
 
   return (
     <>
-      <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-        <Dialog.Content>
-          <Dialog.CloseTrigger />
-          <QueueDialogHeader intent={intent} />
-          <Dialog.Body paddingTop={5} paddingBottom={6}>
-            <AddParticipants
-              annotators={annotators}
-              setAnnotators={setAnnotators}
-              queueDrawerOpen={newQueueDrawer}
-              sendToQueue={sendToQueue}
-              isLoading={createQueueItem.isPending}
-            />
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+      <Dialog
+        open={open}
+        onClose={onClose}
+        cancelLabel={null}
+        title={intent === "move" ? "Move to queue" : "Add to annotation queue"}
+        description={
+          intent === "move"
+            ? "Change which people or queues these traces are queued for"
+            : "Send the selected traces to people or queues for annotation"
+        }
+      >
+        <AddParticipants
+          annotators={annotators}
+          setAnnotators={setAnnotators}
+          queueDrawerOpen={newQueueDrawer}
+          sendToQueue={sendToQueue}
+          isLoading={createQueueItem.isPending}
+        />
+      </Dialog>
       {newQueueDrawer.open && (
         <AddAnnotationQueueDrawer
           open={newQueueDrawer.open}

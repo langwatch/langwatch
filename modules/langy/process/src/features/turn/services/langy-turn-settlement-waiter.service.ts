@@ -2,27 +2,24 @@ import { clearTimeout, setTimeout } from "node:timers";
 
 import {
   extractLangyTextFromParts,
-  LANGY_CONVERSATION_EVENT_TYPES,
+  LANGY_CONVERSATION_TURN_STATUS,
   LangyConversationNotFoundError,
-  type LangyConversationTurnWireEvent,
-  type LangyEventCursor,
+  type LangyConversationTurnData,
   type LangyTurnSettlement,
   type LangyTurnSettlementWait,
 } from "@langwatch/langy-contract";
 
 import type { LangyTokenBufferRepository } from "../../../repositories/langy-token-buffer.repository.ts";
+import { turnMessageId } from "../../../rules/langy-conversation-shape.rules.ts";
 
+/** The turn-state projection, read for a caller who may see the conversation. */
 export type LangyTurnSettlementReader = {
-  getEventsAfter(input: {
+  findTurn(input: {
     projectId: string;
     conversationId: string;
+    turnId: string;
     userId: string;
-    after: LangyEventCursor;
-  }): Promise<{
-    events: LangyConversationTurnWireEvent[];
-    cursor: LangyEventCursor;
-    truncated: boolean;
-  }>;
+  }): Promise<LangyConversationTurnData[]>;
 };
 
 /** One turn's live edge over a borrowed blocking connection; `release` gives it back. */
@@ -33,7 +30,7 @@ const bufferedPollMs = 5_000;
 const fallbackPollMs = 750;
 const confirmPollMs = 250;
 
-/** Holding a request open until one turn settles, from the fold and the live edge. */
+/** Holding a request open until one turn settles, from the turn projection and the live edge. */
 export class LangyTurnSettlementWaiterService {
   static create(): LangyTurnSettlementWaiterService {
     return new LangyTurnSettlementWaiterService();
@@ -59,129 +56,91 @@ export class LangyTurnSettlementWaiterService {
     });
   }
 
-  deriveSettlementFromEvents(
-    events: LangyConversationTurnWireEvent[],
-    turnId: string,
-  ): LangyTurnSettlement | null {
-    for (const event of events) {
-      const settlement = this.settlementFromEvent(event, turnId);
-      if (settlement) {
-        return settlement;
+  /** How the turn ended, once its projection says it has. */
+  private settlementFromTurn(turn: LangyConversationTurnData): LangyTurnSettlement | null {
+    switch (turn.Status) {
+      case LANGY_CONVERSATION_TURN_STATUS.COMPLETED:
+      case LANGY_CONVERSATION_TURN_STATUS.STOPPED: {
+        return {
+          succeeded: true,
+          outcome: turn.Status,
+          text: extractLangyTextFromParts(turn.AnswerParts),
+          messageId: turnMessageId(turn.TurnId),
+          parts: turn.AnswerParts,
+          error: null,
+        };
       }
-    }
-
-    return null;
-  }
-
-  private settlementFromEvent(
-    event: LangyConversationTurnWireEvent,
-    turnId: string,
-  ): LangyTurnSettlement | null {
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED &&
-      event.data.turnId === turnId
-    ) {
-      if (event.data.outcome === "failed") {
+      case LANGY_CONVERSATION_TURN_STATUS.FAILED: {
         return {
           succeeded: false,
           outcome: "failed",
           text: null,
-          error: event.data.error ?? "Turn failed",
+          error: turn.Error ?? "Turn failed",
         };
       }
-
-      return {
-        succeeded: true,
-        outcome: event.data.outcome,
-        text: extractLangyTextFromParts(event.data.parts),
-        error: null,
-      };
-    }
-
-    if (
-      event.type === LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONSE_FAILED &&
-      event.data.turnId === turnId
-    ) {
-      return {
-        succeeded: false,
-        outcome: "failed",
-        text: null,
-        error: event.data.error,
-      };
-    }
-
-    return null;
-  }
-
-  private userWaitFromEvents(
-    events: LangyConversationTurnWireEvent[],
-    turnId: string,
-  ): LangyTurnSettlementWait | null {
-    for (const event of events) {
-      if (
-        event.type === LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED &&
-        event.data.turnId === turnId
-      ) {
-        const questions = event.data.questions ?? [];
-        return {
-          kind: "awaiting_user",
-          question: questions.map((question) => question.question).join("\n"),
-        };
+      default: {
+        return null;
       }
     }
-
-    return null;
   }
 
-  /** A user wait is answered only after the whole pass found no reply, so a reply always wins. */
-  private async readSettlementFromFold(input: {
+  /** The card the turn is waiting on, as its question prose (empty for a permission card). */
+  private userWaitFromTurn(turn: LangyConversationTurnData): LangyTurnSettlementWait | null {
+    const wait = turn.ToolCalls.find((call) => call.wait?.status === "pending")?.wait;
+    if (!wait) {
+      return null;
+    }
+
+    const questions = Array.isArray(wait.questions) ? wait.questions : [];
+    return {
+      kind: "awaiting_user",
+      question: questions
+        .map((entry) =>
+          entry &&
+          typeof entry === "object" &&
+          "question" in entry &&
+          typeof entry.question === "string"
+            ? entry.question
+            : "",
+        )
+        .filter((question) => question.length > 0)
+        .join("\n"),
+    };
+  }
+
+  /** A reply always wins over a card: the card is answered only while the turn is still open. */
+  private async readSettlementFromTurn(input: {
     langy: LangyTurnSettlementReader;
     projectId: string;
     conversationId: string;
     turnId: string;
     userId: string;
-    signal: AbortSignal;
     shouldSettleOnUserWait?: boolean;
   }): Promise<LangyTurnSettlementWait | null> {
-    let cursor: LangyEventCursor = { acceptedAt: 0, eventId: "" };
-    let userWait: LangyTurnSettlementWait | null = null;
+    const [turn] = await input.langy
+      .findTurn({
+        projectId: input.projectId,
+        conversationId: input.conversationId,
+        turnId: input.turnId,
+        userId: input.userId,
+      })
+      .catch((error: unknown) => {
+        if (error instanceof LangyConversationNotFoundError) {
+          return [];
+        }
 
-    while (!input.signal.aborted) {
-      const page = await input.langy
-        .getEventsAfter({
-          projectId: input.projectId,
-          conversationId: input.conversationId,
-          userId: input.userId,
-          after: cursor,
-        })
-        .catch((error: unknown) => {
-          if (error instanceof LangyConversationNotFoundError) {
-            return null;
-          }
-
-          throw error;
-        });
-      if (!page) {
-        return null;
-      }
-
-      const settlement = this.deriveSettlementFromEvents(page.events, input.turnId);
-      if (settlement) {
-        return { kind: "settled", settlement };
-      }
-
-      if (input.shouldSettleOnUserWait) {
-        userWait ??= this.userWaitFromEvents(page.events, input.turnId);
-      }
-
-      if (!page.truncated) {
-        return userWait;
-      }
-
-      cursor = page.cursor;
+        throw error;
+      });
+    if (!turn) {
+      return null;
     }
 
-    return null;
+    const settlement = this.settlementFromTurn(turn);
+    if (settlement) {
+      return { kind: "settled", settlement };
+    }
+
+    return input.shouldSettleOnUserWait ? this.userWaitFromTurn(turn) : null;
   }
 
   private neverSettles(): Promise<never> {
@@ -266,7 +225,7 @@ export class LangyTurnSettlementWaiterService {
 
     try {
       while (!input.signal.aborted) {
-        const settlement = await this.readSettlementFromFold(input);
+        const settlement = await this.readSettlementFromTurn(input);
         if (settlement) {
           return settlement;
         }

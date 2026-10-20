@@ -1,16 +1,11 @@
 import type { AgentWithFields as StoredAgentWithFields } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Alert,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { formatDistanceToNow, toEpochMs } from "@langwatch/time";
 import { Bot, MoreVertical, Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -21,6 +16,8 @@ import {
 } from "../../behavior/use-agent-list-archive.ts";
 import { AgentArchiveDialog } from "../blocks/agent-archive-dialog.tsx";
 import { agentTypeIcons, agentTypeLabels } from "../blocks/agent-card.tsx";
+
+const AGENTS_DOCS_HREF = "https://langwatch.ai/docs/agent-testing/targets";
 
 type AgentWithFields = WireOf<StoredAgentWithFields>;
 /** What a caller hands agent's list drawer: the agents, as the browser receives them. */
@@ -48,54 +45,28 @@ export function AgentListDrawer(props: AgentListDrawerProps) {
 
   return (
     <>
-      <Drawer.Root
+      <Drawer
         open={isOpen}
-        onOpenChange={({ open }) => !open && props.onClose()}
+        onClose={props.onClose}
         size="md"
-        modal={false}
+        title="Choose Agent"
+        headerAction={{
+          label: "New Agent",
+          icon: <Plus size={14} />,
+          onClick: props.onCreateNew,
+          "data-testid": "new-agent-button",
+        }}
+        footer={{ cancel: { onClick: props.onClose } }}
       >
-        <Drawer.Content bg="bg">
-          <Drawer.CloseTrigger />
-          <Drawer.Header>
-            <HStack gap={2} justify="space-between" width="full">
-              <Drawer.Title>Choose Agent</Drawer.Title>
-              <Button
-                size="sm"
-                colorPalette="blue"
-                onClick={props.onCreateNew}
-                data-testid="new-agent-button"
-              >
-                <Plus size={16} />
-                New Agent
-              </Button>
-            </HStack>
-          </Drawer.Header>
-          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-                Select an existing agent or create a new one.
-              </Text>
-
-              {/* Agent list - scrollable */}
-              <VStack
-                gap={2}
-                align="stretch"
-                flex={1}
-                overflowY="auto"
-                paddingX={6}
-                paddingBottom={4}
-              >
-                <AgentListContent {...props} onArchiveRequested={setAgentToDelete} />
-              </VStack>
-            </VStack>
-          </Drawer.Body>
-          <Drawer.Footer>
-            <Button variant="outline" onClick={props.onClose}>
-              Cancel
-            </Button>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Root>
+        <VStack gap={4} align="stretch">
+          <Text color="fg.muted" fontSize="sm">
+            Select an existing agent or create a new one.
+          </Text>
+          <VStack gap={2} align="stretch">
+            <AgentListContent {...props} onArchiveRequested={setAgentToDelete} />
+          </VStack>
+        </VStack>
+      </Drawer>
 
       <AgentArchiveDialog
         open={Boolean(agentToDelete)}
@@ -120,12 +91,7 @@ function AgentListContent(
       </Alert.Root>
     );
   }
-  if (props.isLoading)
-    return (
-      <HStack justify="center" paddingY={8}>
-        <Spinner size="md" />
-      </HStack>
-    );
+  if (props.isLoading) return <SkeletonRows rows={4} />;
   if (props.items.length === 0) return <EmptyState onCreateNew={props.onCreateNew} />;
 
   return props.items.map((agent) => (
@@ -143,24 +109,27 @@ function AgentListContent(
 }
 
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
+  const accent = useProductAccent();
   return (
-    <VStack paddingY={12} gap={4} textAlign="center">
-      <Box padding={4} borderRadius="full" bg="bg.muted" color="fg.muted">
-        <Bot size={32} />
-      </Box>
-      <VStack gap={1}>
-        <Text fontWeight="medium" color="fg">
-          No agents yet
-        </Text>
-        <Text fontSize="sm" color="fg.muted">
-          Create your first agent to get started
-        </Text>
-      </VStack>
-      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-agent-button">
-        <Plus size={16} />
-        Create your first agent
-      </Button>
-    </VStack>
+    <NoDataInfoBlock
+      size="inline"
+      bordered={false}
+      icon={<Bot size={24} />}
+      title="No agents yet"
+      description="Create your first agent to get started"
+      primaryAction={
+        <Button
+          colorPalette={accent.colorPalette}
+          variant="solid"
+          onClick={onCreateNew}
+          data-testid="create-first-agent-button"
+        >
+          <Plus size={16} />
+          Create your first agent
+        </Button>
+      }
+      next={[{ kind: "docs", label: "How agents are used", href: AGENTS_DOCS_HREF }]}
+    />
   );
 }
 

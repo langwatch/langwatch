@@ -10,14 +10,14 @@ import { formatPassRate, passRateColor } from "./pass-rate-color.ts";
 export type PassRateTextProps = {
   /** 0 to 100, or null when nothing settled. */
   passRate: number | null;
-  fontSize?: string;
+  textStyle?: string;
 };
 
-export function PassRateText({ passRate, fontSize = "12px" }: PassRateTextProps) {
+export function PassRateText({ passRate, textStyle = "caption" }: PassRateTextProps) {
   return (
     <Text
       as="span"
-      fontSize={fontSize}
+      textStyle={textStyle}
       fontWeight="semibold"
       textAlign="right"
       whiteSpace="nowrap"

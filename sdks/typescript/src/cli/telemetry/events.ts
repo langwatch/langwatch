@@ -145,12 +145,17 @@ const softDelay = (ms: number): Promise<void> =>
  * channel: the panel wants "Searching traces..." now, not five seconds from now.
  */
 const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
-  const [{ LoggerProvider, SimpleLogRecordProcessor }, { OTLPLogExporter }, resources] =
-    await Promise.all([
-      import("@opentelemetry/sdk-logs"),
-      import("@opentelemetry/exporter-logs-otlp-http"),
-      import("@opentelemetry/resources"),
-    ]);
+  const [
+    { LoggerProvider, SimpleLogRecordProcessor },
+    { OTLPLogExporter },
+    resources,
+    { resolveOtlpCompression },
+  ] = await Promise.all([
+    import("@opentelemetry/sdk-logs"),
+    import("@opentelemetry/exporter-logs-otlp-proto"),
+    import("@opentelemetry/resources"),
+    import("../../internal/otlp-compression.js"),
+  ]);
 
   // `defaultResource()` doesn't read OTEL_RESOURCE_ATTRIBUTES — only
   // `envDetector` does, so it's wired in explicitly: Langy's worker passes
@@ -174,6 +179,7 @@ const createOtlpSink = async (endpoint: string): Promise<EventSink> => {
         exporter: new OTLPLogExporter({
           url: endpoint,
           timeoutMillis: EXPORT_TIMEOUT_MS,
+          compression: resolveOtlpCompression({ signal: "LOGS" }),
         }),
       }),
     ],

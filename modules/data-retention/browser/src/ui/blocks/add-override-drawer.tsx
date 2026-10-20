@@ -5,10 +5,11 @@ import {
   RETENTION_WEEK_DAYS,
   type ScopeAssignment,
 } from "@langwatch/data-retention-contract";
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Badge,
-  Button,
+  Box,
   createListCollection,
   Field,
   HStack,
@@ -18,7 +19,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import { Switch } from "@langwatch/design-system/switch";
-import { useEffect, useMemo, useState } from "react";
+import { type Ref, type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   buildRetentionMenuItems,
@@ -136,6 +137,7 @@ export function AddOverrideDrawer({
   // ALTER … UPDATE rewrite across all of the scope's parts — an expensive,
   // hard-to-undo operation — so it must be a deliberate choice, not the default.
   const [applyToExisting, setApplyToExisting] = useState<boolean>(false);
+  const [attempted, setAttempted] = useState(false);
 
   const isEditing = !!editTarget;
 
@@ -163,6 +165,7 @@ export function AddOverrideDrawer({
 
   useEffect(() => {
     if (!open) return;
+    setAttempted(false);
     if (editTarget) {
       // Edit mode: lock to the policy's scope and prefill its current value.
       setScopes([editTarget.scope]);
@@ -197,118 +200,124 @@ export function AddOverrideDrawer({
   const resolvedDays = resolveRetentionDays({ preset, customAmount, customUnit });
   const daysValid = isRetentionDaysValid({ preset, resolvedDays });
 
-  const canSave = scopes.length > 0 && daysValid && !isSaving;
+  // Create/Save stays clickable; an attempt with a problem shows it and focuses it.
+  const scopeRef = useRef<HTMLDivElement>(null);
+  const presetRef = useRef<HTMLButtonElement>(null);
+  const amountRef = useRef<HTMLInputElement>(null);
+  const noScope = scopes.length === 0;
+  const daysProblem = daysValid ? null : retentionProblem({ preset });
+
+  const trySave = () => {
+    if (isSaving) return;
+    if (noScope || !daysValid) {
+      setAttempted(true);
+      focusFirstProblem({ noScope, preset, refs: { scopeRef, amountRef, presetRef } });
+      return;
+    }
+    onSave({ scopes, retentionDays: resolvedDays, applyToExisting });
+  };
 
   return (
-    <Drawer.Root
-      placement="end"
-      size="md"
+    <Drawer
       open={open}
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) onClose();
+      onClose={onClose}
+      title={isEditing ? "Edit retention policy" : "Add retention policy"}
+      size="md"
+      footer={{
+        // Edit drawers reached from a row overflow menu carry only the primary
+        // action; the X cancels (row-actions-overflow-menu.md). Add keeps Cancel.
+        cancel: isEditing ? undefined : { onClick: onClose },
+        primaryAction: {
+          label: isEditing ? "Save changes" : "Create",
+          onClick: trySave,
+          loading: isSaving,
+        },
+        busy: isSaving,
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>
-            {isEditing ? "Edit retention policy" : "Add retention policy"}
-          </Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={5} align="stretch">
-            <VStack gap={1.5} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Scope
-              </Text>
-              {isEditing && editTarget ? (
-                // Scope is fixed when editing — changing it would mean deleting
-                // this rule and creating another, which is what "Add" is for.
-                <ScopeReadout scopeType={editTarget.scope.scopeType} name={editTarget.scopeName} />
-              ) : (
-                scopePicker({ value: scopes, onChange: setScopes })
-              )}
-            </VStack>
-
-            <Field.Root>
-              <Field.Label>Retention</Field.Label>
-              <Select.Root
-                collection={presetCollection}
-                value={[preset]}
-                onValueChange={(details) => {
-                  const v = details.value[0];
-                  if (v) setPreset(v);
-                }}
-              >
-                <Select.Trigger background="bg">
-                  <Select.ValueText placeholder="Pick a retention" />
-                </Select.Trigger>
-                <Select.Content>
-                  {presetCollection.items.map((item) => (
-                    <Select.Item key={item.value} item={item}>
-                      {item.label}
-                    </Select.Item>
-                  ))}
-                </Select.Content>
-              </Select.Root>
-              {preset === CUSTOM_PRESET_VALUE && (
-                <CustomRetentionField
-                  amount={customAmount}
-                  unit={customUnit}
-                  onAmountChange={setCustomAmount}
-                  onUnitChange={setCustomUnit}
-                />
-              )}
-              <Field.HelperText>
-                {retentionHelperText({
-                  preset,
-                  customAmount,
-                  daysValid,
-                  resolvedDays,
-                  isEnterprise,
-                })}
-              </Field.HelperText>
-            </Field.Root>
-
-            <HStack gap={3} align="start">
-              <Switch
-                checked={applyToExisting}
-                onCheckedChange={({ checked }) => setApplyToExisting(checked === true)}
-              />
-              <VStack align="start" gap={0}>
-                <Text fontWeight="600" fontSize="sm">
-                  Apply this change to existing data
+      <VStack gap={5} align="stretch">
+        <VStack gap={1.5} align="start" width="full">
+          <Text fontWeight="600" fontSize="sm">
+            Scope
+          </Text>
+          {isEditing && editTarget ? (
+            // Scope is fixed when editing — changing it would mean deleting
+            // this rule and creating another, which is what "Add" is for.
+            <ScopeReadout scopeType={editTarget.scope.scopeType} name={editTarget.scopeName} />
+          ) : (
+            <Box ref={scopeRef} tabIndex={-1} outline="none" width="full">
+              {scopePicker({ value: scopes, onChange: setScopes })}
+              {attempted && noScope && (
+                <Text role="alert" fontSize="xs" color="fg.error" marginTop={1.5}>
+                  Pick at least one scope.
                 </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Rewrites this project's existing rows so the new retention takes effect
-                  immediately, not just for new ingestion.
-                </Text>
-              </VStack>
-            </HStack>
+              )}
+            </Box>
+          )}
+        </VStack>
+
+        <Field.Root invalid={attempted && daysProblem !== null}>
+          <Field.Label>Retention</Field.Label>
+          <Select.Root
+            collection={presetCollection}
+            value={[preset]}
+            onValueChange={(details) => {
+              const v = details.value[0];
+              if (v) setPreset(v);
+            }}
+          >
+            <Select.Trigger ref={presetRef} background="bg">
+              <Select.ValueText placeholder="Pick a retention" />
+            </Select.Trigger>
+            <Select.Content>
+              {presetCollection.items.map((item) => (
+                <Select.Item key={item.value} item={item}>
+                  {item.label}
+                </Select.Item>
+              ))}
+            </Select.Content>
+          </Select.Root>
+          {preset === CUSTOM_PRESET_VALUE && (
+            <CustomRetentionField
+              amount={customAmount}
+              unit={customUnit}
+              inputRef={amountRef}
+              onAmountChange={setCustomAmount}
+              onUnitChange={setCustomUnit}
+            />
+          )}
+          {attempted && daysProblem !== null ? (
+            <Field.ErrorText>{daysProblem}</Field.ErrorText>
+          ) : (
+            <Field.HelperText>
+              {retentionHelperText({
+                preset,
+                customAmount,
+                daysValid,
+                resolvedDays,
+                isEnterprise,
+              })}
+            </Field.HelperText>
+          )}
+        </Field.Root>
+
+        <HStack gap={3} align="start">
+          <Switch
+            checked={applyToExisting}
+            onCheckedChange={({ checked }) => setApplyToExisting(checked === true)}
+          />
+          <VStack align="start" gap={0}>
+            <Text fontWeight="600" fontSize="sm">
+              Apply this change to existing data
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Rewrites this project's existing rows so the new retention takes effect immediately,
+              not just for new ingestion.
+            </Text>
           </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full" justify="end" gap={2}>
-            {/* Edit drawers reached from a row overflow menu carry only the
-                primary action — the header X cancels (row-actions-overflow-menu.md).
-                The Add drawer keeps an explicit Cancel for its create flow. */}
-            {!isEditing && (
-              <Button variant="outline" onClick={onClose} disabled={isSaving}>
-                Cancel
-              </Button>
-            )}
-            <Button
-              colorPalette="blue"
-              disabled={!canSave}
-              loading={isSaving}
-              onClick={() => onSave({ scopes, retentionDays: resolvedDays, applyToExisting })}
-            >
-              {isEditing ? "Save changes" : "Create"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        </HStack>
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -376,21 +385,52 @@ function isRetentionDaysValid({
   );
 }
 
+/** Moves focus to the first control that stopped the save, in visual order. */
+function focusFirstProblem({
+  noScope,
+  preset,
+  refs,
+}: {
+  noScope: boolean;
+  preset: string;
+  refs: {
+    scopeRef: RefObject<HTMLElement | null>;
+    amountRef: RefObject<HTMLElement | null>;
+    presetRef: RefObject<HTMLElement | null>;
+  };
+}): void {
+  if (noScope) refs.scopeRef.current?.focus();
+  else if (preset === CUSTOM_PRESET_VALUE) refs.amountRef.current?.focus();
+  else refs.presetRef.current?.focus();
+}
+
+const LEGACY_NOTE =
+  "This length isn't available on your plan. Pick an option above to change it; leaving it keeps the current value.";
+const CUSTOM_RANGE_NOTE = `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`;
+
+/** What is wrong with the chosen length: only the legacy option and a custom value can fail. */
+function retentionProblem({ preset }: { preset: string }): string {
+  return preset === LEGACY_PRESET_VALUE ? LEGACY_NOTE : CUSTOM_RANGE_NOTE;
+}
+
 /** The custom length: a whole number and its unit. */
 function CustomRetentionField({
   amount,
   unit,
+  inputRef,
   onAmountChange,
   onUnitChange,
 }: {
   amount: string;
   unit: RetentionUnit;
+  inputRef: Ref<HTMLInputElement>;
   onAmountChange: (amount: string) => void;
   onUnitChange: (unit: RetentionUnit) => void;
 }) {
   return (
     <HStack gap={2} marginTop={2} align="start">
       <Input
+        ref={inputRef}
         type="number"
         min={1}
         value={amount}
@@ -441,15 +481,11 @@ function retentionHelperText({
   if (preset === INDEFINITE_PRESET_VALUE) {
     return "Data will be kept indefinitely (exempt from automatic deletion).";
   }
-  if (preset === LEGACY_PRESET_VALUE) {
-    return "This length isn't available on your plan. Pick an option above to change it; leaving it keeps the current value.";
-  }
+  if (preset === LEGACY_PRESET_VALUE) return LEGACY_NOTE;
   if (preset === CUSTOM_PRESET_VALUE && customAmount && daysValid) {
     return `Stored as ${resolvedDays} days.`;
   }
-  if (preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid) {
-    return `Must be between ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} and ${MAX_RETENTION_DAYS} days, in whole weeks.`;
-  }
+  if (preset === CUSTOM_PRESET_VALUE && customAmount && !daysValid) return CUSTOM_RANGE_NOTE;
   if (isEnterprise) {
     return `Custom values start at ${ENTERPRISE_CUSTOM_MIN_RETENTION_DAYS} days (7 weeks) and round to whole weeks.`;
   }
@@ -465,21 +501,14 @@ function ScopeReadout({
 }) {
   const Icon = SCOPE_ICON[scopeType];
   return (
-    <HStack
-      gap={2}
-      width="full"
-      paddingX={3}
-      paddingY={2}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      background="bg.subtle"
-    >
-      <Icon size={14} />
-      <Text>{name}</Text>
-      <Badge size="sm" colorPalette="gray">
-        {scopeType.toLowerCase()}
-      </Badge>
-    </HStack>
+    <Card variant="nested" tone="neutral" padding="sm">
+      <HStack gap={2} width="full">
+        <Icon size={14} />
+        <Text>{name}</Text>
+        <Badge size="sm" colorPalette="gray">
+          {scopeType.toLowerCase()}
+        </Badge>
+      </HStack>
+    </Card>
   );
 }

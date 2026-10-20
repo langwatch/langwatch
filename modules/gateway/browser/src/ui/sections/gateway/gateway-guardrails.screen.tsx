@@ -7,29 +7,29 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
   Field,
-  HStack,
   Input,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import type {
   GatewayGuardrailDirection,
   GatewayGuardrailFailureMode,
 } from "@langwatch/gateway-contract";
 import type { Instant } from "@langwatch/time";
 import { Archive, MoreVertical, Pencil, Plus, Shield } from "lucide-react";
-import { useEffect, useState } from "react";
+import { type FormEvent, type RefObject, useEffect, useId, useRef, useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
 import { useShowErrorToast } from "../../../behavior/gateway-feedback.ts";
 import { useOrganizationTeamProject } from "../../../behavior/gateway-session.ts";
+import { useCloseGatewayDrawer } from "../../../behavior/use-close-gateway-drawer.ts";
 import { useGatewayHost } from "../../../model/gateway-host.ts";
+import { Link } from "../../../ui/elements/gateway-link.tsx";
 import AiGatewayLayout from "../../../ui/sections/gateway-layout.tsx";
 import { ListSkeleton } from "../../elements/list-skeleton.tsx";
 
@@ -153,14 +153,21 @@ function GuardrailsPage() {
         <PageLayout.Heading>Guardrails</PageLayout.Heading>
         <Spacer />
         {canManage && (
-          <PageLayout.HeaderButton
-            primary
-            data-testid="gateway-guardrail-new"
-            onClick={() => openGuardrail()}
-            disabled={guardrailEvaluators.length === 0}
+          <Tooltip
+            content="Add an evaluator that runs as a guardrail first, then you can create guardrails from it."
+            disabled={guardrailEvaluators.length > 0}
           >
-            <Plus size={14} /> New guardrail
-          </PageLayout.HeaderButton>
+            <span>
+              <PageLayout.HeaderButton
+                primary
+                data-testid="gateway-guardrail-new"
+                onClick={() => openGuardrail()}
+                disabled={guardrailEvaluators.length === 0}
+              >
+                <Plus size={14} /> New guardrail
+              </PageLayout.HeaderButton>
+            </span>
+          </Tooltip>
         )}
       </PageLayout.Header>
 
@@ -173,7 +180,10 @@ function GuardrailsPage() {
 
           {isLoadingGuardrails && <ListSkeleton />}
           {showGuardrailsEmpty && (
-            <GuardrailsEmptyState hasGuardrailEvaluators={guardrailEvaluators.length > 0} />
+            <GuardrailsEmptyState
+              hasGuardrailEvaluators={guardrailEvaluators.length > 0}
+              evaluatorsHref={project?.slug ? `/${project.slug}/evaluators` : undefined}
+            />
           )}
           {showGuardrails && (
             <GuardrailsTable
@@ -193,7 +203,7 @@ function GuardrailsPage() {
           if (!open) setArchiving(null);
         }}
         title={`Archive guardrail "${archiving?.name ?? ""}"?`}
-        message="The guardrail stops being evaluated on the gateway within ~60s. VKs that referenced it via guardrailAttachments will simply skip it on next bundle refresh."
+        message="The guardrail stops running on gateway requests within about a minute. Virtual keys that use it will simply skip it from then on."
         confirmLabel="Archive"
         tone="danger"
         loading={archiveMutation.isPending}
@@ -203,16 +213,25 @@ function GuardrailsPage() {
   );
 }
 
-function GuardrailsEmptyState({ hasGuardrailEvaluators }: { hasGuardrailEvaluators: boolean }) {
+function GuardrailsEmptyState({
+  hasGuardrailEvaluators,
+  evaluatorsHref,
+}: {
+  hasGuardrailEvaluators: boolean;
+  evaluatorsHref: string | undefined;
+}) {
   return (
     <NoDataInfoBlock
       title="No guardrails yet"
       description={
         hasGuardrailEvaluators
-          ? "Click New guardrail to bind one of your project evaluators as a pre / post / stream_chunk hook."
-          : "No project evaluators are marked as guardrails. Open Evaluations, edit an evaluator, and switch its execution mode to AS_GUARDRAIL before binding it here."
+          ? "Choose New guardrail to run one of your evaluators on requests, responses or both."
+          : "None of your evaluators can run as a guardrail yet. Open an evaluator and set it to run as a guardrail, then come back to use it here."
       }
       icon={<Shield size={36} />}
+      secondaryAction={
+        evaluatorsHref ? <Link href={evaluatorsHref}>Go to evaluators</Link> : undefined
+      }
     />
   );
 }
@@ -233,109 +252,104 @@ function GuardrailsTable({
   onArchive: (row: GuardrailRow) => void;
 }) {
   return (
-    <Card.Root variant="showcase" width="full" overflowX="auto">
-      <ListTable
-        containerProps={{ overflowX: "auto", maxWidth: "full" }}
-        size="md"
-        variant="line"
-        width="full"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Name</Table.ColumnHeader>
-            <Table.ColumnHeader>Direction</Table.ColumnHeader>
-            <Table.ColumnHeader>Evaluator</Table.ColumnHeader>
-            <Table.ColumnHeader>Failure mode</Table.ColumnHeader>
-            <Table.ColumnHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {rows.map((row) => {
-            const evaluator = evaluatorById.get(row.evaluatorId);
-            return (
-              <Table.Row key={row.id} data-testid="gateway-guardrail-row">
-                <Table.Cell>
+    <ListTable scroll="x" scrollLabel="Guardrails table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Direction</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Evaluator</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Failure mode</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader label="Actions" />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {rows.map((row) => {
+          const evaluator = evaluatorById.get(row.evaluatorId);
+          return (
+            <ListTable.Row key={row.id} data-testid="gateway-guardrail-row">
+              <ListTable.Cell>
+                <VStack align="start" gap={0}>
+                  <Text fontSize="sm" fontWeight="medium">
+                    {row.name}
+                  </Text>
+                  {row.description && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {row.description}
+                    </Text>
+                  )}
+                </VStack>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {evaluator ? (
                   <VStack align="start" gap={0}>
-                    <Text fontSize="sm" fontWeight="medium">
-                      {row.name}
+                    <Text fontSize="sm">{evaluator.name}</Text>
+                    <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
+                      {evaluator.slug}
                     </Text>
-                    {row.description && (
-                      <Text fontSize="xs" color="fg.muted">
-                        {row.description}
-                      </Text>
-                    )}
                   </VStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge variant="subtle">{DIRECTION_LABEL[row.direction]}</Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  {evaluator ? (
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm">{evaluator.name}</Text>
-                      <Text fontSize="2xs" color="fg.muted" fontFamily="mono">
-                        {evaluator.slug}
-                      </Text>
-                    </VStack>
-                  ) : (
-                    <Text fontSize="xs" color="fg.muted" fontFamily="mono">
-                      {row.evaluatorId}
-                    </Text>
-                  )}
-                </Table.Cell>
-                <Table.Cell>
-                  <Badge
-                    variant="surface"
-                    colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
-                  >
-                    {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
-                  </Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  {canManage && (
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <Button size="xs" variant="ghost" aria-label={`Actions for ${row.name}`}>
-                          <MoreVertical size={14} />
-                        </Button>
-                      </Menu.Trigger>
-                      <Menu.Content>
-                        <Menu.Item
-                          value="edit"
-                          data-testid="gateway-guardrail-edit"
-                          onClick={() => onEdit(row)}
-                        >
-                          <Pencil size={14} /> Edit
-                        </Menu.Item>
-                        <Menu.Item
-                          value="archive"
-                          color="fg.error"
-                          data-testid="gateway-guardrail-archive"
-                          onClick={() => onArchive(row)}
-                        >
-                          <Archive size={14} /> Archive
-                        </Menu.Item>
-                      </Menu.Content>
-                    </Menu.Root>
-                  )}
-                </Table.Cell>
-              </Table.Row>
-            );
-          })}
-        </Table.Body>
-      </ListTable>
-    </Card.Root>
+                ) : (
+                  <Text fontSize="xs" color="fg.muted" fontFamily="mono">
+                    {row.evaluatorId}
+                  </Text>
+                )}
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Badge
+                  variant="surface"
+                  colorPalette={row.failureMode === "FAIL_CLOSED" ? "red" : "yellow"}
+                >
+                  {row.failureMode === "FAIL_CLOSED" ? "Fail closed" : "Fail open"}
+                </Badge>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {canManage && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button size="xs" variant="ghost" aria-label={`Actions for ${row.name}`}>
+                        <MoreVertical size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      <Menu.Item
+                        value="edit"
+                        data-testid="gateway-guardrail-edit"
+                        onClick={() => onEdit(row)}
+                      >
+                        <Pencil size={14} /> Edit
+                      </Menu.Item>
+                      <Menu.Item
+                        value="archive"
+                        color="fg.error"
+                        data-testid="gateway-guardrail-archive"
+                        onClick={() => onArchive(row)}
+                      >
+                        <Archive size={14} /> Archive
+                      </Menu.Item>
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </ListTable.Cell>
+            </ListTable.Row>
+          );
+        })}
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
 /** The guardrail editor, opened by address; `drawer.guardrailId` names the one to edit. */
 export function GuardrailDrawer({
   guardrailId,
-  onClose,
+  onClose: callerClose,
 }: {
   guardrailId?: string;
-  onClose: () => void;
+  /** Absent when a link opened the drawer. */
+  onClose?: () => void;
 }) {
+  const onClose = useCloseGatewayDrawer(callerClose);
   const showErrorToast = useShowErrorToast();
   const utils = api.useUtils();
   const { project } = useOrganizationTeamProject();
@@ -353,8 +367,13 @@ export function GuardrailDrawer({
   const [evaluatorId, setEvaluatorId] = useState("");
   const [direction, setDirection] = useState<GatewayGuardrailDirection>("PRE");
   const [failureMode, setFailureMode] = useState<GatewayGuardrailFailureMode>("FAIL_CLOSED");
+  const [attempted, setAttempted] = useState(false);
+  const formId = useId();
+  const nameRef = useRef<HTMLInputElement>(null);
+  const evaluatorRef = useRef<HTMLSelectElement>(null);
 
   useEffect(() => {
+    setAttempted(false);
     if (mode === "edit" && existing) {
       setName(existing.name);
       setDescription(existing.description ?? "");
@@ -395,9 +414,24 @@ export function GuardrailDrawer({
   });
 
   const isPending = createMutation.isPending || updateMutation.isPending;
-  const submitDisabled = !name.trim() || !evaluatorId || isPending;
+  const nameMissing = !name.trim();
+  const evaluatorMissing = !evaluatorId;
+  const editingUnavailable = mode === "edit" && !existing;
 
-  const submit = () => {
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (isPending || editingUnavailable) return;
+    setAttempted(true);
+    const invalid = firstInvalidField({
+      nameMissing,
+      evaluatorMissing,
+      nameRef,
+      evaluatorRef,
+    });
+    if (invalid) {
+      invalid.focus();
+      return;
+    }
     if (mode === "create") {
       createMutation.mutate({
         projectId,
@@ -421,118 +455,151 @@ export function GuardrailDrawer({
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open
-      onOpenChange={({ open: next }) => {
-        if (!next) onClose();
-      }}
-      placement="end"
+      onClose={onClose}
       size="md"
+      title={mode === "create" ? "New guardrail" : "Edit guardrail"}
+      loading={mode === "edit" && listQuery.isLoading}
+      error={editError({ mode, listQuery, existing })}
+      footer={{
+        cancel: { onClick: onClose },
+        busy: isPending,
+        ...(editingUnavailable
+          ? {}
+          : {
+              primaryAction: {
+                label: mode === "create" ? "Create" : "Save changes",
+                type: "submit" as const,
+                form: formId,
+                loading: isPending,
+                "data-testid": "gateway-guardrail-submit",
+              },
+            }),
+      }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{mode === "create" ? "New guardrail" : "Edit guardrail"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={5}>
-            <Field.Root required>
-              <Field.Label>Name</Field.Label>
-              <Input
-                data-testid="gateway-guardrail-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. block PII on requests"
-              />
-            </Field.Root>
+      <form id={formId} noValidate onSubmit={submit}>
+        <VStack align="stretch" gap={5}>
+          <Field.Root required invalid={attempted && nameMissing}>
+            <Field.Label>Name</Field.Label>
+            <Input
+              ref={nameRef}
+              data-testid="gateway-guardrail-name"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              placeholder="e.g. block PII on requests"
+            />
+            <Field.ErrorText>Enter a name.</Field.ErrorText>
+          </Field.Root>
 
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                rows={2}
-                placeholder="Why this guardrail exists"
-              />
-            </Field.Root>
+          <Field.Root>
+            <Field.Label>Description</Field.Label>
+            <Textarea
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              rows={2}
+              placeholder="Why this guardrail exists"
+            />
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Evaluator</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-guardrail-evaluator"
-                  value={evaluatorId}
-                  onChange={(e) => setEvaluatorId(e.target.value)}
-                >
-                  <option value="">Pick an evaluator…</option>
-                  {guardrailEvaluators.map((e) => (
-                    <option key={e.id} value={e.id}>
-                      {e.name} ({e.slug})
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an evaluator in
-                Evaluations to expose it here.
-              </Field.HelperText>
-            </Field.Root>
+          <Field.Root required invalid={attempted && evaluatorMissing}>
+            <Field.Label>Evaluator</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                ref={evaluatorRef}
+                data-testid="gateway-guardrail-evaluator"
+                value={evaluatorId}
+                onChange={(e) => setEvaluatorId(e.target.value)}
+              >
+                <option value="">Pick an evaluator…</option>
+                {guardrailEvaluators.map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name} ({e.slug})
+                  </option>
+                ))}
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>
+              Only evaluators with executionMode AS_GUARDRAIL are listed. Flip an evaluator in
+              Evaluations to expose it here.
+            </Field.HelperText>
+            <Field.ErrorText>Choose an evaluator.</Field.ErrorText>
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Direction</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  data-testid="gateway-guardrail-direction"
-                  value={direction}
-                  onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
-                >
-                  {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
-                    <option key={d} value={d}>
-                      {DIRECTION_LABEL[d]}
-                    </option>
-                  ))}
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>{DIRECTION_HELP[direction]}</Field.HelperText>
-            </Field.Root>
+          <Field.Root required>
+            <Field.Label>Direction</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                data-testid="gateway-guardrail-direction"
+                value={direction}
+                onChange={(e) => setDirection(e.target.value as GatewayGuardrailDirection)}
+              >
+                {(["PRE", "POST", "STREAM_CHUNK"] as const).map((d) => (
+                  <option key={d} value={d}>
+                    {DIRECTION_LABEL[d]}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>{DIRECTION_HELP[direction]}</Field.HelperText>
+          </Field.Root>
 
-            <Field.Root required>
-              <Field.Label>Failure mode</Field.Label>
-              <NativeSelect.Root size="sm">
-                <NativeSelect.Field
-                  value={failureMode}
-                  onChange={(e) => setFailureMode(e.target.value as GatewayGuardrailFailureMode)}
-                >
-                  <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
-                  <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>
-                </NativeSelect.Field>
-              </NativeSelect.Root>
-              <Field.HelperText>
-                stream_chunk is always fail-open per contract regardless of this setting.
-              </Field.HelperText>
-            </Field.Root>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose} disabled={isPending}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              data-testid="gateway-guardrail-submit"
-              onClick={submit}
-              loading={isPending}
-              disabled={submitDisabled}
-            >
-              {mode === "create" ? "Create" : "Save changes"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          <Field.Root required>
+            <Field.Label>Failure mode</Field.Label>
+            <NativeSelect.Root size="sm">
+              <NativeSelect.Field
+                value={failureMode}
+                onChange={(e) => setFailureMode(e.target.value as GatewayGuardrailFailureMode)}
+              >
+                <option value="FAIL_CLOSED">{FAILURE_LABEL.FAIL_CLOSED}</option>
+                <option value="FAIL_OPEN">{FAILURE_LABEL.FAIL_OPEN}</option>
+              </NativeSelect.Field>
+            </NativeSelect.Root>
+            <Field.HelperText>
+              stream_chunk is always fail-open per contract regardless of this setting.
+            </Field.HelperText>
+          </Field.Root>
+        </VStack>
+      </form>
+    </Drawer>
   );
+}
+
+/** The first field a save attempt must fix, in the order the form shows them. */
+function firstInvalidField({
+  nameMissing,
+  evaluatorMissing,
+  nameRef,
+  evaluatorRef,
+}: {
+  nameMissing: boolean;
+  evaluatorMissing: boolean;
+  nameRef: RefObject<HTMLInputElement | null>;
+  evaluatorRef: RefObject<HTMLSelectElement | null>;
+}) {
+  if (nameMissing) return nameRef.current;
+  if (evaluatorMissing) return evaluatorRef.current;
+  return null;
+}
+
+/** Why an edit has nothing to edit yet: the list failed, or the row is gone. */
+function editError({
+  mode,
+  listQuery,
+  existing,
+}: {
+  mode: "create" | "edit";
+  listQuery: { isLoading: boolean; isError: boolean; refetch: () => unknown };
+  existing: unknown;
+}) {
+  if (mode !== "edit" || listQuery.isLoading || existing) return undefined;
+  if (listQuery.isError) {
+    return {
+      title: "Couldn't load this guardrail",
+      onRetry: () => void listQuery.refetch(),
+    };
+  }
+  return { title: "This guardrail is no longer available" };
 }
 
 export default GuardrailsPage;

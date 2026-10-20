@@ -57,6 +57,19 @@ describe("explorerHiddenOrigins", () => {
       expect(explorerHiddenOrigins("status:(")).toEqual([LANGY_TRACE_ORIGIN]);
     });
   });
+
+  describe("given the person's own personal project", () => {
+    /** @scenario "A personal project shows Langy's turns" */
+    it.each(["", "checkout", "status:error"])("hides nothing for %j", (query) => {
+      expect(explorerHiddenOrigins(query, { personalProject: true })).toEqual([]);
+    });
+  });
+
+  describe("given a project that is not personal", () => {
+    it("keeps Langy's turns out", () => {
+      expect(explorerHiddenOrigins("", { personalProject: false })).toEqual([LANGY_TRACE_ORIGIN]);
+    });
+  });
 });
 
 describe("findHiddenOriginConditions", () => {

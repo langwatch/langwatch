@@ -130,6 +130,15 @@ Feature: Platform placeholders — Insights, Analytics, Signals & Alerts
     # "No data yet" reads as an empty organization. Nothing queries
     # anything, so the body names the real reason instead.
 
+  @integration
+  Scenario: The empty Dashboards tab points at the Explore builder
+    Given the member is on the Dashboards tab of "/governance/analytics"
+    When the member presses "Build a query in Explore"
+    Then the Explore tab is selected and its chart is shown
+    And focus rests on the Explore tab
+    # The button sends the reader to the existing builder. It does not
+    # run anything: the preview still says the chart is not connected.
+
   @unit
   Scenario: The query line follows the measure, breakdown and interval
     When the measure is "Requests", the breakdown is "Model" and the

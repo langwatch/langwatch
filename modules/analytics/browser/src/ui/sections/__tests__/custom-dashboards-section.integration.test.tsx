@@ -1,9 +1,9 @@
 /**
  * @vitest-environment jsdom
- * The dashboard list in the analytics menu: rename, reorder and delete.
+ * The Dashboards tab menu and the current dashboard's actions: pick, add, reorder, delete.
  */
 
-import { render, screen, within } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -37,21 +37,7 @@ vi.mock("../../../behavior/analytics-api.ts", () => {
   };
 });
 
-import { CustomDashboardsSection } from "../custom-dashboards-section.tsx";
-
-function mount(dashboards: { id: string; name: string }[]) {
-  api.dashboards = dashboards;
-  api.sent = [];
-  const host = new StubAnalyticsHost({
-    route: { params: {}, query: { dashboard: dashboards[0]?.id } },
-  });
-  render(
-    <AnalyticsTestHarness host={host}>
-      <CustomDashboardsSection projectSlug="my-project" />
-    </AnalyticsTestHarness>,
-  );
-  return userEvent.setup();
-}
+import { DashboardActionsMenu, DashboardsTabMenu } from "../custom-dashboards-section.tsx";
 
 const THREE = [
   { id: "d1", name: "Overview" },
@@ -59,110 +45,121 @@ const THREE = [
   { id: "d3", name: "Quality" },
 ];
 
-async function openMenuOf(user: ReturnType<typeof userEvent.setup>, name: string) {
-  const row = screen.getByText(name).closest("a")!.parentElement!;
-  await user.click(within(row).getByRole("button"));
+function mountTab({
+  dashboards,
+  host = new StubAnalyticsHost({ route: { params: {}, query: {} } }),
+  activeDashboardId,
+  isActive = true,
+}: {
+  dashboards: { id: string; name: string }[];
+  host?: StubAnalyticsHost;
+  activeDashboardId?: string;
+  isActive?: boolean;
+}) {
+  api.dashboards = dashboards;
+  api.sent = [];
+  render(
+    <AnalyticsTestHarness host={host}>
+      <DashboardsTabMenu
+        projectSlug="my-project"
+        activeDashboardId={activeDashboardId}
+        isActive={isActive}
+      />
+    </AnalyticsTestHarness>,
+  );
+  return userEvent.setup();
 }
 
-describe("the custom dashboards list", () => {
+function mountActions({ dashboardId, onRename }: { dashboardId: string; onRename?: () => void }) {
+  api.sent = [];
+  render(
+    <AnalyticsTestHarness host={new StubAnalyticsHost()}>
+      <DashboardActionsMenu
+        projectSlug="my-project"
+        dashboardId={dashboardId}
+        onRename={onRename}
+      />
+    </AnalyticsTestHarness>,
+  );
+  const user = userEvent.setup();
+  return { user, open: () => user.click(screen.getByTestId("analytics-dashboard-menu")) };
+}
+
+describe("the Dashboards tab", () => {
   beforeEach(() => {
     api.sent = [];
   });
 
-  it("marks the displayed default dashboard when the URL has no dashboard ID", () => {
-    api.dashboards = THREE;
-    const host = new StubAnalyticsHost({ route: { params: {}, query: {} } });
-    render(
-      <AnalyticsTestHarness host={host}>
-        <CustomDashboardsSection projectSlug="my-project" activeDashboardId="d2" />
-      </AnalyticsTestHarness>,
-    );
-
-    expect(screen.getByRole("link", { name: "Costs" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("link", { name: "Overview" })).not.toHaveAttribute("aria-current");
+  it("names the dashboard on screen, defaulted when the URL has no dashboard ID", () => {
+    mountTab({ dashboards: THREE, activeDashboardId: "d2" });
+    expect(screen.getByTestId("analytics-dashboards-tab")).toHaveTextContent("Costs");
   });
 
-  it("leaves dashboards unselected on another analytics page without a dashboard ID", () => {
-    api.dashboards = THREE;
-    const host = new StubAnalyticsHost({ route: { params: {}, query: {} } });
-    render(
-      <AnalyticsTestHarness host={host}>
-        <CustomDashboardsSection projectSlug="my-project" />
-      </AnalyticsTestHarness>,
-    );
+  it("reads Dashboards on another analytics page", () => {
+    mountTab({ dashboards: THREE, isActive: false });
+    expect(screen.getByTestId("analytics-dashboards-tab")).toHaveTextContent("Dashboards");
+  });
 
+  it("lists every dashboard and offers to add one", async () => {
+    const user = mountTab({ dashboards: THREE, activeDashboardId: "d1" });
+    await user.click(screen.getByTestId("analytics-dashboards-tab"));
     for (const dashboard of THREE) {
-      expect(screen.getByRole("link", { name: dashboard.name })).not.toHaveAttribute(
-        "aria-current",
-      );
+      expect(screen.getByRole("menuitem", { name: dashboard.name })).toBeInTheDocument();
     }
+    expect(screen.getByTestId("analytics-dashboard-add")).toBeInTheDocument();
   });
+});
 
-  it("shows each dashboard's name on one line with the full name as a tooltip", () => {
-    const long = "Quarterly cost and quality review for the enterprise accounts";
-    mount([
-      { id: "dash_8f2a", name: long },
-      { id: "dash_9b3c", name: "Costs" },
-    ]);
-    const label = screen.getByText(long);
-    expect(label).toHaveAttribute("title", long);
-    expect(label).toHaveStyle({ textOverflow: "ellipsis", whiteSpace: "nowrap" });
-    expect(screen.queryByText("dash_8f2a")).toBeNull();
+describe("the current dashboard's actions", () => {
+  beforeEach(() => {
+    api.dashboards = THREE;
   });
 
   it("offers move up and down only where there is room, and delete only with more than one", async () => {
-    const user = mount(THREE);
-    await openMenuOf(user, "Overview");
-    expect(screen.queryByText("Move Up")).toBeNull();
-    expect(screen.getByText("Move Down")).toBeInTheDocument();
+    const { open } = mountActions({ dashboardId: "d1" });
+    await open();
+    expect(screen.queryByText("Move up")).toBeNull();
+    expect(screen.getByText("Move down")).toBeInTheDocument();
     expect(screen.getByText("Delete")).toBeInTheDocument();
   });
 
   it("reorders by swapping with the neighbour", async () => {
-    const user = mount(THREE);
-    await openMenuOf(user, "Costs");
-    await user.click(screen.getByText("Move Up"));
+    const { user, open } = mountActions({ dashboardId: "d2" });
+    await open();
+    await user.click(screen.getByText("Move up"));
     expect(api.sent).toEqual([
       { reorder: { projectId: "proj-1", dashboardIds: ["d2", "d1", "d3"] } },
     ]);
   });
 
-  it("renames with the trimmed name on Enter, and drops the edit on Escape", async () => {
-    const user = mount(THREE);
-    await openMenuOf(user, "Quality");
+  it("hands rename back to the title row", async () => {
+    const onRename = vi.fn();
+    const { user, open } = mountActions({ dashboardId: "d3", onRename });
+    await open();
     await user.click(screen.getByText("Rename"));
-    const input = screen.getByDisplayValue("Quality");
-    await user.clear(input);
-    await user.type(input, "  Evals  {Enter}");
-    expect(api.sent).toEqual([
-      { rename: { projectId: "proj-1", dashboardId: "d3", name: "Evals" } },
-    ]);
-
-    await openMenuOf(user, "Costs");
-    await user.click(screen.getByText("Rename"));
-    await user.type(screen.getByDisplayValue("Costs"), "x{Escape}");
-    expect(api.sent).toHaveLength(1);
+    expect(onRename).toHaveBeenCalledOnce();
   });
 
-  it("deletes after confirmation", async () => {
-    const user = mount(THREE);
-    await openMenuOf(user, "Costs");
+  /** @scenario "AC199d Split: a Reports delete leaves the Dashboards area unchanged" */
+  it("deletes after confirmation through the Reports procedure alone", async () => {
+    const { user, open } = mountActions({ dashboardId: "d2" });
+    await open();
     await user.click(screen.getByText("Delete"));
     await user.click(screen.getByRole("button", { name: "Delete" }));
     expect(api.sent).toEqual([{ delete: { projectId: "proj-1", dashboardId: "d2" } }]);
   });
 
   it("never offers to delete the last dashboard", async () => {
-    const user = mount([{ id: "d1", name: "Overview" }]);
-    await openMenuOf(user, "Overview");
+    api.dashboards = [{ id: "d1", name: "Overview" }];
+    const { open } = mountActions({ dashboardId: "d1" });
+    await open();
     expect(screen.queryByText("Delete")).toBeNull();
   });
 });
 
 describe("the dashboard list on an aggregate project", () => {
   /** @scenario "The app marks the aggregate and offers no way to add data to it" */
-  it("offers no way to create a dashboard", () => {
-    api.dashboards = [];
+  it("offers no way to create a dashboard", async () => {
     const host = new StubAnalyticsHost({
       project: {
         id: "proj-agg",
@@ -172,12 +169,8 @@ describe("the dashboard list on an aggregate project", () => {
         kind: "aggregate",
       },
     });
-    render(
-      <AnalyticsTestHarness host={host}>
-        <CustomDashboardsSection projectSlug="company-traces" />
-      </AnalyticsTestHarness>,
-    );
-
+    const user = mountTab({ dashboards: [], host });
+    await user.click(screen.getByTestId("analytics-dashboards-tab"));
     expect(screen.queryByTestId("analytics-dashboard-add")).not.toBeInTheDocument();
   });
 });

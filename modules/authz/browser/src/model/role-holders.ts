@@ -155,7 +155,7 @@ export function scopeLabel({ scopeType, scopeName }: Omit<GrantScope, "scopeId">
 
 /** The one colour on a holder row: how much the role can do. */
 export function roleTone(tier: string): string {
-  if (tier === "ADMIN") return "red";
+  if (tier === "ADMIN") return "orange";
   if (tier === "MEMBER") return "blue";
   if (tier === "VIEWER") return "gray";
   return "purple";

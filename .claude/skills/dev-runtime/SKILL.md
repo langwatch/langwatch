@@ -28,7 +28,7 @@ questions at the foot of the ADR that remain are Alex's, not answered.
   `ui` (only `--hmr`), `go`, `langy`, then `backend`. It runs the upgrade
   (`start:prepare:db`, `pnpm task upgrade`) once before any lane starts, and without
   `--hmr` builds the UI once (`@langwatch/ui:build:local`, copied to
-  `apps/ui/dist/client.dev`, served through `LANGWATCH_UI_DIST_DIR`). Run it from the root.
+  the UI build folder as `client.dev`, served through `LANGWATCH_UI_DIST_DIR`). Run it from the root.
 - Under haven a still or `--watch` stack names the backend lane `app`; an `--hmr` stack
   names it `api` beside a `ui` lane. `LANGWATCH_DEV_ONE_PROCESS=0` now only splits the
   simulators out of the `go` lane (`LANGWATCH_GO_ONE_PROCESS` is its deprecated alias).
@@ -45,16 +45,17 @@ questions at the foot of the ADR that remain are Alex's, not answered.
   edit to the host's own `src/` (Node loaded it natively) applies on the next restart.
 - `backend.reload.ts`: finds the loaded modules a changed file reaches
   (`staleModuleIds`) and drops only those; reloads are debounced, never held.
-- `backend.process.ts`: `startBackend` boots the api and the worker together (the api never
-  waits on the upgrade and holds no request: a Postgres read ahead of the schema answers
-  `upgrade_in_progress`, NO-HOLDS); `drainBackend` stops the worker first, then the api.
-  Another lane is moving this seam into a shipped `apps/backend` (ADR-168 open question 3).
+- `backend.process.ts`: the dev host's two moves over the shared host in
+  `@langwatch/process/backend-host`, the same code `apps/backend` ships (ADR-168). `startFreshBackend`
+  is the cold boot: api and worker start together (the api never waits on the upgrade and holds no
+  request: a Postgres read ahead of the schema answers `upgrade_in_progress`, NO-HOLDS) and the port
+  moves to the api as soon as it is up. `replaceBackend` is a reload. `drainBackend` stops the
+  worker first, then the api.
 
 A backend edit that touches a loaded file re-links, boots the new api beside the old one,
 moves `API_PORT` to it and drains the old generation. A change that does not link leaves the
-old generation serving. A failed boot retries on its own and on the next change. Each
-generation logs one `backend ready` line: generation number, changed files, `swapMs`,
-`readyMs`, `rssMiB`.
+old generation serving. Each generation logs one `backend ready` line: generation number,
+changed files, `swapMs`, `readyMs`, `rssMiB`.
 
 ## Reload knobs
 
@@ -84,9 +85,11 @@ first visit and closed after idle; `LANGWATCH_MAIL_PREVIEW_SPAWN=1` runs it as i
 
 - A reload storm after a burst of agent writes: raise `LANGWATCH_DEV_WATCH_DEBOUNCE_MS`;
   the log names the changed files per generation.
-- `backend did not link` after an edit: the old generation keeps serving. `boot failed;
-waiting for a change`: the old one is drained and the next change retries. Fix the file;
-  do not restart the lane.
+- `backend did not link` after an edit: the old generation keeps serving. A replacement api that
+  refuses to boot also leaves the old api serving, because the replacement boots before the port
+  moves or the old one is disposed. A worker that then fails to boot leaves the new api serving
+  with an idle worker (`IDLE_WORKER`), and the next change retries. Fix the file; do not restart
+  the lane.
 - Memory growing over many generations: note `rssMiB` per `backend ready` line; a restart
   is the guardrail. Report it, since it is an ADR-168 risk.
 

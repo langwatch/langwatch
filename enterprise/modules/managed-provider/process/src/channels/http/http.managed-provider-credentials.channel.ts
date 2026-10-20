@@ -12,17 +12,20 @@ import {
  * proxy's borrowed identity.
  */
 export class HttpManagedProviderCredentialsChannel extends ManagedProviderCredentialVendor {
-  private constructor() {
+  private constructor(private readonly stsBase: string | undefined) {
     super();
   }
 
-  static create(): HttpManagedProviderCredentialsChannel {
-    return new HttpManagedProviderCredentialsChannel();
+  /** `stsBase` replaces the region's STS endpoint for both hops (a dev stand-in); unset is AWS. */
+  static create({ stsBase }: { stsBase?: string } = {}): HttpManagedProviderCredentialsChannel {
+    return new HttpManagedProviderCredentialsChannel(stsBase);
   }
 
   async assumeCustomerRole(config: ManagedBedrockConfig): Promise<ManagedProviderCredentials> {
+    const endpoint = this.stsBase === undefined ? {} : { endpoint: this.stsBase };
     const proxyClient = new STSClient({
       region: config.region,
+      ...endpoint,
       credentials: {
         accessKeyId: config.proxyAwsAccessKeyId,
         secretAccessKey: config.proxyAwsSecretAccessKey,
@@ -45,6 +48,7 @@ export class HttpManagedProviderCredentialsChannel extends ManagedProviderCreden
 
     const customerClient = new STSClient({
       region: config.region,
+      ...endpoint,
       credentials: {
         accessKeyId: proxyCredentials.AccessKeyId,
         secretAccessKey: proxyCredentials.SecretAccessKey,

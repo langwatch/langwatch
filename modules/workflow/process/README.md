@@ -154,6 +154,14 @@ A peer's inbound Studio event, prepared the same way before it re-enters the gra
 enrichStudioEvent(input: { event: StudioClientEvent; projectId: string; principal?: WorkflowRunPrincipal | undefined; }): Promise<StudioClientEvent>;
 ```
 
+#### `executeStudioEventSync`
+
+One prepared Studio event run to completion on the project's engine. An engine refusal throws `WorkflowExecutionFailedError`; the run's own failure is in the answer's `error`.
+
+```typescript
+executeStudioEventSync(input: { projectId: string; event: StudioClientEvent; origin: WorkflowRunOrigin; causalityDepth?: number; parentTrace?: { traceId: string; parentSpanId: string }; }): Promise<WorkflowRunAnswer>;
+```
+
 #### `getFields`
 
 The evaluator-fields shape a peer's guard and run read off this workflow.
@@ -390,9 +398,9 @@ Permission `scenarios:create`. Hidden from the OpenAPI document. Declared at `sr
 Answers at `/api/scenario/execute-sync`.
 
 ```typescript
-// Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:124
+// Body: executeSyncRelayEventSchema, ../contract/src/workflow-rest.schemas.ts:210
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/workflow-execute-sync.rest.ts:26
+// Response: inline, src/transport/workflow-execute-sync.rest.ts:27
 type Response = unknown;
 ```
 
@@ -414,49 +422,45 @@ Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:5
 Answers at `/api/optimization/:workflowId/:versionId`, `/api/v1/optimization/:workflowId/:versionId`.
 
 ```typescript
-// Params: workflowRunRestVersionedParamsSchema, ../contract/src/workflow-rest.schemas.ts:76
+// Params: workflowRunRestVersionedParamsSchema, ../contract/src/workflow-rest.schemas.ts:130
 interface Params {
   workflowId: string;
   versionId: string;
 }
-// Body: workflowRunRestBodySchema, ../contract/src/workflow-rest.schemas.ts:68
+// Body: workflowRunRestBodySchema, ../contract/src/workflow-rest.schemas.ts:111
 type Body = Record<string, unknown>;
-// Response: workflowRunAnswerSchema, ../contract/src/workflow.ts:41
-interface Response {
-  result?: Record<string, unknown> | null;
-  status: "idle" | "waiting" | "running" | "success" | "error" | "skipped";
-}
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/run` · `postApiWorkflowsByWorkflowIdRun`
 
 Run a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:82`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:83`.
 
 Answers at `/api/workflows/:workflowId/run`, `/api/v1/workflows/:workflowId/run`.
 
 ```typescript
-// Params: workflowRunRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:73
+// Params: workflowRunRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:119
 interface Params {
   workflowId: string;
 }
-type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:68
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:41
+type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 #### `POST /api/workflows/:workflowId/:versionId/run` · `postApiWorkflowsByWorkflowIdByVersionIdRun`
 
 Run a specific workflow version
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:109`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-run.rest.ts:111`.
 
 Answers at `/api/workflows/:workflowId/:versionId/run`, `/api/v1/workflows/:workflowId/:versionId/run`.
 
 ```typescript
-type Params = z.infer<typeof workflowRunRestVersionedParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:76
-type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:68
-type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:41
+type Params = z.infer<typeof workflowRunRestVersionedParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:130
+type Body = z.infer<typeof workflowRunRestBodySchema>; // ../contract/src/workflow-rest.schemas.ts:111
+type Response = z.infer<typeof workflowRunAnswerSchema>; // ../contract/src/workflow.ts:62
 ```
 
 ### `workflowStudioRest`
@@ -475,13 +479,13 @@ Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.t
 Answers at `/api/workflows/code-completion`.
 
 ```typescript
-// Query: workflowCodeCompletionQuerySchema, ../contract/src/workflow-rest.schemas.ts:89
+// Query: workflowCodeCompletionQuerySchema, ../contract/src/workflow-rest.schemas.ts:150
 interface Query {
   projectId: string;
 }
-// Body: workflowCodeCompletionBodySchema, ../contract/src/workflow-rest.schemas.ts:90
+// Body: workflowCodeCompletionBodySchema, ../contract/src/workflow-rest.schemas.ts:156
 type Body = Record<string, unknown>;
-// Response: workflowCodeCompletionResponseSchema, ../contract/src/workflow-rest.schemas.ts:105
+// Response: workflowCodeCompletionResponseSchema, ../contract/src/workflow-rest.schemas.ts:185
 interface Response {
   completion: string | null;
   error?: string;
@@ -491,13 +495,13 @@ interface Response {
 
 #### `POST /api/workflows/post_event` · `postWorkflowStudioEvent`
 
-Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:36`.
+Permission `workflows:manage`. Declared at `src/transport/workflow-studio.rest.ts:37`.
 
 Answers at `/api/workflows/post_event`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:37)
-// Response: inline, src/transport/workflow-studio.rest.ts:44
+// Rawbody: "text" (inline, src/transport/workflow-studio.rest.ts:39)
+// Response: inline, src/transport/workflow-studio.rest.ts:46
 type Response = unknown;
 ```
 
@@ -543,11 +547,11 @@ Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:87`.
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
 ```typescript
-// Params: workflowRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:31
+// Params: workflowRestParamsSchema, ../contract/src/workflow-rest.schemas.ts:47
 interface Params {
   id: string;
 }
-// Response: workflowRestDetailSchema, ../contract/src/workflow-rest.schemas.ts:25
+// Response: workflowRestDetailSchema, ../contract/src/workflow-rest.schemas.ts:39
 interface Response {
   id: string;
   name: string;
@@ -570,27 +574,27 @@ Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:105`.
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:31
-// Body: workflowRestUpdateSchema, ../contract/src/workflow-rest.schemas.ts:34
+type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:47
+// Body: workflowRestUpdateSchema, ../contract/src/workflow-rest.schemas.ts:59
 interface Body {
   name?: string;
   icon?: string;
   description?: string;
 }
-type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/workflow-rest.schemas.ts:25
+type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/workflow-rest.schemas.ts:39
 ```
 
 #### `DELETE /:id` · `deleteApiWorkflowsById`
 
 Archive (soft-delete) a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:125`.
+Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:126`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:31
-// Response: workflowRestArchivedSchema, ../contract/src/workflow-rest.schemas.ts:41
+type Params = z.infer<typeof workflowRestParamsSchema>; // ../contract/src/workflow-rest.schemas.ts:47
+// Response: workflowRestArchivedSchema, ../contract/src/workflow-rest.schemas.ts:70
 interface Response {
   id: string;
   archived: boolean;
@@ -632,7 +636,7 @@ type Output = z.infer<typeof processAnswerSchema>; // ../contract/src/workflow-o
 
 // optimization.disableAsComponent
 type Input = z.infer<typeof workflowScopeSchema>; // ../contract/src/workflow-optimization.trpc.ts:13
-// Output: workflowWriteAcknowledgedSchema, ../contract/src/workflow.trpc-schemas.ts:145
+// Output: workflowWriteAcknowledgedSchema, ../contract/src/workflow.trpc-schemas.ts:211
 interface Output {
   success: boolean;
 }
@@ -645,7 +649,7 @@ interface Input {
   isComponent: boolean;
   isEvaluator: boolean;
 }
-type Output = z.infer<typeof workflowWriteAcknowledgedSchema>; // ../contract/src/workflow.trpc-schemas.ts:145
+type Output = z.infer<typeof workflowWriteAcknowledgedSchema>; // ../contract/src/workflow.trpc-schemas.ts:211
 
 // optimization.getComponents
 // Input: inline, ../contract/src/workflow-optimization.trpc.ts:42
@@ -683,39 +687,39 @@ Contract `../contract/src/workflow.trpc.ts:47`, router `src/transport/workflow.t
 
 ```typescript
 // workflow.engineMode
-// Input: workflowApiEngineModeInputSchema, ../contract/src/workflow.trpc-schemas.ts:30
+// Input: workflowApiEngineModeInputSchema, ../contract/src/workflow.trpc-schemas.ts:41
 interface Input {
   projectId: string;
 }
-// Output: workflowEngineModeSchema, ../contract/src/workflow.trpc-schemas.ts:193
+// Output: workflowEngineModeSchema, ../contract/src/workflow.trpc-schemas.ts:281
 interface Output {
   engineMode: "go";
   optimizeEnabled: false;
 }
 
 // workflow.create
-type Input = z.infer<typeof workflowApiCreateInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:41
-type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:187
+type Input = z.infer<typeof workflowApiCreateInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:68
+type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:270
 
 // workflow.copy
-// Input: workflowApiCopyInputSchema, ../contract/src/workflow.trpc-schemas.ts:49
+// Input: workflowApiCopyInputSchema, ../contract/src/workflow.trpc-schemas.ts:80
 interface Input {
   workflowId: string;
   projectId: string;
   sourceProjectId: string;
   copyDatasets?: boolean;
 }
-type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:187
+type Output = z.infer<typeof workflowWithNewVersionSchema>; // ../contract/src/workflow.trpc-schemas.ts:270
 
 // workflow.getAll
-// Input: workflowApiProjectInputSchema, ../contract/src/workflow.trpc-schemas.ts:19
+// Input: workflowApiProjectInputSchema, ../contract/src/workflow.trpc-schemas.ts:27
 interface Input {
   projectId: string;
 }
 // Output: workflowListRowSchema.array() (inline, ../contract/src/workflow.trpc.ts:66)
 
 // workflow.getCopies
-// Input: workflowApiWorkflowInputSchema, ../contract/src/workflow.trpc-schemas.ts:24
+// Input: workflowApiWorkflowInputSchema, ../contract/src/workflow.trpc-schemas.ts:38
 interface Input {
   projectId: string;
   workflowId: string;
@@ -733,15 +737,15 @@ type Output = {
 }[];
 
 // workflow.getById
-// Input: workflowApiGetByIdInputSchema, ../contract/src/workflow.trpc-schemas.ts:33
+// Input: workflowApiGetByIdInputSchema, ../contract/src/workflow.trpc-schemas.ts:44
 interface Input {
   projectId: string;
   workflowId: string;
 }
-type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:113
+type Output = z.infer<typeof workflowWithVersionSchema>; // ../contract/src/workflow.ts:149
 
 // workflow.getVersions
-// Input: workflowApiGetVersionsInputSchema, ../contract/src/workflow.trpc-schemas.ts:35
+// Input: workflowApiGetVersionsInputSchema, ../contract/src/workflow.trpc-schemas.ts:55
 interface Input {
   projectId: string;
   workflowId: string;
@@ -750,51 +754,51 @@ interface Input {
 // Output: workflowVersionHistoryEntrySchema.array() (inline, ../contract/src/workflow.trpc.ts:78)
 
 // workflow.restoreVersion
-// Input: workflowApiRestoreVersionInputSchema, ../contract/src/workflow.trpc-schemas.ts:56
+// Input: workflowApiRestoreVersionInputSchema, ../contract/src/workflow.trpc-schemas.ts:90
 interface Input {
   projectId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.autosave
-type Input = z.infer<typeof workflowApiAutosaveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:61
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+type Input = z.infer<typeof workflowApiAutosaveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:102
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.commitVersion
-type Input = z.infer<typeof workflowApiCommitVersionInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:68
-type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:68
+type Input = z.infer<typeof workflowApiCommitVersionInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:114
+type Output = z.infer<typeof workflowVersionSchema>; // ../contract/src/workflow.ts:102
 
 // workflow.publish
-// Input: workflowApiPublishInputSchema, ../contract/src/workflow.trpc-schemas.ts:75
+// Input: workflowApiPublishInputSchema, ../contract/src/workflow.trpc-schemas.ts:125
 interface Input {
   projectId: string;
   workflowId: string;
   versionId: string;
 }
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.unpublish
-type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.syncFromSource
-type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
 // Output: syncedFromSourceSchema, ../contract/src/workflow.trpc.ts:45
 type Output = unknown;
 
 // workflow.pushToCopies
-// Input: workflowApiPushToCopiesInputSchema, ../contract/src/workflow.trpc-schemas.ts:81
+// Input: workflowApiPushToCopiesInputSchema, ../contract/src/workflow.trpc-schemas.ts:137
 interface Input {
   projectId: string;
   workflowId: string;
   copyIds?: string[];
 }
-type Output = z.infer<typeof workflowPushToCopiesSchema>; // ../contract/src/workflow.trpc-schemas.ts:199
+type Output = z.infer<typeof workflowPushToCopiesSchema>; // ../contract/src/workflow.trpc-schemas.ts:296
 
 // workflow.getRelatedEntities
-type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:24
-// Output: workflowRelatedEntitiesSchema, ../contract/src/workflow.trpc-schemas.ts:209
+type Input = z.infer<typeof workflowApiWorkflowInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:38
+// Output: workflowRelatedEntitiesSchema, ../contract/src/workflow.trpc-schemas.ts:306
 interface Output {
   agents: {
     id: string;
@@ -803,32 +807,32 @@ interface Output {
 }
 
 // workflow.cascadeArchive
-// Input: workflowApiArchiveInputSchema, ../contract/src/workflow.trpc-schemas.ts:88
+// Input: workflowApiArchiveInputSchema, ../contract/src/workflow.trpc-schemas.ts:148
 interface Input {
   projectId: string;
   workflowId: string;
   unarchive?: boolean;
 }
-type Output = z.infer<typeof workflowCascadeArchiveSchema>; // ../contract/src/workflow.trpc-schemas.ts:214
+type Output = z.infer<typeof workflowCascadeArchiveSchema>; // ../contract/src/workflow.trpc-schemas.ts:317
 
 // workflow.archive
-type Input = z.infer<typeof workflowApiArchiveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:88
-type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:48
+type Input = z.infer<typeof workflowApiArchiveInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:148
+type Output = z.infer<typeof workflowSchema>; // ../contract/src/workflow.ts:84
 
 // workflow.generateCommitMessage
-type Input = z.infer<typeof workflowApiGenerateCommitMessageInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:94
+type Input = z.infer<typeof workflowApiGenerateCommitMessageInputSchema>; // ../contract/src/workflow.trpc-schemas.ts:159
 // Output: inline, ../contract/src/workflow.trpc.ts:122
 type Output = string;
 
 // workflow.copyAgent
-// Input: agentApiCopyRequestSchema, ../../agent/contract/src/agent.schemas.ts:37
+// Input: agentApiCopyRequestSchema, ../../agent/contract/src/agent.schemas.ts:73
 interface Input {
   agentId: string;
   projectId: string;
   sourceProjectId: string;
   newAgentId?: string;
 }
-// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:145
+// Output: agentCopyCreatedSchema, ../../agent/contract/src/agent.queries.ts:202
 interface Output {
   id: string;
   projectId: string;
@@ -873,14 +877,14 @@ Declared at `src/eventing/workflow-nlp-lambda-cleanup.pipeline.ts:31`.
 
 | Kind   | Leaf                         | Environment variable                      | Declared at                             |
 | ------ | ---------------------------- | ----------------------------------------- | --------------------------------------- |
-| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:498`           |
-| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:499`           |
-| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:500`           |
-| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:79` |
-| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:81` |
-| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:82` |
-| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:84` |
-| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:86` |
-| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:88` |
+| secret | `nlpLambdaFleet`             | `LANGWATCH_NLP_LAMBDA_CONFIG`             | `src/app/workflow.app.ts:501`           |
+| secret | `nlpInternal`                | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/workflow.app.ts:502`           |
+| secret | `s3KeySalt`                  | `S3_KEY_SALT`                             | `src/app/workflow.app.ts:503`           |
+| config | `nlpServiceUrl`              | `LANGWATCH_NLP_SERVICE`                   | `../contract/src/workflow.config.ts:82` |
+| config | `stagingThresholdBytes`      | `LANGEVALS_STAGING_THRESHOLD_BYTES`       | `../contract/src/workflow.config.ts:84` |
+| config | `stagingTtlSeconds`          | `LANGEVALS_STAGING_TTL_SECONDS`           | `../contract/src/workflow.config.ts:85` |
+| config | `relayTurnCeilingMs`         | `NLP_FETCH_MAX_TIMEOUT_MS`                | `../contract/src/workflow.config.ts:87` |
+| config | `publicBaseUrl`              | `BASE_HOST`                               | `../contract/src/workflow.config.ts:89` |
+| config | `nlpCodeBlockTimeoutSeconds` | `NLPGO_ENGINE_CODE_BLOCK_TIMEOUT_SECONDS` | `../contract/src/workflow.config.ts:91` |
 
 <!-- readme:generated:end -->

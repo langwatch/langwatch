@@ -54,7 +54,10 @@ function HeroField({ canAsk, isNewProject }: { canAsk: boolean; isNewProject: bo
 }
 
 export function LangyHomeHero() {
-  const canAsk = useProjectHomeHost().canAskLangy();
+  const host = useProjectHomeHost();
+  // Without Langy the field is just the command bar: no asks, no Langy routes.
+  const hasLangy = host.langyVisibility().show;
+  const canAsk = hasLangy && host.canAskLangy();
 
   const reach = useProjectReach();
   const { isNewProject } = reach;
@@ -133,14 +136,21 @@ export function LangyHomeHero() {
           <GuidedOnboardingOffer space="project" spaceInUse={reachKnown ? !isNewProject : null} />
         </VStack>
 
-        {!canAsk ? (
-          <Text fontSize="12px" color="fg.subtle" textAlign="center">
-            You can read Langy conversations here. To start one, ask whoever manages your account
-            for access.
-          </Text>
-        ) : null}
+        <LangyAccessCaption hasLangy={hasLangy} canAsk={canAsk} />
       </VStack>
     </VStack>
+  );
+}
+
+/** One quiet line under the field when this reader cannot ask Langy, saying why. */
+function LangyAccessCaption({ hasLangy, canAsk }: { hasLangy: boolean; canAsk: boolean }) {
+  if (canAsk) return null;
+  return (
+    <Text textStyle="caption" color="fg.subtle" textAlign="center">
+      {hasLangy
+        ? "You can read Langy conversations here. To start one, ask whoever manages your account for access."
+        : "Langy isn't enabled for this workspace."}
+    </Text>
   );
 }
 

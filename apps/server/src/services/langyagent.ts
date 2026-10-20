@@ -79,6 +79,7 @@ export async function startLangyagent(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.langyagent}/health`),
     timeoutMs: 30_000,
   });

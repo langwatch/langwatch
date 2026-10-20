@@ -9,48 +9,63 @@ import { datasetClient } from "@langwatch/dataset-client";
 import {
   type DatasetColumns,
   datasetColumnsSchema,
-  datasetDisplayRecordCount,
   type DatasetSummaryWire,
 } from "@langwatch/dataset-contract";
-import { InputGroup } from "@langwatch/design-system/input-group";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import {
+  ListPage,
+  type ListPageErrorConfig,
+  type ListPageState,
+} from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
   HStack,
-  Input,
   Skeleton,
-  Spacer,
-  Table,
   Text,
   useDisclosure,
-  VStack,
 } from "@langwatch/design-system/primitives";
 import { AggregateReadOnlyGate } from "@langwatch/error-views";
 import { isAggregateProjectKind } from "@langwatch/project-contract";
 import { readableDate } from "@langwatch/time";
-import {
-  ChevronDown,
-  Copy,
-  EllipsisVertical,
-  Pencil,
-  Plus,
-  Search,
-  Table as TableIcon,
-  Trash2,
-  Upload,
-} from "lucide-react";
+import { ChevronDown, Copy, Pencil, Plus, Table as TableIcon, Trash2, Upload } from "lucide-react";
 import { type ReactNode, useMemo, useState } from "react";
 
 import { datasetApi } from "../../behavior/dataset-api.ts";
+import { SetupWithAgentButton } from "../../behavior/lent-setup-with-agent-button.tsx";
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DeleteDatasetDialog } from "../../ui/blocks/delete-dataset-dialog.tsx";
 import { AddOrEditDatasetDrawer } from "./add-or-edit-dataset-drawer.tsx";
 import { BulkUploadDrawer } from "./bulk-upload-drawer.tsx";
 import { CopyDatasetDialog } from "./copy-dataset-dialog.tsx";
+
+const DATASETS_DOCS = "https://docs.langwatch.ai/datasets/overview";
+
+/**
+ * What the list shows, from the read. An aggregate project only ever shows its notice; a
+ * failed refresh keeps the rows, and ListPage shows the error inline over them.
+ */
+function listStateOf({
+  isAggregate,
+  isError,
+  total,
+  shown,
+}: {
+  isAggregate: boolean;
+  isError: boolean;
+  total: number | undefined;
+  shown: number | undefined;
+}): ListPageState {
+  if (isAggregate) return "ready";
+  if (total === undefined) return isError ? "error" : "loading";
+  if (total === 0) return "empty";
+  return shown === 0 ? "no-results" : "ready";
+}
 
 /** How long the undoable delete notice stands before it goes. */
 const DELETE_NOTICE_MS = 10_000;
@@ -86,145 +101,170 @@ function UploadOrCreateDatasetMenu({
 
 type DatasetRow = WireOf<DatasetSummaryWire>;
 
-function DatasetTableBody({
+function DatasetTable({
   columnsOf,
   datasets,
   goToDataset,
   isLiteMember,
-  isLoading,
   onCopy,
   onDelete,
   onEdit,
-  search,
+  recordCounts,
+  countsFailed,
+  slug,
 }: {
   columnsOf: (dataset: DatasetRow) => DatasetColumns;
-  datasets: DatasetRow[] | undefined;
+  datasets: DatasetRow[];
   goToDataset: (datasetId: string) => void;
   isLiteMember: boolean;
-  isLoading: boolean;
   onCopy: (target: { datasetId: string; datasetName: string }) => void;
   onDelete: (target: { id: string; name: string }) => void;
   onEdit: (dataset: DatasetRow) => void;
-  search: string;
+  /** Each dataset's entry count; a missing one is still being counted. */
+  recordCounts: ReadonlyMap<string, number>;
+  /** The count read gave up: missing counts show as unavailable, not loading. */
+  countsFailed: boolean;
+  slug: string | undefined;
 }) {
-  if (isLoading) {
-    return (
-      <>
-        {Array.from({ length: 3 }).map((_, row) => (
-          <Table.Row key={row}>
-            {Array.from({ length: 4 }).map((__, cell) => (
-              <Table.Cell key={cell}>
-                <Skeleton height="20px" />
-              </Table.Cell>
-            ))}
-          </Table.Row>
+  return (
+    <ListTable aria-label="Datasets" scroll="x" scrollLabel="Datasets" minWidth="40rem">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Columns</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader align="end">Entries</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader width={240}>Last updated</ListTable.ColumnHeader>
+          <ListTable.ActionHeader label="Dataset actions" />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {datasets.map((dataset) => (
+          <ListTable.Row
+            key={dataset.id}
+            data-testid={`dataset-row-${dataset.id}`}
+            onActivate={() => goToDataset(dataset.id)}
+          >
+            <ListTable.Cell>
+              <HStack gap={2}>
+                <ListTable.RowAction
+                  href={`/${slug}/datasets/${dataset.id}`}
+                  onNavigate={() => goToDataset(dataset.id)}
+                >
+                  {dataset.name}
+                </ListTable.RowAction>
+                <DatasetStatusBadge status={dataset.status} />
+              </HStack>
+            </ListTable.Cell>
+            <ListTable.Cell maxWidth="250px">
+              <HStack wrap="wrap">
+                {columnsOf(dataset).map(({ name }) => (
+                  <Badge size="sm" key={name}>
+                    <Text as="span" truncate maxWidth="160px" title={name}>
+                      {name}
+                    </Text>
+                  </Badge>
+                ))}
+              </HStack>
+            </ListTable.Cell>
+            <ListTable.Cell numeric>
+              <RecordCount count={recordCounts.get(dataset.id)} failed={countsFailed} />
+            </ListTable.Cell>
+            <ListTable.Cell tone="muted">
+              <FormattedDate
+                value={readableDate(dataset.updatedAt ?? dataset.createdAt).getTime()}
+                display="datetime"
+              />
+            </ListTable.Cell>
+            <ListTable.ActionCell>
+              <DatasetRowMenu
+                dataset={dataset}
+                isLiteMember={isLiteMember}
+                onCopy={onCopy}
+                onDelete={onDelete}
+                onEdit={onEdit}
+              />
+            </ListTable.ActionCell>
+          </ListTable.Row>
         ))}
-      </>
-    );
-  }
-  if (!datasets) return null;
-  if (datasets.length === 0) {
+      </ListTable.Body>
+    </ListTable>
+  );
+}
+
+function RecordCount({ count, failed }: { count: number | undefined; failed: boolean }) {
+  if (count !== undefined) return <>{count}</>;
+  if (failed) {
     return (
-      <Table.Row>
-        <Table.Cell colSpan={5}>
-          <Text paddingY={4} color="fg.muted">
-            No datasets match &quot;{search}&quot;
-          </Text>
-        </Table.Cell>
-      </Table.Row>
+      <Text as="span" color="fg.muted" aria-label="Entry count unavailable">
+        —
+      </Text>
     );
   }
 
   return (
-    <>
-      {datasets.map((dataset) => (
-        <Table.Row
-          key={dataset.id}
-          cursor="pointer"
-          data-testid={`dataset-row-${dataset.id}`}
-          onClick={() => goToDataset(dataset.id)}
-        >
-          <Table.Cell>
-            <HStack gap={2}>
-              <Text>{dataset.name}</Text>
-              <DatasetStatusBadge status={dataset.status} />
-            </HStack>
-          </Table.Cell>
-          <Table.Cell maxWidth="250px">
-            <HStack wrap="wrap">
-              {columnsOf(dataset).map(({ name }) => (
-                <Badge size="sm" key={name}>
-                  <Text as="span" truncate maxWidth="160px" title={name}>
-                    {name}
-                  </Text>
-                </Badge>
-              ))}
-            </HStack>
-          </Table.Cell>
-          <Table.Cell>{datasetDisplayRecordCount(dataset)}</Table.Cell>
-          <Table.Cell>
-            {readableDate(dataset.updatedAt ?? dataset.createdAt).toLocaleString()}
-          </Table.Cell>
-          <Table.Cell>
-            <Menu.Root>
-              <Menu.Trigger asChild>
-                <Button
-                  variant="ghost"
-                  aria-label={`Actions for ${dataset.name}`}
-                  onClick={(event) => event.stopPropagation()}
-                >
-                  <EllipsisVertical />
-                </Button>
-              </Menu.Trigger>
-              <Menu.Content>
-                {/* Replicate and Edit operate on dataset CONTENT, which
-                      only exists once `ready` — copy and column edits
-                      refuse on a processing or failed row. Gate them on
-                      ready (a null status = legacy = ready). Delete stays
-                      available so a stuck or failed dataset can always be
-                      cleaned up. */}
-                {(dataset.status === "ready" || dataset.status == null) && (
-                  <Menu.Item
-                    value="copy"
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onCopy({ datasetId: dataset.id, datasetName: dataset.name });
-                    }}
-                  >
-                    <Copy size={16} /> Replicate to another project
-                  </Menu.Item>
-                )}
-                {!isLiteMember && (
-                  <>
-                    {(dataset.status === "ready" || dataset.status == null) && (
-                      <Menu.Item
-                        value="edit"
-                        onClick={(event) => {
-                          event.stopPropagation();
-                          onEdit(dataset);
-                        }}
-                      >
-                        <Pencil size={16} /> Edit dataset
-                      </Menu.Item>
-                    )}
-                    <Menu.Item
-                      value="delete"
-                      color="fg.error"
-                      onClick={(event) => {
-                        event.stopPropagation();
-                        onDelete({ id: dataset.id, name: dataset.name });
-                      }}
-                    >
-                      <Trash2 size={16} /> Delete dataset
-                    </Menu.Item>
-                  </>
-                )}
-              </Menu.Content>
-            </Menu.Root>
-          </Table.Cell>
-        </Table.Row>
-      ))}
-    </>
+    <Skeleton
+      display="inline-block"
+      height="1em"
+      width="2.5em"
+      verticalAlign="middle"
+      aria-label="Counting entries"
+    />
+  );
+}
+
+function DatasetRowMenu({
+  dataset,
+  isLiteMember,
+  onCopy,
+  onDelete,
+  onEdit,
+}: {
+  dataset: DatasetRow;
+  isLiteMember: boolean;
+  onCopy: (target: { datasetId: string; datasetName: string }) => void;
+  onDelete: (target: { id: string; name: string }) => void;
+  onEdit: (dataset: DatasetRow) => void;
+}) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger asChild>
+        <Button size="xs" variant="ghost" aria-label={`Actions for ${dataset.name}`}>
+          <MoreVerticalIcon size={16} aria-hidden />
+        </Button>
+      </Menu.Trigger>
+      <Menu.Content>
+        {/* Replicate and Edit operate on dataset CONTENT, which
+              only exists once `ready` — copy and column edits
+              refuse on a processing or failed row. Gate them on
+              ready (a null status = legacy = ready). Delete stays
+              available so a stuck or failed dataset can always be
+              cleaned up. */}
+        {(dataset.status === "ready" || dataset.status == null) && (
+          <Menu.Item
+            value="copy"
+            onClick={() => onCopy({ datasetId: dataset.id, datasetName: dataset.name })}
+          >
+            <Copy size={16} /> Replicate to another project
+          </Menu.Item>
+        )}
+        {!isLiteMember && (
+          <>
+            {(dataset.status === "ready" || dataset.status == null) && (
+              <Menu.Item value="edit" onClick={() => onEdit(dataset)}>
+                <Pencil size={16} /> Edit dataset
+              </Menu.Item>
+            )}
+            <Menu.Item
+              value="delete"
+              color="fg.error"
+              onClick={() => onDelete({ id: dataset.id, name: dataset.name })}
+            >
+              <Trash2 size={16} /> Delete dataset
+            </Menu.Item>
+          </>
+        )}
+      </Menu.Content>
+    </Menu.Root>
   );
 }
 
@@ -259,6 +299,10 @@ export default function DatasetsScreen() {
     { projectId: project?.id ?? "" },
     { enabled: !!project },
   );
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId: project?.id,
+    datasets: datasets.data,
+  });
 
   /**
    * `columnTypes` is persisted JSON and older or CLI-created rows can carry an
@@ -342,106 +386,91 @@ export default function DatasetsScreen() {
     addEditDatasetDrawer.onOpen();
   };
 
+  const listState = listStateOf({
+    isAggregate: projectIsAggregate,
+    isError: datasets.isError,
+    total: datasets.data?.length,
+    shown: filteredDatasets?.length,
+  });
+  const loadError: ListPageErrorConfig = {
+    title: "Couldn't load the datasets",
+    description: "Try again, or read how datasets work.",
+    onRetry: () => void datasets.refetch(),
+    next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+  };
+  // ListPage draws any error it is given over loaded rows, so only a failed read passes one.
+  const stateProps =
+    listState === "error"
+      ? { state: listState, error: loadError }
+      : { state: listState, ...(datasets.isError ? { error: loadError } : {}) };
+
   return (
     <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Datasets</PageLayout.Heading>
-        <Spacer />
-        <InputGroup maxWidth="280px" startElement={<Search size={14} />}>
-          <Input
-            size="sm"
-            placeholder="Search datasets"
-            data-testid="datasets-search"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-        </InputGroup>
-        {!projectIsAggregate && (
-          <UploadOrCreateDatasetMenu
-            onUpload={() => bulkUploadModal.onOpen()}
-            onCreate={openCreateDrawer}
-          >
-            <Button variant="outline" size="sm" data-testid="upload-or-create-dataset">
-              <Upload height={17} width={17} strokeWidth={2.5} /> Upload or create dataset{" "}
-              <ChevronDown size={16} />
-            </Button>
-          </UploadOrCreateDatasetMenu>
-        )}
-      </PageLayout.Header>
-      <PageLayout.Container paddingY={6}>
+      <ListPage
+        title="Datasets"
+        actions={
+          projectIsAggregate ? undefined : (
+            <UploadOrCreateDatasetMenu
+              onUpload={() => bulkUploadModal.onOpen()}
+              onCreate={openCreateDrawer}
+            >
+              <PageLayout.HeaderButton primary data-testid="upload-or-create-dataset">
+                <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
+              </PageLayout.HeaderButton>
+            </UploadOrCreateDatasetMenu>
+          )
+        }
+        {...stateProps}
+        toolbar={
+          projectIsAggregate
+            ? undefined
+            : {
+                search: {
+                  value: search,
+                  onChange: setSearch,
+                  placeholder: "Search datasets",
+                  ariaLabel: "Search datasets",
+                  testId: "datasets-search",
+                },
+              }
+        }
+        empty={{
+          title: "No datasets yet",
+          description:
+            "Upload or create datasets on your messages to do further analysis or to train your own models.",
+          icon: <TableIcon size={24} />,
+          secondaryAction: <SetupWithAgentButton surface="datasets" size="md" />,
+          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+        }}
+        noResults={{
+          description: `No datasets match "${search}"`,
+          onClear: () => setSearch(""),
+          next: [{ kind: "docs", label: "Read about datasets", href: DATASETS_DOCS }],
+        }}
+      >
         {/* An aggregate (ADR-177) keeps no datasets of its own; the server refuses one. */}
         <AggregateReadOnlyGate isAggregate={projectIsAggregate}>
-          {datasets.data && datasets.data.length === 0 ? (
-            <NoDataInfoBlock
-              title="No datasets yet"
-              description="Upload or create datasets on your messages to do further analysis or to train your own models."
-              docsInfo={
-                <VStack gap={3}>
-                  <HStack gap={2}>
-                    <UploadOrCreateDatasetMenu
-                      onUpload={() => bulkUploadModal.onOpen()}
-                      onCreate={openCreateDrawer}
-                    >
-                      <Button
-                        size="sm"
-                        colorPalette="orange"
-                        data-testid="empty-state-create-dataset"
-                      >
-                        <Upload size={16} /> Upload or create dataset <ChevronDown size={16} />
-                      </Button>
-                    </UploadOrCreateDatasetMenu>
-                  </HStack>
-                  <Text>
-                    To learn more about datasets, please visit our{" "}
-                    <a
-                      href="https://docs.langwatch.ai/datasets/overview"
-                      target="_blank"
-                      rel="noreferrer"
-                      style={{ color: "inherit", textDecoration: "underline" }}
-                    >
-                      documentation
-                    </a>
-                    .
-                  </Text>
-                </VStack>
-              }
-              icon={<TableIcon size={24} />}
-            />
-          ) : (
-            <ListTable>
-              <Table.Header>
-                <Table.Row>
-                  <Table.ColumnHeader>Name</Table.ColumnHeader>
-                  <Table.ColumnHeader>Columns</Table.ColumnHeader>
-                  <Table.ColumnHeader>Entries</Table.ColumnHeader>
-                  <Table.ColumnHeader width={240}>Last Update</Table.ColumnHeader>
-                  <Table.ColumnHeader width={20}></Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                <DatasetTableBody
-                  columnsOf={columnsOf}
-                  datasets={filteredDatasets}
-                  goToDataset={goToDataset}
-                  isLiteMember={isLiteMember}
-                  isLoading={datasets.isLoading}
-                  onCopy={setCopyDataset}
-                  onDelete={setDatasetToDelete}
-                  onEdit={(dataset) => {
-                    setEditDataset({
-                      datasetId: dataset.id,
-                      name: dataset.name,
-                      columnTypes: columnsOf(dataset),
-                    });
-                    addEditDatasetDrawer.onOpen();
-                  }}
-                  search={search}
-                />
-              </Table.Body>
-            </ListTable>
-          )}
+          <DatasetTable
+            columnsOf={columnsOf}
+            datasets={filteredDatasets ?? []}
+            goToDataset={goToDataset}
+            isLiteMember={isLiteMember}
+            onCopy={setCopyDataset}
+            onDelete={setDatasetToDelete}
+            recordCounts={recordCounts}
+            countsFailed={countsFailed}
+            onEdit={(dataset) => {
+              setEditDataset({
+                datasetId: dataset.id,
+                name: dataset.name,
+                columnTypes: columnsOf(dataset),
+              });
+              addEditDatasetDrawer.onOpen();
+            }}
+            slug={project?.slug}
+          />
         </AggregateReadOnlyGate>
-      </PageLayout.Container>
+      </ListPage>
 
       <AddOrEditDatasetDrawer
         open={addEditDatasetDrawer.open}
@@ -463,6 +492,7 @@ export default function DatasetsScreen() {
         onUploaded={() => {
           void datasets.refetch();
         }}
+        onOpenDataset={goToDataset}
         onCreateFromScratch={() => {
           bulkUploadModal.onClose();
           openCreateDrawer();

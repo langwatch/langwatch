@@ -199,6 +199,8 @@ describe("MemoryProjectRepository", () => {
         slug: `governance-${ORGANIZATION_ID}`,
         apiKey: "sk-lw-internal",
         teamId: TEAM_ID,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        framework: "governance",
       });
     });
 
@@ -251,6 +253,8 @@ describe("MemoryProjectRepository", () => {
         slug: `governance-${ORGANIZATION_ID}`,
         apiKey: "sk-lw-internal",
         teamId: TEAM_ID,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        framework: "governance",
       });
       const loser = await repository.createInternalOrFindWinner({
         id: "project_internal_second",
@@ -258,10 +262,17 @@ describe("MemoryProjectRepository", () => {
         slug: `governance-${ORGANIZATION_ID}`,
         apiKey: "sk-lw-internal-second",
         teamId: TEAM_ID,
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        framework: "governance",
       });
 
       expect(loser).toEqual(minted);
-      expect(await repository.findInternalByOrganization(ORGANIZATION_ID)).toEqual(minted);
+      expect(
+        await repository.findInternalByOrganization({
+          organizationId: ORGANIZATION_ID,
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).toEqual(minted);
       expect(await repository.countLiveNonGovernanceProjects(ORGANIZATION_ID)).toBe(0);
       expect(
         await repository.findAllByTeam({ organizationId: ORGANIZATION_ID, teamId: TEAM_ID }),

@@ -20,6 +20,8 @@ const phase = () => {
     return "main";
   }
 };
+// unreadBody marks a failed response whose body was gone (the page navigated); observe.go reads it.
+const unreadBody = "body unread";
 const stopped = () => existsSync(join(runDir, "walk.stop"));
 const dismissNudge = (page) =>
   page
@@ -37,7 +39,9 @@ const outsideAuth = (at) => !at.pathname.startsWith("/auth/");
 async function signIn(page) {
   await page.goto(`${url}/auth/signin`, { timeout: 30_000, waitUntil: "domcontentloaded" });
   const form = page
-    .locator('input[type="email"]:enabled, input[name="email"]:not([type="hidden"]):enabled')
+    .locator(
+      'input[type="email"]:enabled, input[name="email"]:not([type="hidden"]):enabled, input[autocomplete~="email"]:enabled, input[autocomplete~="username"]:enabled',
+    )
     .first();
   await Promise.race([
     form.waitFor({ timeout: 30_000 }),
@@ -55,20 +59,36 @@ async function signIn(page) {
   await dismissNudge(page);
 }
 
-const browser = await chromium.launch();
-try {
-  const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+// No GPU or WebGL: the boot screen's shader otherwise renders in software on ~4 cores;
+// without WebGL it shows its still background.
+const launchOptions = {
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
+};
+let browser = await chromium.launch(launchOptions);
+let page;
+let step = "start";
+// Opens the walker's one tab, relaunching Chromium first when it died, so a crash costs one round.
+async function openPage() {
+  if (!browser.isConnected()) browser = await chromium.launch(launchOptions);
+  page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
   // The lab has no internet: web fonts answer empty CSS, so a stalled DNS lookup never holds
   // the page.
   await page.route(/fonts\.(googleapis|gstatic)\.com/, (route) =>
     route.fulfill({ contentType: "text/css", body: "" }),
   );
-  let step = "start";
   page.on(
     "console",
     (message) =>
       message.type() === "error" &&
       log({ kind: "console", step, url: page.url(), text: message.text().slice(0, 500) }),
+  );
+  // A main-frame navigation while the walker naps is the app reloading itself (T1-F2).
+  page.on(
+    "framenavigated",
+    (frame) =>
+      frame === page.mainFrame() &&
+      step === "idle" &&
+      log({ kind: "navigated", step, url: frame.url(), text: "the page navigated on its own" }),
   );
   page.on("pageerror", (error) =>
     log({ kind: "pageerror", step, url: page.url(), text: String(error).slice(0, 500) }),
@@ -84,7 +104,11 @@ try {
   page.on("response", async (response) => {
     if (response.status() < 400) return;
     const text =
-      response.status() === 503 ? (await response.text().catch(() => "")).slice(0, 300) : "";
+      response.status() === 503 || response.status() === 400
+        ? (
+            await response.text().catch((error) => `${unreadBody}: ${error?.message ?? error}`)
+          ).slice(0, 300)
+        : "";
     log({
       kind: "http",
       step,
@@ -94,6 +118,10 @@ try {
       retryAfter: response.headers()["retry-after"] ?? "",
     });
   });
+}
+
+try {
+  await openPage();
 
   let project = "";
   const shot = new Set();
@@ -103,6 +131,7 @@ try {
       if (!granted && existsSync(join(runDir, "operator.granted"))) {
         granted = true;
         project = "";
+        step = "regrant";
         // Off the signed-in page first, so nothing it still fetches goes out without the cookie.
         await page.goto("about:blank");
         await page.context().clearCookies();
@@ -119,6 +148,7 @@ try {
           throw new Error(`signed in but on no project; page showed ${await shown(page)}`);
       }
       const pages = [
+        ["home", `/${project}`],
         ["traces", `/${project}/messages`],
         ["prompts", `/${project}/prompts`],
         ["experiments", `/${project}/experiments`],
@@ -130,6 +160,11 @@ try {
         step = name;
         await page.goto(`${url}${path}`, { timeout: 30_000, waitUntil: "domcontentloaded" });
         await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => undefined);
+        // Signed in, /auth/signin redirects through "/": let it land, or the next goto aborts it.
+        if (name === "signin")
+          await page
+            .waitForURL((at) => outsideAuth(at) && at.pathname !== "/", { timeout: 15_000 })
+            .catch(() => undefined);
         if (name === "traces") {
           step = "trace-drawer";
           await page
@@ -179,7 +214,17 @@ try {
           .catch(() => undefined);
       }
       project = "";
+      if (page.isClosed() || !browser.isConnected()) {
+        log({
+          kind: "walkerror",
+          step: "reopen",
+          url: "",
+          text: "tab or browser closed: opening a new one",
+        });
+        await openPage().catch(() => undefined);
+      }
     }
+    step = "idle";
     await nap(every);
   }
 } finally {

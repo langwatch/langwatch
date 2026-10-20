@@ -2,14 +2,15 @@
  * @vitest-environment node
  * The installer over memory persistence, in both roles that boot it.
  */
-import { type AuthzApi as AuthzApiContract } from "@langwatch/authz-contract";
-import { evaluatorSchema, type EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { evaluatorSchema, EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { MonitorApi, type MonitorCreateInput } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import { monitorProcessModule } from "../../monitor.module.ts";
@@ -32,18 +33,29 @@ function evaluatorRow(input: { id: string; projectId: string }) {
 }
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([monitorProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ monitor: { publicBaseUrl: PUBLIC_BASE_URL } })
-    .provide({
-      authz: createApiFixture<AuthzApiContract>({ hasProjectPermission: async () => true }),
-      evaluator: createApiFixture<EvaluatorApi>({
-        getById: async ({ id, projectId }) => evaluatorRow({ id, projectId }),
+  return bootInstalledProcess({
+    role,
+    modules: [monitorProcessModule],
+    config: { monitor: { publicBaseUrl: PUBLIC_BASE_URL } },
+    stores: memoryStores(),
+    peers: [
+      testPeer({
+        token: AuthzApi,
+        instance: createApiFixture<AuthzApi>({ hasProjectPermission: async () => true }),
       }),
-      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-      workflow: createApiFixture<WorkflowApi>(),
-    });
+      testPeer({
+        token: EvaluatorApi,
+        instance: createApiFixture<EvaluatorApi>({
+          getById: async ({ id, projectId }) => evaluatorRow({ id, projectId }),
+        }),
+      }),
+      testPeer({
+        token: FeatureFlagApi,
+        instance: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+      }),
+      testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+    ],
+  });
 }
 
 const created: MonitorCreateInput = {
@@ -60,7 +72,7 @@ const created: MonitorCreateInput = {
 
 describe("monitor app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(MonitorApi);
@@ -80,7 +92,7 @@ describe("monitor app installation", () => {
 
   /** @scenario "A monitor's platform link is built on the process's public base URL" */
   it("links a monitor on the public base URL the process supplies", async () => {
-    const runtime = await process("api").boot();
+    const runtime = await process("api");
 
     try {
       expect(
@@ -94,8 +106,8 @@ describe("monitor app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process("api").boot();
-    const second = await process("api").boot();
+    const first = await process("api");
+    const second = await process("api");
 
     try {
       await first.service(MonitorApi).create({ ...created });

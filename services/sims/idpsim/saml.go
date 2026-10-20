@@ -1,0 +1,206 @@
+package idpsim
+
+import (
+	"encoding/base64"
+	"encoding/xml"
+	"fmt"
+	"net/http"
+	"net/url"
+
+	"github.com/crewjam/saml"
+)
+
+// samlIDP builds the crewjam identity provider for a tenant. The value is
+// rebuilt per request: it is cheap, and the SSO handler customizes the
+// service-provider registry per request.
+func (s *Server) samlIDP(t *Tenant) saml.IdentityProvider {
+	current := t.currentKey()
+	return saml.IdentityProvider{
+		Key:         current.Key,
+		Certificate: current.Cert,
+		MetadataURL: mustParseURL(t.BaseURL + "/saml/metadata"),
+		SSOURL:      mustParseURL(t.BaseURL + "/saml/sso"),
+	}
+}
+
+// handleSAMLMetadata publishes the tenant's IdP metadata: entity id, SSO
+// endpoint and the signing certificates service providers pin, the previous
+// one too while a rotation has not dropped it.
+func (s *Server) handleSAMLMetadata(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	idp := s.samlIDP(t)
+	buf, err := xml.MarshalIndent(withRetiredCertificates(idp.Metadata(), t), "", "  ")
+	if err != nil {
+		http.Error(w, "rendering metadata failed", http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "application/samlmetadata+xml")
+	_, _ = w.Write(buf)
+}
+
+// withRetiredCertificates adds a signing KeyDescriptor for each published key past the current one.
+func withRetiredCertificates(md *saml.EntityDescriptor, t *Tenant) *saml.EntityDescriptor {
+	sso := &md.IDPSSODescriptors[0]
+	for _, k := range t.SigningKeys()[1:] {
+		sso.KeyDescriptors = append(sso.KeyDescriptors, saml.KeyDescriptor{
+			Use: "signing",
+			KeyInfo: saml.KeyInfo{X509Data: saml.X509Data{X509Certificates: []saml.X509Certificate{
+				{Data: base64.StdEncoding.EncodeToString(k.Cert.Raw)},
+			}}},
+		})
+	}
+	return md
+}
+
+// permissiveSPProvider fabricates service-provider metadata from the incoming
+// authentication request instead of requiring pre-registration: whatever ACS
+// URL the request names is where the response goes. That is exactly wrong for
+// a real IdP and exactly right for a simulator — the test drives both sides.
+type permissiveSPProvider struct {
+	entityID string
+	acsURL   string
+}
+
+func (p permissiveSPProvider) GetServiceProvider(_ *http.Request, serviceProviderID string) (*saml.EntityDescriptor, error) {
+	entityID := p.entityID
+	if entityID == "" {
+		entityID = serviceProviderID
+	}
+	isDefault := true
+	return &saml.EntityDescriptor{
+		EntityID: entityID,
+		SPSSODescriptors: []saml.SPSSODescriptor{{
+			SSODescriptor: saml.SSODescriptor{
+				RoleDescriptor: saml.RoleDescriptor{
+					ProtocolSupportEnumeration: "urn:oasis:names:tc:SAML:2.0:protocol",
+				},
+			},
+			AssertionConsumerServices: []saml.IndexedEndpoint{{
+				Binding:   saml.HTTPPostBinding,
+				Location:  p.acsURL,
+				Index:     1,
+				IsDefault: &isDefault,
+			}},
+		}},
+	}, nil
+}
+
+// handleSAMLSSO accepts an AuthnRequest (redirect or POST binding), signs an
+// assertion for the hinted user, and returns crewjam's auto-submitting POST
+// form aimed at the request's ACS URL. A redirect-binding request with no
+// login_hint lands on the account picker, as an OIDC authorize request does;
+// its links repeat the request with the hint. A POST without one still asserts
+// the first active user, since a link cannot carry its body.
+func (s *Server) handleSAMLSSO(w http.ResponseWriter, r *http.Request) {
+	t, ok := s.tenantFor(r)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	req, sp, ok := s.readAuthnRequest(w, t, r)
+	if !ok {
+		return
+	}
+	if r.Method == http.MethodGet && samlHintOf(r) == "" {
+		s.serveConsolePage(w, r, http.StatusOK)
+		return
+	}
+	user, ok := s.samlUser(t, r)
+	if !ok {
+		s.record(t, Event{
+			Kind:    "saml.sso",
+			Outcome: OutcomeRefused,
+			Client:  sp.entityID,
+			Detail:  "the tenant has no active user to assert",
+		})
+		http.Error(w, "the tenant has no active user to assert", http.StatusBadRequest)
+		return
+	}
+	mode, err := issueSAML(samlIssue{Tenant: t, Req: req, User: user})
+	if err != nil {
+		http.Error(w, fmt.Sprintf("building the assertion failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+	s.record(t, Event{
+		Kind:    "saml.sso",
+		Outcome: OutcomeOK,
+		Client:  sp.entityID,
+		Subject: user.Email,
+		Detail:  faultDetail("signed an assertion for "+user.Email+", posting it to "+sp.acsURL, mode, t),
+	})
+	if err := req.WriteResponse(w); err != nil {
+		http.Error(w, fmt.Sprintf("writing the response failed: %v", err), http.StatusInternalServerError)
+		return
+	}
+}
+
+// readAuthnRequest parses and validates the incoming AuthnRequest, returning
+// it alongside the service-provider registry built from the request itself.
+// It writes the refusal and reports false when the request cannot be read.
+func (s *Server) readAuthnRequest(w http.ResponseWriter, t *Tenant, r *http.Request) (*saml.IdpAuthnRequest, permissiveSPProvider, bool) {
+	idp := s.samlIDP(t)
+	req, err := saml.NewIdpAuthnRequest(&idp, r)
+	if err != nil {
+		http.Error(w, fmt.Sprintf("unreadable SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	// Pre-read the request's issuer and ACS URL so the permissive registry can
+	// echo them back through Validate's metadata lookup. The buffer is
+	// size-bounded first; encoding/xml resolves no external entities, and the
+	// simulator only ever parses its own developer's test traffic.
+	if len(req.RequestBuffer) > 1<<20 {
+		http.Error(w, "SAML request exceeds 1 MiB", http.StatusRequestEntityTooLarge)
+		return nil, permissiveSPProvider{}, false
+	}
+	var pre saml.AuthnRequest
+	if err := xml.Unmarshal(req.RequestBuffer, &pre); err != nil {
+		http.Error(w, fmt.Sprintf("unparseable SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	sp := permissiveSPProvider{acsURL: pre.AssertionConsumerServiceURL}
+	if pre.Issuer != nil {
+		sp.entityID = pre.Issuer.Value
+	}
+	idp.ServiceProviderProvider = sp
+	if err := req.Validate(); err != nil {
+		http.Error(w, fmt.Sprintf("invalid SAML request: %v", err), http.StatusBadRequest)
+		return nil, permissiveSPProvider{}, false
+	}
+	return req, sp, true
+}
+
+// samlUser picks who the assertion names: an explicit login_hint, or the
+// tenant's first active user.
+func (s *Server) samlUser(t *Tenant, r *http.Request) (*User, bool) {
+	if hint := samlHintOf(r); hint != "" {
+		u, ok := t.FindUser(hint)
+		return u, ok && u.Active // a user disabled at the IdP is refused here
+	}
+	for _, u := range t.Users() {
+		if u.Active {
+			return u, true
+		}
+	}
+	return nil, false
+}
+
+// samlHintOf is who the request names: login_hint, or its `user` alias as on
+// the authorize endpoint.
+func samlHintOf(r *http.Request) string {
+	if hint := r.URL.Query().Get("login_hint"); hint != "" {
+		return hint
+	}
+	return r.URL.Query().Get("user")
+}
+
+func mustParseURL(raw string) url.URL {
+	u, err := url.Parse(raw)
+	if err != nil {
+		panic(err) // only called on URLs the simulator itself assembled
+	}
+	return *u
+}

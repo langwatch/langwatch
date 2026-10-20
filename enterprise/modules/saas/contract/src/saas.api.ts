@@ -39,7 +39,6 @@ export const releaseIdentitySchema: ReleaseIdentitySchema = releaseIdentitySchem
 const usageReportReceiptSchemaDefinition = z.object({
   message: z.literal("Event captured"),
   latest_release: releaseIdentitySchema.optional(),
-  floor: z.string().optional(),
 });
 export interface UsageReportReceiptSchema extends Named<
   typeof usageReportReceiptSchemaDefinition

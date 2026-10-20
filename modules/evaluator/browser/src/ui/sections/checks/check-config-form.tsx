@@ -7,11 +7,11 @@ import {
   type MappingState,
   mappingStateSchema,
 } from "@langwatch/dataset-contract";
+import { Card } from "@langwatch/design-system/card";
 import { HorizontalFormControl } from "@langwatch/design-system/horizontal-form-control";
 import {
   Accordion,
   Button,
-  Card,
   Field,
   HStack,
   Input,
@@ -302,75 +302,73 @@ function EvaluatorSummaryCard({
   } = form;
   const settingsLookup = evaluatorSettingsSchemaFor(checkType);
   return (
-    <Card.Root width="full">
-      <Card.Body>
-        <VStack gap={0}>
-          <HorizontalFormControl
-            label="Evaluation Type"
-            helper="Select the evaluation to run"
-            invalid={!!errors.checkType}
-          >
-            <VStack align="start" width="full">
-              <HStack gap={0} width="full">
-                <Text>{evaluatorDisplayName(evaluatorDefinition.name)}</Text>
-                <Button
-                  variant="ghost"
-                  size="xs"
-                  onClick={() => {
-                    void router.push({
-                      pathname: router.pathname + "/choose",
-                      query: router.query,
-                    });
-                  }}
-                  marginLeft={4}
-                  fontWeight="normal"
-                  color="fg.muted"
-                >
-                  <Edit2 size={14} />
-                </Button>
-              </HStack>
-              <Text fontSize="12px" color="fg.muted">
-                {evaluatorDefinition.description}
-              </Text>
-            </VStack>
-          </HorizontalFormControl>
-          <HorizontalFormControl
-            label="Name"
-            helper="Used to identify the check and call it from the API"
-            invalid={!!errors.name}
-            align="start"
-          >
-            <VStack gap={2} align="start">
-              <Input
-                id="name"
-                {...register("name", {
-                  required: true,
-                })}
-              />
-              {isNameAlreadyInUse && (
-                <Text color="red.fg" fontSize="13px">
-                  An evaluation with the same name already exists, please choose a different name to
-                  have a different slug identifier as well
-                </Text>
-              )}
-              <Text fontSize="12px" paddingLeft={4}>
-                {nameValue && "slug: "}
-                {slug}
-              </Text>
-            </VStack>
-          </HorizontalFormControl>
-          {settingsLookup.found && (
-            <DynamicZodForm
-              schema={settingsLookup.schema}
-              evaluatorType={checkType}
-              prefix="settings"
-              errors={errors.settings}
-              skipFields={["max_tokens"]}
+    <Card padding="lg">
+      <VStack gap={0}>
+        <HorizontalFormControl
+          label="Evaluation Type"
+          helper="Select the evaluation to run"
+          invalid={!!errors.checkType}
+        >
+          <VStack align="start" width="full">
+            <HStack gap={0} width="full">
+              <Text>{evaluatorDisplayName(evaluatorDefinition.name)}</Text>
+              <Button
+                variant="ghost"
+                size="xs"
+                onClick={() => {
+                  void router.push({
+                    pathname: router.pathname + "/choose",
+                    query: router.query,
+                  });
+                }}
+                marginLeft={4}
+                fontWeight="normal"
+                color="fg.muted"
+              >
+                <Edit2 size={14} />
+              </Button>
+            </HStack>
+            <Text textStyle="caption" color="fg.muted">
+              {evaluatorDefinition.description}
+            </Text>
+          </VStack>
+        </HorizontalFormControl>
+        <HorizontalFormControl
+          label="Name"
+          helper="Used to identify the check and call it from the API"
+          invalid={!!errors.name}
+          align="start"
+        >
+          <VStack gap={2} align="start">
+            <Input
+              id="name"
+              {...register("name", {
+                required: true,
+              })}
             />
-          )}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+            {isNameAlreadyInUse && (
+              <Text color="red.fg" textStyle="bodySm">
+                An evaluation with the same name already exists, please choose a different name to
+                have a different slug identifier as well
+              </Text>
+            )}
+            <Text textStyle="caption" paddingLeft={4}>
+              {nameValue && "slug: "}
+              {slug}
+            </Text>
+          </VStack>
+        </HorizontalFormControl>
+        {settingsLookup.found && (
+          <DynamicZodForm
+            schema={settingsLookup.schema}
+            evaluatorType={checkType}
+            prefix="settings"
+            errors={errors.settings}
+            skipFields={["max_tokens"]}
+          />
+        )}
+      </VStack>
+    </Card>
   );
 }
 
@@ -418,128 +416,126 @@ function ExecutionCard({
   const [accordionValue, setAccordionValue] = useState(accordionIndex ? ["0"] : []);
   const settingsLookup = evaluatorSettingsSchemaFor(checkType);
   return (
-    <Card.Root width="full" padding={0}>
-      <Card.Body padding={0}>
-        <VStack paddingX={4} gap={0}>
-          <HorizontalFormControl
-            label="Execution Mode"
-            helper="Configure when this evaluation is executed"
-            invalid={!!errors.executionMode}
-            align="start"
-            _last={{ borderBottomWidth: "1px" }}
-          >
-            <NativeSelect.Root>
-              <NativeSelect.Field {...register("executionMode")}>
-                <option value={EvaluationExecutionMode.ON_MESSAGE}>When message arrives</option>
-                {evaluatorDefinition?.isGuardrail && (
-                  <option value={EvaluationExecutionMode.AS_GUARDRAIL}>As a Guardrail</option>
-                )}
-                <option value={EvaluationExecutionMode.MANUALLY}>Manually</option>
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-          </HorizontalFormControl>
-          {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
-            <EvaluationManualIntegration
-              slug={slug}
-              evaluatorDefinition={evaluatorDefinition}
-              form={form}
-              checkType={checkType}
-              name={nameValue}
-              executionMode={executionMode}
-              settings={settings}
-              storeSettingsOnCode={storeSettingsOnCode ?? false}
-            />
-          )}
-        </VStack>
-
-        {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
-          <Accordion.Root
-            value={accordionValue}
-            onValueChange={({ value }) => {
-              setAccordionValue(value);
-            }}
-            multiple
-          >
-            <Accordion.Item value="0">
-              <Accordion.ItemTrigger padding={4} paddingBottom={6}>
-                <Field.Root>
-                  <VStack align="start" gap={1}>
-                    <Field.Label margin={0}>Execution Settings</Field.Label>
-                    <Field.HelperText margin={0} fontSize="13px">
-                      Configure how and when this evaluation is executed when a new message arrives
-                    </Field.HelperText>
-                  </VStack>
-                </Field.Root>
-                <Accordion.ItemIndicator>
-                  <ChevronDown />
-                </Accordion.ItemIndicator>
-              </Accordion.ItemTrigger>
-              <Accordion.ItemContent paddingX={4}>
-                <HorizontalFormControl
-                  label="Mappings"
-                  helper="Map which fields from the trace will be used to run the evaluation"
-                >
-                  <EvaluatorTracesMapping
-                    targetFields={fields}
-                    traceMapping={mappings}
-                    setTraceMapping={(mapping) => {
-                      form.setValue("mappings", mapping);
-                    }}
-                  />
-                </HorizontalFormControl>
-                <PreconditionsField
-                  runOn={runOnHint}
-                  append={appendPrecondition}
-                  remove={removePrecondition}
-                  fields={fieldsPrecondition}
-                />
-                {settingsLookup.found && (
-                  <DynamicZodForm
-                    schema={settingsLookup.schema}
-                    evaluatorType={checkType}
-                    prefix="settings"
-                    errors={errors.settings}
-                    onlyFields={["max_tokens"]}
-                  />
-                )}
-                <HorizontalFormControl
-                  label="Sampling"
-                  helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
-                  invalid={!!errors.sample}
-                  align="start"
-                >
-                  <Controller
-                    control={control}
-                    name="sample"
-                    render={({ field }) => (
-                      <VStack align="start">
-                        <HStack>
-                          <Input
-                            width="110px"
-                            type="number"
-                            min="0"
-                            max="1"
-                            step="0.1"
-                            placeholder="0.0"
-                            {...field}
-                            onChange={(e) => field.onChange(+e.target.value)}
-                          />
-                          <Tooltip content="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
-                            <HelpCircle width="14px" />
-                          </Tooltip>
-                        </HStack>
-                        {runOn}
-                      </VStack>
-                    )}
-                  />
-                </HorizontalFormControl>
-              </Accordion.ItemContent>
-            </Accordion.Item>
-          </Accordion.Root>
+    <Card padding="none">
+      <VStack paddingX={4} gap={0}>
+        <HorizontalFormControl
+          label="Execution Mode"
+          helper="Configure when this evaluation is executed"
+          invalid={!!errors.executionMode}
+          align="start"
+          _last={{ borderBottomWidth: "1px" }}
+        >
+          <NativeSelect.Root>
+            <NativeSelect.Field {...register("executionMode")}>
+              <option value={EvaluationExecutionMode.ON_MESSAGE}>When message arrives</option>
+              {evaluatorDefinition?.isGuardrail && (
+                <option value={EvaluationExecutionMode.AS_GUARDRAIL}>As a Guardrail</option>
+              )}
+              <option value={EvaluationExecutionMode.MANUALLY}>Manually</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </HorizontalFormControl>
+        {executionMode !== EvaluationExecutionMode.ON_MESSAGE && (
+          <EvaluationManualIntegration
+            slug={slug}
+            evaluatorDefinition={evaluatorDefinition}
+            form={form}
+            checkType={checkType}
+            name={nameValue}
+            executionMode={executionMode}
+            settings={settings}
+            storeSettingsOnCode={storeSettingsOnCode ?? false}
+          />
         )}
-      </Card.Body>
-    </Card.Root>
+      </VStack>
+
+      {executionMode === EvaluationExecutionMode.ON_MESSAGE && (
+        <Accordion.Root
+          value={accordionValue}
+          onValueChange={({ value }) => {
+            setAccordionValue(value);
+          }}
+          multiple
+        >
+          <Accordion.Item value="0">
+            <Accordion.ItemTrigger padding={4} paddingBottom={6}>
+              <Field.Root>
+                <VStack align="start" gap={1}>
+                  <Field.Label margin={0}>Execution Settings</Field.Label>
+                  <Field.HelperText margin={0} textStyle="bodySm">
+                    Configure how and when this evaluation is executed when a new message arrives
+                  </Field.HelperText>
+                </VStack>
+              </Field.Root>
+              <Accordion.ItemIndicator>
+                <ChevronDown />
+              </Accordion.ItemIndicator>
+            </Accordion.ItemTrigger>
+            <Accordion.ItemContent paddingX={4}>
+              <HorizontalFormControl
+                label="Mappings"
+                helper="Map which fields from the trace will be used to run the evaluation"
+              >
+                <EvaluatorTracesMapping
+                  targetFields={fields}
+                  traceMapping={mappings}
+                  setTraceMapping={(mapping) => {
+                    form.setValue("mappings", mapping);
+                  }}
+                />
+              </HorizontalFormControl>
+              <PreconditionsField
+                runOn={runOnHint}
+                append={appendPrecondition}
+                remove={removePrecondition}
+                fields={fieldsPrecondition}
+              />
+              {settingsLookup.found && (
+                <DynamicZodForm
+                  schema={settingsLookup.schema}
+                  evaluatorType={checkType}
+                  prefix="settings"
+                  errors={errors.settings}
+                  onlyFields={["max_tokens"]}
+                />
+              )}
+              <HorizontalFormControl
+                label="Sampling"
+                helper="Run this check only on a sample of messages (min 0.01, max 1.0)"
+                invalid={!!errors.sample}
+                align="start"
+              >
+                <Controller
+                  control={control}
+                  name="sample"
+                  render={({ field }) => (
+                    <VStack align="start">
+                      <HStack>
+                        <Input
+                          width="110px"
+                          type="number"
+                          min="0"
+                          max="1"
+                          step="0.1"
+                          placeholder="0.0"
+                          {...field}
+                          onChange={(e) => field.onChange(+e.target.value)}
+                        />
+                        <Tooltip content="You can use this to save costs on expensive checks if you have too many messages incomming. From 0.01 to run on 1% of the messages to 1.0 to run on 100% of the messages">
+                          <HelpCircle width="14px" />
+                        </Tooltip>
+                      </HStack>
+                      {runOn}
+                    </VStack>
+                  )}
+                />
+              </HorizontalFormControl>
+            </Accordion.ItemContent>
+          </Accordion.Item>
+        </Accordion.Root>
+      )}
+    </Card>
   );
 }
 

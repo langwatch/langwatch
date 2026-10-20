@@ -2,6 +2,7 @@ import { useColorMode } from "@langwatch/design-system/color-mode";
 import { CopyIcon } from "@langwatch/design-system/copy-icon";
 import { toaster } from "@langwatch/design-system/toaster";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import {
   collectMediaParts,
   isPythonRepr,
@@ -74,7 +75,7 @@ export const RenderInputOutput = React.memo(function RenderInputOutput(
         collapseStringsAfterLength={options.collapseStringsAfterLength ?? 1000}
         collapsed={options.collapsed}
         style={{
-          fontSize: "13px",
+          fontSize: `${TYPE_SCALE_PX.bodySm}px`,
           backgroundColor: "transparent",
         }}
         theme={colorMode === "dark" ? "twilight" : "rjv-default"}

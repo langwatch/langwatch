@@ -6,6 +6,7 @@ import {
   formatTokens,
 } from "@langwatch/design-system/display-formatters";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { GLYPH_ART_PX } from "@langwatch/design-system/typography";
 import { readableDate } from "@langwatch/time";
 import {
   Fragment,
@@ -21,7 +22,6 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
-  CLAUDE_MARK_GRADIENT,
   TERMINAL_FONT_STACK,
   TERMINAL_TOKENS,
 } from "../../../../model/coding-agent/trace/terminal-palette.ts";
@@ -47,6 +47,14 @@ import {
   findCacheRebuilds,
 } from "../../../../model/coding-agent/trace/token-timeline.ts";
 import { toolResultBodyToString } from "../../../../model/coding-agent/trace/tool-result-body.ts";
+import {
+  CLAUDE_MARK_GRADIENT,
+  GEMINI_MARK_GRADIENT,
+  OPENCODE_GRAY,
+  OPENCODE_GRAY_FILL,
+  OPENCODE_WHITE,
+  OPENCODE_WHITE_FILL,
+} from "../../../../model/explorer/ai/ai-brand-palette.ts";
 import { TerminalDiff } from "./terminal-diff.tsx";
 import { TerminalOutput } from "./terminal-output.tsx";
 import { TerminalPatch } from "./terminal-patch.tsx";
@@ -81,7 +89,7 @@ const GLYPH = {
 /** Everything on the screen is one monospace size — a terminal has one font. */
 const CELL = {
   fontFamily: TERMINAL_FONT_STACK,
-  fontSize: "13px",
+  textStyle: "bodySm",
   lineHeight: "1.55",
 } as const;
 
@@ -878,20 +886,13 @@ function claudeGradientMark(rows: readonly string[]): MarkSpec {
  * (tmux capture-pane -e of `gemini` v0.51): a five-column gradient from
  * blue to pink, colored by COLUMN, not by row.
  */
-const GEMINI_MARK = columnColoredMark(
-  ["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "],
-  ["#4796E4", "#6688D9", "#847ACE", "#A471A7", "#C3677F"],
-);
+const GEMINI_MARK = columnColoredMark(["▝▜▄  ", "  ▝▜▄", " ▗▟▀ ", "▝▀   "], GEMINI_MARK_GRADIENT);
 
 /**
  * opencode's block wordmark, segment-for-segment from the real TUI (tmux capture-pane -e of
  * `opencode` v1.18): "open" in gray, "code" in near-white, letter counters filled with a
  * raised tone. Without the fills the letters read as hollow outlines and the n welds into an o.
  */
-const OPENCODE_GRAY = "#808080";
-const OPENCODE_GRAY_FILL = "#282828";
-const OPENCODE_WHITE = "#EEEEEE";
-const OPENCODE_WHITE_FILL = "#434343";
 const OPENCODE_MARK: MarkSpec = {
   rows: [
     [{ text: "                                 ▄", color: OPENCODE_WHITE }],
@@ -954,7 +955,7 @@ const CODEX_MARK: MarkSpec = {
     ],
     TERMINAL_TOKENS.screenFg,
   ),
-  fontSize: "4px",
+  fontSize: `${GLYPH_ART_PX}px`,
 };
 
 /**
@@ -1157,7 +1158,7 @@ function AgentMark({ mark }: { mark: MarkSpec }) {
         <Text
           key={rowIndex}
           {...CELL}
-          fontSize={mark.fontSize ?? CELL.fontSize}
+          fontSize={mark.fontSize}
           // Block-glyph art paints exactly the 1em glyph box, so any leading
           // above 1 shows through as background hairlines between the rows
           // and visually welds letterforms shut.
@@ -1389,7 +1390,7 @@ function ToolCall({
       <HStack align="flex-start" gap={2}>
         <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
         {/* One flowing block, not nested spans with their own box — nesting
-            `fontWeight="bold"` on an inline child was giving a wrapped
+            `fontWeight="semibold"` on an inline child was giving a wrapped
             second line extra indent from its own inline-block layout. */}
         <Text
           {...CELL}
@@ -1398,7 +1399,7 @@ function ToolCall({
           minWidth={0}
           wordBreak="break-word"
         >
-          <Text as="span" fontWeight="bold" color={TERMINAL_TOKENS.screenFg}>
+          <Text as="span" fontWeight="semibold" color={TERMINAL_TOKENS.screenFg}>
             {name}
           </Text>
           {arg ? `(${truncateArg(arg)})` : ""}
@@ -1557,7 +1558,7 @@ function Glyph({ char, color, bold }: { char: string; color: string; bold?: bool
     <Text
       {...CELL}
       color={color}
-      fontWeight={bold ? "bold" : undefined}
+      fontWeight={bold ? "semibold" : undefined}
       flexShrink={0}
       userSelect="none"
       aria-hidden
@@ -1658,7 +1659,13 @@ function StatusLine({
     >
       <AsciiBox>
         <HStack gap={2}>
-          <Text {...CELL} color={TERMINAL_TOKENS.blue} fontWeight="bold" flexShrink={0} aria-hidden>
+          <Text
+            {...CELL}
+            color={TERMINAL_TOKENS.blue}
+            fontWeight="semibold"
+            flexShrink={0}
+            aria-hidden
+          >
             ❯
           </Text>
           <Text {...CELL} color={TERMINAL_TOKENS.faint} truncate minWidth={0} flex={1}>

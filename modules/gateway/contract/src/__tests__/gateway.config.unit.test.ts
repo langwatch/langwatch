@@ -12,15 +12,17 @@ const read = (source: Record<string, string | undefined>) =>
 describe("gateway server configuration", () => {
   describe("given a deployment sets nothing", () => {
     /** @scenario "A feature reads its configuration through its own schema" */
-    it("reads every address and the grace absent, isSaas and loopback voice providers off", () => {
+    it("reads every address and the grace absent, isSaas and loopback voice providers off, the fold cache at its default", () => {
       expect(read({})).toEqual({
         spendSettlementGraceMs: undefined,
         internalUrl: undefined,
         controlPlaneUrl: undefined,
         baseUrl: undefined,
         publicUrl: undefined,
+        publicBaseUrl: undefined,
         isSaas: false,
         allowLoopbackVoiceProviders: false,
+        foldCacheTtlSeconds: 300,
       });
     });
   });

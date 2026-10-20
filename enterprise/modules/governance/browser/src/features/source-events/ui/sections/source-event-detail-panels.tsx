@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
-import { Box, Code, SimpleGrid, Table, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, Code, SimpleGrid, Text } from "@langwatch/design-system/primitives";
 
 import type { SourceEventRowData } from "./source-events-table.tsx";
 
@@ -8,17 +9,22 @@ import type { SourceEventRowData } from "./source-events-table.tsx";
  * to the raw payload as ingested. Rendered as a full-width row directly
  * under the event it belongs to.
  */
-export function EventDetailRow({ event, colSpan }: { event: SourceEventRowData; colSpan: number }) {
+export function EventDetailRow({ event, columns }: { event: SourceEventRowData; columns: number }) {
   return (
-    <Table.Row>
-      <Table.Cell colSpan={colSpan} bg="bg.subtle">
+    <ListTable.SpanRow id={detailRowId(event.eventId)} columns={columns}>
+      <Box bg="bg.subtle" paddingX={4} paddingY={3}>
         <SimpleGrid columns={{ base: 1, lg: 2 }} gap={3} paddingY={1}>
           <NormalisedPanel event={event} />
           <RawPanel event={event} />
         </SimpleGrid>
-      </Table.Cell>
-    </Table.Row>
+      </Box>
+    </ListTable.SpanRow>
   );
+}
+
+/** The detail row's id, which its row's expand button names in `aria-controls`. */
+export function detailRowId(eventId: string): string {
+  return `source-event-detail-${eventId}`;
 }
 
 function NormalisedPanel({ event }: { event: SourceEventRowData }) {

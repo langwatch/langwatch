@@ -132,11 +132,17 @@ export class ProjectsApiService {
     if (options?.page) params.set("page", String(options.page));
     if (options?.limit) params.set("limit", String(options.limit));
     const qs = params.toString();
-    return this.request<PaginatedProjects>("list projects", `/api/projects${qs ? `?${qs}` : ""}`);
+    return this.request<PaginatedProjects>(
+      "list projects",
+      `/api/v1/projects${qs ? `?${qs}` : ""}`,
+    );
   }
 
   async get(id: string): Promise<Project> {
-    return this.request<Project>(`get project "${id}"`, `/api/projects/${encodeURIComponent(id)}`);
+    return this.request<Project>(
+      `get project "${id}"`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
+    );
   }
 
   /**
@@ -147,13 +153,13 @@ export class ProjectsApiService {
   async getApiKey(id: string): Promise<string> {
     const answer = await this.request<{ apiKey: string }>(
       `get api key of project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}/api-key`,
+      `/api/v1/projects/${encodeURIComponent(id)}/api-key`,
     );
     return answer.apiKey;
   }
 
   async create(input: CreateProjectInput): Promise<ProjectWithServiceKey> {
-    return this.request<ProjectWithServiceKey>("create project", "/api/projects", {
+    return this.request<ProjectWithServiceKey>("create project", "/api/v1/projects", {
       method: "POST",
       body: JSON.stringify(input),
     });
@@ -162,7 +168,7 @@ export class ProjectsApiService {
   async update(id: string, input: UpdateProjectInput): Promise<Project> {
     return this.request<Project>(
       `update project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
       { method: "PATCH", body: JSON.stringify(input) },
     );
   }
@@ -170,7 +176,7 @@ export class ProjectsApiService {
   async archive(id: string): Promise<ArchivedProject> {
     return this.request<ArchivedProject>(
       `archive project "${id}"`,
-      `/api/projects/${encodeURIComponent(id)}`,
+      `/api/v1/projects/${encodeURIComponent(id)}`,
       { method: "DELETE" },
     );
   }

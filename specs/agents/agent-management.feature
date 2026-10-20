@@ -196,6 +196,60 @@ Feature: Agent management
     And the agents the AgentListDrawer lists are read again
     And the editor closes
 
+  @integration
+  Scenario: Edit config shows the stored inputs, outputs and mappings
+    Given a stored code agent with inputs, outputs and scenario mappings
+    When I open the AgentCodeEditorDrawer on it
+    Then the editor shows the agent's inputs and outputs
+    And it shows the scenario mappings with the chosen output field
+
+  @integration
+  Scenario: Saving an edited agent keeps the keys the editor does not show
+    Given the AgentCodeEditorDrawer is open on a stored code agent
+    When I save without changes
+    Then the stored inputs, outputs, mappings and timeout are saved back unchanged
+
+  @integration
+  Scenario: Code agent outputs offer the code output types
+    Given the AgentCodeEditorDrawer is open on a code agent
+    When I open an output's type
+    Then I can pick Text, Number, Boolean, JSON Schema, Object, List or Image
+    And a type a stored output already has is offered too
+
+  @integration
+  Scenario: Adding a JSON schema output to a code agent saves it with its schema
+    Given the AgentCodeEditorDrawer is open on a code agent
+    When I add a JSON Schema output and save
+    Then the agent's config stores an output named output_1 of type JSON schema with its schema
+    And reopening the agent shows that output as a JSON schema output
+
+  @integration
+  Scenario: Changing a code agent output's type saves the new type
+    Given the AgentCodeEditorDrawer is open on a code agent with a described output
+    When I change that output's type and save
+    Then the agent's config stores the new type
+    And the output keeps its description
+
+  @integration
+  Scenario: A stored JSON schema output keeps its schema through a save
+    Given a code agent with a JSON schema output
+    When I open it in the AgentCodeEditorDrawer and save
+    Then the output is stored again with its type and its schema
+
+  @integration
+  Scenario: Mapping a dataset column to a code agent input in the workbench
+    Given an evaluation workbench opens the AgentCodeEditorDrawer on a code agent target
+    When I map one of the agent's inputs to a dataset column
+    Then the workbench stores the mapping at once
+
+  @integration
+  Scenario: HTTP agent editor shows the Variables tab in the workbench
+    Given an evaluation workbench opens the AgentHttpEditorDrawer on an HTTP agent target
+    Then the editor shows a Variables tab that maps its variables to the dataset
+    And it says at least one variable must be mapped until one is
+    When I map a variable to a dataset column
+    Then the workbench stores the mapping at once
+
   # ============================================================================
   # Agent type selector drawer
   # ============================================================================
@@ -256,6 +310,15 @@ Feature: Agent management
     When I open its editor on the Auth tab
     Then the token field is blank
     And it says "Stored; enter a new value to replace it"
+
+  @integration
+  Scenario: Saving an HTTP agent without a name or endpoint says what is missing
+    Given a new HTTP agent with no name and no endpoint URL
+    When I press "Create Agent"
+    Then the button was clickable and each missing field says what to enter
+    And the name field has focus and no agent is created
+    When I enter a name and press "Create Agent" again
+    Then the endpoint field has focus and no agent is created
 
   @integration
   Scenario: A saved agent's credentials are read-only on the Studio node

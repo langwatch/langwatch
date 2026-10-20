@@ -286,7 +286,7 @@ func (e *Emitter) EndSpan(ctx context.Context, params aitrace.Params) {
 		span.SetAttributes(attrOutputMessages.String(output))
 	}
 
-	stampMirrorMarkers(span, params)
+	stampMirrorMarkers(ctx, span, params)
 
 	if isError {
 		span.SetStatus(codes.Error, params.UpstreamErrorType)
@@ -425,12 +425,16 @@ func attributionAttributes(ctx context.Context, params aitrace.Params) []attribu
 // trace first, which marked a fresh project as integrated before the langy
 // root could rank the trace as Langy's. Naming the origin here, on the span,
 // settles the trace's origin from its first span. The resource keeps the
-// gateway's identity.
-func stampMirrorMarkers(span trace.Span, params aitrace.Params) {
+// gateway's identity. A call whose turn withholds the mirror stays a Langy
+// call and only loses the markers that make the mirror copy.
+func stampMirrorMarkers(ctx context.Context, span trace.Span, params aitrace.Params) {
 	if !isMirroredTier(params.MirrorTier) {
 		return
 	}
 	span.SetAttributes(attribute.String(otelsetup.AttrLangWatchOrigin, OriginLangy))
+	if MirrorWithheld(ctx) {
+		return
+	}
 	span.SetAttributes(attrMirrorTier.String(params.MirrorTier))
 	if params.MirrorSourceOrgID != "" {
 		span.SetAttributes(attrMirrorSourceOrg.String(params.MirrorSourceOrgID))

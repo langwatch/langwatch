@@ -213,6 +213,7 @@ func withDatabasesOf(reg, ensured domain.Stack) domain.Stack {
 	if ensured.ClickHouseDatabase != "" {
 		reg.ClickHouseHTTPPort, reg.ClickHouseDatabase = ensured.ClickHouseHTTPPort, ensured.ClickHouseDatabase
 		reg.ClickHousePostgresHost = ensured.ClickHousePostgresHost
+		reg.ClickHouseUser, reg.ClickHousePassword = ensured.ClickHouseUser, ensured.ClickHousePassword
 	}
 	if ensured.PostgresDatabase != "" {
 		reg.PostgresPort, reg.PostgresDatabase = ensured.PostgresPort, ensured.PostgresDatabase

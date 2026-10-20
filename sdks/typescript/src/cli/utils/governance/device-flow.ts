@@ -235,6 +235,10 @@ export async function exchange(
       throw new DeviceFlowError("slow_down", "polling too fast");
     default: {
       const body = await res.text().catch(() => "");
+      // Approved, but the key's grants have not landed yet: the next poll takes it.
+      if (res.status === 503 && body.includes("authz_grant_not_confirmed")) {
+        throw new DeviceFlowError("pending", "access is still being set up");
+      }
       throw new DeviceFlowError("other", `unexpected status ${res.status}: ${body.slice(0, 256)}`);
     }
   }

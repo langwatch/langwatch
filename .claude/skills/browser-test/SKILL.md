@@ -1,200 +1,78 @@
 ---
 name: browser-test
-description: "Validate a feature works by driving a real browser with Playwright MCP. No test files — just interactive verification."
+description: "Check that a feature works by walking its scenarios in a real browser and writing a pass/fail report with evidence. A recipe over `haven browser`: no test files, no browser commands of its own. Use when someone says 'browser test', 'verify this in the browser', 'walk the scenarios', 'check the feature live', or hands you a specs/*.feature file to confirm on a running stack."
 user-invocable: true
-argument-hint: "[port] [feature description or feature-file-path]"
+argument-hint: "[feature description or feature-file-path]"
 ---
 
-# Browser Test — Interactive Feature Validation
+# Browser test: walk the scenarios, report the evidence
 
-You are the **orchestrator**. You do NOT drive the browser yourself. You spawn a focused sub-agent to do the browser work, monitor its progress, and collect results.
+This skill is the recipe from "scenarios" to "report". It does not drive the browser itself.
+**`haven browser` is the one way to drive a browser** (see `haven-browser`; sign-in is `--as admin`,
+see `haven-auth`; seeded logins are `haven-seed`). Playwright's MCP tools and `playwright-cli` are
+refused where haven is installed, and MCP browser tools are never used by lanes. Use plain
+Playwright only for something haven cannot reach, and say so in the report.
 
-## Step 1: Prepare
+## 1. Prepare
 
-Parse `$ARGUMENTS` for:
+- A feature file path: read it and turn each scenario into a numbered step with an expected
+  result. A plain description: use it as the one step list. Neither: smoke test (app loads,
+  admin sign-in works, the dashboard renders).
+- Stack: `haven status`. If none runs, start one only when asked (`haven-lifecycle`), and say if you
+  did. The base URL is whatever `haven status` prints; use that one origin for the whole run. A
+  different hostname for the same app (`127.0.0.1`, say) fails sign-in with a 403.
+- A plain `pnpm dev` stack serves the built UI; `pnpm dev:hmr` serves Vite. First loads can take
+  tens of seconds under Vite.
+- Workspace: `browser-tests/<feature>/<YYYY-MM-DD>/` (gitignored; never commit it).
 
-- **Port** (optional): a number (e.g. `5570`) or `:<port>` format
-- **Feature** (optional): a description of what to verify, or a path to a `specs/*.feature` file
+## 2. Seed only what the steps need
 
-If a feature file path is given, **read it now** and extract the scenarios into a concrete checklist. If a plain description is given, use it directly. If neither is provided, use the **default smoke test**: app loads, sign in works, dashboard renders after auth.
+Decide which data must exist (a suite with one scenario, one trace, a completed run). Create it
+through the UI where practical; use the API or a seed (`haven db seed`, `haven-seed`) for bulk
+data. Keep it minimal. Credentials for ingestion come from a seeded login or a personal scoped
+key, never a project key read from settings, and never pasted into a prompt or a report.
 
-### Resolve the base URL
+## 3. Walk it
 
-1. Explicit port in `$ARGUMENTS` → `http://localhost:<port>`
-2. A haven stack (the recommended path): `make haven status` names the slug, and the URL
-   is `https://app.<slug>.langwatch.localhost:<port>` with the port from
-   `~/.portless/proxy.port`. See the `haven` skill (`troubleshooting.md`).
-3. A plain `pnpm dev` stack: the browser application binds `PORT` (default 5560).
-4. A per-worktree isolated compose stack: `dev/scripts/dev-up.sh` writes `.dev-port` at
-   the repo root with `APP_PORT` and `BASE_URL`; source it.
+Use one lane per run (`--lane bt-<feature> --as admin`). For each step: act, check the expected
+result in the diff or a `snapshot --grep`, and record PASS or FAIL.
 
-Never start a stack the user did not ask for, and never leave one running that you
-started without saying so.
+- Take a screenshot for each step that checks how something looks (drawer width, card padding,
+  colour, clipping, dark mode) and for every failure. A snapshot finds controls; it cannot show
+  paint. Save with `--out browser-tests/<feature>/<date>/NN-name.png`.
+- On a failure: screenshot, `haven browser console --level error`, `haven browser network --failed`,
+  mark it FAIL and go on. Do not debug the app or edit code during the walk.
+- Overlays are a routed singleton with a back stack: assert that one overlay is open, that back
+  returns to the caller and that a draft survives. Two stacked copies of the same drawer is a
+  defect to report, not a quirk to press Escape past.
+- Waits are `--wait-for 'text=...'`, never sleeps. Close the lane when done.
 
-### Resolve the feature
+## 4. Report
 
-If a feature file was given, read it and turn each scenario into a numbered verification step. Example:
-
-```
-Feature file: specs/features/beta-pill.feature
-Scenarios:
-  1. Navigate to dashboard → verify purple "Beta" badge next to Suites in sidebar
-  2. Hover over badge → verify popover appears with beta disclaimer text
-  3. Press Tab to focus badge → verify same popover appears via keyboard
-```
-
-### Create artifact directory
-
-```
-browser-tests/<feature-name>/<YYYY-MM-DD>/screenshots/
-```
-
-Derive `<feature-name>` from: feature filename (without extension) > slugified description > branch name suffix.
-
-## Step 2: Determine data seeding needs
-
-Before verification, decide what data the feature under test requires. Many features need pre-existing data to be meaningful (e.g., a suites page needs at least one suite with runs, a trace viewer needs traces, an evaluations dashboard requires completed evaluations).
-
-1. **Analyze the verification steps** from Step 1. For each step, ask: "What data must already exist for this to be testable?"
-2. **Build a seeding checklist** — the minimal set of entities needed. Examples:
-   - Suites page → create one suite with a name and at least one scenario
-   - Trace viewer → send at least one trace via the SDK or API
-   - Evaluation results → trigger a batch run and wait for results
-3. **Prefer seeding through the UI** — navigate to create forms, fill them in, submit. This exercises the same path a user would and is the most reliable approach in dev mode.
-4. **Fall back to API/SDK only for bulk data** that would be impractical to create through the UI (e.g., 50 traces for a pagination test).
-5. **Keep seeding MINIMAL** — only create what is strictly needed to verify the feature. Do not populate the app with extra data "just in case."
-
-Include the seeding instructions in the sub-agent prompt (Step 3) so the sub-agent creates the data before verifying.
-
-## Step 3: Spawn the browser agent
-
-Use the **Agent tool** to spawn a sub-agent. Give it everything it needs in the prompt — port, verification steps, credentials, artifact path. The sub-agent has access to Playwright MCP tools and Bash.
-
-**Critical:** The sub-agent prompt must include ALL of the following. Do not assume it knows anything — it starts with zero context:
-
-```
-You are a browser test agent. Your ONLY job is to drive a browser and verify features.
-
-## Your mission
-<paste the numbered verification steps here>
-
-## Data seeding
-Before verifying, create the minimal data the feature needs. Follow the checklist below.
-Prefer seeding through the UI; use API/SDK only when the checklist explicitly calls for it:
-<paste the seeding checklist from Step 2 here — e.g.:>
-- Navigate to Suites → click "Create Suite" → fill name "Test Suite" → save
-- Open the suite → add a scenario → run it once
-- Wait for the run to complete before proceeding to verification
-
-Only create what is listed above. Do not add extra data beyond what is needed.
-
-## Connection
-- App URL: http://localhost:<port>
-- Browser: Chromium (headless) — use Playwright MCP tools
-- Save screenshots to: <absolute artifact path>/screenshots/
-
-## Auth (email + password credentials form, not a third-party IdP)
-- Navigate to the app → redirects to /auth/signin (Email + Password form)
-- Email: browser-test@langwatch.ai
-- Password: BrowserTest123!
-- If "Register new account" needed, register first with same credentials
-- Org name if onboarding: Browser Test Org
-- After auth: dashboard shows "Hello, Browser" + "Browser Test Org" header
-- Sign-in only works from the origin the app is configured with; a raw 127.0.0.1
-  origin 403s the sign-in even though anonymous pages load
-
-## How to interact
-- Use browser_snapshot (accessibility tree) for finding elements — it's faster than screenshots
-- Use browser_take_screenshot to capture evidence at each key step
-- Use browser_wait_for with generous timeouts (30-60s for the first load in dev)
-- Number screenshots sequentially: 01-sign-in.png, 02-dashboard.png, etc.
-
-## Guardrails — READ THESE
-- You have a maximum of 40 tool calls (seeding + verification). If you haven't finished, report what you verified and what's left.
-- Do NOT debug app issues. If something doesn't work, screenshot it, mark it FAIL, and move on.
-- Do NOT modify any files, fix any code, or investigate root causes.
-- Do NOT go off-script. Only verify the steps listed above.
-- If a step fails, take a screenshot, record FAIL, and continue to the next step.
-- When done, return a markdown summary table: | # | Step | Result | Screenshot |
-```
-
-## Step 4: Collect results
-
-When the sub-agent returns:
-
-1. Parse its summary table
-2. Write the report to `browser-tests/<feature-name>/<YYYY-MM-DD>/report.md`:
+Write `browser-tests/<feature>/<date>/report.md`:
 
 ```markdown
-# Browser Test: <feature-name>
+# Browser test: <feature>
 
-**Date:** YYYY-MM-DD
-**App:** http://localhost:<port>
-**Browser:** Chromium (headless)
-**Branch:** <current branch>
-**PR:** #<number> (if known)
+**Date / stack URL / branch / PR (if known)**
 
-## Results
+| #   | Scenario | Result | Evidence    |
+| --- | -------- | ------ | ----------- |
+| 1   | <name>   | PASS   | 01-name.png |
 
-| #   | Scenario | Result | Screenshot             |
-| --- | -------- | ------ | ---------------------- |
-| 1   | <name>   | PASS   | screenshots/01-xxx.png |
+## Failures
 
-## Failures (if any)
-
-- **Scenario 2:** Expected X but saw Y.
-
-## Notes
-
-<any observations>
+- **2:** expected X, saw Y (console and network lines).
 ```
 
-3. If you started a compose stack yourself, tear it down: `dev/scripts/dev-down.sh`. Leave
-   a stack the user already had running alone.
-
-## Step 5: Upload screenshots and update the PR
-
-Screenshots go to an external host rather than into git, so the repo carries no binaries.
-The host below is not maintained by us — check it still answers before relying on it, and
-say so in the report if it does not.
-
-1. **Upload each screenshot** to img402.dev:
-
-   ```bash
-   curl -s -F "image=@browser-tests/<feature>/<date>/screenshots/01-xxx.jpeg" https://img402.dev/api/free
-   # Returns: {"url":"https://i.img402.dev/abc123.jpg", ...}
-   ```
-
-   Collect the returned URLs for each screenshot.
-
-2. **Update the PR description** with the results table using img402 URLs so images render inline:
-
-   Read the current PR body first (`gh pr view --json body`), then append a new section:
-
-   ```markdown
-   ## Browser Test: <feature-name>
-
-   | #   | Scenario | Result | Screenshot                             |
-   | --- | -------- | ------ | -------------------------------------- |
-   | 1   | <name>   | PASS   | ![01](https://i.img402.dev/abc123.jpg) |
-   ```
-
-   Use `gh api repos/langwatch/langwatch/pulls/<number> -X PATCH -f body="..."` to update (not `gh pr edit`).
-
-3. **Do NOT commit `browser-tests/`** — it is gitignored. Screenshots are ephemeral local artifacts; the img402 URLs in the PR body are the permanent record.
-
-## Step 6: Report
-
-Return the summary to the user/orchestrator. Include:
-
-- The results table
-- Link to the PR where screenshots are now visible
-- Note: img402.dev free tier has 7-day retention; screenshots expire but remain in the PR body as broken images after that
+Return the table to the caller. Publishing is a separate act, done only when asked: upload
+screenshots with `gh issue comment --attach file#alt` (see the repository's PR rules) and put
+the table in a PR comment, not the squash-merge body.
 
 ## Rules
 
-- **You are the orchestrator, not the browser driver.** Spawn a sub-agent for all browser work.
-- **Never ask the user for anything.** Ports, credentials, features, browser choice — all resolved automatically.
-- **Read `HOW_TO.md`** in this skill directory before your first run — it has gotchas about Chakra UI, dev mode slowness, and known issues. Include relevant warnings in the sub-agent prompt.
-- **One sub-agent per run.** If it fails or times out, report the failure — don't retry.
-- **Don't create test files.** This is interactive verification only.
+- Never ask the user for a port, account or browser: resolve them as above.
+- Read `HOW_TO.md` beside this file for gotchas before the first run.
+- Do not create test files. To turn a walk into an e2e test use `haven browser record`
+  (`haven-browser`), then `record export`.
+- For a live session with a person watching, see `browser-pair`.

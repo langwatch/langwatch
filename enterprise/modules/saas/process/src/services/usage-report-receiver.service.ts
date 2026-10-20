@@ -32,10 +32,7 @@ type UsageReportFacts = Readonly<{
     "send"
   >;
 }>;
-type ReleaseConfig = Pick<
-  SaasServerConfig,
-  "latestRelease" | "latestReleaseCommit" | "releaseFloor"
->;
+type ReleaseConfig = Pick<SaasServerConfig, "latestRelease" | "latestReleaseCommit">;
 
 /**
  * The anonymous daily report a self-hosted install posts. It lands in the
@@ -147,16 +144,11 @@ export class UsageReportReceiverService {
 }
 
 /** The latest release travels with its commit, so two builds of one release name are told apart. */
-function receiptOf({
-  latestRelease,
-  latestReleaseCommit,
-  releaseFloor,
-}: ReleaseConfig): UsageReportReceipt {
+function receiptOf({ latestRelease, latestReleaseCommit }: ReleaseConfig): UsageReportReceipt {
   return {
     message: "Event captured",
     ...(latestRelease && {
       latest_release: { release: latestRelease, commit: latestReleaseCommit ?? null },
     }),
-    ...(releaseFloor && { floor: releaseFloor }),
   };
 }

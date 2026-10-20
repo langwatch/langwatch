@@ -1,5 +1,4 @@
 import type { WireOf } from "@langwatch/api/web";
-import { UpgradeRequired } from "@langwatch/design-system/access-state";
 /**
  * The organization's audit trail, at `/settings/audit-log`. ONE TABLE OVER TWO WRITE SHAPES.
  */
@@ -14,7 +13,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -24,8 +22,9 @@ import type { EnrichedAuditLog as StoredEnrichedAuditLog } from "@langwatch/orga
 /** An audit row as the browser receives it: its instant is an ISO string. */
 type EnrichedAuditLog = WireOf<StoredEnrichedAuditLog>;
 import { neutralizeFormula, neutralizeRows } from "@langwatch/csv";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { currentTimeZone, nowInstant, toDate, type Instant } from "@langwatch/time";
-import { ArrowLeft, Download, ScrollText, Search } from "lucide-react";
+import { ArrowLeft, Download, Lock, ScrollText, Search } from "lucide-react";
 import Parse from "papaparse";
 import { useState } from "react";
 
@@ -115,6 +114,44 @@ function auditProjectTree({
   };
 }
 
+/**
+ * The page in place of the table: an upsell below Enterprise, or, when a project grant showed the
+ * entry but the organization-wide read refuses, who can see it. Null when the table renders.
+ */
+function auditLogNotice({ isEnterprise, error }: { isEnterprise: boolean; error: unknown }) {
+  const refused = readHandledError(error)?.code === "permission_denied";
+  if (isEnterprise && !refused) return null;
+  return (
+    <>
+      <PageLayout.Header>
+        <PageLayout.Heading>Audit log</PageLayout.Heading>
+      </PageLayout.Header>
+      {isEnterprise ? (
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Only organization admins can see the audit log"
+          description="It shows what every member did across the organization, so an organization admin can open it for you."
+          testId="audit-log-admins-only"
+        />
+      ) : (
+        <NoDataInfoBlock
+          size="page"
+          icon={<Lock />}
+          title="Audit log is included in Enterprise"
+          description="See who changed what across your organization, and when, in a trail you can search and export."
+          testId="audit-log-enterprise-upsell"
+          primaryAction={
+            <Button asChild colorPalette="orange" size="sm">
+              <Link href="/settings/plans">See plans</Link>
+            </Button>
+          }
+        />
+      )}
+    </>
+  );
+}
+
 /** The first batch, then every later one until the history or the batches run out. */
 async function collectAuditLogs<T>({
   first,
@@ -132,14 +169,10 @@ async function collectAuditLogs<T>({
   return collected;
 }
 
-/** A 28px band; the row's selector outweighs the table's default cell padding. */
-const DAY_BAND = { "& > td": { height: "28px", paddingTop: 0, paddingBottom: 0 } } as const;
-
 /** Filter controls share one 32px line, 13px text and a 4px radius. */
 const FILTER_CONTROL = {
   height: "32px",
-  fontSize: "13px",
-  lineHeight: "20px",
+  textStyle: "bodySm",
   borderRadius: "4px",
 };
 
@@ -164,28 +197,28 @@ function AuditFeed({
     >
       <AuditTableHead />
       {auditFeedDays({ rows, now: toDate(now) }).map((day) => (
-        <Table.Body key={day.heading} aria-label={day.label}>
-          <Table.Row css={DAY_BAND}>
-            <Table.Cell
-              colSpan={AUDIT_TABLE_COLUMNS.length}
-              bg="bg.muted"
+        <ListTable.Body key={day.heading} aria-label={day.label}>
+          <ListTable.SpanRow columns={AUDIT_TABLE_COLUMNS.length} band>
+            <HStack
+              justify="flex-start"
+              gap={3}
+              height="28px"
+              paddingX={4}
               fontSize="xs"
               lineHeight="16px"
               fontWeight="medium"
               color="fg"
             >
-              <HStack justify="flex-start" gap={3}>
-                <Text>{day.heading}</Text>
-                <Text color="fg.muted" fontWeight="normal">
-                  {currentTimeZone()}
-                </Text>
-              </HStack>
-            </Table.Cell>
-          </Table.Row>
+              <Text>{day.heading}</Text>
+              <Text color="fg.muted" fontWeight="normal">
+                {currentTimeZone()}
+              </Text>
+            </HStack>
+          </ListTable.SpanRow>
           {day.runs.map((run) => (
             <AuditLogEntry key={run.id} run={run} projectLabel={projectLabel} />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       ))}
     </ListTable>
   );
@@ -242,20 +275,8 @@ export default function AuditLogScreen() {
     return <SettingsRowsSkeleton rows={8} />;
   }
 
-  if (!isEnterprise) {
-    return (
-      <VStack gap={6} width="full" align="start">
-        <UpgradeRequired
-          feature="Audit logs"
-          actions={
-            <Button asChild colorPalette="orange" size="sm">
-              <Link href="/settings/plans">Compare plans</Link>
-            </Button>
-          }
-        />
-      </VStack>
-    );
-  }
+  const notice = auditLogNotice({ isEnterprise, error: auditLogs.error });
+  if (notice) return notice;
 
   const feed = matchesNobody ? undefined : auditLogs.data;
   const rows: EnrichedAuditLog[] = feed?.auditLogs ?? [];
@@ -347,7 +368,7 @@ export default function AuditLogScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Audit Log</PageLayout.Heading>
+        <PageLayout.Heading>Audit log</PageLayout.Heading>
         <Spacer />
         <PageLayout.HeaderButton
           onClick={() => setIsExportOpen(true)}
@@ -396,7 +417,7 @@ export default function AuditLogScreen() {
         </VStack>
 
         <HStack gap={2} width="full" flexWrap="wrap">
-          <InputGroup startElement={<Search size={14} />} width="240px">
+          <InputGroup startElement={<Search size={14} />} width="220px">
             <Input
               size="sm"
               {...FILTER_CONTROL}
@@ -409,13 +430,13 @@ export default function AuditLogScreen() {
           <Input
             size="sm"
             {...FILTER_CONTROL}
-            width="200px"
+            width="220px"
             placeholder="Filter by action..."
             aria-label="Filter by Action"
             value={actionFilter}
             onChange={(event) => handleActionFilterChange(event.target.value)}
           />
-          <Box width="200px" data-testid="audit-project-filter">
+          <Box width="220px" data-testid="audit-project-filter">
             <ScopeChipPicker
               variant="single-select"
               size="sm"

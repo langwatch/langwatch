@@ -102,7 +102,7 @@ vi.mock("@langwatch/scenario-client", () => ({
 }));
 
 vi.mock("../../scenarios/scenario-form-drawer.tsx", () => ({
-  ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit Scenario</div> : null),
+  ScenarioFormDrawer: ({ open }: { open?: boolean }) => (open ? <div>Edit scenario</div> : null),
 }));
 
 vi.mock("../../scenarios/run-scenario-modal.tsx", () => ({
@@ -117,7 +117,7 @@ vi.mock("../../../../behavior/use-simulation-streaming-state.ts", () => ({
   useSimulationStreamingState: () => ({
     streamingMessages: [],
     handleStreamingEvent: vi.fn(),
-    clearCompleted: vi.fn(),
+    reconcileWithServer: vi.fn(),
   }),
 }));
 

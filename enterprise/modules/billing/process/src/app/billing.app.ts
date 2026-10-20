@@ -456,6 +456,7 @@ export class BillingModule
         billing,
         seats,
         tick: ConnectedBillingTickService.create({
+          seats,
           statements: statementMail
             ? ConnectedMonthlyStatementService.create({
                 repository,

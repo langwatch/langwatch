@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -58,8 +59,14 @@ func TestCodexGateIsLocalAndIdempotent(t *testing.T) {
 		t.Fatalf("install: changed=%v err=%v", changed, err)
 	}
 	entries := readHooks(t, root).Hooks["PreToolUse"]
-	if len(entries) != 1 || entries[0].Matcher != "^Bash$" || len(entries[0].Hooks) != 1 || entries[0].Hooks[0].Command != command {
+	if len(entries) != 1 || entries[0].Matcher != hookMatcher || len(entries[0].Hooks) != 1 || entries[0].Hooks[0].Command != command {
 		t.Fatalf("unexpected hook registration: %+v", entries)
+	}
+	matcher := regexp.MustCompile(entries[0].Matcher)
+	for tool, want := range map[string]bool{"Bash": true, "mcp__playwright__browser_navigate": true, "mcp__plugin_playwright_playwright__browser_click": true, "Edit": false, "BashOutput": false} {
+		if matcher.MatchString(tool) != want {
+			t.Fatalf("matcher %q on %s: want %v", entries[0].Matcher, tool, want)
+		}
 	}
 	changed, err = New().EnsureHook(root, command)
 	if err != nil || changed {

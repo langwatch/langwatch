@@ -12,170 +12,53 @@ build or set up.
 
 ---
 
-## Step 1 — Read the project context
+## Scope
 
-Check `package.json` if available. Look for:
+This skill is for **implementation work inside `packages/design-system`**: a component, a
+recipe or a token. A module or app never imports Chakra; it takes a component from
+`@langwatch/design-system/<subpath>` (see the `design-system` skill). Raw Chakra examples below
+are implementation-only: never copy them into `modules/*/browser` or `apps/ui`.
 
-- Chakra UI version (use v3 patterns by default; only use v2 if explicitly on
-  v2)
-- Framework: Next.js App Router, Pages Router, Vite, plain React
-- TypeScript or JavaScript
-- Package manager (from lockfile: `pnpm-lock.yaml`, `yarn.lock`, `bun.lock`,
-  `package-lock.json`)
+## Step 1: Read the project context
 
-Also glance at existing components if the user references them, so your code
-matches the conventions already in use (naming, file structure, import style).
+The setup already exists. Do not install Chakra, run the CLI snippet generator or write a
+second provider and theme.
 
-If the requirements are vague or the component is complex enough that choices
-matter (layout direction, data shape, color palette, number of variants), ask
-before building rather than generating something that needs to be thrown away.
+- Provider: `packages/design-system/src/provider/index.tsx`; the Vite composition root is
+  `apps/ui/src/main.tsx`.
+- System, tokens and recipes: `packages/design-system/src/system/config.ts` and
+  `create-system.ts`. Change tokens there; do not add a `theme.ts` beside it.
+- Components: `packages/design-system/src/components/<concern>/` (`forms`, `layout`, `overlays`,
+  `display`, `states`, ...), each with a story and a subpath in `package.json` `exports`.
+- Drawer, Dialog and Card are callable shapes with closed props; build with them, not from raw
+  parts (`design-system` skill, `references/component-apis.md`).
+- The app is a Vite SPA on Chakra v3. There is no Next.js, no `"use client"`, no `next/link`.
 
----
-
-## Project setup
-
-If Chakra UI isn't installed yet, complete setup before building.
-
-### Install
-
-```bash
-# npm
-npm install @chakra-ui/react @emotion/react
-
-# pnpm
-pnpm add @chakra-ui/react @emotion/react
-
-# yarn
-yarn add @chakra-ui/react @emotion/react
-
-# bun
-bun add @chakra-ui/react @emotion/react
-```
-
-### Generate snippets with the CLI
-
-```bash
-npx @chakra-ui/cli snippet add
-```
-
-With no arguments this adds the recommended set — `provider`, `toaster`, and
-`tooltip` — and automatically installs required dependencies (including
-`next-themes`). Use `--all` to add every snippet, or `snippet list` to browse
-first.
-
-The CLI detects your framework and writes files to the right place:
-
-| Framework             | Output path          |
-| --------------------- | -------------------- |
-| Next.js (with `src/`) | `src/components/ui/` |
-| Next.js (no `src/`)   | `components/ui/`     |
-| Vite / plain React    | `src/components/ui/` |
-| Remix                 | `app/components/ui/` |
-
-### Wire up the Provider
-
-**Next.js App Router** (`app/layout.tsx`):
-
-```tsx
-import { Provider } from "@/components/ui/provider";
-
-export default function RootLayout({ children }: { children: React.ReactNode }) {
-  return (
-    <html lang="en" suppressHydrationWarning>
-      <body>
-        <Provider>{children}</Provider>
-      </body>
-    </html>
-  );
-}
-```
-
-`suppressHydrationWarning` prevents a mismatch caused by `next-themes` injecting
-the color-mode class. Do **not** add `"use client"` to `layout.tsx` — the
-generated provider file already has it.
-
-**Next.js Pages Router** (`pages/_app.tsx`):
-
-```tsx
-import { Provider } from "@/components/ui/provider";
-
-export default function App({ Component, pageProps }) {
-  return (
-    <Provider>
-      <Component {...pageProps} />
-    </Provider>
-  );
-}
-```
-
-**Vite** (`src/main.tsx`):
-
-```tsx
-import { Provider } from "./components/ui/provider";
-
-createRoot(document.getElementById("root")!).render(
-  <StrictMode>
-    <Provider>
-      <App />
-    </Provider>
-  </StrictMode>,
-);
-```
-
-### Manual Provider (if CLI is unavailable)
-
-If the CLI fails, create `components/ui/provider.tsx` manually and install
-`next-themes` separately:
-
-```tsx
-"use client";
-import { ChakraProvider, defaultSystem } from "@chakra-ui/react";
-import { ThemeProvider } from "next-themes";
-
-export function Provider({ children }: { children: React.ReactNode }) {
-  return (
-    <ChakraProvider value={defaultSystem}>
-      <ThemeProvider attribute="class" disableTransitionOnChange>
-        {children}
-      </ThemeProvider>
-    </ChakraProvider>
-  );
-}
-```
-
-### Common setup issues
-
-- **Unstyled components** — app is not wrapped in `<Provider>`. Check the import
-  path and that `Provider` wraps the component tree.
-- **Hydration mismatch** — add `suppressHydrationWarning` to `<html>` in App
-  Router.
-- **`next-themes` not found** — install it: `npm install next-themes` (only
-  needed for the manual fallback; the CLI handles it automatically).
-- **`extendTheme` not exported** — this is a v2 pattern. Use `createSystem` in
-  v3.
+If the requirements are vague or the choices matter (layout direction, data shape, variants), ask
+before building.
 
 ---
 
-## Step 2 — Choose the right layout primitives
+## Step 2: Choose the right layout primitives
 
 Reach for the right Chakra primitive rather than wrapping everything in `Box`:
 
-| Need                     | Use                                     |
-| ------------------------ | --------------------------------------- |
-| Vertical stack of items  | `Stack` (default) or `VStack`           |
-| Horizontal row           | `HStack` or `Flex`                      |
-| CSS Grid                 | `Grid` + `GridItem`                     |
-| Equal-column grid        | `SimpleGrid columns={N}`                |
-| Centered page content    | `Container maxW="container.lg"`         |
-| Full flexbox control     | `Flex` with explicit props              |
-| Semantic section/article | `Box as="section"` / `Box as="article"` |
+| Need                     | Use                                                                                             |
+| ------------------------ | ----------------------------------------------------------------------------------------------- |
+| Vertical stack of items  | `Stack` (default) or `VStack`                                                                   |
+| Horizontal row           | `HStack` or `Flex`                                                                              |
+| CSS Grid                 | `Grid` + `GridItem`                                                                             |
+| Equal-column grid        | `SimpleGrid columns={N}`                                                                        |
+| Centered page content    | the product layout component (`PageLayout`), or `Container` with a size from `system/config.ts` |
+| Full flexbox control     | `Flex` with explicit props                                                                      |
+| Semantic section/article | `Box as="section"` / `Box as="article"`                                                         |
 
 Avoid deep nesting. If you're three `Box` levels deep with no semantic reason,
 flatten it. Prefer `gap` over margin between siblings.
 
 ---
 
-## Step 3 — Use tokens, not raw values
+## Step 3: Use tokens, not raw values
 
 Chakra v3 ships semantic tokens that automatically adapt to light/dark mode.
 Prefer them over hard-coded palette values — they make the component theme-aware
@@ -183,7 +66,7 @@ without any extra work.
 
 ```tsx
 // Prefer semantic tokens
-<Box bg="bg.subtle" color="fg.default" borderColor="border.subtle" />
+<Box bg="bg.subtle" color="fg" borderColor="border.subtle" />
 <Text color="fg.muted" />
 <Box shadow="md" rounded="lg" />
 
@@ -192,12 +75,14 @@ without any extra work.
 <Badge colorPalette="green">Active</Badge>
 ```
 
-Use raw palette values (`blue.500`, `gray.100`) only when a specific color is
-intentional and should not shift with color mode.
+Inside the design system, raw palette values (`blue.500`) are allowed only when a specific
+colour is intentional and should not shift with colour mode, and new colours are made as
+semantic tokens in `system/config.ts` with a light and a dark value. The foreground token is
+`fg` (`fg.DEFAULT` in the config), not `fg.default`. Outside the package, only semantic tokens.
 
 ---
 
-## Step 4 — Responsive styles
+## Step 4: Responsive styles
 
 Chakra uses mobile-first breakpoints. Use array or object syntax consistently:
 
@@ -215,7 +100,7 @@ breakpoints unless the request is explicitly desktop-only.
 
 ---
 
-## Step 5 — Forms
+## Step 5: Forms
 
 Use `Field.Root` for all form fields — it wires up label, input, error, and help
 text correctly:
@@ -225,7 +110,7 @@ text correctly:
   <Field.Label>Email address</Field.Label>
   <Input type="email" placeholder="you@example.com" />
   <Field.ErrorText>{error}</Field.ErrorText>
-  <Field.HelpText>We'll never share your email.</Field.HelpText>
+  <Field.HelperText>We'll never share your email.</Field.HelperText>
 </Field.Root>
 ```
 
@@ -234,14 +119,16 @@ buttons. Group related fields in a `Stack gap={4}`.
 
 ---
 
-## Step 6 — Accessibility
+## Step 6: Accessibility
 
 Chakra's built-in components handle most accessibility automatically — don't
 override it. The things you do need to provide:
 
 - **Icon-only buttons**: always add `aria-label`
   ```tsx
-  <IconButton aria-label="Close dialog" icon={<CloseIcon />} />
+  <IconButton aria-label="Close dialog">
+    <CloseIcon />
+  </IconButton>
   ```
 - **Images**: always pass meaningful `alt` text (or `alt=""` for decorative)
 - **Form labels**: use `Field.Label` or ensure `htmlFor` matches the input `id`
@@ -253,46 +140,7 @@ override it. The things you do need to provide:
 
 ---
 
-## Step 7 — Next.js: where to add `"use client"`
-
-In Next.js App Router, Server Components are the default. Add `"use client"`
-only to files that need it — not to entire layouts or pages.
-
-A component needs `"use client"` when it:
-
-- Uses React hooks (`useState`, `useEffect`, `useContext`, etc.)
-- Handles browser events (`onClick` with state, form submission, etc.)
-- Uses browser APIs
-
-```tsx
-// Server Component — no directive needed
-export default function ProductCard({ name, price }: Props) {
-  return (
-    <Box p={4} borderWidth={1} rounded="md">
-      <Text fontWeight="bold">{name}</Text>
-      <Text color="fg.muted">{price}</Text>
-    </Box>
-  );
-}
-
-// Client Component — needs the directive
-("use client");
-export function AddToCartButton({ productId }: { productId: string }) {
-  const [added, setAdded] = useState(false);
-  return (
-    <Button onClick={() => setAdded(true)} colorPalette="blue">
-      {added ? "Added!" : "Add to cart"}
-    </Button>
-  );
-}
-```
-
-The goal is to push interactivity to the leaves — keep as much of the tree as
-Server Components as possible.
-
----
-
-## Step 8 — When to extract components, use recipes, and customize the theme
+## Step 7: When to extract components, use recipes, and customize the theme
 
 Extract a component when the same structure appears more than twice, or when a
 piece is complex enough that naming it makes the parent clearer.
@@ -302,13 +150,13 @@ developer would want to customize. Suggest a **slot recipe** for components with
 multiple coordinated parts (card with header/body/footer, stat with
 label/value/icon, etc.).
 
-For deeper theming work — defining brand color tokens, semantic tokens with dark
+For deeper theming work: defining brand color tokens, semantic tokens with dark
 mode values, full recipe/slot-recipe authoring, typegen, or ejecting the default
 theme — read `references/theming.md` before responding. It covers the complete
 `defineConfig` / `createSystem` API with full examples.
 
-For any chart request — bar charts, area charts, line charts, pie/donut charts,
-`BarList`, `BarSegment`, or anything involving `@chakra-ui/charts` — read
+For any chart request (bar charts, area charts, line charts, pie/donut charts,
+`BarList`, `BarSegment`, or anything involving `@chakra-ui/charts`) read
 `references/charts.md` before responding. It covers the `useChart` hook, all
 three chart types, Recharts integration, color tokens, and complete runnable
 examples.

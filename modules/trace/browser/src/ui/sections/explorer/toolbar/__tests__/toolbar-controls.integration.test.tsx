@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  *
- * The toolbar's grouping menu, time-range popover and columns picker.
+ * The toolbar's grouping select, density select, time-range popover and columns picker.
  * @see specs/traces-v2/trace-table.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -10,8 +10,10 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { useExplorerStore } from "../../../../../behavior/explorer.store.ts";
+import { useDensityStore } from "../../../../../features/explorer/behavior/density.store.ts";
 import { ColumnPickerContent } from "../column-picker-content.tsx";
-import { GroupingSelector } from "../grouping-selector.tsx";
+import { DensitySelect } from "../density-select.tsx";
+import { GroupingSelect } from "../grouping-select.tsx";
 import { TimeRangePicker } from "../time-range-picker.tsx";
 import "@testing-library/jest-dom/vitest";
 
@@ -19,9 +21,11 @@ vi.mock("../../../../../behavior/trace-host.ts", async (importOriginal) => ({
   ...(await importOriginal<object>()),
   useTraceHost: () => ({ hasPermission: () => true }),
 }));
+const scope = vi.hoisted(() => ({ isPersonal: false }));
 vi.mock("../../../../../behavior/use-organization-team-project.ts", () => ({
   useOrganizationTeamProject: () => ({
     project: { id: "proj-1", slug: "acme" },
+    team: { id: "team-1", isPersonal: scope.isPersonal },
   }),
 }));
 
@@ -30,6 +34,7 @@ vi.mock("../../../../../features/instant-eval/behavior/use-evaluator-options.ts"
 }));
 
 beforeEach(() => {
+  scope.isPersonal = false;
   useExplorerStore.getState().clearAll();
   useExplorerStore.getState().setGrouping("flat");
 });
@@ -38,21 +43,79 @@ afterEach(() => {
   cleanup();
 });
 
-describe("the grouping menu", () => {
+describe("the grouping select", () => {
   /** @scenario "Grouping selector shows checkmark on selected item" */
-  it("marks the selected grouping with a checkmark and no other item", async () => {
+  it("marks the selected grouping with a checkmark and no other grouping", async () => {
     useExplorerStore.getState().setGrouping("by-model");
-    renderWithDesignSystem(<GroupingSelector />);
+    renderWithDesignSystem(<GroupingSelect />);
 
-    await userEvent.click(screen.getByRole("button", { name: /Group rows/ }));
+    await userEvent.click(screen.getByRole("button", { name: "Group by: Model" }));
 
     const items = await screen.findAllByRole("menuitemradio");
     const selected = items.filter((item) => item.getAttribute("aria-checked") === "true");
-    expect(selected.map((item) => item.textContent)).toEqual(["By Model"]);
+    expect(selected.map((item) => item.textContent)).toEqual(["Model"]);
     expect(selected[0]?.querySelector("svg")).toBeVisible();
     for (const item of items.filter((i) => i !== selected[0])) {
       expect(item.querySelector("svg")).not.toBeVisible();
     }
+  });
+
+  it("names the active grouping on the trigger", () => {
+    renderWithDesignSystem(<GroupingSelect />);
+
+    const trigger = screen.getByRole("button", { name: "Group by: None" });
+    expect(trigger).toHaveTextContent("Group by:None");
+  });
+});
+
+describe("the grouping select in a coding-agent scope", () => {
+  /** @scenario "A coding-agent scope labels the conversation grouping By session" */
+  it("reads Session for the conversation grouping, and Conversation elsewhere", async () => {
+    useExplorerStore.getState().setGrouping("by-conversation");
+    scope.isPersonal = true;
+    renderWithDesignSystem(<GroupingSelect />);
+
+    await userEvent.click(screen.getByRole("button", { name: "Group by: Session" }));
+
+    const labels = (await screen.findAllByRole("menuitemradio")).map((item) => item.textContent);
+    expect(labels).toContain("Session");
+    expect(labels).not.toContain("Conversation");
+
+    cleanup();
+    scope.isPersonal = false;
+    renderWithDesignSystem(<GroupingSelect />);
+    expect(screen.getByRole("button", { name: "Group by: Conversation" })).toBeInTheDocument();
+  });
+});
+
+describe("the density select", () => {
+  /** @scenario "Density select names the current density" */
+  it("reads the current density, offers both with a hint, and switches on choice", async () => {
+    useDensityStore.getState().setDensity("comfortable");
+    renderWithDesignSystem(<DensitySelect />);
+
+    const trigger = screen.getByRole("button", { name: "Density: Comfortable" });
+    expect(trigger).toHaveTextContent("Comfortable");
+
+    await userEvent.click(trigger);
+    const items = await screen.findAllByRole("menuitemradio");
+    expect(items.map((item) => item.textContent)).toEqual([
+      expect.stringContaining("Compact"),
+      expect.stringContaining("Comfortable"),
+    ]);
+    expect(items[0]).toHaveTextContent(/More traces on screen/);
+
+    await userEvent.click(items[0]!);
+
+    expect(useDensityStore.getState().density).toBe("compact");
+  });
+
+  it("keeps only the icon when compact", () => {
+    useDensityStore.getState().setDensity("compact");
+    renderWithDesignSystem(<DensitySelect compact />);
+
+    const trigger = screen.getByRole("button", { name: "Density: Compact" });
+    expect(trigger).not.toHaveTextContent("Compact");
   });
 });
 
@@ -103,5 +166,16 @@ describe("the columns picker", () => {
     await userEvent.click(screen.getByRole("checkbox", { name: /Service/ }));
 
     expect(useExplorerStore.getState().columnOrder).toContain("service");
+  });
+
+  /** @scenario "The session id column can be added and shows the id" */
+  it("offers Session ID and adds it to the view when its checkbox is checked", async () => {
+    const store = useExplorerStore.getState();
+    if (store.columnOrder.includes("sessionId")) store.toggleColumn("sessionId");
+    renderWithDesignSystem(<ColumnPickerContent />);
+
+    await userEvent.click(screen.getByRole("checkbox", { name: /Session ID/ }));
+
+    expect(useExplorerStore.getState().columnOrder).toContain("sessionId");
   });
 });

@@ -150,8 +150,12 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		NodeEnv: p.nodeEnv, LogPath: p.logPath, Port: p.port,
 	}
 	isBuiltUI := !st.Layout.IsMonolith() && opts.Selection.IsBuiltUI()
-	out := []Child{p.frontChild(mono, isBuiltUI)}
-	if isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
+	isAppOn := !opts.Selection.AppOff
+	var out []Child
+	if isAppOn {
+		out = append(out, p.frontChild(mono, isBuiltUI))
+	}
+	if isAppOn && isBuiltUI && opts.Selection.Refresh == domain.RefreshWatch && len(p.o.cfg.UIWatchArgv) > 0 {
 		out = append(out, uiWatchChild(repoDir, p.nodeEnv("ui"), p.logPath("ui"), p.o.cfg.UIWatchArgv))
 	}
 	out = append(out, p.goLanes(mono)...)
@@ -169,7 +173,7 @@ func (o *Orchestrator) planChildren(st domain.Stack, opts PlanOptions, repoDir s
 		langy.LogPath = p.logPath("langyagent")
 		out = append(out, langy)
 	}
-	if st.Layout.IsMonolith() || isBuiltUI {
+	if st.Layout.IsMonolith() || isBuiltUI || !isAppOn {
 		return out
 	}
 	// --hmr: Vite runs as its own ui lane beside the backend (ADR-168, 2026-10-10).
@@ -205,6 +209,9 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 	// computed before `base` feeds the ui/backend lanes (and mono's own copy)
 	// below, so a monolith checkout's one lane gets them too.
 	p.base = append(p.base, simulatorsEnv(opts.Selection, st, repoDir)...)
+	if opts.Selection.Outbound && o.proxy.CACertPath() != "" {
+		p.base = append(p.base, domain.WebPushProviderEnv(resolvedDevEnv(repoDir), st.OutboundTLSPort)...)
+	}
 	if os.Getenv(domain.NoMailKnob) == "1" {
 		p.base = append(p.base, domain.NoMailEnv()...) // after mailsim's SMTP lines, so these win
 	}
@@ -215,7 +222,7 @@ func (o *Orchestrator) newChildPlan(st domain.Stack, opts PlanOptions, repoDir s
 // seed both take it: the seed writes the LLM base URLs into the provider rows.
 func simulatorsEnv(sel domain.Selection, st domain.Stack, repoDir string) []string {
 	var env []string
-	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService, domain.LambdaService} {
+	for _, name := range []string{domain.MailService, domain.StorageService, domain.VoiceService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.LLMService, domain.LambdaService, domain.GithubService} {
 		for _, svc := range st.Services {
 			if svc.Name == name {
 				env = append(env, simulatorBaseEnv(sel, svc, repoDir)...)
@@ -241,13 +248,19 @@ func simulatorBaseEnv(sel domain.Selection, svc domain.Service, repoDir string) 
 	case svc.Name == domain.AnalyticsService && sel.Analytics && svc.Port != 0:
 		return domain.AnalyticsProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.OutboundService && sel.Outbound && svc.Port != 0:
-		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL)
+		return domain.OutboundProviderEnv(resolvedDevEnv(repoDir), svc.URL, svc.Port)
 	case svc.Name == domain.PaymentService && sel.Payment && svc.Port != 0:
 		return domain.PaymentProviderEnv(resolvedDevEnv(repoDir), svc.URL)
 	case svc.Name == domain.LLMService && sel.LLM && svc.Port != 0:
 		return domain.LLMProviderEnv(resolvedDevEnv(repoDir), svc.Port)
 	case svc.Name == domain.LambdaService && sel.Lambda && svc.Port != 0:
 		return domain.LambdaFleetEnv(resolvedDevEnv(repoDir), svc.Port)
+	case svc.Name == domain.GithubService && sel.Github && svc.Port != 0:
+		env := domain.GithubAppEnv(svc.URL)
+		if sel.Langy {
+			env = append(env, domain.GithubLangyEnv(svc.URL)...)
+		}
+		return env
 	}
 	return nil
 }
@@ -279,9 +292,6 @@ func (p *childPlan) nodeEnv(lane string) []string {
 	}
 	if lane == "ui" || lane == AppLane {
 		env = append(env, "LANGWATCH_VITE_NO_POLLING=1")
-		if p.opts.Selection.Refresh == domain.RefreshHMR {
-			env = append(env, "LANGWATCH_UI_BUNDLED=1")
-		}
 		if p.opts.Selection.Refresh == domain.RefreshWatch {
 			env = append(env, "LANGWATCH_UI_WATCH=1") // the api's port marks pages, which then reload once idle
 		}
@@ -303,8 +313,9 @@ func (p *childPlan) frontChild(mono monolithPlan, isBuiltUI bool) Child {
 	}
 	return Child{
 		Name: "ui", Dir: p.repoDir, Color: palette[1], LogPath: p.logPath("ui"),
-		Shell: "pnpm --silent --filter " + UIPackage + " dev",
-		Env:   p.nodeEnv("ui"),
+		Shell:       "pnpm --silent --filter " + UIPackage + " dev",
+		Env:         p.nodeEnv("ui"),
+		MaxRSSBytes: p.o.cfg.LaneMemory.UIBytes(),
 		// No readiness probe: the browser application holds the reader on its
 		// own waiting screen until the API answers, so serving it first is the
 		// boot the reader should see. specs/ui/api-boot-wait.feature.
@@ -430,7 +441,7 @@ func (p *childPlan) planSimulators() simulatorPlan {
 	return sp
 }
 
-// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry and lambda, in that order.
+// hostBundledSimulators places storage, voice, LLM, analytics, outbound, payment, telemetry, lambda, github and mcp, in that order.
 func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 	o, st, sel, repoRoot, base := p.o, p.st, p.opts.Selection, p.opts.RepoRoot, p.base
 	for _, sim := range []struct {
@@ -443,10 +454,12 @@ func (p *childPlan) hostBundledSimulators(sp *simulatorPlan) {
 		{sel.Voice, "voicesim", func() []string { return voiceEnv(st) }, func() Child { return o.voiceChild(st, repoRoot, base) }},
 		{sel.LLM, "llmsim", func() []string { return llmEnv(st) }, func() Child { return o.llmChild(st, repoRoot, base) }},
 		{sel.Analytics, "analyticssim", func() []string { return analyticsEnv(st) }, func() Child { return o.analyticsChild(st, repoRoot, base) }},
-		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
+		{sel.Outbound, "outboundsim", func() []string { return outboundEnv(st, o.proxy.CACertPath()) }, func() Child { return o.outboundChild(st, repoRoot, base) }},
 		{sel.Payment, "paymentsim", func() []string { return paymentEnv(st, repoRoot) }, func() Child { return o.paymentChild(st, repoRoot, base) }},
 		{sel.Telemetry, "telemetrysim", func() []string { return telemetryEnv(st) }, func() Child { return o.telemetryChild(st, repoRoot, base) }},
 		{sel.Lambda, "lambdasim", func() []string { return lambdaEnv(st) }, func() Child { return o.lambdaChild(st, repoRoot, base) }},
+		{sel.Github, "githubsim", func() []string { return githubEnv(st) }, func() Child { return o.githubChild(st, repoRoot, base) }},
+		{sel.Mcp, "mcpsim", func() []string { return mcpEnv(st) }, func() Child { return o.mcpChild(st, repoRoot, base) }},
 	} {
 		if sim.isSelected {
 			sp.host(sim.binary, sim.env, sim.child)
@@ -469,8 +482,9 @@ func (p *childPlan) backendChild() Child {
 		// WORKERS_IN_PROCESS or START_WORKERS. Production still deploys them
 		// separately.
 		Name: APILane, Dir: p.repoDir, Color: palette[0], LogPath: p.logPath(APILane), SplitLog: true,
-		Shell: "pnpm --silent --filter " + BackendPackage + " dev",
-		Env:   p.nodeEnv(APILane),
+		Shell:       "pnpm --silent --filter " + BackendPackage + " dev",
+		Env:         p.nodeEnv(APILane),
+		MaxRSSBytes: p.o.cfg.LaneMemory.BackendBytes(),
 	}
 }
 
@@ -505,9 +519,10 @@ const nxCacheEnv = "FORCE_COLOR=0 NX_LOAD_DOT_ENV_FILES=false "
 // UIBuildShell builds apps/ui through Nx's cached `build:local` target (an
 // unchanged tree restores in seconds), moves it to a per-pid staging dir and
 // swaps it in with two renames, so the api never serves a half-written bundle.
-// A lock (pid file, stale when its owner is gone) serialises the shared output.
+// A lock (pid file, stale when its owner is gone) serializes the shared output.
+// HAVEN_STACK_BUILD lets with-build-slot.sh run it at once, capped, never queued.
 const UIBuildShell = "set -e; " + uiStageVars + "s=$d/client.local; " + uiLockShell + "rm -rf $n; " +
-	nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
+	"HAVEN_STACK_BUILD=1 " + nxCacheEnv + "pnpm --silent nx run " + UIPackage + ":build:local --outputStyle=static; mv $s $n; " + uiSwapShell
 
 // uiStageVars names the served bundle's dir, this shell's staging and old dirs, and the lock.
 const uiStageVars = "d=" + UIDirRel + "/dist; n=$d/client.next.$$; o=$d/client.old.$$; l=$d/client.lock; mkdir -p $d; "
@@ -589,6 +604,3 @@ const (
 // UIDirRel is where the browser application lives inside the workspace. Only
 // the Vite lane's own working directory needs it.
 const UIDirRel = "apps/ui"
-
-// UIDir is the Vite lane's working directory inside a checkout.
-func UIDir(repoDir string) string { return filepath.Join(repoDir, UIDirRel) }

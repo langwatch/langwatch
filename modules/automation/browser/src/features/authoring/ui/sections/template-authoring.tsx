@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   Badge,
   Box,
@@ -8,6 +9,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { Monaco, OnMount } from "@monaco-editor/react";
 import { ChevronDown, ChevronRight, ExternalLink, Link2 } from "lucide-react";
 import * as React from "react";
@@ -140,7 +142,7 @@ export function TemplateDisclosure({
 
 const editorOptions = {
   minimap: { enabled: false },
-  fontSize: 13,
+  fontSize: TYPE_SCALE_PX.bodySm,
   wordWrap: "on" as const,
   automaticLayout: true,
   scrollBeyondLastLine: false,
@@ -400,7 +402,7 @@ export function CompactSlackPreview({
 
   const blockCount = payload.blocks.length;
   return (
-    <Box bg="bg.subtle" borderRadius="md" padding={4} border="1px solid" borderColor="border">
+    <Card variant="nested" tone="neutral" padding="md">
       <VStack align="stretch" gap={3}>
         <VStack align="stretch" gap={1}>
           <Text textStyle="sm" fontWeight="semibold">
@@ -432,7 +434,7 @@ export function CompactSlackPreview({
           </Tooltip>
         </HStack>
       </VStack>
-    </Box>
+    </Card>
   );
 }
 

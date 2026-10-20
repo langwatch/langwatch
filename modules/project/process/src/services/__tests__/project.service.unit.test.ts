@@ -28,7 +28,10 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { fromDate } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
-import type { ProjectRepository } from "../../repositories/project.repository.ts";
+import type {
+  ProjectBackfillEntry,
+  ProjectRepository,
+} from "../../repositories/project.repository.ts";
 import { ProjectCreatedNoticeService } from "../project-created-notice.service.ts";
 import { ProjectCredentials } from "../project-credentials.service.ts";
 import { ProjectService } from "../project.service.ts";
@@ -126,8 +129,8 @@ class StubRepository implements ProjectRepository {
   assignProjectDepartment = vi.fn(async () => false);
   existing: InternalProject | null = null;
   findInternalByOrganization = vi.fn(async () => this.existing);
-  findInternalBySlug = vi.fn(async () => null);
-  findLiveInternalIds = vi.fn(async () => []);
+  findInternalBySlug = vi.fn(async (_slug: string): Promise<InternalProject | null> => null);
+  findLiveInternalIds = vi.fn(async (_input: { kind: string }): Promise<string[]> => []);
   createInternalOrFindWinner = vi.fn(async () => project);
   isPresenceEnabled = vi.fn(async () => true);
   findBySlugInTeam = vi.fn(async () => null);
@@ -142,19 +145,23 @@ class StubRepository implements ProjectRepository {
   findLiveBySlugInOrganization = vi.fn(async (): Promise<Project[]> => []);
   countUsage = vi.fn(async () => ({ projects: 0, updatedProjects: 0 }));
   countWithTraces = vi.fn(async () => 0);
-  findSharedProjectSlugs = vi.fn(async () => []);
+  findSharedProjectSlugs = vi.fn(async (): Promise<string[]> => []);
   listAllIds = vi.fn(async () => ({ ids: [], next: null }));
-  listAllWithOrganization = vi.fn(async () => ({ projects: [], next: null }));
+  listAllWithOrganization = vi.fn(async () => ({ projects: [], orphanIds: [], next: null }));
   listAllWithPrivateS3 = vi.fn(async () => ({ projects: [], next: null }));
   listLwqlKeys = vi.fn(async () => ({ projects: [], next: null }));
   create = vi.fn(async () => applicationProject);
   findById = vi.fn(async () => applicationProject);
   findOrganizationId = vi.fn<(projectId: string) => Promise<string | undefined>>(async () => "org");
   findWithTeam = vi.fn<(id: string) => Promise<ProjectWithTeam | null>>(async () => null);
+  findLiveWithTeamByIds = vi.fn<(ids: readonly string[]) => Promise<ProjectWithTeam[]>>(
+    async () => [],
+  );
   updateMetadata = vi.fn(async () => undefined);
   touchCodingAgentSessionSeen = vi.fn(async () => undefined);
   touchCodingAgentPullRequestSeen = vi.fn(async () => undefined);
   findWithOrgAdmin = vi.fn(async () => null);
+  findBackfillPage = vi.fn(async (): Promise<ProjectBackfillEntry[]> => []);
   findTraceSharingConfig = vi.fn(async () => null);
   searchByQuery = vi.fn(async () => []);
   update = vi.fn(async () => applicationProject);
@@ -200,6 +207,10 @@ class StubOrganizationService {
   >(async () => ({ id: "team_1", isPersonal: false }));
   readonly createdTeams: CreateOrganizationTeamInput[] = [];
   readonly addedTeamMembers: AddOrganizationTeamMemberInput[] = [];
+  findMemberTeamIds = vi.fn<
+    (input: { organizationId: string; userId: string }) => Promise<string[]>
+  >(async () => []);
+
   readonly staffedTeams: {
     input: Parameters<OrganizationApi["createTeamWithMembers"]>[0];
     by: Parameters<OrganizationApi["createTeamWithMembers"]>[1];
@@ -408,6 +419,29 @@ class FixedCredentials extends ProjectCredentials {
 
 const MEMBER = { type: "user", id: "user_1" } as const;
 
+type UserBinding = Awaited<ReturnType<AuthzApi["listUserBindings"]>>[number];
+const listUserBindings = vi.fn(async (): Promise<UserBinding[]> => []);
+
+const userBinding = ({
+  scopeType,
+  scopeId,
+}: Pick<UserBinding, "scopeType" | "scopeId">): UserBinding => ({
+  id: `binding-${scopeId}`,
+  organizationId: "org",
+  userId: "user_1",
+  groupId: null,
+  apiKeyId: null,
+  role: "CUSTOM",
+  customRoleId: "role_1",
+  scopeType,
+  scopeId,
+  createdAt: new Date(0),
+  user: null,
+  group: null,
+  apiKey: null,
+  customRole: null,
+});
+
 const createService = (
   repository: StubRepository,
   organizations = new StubOrganizationService(),
@@ -415,7 +449,6 @@ const createService = (
     logger: { error: () => void 0 },
     projects: {
       findWithOrgAdmin: async () => null,
-      findIdsByOrganization: async () => [],
       findWithTeam: async () => null,
     },
   }),
@@ -428,6 +461,7 @@ const createService = (
         allowed: granted(permission),
         organizationRole: null,
       }),
+      listUserBindings,
     }),
     repository,
     credentials: new FixedCredentials(),
@@ -435,6 +469,7 @@ const createService = (
       getOldestTeamId: () => organizations.getOldestTeamId(),
       createTeam: (input) => organizations.createTeam(input),
       addTeamMember: (input) => organizations.addTeamMember(input),
+      findMemberTeamIds: (input) => organizations.findMemberTeamIds(input),
       createTeamWithMembers: (input, by) => organizations.staffNewTeam(input, by),
       getTeam: async (input) => {
         const team = await organizations.findActiveTeam(input);
@@ -454,6 +489,48 @@ const createService = (
   });
 
 describe("ProjectService", () => {
+  /** @scenario "A member's landing projects come from their grants" */
+  it("finds a member's shared projects through their team and project grants", async () => {
+    const repository = new StubRepository();
+    repository.findSharedProjectSlugs.mockResolvedValue(["acme"]);
+    listUserBindings.mockResolvedValueOnce([
+      userBinding({ scopeType: "TEAM", scopeId: "team_1" }),
+      userBinding({ scopeType: "PROJECT", scopeId: "project_1" }),
+      userBinding({ scopeType: "ORGANIZATION", scopeId: "org" }),
+    ]);
+
+    await expect(
+      createService(repository).findSharedProjectSlugs({
+        organizationId: "org",
+        memberUserId: "user_1",
+        limit: 1,
+      }),
+    ).resolves.toEqual(["acme"]);
+    expect(listUserBindings).toHaveBeenCalledWith({ organizationId: "org", userId: "user_1" });
+    expect(repository.findSharedProjectSlugs).toHaveBeenCalledWith({
+      organizationId: "org",
+      member: { teamIds: ["team_1"], projectIds: ["project_1"] },
+      limit: 1,
+    });
+  });
+
+  /** @scenario "A member's landing projects come from their grants" */
+  it("offers no project to a member with no team or project grant", async () => {
+    const repository = new StubRepository();
+    listUserBindings.mockResolvedValueOnce([
+      userBinding({ scopeType: "ORGANIZATION", scopeId: "org" }),
+    ]);
+
+    await expect(
+      createService(repository).findSharedProjectSlugs({
+        organizationId: "org",
+        memberUserId: "user_1",
+        limit: 1,
+      }),
+    ).resolves.toEqual([]);
+    expect(repository.findSharedProjectSlugs).not.toHaveBeenCalled();
+  });
+
   it("resolves a live explicit trace destination without falling back", async () => {
     const repository = new StubRepository();
     repository.findLiveTraceDestination.mockResolvedValue(traceDestination);
@@ -560,6 +637,109 @@ describe("ProjectService", () => {
       slug: "governance-org",
       apiKey: "secret-api-key",
       teamId: "oldest-team",
+      kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      framework: "governance",
+    });
+  });
+
+  /** @scenario "A feature ensures an internal project" */
+  it("creates the checkup project under its own slug and kind", async () => {
+    const repository = new StubRepository();
+
+    await createService(repository).ensureInternal({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+
+    expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+      organizationId: "org",
+      kind: PROJECT_KIND.INTERNAL_CHECKUP,
+    });
+    expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+      expect.objectContaining({
+        slug: "checkup-org",
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        framework: "checkup",
+      }),
+    );
+  });
+
+  describe("given the organization has no internal project of the kind but its slug is held", () => {
+    /** @scenario "A feature ensures an internal project" */
+    it("reuses the project holding the slug when it is of the same kind", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue(project);
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalBySlug).toHaveBeenCalledWith("governance-org");
+      expect(repository.createInternalOrFindWinner).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A feature ensures an internal project" */
+    it("hands a slug held by a different kind to the repository's create-or-find-winner", async () => {
+      const repository = new StubRepository();
+      repository.findInternalBySlug.mockResolvedValue({
+        ...project,
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
+
+      await expect(
+        createService(repository).ensureInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toEqual(project);
+      expect(repository.createInternalOrFindWinner).toHaveBeenCalledWith(
+        expect.objectContaining({
+          slug: "governance-org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      );
+    });
+  });
+
+  describe("when a feature reads internal projects", () => {
+    /** @scenario "A feature reads an internal project" */
+    it("finds the organization's internal project of the kind", async () => {
+      const repository = new StubRepository();
+      repository.existing = project;
+
+      await expect(
+        createService(repository).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+        }),
+      ).resolves.toBe(project);
+      expect(repository.findInternalByOrganization).toHaveBeenCalledWith({
+        organizationId: "org",
+        kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+      });
+    });
+
+    it("answers null when the organization has none", async () => {
+      await expect(
+        createService(new StubRepository()).findInternal({
+          organizationId: "org",
+          kind: PROJECT_KIND.INTERNAL_CHECKUP,
+        }),
+      ).resolves.toBeNull();
+    });
+
+    it("lists the live internal project ids of a kind", async () => {
+      const repository = new StubRepository();
+      repository.findLiveInternalIds.mockResolvedValue(["p1", "p2"]);
+
+      await expect(
+        createService(repository).findInternalIds({ kind: PROJECT_KIND.INTERNAL_CHECKUP }),
+      ).resolves.toEqual(["p1", "p2"]);
+      expect(repository.findLiveInternalIds).toHaveBeenCalledWith({
+        kind: PROJECT_KIND.INTERNAL_CHECKUP,
+      });
     });
   });
 
@@ -674,17 +854,22 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
         },
       });
       created.connect({
-        recordProjectCreated: { send },
+        recordProjectCreated: { send, sendBatch: async () => undefined },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -710,17 +895,22 @@ describe("ProjectService", () => {
         logger: { error: () => void 0 },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
         },
       });
       created.connect({
-        recordProjectCreated: { send },
+        recordProjectCreated: { send, sendBatch: async () => undefined },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -746,17 +936,25 @@ describe("ProjectService", () => {
         logger: { error },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
         },
       });
       created.connect({
-        recordProjectCreated: { send: () => Promise.reject(new Error("queue down")) },
+        recordProjectCreated: {
+          send: () => Promise.reject(new Error("queue down")),
+          sendBatch: async () => undefined,
+        },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },
@@ -1296,6 +1494,59 @@ describe("ProjectService", () => {
     expect(repository.touchCodingAgentSessionSeen).toHaveBeenCalledWith(expected);
     expect(repository.touchCodingAgentPullRequestSeen).toHaveBeenCalledWith(expected);
   });
+
+  describe("when asked isTeamMember", () => {
+    describe("given an unknown project", () => {
+      it("reports false without asking the organisation roster", async () => {
+        const repository = new StubRepository();
+        const organizations = new StubOrganizationService();
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: "missing",
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+        expect(organizations.findMemberTeamIds).not.toHaveBeenCalled();
+      });
+    });
+
+    describe("when the user belongs to another team in the same organisation", () => {
+      it("reports false", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(false);
+      });
+    });
+
+    describe("when the user belongs to the project's team", () => {
+      it("reports true and asks the roster for that organisation and user", async () => {
+        const repository = new StubRepository();
+        repository.findWithTeam.mockResolvedValue(projectWithTeam({ teamId: "team_1" }));
+        const organizations = new StubOrganizationService();
+        organizations.findMemberTeamIds.mockResolvedValue(["team_other", "team_1"]);
+
+        await expect(
+          createService(repository, organizations).isTeamMember({
+            projectId: applicationProject.id,
+            userId: "user_1",
+          }),
+        ).resolves.toBe(true);
+        expect(organizations.findMemberTeamIds).toHaveBeenCalledWith({
+          organizationId: "org",
+          userId: "user_1",
+        });
+      });
+    });
+  });
 });
 
 describe("ProjectService lifecycle facts for authz's lineage", () => {
@@ -1311,17 +1562,22 @@ describe("ProjectService lifecycle facts for authz's lineage", () => {
       logger: { error },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
       },
     });
     created.connect({
-      recordProjectCreated: { send: async () => undefined },
+      recordProjectCreated: { send: async () => undefined, sendBatch: async () => undefined },
       recordProjectLegacyKeyRevoked: { send: async () => undefined },
-      recordPresenceSettingChanged: { send: async () => undefined },
+      recordPresenceSettingChanged: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectMoved: { send: moved },
       recordProjectArchived: { send: archived },
-      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectDepartmentAssigned: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
       recordProjectAggregateRuleChanged: { send: async () => undefined },
       recordProjectRevived: { send: async () => undefined },
@@ -1441,17 +1697,19 @@ describe("ProjectService department facts for data privacy's fold", () => {
       logger: { error: vi.fn() },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => projectWithTeam({ teamId: "team_alpha", departmentId: "risk" }),
       },
     });
     created.connect({
-      recordProjectCreated: { send: async () => undefined },
+      recordProjectCreated: { send: async () => undefined, sendBatch: async () => undefined },
       recordProjectLegacyKeyRevoked: { send: async () => undefined },
-      recordPresenceSettingChanged: { send: async () => undefined },
+      recordPresenceSettingChanged: {
+        send: async () => undefined,
+        sendBatch: async () => undefined,
+      },
       recordProjectMoved: { send: async () => undefined },
       recordProjectArchived: { send: async () => undefined },
-      recordProjectDepartmentAssigned: { send: departments },
+      recordProjectDepartmentAssigned: { send: departments, sendBatch: async () => undefined },
       recordProjectTraceSharingDisabled: { send: async () => undefined },
       recordProjectAggregateRuleChanged: { send: async () => undefined },
       recordProjectRevived: { send: async () => undefined },

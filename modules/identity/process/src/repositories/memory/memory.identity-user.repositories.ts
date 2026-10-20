@@ -141,9 +141,8 @@ export class MemoryIdentityUsersRepository implements IdentityUsersRepository {
   }
 
   async findUserIdsByEmail(args: { normalizedValue: string }): Promise<string[]> {
-    const wanted = args.normalizedValue.toLowerCase();
     return [...this.store.users.values()]
-      .filter((candidate) => (candidate.email ?? "").toLowerCase() === wanted)
+      .filter((candidate) => candidate.email === args.normalizedValue)
       .map((row) => row.id);
   }
 }
@@ -216,7 +215,21 @@ export class MemoryIdentityVerificationRepository implements IdentityVerificatio
   }
 }
 
-/** The backfill twin: the three reads the plan is built from. */
+function memoryBackfillUserRow(
+  row: NonNullable<ReturnType<MemoryIdentityStore["findUserRow"]>>,
+): BackfillUserRow {
+  return {
+    id: row.id,
+    email: row.email,
+    emailVerified: row.emailVerified,
+    createdAtMs: row.createdAtMs,
+    userHashKey: row.userHashKey,
+    lastLoginAtMs: row.lastLoginAtMs ?? null,
+    passkeySignupPending: row.passkeySignupPending ?? false,
+  };
+}
+
+/** The backfill twin: the reads the plan is built from. */
 export class MemoryIdentityBackfillRepository implements IdentityBackfillRepository {
   static create(store: MemoryIdentityStore): MemoryIdentityBackfillRepository {
     return new MemoryIdentityBackfillRepository(store);
@@ -228,18 +241,26 @@ export class MemoryIdentityBackfillRepository implements IdentityBackfillReposit
     const row = this.store.findUserRow(args);
     if (!row) throw new UserNotFoundError(args.userId);
 
-    return {
-      id: row.id,
-      email: row.email,
-      emailVerified: row.emailVerified,
-      createdAtMs: row.createdAtMs,
-      userHashKey: row.userHashKey,
-      lastLoginAtMs: row.lastLoginAtMs ?? null,
-    };
+    return memoryBackfillUserRow(row);
+  }
+
+  async findAddressSharers(args: { normalizedValue: string }): Promise<BackfillUserRow[]> {
+    return [...this.store.users.values()]
+      .filter((row) => row.email === args.normalizedValue)
+      .map(memoryBackfillUserRow);
+  }
+
+  async findAddressLockHolders(args: { normalizedValue: string }): Promise<string[]> {
+    const holder = this.store.reservations.get(args.normalizedValue);
+    return holder ? [holder.userId] : [];
   }
 
   async findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]> {
     return this.store.accounts.get(args.userId) ?? [];
+  }
+
+  async countPasskeys(args: { userId: string }): Promise<number> {
+    return this.store.passkeyCounts.get(args.userId) ?? 0;
   }
 
   async findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]> {

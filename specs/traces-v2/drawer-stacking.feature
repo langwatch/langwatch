@@ -78,3 +78,10 @@ Feature: Moving between drawers without losing your place
       When I open another trace from the list behind the drawer
       And I close that trace's drawer
       Then no drawer is left open
+
+    @integration
+    Scenario: Escape in Add to Dataset leaves the drawer open while a cell editor is open
+      Given the Add to Dataset drawer with a floating cell editor open
+      When I press Escape
+      Then the drawer stays open
+      And once the editor is gone Escape closes the drawer

@@ -34,7 +34,7 @@ import type {
 } from "@langwatch/prisma-client/generated";
 import { Prisma } from "@langwatch/prisma-client/generated";
 import type { ProjectIdentity } from "@langwatch/project-contract";
-import { fromDate, type Instant, nowInstant, toDate } from "@langwatch/time";
+import { type Instant, fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import { keysetAfter } from "../../rules/gateway-wire-pagination.rules.ts";
 import type {
@@ -923,7 +923,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
             ...identityPatchData({ metadata: input.metadata }),
             cycleAnchorAt: cycleAnchorAt ? toDate(cycleAnchorAt) : null,
             resetsAt: toDate(resetsAt),
-            currentPeriodStartedAt: new Date(),
+            currentPeriodStartedAt: toDate(nowInstant()),
             createdById: input.actorUserId,
           },
         });
@@ -1011,7 +1011,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     return this.prisma.$transaction(async (tx) => {
       const updated = await tx.gatewayBudget.update({
         where: { id: input.id },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: toDate(nowInstant()) },
       });
       await this.changeEvents.append(
         {
@@ -1109,7 +1109,7 @@ export class PrismaGatewayBudgetRepository extends GatewayBudgetRepository {
     const existing = await this.tryGetStored(input.id, input.organizationId);
     if (!existing) throw new GatewayBudgetNotFoundError();
     const before = serializeRowForAudit(existing);
-    const now = new Date();
+    const now = toDate(nowInstant());
 
     if (input.endUserId) {
       await this.resetAttributedUserBucket({

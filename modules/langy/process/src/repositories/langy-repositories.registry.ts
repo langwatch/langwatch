@@ -5,7 +5,6 @@ import type {
   LangyMessageProjectionRecord,
 } from "@langwatch/langy-contract";
 import { defineRepositories } from "@langwatch/process";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
 import type { LangyAnalyticsEventRepository } from "./langy-analytics-event.repository.ts";
 import type { LangyConversationRepository } from "./langy-conversation-projection.repository.ts";
@@ -18,7 +17,10 @@ import type {
   LangyTurnAccessRepository,
   LangyTurnHandoffRepository,
 } from "./langy-live-turn.repository.ts";
+import type { LangyLocalCallRepository } from "./langy-local-call.repository.ts";
+import type { LangyLocalControlRequestRepository } from "./langy-local-control-request.repository.ts";
 import type { LangyLocalPresenceRepository } from "./langy-local-presence.repository.ts";
+import type { LangyLocalUserWaitRepository } from "./langy-local-user-wait.repository.ts";
 import type { LangyMessageRepository } from "./langy-message.repository.ts";
 import type { LangyRateLimitRepository } from "./langy-rate-limit.repository.ts";
 import type { LangySessionKeyRepository } from "./langy-session-key.repository.ts";
@@ -39,7 +41,9 @@ export interface LangyRepositories extends LangyDatabaseRepositories {
   readonly frameDedup: LangyFrameDedupRepository;
   readonly resourceLinks: LangyResourceLinksRepository;
   readonly localPresence: LangyLocalPresenceRepository;
-  readonly sessionState: SessionStateStore;
+  readonly localCalls: LangyLocalCallRepository;
+  readonly localUserWaits: LangyLocalUserWaitRepository;
+  readonly localControlRequests: LangyLocalControlRequestRepository;
   /** The per-user daily count of pull requests Langy opened. */
   readonly githubPrCounts: LangyGithubPrCountRepository;
   /** When each person was last asked for feedback. */

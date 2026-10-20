@@ -216,7 +216,7 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 |             |                                                |
 | ----------- | ---------------------------------------------- |
-| Declared at | `src/transport/evaluations-legacy.rest.ts:147` |
+| Declared at | `src/transport/evaluations-legacy.rest.ts:148` |
 | Base URL    | none: each route's path is its address         |
 | Addressing  | literal                                        |
 | Credential  | project                                        |
@@ -225,12 +225,12 @@ detectPii(input: PiiDetectionRequest): Promise<PiiDetectionOutcome>;
 
 List the built-in evaluators
 
-Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:155`.
+Public: static evaluator catalogue; the same list for every caller, no project data. Declared at `src/transport/evaluations-legacy.rest.ts:156`.
 
 Answers at `/api/evaluations/list`, `/api/v1/evaluations/list`.
 
 ```typescript
-// Response: inline, src/transport/evaluations-legacy.rest.ts:162
+// Response: inline, src/transport/evaluations-legacy.rest.ts:163
 type Response = unknown;
 ```
 
@@ -238,18 +238,18 @@ type Response = unknown;
 
 Run an evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:183`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:184`.
 
 Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluator/evaluate`.
 
 ```typescript
-// Params: evaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:8
+// Params: evaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:17
 interface Params {
   evaluator: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:186
+// Body: inline, src/transport/evaluations-legacy.rest.ts:188
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:189
+// Response: inline, src/transport/evaluations-legacy.rest.ts:191
 type Response = unknown;
 ```
 
@@ -257,19 +257,19 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:213`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:215`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
 ```typescript
-// Params: namespacedEvaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:16
+// Params: namespacedEvaluatorParamsSchema, ../contract/src/evaluation-legacy.schemas.ts:27
 interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:219
+// Body: inline, src/transport/evaluations-legacy.rest.ts:222
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:222
+// Response: inline, src/transport/evaluations-legacy.rest.ts:225
 type Response = unknown;
 ```
 
@@ -277,15 +277,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:246`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:249`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
-type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:8
-// Body: inline, src/transport/evaluations-legacy.rest.ts:248
+type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
+// Body: inline, src/transport/evaluations-legacy.rest.ts:252
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:251
+// Response: inline, src/transport/evaluations-legacy.rest.ts:255
 type Response = unknown;
 ```
 
@@ -306,14 +306,14 @@ Contract `../contract/src/evaluation.trpc.ts:26`, router `src/transport/evaluati
 
 ```typescript
 // evaluations.availableEvaluators
-// Input: evaluationProjectScopeSchema, ../contract/src/evaluation-trpc.schemas.ts:9
+// Input: evaluationProjectScopeSchema, ../contract/src/evaluation-trpc.schemas.ts:15
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:33
+type Output = z.infer<typeof evaluatorCatalogueSchema>; // ../contract/src/evaluation.responses.ts:49
 
 // evaluations.availableCustomEvaluators
-type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:9
+type Input = z.infer<typeof evaluationProjectScopeSchema>; // ../contract/src/evaluation-trpc.schemas.ts:15
 // Output: inline, ../contract/src/evaluation.trpc.ts:39
 type Output = {
   id: string;
@@ -323,23 +323,23 @@ type Output = {
 }[];
 
 // evaluations.runEvaluation
-type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:42
-type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:39
+type Input = z.infer<typeof runTraceEvaluationInputSchema>; // ../contract/src/evaluation-trpc.schemas.ts:76
+type Output = z.infer<typeof evaluationRunOutcomeSchema>; // ../contract/src/evaluation.responses.ts:66
 
 // evaluations.warmupLambda
-// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:51
+// Input: warmupEvaluatorsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:87
 interface Input {
   projectId: string;
   count?: number;
 }
-// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:49
+// Output: evaluationWarmupSchema, ../contract/src/evaluation.responses.ts:72
 interface Output {
   success: boolean;
   count: number;
 }
 
 // evaluations.getMonitorPerformanceForProject
-// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:29
+// Input: monitorPerformanceForProjectInputSchema, ../contract/src/evaluation.performance.ts:53
 interface Input {
   projectId: string;
   timeZone?: string;
@@ -354,13 +354,13 @@ type Output = {
 }[];
 
 // evaluations.getEvaluationInputs
-// Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:13
+// Input: evaluationInputsInputSchema, ../contract/src/evaluation-trpc.schemas.ts:29
 interface Input {
   projectId: string;
   evaluationId: string;
   tenantId?: string;
 }
-// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:21
+// Output: evaluationInputsSchema, ../contract/src/evaluation-trpc.schemas.ts:34
 type Output = Record<string, unknown> | null;
 ```
 
@@ -382,37 +382,40 @@ Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluat
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
-Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:125`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
+Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:149`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                                      | Declared at                                                     |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| command                    | –                                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:165` |
-| command                    | `startEvaluation`                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:178` |
-| command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:181` |
-| command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:184` |
-| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:192` |
-| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:210` |
-| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:221` |
-| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:245` |
-| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:137` |
-| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:142` |
-| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:147` |
-| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:152` |
+| command                    | –                                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:189` |
+| command                    | `startEvaluation`                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:202` |
+| command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:205` |
+| command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:208` |
+| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:216` |
+| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:237` |
+| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:251` |
+| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:275` |
+| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:161` |
+| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:166` |
+| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:171` |
+| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:176` |
+| lane aliases               | `≈ MAIN_TRACE_REACTION_LANE_ALIASES`                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:281` |
 
 ## Configuration
 
-| Kind   | Leaf                             | Environment variable                 | Declared at                               |
-| ------ | -------------------------------- | ------------------------------------ | ----------------------------------------- |
-| secret | `openAi`                         | `OPENAI_API_KEY`                     | `src/app/evaluation.app.ts:277`           |
-| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`           | `src/app/evaluation.app.ts:278`           |
-| config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                 | `../contract/src/evaluation.config.ts:27` |
-| config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`  | `../contract/src/evaluation.config.ts:28` |
-| config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`      | `../contract/src/evaluation.config.ts:29` |
-| config | `evaluationMaxPayloadBytes`      | `EVAL_MAX_PAYLOAD_BYTES`             | `../contract/src/evaluation.config.ts:30` |
-| config | `topicClusteringMaxPayloadBytes` | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES` | `../contract/src/evaluation.config.ts:31` |
-| config | `azureContentSafetyEndpoint`     | `AZURE_CONTENT_SAFETY_ENDPOINT`      | `../contract/src/evaluation.config.ts:35` |
-| config | `enablePresidio`                 | `LANGWATCH_ENABLE_PRESIDIO`          | `../contract/src/evaluation.config.ts:36` |
-| config | `enableLingua`                   | `LANGWATCH_ENABLE_LINGUA`            | `../contract/src/evaluation.config.ts:37` |
-| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`   | `../contract/src/evaluation.config.ts:38` |
+| Kind   | Leaf                             | Environment variable                       | Declared at                               |
+| ------ | -------------------------------- | ------------------------------------------ | ----------------------------------------- |
+| secret | `openAi`                         | `OPENAI_API_KEY`                           | `src/app/evaluation.app.ts:275`           |
+| secret | `azureContentSafety`             | `AZURE_CONTENT_SAFETY_KEY`                 | `src/app/evaluation.app.ts:276`           |
+| config | `langevalsEndpoint`              | `LANGEVALS_ENDPOINT`                       | `../contract/src/evaluation.config.ts:43` |
+| config | `stagingThresholdBytes`          | `LANGEVALS_STAGING_THRESHOLD_BYTES`        | `../contract/src/evaluation.config.ts:44` |
+| config | `stagingTtlSeconds`              | `LANGEVALS_STAGING_TTL_SECONDS`            | `../contract/src/evaluation.config.ts:45` |
+| config | `evaluationMaxPayloadBytes`      | `EVAL_MAX_PAYLOAD_BYTES`                   | `../contract/src/evaluation.config.ts:46` |
+| config | `topicClusteringMaxPayloadBytes` | `TOPIC_CLUSTERING_MAX_PAYLOAD_BYTES`       | `../contract/src/evaluation.config.ts:47` |
+| config | `inputsInlineMaxBytes`           | `LANGWATCH_EVAL_INPUTS_INLINE_MAX_BYTES`   | `../contract/src/evaluation.config.ts:51` |
+| config | `inputsHardCeilingBytes`         | `LANGWATCH_EVAL_INPUTS_HARD_CEILING_BYTES` | `../contract/src/evaluation.config.ts:55` |
+| config | `azureContentSafetyEndpoint`     | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:59` |
+| config | `enablePresidio`                 | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:60` |
+| config | `enableLingua`                   | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:61` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:62` |
 
 <!-- readme:generated:end -->

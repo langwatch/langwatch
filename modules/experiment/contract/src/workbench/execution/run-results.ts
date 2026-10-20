@@ -316,20 +316,45 @@ const carryErrors = ({
   }
 };
 
+type IsVerdictCarried = (verdict: {
+  rowIndex: number;
+  targetId: string;
+  evaluatorId: string;
+}) => boolean;
+
+const carryEvaluatorVerdicts = ({
+  targetId,
+  evaluatorId,
+  verdicts,
+  openCell,
+  isVerdictCarried,
+}: {
+  targetId: string;
+  evaluatorId: string;
+  verdicts: unknown[];
+  openCell: OpenCarriedCell;
+  isVerdictCarried: IsVerdictCarried;
+}): void => {
+  verdicts.forEach((result, rowIndex) => {
+    if (result === undefined || result === null) return;
+    if (!isVerdictCarried({ rowIndex, targetId, evaluatorId })) return;
+    const cell = openCell({ rowIndex, targetId });
+    if (cell) cell.evaluatorResults.push({ evaluatorId, result });
+  });
+};
+
 const carryVerdicts = ({
   results,
   openCell,
+  isVerdictCarried,
 }: {
   results: PersistedResults;
   openCell: OpenCarriedCell;
+  isVerdictCarried: IsVerdictCarried;
 }): void => {
   for (const [targetId, byEvaluator] of Object.entries(results.evaluatorResults)) {
     for (const [evaluatorId, verdicts] of Object.entries(byEvaluator)) {
-      verdicts.forEach((result, rowIndex) => {
-        if (result === undefined || result === null) return;
-        const cell = openCell({ rowIndex, targetId });
-        if (cell) cell.evaluatorResults.push({ evaluatorId, result });
-      });
+      carryEvaluatorVerdicts({ targetId, evaluatorId, verdicts, openCell, isVerdictCarried });
     }
   }
 };
@@ -374,14 +399,22 @@ const carryMetadata = ({
 
 /**
  * The board's cells, minus the ones the run covers, as the run carries them.
+ * Verdicts the run produces itself, and verdicts of evaluators no longer on
+ * the workbench, are left behind.
  */
 export const carriedOverCells = ({
   results,
   coveredCells,
+  coveredVerdicts,
+  evaluatorIds,
 }: {
   results?: PersistedResults;
   /** `${rowIndex}:${targetId}` for every cell the run itself covers. */
   coveredCells: ReadonlySet<string>;
+  /** `${rowIndex}:${targetId}:${evaluatorId}` for every verdict an evaluator-only run produces. */
+  coveredVerdicts?: ReadonlySet<string>;
+  /** The evaluators on the workbench; a verdict of any other is not carried. */
+  evaluatorIds?: ReadonlySet<string>;
 }): CarriedOverCell[] => {
   if (!results) return [];
 
@@ -403,7 +436,13 @@ export const carriedOverCells = ({
 
   carryOutputs({ results, openCell });
   carryErrors({ results, openCell });
-  carryVerdicts({ results, openCell });
+  carryVerdicts({
+    results,
+    openCell,
+    isVerdictCarried: ({ rowIndex, targetId, evaluatorId }) =>
+      (evaluatorIds?.has(evaluatorId) ?? true) &&
+      !coveredVerdicts?.has(`${rowIndex}:${targetId}:${evaluatorId}`),
+  });
   carryMetadata({ results, cells });
 
   return [...cells.values()];

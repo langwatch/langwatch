@@ -239,4 +239,60 @@ describe("given the derived Postgres catalog's overrides", () => {
       }
     });
   });
+
+  describe("when a board's author set it to Only me", () => {
+    const statementOf = (baseRelation: string) => {
+      const view = byModel.get(baseRelation)!;
+      return postgresViews
+        .approvedViewStatements({ schema: "public" })
+        .find((entry) => entry.includes(`"${view.postgres!.approvedView}"`));
+    };
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("leaves the board out of both boards views, for every caller", () => {
+      for (const baseRelation of ["Dashboard", "DashboardsV2"]) {
+        expect(statementOf(baseRelation), baseRelation).toContain(`("m"."scope" <> 'PRIVATE')`);
+      }
+    });
+
+    /** @scenario "AC171 Scope: an Only me board exists for its author alone" */
+    it("leaves what is placed on it out of the charts and widgets views, and keeps what is on no board", () => {
+      for (const [baseRelation, board] of [
+        ["CustomGraph", "Dashboard"],
+        ["DashboardWidget", "DashboardsV2"],
+      ] as const) {
+        expect(statementOf(baseRelation), baseRelation).toContain(
+          `"m"."dashboardId" IS NULL OR NOT EXISTS (\n` +
+            `  SELECT 1 FROM "public"."${board}" AS "d"\n` +
+            `  WHERE "d"."id" = "m"."dashboardId"\n` +
+            `    AND "d"."projectId" = "m"."projectId"\n` +
+            `    AND "d"."scope" = 'PRIVATE'\n` +
+            `)`,
+        );
+      }
+    });
+
+    /** @scenario "AC199h Split: the LangWatchQL views leave out the stale copies" */
+    it("leaves every srcdoc row out of the custom graphs view", () => {
+      expect(statementOf("CustomGraph")).toContain(
+        `\nWHERE (("m"."kind" <> 'dashboard_srcdoc') AND (`,
+      );
+    });
+
+    /** @scenario "AC199h Split: the LangWatchQL views leave out the stale copies" */
+    it("leaves a board only DashboardsV2 holds out of the dashboards view, and keeps a mixed one", () => {
+      expect(statementOf("Dashboard")).toContain(
+        `AND (NOT EXISTS (\n` +
+          `  SELECT 1 FROM "public"."DashboardsV2" AS "v"\n` +
+          `  WHERE "v"."id" = "m"."id"\n` +
+          `    AND "v"."projectId" = "m"."projectId"\n` +
+          `) OR EXISTS (\n` +
+          `  SELECT 1 FROM "public"."CustomGraph" AS "g"\n` +
+          `  WHERE "g"."dashboardId" = "m"."id"\n` +
+          `    AND "g"."projectId" = "m"."projectId"\n` +
+          `    AND "g"."kind" <> 'dashboard_srcdoc'\n` +
+          `))`,
+      );
+    });
+  });
 });

@@ -143,7 +143,7 @@ Contract `../contract/src/slack.trpc.ts:57`, router `src/transport/slack.trpc.ts
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof slackConnectionListSchema>; // ../contract/src/slack.schemas.ts:36
+type Output = z.infer<typeof slackConnectionListSchema>; // ../contract/src/slack.schemas.ts:56
 
 // slackIntegration.create
 // Input: createInputSchema, ../contract/src/slack.trpc.ts:29
@@ -155,7 +155,7 @@ interface Input {
   scopeId: string;
   secret: string;
 }
-type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:30
+type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:44
 
 // slackIntegration.update
 // Input: updateInputSchema, ../contract/src/slack.trpc.ts:43
@@ -168,7 +168,7 @@ interface Input {
   secret?: string;
   force?: boolean;
 }
-type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:30
+type Output = z.infer<typeof slackManagedConnectionSchema>; // ../contract/src/slack.schemas.ts:44
 
 // slackIntegration.delete
 // Input: deleteInputSchema, ../contract/src/slack.trpc.ts:55
@@ -176,7 +176,7 @@ interface Input {
   projectId: string;
   id: string;
 }
-// Output: slackConnectionDeletedSchema, ../contract/src/slack.schemas.ts:43
+// Output: slackConnectionDeletedSchema, ../contract/src/slack.schemas.ts:67
 interface Output {
   deleted: true;
   dependentAutomations: number;

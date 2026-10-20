@@ -341,7 +341,7 @@ describe("maybeOfferIngestionShellRcPersist", () => {
         "",
         "[otel.trace_exporter.otlp-http]",
         `endpoint = "http://app.example.com/api/otel/v1/traces"`,
-        `protocol = "json"`,
+        `protocol = "binary"`,
         `headers = { "Authorization" = "Bearer sk-lw-token" }`,
         "# <<< langwatch otel end <<<",
         "",

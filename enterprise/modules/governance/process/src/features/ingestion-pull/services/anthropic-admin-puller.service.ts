@@ -47,6 +47,7 @@ import { nowInstant, toEpochMs } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { GovernanceHttpClient } from "../../../channels/governance-http.channel.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../../rules/vendor-bases.rules.ts";
 import {
   costRequestStart,
   cursorSchema,
@@ -74,12 +75,15 @@ export class AnthropicAdminPullerService implements PullerAdapter<AnthropicAdmin
 
   private readonly pages: AnthropicAdminReportPageService;
 
-  private constructor(http: GovernanceHttpClient) {
-    this.pages = AnthropicAdminReportPageService.create(http);
+  private constructor(http: GovernanceHttpClient, vendorBases: VendorBases) {
+    this.pages = AnthropicAdminReportPageService.create(http, vendorBases.anthropicAdmin);
   }
 
-  static create(http: GovernanceHttpClient): AnthropicAdminPullerService {
-    return new AnthropicAdminPullerService(http);
+  static create(
+    http: GovernanceHttpClient,
+    vendorBases: VendorBases = REAL_VENDOR_BASES,
+  ): AnthropicAdminPullerService {
+    return new AnthropicAdminPullerService(http, vendorBases);
   }
 
   validateConfig(config: unknown): AnthropicAdminPullConfig {

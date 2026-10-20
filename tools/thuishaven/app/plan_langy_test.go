@@ -176,7 +176,16 @@ func TestLangyWorkerIdleMS(t *testing.T) {
 func TestLangyChildHostTier(t *testing.T) {
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}}
 	st := domain.Stack{Slug: "demo", LangyTier: domain.LangyTierHostUnsafe}
-	child := o.langyChild(st, PlanOptions{RepoRoot: t.TempDir()}, nil, 4123, "")
+	repo := t.TempDir()
+	child := o.langyChild(st, PlanOptions{RepoRoot: repo}, nil, 4123, "")
+
+	// @scenario "Langy on the host runs this checkout's langwatch CLI"
+	t.Run("puts the checkout's CLI shims first on PATH, after the login profile", func(t *testing.T) {
+		want := "export PATH=" + shQuote(langyCLIBinDir(repo)) + `:"$PATH"; make `
+		if !strings.HasPrefix(child.Shell, want) {
+			t.Fatalf("host tier shell does not lead with the CLI shims: %q", child.Shell)
+		}
+	})
 
 	t.Run("accepts the manager's loopback relay over cleartext", func(t *testing.T) {
 		if !slices.Contains(child.Env, "LANGY_EGRESS_REQUIRE_TLS=false") {
@@ -249,6 +258,57 @@ func TestEnsureLangyWorkerBinary(t *testing.T) {
 		run(t, sup, false, domain.LangyTierSandboxed)
 		if len(sup.shells) != 0 {
 			t.Fatalf("unexpected build: %v", sup.shells)
+		}
+	})
+}
+
+// @scenario "Langy on the host runs this checkout's langwatch CLI"
+func TestEnsureLangyCLI(t *testing.T) {
+	run := func(t *testing.T, sup *fakeSupervisor, built bool, tier domain.LangyTier) string {
+		t.Helper()
+		repo := t.TempDir()
+		if built {
+			entry := langyCLIEntry(repo)
+			if err := os.MkdirAll(filepath.Dir(entry), 0o750); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(entry, []byte("#!/usr/bin/env node\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+		}
+		o := &Orchestrator{sup: sup, sys: &fakeSystem{}, log: zap.NewNop()}
+		st := domain.Stack{Slug: "demo", WorktreeDir: t.TempDir(), LangyTier: tier}
+		o.ensureLangyCLI(context.Background(), st, &PlanOptions{RepoRoot: repo, Selection: domain.Selection{Langy: true}})
+		return repo
+	}
+
+	t.Run("writes langwatch and lw shims that run the built CLI", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		repo := run(t, sup, true, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 0 {
+			t.Fatalf("built CLI was rebuilt: %v", sup.shells)
+		}
+		for _, name := range []string{"langwatch", "lw"} {
+			body, err := os.ReadFile(filepath.Join(langyCLIBinDir(repo), name)) //nolint:gosec // G304: the test's own temp dir
+			if err != nil || !strings.Contains(string(body), langyCLIEntry(repo)) {
+				t.Fatalf("%s shim: %q, %v", name, body, err)
+			}
+		}
+	})
+
+	t.Run("builds a missing CLI first", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		run(t, sup, false, domain.LangyTierHostUnsafe)
+		if len(sup.shells) != 1 || !strings.Contains(sup.shells[0], "pnpm --filter langwatch build") {
+			t.Fatalf("expected one CLI build, got %v", sup.shells)
+		}
+	})
+
+	t.Run("does nothing for a container tier", func(t *testing.T) {
+		sup := &fakeSupervisor{}
+		repo := run(t, sup, false, domain.LangyTierSandboxed)
+		if _, err := os.Stat(langyCLIBinDir(repo)); len(sup.shells) != 0 || err == nil {
+			t.Fatalf("container tier built or wrote shims: %v", sup.shells)
 		}
 	})
 }

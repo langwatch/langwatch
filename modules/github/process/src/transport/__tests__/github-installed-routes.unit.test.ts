@@ -1,12 +1,13 @@
 import { BearerIdentity, RestHost, UnauthorizedError } from "@langwatch/api/rest";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthApi } from "@langwatch/auth-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthApi } from "@langwatch/auth-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
 import { GithubApi } from "@langwatch/github-contract";
-import type { OrganizationApi } from "@langwatch/organization-contract";
-import { createApp, type ModuleSecretsScope } from "@langwatch/process";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { bootInstalledProcess, type ModuleSecretsScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 /**
  * @vitest-environment node
@@ -39,37 +40,56 @@ async function installedGithub(
 ) {
   const { signedInAs = "user-1", canManage = true } = options;
 
-  return createApp({ role: "api", secrets: githubSecrets() })
-    .withModules([githubProcessModule])
-    .withConfig({ github: { appId: undefined, host: undefined, appSlug: undefined } })
-    .withStores(memoryStores())
-    .provide({
-      organization: createApiFixture<OrganizationApi>({ isMember: async () => true }),
-      project: createApiFixture<ProjectApi>({}),
-      authz: createApiFixture<AuthzApi>({ hasPermission: async () => canManage }),
-      auth: createApiFixture<AuthApi>({
-        verifyBrowserSession: async ({ headers }) =>
-          headers.get("cookie") === SESSION_COOKIE
-            ? {
-                kind: "verified",
-                verified: {
-                  session: { id: "session-1", expiresAt: new Date(Date.now() + 60_000) },
-                  user: { id: signedInAs },
-                },
-              }
-            : { kind: "anonymous" },
-        resolveBrowserSession: async ({ verified }) => ({
-          kind: "signed_in",
-          session: {
-            user: { id: verified.user.id },
-            expires: verified.session.expiresAt.toISOString(),
-            sessionId: verified.session.id,
-          },
+  return bootInstalledProcess({
+    role: "api",
+    modules: [githubProcessModule],
+    config: {
+      github: {
+        appId: undefined,
+        host: undefined,
+        appSlug: undefined,
+        apiBase: undefined,
+        webBase: undefined,
+      },
+    },
+    stores: memoryStores(),
+    secrets: githubSecrets(),
+    peers: [
+      testPeer({
+        token: OrganizationApi,
+        instance: createApiFixture<OrganizationApi>({ isMember: async () => true }),
+      }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>({}) }),
+      testPeer({
+        token: AuthzApi,
+        instance: createApiFixture<AuthzApi>({ hasPermission: async () => canManage }),
+      }),
+      testPeer({
+        token: AuthApi,
+        instance: createApiFixture<AuthApi>({
+          verifyBrowserSession: async ({ headers }) =>
+            headers.get("cookie") === SESSION_COOKIE
+              ? {
+                  kind: "verified",
+                  verified: {
+                    session: { id: "session-1", expiresAt: new Date(Date.now() + 60_000) },
+                    user: { id: signedInAs },
+                  },
+                }
+              : { kind: "anonymous" },
+          resolveBrowserSession: async ({ verified }) => ({
+            kind: "signed_in",
+            session: {
+              user: { id: verified.user.id },
+              expires: verified.session.expiresAt.toISOString(),
+              sessionId: verified.session.id,
+            },
+          }),
         }),
       }),
-      "audit-log": createApiFixture<AuditLogApi>({}),
-    })
-    .boot();
+      testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>({}) }),
+    ],
+  });
 }
 
 function restHost(): RestHost {

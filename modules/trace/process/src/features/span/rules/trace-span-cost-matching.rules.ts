@@ -1,4 +1,8 @@
-import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
+import {
+  estimateModelCost,
+  getStaticModelCostRates,
+  isModelCostUnpriced,
+} from "@langwatch/model-provider-contract";
 import type { NormalizedAttributes } from "@langwatch/trace-contract";
 
 /**
@@ -21,4 +25,22 @@ export function computeSpanCost({
     { attrs, model, promptTokens, completionTokens },
     getStaticModelCostRates(),
   );
+}
+
+/** Whether the span's usage has no price in the cascade above, so a zero cost means unknown. */
+export function isSpanCostUnpriced({
+  attrs,
+  model,
+  promptTokens,
+  completionTokens,
+}: {
+  attrs: NormalizedAttributes;
+  model?: string;
+  promptTokens: number | null;
+  completionTokens: number | null;
+}): boolean {
+  return isModelCostUnpriced({
+    input: { attrs, model, promptTokens, completionTokens },
+    staticCosts: getStaticModelCostRates(),
+  });
 }

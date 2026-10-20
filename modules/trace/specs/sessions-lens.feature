@@ -264,3 +264,30 @@ Rule: Session spend follows the viewer's cost permission
     When the page is gated for a viewer who may not view costs
     Then every session's total cost is stripped
     And a viewer who may view costs keeps the spend
+
+Rule: A session is a conversation under its coding-agent name
+
+  # One field carries both: coding agents stamp their session id on
+  # `gen_ai.conversation.id`, and span normalisation lifts `session.id` onto
+  # it, so grouping by conversation already groups sessions. Only the name differs.
+
+  @integration
+  Scenario: The session id column can be added and shows the id
+    Given the traces list and the conversation grouping
+    When the reader adds the Session ID column from the column picker
+    Then the column joins the view
+    And each row shows its session id in mono, truncated
+
+  @integration
+  Scenario: Grouping by conversation groups traces that carry only a session id
+    Given session rollups whose only identity is a session id
+    When the conversation grouping renders them
+    Then each session is one row keyed by that session id
+    And the Session ID column shows the same id
+
+  @integration
+  Scenario: A coding-agent scope labels the conversation grouping By session
+    Given the reader is in a coding-agent scope
+    When the reader opens the Group by picker
+    Then the conversation grouping reads Session
+    And any other scope still reads Conversation

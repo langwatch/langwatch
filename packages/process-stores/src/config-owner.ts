@@ -35,12 +35,19 @@ function readLaneReserveShare(value: unknown): number | undefined {
   return undefined;
 }
 
+/** Blank means unset, so an empty chart value keeps the default instead of reading as 0. */
+const unsetWhenBlank = z.preprocess(
+  (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+  z.string().optional(),
+);
+
 export const storesOwner = {
   name: "stores",
   config: Config.define((c) => ({
+    /** Days an event-log row with no tenant policy keeps: the previous default (ADR-022). */
     defaultRetentionDays: c.env(
       "DEFAULT_RETENTION_DAYS",
-      z.coerce.number().int().positive().default(30),
+      z.coerce.number().int().positive().default(49),
     ),
     /**
      * Queue drain on shutdown in ms, from the chart's shutdownDrainSeconds; the
@@ -51,6 +58,12 @@ export const storesOwner = {
       "SHUTDOWN_DRAIN_TIMEOUT_MS",
       z.preprocess(readDrainTimeoutMs, z.number().int().positive().optional()),
     ),
+    /** Queue policy, main's names: jobs run at once per worker (default 100). */
+    queueConcurrency: c.env("GLOBAL_QUEUE_CONCURRENCY", unsetWhenBlank),
+    /** Per-tenant in-flight soft cap (default 50); "0" turns the cap off. */
+    queueTenantCap: c.env("LANGWATCH_DISPATCH_TENANT_CAP", unsetWhenBlank),
+    /** Fleet in-flight budget the tenants share; unset or "0" keeps the fixed cap. */
+    queueGlobalBudget: c.env("LANGWATCH_DISPATCH_GLOBAL_BUDGET", unsetWhenBlank),
     clickhousePool: {
       override: c.env("CLICKHOUSE_MAX_OPEN_CONNECTIONS", z.coerce.number().optional()),
       replicas: c.env("CLICKHOUSE_CLIENT_REPLICAS", z.coerce.number().optional()),
@@ -107,6 +120,8 @@ export const storesOwner = {
     /** Main's `CLICKHOUSE_URL__<label>__<orgId>` family: each organization's own server. */
     clickhouseRoutes: Secret.family(PRIVATE_ROUTE_ENV_PREFIX),
     redis: Secret.load("REDIS_URL", { optional: true }),
+    /** The previous release's cluster Redis: endpoints read instead of REDIS_URL when set. */
+    redisClusterEndpoints: Secret.load("REDIS_CLUSTER_ENDPOINTS", { optional: true }),
     encryption: credentialsSecret,
     encryptionFallback: sessionSecret,
     /** Opens values sealed before a CREDENTIALS_SECRET rotation; never seals. */

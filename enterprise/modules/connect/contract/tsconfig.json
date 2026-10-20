@@ -8,19 +8,19 @@
     "lib": ["es2023", "dom"],
     "types": [],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

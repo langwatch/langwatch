@@ -44,6 +44,9 @@ export type PersonalWorkspaceFeatureProject = {
   personalFeatures: unknown;
 };
 
+/** One organization's stored presence switch, as the presence step reads it a page at a time. */
+export type OrganizationPresenceSettingRow = Readonly<{ id: string; presenceEnabled: boolean }>;
+
 /**
  * The stored settings row, before decryption: `tryFindSettings` is the
  * service's, over this raw read, since encryption is an members
@@ -77,6 +80,11 @@ export abstract class OrganizationSettingsCipher {
 export abstract class OrganizationRepository {
   /** Organization ids ordered by id, after the cursor; no limit reads them all. */
   abstract listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
+  /** Organizations' presence switches in id order after `afterId`, system ones left out. */
+  abstract findPresenceSettingPage(input: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationPresenceSettingRow[]>;
   /** The usage report's counts; the caller never passes an empty organization list. */
   abstract countUsage(input: {
     organizationIds: readonly string[];
@@ -159,6 +167,16 @@ export abstract class OrganizationRepository {
     organizationId: string;
     userId: string;
     at: Instant;
+  }): Promise<void>;
+  /**
+   * Records the labels of the private ClickHouse and S3 routes seen for an organization, each
+   * only where none is recorded yet: safe to repeat.
+   * Spec: specs/private-dataplane/clickhouse-routing.feature.
+   */
+  abstract recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
   }): Promise<void>;
   abstract getOldestTeamId(organizationId: string): Promise<string>;
   abstract getBillingProfile(organizationId: string): Promise<OrganizationBillingProfile>;

@@ -39,7 +39,7 @@ export function RunNoteField({ value, onChange, onRemove }: RunNoteFieldProps) {
         onChange={(event) => onChange(event.target.value)}
       />
       {isTooLong && (
-        <Text marginTop={1} fontSize="11px" color="red.fg" data-testid="run-note-too-long">
+        <Text marginTop={1} textStyle="micro" color="red.fg" data-testid="run-note-too-long">
           The note is too long: it can hold {MAX_RUN_NOTE_LENGTH} characters.
         </Text>
       )}

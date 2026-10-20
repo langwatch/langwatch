@@ -343,4 +343,47 @@ describe("AuthzGrantProjection", () => {
       occurredAt: Temporal.Instant.fromEpochMilliseconds(2),
     });
   });
+
+  /** @scenario "A shared grant's window is stored with its row" */
+  it("carries a shared read's window onto the row and leaves an own grant's row without one", () => {
+    const condition = { type: "trace", from: "2026-10-10T10:37:55.584Z" } as const;
+    const shared = projection.map(
+      event(
+        {
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_shared",
+            principal: { type: "project", id: "project_aggregate" },
+            roleKey: "project-reader",
+            scope: { type: "PROJECT", id: "project_member" },
+            condition,
+            source: "aggregate-reconciler",
+            actor: ACTOR,
+          },
+        },
+        "grant_shared",
+        1,
+      ),
+    );
+    const own = projection.map(
+      event(
+        {
+          type: GRANT_ATTACHED_EVENT_TYPE,
+          data: {
+            grantId: "grant_own",
+            principal: { type: "user", id: "user_1" },
+            roleKey: "member",
+            scope: { type: "TEAM", id: "team_1" },
+            source: "grants-service",
+            actor: ACTOR,
+          },
+        },
+        "grant_own",
+        1,
+      ),
+    );
+
+    expect(shared).toMatchObject({ kind: "grant.upsert", row: { condition } });
+    expect(own.kind === "grant.upsert" && "condition" in own.row).toBe(false);
+  });
 });

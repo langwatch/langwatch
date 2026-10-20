@@ -74,15 +74,15 @@ afterEach(() => cleanup());
 
 describe("BudgetCreateDrawer submit", () => {
   describe("when the name is missing", () => {
-    it("keeps the create button disabled", async () => {
+    it("refuses with a toast and sends nothing", async () => {
       const user = userEvent.setup();
-      renderDrawer();
+      const { host } = renderDrawer();
       await fill(user, { name: "", limit: "50" });
+      await submit(user);
 
-      expect(screen.getByRole("button", { name: "Create budget" })).toHaveProperty(
-        "disabled",
-        true,
-      );
+      expect(host.recording.failures.map((f) => f.fallbackTitle)).toEqual([
+        "Name and limit are required",
+      ]);
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });

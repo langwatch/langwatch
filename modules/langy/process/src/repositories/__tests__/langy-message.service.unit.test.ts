@@ -25,6 +25,7 @@ function conversationRow(overrides: Partial<LangyConversationRow> = {}): LangyCo
     currentTurnId: null,
     lastError: null,
     lastModel: null,
+    origin: "interactive",
     messageCount: 0,
     lastActivityAtMs: 1,
     createdAtMs: 1,

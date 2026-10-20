@@ -78,8 +78,6 @@ import { EvaluationFilterMatchingService } from "../features/execution/services/
 import { EvaluationGuardrailCheckService } from "../features/execution/services/evaluation-guardrail-check.service.ts";
 import { FlaggedEvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload-switch.service.ts";
 import {
-  EVAL_INPUTS_HARD_CEILING_BYTES,
-  EVAL_INPUTS_INLINE_MAX_BYTES,
   EVAL_INPUTS_PREVIEW_BYTES,
   EvaluationInputsOffloadService,
 } from "../features/execution/services/evaluation-inputs-offload.service.ts";
@@ -408,8 +406,8 @@ export class EvaluationModule implements EvaluationApiContract {
       storage: repositories.inputs,
       retention: EvaluationRetentionDaysService.create(dependencies.retention),
       config: {
-        inlineMaxBytes: EVAL_INPUTS_INLINE_MAX_BYTES,
-        hardCeilingBytes: EVAL_INPUTS_HARD_CEILING_BYTES,
+        inlineMaxBytes: config.inputsInlineMaxBytes,
+        hardCeilingBytes: config.inputsHardCeilingBytes,
         previewBytes: EVAL_INPUTS_PREVIEW_BYTES,
       },
     });

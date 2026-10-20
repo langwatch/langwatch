@@ -26,6 +26,8 @@ import { OrganizationUserRoleField } from "../elements/organization-user-role-fi
 import { InviteTeamAssignments } from "./invite-team-assignments.tsx";
 
 interface AddMembersFormProps {
+  /** Set when the host draws the actions (a drawer footer) and submits this form by id. */
+  formId?: string;
   teamOptions: TeamOption[];
   organizationId: string;
   onSubmit: SubmitHandler<MembersForm>;
@@ -43,6 +45,7 @@ interface AddMembersFormProps {
 }
 
 export function AddMembersForm({
+  formId,
   teamOptions,
   organizationId,
   onSubmit,
@@ -78,7 +81,10 @@ export function AddMembersForm({
   useTeamsFollowSeat({ orgRole, selectedTeams, setValue });
 
   return (
-    <form onSubmit={handleSubmit((values) => onSubmit({ invites: invitesFromForm(values) }))}>
+    <form
+      id={formId}
+      onSubmit={handleSubmit((values) => onSubmit({ invites: invitesFromForm(values) }))}
+    >
       <VStack align="start" gap={4} width="100%">
         <VStack width="full" gap={0}>
           <InviteEmailsField control={control} errors={errors} />
@@ -92,12 +98,14 @@ export function AddMembersForm({
           organizationId={organizationId}
           isInviterAdmin={isInviterAdmin}
         />
-        <InviteFormActions
-          isLoading={isLoading}
-          hasEmailProvider={hasEmailProvider}
-          onClose={onClose}
-          onCloseText={onCloseText}
-        />
+        {formId === undefined && (
+          <InviteFormActions
+            isLoading={isLoading}
+            hasEmailProvider={hasEmailProvider}
+            onClose={onClose}
+            onCloseText={onCloseText}
+          />
+        )}
       </VStack>
     </form>
   );

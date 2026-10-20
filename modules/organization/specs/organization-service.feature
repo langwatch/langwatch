@@ -364,11 +364,32 @@ Feature: Shared organization service
     And peers such as prompt seed their own defaults from that fact
 
   @unit
+  Scenario: A founder organization whose grants are slow to land is kept
+    Given a sign-up whose founder grants are appended but not yet confirmed within the wait
+    When the organization is created
+    Then the organization, its first team and the founder's membership stay, the membership enabled
+    And the grants land once a worker takes them, so the founder is never left without an organization
+    # T0-F11: deleting it here dropped the grants and stranded the founder on onboarding.
+
+  @unit
+  Scenario: The sign-up answer says whether the founder's grants are confirmed
+    Given a sign-up whose founder grants were appended
+    When the organization is initialized
+    Then the answer carries grantsConfirmed true when they landed in time and false while they still land
+
+  @unit
+  Scenario: A founder organization whose grants are refused is removed
+    Given a sign-up whose founder grants are refused
+    When the organization is created
+    Then the organization and every row it committed are removed and the refusal is raised
+
+  @unit
   Scenario: The organization presence step records every organization a page at a time
     Given three organizations with stored presence settings, served two to a page
     When the organization presence upgrade step runs
     Then each organization's stored setting is recorded once
     And the step saves its checkpoint after each page, naming the page's last organization
+    And each page's settings are sent to the queue as one batch
 
   @unit
   Scenario: The organization presence step resumes after the last page it saved

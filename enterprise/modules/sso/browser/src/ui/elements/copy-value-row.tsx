@@ -29,7 +29,7 @@ export function CopyValueRow({
           </Text>
         )}
       </VStack>
-      <Text fontSize="xs" fontFamily="mono" wordBreak="break-all" flex={1}>
+      <Text textStyle="monoSm" wordBreak="break-all" flex={1}>
         {value}
       </Text>
       <CopyButton value={value} label={label} aria-label={`Copy ${label}`} />

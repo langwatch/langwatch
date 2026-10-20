@@ -7,8 +7,11 @@ import dotenv from "dotenv";
 import { defineConfig, type Plugin, type UserConfig } from "vite";
 
 import { UI_ASSET_URL_GLOBAL } from "./vite/asset-base";
+import { bootSplash } from "./vite/boot-splash";
+import { chunkImportRetry } from "./vite/chunk-import-retry";
 import { designSystemStorybook } from "./vite/design-system-storybook";
 import { createDevLogger } from "./vite/dev-logging";
+import { entryCoreChunkGroup, hostMountsChunkGroup } from "./vite/entry-core-chunks";
 import { HAVEN_SLUG_ENV, havenOrb } from "./vite/haven-orb";
 import { havenHmrGate } from "./vite/havenHmrGate";
 import { mailPreview } from "./vite/mail-preview";
@@ -16,11 +19,38 @@ import { publicConfigPages } from "./vite/public-config-from-api";
 import { pushServiceWorker } from "./vite/push-service-worker";
 import { rootDiscoveryProxyPattern } from "./vite/root-discovery-proxy";
 import { SHIKI_PREBUNDLE_INCLUDE } from "./vite/shiki-prebundle";
+import { shikiReachGuard } from "./vite/shiki-reach-guard";
 
 // This package declares `"type": "module"`, so Vite bundles the config as ESM
 // and `__dirname` does not exist. `import.meta.dirname` is the same directory.
 const here = import.meta.dirname;
 const repoRoot = path.resolve(here, "../..");
+
+/** Names the chunk a module must land in, or undefined for Rolldown's default split. */
+function manualChunkFor(id: string): string | undefined {
+  // Every `import()` calls the preload helper. Left unassigned, Rolldown puts it in the
+  // first manual chunk that uses it (shiki), so the entry imported 600 kB of highlighter
+  // on every page just to lazy-load a screen.
+  if (id.includes("vite/preload-helper")) return "preload-helper";
+  // Shiki chunk-splitting lives in the Design System's `shiki-chunking` module
+  // (dependency-free) so its guard test can exercise the real logic.
+  return shikiManualChunk(id);
+}
+
+// A named chunk swallows the modules it depends on, first come first served, so a shared
+// helper landed wherever Rolldown looked first. Priorities make it deterministic: the small
+// chunks claim their modules before the shiki chunk can, highest first.
+const NAMED_CHUNKS = ["preload-helper", "hast-helpers", "shiki-langs", "shiki"] as const;
+// The first-paint core comes last, so it never takes a module a named chunk claims.
+const CHUNK_GROUPS = [
+  ...NAMED_CHUNKS.map((name, index) => ({
+    name,
+    test: (id: string) => manualChunkFor(id) === name,
+    priority: NAMED_CHUNKS.length - index + 1,
+  })),
+  entryCoreChunkGroup({ priority: 1 }),
+  hostMountsChunkGroup({ priority: 1 }),
+];
 
 type PackageExportTarget = string | { default?: string };
 
@@ -100,9 +130,6 @@ function workspaceSourcePlugin(): Plugin {
 const rootEnvPath = path.resolve(here, "../../.env");
 
 dotenv.config({ path: rootEnvPath, quiet: true });
-
-// Set by `haven up --ui=bundled`: Vite serves incrementally rebuilt bundles from memory.
-const IS_BUNDLED = process.env.LANGWATCH_UI_BUNDLED === "1";
 
 // Set by the cached `build:local` target haven serves: gzip size reporting is pure cost there.
 const IS_LOCAL_BUILD = process.env.LANGWATCH_UI_LOCAL_BUILD === "1";
@@ -211,23 +238,6 @@ function logDevelopmentTlsState(
   devLogger.info("[vite-config] HTTPS disabled (set LANGWATCH_DEV_HTTP2=1)");
 }
 
-const BUNDLED_ROLLDOWN = IS_BUNDLED ? { experimental: { devMode: { lazy: false } } } : {};
-
-/** Bundled dev runs plugin-react's preamble after the app's modules; stubs stop them throwing. */
-function bundledRefreshStub(): Plugin {
-  return {
-    name: "bundled-refresh-stub",
-    apply: "serve",
-    transformIndexHtml: () => [
-      {
-        tag: "script",
-        children: "window.$RefreshReg$=()=>{};window.$RefreshSig$=()=>(t)=>t;",
-        injectTo: "head-prepend",
-      },
-    ],
-  };
-}
-
 type RenderBuiltUrl = NonNullable<NonNullable<UserConfig["experimental"]>["renderBuiltUrl"]>;
 type RollupOnWarn = NonNullable<
   NonNullable<NonNullable<UserConfig["build"]>["rollupOptions"]>["onwarn"]
@@ -276,16 +286,18 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
       // Skipped components are logged by the dev server only; a build stays quiet.
       react({ compiler: command === "serve" ? { logDiagnostics: true } : true }),
       patchObjectInspectBrowserStub(),
+      // The loading screen as plain HTML: before the bundle runs, and on Vite's bundling page.
+      bootSplash(),
       // The api renders the page's public config; the dev server lifts it from the api's shell.
       ...(command === "serve" ? [injectDevelopmentPublicConfig({ apiUrl: API_TARGET })] : []),
       havenHmrGate(),
-      ...(IS_BUNDLED ? [bundledRefreshStub()] : []),
-      // Skipped when bundled: its /@fs script is not in the bundle, so it 404s.
-      havenOrb({ slug: IS_BUNDLED ? undefined : process.env[HAVEN_SLUG_ENV] }),
+      havenOrb({ slug: process.env[HAVEN_SLUG_ENV] }),
       designSystemStorybook({ appPort: FRONTEND_PORT }),
       mailPreview({ appPort: FRONTEND_PORT }),
       workspaceSourcePlugin(),
       pushServiceWorker(),
+      shikiReachGuard(),
+      chunkImportRetry({ repoRoot }),
     ],
     resolve: {
       // ONE zod instance for the app AND linked workspace packages
@@ -317,27 +329,20 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
     },
     build: {
       outDir: "dist/client",
-      sourcemap: true,
+      sourcemap: !IS_LOCAL_BUILD,
       reportCompressedSize: !IS_LOCAL_BUILD,
       rollupOptions: {
-        // Vite 8.3's bundled client lacks the `requestLazy` rolldown 1.2.9 emits for lazy imports.
-        ...BUNDLED_ROLLDOWN,
         // Both statically and dynamically imported means the `import()` splits
         // nothing -- the module stays in the importer's chunk. Rolldown always
         // detected this and we only logged it, which is how 468 kB of screens
         // ended up eager across 22 modules.
         onwarn: failOnIneffectiveDynamicImport,
         output: {
-          manualChunks(id: string) {
-            // Shiki chunk-splitting lives in the Design System's `shiki-chunking`
-            // module (dependency-free) so its guard test can exercise the real logic.
-            return shikiManualChunk(id);
-          },
+          codeSplitting: { groups: CHUNK_GROUPS },
         },
       },
     },
     experimental: {
-      bundledDev: IS_BUNDLED,
       renderBuiltUrl,
     },
     server: {
@@ -424,14 +429,16 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           changeOrigin: true,
           secure: false,
         },
-        // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
-        "^/mcp(?:\\?.*)?$": {
+        // The API process serves the sandboxed chart frame in production; in
+        // dev the frontend owns the root, so it needs its own entry or it
+        // falls through to the SPA and every widget frame renders blank.
+        "^/sandbox/chart-frame(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,
         },
-        // The widget chart frame is the API's framed document; unproxied it falls to the SPA shell.
-        "^/sandbox/chart-frame(?:\\?.*)?$": {
+        // Exact /mcp match (not prefix) to avoid swallowing /mcp/authorize; include query handling.
+        "^/mcp(?:\\?.*)?$": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,
@@ -442,11 +449,6 @@ export default defineConfig(async ({ command }): Promise<UserConfig> => {
           secure: false,
         },
         "/sse": {
-          target: API_TARGET,
-          changeOrigin: true,
-          secure: false,
-        },
-        "/messages": {
           target: API_TARGET,
           changeOrigin: true,
           secure: false,

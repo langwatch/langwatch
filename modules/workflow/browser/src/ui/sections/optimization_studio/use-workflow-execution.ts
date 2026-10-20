@@ -66,17 +66,8 @@ export const useWorkflowExecution = () => {
     setWorkflowExecutionState: state.setWorkflowExecutionState,
   }));
 
-  const socketAvailable = useCallback(() => {
-    if (socketStatus !== "connected") {
-      toaster.create({
-        title: "Studio is not connected yet",
-        type: "error",
-        duration: 5000,
-      });
-      return false;
-    }
-    return true;
-  }, [socketStatus]);
+  // Run controls are disabled while disconnected; the header status line says why.
+  const socketAvailable = useCallback(() => socketStatus === "connected", [socketStatus]);
 
   useEffect(() => {
     if (!triggerTimeout) return;

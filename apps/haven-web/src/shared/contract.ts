@@ -25,6 +25,8 @@ export const surfaceSchema = z.object({
   restart: z.string(),
   /** The `haven up +<name>` name that adds this not-selected row, "" when it has none. */
   start: z.string(),
+  /** The `haven service on|off <name>` this row's switch flips, "" when it has none. */
+  switch: z.string(),
 });
 export type Surface = z.infer<typeof surfaceSchema>;
 
@@ -84,10 +86,8 @@ export const stackHomeSchema = z.object({
     canStart: z.boolean(),
     startDir: z.string(),
     canStartService: z.boolean(),
-    canResetDatabases: z.boolean(),
+    canStopService: z.boolean(),
   }),
-  /** The upgrade gate's refusal while it holds the api, "" otherwise. */
-  belowFloor: z.string(),
   /** The seed console: what `haven db seed` takes, its last status line and log tail. */
   seed: z.object({
     canSeed: z.boolean(),
@@ -198,6 +198,18 @@ export const limitsSchema = z.object({
   limits: z.array(limitSchema),
 });
 export type Limits = z.infer<typeof limitsSchema>;
+
+export const machineSettingSchema = z.object({
+  name: z.string(),
+  kind: z.enum(["switch", "minutes"]),
+  value: z.string(),
+  default: z.string(),
+  summary: z.string(),
+});
+export type MachineSetting = z.infer<typeof machineSettingSchema>;
+
+export const machineSettingsSchema = z.object({ settings: z.array(machineSettingSchema) });
+export type MachineSettings = z.infer<typeof machineSettingsSchema>;
 
 export const actionAnswerSchema = z.union([
   z.object({ message: z.string() }),

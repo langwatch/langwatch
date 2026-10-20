@@ -40,11 +40,10 @@ Sources, read in this order when a step here is unclear:
                                                                                                     │
             ┌──────────────────────── FLOW ROUND (per flow, on head) ───────────────────────────┐   ▼
             │ own worktree + haven stack (--mode) ─► sims ─► persona seed ─► steps ─► assert in  │  #8553 row
-            │ the product ─► visualdiff check / apidiff scenarios / workerrun ─► logs + consoles │  round log
+            │ the product ─► workerrun ─► logs + consoles │  round log
             │ Plugs in: (a) on a fresh head stack; (b) on the stores a kept cell upgraded         │  fix lanes
             │ (-keep), so each flow also proves "works after upgrade"                             │
             └────────────────────────────────────────────────────────────────────────────────────┘
-   Beside both: UI fuzz lanes (fuzz ui), never on a stack a cell or flow round is judging.
 ```
 
 What runs today:
@@ -317,13 +316,9 @@ haven status --agent          # slug = flows-<name>; app at https://app.flows-<n
 
 Tools every flow below uses:
 
-| Tool                                 | Command                                                                                                                                                             | Proves                          |
-| ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------- |
-| visualdiff check                     | `go run ./cmd/visualdiff check -stack flows-<name> -only <flow ids>` (`-mark` to record passes)                                                                     | UI flow, scripted, with expects |
-| apidiff scenarios                    | `.bin/apidiff/apidiff scenarios -a https://app.flows-<name>.langwatch.localhost -scenarios 'tools/apidiff/scenarios/<name>.yaml'` (no `-b`: PASS/FAIL on one stack) | API behaviour                   |
-| workerrun                            | `.bin/workerrun/workerrun -stack flows-<name> -families <list> -n 50`                                                                                               | worker drained, read back by id |
-| interactionsimulator                 | `pnpm --filter @langwatch/interactionsimulator simulate run -url <app> -features <f> -budget-usd 5` (spends model money; needs AI keys from the environment)        | exploratory journeys, findings  |
-| fuzz (beside, not on a judged stack) | `.bin/fuzz/fuzz ui -url <app> -duration 20m -reload-every 5` / `fuzz api`                                                                                           | crashes, 5xx                    |
+| Tool      | Command                                                               | Proves                          |
+| --------- | --------------------------------------------------------------------- | ------------------------------- |
+| workerrun | `.bin/workerrun/workerrun -stack flows-<name> -families <list> -n 50` | worker drained, read back by id |
 
 Rows, prerequisite ids (P1, P2, …: persona or tier, sims, env flags) and claims live in
 [#8553](https://github.com/langwatch/langwatch/issues/8553). The full flow list and prereq
@@ -340,7 +335,7 @@ to run each flow. It does not copy the rows.
 | Assert             | first sign-in creates the user and membership; a confirmed local account is linked, not duplicated; `haven sim idp activity` shows the authorize and token calls                                                                                                         |
 | Negative           | `haven sim idp fault 1 bad-signature`, `skew`, `rotate-key`, `user disable`: each sign-in refuses with the named page                                                                                                                                                    |
 | Failure signatures | stuck on the refusal page with no idpsim activity (request never arrived); duplicate user; 500 on callback                                                                                                                                                               |
-| Bind to            | `specs/e2e/sso-journeys.feature`, `specs/identity/sso-connection-lifecycle.feature`, `specs/identity/sso-assertion-refusals.feature`; flows `auth-sso-settings-overview`, `auth-sso-refusal-page`                                                                        |
+| Bind to            | `specs/e2e/sso-journeys.feature`, `specs/identity/sso-connection-lifecycle.feature`, `specs/identity/sso-assertion-refusals.feature`                                                                                                                                     |
 
 ### 4.2 Old (legacy) SSO
 
@@ -371,36 +366,36 @@ to run each flow. It does not copy the rows.
 | Sims               | `haven sim idp scim target set 1 …` with the stack's SCIM base and token, then `haven sim idp populate 1 --users 500 --groups 12 --seed 1`, `haven sim idp scim push 1`, later `haven sim idp churn 1 --join 20 --leave 10 --deactivate 5 --rename 5 --regroup 5` and `haven sim idp scim sync 1` |
 | Assert             | members and groups match `haven sim idp scim pull 1`; deactivated people lose access; departments and cost centres appear once                                                                                                                                                                    |
 | Failure signatures | drift after sync; a removed person still signs in; duplicate groups                                                                                                                                                                                                                               |
-| Bind to            | `enterprise/modules/scim/specs/provisioning.feature`, `scim-connection-sync.feature`, `scim-group-mapping.feature`, `specs/identity/scim-sso-signin.feature`; flows `scim-push-synced-groups-and-people`, `scim-provisioning-page-and-token-dialog`                                               |
+| Bind to            | `enterprise/modules/scim/specs/provisioning.feature`, `scim-connection-sync.feature`, `scim-group-mapping.feature`, `specs/identity/scim-sso-signin.feature`                                                                                                                                      |
 
 ### 4.5 Revoking tokens (API keys, sessions, virtual keys, invites)
 
-|                    |                                                                                                                                                                                                                                                                                                                                                          |
-| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre                | any persona; `--mode saas`                                                                                                                                                                                                                                                                                                                               |
-| Steps              | create, use, revoke: project API key, personal key, service key, gateway virtual key, a session (Settings > Sessions), a pending invite                                                                                                                                                                                                                  |
-| Assert             | the revoked credential gets 401 on the next call (allow the auth-check cache's bound, `modules/api-key/specs/auth-check-cache.feature`); the revoked session is signed out                                                                                                                                                                               |
-| Failure signatures | a revoked key still answers 200 after the cache bound (**security: record as "fix pending" only**)                                                                                                                                                                                                                                                       |
-| Bind to            | `specs/api-keys/api-keys-v2.feature`, `specs/auth/admin-email-change-revokes-sessions.feature`, `specs/ai-gateway/cli-token-revoke-on-deactivation.feature`; flows `api-key-create-copy-revoke`, `api-key-service-create-and-revoke`, `auth-sessions-list-and-revoke`, `gateway-virtual-key-revoke-reads-back`, `members-pending-invite-list-and-revoke` |
+|                    |                                                                                                                                                                            |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre                | any persona; `--mode saas`                                                                                                                                                 |
+| Steps              | create, use, revoke: project API key, personal key, service key, gateway virtual key, a session (Settings > Sessions), a pending invite                                    |
+| Assert             | the revoked credential gets 401 on the next call (allow the auth-check cache's bound, `modules/api-key/specs/auth-check-cache.feature`); the revoked session is signed out |
+| Failure signatures | a revoked key still answers 200 after the cache bound (**security: record as "fix pending" only**)                                                                         |
+| Bind to            | `specs/api-keys/api-keys-v2.feature`, `specs/auth/admin-email-change-revokes-sessions.feature`, `specs/ai-gateway/cli-token-revoke-on-deactivation.feature`                |
 
 ### 4.6 Auth grants (and "authz fails closed")
 
-|              |                                                                                                                                                                                                                           |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre          | org with custom roles and groups (persona `enterprise-sso`)                                                                                                                                                               |
-| Steps        | `.bin/apidiff/apidiff scenarios -a <app> -scenarios tools/apidiff/scenarios/grants.yaml`; UI: flows `roles-access-grant-change-revoke`, `role-assign-custom-role-to-member`, `roles-access-reader-sees-roles-beyond-them` |
-| Assert       | every `grants-*` and `roles-*` scenario PASS; a key never raises itself; the last admin cannot be removed                                                                                                                 |
-| Fails closed | with no grant, every door answers 401/403; a broken authz read answers 500 with no rows, never partial data                                                                                                               |
-| Bind to      | `modules/authz/specs/grant-revocation.feature`, `expiring-grants.feature`, `permission-resolution.feature`, `cutover-gate.feature`                                                                                        |
+|              |                                                                                                                                    |
+| ------------ | ---------------------------------------------------------------------------------------------------------------------------------- |
+| Pre          | org with custom roles and groups (persona `enterprise-sso`)                                                                        |
+| Steps        | ❌ none scripted yet                                                                                                               |
+| Assert       | every `grants-*` and `roles-*` scenario PASS; a key never raises itself; the last admin cannot be removed                          |
+| Fails closed | with no grant, every door answers 401/403; a broken authz read answers 500 with no rows, never partial data                        |
+| Bind to      | `modules/authz/specs/grant-revocation.feature`, `expiring-grants.feature`, `permission-resolution.feature`, `cutover-gate.feature` |
 
 ### 4.7 Creating prompts
 
-|         |                                                                                                                                                                                                             |
-| ------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre     | `+llm` (playground answers from llmsim)                                                                                                                                                                     |
-| Steps   | UI flows `prompt-create-and-save`, `prompt-restore-version`, `prompt-playground-run-outcome`; API `apidiff scenarios -scenarios tools/apidiff/scenarios/cv3-prompts.yaml` and `…/sdk-contract-prompts.yaml` |
-| Assert  | versions and tags read back through REST and the SDK; the playground call shows in `haven sim llm list`                                                                                                     |
-| Bind to | `modules/prompt/specs/prompt.feature`, `prompt-version-restore.feature`; the upgrade cell's `prompt-create`/`prompt-update` kinds cover writes during the switch                                            |
+|         |                                                                                                                                                                  |
+| ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre     | `+llm` (playground answers from llmsim)                                                                                                                          |
+| Steps   | ❌ none scripted yet                                                                                                                                             |
+| Assert  | versions and tags read back through REST and the SDK; the playground call shows in `haven sim llm list`                                                          |
+| Bind to | `modules/prompt/specs/prompt.feature`, `prompt-version-restore.feature`; the upgrade cell's `prompt-create`/`prompt-update` kinds cover writes during the switch |
 
 ### 4.8 Coding-agent ingestion (Claude Code, Codex)
 
@@ -411,24 +406,24 @@ to run each flow. It does not copy the rows.
 | Expect from the sim   | `state: "done"`, `acked == sent`, `refused == 0`, `failed == 0`                                                                                                                                                                                                                                                                                               |
 | Steps (real agent)    | isolate first (`dev/docs/best_practices/dogfooding-isolation.md`): `export LANGWATCH_CLI_CONFIG=$PWD/.claude/tmp/dogfood/langwatch-config.json CLAUDE_CONFIG_DIR=$PWD/.claude/tmp/dogfood/claude CODEX_HOME=$PWD/.claude/tmp/dogfood/codex`, then `langwatch login` against the flow stack and run a real interactive session in a sub-tmux (not `claude -p`) |
 | Assert in the product | the session lists on the coding sessions screen; events read back (`GET /api/coding-agent/sessions/{id}/events`); token cost shows                                                                                                                                                                                                                            |
-| Bind to               | `specs/coding-agent/session-aggregate.feature`, `sessions-screen.feature`, `modules/coding-agent/specs/coding-agent-session-read.feature`; `apidiff scenarios -scenarios tools/apidiff/scenarios/coding.yaml`; flows `coding-session-list-shows-ingested-sessions`, `coding-session-events-api-reads-back`                                                    |
+| Bind to               | `specs/coding-agent/session-aggregate.feature`, `sessions-screen.feature`, `modules/coding-agent/specs/coding-agent-session-read.feature`                                                                                                                                                                                                                     |
 
 ### 4.9 Scenarios
 
-|                    |                                                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Pre                | `+llm` (the judge and the simulated user answer from llmsim)                                                                                                                                |
-| Steps              | flows `sim-create-scenario`, `sim-run-scenario`, `sim-run-suite`; API `apidiff scenarios -scenarios 'tools/apidiff/scenarios/simulations*.yaml'`; load `workerrun -families scenario -n 50` |
-| Assert             | runs reach SUCCESS or FAILED with a verdict; suite progress counts each run once                                                                                                            |
-| Failure signatures | runs stuck queued (orphan recovery), a missing verdict                                                                                                                                      |
-| Bind to            | `specs/scenarios/scenario-execution.feature`, `simulation-runs-api.feature`, `modules/suite/specs/suite-progress-from-scenario-facts.feature`                                               |
+|                    |                                                                                                                                               |
+| ------------------ | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pre                | `+llm` (the judge and the simulated user answer from llmsim)                                                                                  |
+| Steps              | load `workerrun -families scenario -n 50`                                                                                                     |
+| Assert             | runs reach SUCCESS or FAILED with a verdict; suite progress counts each run once                                                              |
+| Failure signatures | runs stuck queued (orphan recovery), a missing verdict                                                                                        |
+| Bind to            | `specs/scenarios/scenario-execution.feature`, `simulation-runs-api.feature`, `modules/suite/specs/suite-progress-from-scenario-facts.feature` |
 
 ### 4.10 Voice scenarios
 
 |                    |                                                                                                                                                                                                 |
 | ------------------ | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pre                | `haven up +voice` (sets `ELEVENLABS_BASE_URL` to voicesim and `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS=1` unless `.env` names one)                                                                |
-| Steps              | flows `agent-create-voice`, `sim-scenario-edit-drawer-header-and-caller-voice`; run a voice scenario against agent `agent_voicesim_seed`                                                        |
+| Steps              | run a voice scenario against agent `agent_voicesim_seed`                                                                                                                                        |
 | Assert             | `haven sim voice list --json` lists the call (`conv_voicesim_000N`); the run shows the transcript and audio; the trace button opens the trace                                                   |
 | Failure signatures | loopback refused (the switch is off), no call in voicesim                                                                                                                                       |
 | Bind to            | `specs/simulation-testing/voice-agents/testing-elevenlabs-convai.feature`, `modules/scenario/specs/voice-run-audio.feature`, `voice-session-rest.feature`, `specs/setup/haven-voicesim.feature` |
@@ -445,7 +440,7 @@ to run each flow. It does not copy the rows.
 |                    |                                                                                                                                                            |
 | ------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pre                | `+langevals +llm` (embeddings `text-embedding-llmsim`, naming via llmsim); at least 10 traces with input for batch mode (incremental needs 1,200 assigned) |
-| Steps              | `haven sim telemetry send --preset llm-trace --seed 7 --batches 200`, then flow `topic-clustering-manual-run-reaches-history` (manual trigger)             |
+| Steps              | `haven sim telemetry send --preset llm-trace --seed 7 --batches 200`, then trigger a clustering run by hand                                                |
 | Assert             | run history shows a finished run; traces carry topic and subtopic names (`analytics-topics-page`)                                                          |
 | Failure signatures | warn-and-skip when `LANGEVALS_ENDPOINT` is unset; outbox retries (3 attempts, 12 min deadline)                                                             |
 | Bind to            | `modules/topic/specs/topic-manual-trigger.feature`, `run-history.feature`, `trace-assignment.feature`, `specs/nlp-go/topic-clustering.feature`             |
@@ -473,7 +468,6 @@ round and correct this table.
 | One cell (old app + worker, then head api + worker, redis) | 6-8 GB at the switch | ≤ 2                                                 |
 | One flow stack (`haven up` + 4 sims)                       | 4-6 GB               | ≤ 2                                                 |
 | `+langevals`                                               | +2-3 GB              | 1                                                   |
-| UI fuzz lane (`fuzz ui`, 16 workers)                       | 3-5 GB               | 1, on its own stack                                 |
 | Tier L or XL                                               | n/a                  | never on the laptop's shared native ClickHouse (R3) |
 
 ---
@@ -483,7 +477,7 @@ round and correct this table.
 ### 6.1 Rules
 
 - **Compare runs by failing ids, never counts.** Ids are invariant ids (`N3`, `H1`), cell names
-  (`cloud_s_typical_1`), flow ids (`scim-push-synced-groups-and-people`), apidiff scenario ids,
+  (`cloud_s_typical_1`), flow ids (`scim-push-synced-groups-and-people`),
   workerrun item ids (`collector-0007`).
 - Keep a **round log** at `.claude/tmp/upgradelab/rounds.md`: one block per round with date, commit,
   cells and flows run, failing ids, and new vs fixed ids since the last round.

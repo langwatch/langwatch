@@ -15,6 +15,7 @@ import { checkLends } from "./module/ui-module-lends.ts";
 import { checkScreenAddresses } from "./page/ui-screen-addresses.ts";
 import { UiFacilitiesSupply, UiShellSupply } from "./ui-supply.options.ts";
 import type {
+  AppendUiModules,
   CheckedUiModules,
   Merge,
   MissingUiSupplyFields,
@@ -157,8 +158,8 @@ export class UiSupply<
   withModules<const Next extends readonly SupplyModule[]>(
     modules: Next,
     ..._checked: [CheckedUiModules<Next>] extends [never] ? [never] : []
-  ) {
-    return new UiSupply<[...Modules, ...Next], Supplied>({
+  ): UiSupply<AppendUiModules<Modules, Next>, Supplied> {
+    return new UiSupply<AppendUiModules<Modules, Next>, Supplied>({
       ...this.#state,
       modules: [...this.#state.modules, ...modules],
     });
@@ -175,28 +176,34 @@ export class UiSupply<
     });
   }
 
-  withInjectedConfig<Reader extends InjectedConfigReader>(reader: Reader) {
+  withInjectedConfig<Reader extends InjectedConfigReader>(
+    reader: Reader,
+  ): UiSupply<Modules, Merge<Supplied, { "injected-config": Reader }>> {
     return this.#withSupply({ "injected-config": reader });
   }
 
-  withTransport<Value extends UiRequirementValue<Modules, "transport">>(transport: Value) {
+  withTransport<Value extends UiRequirementValue<Modules, "transport">>(
+    transport: Value,
+  ): UiSupply<Modules, Merge<Supplied, { transport: Value }>> {
     return this.#withSupply({ transport });
   }
 
-  withSession<Value extends UiRequirementValue<Modules, "session">>(session: Value) {
+  withSession<Value extends UiRequirementValue<Modules, "session">>(
+    session: Value,
+  ): UiSupply<Modules, Merge<Supplied, { session: Value }>> {
     return this.#withSupply({ session });
   }
 
   withFacilities<Next extends object>(
     configure: (facilities: UiFacilitiesSupply<Modules>) => UiFacilitiesSupply<Modules, Next>,
-  ) {
+  ): UiSupply<Modules, Merge<Supplied, Next>> {
     const facilities = configure(UiFacilitiesSupply.create<Modules>());
     return this.#withSupply(facilities.supplied as Next);
   }
 
   withShell<Next extends object>(
     configure: (shell: UiShellSupply<Modules>) => UiShellSupply<Modules, Next>,
-  ) {
+  ): UiSupply<Modules, Merge<Supplied, Next>> {
     const shell = configure(UiShellSupply.create<Modules>());
     return this.#withSupply(shell.supplied as Next);
   }

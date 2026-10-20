@@ -19,8 +19,9 @@ import (
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
-// seedTaskModule is the LANGWATCH_TASK_MODULES entry that gives `pnpm task` the seed:apply task.
-const seedTaskModule = "@langwatch/seedgen-runner"
+// seedTaskModule is the runner's entry under the worktree. A path, not the package name: the
+// tasks app imports nothing of it, so its package.json cannot list it as a dependency.
+const seedTaskModule = "tools/seedgen/runner/src/index.ts"
 
 // autoSeedWait is how long an up's auto-seed is waited on before it carries on in the background.
 var autoSeedWait = 60 * time.Second
@@ -52,6 +53,8 @@ type SeedRequest struct {
 	Live bool
 	// JSON and Reveal shape the access block printed after a seed (SeedAccess).
 	JSON, Reveal bool
+	// Resume continues this stack's last run of the same flags, keeping its anchor and so its run id.
+	Resume bool
 }
 
 // seedTarget is the stack a seed writes into and the environment seedgen's task child runs with.
@@ -59,6 +62,8 @@ type seedTarget struct {
 	Slug, Dir string
 	Env       []string
 	IsAuto    bool
+	// Anchor is the default anchor of the run's flags; zero means this hour.
+	Anchor time.Time
 }
 
 // seedStatus is what haven remembers of a stack's last seed, for `haven status` and `haven db status`.
@@ -180,7 +185,15 @@ func (o *Orchestrator) Seed(ctx context.Context, p UpParams, req SeedRequest) er
 		return err
 	}
 	env := append(o.seedEnv(p), "DOTENV_CONFIG_QUIET=true")
-	code := o.runSeedgen(ctx, seedTarget{Slug: slug, Dir: st.WorktreeDir, Env: env}, req.Args)
+	target := seedTarget{Slug: slug, Dir: st.WorktreeDir, Env: env}
+	if req.Resume {
+		anchor, found := o.lastRunAnchor(slug, req.Args)
+		if !found {
+			return refused("haven db seed --resume: this stack has no earlier run of these flags to resume")
+		}
+		target.Anchor = anchor
+	}
+	code := o.runSeedgen(ctx, target, req.Args)
 	if code != 0 {
 		st, _ := o.readSeedStatus(slug)
 		return &SeedExit{Code: code, Err: fmt.Errorf("haven db seed: seedgen exited %d: %s", code,
@@ -208,19 +221,23 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 	status := seedStatus{State: "running", Auto: t.IsAuto, Args: args, PID: o.sys.Getpid(), StartedAt: o.sys.Now()}
 	o.writeSeedStatus(t.Slug, status)
 	shell := "go run " + shellQuote(filepath.Join(t.Dir, "cmd", "seedgen")) + " run"
-	for _, a := range o.runRecordArgs(t.Slug, args) {
+	for _, a := range o.runRecordArgs(t.Slug, args, t.Anchor) {
 		shell += " " + shellQuote(a)
 	}
-	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+seedTaskModule)
+	env := append(append([]string{}, t.Env...), "LANGWATCH_TASK_MODULES="+filepath.Join(t.Dir, seedTaskModule))
 	env = append(env, o.licenceEnv(t.Slug, resolvedDevEnv(t.Dir), true)...)
 	err := o.sup.RunOnce(ctx, "seed", t.Dir, shell, env)
 	status.Exit, status.FinishedAt = exitCodeOf(err), o.sys.Now()
-	if dir := o.seedRunDir(t.Slug, args); err != nil && dir != "" {
+	if dir := o.seedRunDir(t.Slug, args, t.Anchor); err != nil && dir != "" {
 		reason, _ := os.ReadFile(filepath.Join(dir, seedgen.FailureFile))
 		status.Reason = strings.TrimSpace(string(reason))
 	}
 	if status.Exit < 0 {
 		status.Exit = 1
+	}
+	// `go run` turns every exit of seedgen into 1; a stall is told apart by seedgen's own line.
+	if err != nil && strings.HasPrefix(status.Reason, stalledReasonPrefix) {
+		status.Exit = 4
 	}
 	switch {
 	case err == nil:
@@ -238,8 +255,8 @@ func (o *Orchestrator) runSeedgen(ctx context.Context, t seedTarget, args []stri
 
 // runRecordArgs points seedgen at this stack's record of the run args plan; a run seen before
 // resumes from its checkpoint, so seeding again sends nothing twice.
-func (o *Orchestrator) runRecordArgs(slug string, args []string) []string {
-	dir := o.seedRunDir(slug, args)
+func (o *Orchestrator) runRecordArgs(slug string, args []string, anchor time.Time) []string {
+	dir := o.seedRunDir(slug, args, anchor)
 	if dir == "" {
 		return args // seedgen refuses the same flags itself, with exit 2
 	}
@@ -251,8 +268,8 @@ func (o *Orchestrator) runRecordArgs(slug string, args []string) []string {
 }
 
 // seedRunDir is this stack's record directory for the run args plan, "" when they plan nothing.
-func (o *Orchestrator) seedRunDir(slug string, args []string) string {
-	flags, err := seedgen.ParseFlags(args, o.sys.Now().UTC().Truncate(time.Hour))
+func (o *Orchestrator) seedRunDir(slug string, args []string, anchor time.Time) string {
+	flags, err := seedgen.ParseFlags(args, o.defaultAnchor(anchor))
 	if err != nil || o.cfg.Home == "" {
 		return ""
 	}
@@ -261,6 +278,55 @@ func (o *Orchestrator) seedRunDir(slug string, args []string) string {
 		return ""
 	}
 	return filepath.Join(o.seedRunsDir(slug), plan.Run)
+}
+
+// stalledReasonPrefix starts seedgen's StallError line (exit 4), the only exit haven must tell apart.
+const stalledReasonPrefix = "stalled:"
+
+// defaultAnchor is the anchor flags without --anchor get: the given one, else this hour.
+func (o *Orchestrator) defaultAnchor(anchor time.Time) time.Time {
+	if anchor.IsZero() {
+		return o.sys.Now().UTC().Truncate(time.Hour)
+	}
+	return anchor
+}
+
+// lastRunAnchor finds the newest run record on the stack that args plan once given the anchor it
+// ran with, so a resume in a later hour keeps the run id. --age is folded into a manifest's anchor,
+// so it is added back before the flags are planned again.
+func (o *Orchestrator) lastRunAnchor(slug string, args []string) (time.Time, bool) {
+	base := o.defaultAnchor(time.Time{})
+	probe, err := seedgen.ParseFlags(args, base)
+	if err != nil {
+		return time.Time{}, false
+	}
+	age := base.Sub(probe.Anchor)
+	dirs, _ := os.ReadDir(o.seedRunsDir(slug))
+	slices.SortFunc(dirs, func(a, b os.DirEntry) int { return modTime(b).Compare(modTime(a)) })
+	for _, dir := range dirs {
+		recorded := filepath.Join(o.seedRunsDir(slug), dir.Name())
+		data, err := os.ReadFile(filepath.Join(recorded, "manifest.json"))
+		var manifest seedgen.Manifest
+		if err != nil || json.Unmarshal(data, &manifest) != nil {
+			continue
+		}
+		if _, err := os.Stat(filepath.Join(recorded, "run.json")); err != nil {
+			continue
+		}
+		candidate := manifest.Flags.Anchor.Add(age)
+		if o.seedRunDir(slug, args, candidate) == recorded {
+			return candidate, true
+		}
+	}
+	return time.Time{}, false
+}
+
+func modTime(entry os.DirEntry) time.Time {
+	info, err := entry.Info()
+	if err != nil {
+		return time.Time{}
+	}
+	return info.ModTime()
 }
 
 // AutoSeed runs after an up's identity seed (design §9.1). It seeds a stack that was never seeded

@@ -4,6 +4,7 @@
  * fact handled twice, by event id or by idempotency key, yields one delivery and one request.
  * @see modules/webhook/specs/webhook-gateway-events.feature
  */
+import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
 import { createTenantId, EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
@@ -67,6 +68,7 @@ function worker(eventStore: EventStoreMemory) {
     .withStores(memoryStores())
     .withEventing(eventing)
     .provide({
+      "data-retention": createApiFixture<DataRetentionApi>({}),
       entitlement: createApiFixture<EntitlementApi>({
         getActivePlan: async () => entitledPlan,
         requestBound: async () => 10,

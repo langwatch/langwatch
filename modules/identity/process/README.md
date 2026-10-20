@@ -86,7 +86,7 @@ Spec: `specs/identity/identifier-model.feature`,
 
 ## Installation
 
-`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).provideMiddlewareBindings(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withMigrations(…)`, `src/identity.module.ts:25`.
+`defineProcessModule("identity").withRepositories(identityRepositories).withChannels(identityChannels).withApi(IdentityModule).withTransports(identityLookupTrpcTransport, identityTrpcTransport, joinRequestTrpcTransport, twoStepVerificationTrpcTransport).provideMiddlewareBindings(…).withEventing(identityEventing).withEventing(identityPipelineEventing).withEventing(joinRequestEventing).withEventing(ssoConnectionEventing).withEventing(twoStepRequirementEventing).withMigrations(…)`, `src/identity.module.ts:26`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -94,7 +94,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The platform operator's identity lookup (D05). The door admits only ops:manage at the platform and hides the surface from everyone else; every act is recorded.
 
-Peers call these through the token, declared at `../contract/src/identity-lookup.ts:188`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/identity-lookup.ts:234`; nothing else in this package is public.
 
 #### `lookupAddress`
 
@@ -195,7 +195,7 @@ Contract `../contract/src/identity-lookup.trpc.ts:24`, router `src/transport/ide
 interface Input {
   address: string;
 }
-type Output = z.infer<typeof identityLookupAnswerSchema>; // ../contract/src/identity-lookup.ts:65
+type Output = z.infer<typeof identityLookupAnswerSchema>; // ../contract/src/identity-lookup.ts:88
 
 // identityLookup.person
 // Input: inline, ../contract/src/identity-lookup.trpc.ts:30
@@ -268,19 +268,19 @@ interface Input {
   organizationId: string;
   inviteId: string;
 }
-// Output: lookupInvitationExpirySchema, ../contract/src/identity-lookup.ts:172
+// Output: lookupInvitationExpirySchema, ../contract/src/identity-lookup.ts:218
 interface Output {
   expiresAtMs: number | null;
 }
 
 // identityLookup.extendInvitation
 type Input = z.infer<typeof invitationInputSchema>; // ../contract/src/identity-lookup.trpc.ts:19
-type Output = z.infer<typeof lookupInvitationExpirySchema>; // ../contract/src/identity-lookup.ts:172
+type Output = z.infer<typeof lookupInvitationExpirySchema>; // ../contract/src/identity-lookup.ts:218
 ```
 
 ### `identity`
 
-Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.trpc.ts:27`.
+Contract `../contract/src/identity.trpc.ts:30`, router `src/transport/identity.trpc.ts:27`.
 
 | Procedure                               | Kind     | Gate                                                                                                                                                              | Input                             | Output                         |
 | --------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------- | ------------------------------ |
@@ -295,14 +295,14 @@ Contract `../contract/src/identity.trpc.ts:25`, router `src/transport/identity.t
 
 ```typescript
 // identity.completeVerification
-// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:17
+// Input: completeVerificationInputSchema, ../contract/src/identity.trpc.ts:28
 interface Input {
   identifierId: string;
   verificationId: string;
   token: string;
   codeVerifier: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:28
+// Output: inline, ../contract/src/identity.trpc.ts:33
 interface Output {
   verified: true;
 }
@@ -310,7 +310,7 @@ interface Output {
 // identity.myTestArrival
 // Input: emptyInputSchema, ../contract/src/identity.trpc.ts:14
 type Input = Record<string, unknown>;
-// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:74
+// Output: ssoTestArrivalStandingSchema, ../contract/src/features/sso-arrival/sso-admission.ts:90
 type Output =
   | {
       testing: true;
@@ -324,11 +324,11 @@ type Output =
 
 // identity.myIdentifiers
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
-// Output: z.array(accountIdentifierSchema) (inline, ../contract/src/identity.trpc.ts:36)
+// Output: z.array(accountIdentifierSchema) (inline, ../contract/src/identity.trpc.ts:41)
 
 // identity.myMethodsLastUsed
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
-// Output: methodsLastUsedSchema, ../contract/src/account-identifiers.ts:34
+// Output: methodsLastUsedSchema, ../contract/src/account-identifiers.ts:49
 interface Output {
   byIdentifier: Record<string, string>;
   secondFactorAt: string | null;
@@ -336,39 +336,39 @@ interface Output {
 
 // identity.mySignInGovernance
 type Input = z.infer<typeof emptyInputSchema>; // ../contract/src/identity.trpc.ts:14
-// Output: inline, ../contract/src/identity.trpc.ts:45
+// Output: inline, ../contract/src/identity.trpc.ts:50
 interface Output {
   governedBySso: boolean;
 }
 
 // identity.addEmailIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:48
+// Input: inline, ../contract/src/identity.trpc.ts:53
 interface Input {
   email: string;
   codeChallenge: string;
 }
-// Output: emailIdentifierAddedSchema, ../contract/src/account-identifiers.ts:30
+// Output: emailIdentifierAddedSchema, ../contract/src/account-identifiers.ts:38
 interface Output {
   identifierId: string;
 }
 
 // identity.resendIdentifierConfirmation
-// Input: inline, ../contract/src/identity.trpc.ts:53
+// Input: inline, ../contract/src/identity.trpc.ts:58
 interface Input {
   identifierId: string;
   codeChallenge: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:55
+// Output: inline, ../contract/src/identity.trpc.ts:60
 interface Output {
   sent: true;
 }
 
 // identity.removeIdentifier
-// Input: inline, ../contract/src/identity.trpc.ts:58
+// Input: inline, ../contract/src/identity.trpc.ts:63
 interface Input {
   identifierId: string;
 }
-// Output: inline, ../contract/src/identity.trpc.ts:59
+// Output: inline, ../contract/src/identity.trpc.ts:64
 interface Output {
   removed: true;
 }
@@ -410,17 +410,17 @@ type Output = z.infer<typeof joinRequestLookupSchema>; // ../contract/src/featur
 // identity.joinRequests.dismissOffer
 // Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:52
 type Input = Record<string, unknown>;
-// Output: joinRequestWriteAckSchema, ../contract/src/features/join-request/join-request.responses.ts:63
+// Output: joinRequestWriteAckSchema, ../contract/src/features/join-request/join-request.responses.ts:83
 interface Output {
   success: true;
 }
 
 // identity.joinRequests.admitAutomatically
-// Input: joinRequestApiAdmitInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:29
+// Input: joinRequestApiAdmitInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:52
 interface Input {
   origin?: "web" | "cli";
 }
-// Output: joinRequestAdmittedSchema, ../contract/src/features/join-request/join-request.responses.ts:35
+// Output: joinRequestAdmittedSchema, ../contract/src/features/join-request/join-request.responses.ts:56
 interface Output {
   organization: {
     organizationId: string;
@@ -432,7 +432,7 @@ interface Output {
 // identity.joinRequests.mine
 // Input: inline, ../contract/src/features/join-request/join-request.trpc.ts:62
 type Input = unknown;
-// Output: joinRequestMineSchema, ../contract/src/features/join-request/join-request.responses.ts:20
+// Output: joinRequestMineSchema, ../contract/src/features/join-request/join-request.responses.ts:25
 type Output = {
   joinRequestId: string;
   requestedAt: unknown;
@@ -441,30 +441,30 @@ type Output = {
 }[];
 
 // identity.joinRequests.request
-// Input: joinRequestApiRequestInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:23
+// Input: joinRequestApiRequestInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:42
 interface Input {
   organizationId: string;
   origin?: "web" | "cli";
 }
-// Output: joinRequestFiledSchema, ../contract/src/features/join-request/join-request.responses.ts:26
+// Output: joinRequestFiledSchema, ../contract/src/features/join-request/join-request.responses.ts:33
 interface Output {
   joinRequestId: string;
   state: "PENDING" | "APPROVED";
 }
 
 // identity.joinRequests.withdraw
-// Input: joinRequestApiWithdrawInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:33
+// Input: joinRequestApiWithdrawInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:61
 interface Input {
   joinRequestId: string;
 }
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:83
 
 // identity.joinRequests.pending
-// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
+// Input: joinRequestApiOrganizationScopeSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:18
 interface Input {
   organizationId: string;
 }
-// Output: joinRequestPendingSchema, ../contract/src/features/join-request/join-request.responses.ts:67
+// Output: joinRequestPendingSchema, ../contract/src/features/join-request/join-request.responses.ts:100
 type Output = {
   joinRequestId: string;
   requestedAt: unknown;
@@ -476,20 +476,20 @@ type Output = {
 }[];
 
 // identity.joinRequests.approve
-// Input: joinRequestApiDecisionInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
+// Input: joinRequestApiDecisionInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:73
 interface Input {
   organizationId: string;
   joinRequestId: string;
 }
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:83
 
 // identity.joinRequests.reject
-type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:39
-type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:63
+type Input = z.infer<typeof joinRequestApiDecisionInputSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:73
+type Output = z.infer<typeof joinRequestWriteAckSchema>; // ../contract/src/features/join-request/join-request.responses.ts:83
 
 // identity.joinRequests.joining
-type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
-// Output: joinRequestJoiningSchema, ../contract/src/features/join-request/join-request.responses.ts:79
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:18
+// Output: joinRequestJoiningSchema, ../contract/src/features/join-request/join-request.responses.ts:115
 interface Output {
   domainJoin: "off" | "request" | "auto";
   joinDomains: string[];
@@ -497,14 +497,14 @@ interface Output {
 }
 
 // identity.joinRequests.setJoining
-// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:46
+// Input: joinRequestApiSetJoiningInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:87
 interface Input {
   organizationId: string;
   domainJoin: "off" | "request" | "auto";
   domains?: string[];
   joinerRole?: "MEMBER" | "DEVELOPER";
 }
-// Output: joinRequestJoiningChangedSchema, ../contract/src/features/join-request/join-request.responses.ts:89
+// Output: joinRequestJoiningChangedSchema, ../contract/src/features/join-request/join-request.responses.ts:133
 interface Output {
   previous: "off" | "request" | "auto";
   next: "off" | "request" | "auto";
@@ -515,8 +515,8 @@ interface Output {
 }
 
 // identity.joinRequests.automaticJoins
-type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:10
-// Output: joinRequestAutomaticJoinsSchema, ../contract/src/features/join-request/join-request.responses.ts:50
+type Input = z.infer<typeof joinRequestApiOrganizationScopeSchema>; // ../contract/src/features/join-request/join-request.trpc-schemas.ts:18
+// Output: joinRequestAutomaticJoinsSchema, ../contract/src/features/join-request/join-request.responses.ts:74
 type Output = {
   joinRequestId: string;
   userId: string;
@@ -526,7 +526,7 @@ type Output = {
 }[];
 
 // identity.joinRequests.getJoinAdmissions
-// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:55
+// Input: joinRequestApiAdmissionsInputSchema, ../contract/src/features/join-request/join-request.trpc-schemas.ts:99
 interface Input {
   organizationId: string;
   userIds: string[];
@@ -557,7 +557,7 @@ Contract `../contract/src/two-step-verification.trpc.ts:16`, router `src/transpo
 // twoStepVerification.account
 // Input: inline, ../contract/src/two-step-verification.trpc.ts:18
 type Input = Record<string, unknown>;
-// Output: twoStepAccountStandingSchema, ../contract/src/two-step-verification.ts:17
+// Output: twoStepAccountStandingSchema, ../contract/src/two-step-verification.ts:32
 interface Output {
   offered: boolean;
   enabled: boolean;
@@ -575,7 +575,7 @@ interface Input {
   password?: string;
   code: string;
 }
-// Output: twoStepDisabledSchema, ../contract/src/two-step-verification.ts:84
+// Output: twoStepDisabledSchema, ../contract/src/two-step-verification.ts:131
 interface Output {
   disabled: true;
 }
@@ -585,11 +585,11 @@ interface Output {
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof organizationMfaStandingSchema>; // ../contract/src/two-step-verification.ts:43
+type Output = z.infer<typeof organizationMfaStandingSchema>; // ../contract/src/two-step-verification.ts:75
 
 // twoStepVerification.requirement
 type Input = z.infer<typeof organizationInputSchema>; // ../contract/src/two-step-verification.trpc.ts:14
-// Output: organizationMfaRequirementSchema, ../contract/src/two-step-verification.ts:62
+// Output: organizationMfaRequirementSchema, ../contract/src/two-step-verification.ts:101
 interface Output {
   mfaRequired: boolean;
   offered: boolean;
@@ -606,7 +606,7 @@ interface Input {
   organizationId: string;
   mfaRequired: boolean;
 }
-// Output: organizationMfaRequirementChangeSchema, ../contract/src/two-step-verification.ts:69
+// Output: organizationMfaRequirementChangeSchema, ../contract/src/two-step-verification.ts:112
 interface Output {
   previous: boolean;
   next: boolean;
@@ -625,15 +625,16 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `identity_maintenance` (aggregate `global`)
 
-Declared at `src/eventing/identity.pipeline.ts:51`.
+Declared at `src/eventing/identity.pipeline.ts:61`.
 
-| Kind            | Name                        | Handles                                                                                           | Declared at                            |
-| --------------- | --------------------------- | ------------------------------------------------------------------------------------------------- | -------------------------------------- |
-| process manager | `breakGlassExpiryWarn`      | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:71` |
-| process manager | `ssoDomainReproofSweep`     | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:87` |
-| peer subscriber | `userRegistered`            | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:58` |
-| peer subscriber | `joinRequestInviteAccepted` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:63` |
-| peer subscriber | `joinRequestMembersInvited` | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:67` |
+| Kind            | Name                           | Handles                                                                                           | Declared at                             |
+| --------------- | ------------------------------ | ------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| process manager | `breakGlassExpiryWarn`         | every 1 h (`BREAK_GLASS_EXPIRY_WARN_INTERVAL_MS = 60 * 60 * 1000`); intents `warn` (outbox)       | `src/eventing/identity.pipeline.ts:93`  |
+| process manager | `ssoDomainReproofSweep`        | every 8 h (`SSO_DOMAIN_REPROOF_SWEEP_INTERVAL_MS = 8 * 60 * 60 * 1000`); intents `sweep` (outbox) | `src/eventing/identity.pipeline.ts:109` |
+| peer subscriber | `userRegistered`               | `lw.user.registered` from [user](../../user/README.md)                                            | `src/eventing/identity.pipeline.ts:68`  |
+| peer subscriber | `identifierBackfillRolledBack` | `lw.ops.tenant_migration.rolled_back` from [ops](../../ops/README.md)                             | `src/eventing/identity.pipeline.ts:74`  |
+| peer subscriber | `joinRequestInviteAccepted`    | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:85`  |
+| peer subscriber | `joinRequestMembersInvited`    | ≈ event type not read                                                                             | `src/eventing/identity.pipeline.ts:89`  |
 
 ### Pipeline `identity` (aggregate `user_identity`)
 
@@ -673,6 +674,15 @@ Declared at `src/features/join-request/eventing/join-request.pipeline.ts:92`. Ev
 | process manager     | `joinRequestLifecycle`                                                              | –       | `src/features/join-request/eventing/join-request.pipeline.ts:137` |
 | Postgres projection | `≈ new JoinRequestStateFoldProjection({ store: deps.joinRequestProjectionStore, })` | –       | `src/features/join-request/eventing/join-request.pipeline.ts:105` |
 
+### Pipeline `identity_two_step_requirement` (aggregate `organization_two_step_requirement`)
+
+Declared at `src/features/mfa/eventing/two-step-requirement.pipeline.ts:31`. Events: `twoStepRequirementChangedEventSchema`.
+
+| Kind            | Name                              | Handles                          | Declared at                                                     |
+| --------------- | --------------------------------- | -------------------------------- | --------------------------------------------------------------- |
+| command         | `recordTwoStepRequirementChanged` | –                                | `src/features/mfa/eventing/two-step-requirement.pipeline.ts:36` |
+| process manager | `twoStepRequirementNotice`        | intents `notifyMembers` (outbox) | `src/features/mfa/eventing/two-step-requirement.pipeline.ts:37` |
+
 ### Pipeline `sso-connections` (aggregate `sso_connection`)
 
 Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185`. Events: `connectionRegisteredEventSchema`, `domainClaimedEventSchema`, `domainClaimApprovedEventSchema`, `domainClaimRejectedEventSchema`, `connectionDiscardedEventSchema`, `verificationRequestedEventSchema`, `domainAttestedEventSchema`, `domainWithdrawnEventSchema`, `domainVerifiedEventSchema`, `domainProofWaveredEventSchema`, `domainProofLapsedEventSchema`, `domainProofRecoveredEventSchema`, `connectionActivatedEventSchema`, `connectionSuspendedEventSchema`, `connectionResumedEventSchema`, `teardownRequestedEventSchema`, `connectionTornDownEventSchema`, `connectionArrivalPolicySetEventSchema`, `connectionRenamedEventSchema`, `connectionIdpUpdatedEventSchema`, `replacementConnectionRegisteredEventSchema`, `migrationRouteSelectedEventSchema`, `migrationFinalizationStartedEventSchema`, `migrationFinalizedEventSchema`.
@@ -710,14 +720,15 @@ Declared at `src/features/sso-connection/eventing/sso-connection.pipeline.ts:185
 
 ## Configuration
 
-| Kind   | Leaf                          | Environment variable           | Declared at                             |
-| ------ | ----------------------------- | ------------------------------ | --------------------------------------- |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`        | `src/app/identity.app.ts:454`           |
-| config | `ssoDomainProofDnsServers`    | `SSO_DOMAIN_PROOF_DNS_SERVERS` | `../contract/src/identity.config.ts:28` |
-| config | `isSaas`                      | `IS_SAAS`                      | `../contract/src/identity.config.ts:30` |
-| config | `publicBaseUrl`               | `BASE_HOST`                    | `../contract/src/identity.config.ts:32` |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`             | `../contract/src/identity.config.ts:34` |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`          | `../contract/src/identity.config.ts:35` |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`      | `../contract/src/identity.config.ts:36` |
+| Kind   | Leaf                              | Environment variable                | Declared at                             |
+| ------ | --------------------------------- | ----------------------------------- | --------------------------------------- |
+| secret | `internalSlackSignupsWebhook`     | `SLACK_CHANNEL_SIGNUPS`             | `src/app/identity.app.ts:463`           |
+| config | `ssoDomainProofDnsServers`        | `SSO_DOMAIN_PROOF_DNS_SERVERS`      | `../contract/src/identity.config.ts:28` |
+| config | `isSaas`                          | `IS_SAAS`                           | `../contract/src/identity.config.ts:30` |
+| config | `publicBaseUrl`                   | `BASE_HOST`                         | `../contract/src/identity.config.ts:32` |
+| config | `passkeysEnabled`                 | `PASSKEYS_ENABLED`                  | `../contract/src/identity.config.ts:34` |
+| config | `mfaEnrollmentOpen`               | `MFA_ENROLLMENT_OPEN`               | `../contract/src/identity.config.ts:35` |
+| config | `localPasswords`                  | `LOCAL_PASSWORDS_ENABLED`           | `../contract/src/identity.config.ts:36` |
+| config | `identifierBackfillMaxQueuedJobs` | `IDENTITY_BACKFILL_MAX_QUEUED_JOBS` | `../contract/src/identity.config.ts:38` |
 
 <!-- readme:generated:end -->

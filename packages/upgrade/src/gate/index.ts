@@ -1,7 +1,6 @@
 export {
   assertCurrent,
   firstInstallVerdict,
-  ledgerFloor,
   servingImageSchema,
   servingRoleSchema,
   UPGRADE_COMMAND,
@@ -16,9 +15,17 @@ export type {
 } from "./upgrade-gate.service.ts";
 export {
   type FirstInstallUpgrade,
-  spawnFirstInstallUpgrade,
+  type UpgradeRunResult,
   TASKS_APP_DIRECTORY,
 } from "./first-install-upgrade.ts";
+export {
+  type BootUpgradeModules,
+  inProcessUpgrade,
+  langWatchQlReconciler,
+  PASS_REQUEST_TASK,
+  passRequestReconciler,
+  type UpgradeModules,
+} from "./in-process-upgrade.ts";
 export {
   IMAGE_MIGRATION_DIRECTORIES,
   imageGateSteps,

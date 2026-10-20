@@ -61,7 +61,8 @@ export function buildOtelEnvBlock(
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_LOGS_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
+        OTEL_EXPORTER_OTLP_COMPRESSION: "gzip",
         OTEL_LOG_USER_PROMPTS: "1",
         OTEL_LOG_TOOL_DETAILS: "1",
         OTEL_LOG_TOOL_CONTENT: "1",
@@ -72,7 +73,7 @@ export function buildOtelEnvBlock(
     case "codex":
       return {
         OTEL_TRACES_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=codex",
       };
@@ -99,7 +100,7 @@ export function buildOtelEnvBlock(
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_LOGS_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=opencode",
       };
@@ -107,14 +108,14 @@ export function buildOtelEnvBlock(
       // COPILOT_OTEL_EXPORTER_TYPE is pinned "otlp-http": an inherited
       // =file (prior ccusage setup) would silently redirect telemetry to
       // JSONL (ADR-039 D5). No OTEL_LOGS_EXPORTER -- Copilot emits spans +
-      // metrics only; grpc falls back silently, so http/json is pinned.
+      // metrics only; grpc falls back silently, so http/protobuf is pinned.
       return {
         COPILOT_OTEL_ENABLED: "true",
         COPILOT_OTEL_EXPORTER_TYPE: "otlp-http",
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-cli",
       };
@@ -128,7 +129,7 @@ export function buildOtelEnvBlock(
         OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT: "true",
         OTEL_TRACES_EXPORTER: "otlp",
         OTEL_METRICS_EXPORTER: "otlp",
-        OTEL_EXPORTER_OTLP_PROTOCOL: "http/json",
+        OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf",
         ...base,
         OTEL_RESOURCE_ATTRIBUTES: "service.name=copilot-chat",
       };

@@ -35,12 +35,10 @@ import {
   type SignUpEnrollment,
   type SignUpVerificationRequest,
   type PriorSession,
-  type AuthFederatedPasswordChange,
-  type AuthFederatedPasswordOutcome,
   isEmailPasswordEnabled,
+  type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { AuthzApi, type AuthzGrantsService } from "@langwatch/authz-contract";
-import { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SsoApi } from "@langwatch/enterprise-sso-contract";
 import {
   configuredAuthProvider,
@@ -88,7 +86,6 @@ import {
 } from "@langwatch/user-contract";
 
 import type { AuthChannels } from "../channels/auth.channels.ts";
-import { auth0ManagementSecret } from "../channels/auth0-password.channel.ts";
 import {
   BetterAuthAnnouncements,
   BetterAuthFederation,
@@ -149,7 +146,6 @@ import { BrowserSessionService } from "../services/browser-session.service.ts";
 import { CredentialRegistrationService } from "../services/credential-registration.service.ts";
 import { CredentialSignInPolicyService } from "../services/credential-sign-in-policy.service.ts";
 import { FederatedAccountReadsService } from "../services/federated-account-reads.service.ts";
-import { FederatedPasswordService } from "../services/federated-password.service.ts";
 import {
   LegacySsoAccessService,
   type LegacySsoAccessConnections,
@@ -257,11 +253,9 @@ export class AuthModule implements AuthApiContract {
     auditLog: AuditLogApi,
     /** Whether an organization's plan carries the sign-in security rules. */
     entitlements: EntitlementApi,
-    /** Whether a signed license permits platform single sign-on (ADR-027). */
-    licensing: LicensingApi,
     /** Whether this installation names a way to send email, before a confirmation is offered. */
     notifications: NotificationService,
-    /** The sign-in providers, shaped for Better Auth by enterprise SSO. */
+    /** The sign-in providers, shaped for Better Auth, and the ADR-027 SSO gate. */
     sso: SsoApi,
     /** Whether a CLI person may bind a session to a project (`project:view`). */
     authz: AuthzApi,
@@ -274,8 +268,6 @@ export class AuthModule implements AuthApiContract {
   static readonly secrets = {
     session: sessionSecret,
     ...signInProviderSecrets,
-    /** Read by the live channel tier, which scopes to this module's declared secrets. */
-    auth0ManagementSecret,
     /** LangWatch's own sign-ups Slack webhook, shared with organization, billing and identity. */
     internalSlackSignupsWebhook,
   } as const;
@@ -319,8 +311,6 @@ export class AuthModule implements AuthApiContract {
   readonly #registrations: CredentialRegistrationService;
   /** This deployment's sign-in mode, set once the provider secrets resolve. */
   #authProviders: AuthProviderService | null = null;
-  /** The Auth0 tenant's password change; set by {@link AuthModule.create}. */
-  #federatedPasswords: FederatedPasswordService | null = null;
   /**
    * Composes the deployment's ONE Better Auth instance on first use (it asks
    * the SSO peer, which construction may not), or nothing where it named no
@@ -529,6 +519,7 @@ export class AuthModule implements AuthApiContract {
       refreshTokenTtlSeconds: config.cliRefreshTokenTtlSeconds,
       store: repositories.cliSessions,
       settlements: channels.cliSettlements,
+      rotations: repositories.cliRotations,
     });
 
     const cliDeviceDirectory = CliDeviceDirectoryService.create({
@@ -541,7 +532,7 @@ export class AuthModule implements AuthApiContract {
     const resolveDefaultMethods = async () => {
       const policy = await SignInMethodPolicyService.create({
         resolveAuthProvider: () => app.resolveAuthProvider(),
-        federationLicensed: () => dependencies.licensing.isPlatformSsoLicensed(),
+        federationLicensed: () => dependencies.sso.platformAllowed(),
         offersPasskeys: () => config.passkeysEnabled,
         issuesOwnPasswords: () => config.localPasswords,
         selfHosted: () => !config.isSaas,
@@ -664,14 +655,10 @@ export class AuthModule implements AuthApiContract {
       baseUrl: config.sessionUrl ?? "",
     });
     app.#mountedSocialMethodIds = mountedSocialMethodIds({ configuration: signInProviders });
-    app.#federatedPasswords = FederatedPasswordService.create({
-      accounts: accountRows,
-      auth0: channels.auth0Passwords,
-    });
     app.#authProviders = AuthProviderService.create({
       configuredProvider: configuredAuthProvider(config.signInProviders).provider,
       providerMounted: isNamedProviderMounted(signInProviders),
-      platformSsoAllowed: () => dependencies.licensing.isPlatformSsoLicensed(),
+      platformSsoAllowed: () => dependencies.sso.platformAllowed(),
     });
 
     const signupAnnouncements = SignupAnnouncementService.create({
@@ -741,12 +728,12 @@ export class AuthModule implements AuthApiContract {
             signInRouting: (input) => dependencies.identity.routeSignIn(input),
             authProvider: configuredAuthProvider(config.signInProviders).provider,
             signInProviders,
-            licensing: dependencies.licensing,
             sso: dependencies.sso,
             isSaas: config.isSaas,
             localPasswords: config.localPasswords,
             trustedIdpOrigins: config.trustedIdpOrigins,
             idpSimulatorUrl: config.idpSimulatorUrl,
+            socialProviderBases: config.socialProviderBases,
             isProduction: config.nodeEnvironment === "production",
             logger,
           });
@@ -795,19 +782,6 @@ export class AuthModule implements AuthApiContract {
     actorUserId: string;
   }): Promise<ReleaseHeldAccountResult> {
     return this.#signInSecurity.release(input);
-  }
-
-  changeFederatedPassword(
-    input: AuthFederatedPasswordChange,
-  ): Promise<AuthFederatedPasswordOutcome> {
-    const federatedPasswords = this.#federatedPasswords;
-    if (!federatedPasswords) {
-      throw new AuthUnavailableError({
-        capability: "identity-provider password change",
-        processName: this.#processName,
-      });
-    }
-    return federatedPasswords.changePassword(input);
   }
 
   findFederatedAccountProviders(input: { userId: string }): Promise<string[]> {
@@ -890,6 +864,7 @@ export class AuthModule implements AuthApiContract {
 
   resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
+    background?: boolean;
   }): Promise<BrowserSessionResolution> {
     return this.#sessions.resolveBrowserSession(input);
   }
@@ -1414,15 +1389,15 @@ type BetterAuthDeploymentIdentity = Readonly<{
 }>;
 
 /**
- * ADR-027's licence questions, answered by licensing as main's
- * `platformSSOAllowed` did. The configured provider applies only when licensed
+ * ADR-027's licence questions, answered by enterprise SSO's gate (main's
+ * `platformSSOAllowed`). The configured provider applies only when licensed
  * AND mounted; otherwise the door is email mode (main's `resolveAuthProvider`).
  */
 export class ModuleBetterAuthFederation extends BetterAuthFederation {
   static create(options: {
     authProvider: string | undefined;
     providerMounted: boolean;
-    licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
+    sso: Pick<SsoApi, "platformAllowed">;
     passkeysEnabled: boolean;
     isSaas: boolean;
     localPasswords: boolean;
@@ -1435,7 +1410,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
     private readonly deployment: {
       authProvider: string | undefined;
       providerMounted: boolean;
-      licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
+      sso: Pick<SsoApi, "platformAllowed">;
       passkeysEnabled: boolean;
       isSaas: boolean;
       localPasswords: boolean;
@@ -1462,7 +1437,7 @@ export class ModuleBetterAuthFederation extends BetterAuthFederation {
   }
 
   platformSsoAllowed(): Promise<boolean> {
-    return this.deployment.licensing.isPlatformSsoLicensed();
+    return this.deployment.sso.platformAllowed();
   }
 
   private async resolveAuthProvider(): Promise<string> {
@@ -1529,8 +1504,14 @@ export class LoggedBetterAuthAnnouncements extends BetterAuthAnnouncements {
     this.logger.error({ error }, "Better Auth swallowed an error on a best-effort path");
   }
 
-  announceSignup(input: { userName: string; userEmail: string; organizationName: string }): void {
-    void this.signups.announce(input).catch((error: unknown) => this.reportError(error));
+  announceSignup(input: {
+    userId: string;
+    userName: string;
+    userEmail: string;
+    organizationId: string;
+    organizationName: string;
+  }): void {
+    void this.signups.announceJoin(input).catch((error: unknown) => this.reportError(error));
   }
 
   ssoAutoAddNurturing(input: {
@@ -1647,9 +1628,7 @@ type BuildBetterAuthOptions = Readonly<{
   /** Every provider's registration, from which the ones this deployment names mount. */
   signInProviders: SignInProviderConfiguration;
   /** Enterprise SSO, which shapes those providers for Better Auth (ARCHITECTURE §3.3). */
-  sso: Pick<SsoApi, "getSignInProviderMounts">;
-  /** Whether a signed license permits platform single sign-on (ADR-027). */
-  licensing: Pick<LicensingApi, "isPlatformSsoLicensed">;
+  sso: Pick<SsoApi, "getSignInProviderMounts" | "platformAllowed">;
   /** Whether this is the hosted product rather than a self-hosted install. */
   isSaas: boolean;
   /** D09: whether this deployment issues its own passwords beside its provider. */
@@ -1658,6 +1637,7 @@ type BuildBetterAuthOptions = Readonly<{
    *  static ways an origin is trusted without a registered connection. */
   trustedIdpOrigins: string | undefined;
   idpSimulatorUrl: string | undefined;
+  socialProviderBases: SocialProviderBases;
   /** Whether this is a production deployment — the simulator is trusted
    *  nowhere else, because it signs whatever it is asked to sign. */
   isProduction: boolean;
@@ -1716,6 +1696,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
       passkeyHandleSecret: identity.passkeyHandleSecret,
       trustedIdpOrigins: options.trustedIdpOrigins,
       idpSimulatorUrl: options.idpSimulatorUrl,
+      socialProviderBases: options.socialProviderBases,
       isProduction: options.isProduction,
       socialProviders: capturingProfileEmails({
         providers: socialProviders,
@@ -1728,7 +1709,7 @@ async function buildBetterAuth(options: BuildBetterAuthOptions): Promise<BetterA
     federation: ModuleBetterAuthFederation.create({
       authProvider: options.authProvider,
       providerMounted,
-      licensing: options.licensing,
+      sso: options.sso,
       passkeysEnabled: identity.passkeysEnabled,
       isSaas: options.isSaas,
       localPasswords: options.localPasswords,

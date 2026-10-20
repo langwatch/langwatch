@@ -18,6 +18,7 @@ import {
   type CreateProjectInput,
   type InternalProject,
   type InternalProjectKind,
+  internalProjectKindSchema,
   type PaginatedProjects,
   type ArchivedProject,
   type Project,
@@ -40,6 +41,7 @@ import {
 import { fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -149,10 +151,15 @@ export class PrismaProjectRepository
       ...(after === undefined ? {} : { where: { id: { gt: after } } }),
       ...(limit === undefined ? {} : { take: limit + 1 }),
     });
-    const projects = rows.map((row) => ({ id: row.id, organizationId: row.team.organizationId }));
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    // relationMode "prisma" keeps no foreign keys, so a deleted team leaves its projects behind.
+    const projects = page.flatMap((row) => {
+      const organizationId = row.team?.organizationId;
+      return organizationId ? [{ id: row.id, organizationId }] : [];
+    });
+    const orphanIds = page.filter((row) => !row.team?.organizationId).map((row) => row.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({
@@ -196,20 +203,21 @@ export class PrismaProjectRepository
 
   async findSharedProjectSlugs({
     organizationId,
-    memberUserId,
+    member,
     limit,
   }: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]> {
     const projects = await this.prisma.project.findMany({
       where: {
-        team: {
-          organizationId,
-          isPersonal: false,
-          ...(memberUserId === undefined ? {} : { members: { some: { userId: memberUserId } } }),
-        },
+        team: { organizationId, isPersonal: false },
+        ...(member === undefined
+          ? {}
+          : {
+              OR: [{ teamId: { in: [...member.teamIds] } }, { id: { in: [...member.projectIds] } }],
+            }),
         archivedAt: null,
         // An aggregate is opened on purpose (ADR-177 block F): never landed on.
         kind: { notIn: [...NEVER_LANDED_ON_PROJECT_KINDS] },
@@ -221,11 +229,17 @@ export class PrismaProjectRepository
     return projects.map((project) => project.slug);
   }
 
-  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization({
+    organizationId,
+    kind,
+  }: {
+    organizationId: string;
+    kind: InternalProjectKind;
+  }): Promise<InternalProject | null> {
     return this.mapInternal(
       await this.prisma.project.findFirst({
         where: {
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          kind,
           team: { organizationId },
           archivedAt: null,
         },
@@ -252,15 +266,15 @@ export class PrismaProjectRepository
     slug: string;
     apiKey: string;
     teamId: string;
+    kind: InternalProjectKind;
+    framework: string;
   }): Promise<InternalProject> {
     try {
       return this.mapInternalRequired(
         await this.prisma.project.create({
           data: {
             ...input,
-            kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
             language: "internal",
-            framework: "governance",
             traceSharingEnabled: false,
           },
         }),
@@ -311,6 +325,19 @@ export class PrismaProjectRepository
       ...this.mapProjectRequired(projectRow),
       team,
     };
+  }
+
+  async findLiveWithTeamByIds(ids: readonly string[]): Promise<ProjectWithTeam[]> {
+    if (ids.length === 0) return [];
+    const rows = await this.prisma.project.findMany({
+      where: { id: { in: [...ids] }, archivedAt: null },
+      include: { team: true },
+      orderBy: { id: "asc" },
+    });
+    return rows.map(({ team, ...projectRow }) => ({
+      ...this.mapProjectRequired(projectRow),
+      team,
+    }));
   }
 
   async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
@@ -379,6 +406,63 @@ export class PrismaProjectRepository
         : null,
       adminUserId: project.team?.organization?.members?.[0]?.userId ?? null,
     };
+  }
+
+  async findBackfillPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillEntry[]> {
+    const rows = await this.prisma.project.findMany({
+      where: afterId === null ? {} : { id: { gt: afterId } },
+      orderBy: { id: "asc" },
+      take: limit,
+      select: {
+        id: true,
+        createdAt: true,
+        teamId: true,
+        isPersonal: true,
+        departmentId: true,
+        presenceEnabled: true,
+        archivedAt: true,
+        team: {
+          select: {
+            organizationId: true,
+            organization: {
+              select: {
+                members: {
+                  where: { role: "ADMIN" },
+                  select: { userId: true },
+                  orderBy: { createdAt: "asc" },
+                  take: 1,
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+    return rows.map((row): ProjectBackfillEntry => {
+      // relationMode "prisma" keeps no foreign keys: a deleted team or organization leaves this.
+      const organization = row.team?.organization;
+      if (!organization) return { kind: "orphan", id: row.id };
+      return {
+        kind: "whole",
+        project: {
+          id: row.id,
+          createdAt: fromDate(row.createdAt),
+          organizationId: row.team.organizationId,
+          teamId: row.teamId,
+          isPersonal: row.isPersonal,
+          departmentId: row.departmentId,
+          presenceEnabled: row.presenceEnabled,
+          isArchived: row.archivedAt !== null,
+          adminUserId: organization.members[0]?.userId ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
@@ -938,7 +1022,7 @@ export class PrismaProjectRepository
   }
 
   private mapInternal(row: PrismaProject | null): InternalProject | null {
-    if (!row || row.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    if (!row || !internalProjectKindSchema.validate(row.kind)) return null;
     return this.mapInternalRequired(row);
   }
 

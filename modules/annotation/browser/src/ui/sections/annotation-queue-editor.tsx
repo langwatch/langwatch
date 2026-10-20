@@ -10,7 +10,6 @@ import {
   Field,
   HStack,
   Input,
-  Spacer,
   Tag,
   Text,
   Textarea,
@@ -206,190 +205,158 @@ export function AnnotationQueueEditor({
   };
 
   return (
-    <Drawer.Root
-      open
-      placement="end"
+    <Drawer
+      onClose={onClose}
       size="lg"
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      title={queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
+      onSubmit={submit}
+      footer={{
+        primaryAction: {
+          label: "Save",
+          type: "submit",
+          loading: save.isPending,
+          "data-testid": "annotation-queue-editor-save",
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger onClick={onClose} />
-          </HStack>
-          <HStack>
-            <Drawer.Title>
-              {queueId ? "Edit Annotation Queue" : "Create Annotation Queue"}
-            </Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <form
-            onSubmit={(event) => {
-              event.preventDefault();
-              submit();
-            }}
+      <VStack align="start" gap={4}>
+        {problem && (
+          <Text color="fg.error" fontSize="sm" role="alert">
+            {problem}
+          </Text>
+        )}
+
+        <Field.Root>
+          <Field.Label>Participants</Field.Label>
+          <Popover.Root
+            open={participantsOpen && !noMembers}
+            onOpenChange={({ open }) => setParticipantsOpen(open)}
+            positioning={{ placement: "bottom-start" }}
           >
-            <VStack align="start" gap={4}>
-              {problem && (
-                <Text color="fg.error" fontSize="sm" role="alert">
-                  {problem}
-                </Text>
-              )}
+            <Popover.Trigger asChild>
+              <PickedTrigger
+                picked={participantNames(participants, members)}
+                disabled={!organization.data || noMembers}
+                aria-describedby={noMembers ? participantHintId : void 0}
+                placeholder="Add Participants"
+                data-testid="annotation-queue-editor-participants"
+              />
+            </Popover.Trigger>
+            <Popover.Content width="300px">
+              <Popover.Body padding={1}>
+                <VStack align="start" gap={0} maxHeight="min(320px, 50vh)" overflowY="auto">
+                  {members.map((member) => {
+                    const isPicked = participants.some(
+                      (participant) => participant.id === member.user.id,
+                    );
 
-              <Field.Root>
-                <Field.Label>Participants</Field.Label>
-                <Popover.Root
-                  open={participantsOpen && !noMembers}
-                  onOpenChange={({ open }) => setParticipantsOpen(open)}
-                  positioning={{ placement: "bottom-start" }}
-                >
-                  <Popover.Trigger asChild>
-                    <PickedTrigger
-                      picked={participantNames(participants, members)}
-                      disabled={!organization.data || noMembers}
-                      aria-describedby={noMembers ? participantHintId : void 0}
-                      placeholder="Add Participants"
-                      data-testid="annotation-queue-editor-participants"
-                    />
-                  </Popover.Trigger>
-                  <Popover.Content width="300px">
-                    <Popover.Body padding={1}>
-                      <VStack align="start" gap={0} maxHeight="min(320px, 50vh)" overflowY="auto">
-                        {members.map((member) => {
-                          const isPicked = participants.some(
-                            (participant) => participant.id === member.user.id,
-                          );
+                    return (
+                      <OptionItem
+                        type="button"
+                        key={member.user.id}
+                        data-testid="annotation-queue-editor-participant-option"
+                        aria-pressed={isPicked}
+                        onClick={() =>
+                          setParticipants((current) =>
+                            togglePicked(current, {
+                              id: member.user.id,
+                              name: memberName(member.user),
+                            }),
+                          )
+                        }
+                      >
+                        <ReviewerAvatar size="2xs" name={memberName(member.user)} />
+                        <Text fontSize="sm">{memberName(member.user)}</Text>
+                        <Check
+                          size={16}
+                          aria-hidden
+                          style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                        />
+                      </OptionItem>
+                    );
+                  })}
+                </VStack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Root>
+          <ParticipantOptionsHint empty={noMembers} id={participantHintId} />
+        </Field.Root>
 
-                          return (
-                            <OptionItem
-                              type="button"
-                              key={member.user.id}
-                              data-testid="annotation-queue-editor-participant-option"
-                              aria-pressed={isPicked}
-                              onClick={() =>
-                                setParticipants((current) =>
-                                  togglePicked(current, {
-                                    id: member.user.id,
-                                    name: memberName(member.user),
-                                  }),
-                                )
-                              }
-                            >
-                              <ReviewerAvatar size="2xs" name={memberName(member.user)} />
-                              <Text fontSize="sm">{memberName(member.user)}</Text>
-                              <Check
-                                size={16}
-                                aria-hidden
-                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
-                              />
-                            </OptionItem>
-                          );
-                        })}
-                      </VStack>
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Root>
-                <ParticipantOptionsHint empty={noMembers} id={participantHintId} />
-              </Field.Root>
+        <Field.Root invalid={!!problems.name} width="full">
+          <Field.Label>Name Annotation Queue</Field.Label>
+          <Input
+            value={name}
+            required
+            onChange={(event) => setName(event.target.value)}
+            data-testid="annotation-queue-editor-name"
+          />
+          <Field.ErrorText>{problems.name}</Field.ErrorText>
+          <Field.HelperText>Give it a name to identify this annotation queue</Field.HelperText>
+        </Field.Root>
 
-              <Field.Root invalid={!!problems.name} width="full">
-                <Field.Label>Name Annotation Queue</Field.Label>
-                <Input
-                  value={name}
-                  required
-                  onChange={(event) => setName(event.target.value)}
-                  data-testid="annotation-queue-editor-name"
-                />
-                <Field.ErrorText>{problems.name}</Field.ErrorText>
-                <Field.HelperText>
-                  Give it a name to identify this annotation queue
-                </Field.HelperText>
-              </Field.Root>
+        <Field.Root invalid={!!problems.description} width="full">
+          <Field.Label>Description</Field.Label>
+          <Textarea
+            value={description}
+            required
+            data-testid="annotation-queue-editor-description"
+            onChange={(event) => setDescription(event.target.value)}
+          />
+          <Field.ErrorText>{problems.description}</Field.ErrorText>
+          <Field.HelperText>Provide a description of the annotation</Field.HelperText>
+        </Field.Root>
 
-              <Field.Root invalid={!!problems.description} width="full">
-                <Field.Label>Description</Field.Label>
-                <Textarea
-                  value={description}
-                  required
-                  data-testid="annotation-queue-editor-description"
-                  onChange={(event) => setDescription(event.target.value)}
-                />
-                <Field.ErrorText>{problems.description}</Field.ErrorText>
-                <Field.HelperText>Provide a description of the annotation</Field.HelperText>
-              </Field.Root>
+        <Field.Root>
+          <Field.Label>Score Type</Field.Label>
+          <Popover.Root
+            open={scoreTypesOpen && !noScores}
+            onOpenChange={({ open }) => setScoreTypesOpen(open)}
+            positioning={{ placement: "bottom-start" }}
+          >
+            <Popover.Trigger asChild>
+              <PickedTrigger
+                picked={scoreTypes}
+                disabled={!scores.data || noScores}
+                aria-describedby={noScores ? scoreHintId : void 0}
+                placeholder="Add Score Type"
+                data-testid="annotation-queue-editor-score-types"
+              />
+            </Popover.Trigger>
+            <Popover.Content width="300px">
+              <Popover.Body padding={1}>
+                <VStack align="start" gap={0} maxHeight="250px" overflowY="auto">
+                  {(scores.data ?? []).map((score) => {
+                    const isPicked = scoreTypes.some((scoreType) => scoreType.id === score.id);
 
-              <Field.Root>
-                <Field.Label>Score Type</Field.Label>
-                <Popover.Root
-                  open={scoreTypesOpen && !noScores}
-                  onOpenChange={({ open }) => setScoreTypesOpen(open)}
-                  positioning={{ placement: "bottom-start" }}
-                >
-                  <Popover.Trigger asChild>
-                    <PickedTrigger
-                      picked={scoreTypes}
-                      disabled={!scores.data || noScores}
-                      aria-describedby={noScores ? scoreHintId : void 0}
-                      placeholder="Add Score Type"
-                      data-testid="annotation-queue-editor-score-types"
-                    />
-                  </Popover.Trigger>
-                  <Popover.Content width="300px">
-                    <Popover.Body padding={1}>
-                      <VStack align="start" gap={0} maxHeight="250px" overflowY="auto">
-                        {(scores.data ?? []).map((score) => {
-                          const isPicked = scoreTypes.some(
-                            (scoreType) => scoreType.id === score.id,
-                          );
-
-                          return (
-                            <OptionItem
-                              type="button"
-                              key={score.id}
-                              data-testid="annotation-queue-editor-score-option"
-                              aria-pressed={isPicked}
-                              onClick={() =>
-                                setScoreTypes((current) =>
-                                  togglePicked(current, { id: score.id, name: score.name }),
-                                )
-                              }
-                            >
-                              <Text fontSize="sm">{score.name}</Text>
-                              <Check
-                                size={16}
-                                aria-hidden
-                                style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
-                              />
-                            </OptionItem>
-                          );
-                        })}
-                      </VStack>
-                    </Popover.Body>
-                  </Popover.Content>
-                </Popover.Root>
-                <ScoreOptionsHint empty={noScores} id={scoreHintId} />
-              </Field.Root>
-
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  colorPalette="orange"
-                  type="submit"
-                  minWidth="fit-content"
-                  loading={save.isPending}
-                  data-testid="annotation-queue-editor-save"
-                >
-                  Save
-                </Button>
-              </HStack>
-            </VStack>
-          </form>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+                    return (
+                      <OptionItem
+                        type="button"
+                        key={score.id}
+                        data-testid="annotation-queue-editor-score-option"
+                        aria-pressed={isPicked}
+                        onClick={() =>
+                          setScoreTypes((current) =>
+                            togglePicked(current, { id: score.id, name: score.name }),
+                          )
+                        }
+                      >
+                        <Text fontSize="sm">{score.name}</Text>
+                        <Check
+                          size={16}
+                          aria-hidden
+                          style={{ marginInlineStart: "auto", opacity: isPicked ? 1 : 0 }}
+                        />
+                      </OptionItem>
+                    );
+                  })}
+                </VStack>
+              </Popover.Body>
+            </Popover.Content>
+          </Popover.Root>
+          <ScoreOptionsHint empty={noScores} id={scoreHintId} />
+        </Field.Root>
+      </VStack>
+    </Drawer>
   );
 }
 

@@ -76,7 +76,7 @@ export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement
             const isPast = i < currentIdx;
             const labelNode = (
               <Box>
-                <Text textStyle="xs" fontWeight={500} color="fg">
+                <Text textStyle="xs" fontWeight="medium" color="fg">
                   {chapter.label}
                 </Text>
                 <Text textStyle="2xs" color="fg.muted">
@@ -129,7 +129,7 @@ export function BeadStrip({ stage, onJump }: BeadStripProps): React.ReactElement
           <Text as="span" color="fg.subtle">
             {currentIdx + 1} of {total} ·
           </Text>{" "}
-          <Text as="span" color="fg.muted" fontWeight={500}>
+          <Text as="span" color="fg.muted" fontWeight="medium">
             {currentChapter.label}
           </Text>
         </Text>

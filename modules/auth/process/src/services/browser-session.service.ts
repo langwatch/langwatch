@@ -28,14 +28,10 @@ import type {
   StoredBrowserSession,
 } from "../repositories/auth-session.repository.ts";
 import { liveImpersonation } from "../rules/impersonation-claims.rules.ts";
+import { BrowserSessionCacheService } from "./browser-session-cache.service.ts";
 import type { SessionBoundService } from "./session-bound.service.ts";
 
-const CACHE_PREFIX = "better-auth:";
 const logger = createLogger("langwatch:auth:session-lifecycle");
-const activeSessionsKey = (userId: string) => `${CACHE_PREFIX}active-sessions-${userId}`;
-const tokenCacheKey = (token: string) => `${CACHE_PREFIX}${token}`;
-
-type CachedSession = { token: string; expiresAt: number };
 
 /** How long a person's stored name, address and status are trusted on a session read. */
 export const SESSION_PERSON_TTL_MS = 30_000;
@@ -66,8 +62,15 @@ export class BrowserSessionService {
   }
 
   readonly #people = new Map<string, { value: Promise<SessionPerson>; until: number }>();
+  readonly #cachedSessions: BrowserSessionCacheService;
 
-  private constructor(private readonly deps: BrowserSessionDeps) {}
+  private constructor(private readonly deps: BrowserSessionDeps) {
+    this.#cachedSessions = BrowserSessionCacheService.create({
+      sessions: deps.sessions,
+      cache: deps.cache,
+      now: () => deps.now(),
+    });
+  }
 
   countSignedInUsers(input: { at: number }): Promise<number> {
     return this.deps.sessions.countSignedInUsers(input);
@@ -81,13 +84,16 @@ export class BrowserSessionService {
   async resolveBrowserSession(input: {
     verified: VerifiedBrowserSession;
     fresh?: boolean;
+    background?: boolean;
   }): Promise<BrowserSessionResolution> {
     const verified = verifiedBrowserSessionSchema.parse(input.verified);
 
     const stored = await this.deps.sessions.findById({ id: verified.session.id });
     if (!stored) return { kind: "anonymous" };
 
-    if (await this.pastItsWindow({ stored })) return { kind: "anonymous" };
+    if (await this.pastItsWindow({ stored, background: input.background ?? false })) {
+      return { kind: "anonymous" };
+    }
 
     const { user, identityEmail } = await this.person({
       userId: verified.user.id,
@@ -201,8 +207,15 @@ export class BrowserSessionService {
    * so: a session honoured in one place and refused in another has not
    * ended. A destroy that fails still refuses the caller.
    */
-  private async pastItsWindow({ stored }: { stored: StoredBrowserSession }): Promise<boolean> {
+  private async pastItsWindow({
+    stored,
+    background = false,
+  }: {
+    stored: StoredBrowserSession;
+    background?: boolean;
+  }): Promise<boolean> {
     const verdict = await this.deps.sessionBound.enforce({
+      background,
       session: {
         id: stored.id,
         userId: stored.userId,
@@ -304,6 +317,7 @@ export class BrowserSessionService {
         signedInAt: toDate(record.createdAt).toISOString(),
         lastActiveAt: toDate(record.updatedAt).toISOString(),
         expiresAt: toDate(record.expires).toISOString(),
+        startedBySignUp: record.startedBySignUp,
         current: record.id === currentSessionId,
       }),
     );
@@ -329,9 +343,9 @@ export class BrowserSessionService {
     const records = await this.deps.sessions.findForUser({ userId });
     if (!records.some((record) => record.id === sessionId)) return { ended: 0 };
 
-    const tokens = await this.tokensToClear({ userId });
+    const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const ended = await this.deps.sessions.deleteById({ id: sessionId });
-    await this.clearCachedSessions({ userId, tokens });
+    await this.#cachedSessions.clearCachedSessions({ userId, tokens });
     logger.info({ ended, sessionId, userId }, "Ended one of a person's own browser sessions");
 
     return { ended };
@@ -352,12 +366,12 @@ export class BrowserSessionService {
     const minted = records.filter((record) => record.identifierId === identifierId);
     if (minted.length === 0) return { ended: 0 };
 
-    const tokens = await this.tokensToClear({ userId });
+    const tokens = await this.#cachedSessions.tokensToClear({ userId });
     let ended = 0;
     for (const record of minted) {
       ended += await this.deps.sessions.deleteById({ id: record.id });
     }
-    await this.clearCachedSessions({ userId, tokens });
+    await this.#cachedSessions.clearCachedSessions({ userId, tokens });
     logger.info({ ended, identifierId, userId }, "Ended the sessions one sign-in method minted");
 
     return { ended };
@@ -365,9 +379,9 @@ export class BrowserSessionService {
 
   /** Rows first, then the cache (Better Auth's own order), so no refresh re-caches a dead row. */
   async revokeAllBrowserSessions({ userId }: { userId: string }): Promise<void> {
-    const tokens = await this.tokensToClear({ userId });
+    const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteAllForUser({ userId });
-    await this.clearCachedSessions({ userId, tokens });
+    await this.#cachedSessions.clearCachedSessions({ userId, tokens });
     logger.info({ deleted, userId }, "Revoked all browser sessions for user");
   }
 
@@ -379,9 +393,11 @@ export class BrowserSessionService {
     }
 
     const userId = session.userId;
-    const tokens = await this.tokensToClear({ userId });
+    const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const [deletion] = await Promise.allSettled([this.deps.sessions.deleteById({ id: sessionId })]);
-    const [cache] = await Promise.allSettled([this.dropCachedSessions({ userId, tokens })]);
+    const [cache] = await Promise.allSettled([
+      this.#cachedSessions.dropCachedSessions({ userId, tokens }),
+    ]);
     for (const outcome of [deletion, cache]) {
       if (outcome.status === "rejected") throw outcome.reason;
     }
@@ -396,73 +412,14 @@ export class BrowserSessionService {
     keepSessionId: string;
   }): Promise<void> {
     const keep = await this.deps.sessions.findById({ id: keepSessionId });
-    const tokens = await this.tokensToClear({ userId });
+    const tokens = await this.#cachedSessions.tokensToClear({ userId });
     const deleted = await this.deps.sessions.deleteOthersForUser({ userId, keepSessionId });
-    await this.clearCachedSessions({ userId, tokens, keepToken: keep?.sessionToken });
+    await this.#cachedSessions.clearCachedSessions({
+      userId,
+      tokens,
+      keepToken: keep?.sessionToken,
+    });
     logger.info({ deleted, keepSessionId, userId }, "Revoked other browser sessions for user");
-  }
-
-  /** Read before the rows go: a deleted row no longer names its token. None without a cache. */
-  private async tokensToClear({ userId }: { userId: string }): Promise<string[]> {
-    return this.deps.cache ? this.deps.sessions.findTokensForUser({ userId }) : [];
-  }
-
-  private async clearCachedSessions({
-    userId,
-    tokens,
-    keepToken,
-  }: {
-    userId: string;
-    tokens: readonly string[];
-    keepToken?: string;
-  }): Promise<void> {
-    try {
-      await this.dropCachedSessions({ userId, tokens, keepToken });
-    } catch (error) {
-      logger.error(
-        { error, userId },
-        "Failed to clear Better Auth session cache during revocation",
-      );
-    }
-  }
-
-  private async dropCachedSessions({
-    userId,
-    tokens,
-    keepToken,
-  }: {
-    userId: string;
-    tokens: readonly string[];
-    keepToken?: string;
-  }): Promise<void> {
-    const cache = this.deps.cache;
-    if (!cache) {
-      return;
-    }
-
-    const indexKey = activeSessionsKey(userId);
-    const cached = (await cache.findValues({ key: indexKey })).flatMap(parseCachedSessions);
-    const retained = cached.filter(({ token }) => token === keepToken);
-    for (const { token } of cached) {
-      if (token !== keepToken) {
-        await cache.delete({ key: tokenCacheKey(token) });
-      }
-    }
-
-    for (const token of tokens) {
-      if (token !== keepToken) {
-        await cache.delete({ key: tokenCacheKey(token) });
-      }
-    }
-
-    // Better Auth's own lifetime for this index: its furthest live session.
-    const furthest = Math.max(0, ...retained.map(({ expiresAt }) => expiresAt));
-    const ttlSeconds = Math.ceil((furthest - this.deps.now().epochMilliseconds) / 1_000);
-    if (ttlSeconds > 0) {
-      await cache.set({ key: indexKey, value: JSON.stringify(retained), ttlSeconds });
-    } else {
-      await cache.delete({ key: indexKey });
-    }
   }
 }
 
@@ -470,31 +427,3 @@ type SessionPerson = {
   user: Awaited<ReturnType<UserApi["findById"]>>;
   identityEmail: Awaited<ReturnType<IdentityEmailService["resolveEmail"]>> | undefined;
 };
-
-function parseCachedSessions(value: string): CachedSession[] {
-  if (!value) {
-    return [];
-  }
-
-  try {
-    const parsed: unknown = JSON.parse(value);
-    if (!Array.isArray(parsed)) {
-      return [];
-    }
-
-    return parsed.flatMap((item): CachedSession[] => {
-      if (
-        typeof item === "object" &&
-        item !== null &&
-        typeof item.token === "string" &&
-        typeof item.expiresAt === "number"
-      ) {
-        return [{ token: item.token, expiresAt: item.expiresAt }];
-      }
-
-      return [];
-    });
-  } catch {
-    return [];
-  }
-}

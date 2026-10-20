@@ -59,6 +59,10 @@ func (tenancy Tenancy) writeMemberships(out *strings.Builder) {
 }
 
 func (tenancy Tenancy) writeTeams(out *strings.Builder) {
+	members := map[string][]*User{}
+	for i := range tenancy.Users {
+		members[tenancy.Users[i].OrganizationID] = append(members[tenancy.Users[i].OrganizationID], &tenancy.Users[i])
+	}
 	for i := range tenancy.Teams {
 		team := &tenancy.Teams[i]
 		owner := "NULL"
@@ -67,13 +71,20 @@ func (tenancy Tenancy) writeTeams(out *strings.Builder) {
 		}
 		fmt.Fprintf(out, "INSERT INTO \"Team\" (id, name, slug, \"organizationId\", \"createdAt\", \"updatedAt\", \"isPersonal\", \"ownerUserId\") VALUES (%s, %s, %s, %s, %s, %s, %t, %s);\n",
 			quote(team.ID), quote(team.Name), quote(team.Slug), quote(team.OrganizationID), sqlTime(team.CreatedAt), sqlTime(team.CreatedAt), team.Personal, owner)
-		tenancy.writeTeamUsers(out, team)
+		tenancy.writeTeamUsers(out, team, members[team.OrganizationID])
 	}
 }
 
-func (tenancy Tenancy) writeTeamUsers(out *strings.Builder, team *Team) {
-	for _, user := range tenancy.Users {
-		if user.OrganizationID == team.OrganizationID && (!team.Personal || user.ID == team.OwnerUserID) {
+// writeTeamUsers puts the organization's members in the team (only its owner in a personal team); tier L
+// caps a team at teamMembersCap so ten big organizations do not make tens of millions of rows.
+func (tenancy Tenancy) writeTeamUsers(out *strings.Builder, team *Team, members []*User) {
+	written := 0
+	for _, user := range members {
+		if tenancy.teamMembersCap > 0 && written >= tenancy.teamMembersCap {
+			return
+		}
+		if !team.Personal || user.ID == team.OwnerUserID {
+			written++
 			fmt.Fprintf(out, "INSERT INTO \"TeamUser\" (\"userId\", \"teamId\", role, \"createdAt\", \"updatedAt\") VALUES (%s, %s, %s, %s, %s);\n",
 				quote(user.ID), quote(team.ID), quote(user.Role), sqlTime(team.CreatedAt), sqlTime(team.CreatedAt))
 		}

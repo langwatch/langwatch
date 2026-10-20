@@ -1,4 +1,5 @@
-import { Card, Heading, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { VStack } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -54,17 +55,12 @@ export function OpsDashboardContent({ data }: { data: DashboardData }) {
         pausedKeys={data.pausedKeys}
       />
 
-      <Card.Root variant="outline" overflow="hidden" borderColor="border.muted" boxShadow="none">
-        <Card.Header>
-          <Heading size="sm">Throughput</Heading>
-          <Text textStyle="sm" color="fg.muted">
-            Arrival and completion rates alongside the queue backlog.
-          </Text>
-        </Card.Header>
-        <Card.Body>
-          <ThroughputChart data={data} />
-        </Card.Body>
-      </Card.Root>
+      <Card
+        title="Throughput"
+        description="Arrival and completion rates alongside the queue backlog."
+      >
+        <ThroughputChart data={data} />
+      </Card>
 
       <LatencyWindowsCard windows={data.latencyWindows} />
 

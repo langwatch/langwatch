@@ -6,7 +6,7 @@
 import type { WireOf } from "@langwatch/api/web";
 import { useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   INHERIT_SENTINEL,
   ProviderModelSelector,
@@ -159,25 +159,22 @@ function nextHydration({
 
 /**
  * Creating: at least one key must be pinned, since an all-inherit config is a no-op the
- * server refuses. Editing: an empty config is a valid save (it deletes the config), but the
- * target row must have loaded first — an unsettled query turned edits into creates.
+ * server refuses. Every config needs a scope. Editing: an empty config is a valid save
+ * (it deletes the config), but the target row must have loaded first.
  */
-function canSaveConfig({
-  busy,
-  editing,
+function configProblems({
   editingId,
   hasAnyKey,
   scopes,
 }: {
-  busy: boolean;
-  editing: ConfigRow | undefined;
   editingId: string | undefined;
   hasAnyKey: boolean;
   scopes: ScopeTriadEntry[];
-}): boolean {
-  if (scopes.length === 0 || busy) return false;
-
-  return editingId ? !!editing : hasAnyKey;
+}): { scope?: string; models?: string } {
+  return {
+    scope: scopes.length === 0 ? "Pick at least one scope." : void 0,
+    models: !editingId && !hasAnyKey ? "Set a model for at least one role." : void 0,
+  };
 }
 
 /**
@@ -396,6 +393,9 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     EMBEDDINGS: false,
   });
   const [busy, setBusy] = useState(false);
+  const [attempted, setAttempted] = useState(false);
+  const scopeRef = useRef<HTMLDivElement>(null);
+  const rolesRef = useRef<HTMLDivElement>(null);
 
   const hydratedForRef = useRef<string | null>(null);
   useEffect(() => {
@@ -403,6 +403,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     if (!next) return;
 
     hydratedForRef.current = next.target;
+    setAttempted(false);
     setScopes(next.scopes);
     setConfig(next.config);
   }, [editingId, editing]);
@@ -457,10 +458,21 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   }, []);
 
   const hasAnyKey = Object.keys(config).length > 0;
-  const canSave = canSaveConfig({ busy, editing, editingId, hasAnyKey, scopes });
+  const problems = configProblems({ editingId, hasAnyKey, scopes });
+  const targetPending = !!editingId && !editing;
 
   const handleSave = useCallback(async () => {
-    if (!canSave) return;
+    if (busy || targetPending) return;
+
+    setAttempted(true);
+    if (problems.scope) {
+      focusFirstControl(scopeRef.current);
+      return;
+    }
+    if (problems.models) {
+      focusFirstControl(rolesRef.current);
+      return;
+    }
 
     const copy = saveOutcomeCopy({ editingId, hasAnyKey });
     setBusy(true);
@@ -478,72 +490,84 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
     } finally {
       setBusy(false);
     }
-  }, [canSave, saveMutation, editingId, hasAnyKey, config, scopes, utils, host, onClose]);
+  }, [
+    busy,
+    targetPending,
+    problems.scope,
+    problems.models,
+    saveMutation,
+    editingId,
+    hasAnyKey,
+    config,
+    scopes,
+    utils,
+    host,
+    onClose,
+  ]);
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      onOpenChange={(d) => {
-        if (!d.open) onClose();
+      onClose={onClose}
+      size="sm"
+      title={editing ? "Edit default models" : "Add default models"}
+      data-testid="default-model-override-drawer"
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: editing ? "Save changes" : "Add config",
+          onClick: handleSave,
+          loading: busy,
+          disabledReason: targetPending ? "Loading this config" : void 0,
+          "data-testid": "config-save",
+        },
       }}
-      size="md"
     >
-      <Drawer.Content data-testid="default-model-override-drawer" portalled={false}>
-        <Drawer.Header>
-          <Drawer.Title>{editing ? "Edit default models" : "Add default models"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={5}>
-            <ScopeSection scopes={scopes} onChange={setScopes} available={available} />
-            <ReplacedConfigsNote
-              scopes={scopes}
-              configs={dataQuery.data?.configs ?? []}
-              editingId={editingId}
-            />
+      <VStack align="stretch" gap={5}>
+        <Box ref={scopeRef}>
+          <ScopeSection scopes={scopes} onChange={setScopes} available={available} />
+          {attempted && problems.scope && (
+            <Text color="red.fg" fontSize="xs" role="alert" data-testid="scope-error">
+              {problems.scope}
+            </Text>
+          )}
+        </Box>
+        <ReplacedConfigsNote
+          scopes={scopes}
+          configs={dataQuery.data?.configs ?? []}
+          editingId={editingId}
+        />
 
-            <VStack align="stretch" gap={2}>
-              {ROLES.map((role) => (
-                <RoleRow
-                  key={role}
-                  role={role}
-                  config={config}
-                  features={featuresByRole[role]}
-                  inheritedForRole={inherited[role] ?? null}
-                  inheritedForFeature={inherited}
-                  expanded={expanded[role]}
-                  onToggleExpand={() => setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))}
-                  modelOptions={modelOptionsByRole[role]}
-                  onSetOverride={setOverride}
-                  displayNames={displayNames}
-                />
-              ))}
-            </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          {/* Delete moved to the row's 3-dot menu in the table - matches
-              the model-providers row pattern. The drawer is purely
-              edit/save. */}
-          <HStack width="full" justify="flex-end" gap={2}>
-            <Button variant="outline" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              size="sm"
-              onClick={handleSave}
-              disabled={!canSave}
-              loading={busy}
-              data-testid="config-save"
-            >
-              {editing ? "Save changes" : "Add config"}
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        <VStack align="stretch" gap={2} ref={rolesRef}>
+          {attempted && problems.models && (
+            <Text color="red.fg" fontSize="xs" role="alert" data-testid="models-error">
+              {problems.models}
+            </Text>
+          )}
+          {ROLES.map((role) => (
+            <RoleRow
+              key={role}
+              role={role}
+              config={config}
+              features={featuresByRole[role]}
+              inheritedForRole={inherited[role] ?? null}
+              inheritedForFeature={inherited}
+              expanded={expanded[role]}
+              onToggleExpand={() => setExpanded((prev) => ({ ...prev, [role]: !prev[role] }))}
+              modelOptions={modelOptionsByRole[role]}
+              onSetOverride={setOverride}
+              displayNames={displayNames}
+            />
+          ))}
+        </VStack>
+      </VStack>
+    </Drawer>
   );
+}
+
+/** Moves focus to the first control inside a group, so a failed save lands the cursor there. */
+function focusFirstControl(group: HTMLElement | null) {
+  group?.querySelector<HTMLElement>('input, button, [role="combobox"]')?.focus();
 }
 
 type InheritedEntry = ModelDefaultInheritedValues["inherited"][string];

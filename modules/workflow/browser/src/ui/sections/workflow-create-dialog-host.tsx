@@ -2,24 +2,23 @@
  * Creating a workflow, from a template or from an imported file.
  */
 
-import { Dialog } from "@langwatch/design-system/dialog";
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
 import {
   Button,
   Field,
   HStack,
   Input,
   Textarea,
-  useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { studioWorkflowWireSchema, type StudioWorkflow } from "@langwatch/workflow-contract";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { useForm } from "react-hook-form";
 
 import { workflowApi } from "../../behavior/workflow-api.ts";
 import { getRandomWorkflowIcon } from "../../model/random-workflow-icon.ts";
 import { useWorkflowHost } from "../../model/workflow-host.ts";
-import { WorkflowEmojiPicker } from "../blocks/workflow-emoji-picker.tsx";
 import {
   WorkflowCreateDialog as WorkflowCreateDialogView,
   type WorkflowTemplateCardProps,
@@ -56,7 +55,14 @@ export function WorkflowCreateDialogHost({
       renderContentBoundary={(children) => (
         <WorkflowErrorBoundary>{children}</WorkflowErrorBoundary>
       )}
-      renderForm={({ template }) => <NewWorkflowForm template={template} onClose={onClose} />}
+      renderForm={({ template, formId, footerSlot }) => (
+        <NewWorkflowForm
+          template={template}
+          onClose={onClose}
+          formId={formId}
+          footerSlot={footerSlot}
+        />
+      )}
       renderTemplateCard={(props) => <WorkflowTemplateCard {...props} />}
     />
   );
@@ -74,10 +80,19 @@ function WorkflowTemplateCard({ testId, dragging, children, ...props }: Workflow
   );
 }
 
-function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onClose: () => void }) {
+function NewWorkflowForm({
+  template,
+  onClose,
+  formId,
+  footerSlot,
+}: {
+  template: StudioWorkflow;
+  onClose: () => void;
+  formId: string;
+  footerSlot: HTMLElement | null;
+}) {
   const host = useWorkflowHost();
   const { projectId, projectSlug } = host.scope();
-  const emojiPicker = useDisclosure();
   const [defaultIcon] = useState(
     template.icon && template.icon !== "🧩" ? template.icon : getRandomWorkflowIcon(),
   );
@@ -140,54 +155,48 @@ function NewWorkflowForm({ template, onClose }: { template: StudioWorkflow; onCl
   }, [template]);
 
   return (
-    <form onSubmit={handleSubmit(onSubmit)}>
-      <Dialog.Body>
-        <VStack gap={4} align="stretch">
-          <Field.Root invalid={!!errors.name || !!errors.icon}>
-            <WorkflowEmojiPicker
-              open={emojiPicker.open}
-              onClose={emojiPicker.onClose}
-              onChange={(emoji) => {
-                setValue("icon", emoji);
-                emojiPicker.onClose();
+    <form id={formId} onSubmit={handleSubmit(onSubmit)}>
+      <VStack gap={4} align="stretch">
+        <Field.Root invalid={!!errors.name || !!errors.icon}>
+          <Field.Label>Name and icon</Field.Label>
+          <HStack>
+            <EmojiPicker value={icon} onChange={(emoji) => setValue("icon", emoji)} />
+            <Input
+              {...register("name", { required: "Name is required" })}
+              ref={nameRef}
+              data-testid="workflow-create-name"
+              onChange={(event) => {
+                setValue("name", event.target.value);
               }}
             />
-            <Field.Label>Name and Icon</Field.Label>
-            <HStack>
-              <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
-                {icon}
-              </Button>
-              <Input
-                {...register("name", { required: "Name is required" })}
-                ref={nameRef}
-                data-testid="workflow-create-name"
-                onChange={(event) => {
-                  setValue("name", event.target.value);
-                }}
-              />
-            </HStack>
-            <Field.ErrorText>{errors.name?.message ?? errors.icon?.message}</Field.ErrorText>
-          </Field.Root>
-          <Field.Root invalid={!!errors.description}>
-            <Field.Label>Description</Field.Label>
-            <Textarea {...register("description")} />
-            <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-          </Field.Root>
-        </VStack>
-      </Dialog.Body>
-      <Dialog.Footer>
-        <Button
-          type="submit"
-          colorPalette="blue"
-          data-testid="workflow-create-submit"
-          loading={createWorkflowMutation.isPending}
-          onClick={() => {
-            void handleSubmit(onSubmit)();
-          }}
-        >
-          Create workflow
-        </Button>
-      </Dialog.Footer>
+          </HStack>
+          <Field.ErrorText>{errors.name?.message ?? errors.icon?.message}</Field.ErrorText>
+        </Field.Root>
+        <Field.Root invalid={!!errors.description}>
+          <Field.Label>Description</Field.Label>
+          <Textarea {...register("description")} />
+          <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+        </Field.Root>
+      </VStack>
+      {footerSlot &&
+        createPortal(
+          <>
+            <Button variant="ghost" onClick={onClose}>
+              Cancel
+            </Button>
+            <Button
+              type="submit"
+              form={formId}
+              colorPalette="orange"
+              variant="solid"
+              data-testid="workflow-create-submit"
+              loading={createWorkflowMutation.isPending}
+            >
+              Create workflow
+            </Button>
+          </>,
+          footerSlot,
+        )}
     </form>
   );
 }

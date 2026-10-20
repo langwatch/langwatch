@@ -22,9 +22,7 @@ export const STATUS_LINE_ROW = {
 
 /** The shared text metrics of the status/thinking line. */
 export const STATUS_LINE_TEXT = {
-  fontSize: "13px",
-  lineHeight: "1.5",
-  letterSpacing: "-0.005em",
+  textStyle: "bodySm",
 } as const;
 
 /**

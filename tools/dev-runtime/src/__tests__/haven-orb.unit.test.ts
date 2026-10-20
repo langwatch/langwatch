@@ -139,3 +139,44 @@ describe("haven orb on a built-UI stack", () => {
     });
   });
 });
+
+describe("given the api's port forwards to a generation over a pooled connection", () => {
+  describe("when an answer says keep-alive to a request that arrived saying close", () => {
+    /** @scenario "the api's port relays no connection headers" */
+    it("serves the next request too, because the close never reached the api", async () => {
+      const stable = await freeLoopbackPort();
+      const forwarder = await forwardPortWithOrb({ port: stable });
+      closers.push(() => forwarder.close());
+      const refused: string[] = [];
+      const server = http.createServer((_request, response) => {
+        response.writeHead(200, { "content-type": "text/event-stream", connection: "keep-alive" });
+        response.end("data: hint\n\n");
+      });
+      server.on("clientError", (error: NodeJS.ErrnoException, socket: net.Socket) => {
+        refused.push(error.code ?? "");
+        socket.destroy();
+      });
+      await new Promise<void>((resolve) => server.listen(0, "127.0.0.1", resolve));
+      closers.push(() => {
+        server.closeAllConnections();
+        return new Promise<void>((resolve) => server.close(() => resolve()));
+      });
+      forwarder.route((server.address() as net.AddressInfo).port);
+      const ask = (): Promise<http.IncomingMessage> =>
+        new Promise((resolve, reject) => {
+          const headers = { connection: "close" };
+          http
+            .get(
+              { host: "127.0.0.1", port: stable, path: "/api/sse", headers, agent: false },
+              (r) => r.resume().on("end", () => resolve(r)),
+            )
+            .on("error", reject);
+        });
+
+      const statuses = [(await ask()).statusCode, (await ask()).statusCode];
+
+      expect(statuses).toEqual([200, 200]);
+      expect(refused).toEqual([]);
+    });
+  });
+});

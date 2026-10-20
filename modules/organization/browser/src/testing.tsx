@@ -3,7 +3,6 @@
  * the abstract host port rather than mocking a module. Not exported.
  */
 
-import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import type { UiAnalytics } from "@langwatch/browser-host/analytics";
 import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
 import {
@@ -12,6 +11,7 @@ import {
   type UiDrawerToken,
 } from "@langwatch/browser-host/declarations";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
+import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
 import type { ReactElement, ReactNode } from "react";

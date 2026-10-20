@@ -11,11 +11,8 @@ import {
 } from "react-icons/lu";
 
 import { HomeCard } from "./home-card.tsx";
-import {
-  HOME_SECTION_GAP,
-  HOME_SECTION_PADDING,
-  HomeSectionHeader,
-} from "./home-section-header.tsx";
+import { HomeSectionHeader } from "./home-section-header.tsx";
+import { HOME_SECTION_GAP, HOME_SECTION_PADDING } from "./home-section-layout.ts";
 
 /**
  * Docs & guides, said out loud: four first-class guide links, each naming a
@@ -125,17 +122,17 @@ function GuideTile({ guide }: { guide: Guide }) {
         padding={1.5}
         borderRadius="md"
         background="bg.muted"
-        color={`${guide.family}.solid`}
+        color="fg.muted"
         display="grid"
         placeItems="center"
       >
         <Icon size={14} />
       </Box>
       <VStack align="start" gap={0} flex={1} minWidth={0}>
-        <Text fontSize="13px" color="fg" lineHeight="1.3">
+        <Text textStyle="bodySm" color="fg">
           {guide.title}
         </Text>
-        <Text fontSize="11.5px" color="fg.muted" lineClamp={1}>
+        <Text textStyle="caption" color="fg.muted" lineClamp={1}>
           {guide.blurb}
         </Text>
       </VStack>

@@ -48,7 +48,6 @@ describe.skipIf(!DB_URL)("the live project repositories over Postgres", () => {
         logger: { error: () => undefined },
         projects: {
           findWithOrgAdmin: async () => null,
-          findIdsByOrganization: async () => [],
           findWithTeam: async () => null,
         },
       }),

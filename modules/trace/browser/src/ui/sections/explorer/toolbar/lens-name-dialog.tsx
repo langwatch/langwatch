@@ -1,15 +1,7 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, HStack, Input, Stack } from "@langwatch/design-system/primitives";
 import type React from "react";
 import { useEffect, useState } from "react";
-
-import {
-  DialogBody,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "../../dialog.tsx";
 
 interface LensNameDialogProps {
   open: boolean;
@@ -48,36 +40,42 @@ export const LensNameDialog: React.FC<LensNameDialogProps> = ({
   };
 
   return (
-    <DialogRoot open={open} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-        </DialogHeader>
-        <DialogBody>
-          <Stack gap={3}>
-            <Input
-              size="sm"
-              placeholder="Lens name"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === "Enter") submit();
-                else if (e.key === "Escape") onOpenChange(false);
-              }}
-            />
-          </Stack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={2} justify="flex-end" width="full">
-            <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
-              Cancel
-            </Button>
-            <Button size="sm" colorPalette="blue" onClick={submit} disabled={!name.trim()}>
-              Create
-            </Button>
-          </HStack>
-        </DialogFooter>
-      </DialogContent>
-    </DialogRoot>
+    <Dialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title={title}
+      size="sm"
+      showCloseButton={false}
+      trapFocus={false}
+      preventScroll={false}
+      footerContent={
+        <HStack gap={2} justify="flex-end" width="full">
+          <Button size="sm" variant="ghost" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            size="sm"
+            colorPalette="orange"
+            variant="solid"
+            onClick={submit}
+            disabled={!name.trim()}
+          >
+            Create
+          </Button>
+        </HStack>
+      }
+    >
+      <Stack gap={3}>
+        <Input
+          size="sm"
+          placeholder="Lens name"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === "Enter") submit();
+          }}
+        />
+      </Stack>
+    </Dialog>
   );
 };

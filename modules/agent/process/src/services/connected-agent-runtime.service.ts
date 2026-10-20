@@ -1,13 +1,16 @@
 /**
  * The per-process composition of connected agents: one pod id, one state
- * store, one registry and one dispatcher (ADR-128). Redis is installed
- * by the composition root (ADR-093) rather than a module singleton.
+ * repository, one relay channel, one registry and one dispatcher (ADR-128).
  */
 
 import type { AgentCallSignal, DispatchAgent, DispatchCall } from "@langwatch/agent-contract";
 import { generate } from "@langwatch/ksuid";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
+import type { ConnectedAgentRelayChannel } from "../channels/connected-agent-relay.channel.ts";
+import type {
+  ConnectedAgentStateRepository,
+  InstanceMeta,
+} from "../repositories/connected-agent-state.repository.ts";
 import { ConnectedAgentDispatchService } from "./connected-agent-dispatch.service.ts";
 import { ConnectedAgentInstanceOwnershipService } from "./connected-agent-instance-ownership.service.ts";
 import { ConnectedAgentRegistryService } from "./connected-agent-registry.service.ts";
@@ -18,20 +21,6 @@ import { ConnectedAgentRegistryService } from "./connected-agent-registry.servic
  * already carried by every running instance, so it belongs with the writer.
  */
 const POD_KSUID_RESOURCE = "pod";
-
-export interface InstanceMeta {
-  instanceId: string;
-  projectId: string;
-  hostname: string;
-  username: string;
-  pid: number;
-  sdk: { name: string; version: string; language: string };
-  label: string | null;
-  /** The app replica that holds the socket. */
-  podId: string;
-  connectedAt: number;
-  maxConcurrency: number;
-}
 
 /** A live instance with the calls it has in flight. */
 export interface LiveInstance extends InstanceMeta {
@@ -50,39 +39,43 @@ export interface DispatchParams {
 
 export interface ConnectedAgentRuntime {
   podId: string;
-  store: SessionStateStore;
+  state: ConnectedAgentStateRepository;
+  relay: ConnectedAgentRelayChannel;
   registry: ConnectedAgentRegistryService;
   dispatcher: ConnectedAgentDispatchService;
   ownership: ConnectedAgentInstanceOwnershipService;
 }
 
 export class ConnectedAgentRuntimeService {
-  /** Builds a runtime around one store; tests build two to play two pods. */
+  /** Builds a runtime around one state and one relay; tests build two to play two pods. */
   static create({
     podId = generate(POD_KSUID_RESOURCE).toString(),
-    store,
+    state,
+    relay,
     firstTurnGraceMs,
     firstTurnPollMs,
     resultPollMs,
   }: {
     podId?: string;
-    store: SessionStateStore;
+    state: ConnectedAgentStateRepository;
+    relay: ConnectedAgentRelayChannel;
     firstTurnGraceMs?: number;
     firstTurnPollMs?: number;
     resultPollMs?: number;
   }): ConnectedAgentRuntime {
-    const registry = ConnectedAgentRegistryService.create(store);
+    const registry = ConnectedAgentRegistryService.create(state);
     const dispatcher = ConnectedAgentDispatchService.create({
       podId,
-      store,
+      state,
+      relay,
       registry,
       firstTurnGraceMs,
       firstTurnPollMs,
       resultPollMs,
     });
 
-    const ownership = ConnectedAgentInstanceOwnershipService.create(store);
-    return { podId, store, registry, dispatcher, ownership };
+    const ownership = ConnectedAgentInstanceOwnershipService.create(state);
+    return { podId, state, relay, registry, dispatcher, ownership };
   }
 
   private constructor() {}

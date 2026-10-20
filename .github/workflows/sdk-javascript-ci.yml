@@ -138,6 +138,8 @@ jobs:
       - uses: ./.github/actions/nx-cache
         with:
           suffix: sdk
+          # Fork code can run here (pull_request_target): no prune permission, so no PR copy.
+          pr-save: "false"
 
       - name: Run lint check
         run: pnpm run lint
@@ -304,6 +306,8 @@ jobs:
       - uses: ./.github/actions/nx-cache
         with:
           suffix: sdk-e2e
+          # Fork code can run here (pull_request_target): no prune permission, so no PR copy.
+          pr-save: "false"
 
       - name: Build mcp-server
         run: pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static

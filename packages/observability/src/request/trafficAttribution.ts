@@ -71,7 +71,8 @@ export function endpointClassOf(pathname: string): EndpointClass {
   if (under({ path, prefix: "/api/rum" })) return "rum";
   if (under({ path, prefix: "/api/trpc" })) return "dashboard";
   if (under({ path, prefix: "/api/auth" })) return "auth";
-  if (under({ path, prefix: "/api/langy" })) return "langy";
+  if (under({ path, prefix: "/api/langy" }) || under({ path, prefix: "/api/v1/langy" }))
+    return "langy";
   if (under({ path, prefix: "/api/gateway" }) || under({ path, prefix: "/api/internal/gateway" })) {
     return "gateway";
   }

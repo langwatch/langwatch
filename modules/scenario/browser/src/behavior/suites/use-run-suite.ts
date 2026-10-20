@@ -180,7 +180,7 @@ function notifyRunScheduled({
       description: `${parts.join(" and ")} skipped.`,
       type: "warning",
       action: {
-        label: "Edit Run Plan",
+        label: "Edit run plan",
         onClick: onEditRunPlan,
       },
     });

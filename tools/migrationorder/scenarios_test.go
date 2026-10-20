@@ -72,7 +72,6 @@ func repoWithStep(t *testing.T, manifest string) string {
 	root := initRepo(t)
 	writeAndCommit(t, root, stepFile, "export const step = defineMigrationStep({ id: \"topic:seed-clusters\" });\n")
 	writeAndCommit(t, root, "modules/topic/process/src/migrations/__tests__/seed.test.ts", "it(\"topic:seed-clusters\")\n")
-	writeAndCommit(t, root, "packages/upgrade/releases/lts-floor.json", `{"release":"3.20.1","namedAt":"2026-10-06"}`)
 	if manifest != "" {
 		writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", manifest)
 	}

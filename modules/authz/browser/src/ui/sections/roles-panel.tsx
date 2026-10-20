@@ -282,7 +282,9 @@ function SectionHeading({
   return (
     <HStack width="full" align="start">
       <Box>
-        <Heading as="h3">{title}</Heading>
+        <Heading size="sm" as="h3">
+          {title}
+        </Heading>
         <Text color="fg.muted" fontSize="sm">
           {hint}
         </Text>

@@ -3,12 +3,11 @@
  * when multi-input workflow receives empty strings.
  */
 
-import type { WorkflowAgentData } from "@langwatch/scenario-contract";
-import { TRPCError } from "@trpc/server";
+import { ScenarioRunRejectedError, type WorkflowAgentData } from "@langwatch/scenario-contract";
 
 /**
- * Validates workflow agent's scenario mappings. Throws BAD_REQUEST for multi-input
- * workflows with no mappings; single-input allowed (legacy fallback handles it).
+ * Validates workflow agent's scenario mappings. Throws ScenarioRunRejectedError for
+ * multi-input workflows with no mappings; single-input allowed (legacy fallback handles it).
  */
 export class ScenarioWorkflowMappingService {
   static create(): ScenarioWorkflowMappingService {
@@ -32,11 +31,9 @@ export class ScenarioWorkflowMappingService {
       return;
     }
 
-    throw new TRPCError({
-      code: "BAD_REQUEST",
-      message:
-        `Workflow agent '${agentId}' has ${inputs.length} inputs but no scenario mappings configured. ` +
+    throw new ScenarioRunRejectedError(
+      `Workflow agent '${agentId}' has ${inputs.length} inputs but no scenario mappings configured. ` +
         `Open the agent editor to configure how scenario data maps to the workflow's inputs.`,
-    });
+    );
   }
 }

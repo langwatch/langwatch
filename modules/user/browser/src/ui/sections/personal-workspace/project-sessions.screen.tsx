@@ -1,7 +1,9 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentSessionsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
+import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";
 
 /**
@@ -10,6 +12,7 @@ import { useOrganizationTeamProject } from "../../../behavior/personal-workspace
  * reads. Spec: specs/coding-agent/project-menu-links.feature.
  */
 export function ProjectSessionsScreen() {
+  const router = usePersonalRouter();
   const { project, isResolved } = useOrganizationTeamProject();
 
   return (
@@ -35,9 +38,18 @@ export function ProjectSessionsScreen() {
           <CodingAgentSessionsTable projectId={project.id} projectSlug={project.slug} />
         ) : null}
         {isResolved && !project && (
-          <Text fontSize="sm" color="fg.muted">
-            No sessions yet
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No sessions yet"
+            next={[
+              {
+                kind: "setting",
+                label: "Connect your AI tools",
+                href: "/me/configure",
+                onNavigate: ({ href }) => router.push(href),
+              },
+            ]}
+          />
         )}
       </VStack>
     </>

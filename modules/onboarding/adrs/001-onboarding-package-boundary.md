@@ -5,7 +5,7 @@
 **Behavioural contract:** [Guided onboarding](../specs/guided-onboarding.feature),
 [Setup checklist](../specs/integrations-checks.feature),
 [Product analytics](../specs/onboarding-product-analytics.feature),
-[Project create](../specs/onboarding-project-create.feature)
+[Retired project address](../specs/onboarding-project-address.feature)
 
 ## Context
 

@@ -1,3 +1,5 @@
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Text } from "@langwatch/design-system/primitives";
 import {
   currentTimeZone,
@@ -30,6 +32,20 @@ function readableMoment(value: TimeInput): Instant | null {
   const epochMs = toEpochMs(value);
   if (Number.isNaN(epochMs)) return null;
   return Temporal.Instant.fromEpochMilliseconds(epochMs);
+}
+
+/** A moment in a table cell, drawn by the design system; a missing value reads as a dash. */
+export function AdminDate({
+  value,
+  display = "date",
+}: {
+  value: TimeInput | null | undefined;
+  display?: "date" | "datetime";
+}) {
+  if (!value) return <EmptyValue />;
+  const moment = readableMoment(value);
+  if (moment === null) return <EmptyValue />;
+  return <FormattedDate value={moment.epochMilliseconds} display={display} />;
 }
 
 /** Human-readable date (respects locale, uses the user's TZ). */

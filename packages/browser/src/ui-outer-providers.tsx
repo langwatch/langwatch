@@ -33,6 +33,8 @@ export type UiOuterProviderInstall = {
    * Absent falls back to the design system package's own default.
    */
   designSystem?: UiDesignSystemShellProps["system"];
+  /** Lets the overlay error boundary show the cause; composition passes the process mode. */
+  isDevelopment?: boolean;
 };
 
 export function createUiOuterProvider({
@@ -41,13 +43,14 @@ export function createUiOuterProvider({
   transport: Transport,
   graphicsQuality: GraphicsQuality,
   designSystem,
+  isDevelopment,
 }: UiOuterProviderInstall): UiProviderShell {
   return function UiOuterProviders({ children }: { children: ReactNode }) {
     return (
       <Attribution>
         <Session>
           <Transport>
-            <UiDesignSystemShell system={designSystem}>
+            <UiDesignSystemShell system={designSystem} isDevelopment={isDevelopment}>
               <GraphicsQuality>{children}</GraphicsQuality>
             </UiDesignSystemShell>
           </Transport>

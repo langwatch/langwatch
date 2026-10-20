@@ -8,27 +8,18 @@
     "types": [],
     "noUncheckedIndexedAccess": true,
     "verbatimModuleSyntax": true,
-    "resolveJsonModule": true
+    "resolveJsonModule": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

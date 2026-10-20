@@ -238,9 +238,11 @@ export {
   type SsoMigrationView,
 } from "./features/sso-arrival/sso-migration.ts";
 export {
+  grandfatheredSsoConnectionId,
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
   lapsedDomainsOf,
+  legacySsoDomainsToMove,
   looksLikeSsoConnectionId,
   type QualifiableConnection,
   qualifySsoDomainOwnership,
@@ -783,9 +785,9 @@ export { pickPrimaryEmail } from "./primary-email.ts";
 export {
   AUTH0_BRIDGE_METHODS,
   AUTH0_SOCIAL_STRATEGIES,
-  auth0BridgeRailIds,
   type Auth0BridgeMethod,
   type Auth0SocialStrategy,
+  namedProviderServesOnlyLegacySso,
 } from "./auth0-bridge.ts";
 export {
   LOCAL_METHOD_SET,

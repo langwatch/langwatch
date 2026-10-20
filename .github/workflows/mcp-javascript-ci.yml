@@ -117,6 +117,8 @@ jobs:
       - uses: ./.github/actions/nx-cache
         with:
           suffix: mcp
+          # Fork code can run here (pull_request_target): no prune permission, so no PR copy.
+          pr-save: "false"
 
       - name: Build
         run: pnpm exec nx run @langwatch/mcp-server:build --outputStyle=static

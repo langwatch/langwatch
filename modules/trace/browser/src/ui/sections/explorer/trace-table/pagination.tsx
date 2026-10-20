@@ -1,3 +1,4 @@
+import { Pagination as PaginationBar } from "@langwatch/design-system/pagination";
 import { TRACE_LIST_MAX_OFFSET_ROWS } from "@langwatch/trace-contract";
 import type React from "react";
 
@@ -5,7 +6,6 @@ import { useExplorerStore } from "../../../../behavior/explorer.store.ts";
 import { useTraceTableScrollElement } from "../../../../behavior/explorer/trace-table/scroll-context.ts";
 import { type PageCursor } from "../../../../behavior/query.slice.ts";
 import { useExplorerCounts } from "../../../../features/explorer/behavior/use-explorer-counts.ts";
-import { Pagination as PaginationBar } from "../../../elements/pagination.tsx";
 
 const PAGE_SIZE_OPTIONS = [25, 50, 100, 250, 500, 1000] as const;
 
@@ -104,6 +104,9 @@ export const Pagination: React.FC<PaginationProps> = ({
       pageSize={effectivePageSize}
       totalCount={totalHits}
       totalSummary={summary}
+      layout="center"
+      ground="card"
+      summaryTone="subtle"
       visibleCount={visibleCount}
       pageSizeOptions={sizeOptions}
       isLoading={isLoading}

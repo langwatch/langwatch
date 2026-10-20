@@ -8,6 +8,8 @@ import { createContext, useContext } from "react";
 /** The project every suppression read is scoped to. */
 export type NotificationHostProject = {
   id: string;
+  /** Names the project in its pages' addresses; absent until the project is read. */
+  slug?: string;
 };
 
 export type NotificationSuccessNotice = {

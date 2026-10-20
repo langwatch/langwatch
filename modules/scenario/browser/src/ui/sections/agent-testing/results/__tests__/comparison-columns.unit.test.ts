@@ -48,17 +48,21 @@ describe("targetColumnWidth", () => {
 describe("comparisonColumns", () => {
   describe("given two targets", () => {
     /** @scenario "A long target name keeps its own column" */
-    it("gives the header and the rows one template and one smallest width", () => {
+    it("shares the width 1.2 to 1 and scrolls before a column drops below its smallest", () => {
       const targets = [
         { label: "support-agent · production" },
         { label: "support-agent · development (Ana)" },
       ];
 
-      const { template, minWidth } = comparisonColumns(targets);
+      const { scenarioWidth, targetWidth, minWidth } = comparisonColumns(targets);
       const width = targetColumnWidth(targets);
 
-      expect(template).toBe(`minmax(200px, 1.2fr) repeat(2, minmax(${width}px, 1fr))`);
-      expect(minWidth).toBe(`${200 + 2 * width}px`);
+      expect(parseFloat(scenarioWidth) / parseFloat(targetWidth)).toBeCloseTo(1.2);
+      expect(parseFloat(scenarioWidth) + 2 * parseFloat(targetWidth)).toBeCloseTo(100);
+      // At the smallest table width, each column still holds its smallest content width.
+      const smallest = parseFloat(minWidth);
+      expect((smallest * parseFloat(scenarioWidth)) / 100).toBeGreaterThanOrEqual(200);
+      expect((smallest * parseFloat(targetWidth)) / 100).toBeGreaterThanOrEqual(width);
     });
   });
 });

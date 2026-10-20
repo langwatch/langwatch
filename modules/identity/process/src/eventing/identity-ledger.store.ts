@@ -22,8 +22,8 @@ import {
   reduceIdentity,
 } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
+import { counter, histogram } from "@langwatch/observability/metrics";
 import { nowInstant } from "@langwatch/time";
-import { Counter, Histogram, register } from "prom-client";
 
 import type { IdentityHeadsRepository } from "../repositories/identity-heads.repository.ts";
 import type { IdentityLedger } from "../rules/identity-ledger.rules.ts";
@@ -33,30 +33,21 @@ import type { IdentityEvent, IdentityFoldState } from "./identity-state.projecti
 
 const logger = createLogger("langwatch:identity:ledger");
 
-// Remove existing metrics if they exist (for hot reload)
-const metricNames = [
-  "identity_projection_convergence_timeouts_total",
-  "identity_commit_duration_seconds",
-] as const;
-
-for (const name of metricNames) {
-  register.removeSingleMetric(name);
-}
-
 /**
  * A ceremony's read-your-writes wait expired before the fold landed its events in the `Identifier`
  * projection (the grants ledger's `awaitProjection` shape).
  */
-export const identityProjectionConvergenceTimeoutsTotal = new Counter({
+export const identityProjectionConvergenceTimeoutsTotal = counter({
   name: "identity_projection_convergence_timeouts_total",
-  help: "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
+  description:
+    "Identity ceremonies that returned before the fold landed their events; the append is durable and the projection converges later.",
 });
 
 /** End-to-end cost of one identity commit: append, stage, and the wait. */
-const identityCommitDurationSeconds = new Histogram({
+const identityCommitDurationSeconds = histogram({
   name: "identity_commit_duration_seconds",
-  help: "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
-  buckets: [0.005, 0.01, 0.025, 0.05, 0.1, 0.25, 0.5, 1, 2.5, 5],
+  description:
+    "Duration of an identity ledger commit: durable append, queue staging, and the read-your-writes wait.",
 });
 
 /** The read-your-writes window, the grants ledger's convergence shape. */
@@ -98,15 +89,18 @@ interface IdentityLedgerWriterDeps {
   eventing: IdentityEventing;
   /** A test hands the sender in directly rather than composing a port for it. */
   stagedSender?: (name: string) => Promise<IdentityStagedSender | null>;
-  /** The read-your-writes window; production uses the constants above. */
-  convergence?: { timeoutMs: number; pollMs: number };
+  /**
+   * The read-your-writes window; production uses the constants above. `null` stages only: a
+   * caller that proves its own writes on a later pass, the identifier backfill, never waits.
+   */
+  convergence?: { timeoutMs: number; pollMs: number } | null;
 }
 
 export class IdentityLedgerStore implements IdentityLedger {
   private readonly projectionStore: IdentityLedgerWriterDeps["projectionStore"];
   private readonly heads: IdentityLedgerWriterDeps["heads"];
   private readonly stagedSender: (name: string) => Promise<IdentityStagedSender | null>;
-  private readonly convergence: { timeoutMs: number; pollMs: number };
+  private readonly convergence: { timeoutMs: number; pollMs: number } | null;
 
   static create(deps: IdentityLedgerWriterDeps): IdentityLedgerStore {
     return new IdentityLedgerStore(deps);
@@ -121,10 +115,10 @@ export class IdentityLedgerStore implements IdentityLedger {
         deps.eventing
           .resolvePipelineCommand({ pipeline: IDENTITY_PIPELINE_NAME, command })
           .then((resolved) => (resolved.kind === "registered" ? resolved.sender : null)));
-    this.convergence = deps.convergence ?? {
-      timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS,
-      pollMs: IDENTITY_CONVERGENCE_POLL_MS,
-    };
+    this.convergence =
+      deps.convergence === undefined
+        ? { timeoutMs: IDENTITY_CONVERGENCE_TIMEOUT_MS, pollMs: IDENTITY_CONVERGENCE_POLL_MS }
+        : deps.convergence;
   }
 
   async commit({
@@ -136,13 +130,13 @@ export class IdentityLedgerStore implements IdentityLedger {
   }): Promise<IdentityFact[]> {
     const events = identityEventsFor({ command, facts });
     if (events.length === 0) return [];
-    const done = identityCommitDurationSeconds.startTimer();
+    const startedAt = performance.now();
     try {
       await this.writeProvisionalHeads({ command, events });
       await this.stageAndAwait({ command, events });
       return events;
     } finally {
-      done();
+      identityCommitDurationSeconds.observe((performance.now() - startedAt) / 1000);
     }
   }
 
@@ -196,7 +190,8 @@ export class IdentityLedgerStore implements IdentityLedger {
   }): Promise<void> {
     const { userId, tenantId } = command.data;
     await this.stage({ command });
-    await this.awaitFold({ userId, tenantId, events });
+    if (this.convergence === null) return;
+    await this.awaitFold({ userId, tenantId, convergence: this.convergence, events });
   }
 
   /**
@@ -221,10 +216,12 @@ export class IdentityLedgerStore implements IdentityLedger {
   private async awaitFold({
     userId,
     tenantId,
+    convergence,
     events,
   }: {
     userId: string;
     tenantId: string;
+    convergence: { timeoutMs: number; pollMs: number };
     events: IdentityEvent[];
   }): Promise<void> {
     const last = events[events.length - 1];
@@ -232,10 +229,10 @@ export class IdentityLedgerStore implements IdentityLedger {
     const context = { aggregateId: userId, tenantId: createTenantId(tenantId) };
     // Wall-clock, not injectable business time: a frozen test clock would
     // otherwise make this loop unable to time out.
-    const deadline = nowInstant().epochMilliseconds + this.convergence.timeoutMs;
+    const deadline = nowInstant().epochMilliseconds + convergence.timeoutMs;
     let isReached = await this.foldReached({ userId, context, last });
     while (!isReached && nowInstant().epochMilliseconds < deadline) {
-      await new Promise((resolve) => setTimeout(resolve, this.convergence.pollMs));
+      await new Promise((resolve) => setTimeout(resolve, convergence.pollMs));
       isReached = await this.foldReached({ userId, context, last });
     }
     if (isReached) return;

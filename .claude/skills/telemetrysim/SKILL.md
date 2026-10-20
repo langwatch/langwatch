@@ -8,8 +8,8 @@ user-invocable: true
 
 Sends synthesized OTLP/HTTP (protobuf or JSON, gzip by default) at a stack's OTLP door
 (`<app>/api/otel/v1/<signal>`) with the stack's seeded project key. One run at a time,
-counters in memory: a dev shim, never expose it. Code: `services/telemetrysim`, console
-`apps/telemetrysim-web`.
+counters in memory: a dev shim, never expose it. Code: `services/sims/telemetrysim`, console
+`apps/sims/src/telemetry`.
 
 ## Presets
 
@@ -26,7 +26,7 @@ A batch is a pure function of preset, seed and index: the same seed sends the sa
 
 ## Run it
 
-- Opt-in: `haven up +telemetry` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +telemetry` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console: `https://telemetry.<slug>.langwatch.localhost` (`haven sim telemetry console` prints
   it). haven gives the sim the stack's door and key, so nothing there needs a key. Tabs:
   - **Runs**: a start form, the current run and the last ten; a run opens with its rate,

@@ -143,6 +143,9 @@ const bodyCss = ({
   wrap: boolean;
   guttered: boolean;
 }) => ({
+  ...(compact ? COMPACT_BODY : {}),
+  ...(guttered ? GUTTERED : {}),
+  ...(wrap ? wrappedBody({ guttered }) : {}),
   "& pre": {
     margin: 0,
     padding: "12px 16px",
@@ -150,10 +153,10 @@ const bodyCss = ({
     overflowX: "auto",
     tabSize: 4,
     background: "transparent !important",
+    ...(compact ? COMPACT_BODY["& pre"] : {}),
+    ...(guttered ? GUTTERED["& pre"] : {}),
+    ...(wrap ? wrappedBody({ guttered })["& pre"] : {}),
   },
-  ...(compact ? COMPACT_BODY : {}),
-  ...(guttered ? GUTTERED : {}),
-  ...(wrap ? wrappedBody({ guttered }) : {}),
 });
 
 /** One house window for every code sample: title bar, copy button, Shiki body. */
@@ -198,7 +201,7 @@ export function CodePreview({
   return (
     <Box
       border="1px solid"
-      bg="bg.nested"
+      bg={{ base: "bg.nested", _dark: "bg.surface" }}
       {...chrome.root}
       overflow="hidden"
       width="full"
@@ -427,10 +430,18 @@ export function SnippetPreview({
   const { colorMode } = useColorMode();
   const shikiAdapter = useShikiAdapter(colorMode);
   const lang = normalizeShikiLang(codeLanguage);
-  const [langReady, setLangReady] = useState(() => isShikiLangReady(lang));
+  const [, setLoadedTick] = useState(0);
+  const langReady = isShikiLangReady(lang);
   useEffect(() => {
-    if (!langReady) void ensureShikiLangLoaded(lang).then(() => setLangReady(true));
-  }, [lang, langReady]);
+    if (isShikiLangReady(lang)) return;
+    let current = true;
+    ensureShikiLangLoaded(lang)
+      .then(() => current && setLoadedTick((tick) => tick + 1))
+      .catch(() => undefined);
+    return () => {
+      current = false;
+    };
+  }, [lang]);
   const [internalIsVisible, setInternalIsVisible] = useState(false);
   const isVisible = controlledIsVisible ?? internalIsVisible;
   const masks = sensitiveValue !== undefined && !isVisible && code.includes(sensitiveValue);
@@ -449,13 +460,13 @@ export function SnippetPreview({
             colorPalette="orange"
             code={displayCode}
             data-testid={testId}
-            language={langReady ? codeLanguage : "text"}
+            language={langReady ? lang : "text"}
             meta={{ highlightLines, colorScheme: colorMode }}
             transition="all 0.3s ease"
             borderRadius="xl"
             border="1px solid"
             borderColor="border.nested"
-            bg="bg.nested"
+            bg={{ base: "bg.nested", _dark: "bg.surface" }}
             boxShadow="0 4px 30px rgba(0,0,0,0.06)"
             {...layout.root}
             overflow="hidden"

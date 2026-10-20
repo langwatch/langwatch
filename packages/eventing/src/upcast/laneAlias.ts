@@ -12,7 +12,6 @@ export interface LaneTombstone {
   readonly from: string;
   /** Why nothing takes the job, written into the log line. */
   readonly tombstone: string;
-  readonly removeAfter: string;
 }
 
 export interface RoutedLaneAlias {
@@ -24,8 +23,6 @@ export interface RoutedLaneAlias {
   readonly eventTypes?: readonly string[];
   /** The former body as the successor reads it; absent, a reactor's body unwraps to its event. */
   readonly data?: (stored: unknown) => unknown;
-  /** The release that ships the alias: once it is cut, the next one must not carry it. */
-  readonly removeAfter: string;
 }
 
 /** A pipeline's aliases as its built definition carries them, for the runtime and window check. */
@@ -35,22 +32,6 @@ export interface PipelineLaneAliases {
 }
 
 const LANE_KEY = /^[^:]+:[^:]+:.+$/;
-const RELEASE = /^v?(\d+)\.(\d+)\.(\d+)$/;
-
-/** `3.21.0` or `v3.21.0` as comparable numbers; null when it is no release. */
-function parseRelease(release: string): readonly [number, number, number] | null {
-  const match = RELEASE.exec(release.trim());
-  return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
-}
-
-function releaseAtOrAfter({ release, floor }: { release: string; floor: string }): boolean {
-  const left = parseRelease(release);
-  const right = parseRelease(floor);
-  if (!left || !right) return false;
-  const order = left.map((part, index) => part - (right[index] ?? 0)).find((diff) => diff !== 0);
-  return (order ?? 0) >= 0;
-}
-
 /** Refuses, when the pipeline is built, an alias that could never apply or never ends. */
 export function assertLaneAliasesDeclarable({
   pipeline,
@@ -72,9 +53,6 @@ export function assertLaneAliasesDeclarable({
     }
     if ("to" in alias && laneAliasTargetKeys({ pipeline, to: alias.to }).includes(alias.from)) {
       throw refuse(`aliases "${alias.from}" to itself.`);
-    }
-    if (!parseRelease(alias.removeAfter)) {
-      throw refuse(`aliases "${alias.from}" with no release that ends it.`);
     }
     const types = claimed.get(alias.from) ?? new Set<string>();
     const twice = claimEventTypes({ types, alias });
@@ -145,21 +123,6 @@ function formerEventType(stored: Record<string, unknown>): string | undefined {
   if (typeof stored.type === "string") return stored.type;
   const event = toRecord(stored.event);
   return typeof event.type === "string" ? event.type : undefined;
-}
-
-/** The aliases whose window has closed: the release that shipped them has been cut. */
-export function laneAliasesPastWindow({
-  declared,
-  newestRelease,
-}: {
-  declared: readonly PipelineLaneAliases[];
-  newestRelease: string;
-}): readonly { pipeline: string; from: string; removeAfter: string }[] {
-  return declared.flatMap(({ pipeline, aliases }) =>
-    aliases
-      .filter((alias) => releaseAtOrAfter({ release: newestRelease, floor: alias.removeAfter }))
-      .map(({ from, removeAfter }) => ({ pipeline, from, removeAfter })),
-  );
 }
 
 function toRecord(value: unknown): Record<string, unknown> {

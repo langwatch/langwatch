@@ -18,10 +18,12 @@ async function judgeAppWith({
   isCloud,
   apiKey,
   tier = "live",
+  nodeEnvironment = "production",
 }: {
   isCloud: boolean;
   apiKey?: string;
   tier?: Tier;
+  nodeEnvironment?: string;
 }) {
   const resolver = SecretsResolver.over(
     SecretsChain.start({ environment: apiKey ? { JEV_API_KEY: apiKey } : {} }).withEnv(),
@@ -32,6 +34,7 @@ async function judgeAppWith({
     globalTokensPerSecond: 300_000,
     tenantTokensPerSecond: 150_000,
     isSaas: isCloud,
+    nodeEnvironment,
   };
   const secrets = resolver.scopeTo(
     "instant-eval-judge",
@@ -61,6 +64,19 @@ describe("InstantEvalJudgeModule.create", () => {
       expect(
         await app.classify({ projectId: "project-1", text: "hello", questions: [] }),
       ).toMatchObject({ verdicts: [], skippedReason: "classifier_not_configured" });
+    });
+  });
+
+  describe("given a development checkout with LangWatch's key", () => {
+    /** @scenario "A development checkout judges with LangWatch's key directly" */
+    it("builds the classifier, as LangWatch Cloud does", async () => {
+      const app = await judgeAppWith({
+        isCloud: false,
+        apiKey: "langwatch-key",
+        nodeEnvironment: "development",
+      });
+
+      expect(await app.isClassifierConfigured()).toBe(true);
     });
   });
 

@@ -86,7 +86,6 @@ const MAIN_SUITE_RUN_SYNC_ALIASES: readonly LaneAlias[] = [
   from: "simulation_processing:subscriber:suiteRunSync",
   to: { jobType: "subscriber", lane },
   eventTypes: [eventType],
-  removeAfter: "3.21.0",
 }));
 
 /**

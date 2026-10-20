@@ -1,20 +1,14 @@
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import {
-  Button,
-  Center,
-  HStack,
-  Spacer,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Button, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant } from "@langwatch/time";
 import { RotateCcw, XCircle } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsPermission } from "../../../../behavior/ops-session.ts";
-import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { useDeadLetterActions } from "../../behavior/use-dead-letter-actions.ts";
 import { DeadLetterSummary } from "../blocks/dead-letter-summary.tsx";
 import { DeadLettersTable } from "../blocks/dead-letter-table.tsx";
@@ -42,11 +36,7 @@ export function DeadLettersContent() {
   const query = api.ops.listDeadLetters.useQuery({ processName, page, pageSize: PAGE_SIZE }, {});
 
   if (query.isPending) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   const messages = query.data?.messages ?? [];
@@ -176,7 +166,7 @@ function BulkConfirms({
         onConfirm={actions.confirmDiscard}
         title="Discard dead letter"
         description={`Mark "${actions.discardTarget?.intentType}" on ${actions.discardTarget?.processName} as never to be sent. The row is kept as the audit record, and it cannot be redriven afterwards.`}
-        isLoading={actions.discardingId !== null}
+        loading={actions.discardingId !== null}
       />
       <ConfirmDialog
         open={actions.confirmBulk === "redrive"}
@@ -184,7 +174,7 @@ function BulkConfirms({
         onConfirm={() => actions.redriveAll.mutate({ processName })}
         title="Redrive dead letters"
         description={`Return all ${shownCount} dead ${plural} for ${shownScope} to pending with a fresh attempt budget. Their deliveries will run again.`}
-        isLoading={actions.redriveAll.isPending}
+        loading={actions.redriveAll.isPending}
       />
       {processName ? (
         <ConfirmDialog
@@ -193,7 +183,7 @@ function BulkConfirms({
           onConfirm={() => actions.discardAll.mutate({ processName })}
           title="Discard dead letters"
           description={`Mark all ${shownCount} dead ${plural} for ${shownScope} as never to be sent. The rows are kept as the audit record, the work will not run, and none of it can be redriven afterwards.`}
-          isLoading={actions.discardAll.isPending}
+          loading={actions.discardAll.isPending}
         />
       ) : (
         <DeleteConfirmationDialog
@@ -227,26 +217,14 @@ function Pager({
   onPage: (page: number) => void;
 }) {
   if (total <= PAGE_SIZE) return null;
-  const start = (page - 1) * PAGE_SIZE + 1;
-  const end = start + shown - 1;
   return (
-    <HStack justify="space-between">
-      <Text textStyle="xs" color="fg.muted">
-        {start}–{end} of {total}
-      </Text>
-      <HStack gap={2}>
-        <Button size="sm" variant="outline" disabled={page === 1} onClick={() => onPage(page - 1)}>
-          Previous
-        </Button>
-        <Button
-          size="sm"
-          variant="outline"
-          disabled={end >= total}
-          onClick={() => onPage(page + 1)}
-        >
-          Next
-        </Button>
-      </HStack>
-    </HStack>
+    <Pagination
+      page={page}
+      pageSize={PAGE_SIZE}
+      totalCount={total}
+      visibleCount={shown}
+      unitLabel="dead messages"
+      onPageChange={onPage}
+    />
   );
 }

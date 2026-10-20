@@ -1,5 +1,6 @@
 /** The metrics pill of a run group header: pass rate, average agent latency and total cost. */
 
+import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { Box, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { ChevronRight, Clock, Zap } from "lucide-react";
@@ -56,8 +57,8 @@ type RunMetricsSummaryProps = {
 };
 
 const PILL_SIZES = {
-  sm: { height: undefined, paddingX: 2, paddingY: 1, fontSize: "12px" },
-  md: { height: "32px", paddingX: 2.5, paddingY: 0, fontSize: "12.5px" },
+  sm: { height: undefined, paddingX: 2, paddingY: 1, textStyle: "caption" },
+  md: { height: "32px", paddingX: 2.5, paddingY: 0, textStyle: "bodySm" },
 } as const;
 
 function useInteractiveTooltip(closeDelay: number) {
@@ -96,7 +97,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
     !summary.agentLatencyStats && summary.averageAgentLatencyMs !== null;
 
   return (
-    <VStack align="stretch" gap={0} fontSize="12px" minWidth="220px" color="fg">
+    <VStack align="stretch" gap={0} textStyle="caption" minWidth="220px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Pass Rate */}
         <HStack justify="space-between">
@@ -104,7 +105,11 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
           <HStack gap={1.5}>
             <PassRateCircle passRate={summary.passRate} />
             <Text fontWeight="medium" color={getPassRateGradientColor(summary.passRate)}>
-              {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+              {summary.passRate === null ? (
+                <EmptyValue label="No pass rate" />
+              ) : (
+                `${Math.round(summary.passRate)}%`
+              )}
             </Text>
           </HStack>
         </HStack>
@@ -145,7 +150,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="fg.muted">Avg Agent Latency</Text>
+              <Text color="fg.muted">Avg agent latency</Text>
               <HStack gap={1}>
                 <Icon as={Clock} color="fg.muted" boxSize={3} />
                 <Text fontWeight="medium">{formatLatency(summary.averageAgentLatencyMs)}</Text>
@@ -156,7 +161,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         )}
         {showPlainAgentLatency && (
           <HStack justify="space-between">
-            <Text color="fg.muted">Avg Agent Latency</Text>
+            <Text color="fg.muted">Avg agent latency</Text>
             <HStack gap={1}>
               <Icon as={Clock} color="fg.muted" boxSize={3} />
               <Text fontWeight="medium">{formatLatency(summary.averageAgentLatencyMs)}</Text>
@@ -187,7 +192,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
               paddingY={0.5}
               borderRadius="md"
             >
-              <Text color="fg.muted">Avg Agent Cost</Text>
+              <Text color="fg.muted">Avg agent cost</Text>
               <HStack gap={1}>
                 <Text fontWeight="medium">{formatCost(summary.averageAgentCost)}</Text>
                 <Icon as={ChevronRight} boxSize={3} color="fg.subtle" />
@@ -199,7 +204,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {/* Total Duration */}
         {summary.totalDurationMs !== null && (
           <HStack justify="space-between">
-            <Text color="fg.muted">Total Duration</Text>
+            <Text color="fg.muted">Total duration</Text>
             <Text fontWeight="medium">{formatLatency(summary.totalDurationMs)}</Text>
           </HStack>
         )}
@@ -207,7 +212,7 @@ function TooltipContent({ summary }: { summary: RunGroupSummary }) {
         {/* Total Cost */}
         {summary.totalCost !== null && (
           <HStack justify="space-between">
-            <Text color="fg.muted">Total Cost</Text>
+            <Text color="fg.muted">Total cost</Text>
             <Text fontWeight="medium">{formatCost(summary.totalCost)}</Text>
           </HStack>
         )}
@@ -235,7 +240,7 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
     >
       <HStack
         gap={2}
-        fontSize={pill.fontSize}
+        textStyle={pill.textStyle}
         color="fg.muted"
         height={pill.height}
         paddingX={pill.paddingX}
@@ -267,7 +272,11 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
             <HStack gap={1}>
               <PassRateCircle passRate={summary.passRate} />
               <Text color={getPassRateGradientColor(summary.passRate)} fontWeight="medium">
-                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null ? (
+                  <EmptyValue label="No pass rate" />
+                ) : (
+                  `${Math.round(summary.passRate)}%`
+                )}
               </Text>
             </HStack>
           </>
@@ -278,7 +287,11 @@ export function RunMetricsSummary({ summary, size = "sm" }: RunMetricsSummaryPro
             <HStack gap={1}>
               <PassRateCircle passRate={summary.passRate} />
               <Text color={getPassRateGradientColor(summary.passRate)} fontWeight="medium">
-                {summary.passRate === null ? "-" : `${Math.round(summary.passRate)}%`}
+                {summary.passRate === null ? (
+                  <EmptyValue label="No pass rate" />
+                ) : (
+                  `${Math.round(summary.passRate)}%`
+                )}
               </Text>
             </HStack>
           </>

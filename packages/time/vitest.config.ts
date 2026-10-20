@@ -1,5 +1,7 @@
 import { defineConfig } from "vitest/config";
 
+import { repoScans } from "./vitest.repo.config.ts";
+
 // Plain on purpose: @langwatch/observability depends on this package and
 // @langwatch/vitest-config on observability (Alex, 2026-09-27).
 export default defineConfig({
@@ -9,6 +11,6 @@ export default defineConfig({
     isolate: false,
     watch: false,
     testTimeout: 10_000,
-    exclude: ["**/node_modules/**", "**/dist/**", "**/*.browser.test.{ts,tsx}"],
+    exclude: ["**/node_modules/**", "**/dist/**", "**/*.browser.test.{ts,tsx}", ...repoScans],
   },
 });

@@ -83,6 +83,8 @@ func TestNoAdminVariantHoldsNoAdminEmails(t *testing.T) {
 }
 
 // @scenario "E1 fails when the licence copy step is missing or a licensed organisation lost its key"
+//
+//nolint:misspell // the scenario title is the spec's, which is British
 func TestE1NeedsTheCopyStepAndEveryKey(t *testing.T) {
 	ledger := []LedgerRow{{ID: "licensing:copy-organization-licenses", Status: "done"}}
 	cases := []struct {

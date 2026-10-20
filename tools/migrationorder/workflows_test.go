@@ -94,9 +94,9 @@ func TestCompatWorkflowTriggersOnlyOnMigrationPaths(t *testing.T) {
 		}
 	}
 	for job, want := range map[string]string{
-		"n-minus-one":  "github.event_name == 'pull_request'",
-		"prisma-drift": "github.event_name == 'pull_request'",
-		"lts-floor":    "github.event_name != 'pull_request'",
+		"n-minus-one":      "github.event_name == 'pull_request'",
+		"prisma-drift":     "github.event_name == 'pull_request'",
+		"previous-release": "github.event_name != 'pull_request'",
 	} {
 		if got := workflow.Jobs[job].If; got != want {
 			t.Errorf("job %s if = %q, want %q", job, got, want)
@@ -130,6 +130,30 @@ func TestCompatWorkflowRunsBaseSuitesOnHeadsSchema(t *testing.T) {
 	for _, suite := range []string{"api-executable", "api-trpc-record"} {
 		if !strings.Contains(layout.Run, suite) {
 			t.Errorf("the judged suites leave out %s", suite)
+		}
+	}
+}
+
+// @scenario "Base's worker takes jobs while base's suites run"
+func TestCompatWorkflowStartsBasesWorkerBeforeTheSuites(t *testing.T) {
+	workflow, _ := loadWorkflow(t, "migration-compat.yml")
+	steps := workflow.Jobs["n-minus-one"].Steps
+	names := make([]string, len(steps))
+	for i, s := range steps {
+		names[i] = s.Name
+	}
+	worker := slices.Index(names, "Start base's worker beside the suites")
+	suites := slices.Index(names, "Base's live api suites on head's schema")
+	if worker < 0 || suites < 0 || worker > suites {
+		t.Fatalf("base's worker must start before base's suites: %q", names)
+	}
+	step := steps[worker]
+	if !strings.HasSuffix(step.Env["CLICKHOUSE_URL"], "/test_analytics_migrated_schema") {
+		t.Errorf("base's worker is not on the suites' ClickHouse database: %+v", step.Env)
+	}
+	for _, want := range []string{"src/main.ts", "/readyz", "exit 1"} {
+		if !strings.Contains(step.Run, want) {
+			t.Errorf("base's worker step leaves out %q:\n%s", want, step.Run)
 		}
 	}
 }
@@ -171,10 +195,10 @@ func TestCompatWorkflowJudgesAnUnjudgeableBaseByItsImage(t *testing.T) {
 		}
 	}
 	for name, want := range map[string]string{
-		"Read the LTS floor": "packages/upgrade/releases/lts-floor.json",
-		"The LTS floor image passes the smoke on head's schema": "run-old-image.sh floor",
-		"Resolve main head's image":                             "main-head-image.sh base",
-		"Main head's image passes the smoke on head's schema":   "run-old-image.sh main-head",
+		"Read the previous release":                                      "packages/upgrade/releases | sed",
+		"The previous release's image passes the smoke on head's schema": "run-old-image.sh previous",
+		"Resolve main head's image":                                      "main-head-image.sh base",
+		"Main head's image passes the smoke on head's schema":            "run-old-image.sh main-head",
 	} {
 		step := stepNamed(t, steps, name)
 		if step.If != "steps.layout.outputs.judged == 'false'" {
@@ -246,8 +270,8 @@ func TestCompatWorkflowFailsADiffThatErrors(t *testing.T) {
 	}
 }
 
-// @scenario "The LTS floor's image boots on the schema head migrated"
-func TestCompatWorkflowBootsTheFloorImageNightly(t *testing.T) {
+// @scenario "The previous release's image boots on the schema head migrated"
+func TestCompatWorkflowBootsThePreviousReleaseImageNightly(t *testing.T) {
 	workflow, _ := loadWorkflow(t, "migration-compat.yml")
 	if _, ok := workflow.On["schedule"]; !ok {
 		t.Error("no nightly schedule")
@@ -255,14 +279,14 @@ func TestCompatWorkflowBootsTheFloorImageNightly(t *testing.T) {
 	if _, ok := workflow.On["workflow_dispatch"]; !ok {
 		t.Error("no manual dispatch")
 	}
-	steps := workflow.Jobs["lts-floor"].Steps
-	if read := stepNamed(t, steps, "Read the LTS floor"); !strings.Contains(read.Run, "packages/upgrade/releases/lts-floor.json") {
-		t.Errorf("the floor is not read from lts-floor.json:\n%s", read.Run)
+	steps := workflow.Jobs["previous-release"].Steps
+	if read := stepNamed(t, steps, "Read the previous release"); !strings.Contains(read.Run, "sort -V | tail -n 1") {
+		t.Errorf("the previous release is not the newest manifest:\n%s", read.Run)
 	}
-	smoke := stepNamed(t, steps, "The floor image answers and names nothing missing")
+	smoke := stepNamed(t, steps, "The previous release's image answers and names nothing missing")
 	for _, want := range []string{"/api/health", "does not exist", "P2022"} {
 		if !strings.Contains(smoke.Run, want) {
-			t.Errorf("the floor smoke lacks %q", want)
+			t.Errorf("the previous release smoke lacks %q", want)
 		}
 	}
 }

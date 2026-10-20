@@ -3,6 +3,7 @@ import type { Event } from "../domain/types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
 import type {
   EventStore,
+  EventStoreAggregateKey,
   EventStoreEventReadInput,
   EventStoreReadContext,
 } from "./eventStore.types.ts";
@@ -34,6 +35,13 @@ export class EventStoreProducerOnly<
     anchorOccurredAtMs?: number;
   }): Promise<readonly EventType[]> {
     return Promise.reject(this.refuse("getEvents"));
+  }
+
+  findEventsOfAggregates(_request: {
+    aggregates: readonly EventStoreAggregateKey[];
+    aggregateType: AggregateType;
+  }): Promise<readonly EventType[]> {
+    return Promise.reject(this.refuse("findEventsOfAggregates"));
   }
 
   getEventsOccurredSince(_request: {

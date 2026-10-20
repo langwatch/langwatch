@@ -16,11 +16,19 @@ import {
 
 const logger = createLogger("langwatch:governance:coding-assistant-billing");
 
+/** How many organisations the backfill reads and sends for at once. */
+const BACKFILL_SLICE = 100;
+
 type FactCollaborators = {
-  policies: Pick<CostAttributionPolicyRepository, "enabledCodingAssistantConfigs">;
+  policies: Pick<
+    CostAttributionPolicyRepository,
+    "enabledCodingAssistantConfigs" | "findEnabledCodingAssistantConfigs"
+  >;
   /** The organisations the backfill sweeps, a page at a time (round 49: never all in memory). */
   organizationIds: (input: OrganizationIdPageInput) => Promise<OrganizationIdPage>;
   record: (command: RecordCodingAssistantBillingCommand) => Promise<unknown>;
+  /** The backfill's send: many commands in one queue call. */
+  recordMany: (commands: RecordCodingAssistantBillingCommand[]) => Promise<unknown>;
   clock?: () => number;
 };
 
@@ -39,18 +47,8 @@ export class CodingAssistantBillingFactService {
     organizationId: string;
   }): Promise<{ recorded: number }> {
     const configs = await this.collaborators.policies.enabledCodingAssistantConfigs(organizationId);
-    const recordedAtMs = this.now();
-    for (const sourceType of CODING_ASSISTANT_BILLING_SOURCE_TYPES) {
-      await this.collaborators.record({
-        tenantId: organizationId,
-        occurredAt: recordedAtMs,
-        data: {
-          organizationId,
-          sourceType,
-          billed: isSourceBilledByConfigs({ configs, sourceType }),
-          recordedAtMs,
-        },
-      });
+    for (const command of factsOf({ organizationId, configs, recordedAtMs: this.now() })) {
+      await this.collaborators.record(command);
     }
     return { recorded: CODING_ASSISTANT_BILLING_SOURCE_TYPES.length };
   }
@@ -102,7 +100,7 @@ export class CodingAssistantBillingFactService {
     return { afterOrganizationId: cursor ?? null, ...totals };
   }
 
-  /** One page's organisations; false when the signal stopped it part way. */
+  /** One page's organisations: one config read and one batch send per slice; false on abort. */
   private async recordPage({
     ids,
     dryRun,
@@ -114,11 +112,32 @@ export class CodingAssistantBillingFactService {
     signal: AbortSignal | undefined;
     totals: { organizations: number; recorded: number };
   }): Promise<boolean> {
-    for (const organizationId of ids) {
+    for (let start = 0; start < ids.length; start += BACKFILL_SLICE) {
       if (signal?.aborted) return false;
-      if (!dryRun)
-        totals.recorded += (await this.recordForOrganization({ organizationId })).recorded;
-      totals.organizations += 1;
+      const slice = ids.slice(start, start + BACKFILL_SLICE);
+      if (!dryRun) {
+        const rows = await this.collaborators.policies.findEnabledCodingAssistantConfigs({
+          organizationIds: slice,
+        });
+        const configsOf = new Map<string, unknown[]>();
+        for (const row of rows) {
+          configsOf.set(row.organizationId, [
+            ...(configsOf.get(row.organizationId) ?? []),
+            row.config,
+          ]);
+        }
+        const recordedAtMs = this.now();
+        const commands = slice.flatMap((organizationId) =>
+          factsOf({
+            organizationId,
+            configs: configsOf.get(organizationId) ?? [],
+            recordedAtMs,
+          }),
+        );
+        await this.collaborators.recordMany(commands);
+        totals.recorded += commands.length;
+      }
+      totals.organizations += slice.length;
     }
     return true;
   }
@@ -126,4 +145,26 @@ export class CodingAssistantBillingFactService {
   private now(): number {
     return this.collaborators.clock ? this.collaborators.clock() : nowInstant().epochMilliseconds;
   }
+}
+
+/** The organisation's billed answer for every assistant kind, one command each. */
+function factsOf({
+  organizationId,
+  configs,
+  recordedAtMs,
+}: {
+  organizationId: string;
+  configs: readonly unknown[];
+  recordedAtMs: number;
+}): RecordCodingAssistantBillingCommand[] {
+  return CODING_ASSISTANT_BILLING_SOURCE_TYPES.map((sourceType) => ({
+    tenantId: organizationId,
+    occurredAt: recordedAtMs,
+    data: {
+      organizationId,
+      sourceType,
+      billed: isSourceBilledByConfigs({ configs: [...configs], sourceType }),
+      recordedAtMs,
+    },
+  }));
 }

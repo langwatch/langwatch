@@ -23,7 +23,7 @@ export function ToolPairSection({
     >
       <Text
         textStyle="2xs"
-        fontWeight="600"
+        fontWeight="semibold"
         color={tone === "error" ? "red.fg" : "fg.subtle"}
         textTransform="uppercase"
         letterSpacing="0.06em"
@@ -45,7 +45,7 @@ export function ToolArgRow({ name, value }: { name: string; value: unknown }) {
         textStyle="2xs"
         fontFamily="mono"
         color="fg.subtle"
-        fontWeight="500"
+        fontWeight="medium"
         flexShrink={0}
         minWidth="60px"
       >

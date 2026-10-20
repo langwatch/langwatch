@@ -66,22 +66,21 @@ Feature: A successor lane also consumes the key a previous release queued its jo
     And no handler runs and its group is not blocked
 
   @unit
-  Scenario: A job under a key no alias names still retries and blocks
+  Scenario: A job under a key no alias names is retried, then dead-lettered
     Given no pipeline aliases "owner:subscriber:gone"
     When a worker of the new release dequeues a job the previous release queued under it
-    Then the job is rejected for retry as unroutable
-    And once its retries are spent it blocks its group, since it carries no routing of its own
+    Then the job is rejected for retry with an "UnroutableQueuedJobError"
+    And once its attempts are spent it is dead-lettered and its group drains on
+
+  @unit
+  Scenario: An unroutable job reaches the group queue as a hand-back, not a failure
+    Given a job under a key no registration, drain or alias on this worker routes
+    When the group queue runs it on this worker
+    Then the refusal reaches the queue as a hand-back that keeps its cause
+    And every other failure reaches the queue unchanged
 
   @unit
   Scenario: An alias that could never apply is refused when the pipeline is built
     When a pipeline aliases a key that is not "<pipeline>:<jobType>:<name>", or its successor's own key
     Or two of its aliases take the same event type from one key
-    Or an alias names no release that ends it
     Then building the pipeline refuses, naming the pipeline and the key
-
-  @unit
-  Scenario: An alias past its release is refused so it gets removed
-    Given an alias that ends after release "3.21.0"
-    When release "3.21.0" or a later one has been cut
-    Then the window check names the alias, its pipeline and its key
-    And before that release it names nothing

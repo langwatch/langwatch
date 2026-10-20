@@ -4,10 +4,10 @@
  * @see specs/agents/connected-agents.feature
  */
 import { PRESENCE_TTL_SECONDS } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
-import type { InstanceMeta } from "../../services/connected-agent-runtime.service.ts";
+import type { InstanceMeta } from "../../repositories/connected-agent-state.repository.ts";
+import { MemoryConnectedAgentStateRepository } from "../../repositories/memory/memory.connected-agent-state.repository.ts";
 import { ConnectedAgentRegistryService } from "../connected-agent-registry.service.ts";
 
 function meta(overrides: Partial<InstanceMeta> = {}): InstanceMeta {
@@ -30,8 +30,9 @@ describe("ConnectedAgentRegistryService", () => {
   describe("when one instance is connected", () => {
     /** @scenario "An agent is online while one instance is connected" */
     it("lists the instance with its hostname and pid", async () => {
-      const store = memorySessionState();
-      const registry = ConnectedAgentRegistryService.create(store);
+      const registry = ConnectedAgentRegistryService.create(
+        MemoryConnectedAgentStateRepository.create(),
+      );
 
       await registry.register({ meta: meta(), agentIds: ["agent_1"] });
 
@@ -46,8 +47,9 @@ describe("ConnectedAgentRegistryService", () => {
     /** @scenario "An agent goes offline after the presence TTL" */
     it("reads as offline", async () => {
       let now = Date.now();
-      const store = memorySessionState({ now: () => now });
-      const registry = ConnectedAgentRegistryService.create(store);
+      const registry = ConnectedAgentRegistryService.create(
+        MemoryConnectedAgentStateRepository.create({ now: () => now }),
+      );
 
       await registry.register({ meta: meta(), agentIds: ["agent_1"], now });
 

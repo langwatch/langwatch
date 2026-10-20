@@ -29,7 +29,7 @@ import (
 // defer — the same defect as the one above, pointing the other way. Whoever
 // wires it adds Agent back, and the test makes that mandatory rather than
 // something to remember.
-var GatedTools = []string{"Bash", "Edit", "Write"}
+var GatedTools = []string{"Bash", "Edit", "Write", PlaywrightToolMatcher}
 
 // HookMatcher is the PreToolUse matcher routing exactly GatedTools to the gate.
 // Claude Code matches a tool name against it as an alternation.
@@ -119,6 +119,63 @@ func classifyDetail(command string) (kind RunKind, heavy bool, bucket string) {
 	return SingleProcessRun, false, ""
 }
 
+// launcherBuckets are the heavy buckets whose runs take their own slot in the
+// tsc, vitest and oxlint launchers (plan haven-exec-policy D4, phase 8): the
+// gate only refuses them at red. `lint` stays out: a package's lint script may
+// be eslint or the architecture enforcer, which have no launcher.
+var launcherBuckets = []string{
+	TypeScriptCompilerClass, "vitest", "oxlint",
+	"typecheck", "typecheck:one", "typecheck:all",
+	"test", "test:unit", "test:integration", "lint:fix",
+}
+
+// LauncherOwned reports whether every heavy segment of a command is one the
+// launchers count themselves; one segment without a launcher (oxfmt, eslint,
+// golangci-lint, `pnpm lint`, go/docker/next build) keeps the whole gate.
+func LauncherOwned(command string) bool {
+	owned := false
+	for _, segment := range commandSegments(command) {
+		bucket, ok := heavyInvocationBucket(segment)
+		if !ok {
+			continue
+		}
+		if !slices.Contains(launcherBuckets, bucket) {
+			return false
+		}
+		owned = true
+	}
+	return owned
+}
+
+// gatedPrograms is the program a heavy bucket runs, by the name rush's gate
+// queues it under: a package script by the launcher it reaches. A bucket
+// missing here (`pnpm lint`, `format`, docker build) runs no one program.
+var gatedPrograms = map[string]string{
+	TypeScriptCompilerClass: "tsc", "typecheck": "tsc", "typecheck:one": "tsc", "typecheck:all": "tsc",
+	"test": "vitest", "test:unit": "vitest", "test:integration": "vitest", "vitest": "vitest",
+	"oxlint": "oxlint", "lint:fix": "oxlint", "oxfmt": "oxfmt", "eslint": "eslint",
+	"golangci-lint": "golangci-lint", "go build": "go", "next build": "next",
+}
+
+// RushOwned reports whether every heavy segment of a command runs a program
+// rush's gate owns, so rush admits it and haven's gate stands down even at
+// red (heavy-run-admission.feature, "haven steps aside ...").
+func RushOwned(command string, owns func(program string) bool) bool {
+	owned := false
+	for _, segment := range commandSegments(command) {
+		bucket, ok := heavyInvocationBucket(segment)
+		if !ok {
+			continue
+		}
+		program, known := gatedPrograms[bucket]
+		if !known || !owns(program) {
+			return false
+		}
+		owned = true
+	}
+	return owned
+}
+
 // Watches cannot hold a finite check slot for the lifetime of a dev session.
 // Informational flags bypass admission only for a single shell command, so
 // `tsc --version && pnpm typecheck` still counts the check that follows.
@@ -190,51 +247,6 @@ const havenRunMarker = "machine run --class " + HeavySlotClass
 // writes it, so the command that validates the flag and the command that emits
 // it cannot come to disagree about its spelling.
 const HeavySlotClass = "heavy"
-
-// WrapOptions carries what the gate already decided into the wrapped command.
-//
-// Without it `haven run` re-derives its behaviour from nothing and the decision
-// is silently discarded: an unnamed caller resolves to a main session and waits
-// on the thirty-minute failsafe rather than the four-minute ceiling its
-// five-minute cache needs, and a narrowed run is indistinguishable from a
-// queued one.
-type WrapOptions struct {
-	// AgentID is the caller's agent id, which picks the wait ceiling because it
-	// picks the prompt-cache floor.
-	AgentID string
-	// Workers is the narrowed width. Zero means "not narrowed", and the run keeps
-	// whatever width its own config chooses.
-	Workers int
-}
-
-// WrapCommand rewrites a heavy command to run under haven's slot.
-//
-// The original is passed as a single argument for a shell to run, NOT spliced
-// after a separator: tool_input.command is a shell string, so `pnpm test && echo
-// done` spliced bare would gate only the first segment and let the rest run
-// outside the slot.
-//
-// havenPath is haven's own absolute path, because installing it onto PATH is
-// optional and a rewrite that yields "command not found" has broken a working
-// command in the name of failing open. It is quoted for the same reason it is
-// absolute: a checkout under a directory with a space would otherwise split
-// into two words and fail exactly the way the absolute path exists to prevent.
-func WrapCommand(havenPath, command string, opts WrapOptions) string {
-	var b strings.Builder
-	b.WriteString(ShellQuote(havenPath))
-	b.WriteString(" ")
-	b.WriteString(havenRunMarker)
-	if opts.AgentID != "" {
-		b.WriteString(" --agent-id ")
-		b.WriteString(ShellQuote(opts.AgentID))
-	}
-	if opts.Workers > 0 {
-		fmt.Fprintf(&b, " --workers %d", opts.Workers)
-	}
-	b.WriteString(" --sh ")
-	b.WriteString(ShellQuote(command))
-	return b.String()
-}
 
 // ShellQuote single-quotes s for safe interpolation, escaping embedded quotes.
 func ShellQuote(s string) string {
@@ -357,22 +369,6 @@ func RefusalReason(level Pressure, queueDepth int, hint *RetryHint) string {
 	b.WriteString("Continue with work that does not spawn processes (reading, editing, writing, planning) ")
 	b.WriteString("and come back to this at a natural stopping point.")
 	return b.String()
-}
-
-// BackgroundDescription is what replaces a backgrounded command's description.
-//
-// It has to say the run was queued AND that it is running in the background,
-// because a measured probe showed a model whose command was silently
-// substituted ran it, noticed the output did not match what it asked for, and
-// reported its environment as untrustworthy. An unexplained rewrite makes an
-// agent doubt its own tools.
-func BackgroundDescription(queueDepth int) string {
-	if queueDepth > 0 {
-		return fmt.Sprintf(
-			"haven queued this behind %d other heavy runs and is running it in the background; "+
-				"its result arrives when it finishes, not now", queueDepth)
-	}
-	return "haven is running this in the background; its result arrives when it finishes, not now"
 }
 
 // DurationKey reduces a command to the thing worth timing.

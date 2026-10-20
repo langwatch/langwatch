@@ -70,6 +70,7 @@ import {
   isNamedProviderMounted,
   resolveSignInProviders,
 } from "@langwatch/enterprise-sso-contract/sign-in-providers";
+import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { IdentityApi, SsoConnectionNotFoundError } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
@@ -77,6 +78,7 @@ import { AdminSurfaceHiddenError } from "@langwatch/ops-contract";
 import type { FeatureSetup } from "@langwatch/process";
 import { signInProviderSecrets } from "@langwatch/secrets";
 
+import type { SsoSignInProviderPipeline } from "../eventing/sso-sign-in-provider.pipeline.ts";
 import {
   buildGenericOAuthConfigs,
   buildSocialProviders,
@@ -100,6 +102,7 @@ import {
   LicenseDomainClaimAuthority,
   SsoSelfServeContextService,
 } from "../services/sso-self-serve-context.service.ts";
+import { SsoSignInProviderFactsService } from "../services/sso-sign-in-provider-facts.service.ts";
 
 /** The operator a command is appended under. The ledger mints nothing itself. */
 export type SsoConnectionLedgerOperator = Readonly<{ userId: string }>;
@@ -343,6 +346,9 @@ export class SsoModule implements SsoApiContract {
   readonly #selfServeContext: SsoSelfServeContextService;
   readonly #authorization: AuthzApi;
   readonly #auditLog: AuditLogApi;
+  /** Asked per sign-in, never while the process constructs. */
+  readonly #identity: IdentityApi;
+  readonly #signInProviderFacts: SsoSignInProviderFactsService;
 
   private constructor({
     gate,
@@ -355,6 +361,7 @@ export class SsoModule implements SsoApiContract {
     configuration,
     logger,
     dependencies,
+    signInProviderFacts,
   }: {
     gate: SsoGateService;
     connections: SsoConnectionLedger;
@@ -366,8 +373,10 @@ export class SsoModule implements SsoApiContract {
     configuration: SsoConfiguration;
     logger: SsoActivityLogger;
     dependencies: SsoSetup["dependencies"];
+    signInProviderFacts: SsoSignInProviderFactsService;
   }) {
     this.#gate = gate;
+    this.#signInProviderFacts = signInProviderFacts;
     this.#connections = connections;
     this.#ceremony = ceremony;
     this.#selfServe = selfServe;
@@ -402,6 +411,7 @@ export class SsoModule implements SsoApiContract {
     });
     this.#authorization = dependencies.authorization;
     this.#auditLog = dependencies.auditLog;
+    this.#identity = dependencies.identity;
   }
 
   static async create({ dependencies, config, secrets }: SsoSetup): Promise<SsoModule> {
@@ -476,7 +486,13 @@ export class SsoModule implements SsoApiContract {
       configuration,
       logger,
       dependencies,
+      signInProviderFacts: SsoSignInProviderFactsService.create({ logger }),
     });
+  }
+
+  /** Binds the sso_sign_in_provider pipeline's sender. */
+  connectSignInProviderCommands(commands: EventingCommands<SsoSignInProviderPipeline>): void {
+    this.#signInProviderFacts.connect(commands);
   }
 
   /**
@@ -551,18 +567,29 @@ export class SsoModule implements SsoApiContract {
     return this.#gate.resolveProvider();
   }
 
-  getSignInProviderMounts(input: {
+  async getSignInProviderMounts(input: {
     baseUrl: string;
     onMicrosoftProfile?: (profile: Record<string, unknown>) => Promise<void>;
   }): Promise<SignInProviderMounts> {
-    return Promise.resolve({
+    const mounts: SignInProviderMounts = {
       socialProviders: buildSocialProviders(
         { ...this.#configuration, baseUrl: input.baseUrl },
         input.onMicrosoftProfile ? { onMicrosoftProfile: input.onMicrosoftProfile } : {},
       ),
       genericOAuthConfigs:
-        buildGenericOAuthConfigs({ ...this.#configuration, baseUrl: input.baseUrl }) ?? [],
+        buildGenericOAuthConfigs(
+          { ...this.#configuration, baseUrl: input.baseUrl },
+          {
+            isBrokeredAddressProved: (args) =>
+              this.#identity.ssoAssertion().isBrokeredAddressProved(args),
+          },
+        ) ?? [],
+    };
+    await this.#signInProviderFacts.signInProviderMounted({
+      provider: this.#configuration.provider,
+      mounted: this.#gate.providerIsMounted(),
     });
+    return mounts;
   }
 
   async listConnections(

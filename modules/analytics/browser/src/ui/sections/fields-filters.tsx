@@ -1,6 +1,7 @@
 import { system } from "@langwatch/design-system";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { Popover } from "@langwatch/design-system/popover";
 import {
@@ -36,6 +37,14 @@ import type { FilterDefinition, FilterField } from "../../model/analytics-filter
 import { filterOutEmptyFilters, type FilterParam } from "../../model/analytics-filter-params.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
 import { SaveAsViewButton } from "./save-as-view-button.tsx";
+
+const FILTER_VALUES_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How to add metadata",
+    href: "https://docs.langwatch.ai/integration/metadata-and-labels",
+  },
+];
 
 /** An unparsable bound falls back to the slider's own end of the range. */
 function numberOrBound({
@@ -140,7 +149,9 @@ export function FieldsFilters({
   return (
     <VStack align="start" width="300px" gap={4}>
       <HStack width={"full"}>
-        <Heading fontSize="sm">Filters</Heading>
+        <Heading size="sm" fontSize="sm">
+          Filters
+        </Heading>
 
         <Spacer />
 
@@ -334,7 +345,7 @@ function FieldsFilter({
             <InputGroup
               width="full"
               startElement={<Search size={14} color={gray400} />}
-              startElementProps={{ paddingStart: "4px" }}
+              startElementProps={{ paddingStart: "1" }}
               paddingY={1}
               paddingX={2}
             >
@@ -613,7 +624,7 @@ function FilterOptionRow({
         </Checkbox>
         <Spacer />
         {typeof count !== "undefined" && (
-          <Text fontSize="12px" color="fg.subtle">
+          <Text textStyle="caption" color="fg.subtle">
             {count}
           </Text>
         )}
@@ -859,9 +870,11 @@ function ListSelection({
         )}
 
         {isEmpty && (
-          <Text fontSize="sm" paddingX={1} paddingY={2}>
-            No values yet. Filters fill in as traces arrive.
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No values yet. Filters fill in as traces arrive."
+            next={FILTER_VALUES_NEXT}
+          />
         )}
         {filterData.isLoading &&
           Array.from({ length: keys && keys.length > 0 ? 2 : 5 }).map((_, i) => (
@@ -1038,7 +1051,7 @@ function ThumbsUpDownVoteFilter({
           <HStack key={field} width="full" paddingX={1} cursor="pointer">
             <Checkbox
               width="full"
-              paddingY="4px"
+              paddingY="1"
               gap={2}
               size="sm"
               checked={isChecked}

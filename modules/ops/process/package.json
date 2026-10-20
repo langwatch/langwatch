@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -52,11 +52,12 @@
     "@langwatch/group-queue": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/identity-contract": "workspace:*",
+    "@langwatch/insight-contract": "workspace:*",
     "@langwatch/instant-eval-contract": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/langy-contract": "workspace:*",
+    "@langwatch/mail": "workspace:*",
     "@langwatch/model-provider-contract": "workspace:*",
-    "@langwatch/module": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
@@ -90,6 +91,7 @@
   "devDependencies": {
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/module": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",

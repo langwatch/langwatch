@@ -1,50 +1,72 @@
 import { z } from "zod";
 
-import { defineNotice, type NoticeField } from "../notice.ts";
+import { defineNotice } from "../notice.ts";
+import { organizationInOps, userInOps } from "./ops-links.ts";
 
 const newUserSchema = z.object({
+  userId: z.string().min(1),
   userName: z.string().nullish(),
   userEmail: z.string().nullish(),
+  organizationId: z.string().min(1),
   organizationName: z.string().nullish(),
-  phoneNumber: z.string().nullish(),
-  utmCampaign: z.string().nullish(),
-  adminUrl: z.url().nullish(),
+  arrival: z.enum(["invitation", "sso", "scim"]),
+  ssoProviderName: z.string().nullish(),
+  appUrl: z.url(),
 });
 
 export type NewUserNoticeProps = z.input<typeof newUserSchema>;
 
+const routeOf = (props: NewUserNoticeProps): string => {
+  if (props.arrival === "invitation") return "via invitation";
+  if (props.arrival === "scim") return "via SCIM";
+  return props.ssoProviderName ? `via SSO (${props.ssoProviderName})` : "via SSO";
+};
+
 export const newUserNotice = defineNotice({
   id: "new-user",
-  title: "New user registered",
+  title: "New user joined an organisation",
   sentWhen:
-    "Somebody signs up, accepts an invitation or joins through their domain; to the signups channel.",
+    "Somebody joins an existing organisation by invitation, SSO or SCIM; to the signups channel.",
   schema: newUserSchema,
   compose: (props) => {
-    const fields: NoticeField[] = [
-      { label: "Name", value: props.userName ?? "Unknown" },
-      { label: "Email", value: props.userEmail ?? "unknown" },
-      { label: "Organization", value: props.organizationName ?? "Unknown" },
-    ];
-    if (props.phoneNumber) fields.push({ label: "Phone", value: props.phoneNumber });
-    if (props.utmCampaign) fields.push({ label: "Campaign", value: props.utmCampaign });
+    const via = routeOf(props);
+    const who = props.userName || props.userEmail || "Somebody";
     return {
+      kind: "card",
       tone: "signup",
-      title: "New user registered",
-      fields,
-      ...(props.adminUrl ? { actions: [{ label: "Open org in admin", url: props.adminUrl }] } : {}),
+      title: `${who} joined ${props.organizationName || "an organisation"}`,
+      subtitle: [props.userEmail, via].filter(Boolean).join(" · "),
+      actions: [
+        userInOps({ appUrl: props.appUrl, userId: props.userId }),
+        organizationInOps({ appUrl: props.appUrl, organizationId: props.organizationId }),
+      ],
     };
   },
   fixtures: {
-    "from a campaign": {
-      userName: "Morgan Ellis",
-      userEmail: "morgan@acme.example",
+    "joined by invitation": {
+      userId: "user_riley",
+      userName: "Riley Chen",
+      userEmail: "riley.chen@acme.example",
+      organizationId: "organization_acme",
       organizationName: "Acme Robotics",
-      phoneNumber: "+31 20 555 0100",
-      utmCampaign: "launch-week",
-      adminUrl: "https://app.langwatch.ai/admin#/organizations/organization_acme",
+      arrival: "invitation",
+      appUrl: "https://app.langwatch.ai",
     },
-    "with only an email": {
-      userEmail: "morgan@acme.example",
+    "joined through SSO": {
+      userId: "user_riley",
+      userName: "Riley Chen",
+      userEmail: "riley.chen@acme.example",
+      organizationId: "organization_acme",
+      organizationName: "Acme Robotics",
+      arrival: "sso",
+      ssoProviderName: "Okta",
+      appUrl: "https://app.langwatch.ai",
+    },
+    "with only an id": {
+      userId: "user_riley",
+      organizationId: "organization_acme",
+      arrival: "scim",
+      appUrl: "https://app.langwatch.ai",
     },
   },
 });

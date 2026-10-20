@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "DataPrivacyProjectScope" (
+CREATE TABLE IF NOT EXISTS "DataPrivacyProjectScope" (
     "projectId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "teamId" TEXT,
@@ -14,4 +14,4 @@ CREATE TABLE "DataPrivacyProjectScope" (
 );
 
 -- CreateIndex
-CREATE INDEX "DataPrivacyProjectScope_organizationId_idx" ON "DataPrivacyProjectScope"("organizationId");
+CREATE INDEX IF NOT EXISTS "DataPrivacyProjectScope_organizationId_idx" ON "DataPrivacyProjectScope"("organizationId");

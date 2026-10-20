@@ -40,6 +40,7 @@ describe.skipIf(!TEST_DATABASE_URL)("activation codes on Postgres", () => {
       planType: "ENTERPRISE",
       maxMembers: 25,
       maxMembersLite: 0,
+      liteSeatsUnlimited: false,
       licenseTermDays: 365,
       services: ["instant_evals"],
       expiresAt: nowInstant().add({ hours: 24 * 365 }),

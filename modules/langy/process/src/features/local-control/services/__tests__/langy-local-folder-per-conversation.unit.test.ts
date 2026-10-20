@@ -6,11 +6,13 @@
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { LangyConversationDetail, LangyKeyCaller } from "@langwatch/langy-contract";
+import { memorySessionState } from "@langwatch/process-stores";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
 import type { ConnectedWorkspace } from "../../../../repositories/langy-local-presence.repository.ts";
 import { MemoryLangyRepositories } from "../../../../repositories/memory/memory.langy.repositories.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
@@ -58,6 +60,7 @@ function detail(id: string): LangyConversationDetail {
     lastError: null,
     lastModel: "gpt-5-mini",
     eventCursor: null,
+    origin: "interactive",
   };
 }
 
@@ -73,8 +76,11 @@ let terminal: LangyLocalControlTerminalService;
 beforeEach(() => {
   const repositories = MemoryLangyRepositories.create();
   runtime = LangyLocalControlRuntimeService.create({
-    store: repositories.sessionState,
-    presence: LangyLocalPresenceRedisRepository.create({ store: repositories.sessionState }),
+    calls: repositories.localCalls,
+    userWaits: repositories.localUserWaits,
+    controlRequests: repositories.localControlRequests,
+    presence: LangyLocalPresenceRedisRepository.create({ store: memorySessionState() }),
+    workspace: MemoryLangyLocalWorkspaceChannel.create(),
     projects: { getOrganizationId: async () => "organization-1", getSlug: async () => "shop" },
     mintSessionKey: async () => ({ token: `sk-lw-${nextKey}`, apiKeyId: `key-${nextKey++}` }),
     events: { startUserWait: async () => {}, endUserWait: async () => {} },

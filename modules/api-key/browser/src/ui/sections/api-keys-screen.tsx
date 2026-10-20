@@ -5,7 +5,11 @@
 
 import type { ApiKeyListEntry, ApiKeyTrpcGrant } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
-import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { IdText } from "@langwatch/design-system/id-text";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
@@ -13,20 +17,16 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
-  Skeleton,
   Spacer,
-  Table,
   Text,
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ScopeFilter } from "@langwatch/design-system/scope-filter";
-import { Tooltip } from "@langwatch/design-system/tooltip";
-import { nowInstant, toDate, toEpochMs, readableDate } from "@langwatch/time";
-import { Key, MoreVertical, Plus } from "lucide-react";
+import { nowInstant, toDate, toEpochMs } from "@langwatch/time";
+import { Key, Plus } from "lucide-react";
 import { type ReactNode, useEffect, useMemo, useState } from "react";
 
 import { apiKeyApi } from "../../behavior/api-key-api.ts";
@@ -101,39 +101,23 @@ function PermissionBadge({ permissionMode }: { permissionMode: ApiKeyRow["permis
   );
 }
 
-function NoMatchingKeysRow() {
-  return (
-    <Table.Row>
-      <Table.Cell colSpan={9}>
-        <Text color="fg.muted" textAlign="center" paddingY={4}>
-          No keys match the current scope. Change the filter above to see other keys.
-        </Text>
-      </Table.Cell>
-    </Table.Row>
-  );
-}
+/** Pixel widths for the seven columns; long names and owners truncate, nothing else gives way. */
+const KEY_COLUMN_WIDTHS = [320, 120, 228, 176, 104, 110, 56] as const;
+const KEY_COLUMNS = KEY_COLUMN_WIDTHS.length;
+const KEY_TABLE_MIN_WIDTH = `${KEY_COLUMN_WIDTHS.reduce((sum, width) => sum + width, 0)}px`;
 
-/** Rows in the table's own shape while the keys load, so nothing jumps on arrival. */
-function LoadingKeyRows() {
+const API_KEYS_DOCS_HREF = "https://docs.langwatch.ai/platform/api-keys";
+
+function NoMatchingKeysRow({ onClearFilters }: { onClearFilters: () => void }) {
   return (
-    <>
-      {Array.from({ length: 3 }, (_, index) => (
-        <Table.Row key={index} aria-busy="true">
-          <Table.Cell>
-            <VStack align="start" gap={1}>
-              <Skeleton height="12px" width="140px" />
-              <Skeleton height="10px" width="200px" />
-            </VStack>
-          </Table.Cell>
-          {Array.from({ length: 7 }, (_, cell) => (
-            <Table.Cell key={cell}>
-              <Skeleton height="12px" width="64px" />
-            </Table.Cell>
-          ))}
-          <Table.Cell />
-        </Table.Row>
-      ))}
-    </>
+    <ListTable.EmptyRow
+      columns={KEY_COLUMNS}
+      state="no-results"
+      title="No keys match the current scope"
+      description="Change the filter above to see other keys."
+      onClearFilters={onClearFilters}
+      next={[{ kind: "docs", label: "How API keys are scoped", href: API_KEYS_DOCS_HREF }]}
+    />
   );
 }
 
@@ -152,19 +136,30 @@ function ApiKeyTableRow({
   onRevoke: (apiKeyId: string) => void;
 }) {
   return (
-    <Table.Row id={apiKeyRowAnchorId(apiKey.id)}>
-      <Table.Cell minWidth="220px" maxWidth="360px">
+    <ListTable.Row id={apiKeyRowAnchorId(apiKey.id)}>
+      <ListTable.Cell>
         <HStack align="start">
           <Box paddingTop={1} color="fg.muted" flexShrink={0}>
             <Key size={14} />
           </Box>
           <VStack align="start" gap={0} minWidth={0}>
-            <Text fontWeight="medium" maxWidth="full" truncate title={apiKey.name}>
-              {apiKey.name}
-            </Text>
+            <HStack gap={2} maxWidth="full" minWidth={0}>
+              <Text textStyle="label" flex={1} minWidth={0} truncate title={apiKey.name}>
+                {apiKey.name}
+              </Text>
+              {isExpired(apiKey) ? (
+                <Badge size="sm" colorPalette="red" flexShrink={0}>
+                  Expired
+                </Badge>
+              ) : (
+                <Badge size="sm" colorPalette="green" flexShrink={0}>
+                  Active
+                </Badge>
+              )}
+            </HStack>
             {apiKey.description && (
               <Text
-                fontSize="xs"
+                textStyle="caption"
                 color="fg.muted"
                 maxWidth="full"
                 lineClamp={2}
@@ -175,67 +170,50 @@ function ApiKeyTableRow({
             )}
           </VStack>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        {isExpired(apiKey) ? (
-          <Badge size="sm" colorPalette="red">
-            Expired
-          </Badge>
-        ) : (
-          <Badge size="sm" colorPalette="green">
-            Active
-          </Badge>
-        )}
-      </Table.Cell>
-      <Table.Cell>
-        <Text fontSize="xs" fontFamily="monospace" color="fg.muted">
-          sk-lw-{apiKey.lookupIdPrefix}…
-        </Text>
-      </Table.Cell>
-      <Table.Cell>
-        {readableDate(apiKey.createdAt).toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-          year: "numeric",
-        })}
-      </Table.Cell>
-      <Table.Cell>
-        {apiKey.lastUsedAt ? (
-          <Tooltip content={readableDate(apiKey.lastUsedAt).toISOString()}>
-            <Text
-              cursor="help"
-              tabIndex={0}
-              aria-label={`Last used at ${readableDate(apiKey.lastUsedAt).toISOString()}`}
-            >
-              {formatTimeAgo(toEpochMs(apiKey.lastUsedAt)) ?? ""}
-            </Text>
-          </Tooltip>
-        ) : (
-          <Text fontSize="sm" color="fg.muted">
-            Never
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <VStack align="start" gap={0}>
+          <IdText
+            value={`sk-lw-${apiKey.lookupIdPrefix}…`}
+            label="secret key prefix"
+            copyable={false}
+          />
+          <Text textStyle="caption" color="fg.muted">
+            Created <FormattedDate value={apiKey.createdAt} display="date" />
           </Text>
-        )}
-      </Table.Cell>
-      <Table.Cell maxWidth="240px">
-        {apiKey.userId ? (
-          <Badge
-            size="sm"
-            variant="outline"
-            title={apiKey.userEmail ?? apiKey.userName ?? undefined}
-          >
-            <Text truncate>{apiKey.userEmail ?? apiKey.userName ?? " - "}</Text>
-          </Badge>
-        ) : (
-          <Badge size="sm" colorPalette="purple">
-            Service
-          </Badge>
-        )}
-      </Table.Cell>
-      <Table.Cell maxWidth="240px">{scopeBadge}</Table.Cell>
-      <Table.Cell>
+        </VStack>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <VStack align="start" gap={0} minWidth={0}>
+          {apiKey.userId ? (
+            <Text
+              textStyle="bodySm"
+              maxWidth="full"
+              truncate
+              title={apiKey.userEmail ?? apiKey.userName ?? undefined}
+            >
+              {apiKey.userEmail ?? apiKey.userName ?? <EmptyValue label="No owner" />}
+            </Text>
+          ) : (
+            <EmptyValue label="No owner" />
+          )}
+          <Text textStyle="caption" color="fg.muted">
+            {apiKey.userId ? "Personal key" : "Service key"}
+          </Text>
+        </VStack>
+      </ListTable.Cell>
+      <ListTable.Cell>{scopeBadge}</ListTable.Cell>
+      <ListTable.Cell>
         <PermissionBadge permissionMode={apiKey.permissionMode} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
+        {apiKey.lastUsedAt ? (
+          <FormattedDate value={apiKey.lastUsedAt} display="relative" />
+        ) : (
+          <EmptyValue label="Never used" />
+        )}
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {/* Owner/admin can edit/revoke; service keys (no userId) need admin */}
         {canModify && (
           <Menu.Root>
@@ -246,7 +224,7 @@ function ApiKeyTableRow({
                 aria-label={`Actions for API key ${apiKey.name}`}
                 data-testid="api-key-actions"
               >
-                <MoreVertical size={14} />
+                <MoreVerticalIcon size={14} />
               </Button>
             </Menu.Trigger>
             <Menu.Content>
@@ -264,8 +242,8 @@ function ApiKeyTableRow({
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
@@ -467,7 +445,7 @@ export default function ApiKeysScreen() {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>API Keys</PageLayout.Heading>
+        <PageLayout.Heading>API keys</PageLayout.Heading>
         <Spacer />
         <ScopeFilter
           value={scopeFilter}
@@ -487,7 +465,7 @@ export default function ApiKeysScreen() {
           them in the browser or other client-side code.
         </Text>
 
-        {hasLegacyKey && <LegacyProjectKeyBanner />}
+        {hasLegacyKey && <LegacyProjectKeyBanner onCreateKey={onCreateOpen} />}
 
         <VStack gap={8} width="full" align="stretch">
           {/* Personal + service keys (ingestSourceType == null); the page heading titles them. */}
@@ -499,40 +477,48 @@ export default function ApiKeysScreen() {
               testId="api-keys-empty"
             />
           ) : (
-            <Card.Root width="full" overflow="hidden">
-              <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-                <Table.Root variant="line" size="md" width="full">
-                  <Table.Header>
-                    <Table.Row>
-                      <Table.ColumnHeader minWidth="220px">Name</Table.ColumnHeader>
-                      <Table.ColumnHeader>Status</Table.ColumnHeader>
-                      <Table.ColumnHeader whiteSpace="nowrap">Secret key</Table.ColumnHeader>
-                      <Table.ColumnHeader>Created</Table.ColumnHeader>
-                      <Table.ColumnHeader whiteSpace="nowrap">Last used</Table.ColumnHeader>
-                      <Table.ColumnHeader>Type</Table.ColumnHeader>
-                      <Table.ColumnHeader>Scope</Table.ColumnHeader>
-                      <Table.ColumnHeader>Permissions</Table.ColumnHeader>
-                      <Table.ColumnHeader width="100px"></Table.ColumnHeader>
-                    </Table.Row>
-                  </Table.Header>
-                  <Table.Body>
-                    {isLoadingKeys && <LoadingKeyRows />}
-                    {filteredKeys.map((apiKey) => (
-                      <ApiKeyTableRow
-                        key={apiKey.id}
-                        apiKey={apiKey}
-                        scopeBadge={getScopeBadge(apiKey)}
-                        canModify={isAdmin || apiKey.userId === currentUserId}
-                        onEdit={setApiKeyToEdit}
-                        onRevoke={setApiKeyToRevoke}
-                      />
-                    ))}
+            <ListTable
+              scroll="x"
+              scrollLabel="API keys"
+              tableLayout="fixed"
+              minWidth={KEY_TABLE_MIN_WIDTH}
+            >
+              <ListTable.ColumnGroup>
+                {KEY_COLUMN_WIDTHS.map((width) => (
+                  <ListTable.Column key={width} width={`${width}px`} />
+                ))}
+              </ListTable.ColumnGroup>
+              <ListTable.Header>
+                <ListTable.Row>
+                  <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Secret key</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Owner</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Scope</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Permissions</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+                  <ListTable.ActionHeader />
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
+                {isLoadingKeys && <ListTable.LoadingRows rows={3} columns={KEY_COLUMNS} />}
+                {filteredKeys.map((apiKey) => (
+                  <ApiKeyTableRow
+                    key={apiKey.id}
+                    apiKey={apiKey}
+                    scopeBadge={getScopeBadge(apiKey)}
+                    canModify={isAdmin || apiKey.userId === currentUserId}
+                    onEdit={setApiKeyToEdit}
+                    onRevoke={setApiKeyToRevoke}
+                  />
+                ))}
 
-                    {!isLoadingKeys && filteredKeys.length === 0 && <NoMatchingKeysRow />}
-                  </Table.Body>
-                </Table.Root>
-              </Card.Body>
-            </Card.Root>
+                {!isLoadingKeys && filteredKeys.length === 0 && (
+                  <NoMatchingKeysRow
+                    onClearFilters={() => handleScopeFilterChange({ kind: "all" })}
+                  />
+                )}
+              </ListTable.Body>
+            </ListTable>
           )}
 
           {/* Ingestion keys render below the API keys table. */}
@@ -573,6 +559,7 @@ export default function ApiKeysScreen() {
 
         <TokenCreatedDialog
           newToken={newToken}
+          keyName={newKeyInput?.name}
           projectId={scope.projectId}
           endpoint={endpoint}
           orgProjects={(orgProjects.data ?? []).filter((project) =>

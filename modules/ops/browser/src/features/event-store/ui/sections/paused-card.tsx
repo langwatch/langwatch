@@ -1,4 +1,5 @@
-import { Card, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Separator, VStack } from "@langwatch/design-system/primitives";
 import type { ParkedTenant } from "@langwatch/ops-contract";
 import type { ReactNode } from "react";
 
@@ -36,19 +37,15 @@ export function PausedCard({
   if (total === 0) return null;
 
   return (
-    <Card.Root overflow="hidden">
-      <HStack paddingX={4} paddingTop={3} gap={2}>
-        <Text textStyle="sm" fontWeight="medium">
-          Switched off
-        </Text>
-        <Text textStyle="xs" color="fg.muted">
-          {describe({
-            parkedTenants: parkedTenants.length,
-            schedules: schedulesTotal,
-            subscribers: pausedKeys.length,
-          })}
-        </Text>
-      </HStack>
+    <Card
+      padding="none"
+      title="Switched off"
+      description={describe({
+        parkedTenants: parkedTenants.length,
+        schedules: schedulesTotal,
+        subscribers: pausedKeys.length,
+      })}
+    >
       <VStack align="stretch" gap={0} separator={<Separator />}>
         {sectionsWithContent({
           parkedTenants,
@@ -61,7 +58,7 @@ export function PausedCard({
           renderSubscribersLink,
         })}
       </VStack>
-    </Card.Root>
+    </Card>
   );
 }
 

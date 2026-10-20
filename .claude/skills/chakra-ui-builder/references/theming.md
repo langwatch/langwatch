@@ -1,12 +1,18 @@
 # Chakra UI Theming Reference
 
+> **In this repository** the system already exists: edit `packages/design-system/src/system/config.ts`
+> (tokens, semantic tokens, recipes) and `create-system.ts`; the provider is
+> `src/provider/index.tsx`. Do not add a `theme.ts` or a second provider, and do not run the
+> upstream `typegen` or `eject` commands (there is no workspace Chakra CLI script). The
+> examples below are generic Chakra v3 patterns: apply them as edits to the existing config.
+> Token names here are samples; the repository's are `bg`, `fg`, `border` (DEFAULT keys, so
+> `fg`, not `fg.default`), `fg.muted`, `bg.subtle`, and so on. Raw values belong only in this package.
+
 Use v3 patterns (`defineConfig`, `createSystem`, `defineRecipe`,
 `defineSlotRecipe`) by default. Only use v2 patterns (`extendTheme`,
 `styleConfig`) if the project is explicitly on v2.
 
-Before starting, check `package.json` for the Chakra UI version and look for an
-existing theme file (`theme.ts`, `system.ts`) to understand what's already
-defined.
+Before starting, read `src/system/config.ts` to see what is already defined.
 
 Clarify scope when needed:
 
@@ -27,7 +33,7 @@ All theming in v3 starts with `createSystem`. Use `defineConfig` to author
 customizations, then merge with `defaultConfig`:
 
 ```ts
-// theme.ts
+// sample only: in this repository this is src/system/config.ts
 import { createSystem, defaultConfig, defineConfig } from "@chakra-ui/react";
 
 const config = defineConfig({
@@ -42,18 +48,8 @@ const config = defineConfig({
 export const system = createSystem(defaultConfig, config);
 ```
 
-Pass `system` to `ChakraProvider`:
-
-```tsx
-// components/ui/provider.tsx
-"use client";
-import { system } from "@/theme";
-import { ChakraProvider } from "@chakra-ui/react";
-
-export function Provider({ children }) {
-  return <ChakraProvider value={system}>{children}</ChakraProvider>;
-}
-```
+The system is passed to `ChakraProvider` once, by the design system's own provider
+(`packages/design-system/src/provider/index.tsx`). Do not write another.
 
 ---
 
@@ -71,10 +67,12 @@ const config = defineConfig({
           50: { value: "#eff6ff" },
           100: { value: "#dbeafe" },
           200: { value: "#bfdbfe" },
+          400: { value: "#60a5fa" },
           500: { value: "#3b82f6" },
           600: { value: "#2563eb" },
           700: { value: "#1d4ed8" },
           900: { value: "#1e3a8a" },
+          950: { value: "#172554" },
         },
       },
       fonts: {
@@ -127,7 +125,7 @@ const config = defineConfig({
           value: { base: "{colors.brand.50}", _dark: "{colors.brand.950}" },
         },
 
-        "bg.default": { value: { base: "white", _dark: "{colors.gray.900}" } },
+        bg: { value: { base: "white", _dark: "{colors.gray.900}" } },
         "bg.subtle": {
           value: { base: "{colors.gray.50}", _dark: "{colors.gray.800}" },
         },
@@ -135,7 +133,7 @@ const config = defineConfig({
           value: { base: "{colors.gray.100}", _dark: "{colors.gray.700}" },
         },
 
-        "fg.default": { value: { base: "{colors.gray.900}", _dark: "white" } },
+        fg: { value: { base: "{colors.gray.900}", _dark: "white" } },
         "fg.muted": {
           value: { base: "{colors.gray.600}", _dark: "{colors.gray.400}" },
         },
@@ -143,7 +141,7 @@ const config = defineConfig({
           value: { base: "{colors.gray.400}", _dark: "{colors.gray.600}" },
         },
 
-        "border.default": {
+        border: {
           value: { base: "{colors.gray.200}", _dark: "{colors.gray.700}" },
         },
         "border.muted": {
@@ -268,8 +266,8 @@ function Card({ variant = "elevated", size = "md", children }) {
 
 ## Typegen
 
-Run typegen after adding custom tokens, semantic tokens, recipes, or slot
-recipes. Without it, TypeScript won't know your custom values exist.
+Upstream Chakra tooling, not a script in this repository: confirm the repository's own
+procedure before using it. Typegen generates types for custom tokens and recipes.
 
 ```bash
 npx @chakra-ui/cli typegen ./theme.ts
@@ -291,7 +289,8 @@ spacing/font/radius tokens, or new recipes or slot recipes.
 
 ## Ejecting the default theme
 
-For full control over Chakra's built-in tokens, recipes, and styles:
+Upstream Chakra tooling, not a script in this repository (the design system already
+owns its system). For full control over Chakra's built-in tokens, recipes, and styles:
 
 ```bash
 npx @chakra-ui/cli eject

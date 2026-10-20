@@ -2,6 +2,7 @@ import "../../model/ambient.d.ts";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { Link } from "@langwatch/browser-host/link";
 import { Box, Input, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { useState } from "react";
 import { useForm, type UseFormReturn, useWatch } from "react-hook-form";
 import { z } from "zod";
@@ -189,7 +190,7 @@ export function CredentialSignInForm({
                 id={id}
                 type="email"
                 placeholder="you@company.com"
-                fontSize={{ base: "16px", md: "14px" }}
+                fontSize={{ base: "md", md: "sm" }}
                 minHeight="44px"
                 borderRadius={SHAPE.field}
                 autoComplete="username"
@@ -216,7 +217,7 @@ export function CredentialSignInForm({
                 style={{
                   textDecoration: "underline",
                   textUnderlineOffset: "2px",
-                  fontSize: "12px",
+                  fontSize: `${TYPE_SCALE_PX.caption}px`,
                 }}
               >
                 Forgot password?

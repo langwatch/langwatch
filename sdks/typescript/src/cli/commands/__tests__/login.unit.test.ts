@@ -48,6 +48,13 @@ vi.mock("@/cli/utils/governance/session-api", async () => {
   };
 });
 
+// The trusted roots are process-wide state; the test only checks which endpoint is offered.
+const trustLocalDevCa = vi.fn();
+vi.mock("@/cli/utils/localDevCa", () => ({
+  trustLocalDevCa: (...args: unknown[]) => trustLocalDevCa(...args),
+  untrustedCertHint: () => undefined,
+}));
+
 // Keep the notice's name-cache seeding away from the real filesystem.
 vi.mock("@/cli/utils/identityNotice", () => ({
   rememberProjectName: vi.fn(),
@@ -382,6 +389,34 @@ describe("loginCommand", () => {
           choices: { value: string }[];
         };
         expect(firstCall.choices.map((c) => c.value)).toEqual(["cloud", "self-hosted"]);
+      });
+    });
+
+    describe("when the user types a local https endpoint", () => {
+      it("offers that endpoint to the local CA trust before the login runs", async () => {
+        const saved = process.env.LANGWATCH_ENDPOINT;
+        delete process.env.LANGWATCH_ENDPOINT;
+        const cfg = { control_plane_url: "https://app.langwatch.ai" };
+        loadConfig.mockReturnValue(cfg);
+        runDeviceFlowLogin.mockClear();
+        trustLocalDevCa.mockClear();
+        promptsMock
+          .mockResolvedValueOnce({ where: "self-hosted" })
+          .mockResolvedValueOnce({ url: "https://app.wt.langwatch.localhost:1355" })
+          .mockResolvedValueOnce({ mode: "device" });
+
+        try {
+          await loginCommand({});
+        } finally {
+          if (saved !== undefined) process.env.LANGWATCH_ENDPOINT = saved;
+        }
+
+        expect(trustLocalDevCa).toHaveBeenCalledWith({
+          endpoint: "https://app.wt.langwatch.localhost:1355",
+        });
+        expect(trustLocalDevCa.mock.invocationCallOrder[0]).toBeLessThan(
+          runDeviceFlowLogin.mock.invocationCallOrder[0]!,
+        );
       });
     });
 

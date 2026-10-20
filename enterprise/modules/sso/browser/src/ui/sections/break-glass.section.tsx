@@ -5,12 +5,13 @@
  * everything else on this page — a lapsed subscription must never be the
  * reason an organization cannot reach its own recovery path.
  */
+import { Card } from "@langwatch/design-system/card";
+import { ListTable } from "@langwatch/design-system/list-table";
 import {
   Button,
   HStack,
   Input,
   NativeSelect,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -27,8 +28,6 @@ import {
   type BreakGlassGrantView,
 } from "../../model/break-glass-grants.ts";
 import { CopyValueRow } from "../elements/copy-value-row.tsx";
-import { SettingsCard } from "../elements/settings-card.tsx";
-import { SettingsTable } from "../elements/settings-table.tsx";
 
 /**
  * Thirty days, not the ninety the window allows: a default should be the
@@ -73,10 +72,12 @@ export function BreakGlassSection({
   const live = liveBreakGlassGrants(grants);
 
   return (
-    <SettingsCard
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
       title="Name someone who can still get in"
-      hint="The one way in that does not go through your identity provider."
-      testId="connection-break-glass"
+      description="The one way in that does not go through your identity provider."
+      data-testid="connection-break-glass"
     >
       <Text color="fg.muted" fontSize="sm" maxWidth="72ch">
         Once single sign-on decides who gets in, everyone goes through your identity provider. Name
@@ -89,15 +90,19 @@ export function BreakGlassSection({
           Nobody can get in without your identity provider yet.
         </Text>
       ) : (
-        <SettingsTable testId="connection-break-glass-table">
-          <Table.Header>
-            <Table.Row background="transparent">
-              <Table.ColumnHeader>Who</Table.ColumnHeader>
-              <Table.ColumnHeader>Until</Table.ColumnHeader>
-              <Table.ColumnHeader />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable
+          scroll="x"
+          scrollLabel="Break-glass grants table"
+          data-testid="connection-break-glass-table"
+        >
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Who</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Until</ListTable.ColumnHeader>
+              <ListTable.ActionHeader />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {live.map((grant) => (
               <GrantRow
                 key={grant.bindingId}
@@ -110,8 +115,8 @@ export function BreakGlassSection({
                 onRevoke={() => onRevoke({ bindingId: grant.bindingId })}
               />
             ))}
-          </Table.Body>
-        </SettingsTable>
+          </ListTable.Body>
+        </ListTable>
       )}
 
       {grantSettling && (
@@ -143,7 +148,7 @@ export function BreakGlassSection({
           </Text>
         </VStack>
       )}
-    </SettingsCard>
+    </Card>
   );
 }
 
@@ -242,8 +247,8 @@ function GrantRow({
   onRevoke: () => void;
 }) {
   return (
-    <Table.Row data-testid="connection-break-glass-row">
-      <Table.Cell verticalAlign="top">
+    <ListTable.Row data-testid="connection-break-glass-row">
+      <ListTable.Cell valign="top">
         <VStack align="start" gap={0}>
           <Text>{breakGlassHolderName(grant)}</Text>
           {grant.grantedByName && (
@@ -252,8 +257,8 @@ function GrantRow({
             </Text>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell verticalAlign="top">
+      </ListTable.Cell>
+      <ListTable.Cell valign="top">
         <VStack align="start" gap={0}>
           {/* The month in words: a numeric date is read day-first by half the
               world and month-first by the other half, directly under a date
@@ -263,8 +268,8 @@ function GrantRow({
             {grant.daysRemaining} days left
           </Text>
         </VStack>
-      </Table.Cell>
-      <Table.Cell verticalAlign="top">
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {canManage && (
           <HStack gap={2} justify="end">
             <Button size="xs" variant="outline" loading={settling} onClick={onRenew}>
@@ -285,7 +290,7 @@ function GrantRow({
             </Button>
           </HStack>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }

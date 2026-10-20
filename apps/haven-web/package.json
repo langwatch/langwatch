@@ -9,7 +9,7 @@
     "dev": "vite",
     "build": "vite build",
     "screenshot": "node scripts/screenshot.ts",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

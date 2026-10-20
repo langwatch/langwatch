@@ -1,5 +1,6 @@
 import { kebabCase } from "@langwatch/design-system/string-casing";
 import type { LocalPromptConfig } from "@langwatch/experiment-contract";
+import { createLogger } from "@langwatch/observability/browser";
 import {
   PromptScope,
   type PromptConfigFormValues,
@@ -26,6 +27,8 @@ import type { SaveVersionParams } from "./prompt-config-operations.ts";
 import { DEFAULT_MODEL } from "./prompt-constants.ts";
 import { inputsAndOutputsToDemostrationColumns } from "./prompt-form/index.ts";
 import type { WireVersionedPrompt } from "./wire-versioned-prompt.ts";
+
+const logger = createLogger("langwatch:prompt:node-conversion");
 
 export function promptConfigFormValuesToOptimizationStudioNodeData(
   formValues: PromptConfigFormValues,
@@ -98,7 +101,7 @@ export function safeOptimizationStudioNodeDataToPromptConfigFormInitialValues(
 
   if (rawLlmValue && typeof rawLlmValue === "string") {
     // Migrate legacy format: string model name → object with model field
-    console.warn(
+    logger.warn(
       `Migrating legacy LLM format: string "${String(rawLlmValue)}" → object with model field`,
     );
     llmValue = { model: rawLlmValue };
@@ -166,7 +169,7 @@ function safeInputs(
           baseName: "input",
           existingIdentifiers,
         });
-        console.warn(`Auto-generated identifier "${identifier}" for corrupted input`);
+        logger.warn(`Auto-generated identifier "${identifier}" for corrupted input`);
       }
 
       existingIdentifiers.push(identifier);
@@ -206,7 +209,7 @@ function safeOutputs(
           baseName: "output",
           existingIdentifiers,
         });
-        console.warn(`Auto-generated identifier "${identifier}" for corrupted output`);
+        logger.warn(`Auto-generated identifier "${identifier}" for corrupted output`);
       }
 
       existingIdentifiers.push(identifier);
@@ -234,7 +237,7 @@ function nodeLlmConfig(rawLlmValue: LlmConfigParameter["value"]): LLMConfig {
     return { model: DEFAULT_MODEL };
   }
   if (typeof rawLlmValue === "string") {
-    console.warn(
+    logger.warn(
       `Migrating legacy LLM format in nodeDataToLocalPromptConfig: string ${JSON.stringify(rawLlmValue)} -> object`,
     );
     return { model: rawLlmValue };

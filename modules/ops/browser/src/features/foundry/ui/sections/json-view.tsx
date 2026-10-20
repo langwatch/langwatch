@@ -1,5 +1,6 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Badge, Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { Monaco } from "@monaco-editor/react";
 import { Check, Copy, RotateCcw, WrapText } from "lucide-react";
 import { lazy, Suspense, useRef, useState } from "react";
@@ -133,13 +134,14 @@ export function JsonView() {
             }}
             options={{
               minimap: { enabled: false },
-              fontSize: 12,
+              fontSize: TYPE_SCALE_PX.caption,
               lineNumbers: "on",
               scrollBeyondLastLine: false,
               automaticLayout: true,
               tabSize: 2,
               wordWrap: "on",
               formatOnPaste: true,
+              stickyScroll: { enabled: false },
             }}
           />
         </Suspense>

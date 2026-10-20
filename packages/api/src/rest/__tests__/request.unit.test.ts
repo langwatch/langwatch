@@ -7,7 +7,6 @@ import { HandledError } from "@langwatch/handled-error";
 import { Temporal, nowInstant } from "@langwatch/time";
 import { Context, Hono } from "hono";
 import type { ErrorHandler, Next } from "hono";
-import { generateSpecs } from "hono-openapi";
 import { HTTPException } from "hono/http-exception";
 import type { ContentfulStatusCode } from "hono/utils/http-status";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -28,6 +27,7 @@ import type {
   IdempotencyReceiptUpdate,
 } from "../repositories/prisma/prisma.idempotency-receipt.ts";
 import { bodyLimit, validator as zValidator } from "../request.ts";
+import { generateSpecs } from "./generate-specs.ts";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // The request validator, end to end through a real Hono app.

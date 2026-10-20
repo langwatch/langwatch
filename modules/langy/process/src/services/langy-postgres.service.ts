@@ -152,6 +152,7 @@ export class LangyPostgresService {
       repository: this.repositories.conversations,
       messages: this.repositories.messages,
       events: options.events,
+      turnStates: this.repositories.conversationTurnState,
       finalParts: LangyFinalPartsService.create(options.blockMetrics.blockCounter()),
       runtime: options.runtime,
     });

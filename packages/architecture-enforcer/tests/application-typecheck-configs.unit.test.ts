@@ -11,7 +11,7 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "../../..");
 function withApplication(application: string, check: (directory: string) => void) {
   const directory = mkdtempSync(join(tmpdir(), "langwatch-fast-typecheck-"));
   try {
-    for (const filename of ["tsconfig.json", "tsconfig.test.json"]) {
+    for (const filename of ["tsconfig.json", "tsconfig.app.json"]) {
       const source = join(root, "apps", application, filename);
       const parsed = ts.parseConfigFileTextToJson(source, readFileSync(source, "utf8"));
       expect(parsed.error).toBeUndefined();
@@ -61,13 +61,26 @@ function diagnostics(directory: string, filename: string) {
   }));
 }
 
-describe.each(["api", "worker", "ui"])("%s application typecheck modes", (application) => {
-  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
-  it("excludes test entrypoints from fast checks and includes them in full checks", () => {
+function parse(directory: string, filename: string) {
+  const parsed = ts.getParsedCommandLineOfConfigFile(
+    join(directory, filename),
+    {},
+    {
+      ...ts.sys,
+      onUnRecoverableConfigFileDiagnostic: (error) => {
+        throw new Error(ts.flattenDiagnosticMessageText(error.messageText, "\n"));
+      },
+    },
+  );
+  if (!parsed) throw new Error(`${filename} could not be parsed`);
+  return parsed;
+}
+
+describe.each(["api", "worker", "ui"])("%s application typecheck configuration", (application) => {
+  /** @scenario "An application checks its sources and its tests in one configuration" */
+  it("includes test directories and colocated test files in its check", () => {
     withApplication(application, (directory) => {
-      expect(diagnostics(directory, "tsconfig.json")).toEqual([]);
-      const full = diagnostics(directory, "tsconfig.test.json");
-      expect(full).toHaveLength(2);
+      const full = diagnostics(directory, "tsconfig.app.json");
       expect(full.map((error) => error.code)).toEqual([2322, 2322]);
       expect(full.map((error) => error.file)).toEqual(
         expect.arrayContaining([
@@ -78,23 +91,23 @@ describe.each(["api", "worker", "ui"])("%s application typecheck modes", (applic
     });
   });
 
-  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
-  it("still checks a test file imported by production", () => {
+  /** @scenario "An application checks its sources and its tests in one configuration" */
+  it("compiles no file of its own in the solution tsconfig.json", () => {
     withApplication(application, (directory) => {
-      writeFileSync(join(directory, "src/main.ts"), 'export { value } from "./failure.test.ts";');
-      expect(diagnostics(directory, "tsconfig.json")).toEqual([
-        { code: 2322, file: join(directory, "src/failure.test.ts") },
-      ]);
+      expect(parse(directory, "tsconfig.json").fileNames).toEqual([]);
     });
   });
 
-  /** @scenario "Production and full checks stay two configurations, and only one runs as the check" */
-  it("runs only the full configuration as its own typecheck script", () => {
+  /** @scenario "An application checks its sources and its tests in one configuration" */
+  it("builds the solution, which references only the check configuration, as its typecheck", () => {
     const manifest = JSON.parse(
       readFileSync(join(root, "apps", application, "package.json"), "utf8"),
     ) as { scripts?: Record<string, string> };
-    const script = manifest.scripts?.typecheck ?? "";
-    expect(script).toContain("tsconfig.test.json");
-    expect(script).not.toContain("tsconfig.json");
+    const solution = parse(join(root, "apps", application), "tsconfig.json");
+
+    expect(manifest.scripts?.typecheck).toMatch(/^(?:[A-Z_]+=\S+ )*tsc -b$/);
+    expect(solution.projectReferences?.map((reference) => reference.path)).toEqual([
+      join(root, "apps", application, "tsconfig.app.json"),
+    ]);
   });
 });

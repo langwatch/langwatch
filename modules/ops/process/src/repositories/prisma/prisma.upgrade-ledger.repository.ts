@@ -6,14 +6,23 @@ import {
   UpgradeLedgerRepository as ServingLedger,
 } from "@langwatch/upgrade";
 import { imageRelease, readImageCodeSteps, servingImageTree } from "@langwatch/upgrade/gate";
-import { type Deprecation, loadDeprecations, loadReleases } from "@langwatch/upgrade/manifest";
+import {
+  type Deprecation,
+  loadDeprecations,
+  loadReleaseBaseline,
+  loadReleases,
+} from "@langwatch/upgrade/manifest";
 import {
   createUpgradeReader,
+  imageVersionName,
+  imageVersionOf,
+  readBuildCommit,
+  UNRELEASED_IMAGE,
   type ListRunsInput,
   type ListStepsFilter,
   type UpgradeImage,
   type UpgradeReader,
-  type UpgradePreview,
+  type UpgradeImageVersion,
   type UpgradeReleasePage,
   type UpgradeRunDetail,
   type UpgradeRunPage,
@@ -44,9 +53,12 @@ function waitingCodeSteps(): ReadonlySet<string> {
  */
 export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   private constructor(
-    private readonly reader: UpgradeReader,
-    private readonly runner: UpgradeRunnerRepository,
-    private readonly serving: ServingLedger,
+    private readonly parts: {
+      reader: UpgradeReader;
+      runner: UpgradeRunnerRepository;
+      serving: ServingLedger;
+      version: UpgradeImageVersion;
+    },
   ) {}
 
   static create({
@@ -59,32 +71,38 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
     needsOldWritersGone?: ReadonlySet<string>;
   }): PrismaUpgradeLedgerRepository {
     const releases = loadReleases();
-    const { manifests, floor } = releases;
+    const { manifests } = releases;
     const release = imageRelease({ manifests, tree: servingImageTree() }) ?? undefined;
     const shipped = imageSteps({ release: release ?? "0.0.0" });
+    const version = imageVersionOf({
+      release: release ?? null,
+      containsRelease: manifests.at(-1)?.release ?? loadReleaseBaseline().release,
+      commit: readBuildCommit(),
+    });
     const postgres = {
       query: async <Row extends object>(text: string, values: unknown[] = []) => ({
         rows: await prisma.$queryRawUnsafe<Row[]>(`${LEDGER_TENANCY}${text}`, ...values),
       }),
     };
-    return new PrismaUpgradeLedgerRepository(
-      createUpgradeReader({
+    return new PrismaUpgradeLedgerRepository({
+      reader: createUpgradeReader({
         postgres,
         image: {
-          release: release ?? "unreleased",
+          release: release ?? UNRELEASED_IMAGE,
+          name: imageVersionName(version),
           steps: steps ?? shipped,
         },
-        floor,
         needsOldWritersGone,
         planning: { image: { release: release ?? null, steps: shipped }, releases },
       }),
-      UpgradeRunnerRepository.create({ postgres }),
-      ServingLedger.create({ postgres }),
-    );
+      runner: UpgradeRunnerRepository.create({ postgres }),
+      serving: ServingLedger.create({ postgres }),
+      version,
+    });
   }
 
   findStatus(): Promise<UpgradeStatus> {
-    return this.reader.status();
+    return this.parts.reader.status();
   }
 
   findDeprecations(): Deprecation[] {
@@ -92,38 +110,38 @@ export class PrismaUpgradeLedgerRepository implements UpgradeLedgerRepository {
   }
 
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage> {
-    return this.reader.listSteps(filter);
+    return this.parts.reader.listSteps(filter);
   }
 
   findReleases(): Promise<UpgradeReleasePage> {
-    return this.reader.listReleases();
+    return this.parts.reader.listReleases();
   }
 
   findRuns(input?: ListRunsInput): Promise<UpgradeRunPage> {
-    return this.reader.listRuns(input);
+    return this.parts.reader.listRuns(input);
   }
 
   getStep(input: { id: string }): Promise<UpgradeStepDetail> {
-    return this.reader.getStep(input);
+    return this.parts.reader.getStep(input);
   }
 
   getRun(input: { id: string }): Promise<UpgradeRunDetail> {
-    return this.reader.getRun(input);
+    return this.parts.reader.getRun(input);
   }
 
-  findPreview(input: { to: string }): Promise<UpgradePreview> {
-    return this.reader.preview(input);
+  findImageVersion(): UpgradeImageVersion {
+    return this.parts.version;
   }
 
   findTargets(): Promise<UpgradeTargetSummary[]> {
-    return this.reader.listTargets();
+    return this.parts.reader.listTargets();
   }
 
   reopenFailedStep({ id }: { id: string }): Promise<boolean> {
-    return this.runner.retryFailedStep({ id });
+    return this.parts.runner.retryFailedStep({ id });
   }
 
   findLiveRoster({ staleAfterMs }: { staleAfterMs: number }): Promise<ServingRosterEntry[]> {
-    return this.serving.findLiveRoster({ staleAfterMs });
+    return this.parts.serving.findLiveRoster({ staleAfterMs });
   }
 }

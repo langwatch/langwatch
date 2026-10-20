@@ -1,3 +1,4 @@
+import type { ShortcutDefinition } from "@langwatch/design-system/shortcut-hint";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 
 import type { TraceDrawerState } from "../../../behavior/trace-drawer.ts";
@@ -22,11 +23,35 @@ export interface ShortcutContext {
   onClose: () => void;
 }
 
+export type TraceDrawerShortcutId = (typeof SHORTCUT_IDS)[number];
+
+const SHORTCUT_IDS = [
+  "close",
+  "help",
+  "next-trace",
+  "previous-trace",
+  "next-span",
+  "previous-span",
+  "back",
+  "waterfall",
+  "flame",
+  "topology",
+  "sequence",
+  "summary",
+  "trace",
+  "conversation",
+  "session",
+  "terminal",
+  "maximize",
+  "refresh",
+  "copy-trace-id",
+] as const;
+
 interface ShortcutEntry {
+  /** Stable name so hints and the help list read the same definition. */
+  id: TraceDrawerShortcutId;
   /** Keys recognised by `KeyboardEvent.key`. Letter shortcuts list both cases. */
   matchKeys: string[];
-  /** Keys rendered in the help dialog (single canonical form). */
-  displayKeys: string[];
   group: ShortcutGroupTitle;
   description: string;
   detail?: string;
@@ -37,8 +62,8 @@ interface ShortcutEntry {
 
 export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
   {
+    id: "close",
     matchKeys: ["Escape"],
-    displayKeys: ["Esc"],
     group: "View",
     description: "Close drawer / span",
     run: ({ store, onClose }) => {
@@ -52,8 +77,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "help",
     matchKeys: ["?"],
-    displayKeys: ["?"],
     group: "Help",
     description: "Show this help",
     run: ({ store }) => {
@@ -61,8 +86,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "next-trace",
     matchKeys: ["ArrowRight"],
-    displayKeys: ["→"],
     group: "Navigation",
     description: "Next trace in conversation",
     run: ({ store, trace, nextTraceId, nextTimestamp, navigateToTrace }) => {
@@ -76,8 +101,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "previous-trace",
     matchKeys: ["ArrowLeft"],
-    displayKeys: ["←"],
     group: "Navigation",
     description: "Previous trace in conversation",
     run: ({ store, trace, prevTraceId, prevTimestamp, navigateToTrace }) => {
@@ -91,8 +116,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "next-span",
     matchKeys: ["]"],
-    displayKeys: ["]"],
     group: "Navigation",
     description: "Next span",
     guard: ({ spanTree }) => spanTree.length > 0,
@@ -105,8 +130,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "previous-span",
     matchKeys: ["["],
-    displayKeys: ["["],
     group: "Navigation",
     description: "Previous span",
     guard: ({ spanTree }) => spanTree.length > 0,
@@ -119,37 +144,37 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "back",
     matchKeys: ["b", "B"],
-    displayKeys: ["B"],
     group: "Navigation",
     description: "Back to previous trace",
     guard: ({ canGoBack }) => canGoBack,
     run: ({ goBack }) => goBack(),
   },
   {
+    id: "waterfall",
     matchKeys: ["1"],
-    displayKeys: ["1"],
     group: "Visualisation",
     description: "Waterfall",
     run: ({ store }) => store.setVizTab("waterfall"),
   },
   {
+    id: "flame",
     matchKeys: ["2"],
-    displayKeys: ["2"],
     group: "Visualisation",
     description: "Flame graph",
     run: ({ store }) => store.setVizTab("flame"),
   },
   {
+    id: "topology",
     matchKeys: ["3"],
-    displayKeys: ["3"],
     group: "Visualisation",
     description: "Topology",
     run: ({ store }) => store.setVizTab("topology"),
   },
   {
+    id: "sequence",
     matchKeys: ["4"],
-    displayKeys: ["4"],
     group: "Visualisation",
     description: "Sequence diagram",
     run: ({ store }) => store.setVizTab("sequence"),
@@ -158,8 +183,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     // O used to jump to the trace Summary tab inside SpanTabBar. The
     // tab moved to the ModeSwitch (Trace | Summary | Conversation), so
     // O now swaps the drawer mode — same destination, different chrome.
+    id: "summary",
     matchKeys: ["o", "O"],
-    displayKeys: ["O"],
     group: "Navigation",
     description: "Trace summary",
     run: ({ store }) => store.setViewMode("summary"),
@@ -169,15 +194,15 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
   // automatically based on the selected span's kind — there's no
   // user-facing toggle to bind a shortcut to.
   {
+    id: "trace",
     matchKeys: ["t", "T"],
-    displayKeys: ["T"],
     group: "View",
     description: "Trace view",
     run: ({ store }) => store.setViewMode("trace"),
   },
   {
+    id: "conversation",
     matchKeys: ["c", "C"],
-    displayKeys: ["C"],
     group: "View",
     description: "Conversation view",
     guard: ({ trace }) => Boolean(trace.conversationId),
@@ -187,8 +212,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
   // on the same signal the tabs are (`isTerminalOrigin`) — an unguarded S would
   // strand an ordinary LLM trace on a mode it has no tab for.
   {
+    id: "session",
     matchKeys: ["s", "S"],
-    displayKeys: ["S"],
     group: "View",
     description: "Session overview",
     guard: ({ trace }) =>
@@ -199,8 +224,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     run: ({ store }) => store.setViewMode("session"),
   },
   {
+    id: "terminal",
     matchKeys: ["e", "E"],
-    displayKeys: ["E"],
     group: "View",
     description: "Terminal replay",
     guard: ({ trace }) =>
@@ -211,8 +236,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     run: ({ store }) => store.setViewMode("terminal"),
   },
   {
+    id: "maximize",
     matchKeys: ["m", "M"],
-    displayKeys: ["M"],
     group: "View",
     description: "Maximize / restore",
     run: ({ store }) => {
@@ -228,8 +253,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "refresh",
     matchKeys: ["r", "R"],
-    displayKeys: ["R"],
     group: "Actions",
     description: "Refresh trace",
     run: ({ refreshActiveTrace }) => {
@@ -237,8 +262,8 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
     },
   },
   {
+    id: "copy-trace-id",
     matchKeys: ["y", "Y"],
-    displayKeys: ["Y"],
     group: "Actions",
     description: "Copy trace ID",
     run: ({ trace }) => {
@@ -247,10 +272,39 @@ export const TRACE_DRAWER_SHORTCUTS: ShortcutEntry[] = [
   },
 ];
 
-interface HelpGroup {
-  title: ShortcutGroupTitle;
-  items: { keys: string[]; label: string; detail?: string }[];
+export interface ShortcutHelpItem {
+  label: string;
+  /** Absent for a pointer gesture that is not a key. */
+  shortcut?: ShortcutDefinition;
+  gesture?: string;
+  detail?: string;
+  /** Where the key works, e.g. "When the span tabs are focused". */
+  scope?: string;
 }
+
+export interface ShortcutHelpGroup {
+  title: string;
+  items: ShortcutHelpItem[];
+}
+
+/** One chord per distinct key; letter shortcuts list both cases but show one. */
+function definitionFor(entry: ShortcutEntry): ShortcutDefinition {
+  const keys = [
+    ...new Set(entry.matchKeys.map((key) => (key.length === 1 ? key.toLowerCase() : key))),
+  ];
+  const [first, ...rest] = keys.map((key) => ({ keys: [key] as const }));
+  return { alternatives: [first as { keys: readonly [string] }, ...rest] };
+}
+
+/** The hint and ARIA definition for a drawer shortcut, derived from the live table. */
+export function drawerShortcut(id: TraceDrawerShortcutId): ShortcutDefinition {
+  const entry = TRACE_DRAWER_SHORTCUTS.find((candidate) => candidate.id === id);
+  if (!entry) throw new Error(`No drawer shortcut named ${id}`);
+  return definitionFor(entry);
+}
+
+/** Raw JSON is a drawer-header listener, live whenever the drawer is: not an IO-view key. */
+export const RAW_JSON_SHORTCUT: ShortcutDefinition = { alternatives: [{ keys: ["\\"] }] };
 
 const HELP_GROUP_ORDER: ShortcutGroupTitle[] = [
   "View",
@@ -260,25 +314,18 @@ const HELP_GROUP_ORDER: ShortcutGroupTitle[] = [
   "Help",
 ];
 
-/**
- * Drawer help-dialog groups derived from `TRACE_DRAWER_SHORTCUTS`. The "raw
- * JSON" entry is included here even though it isn't a global shortcut — it's
- * a contextual key handled by IOViewer when focused.
- */
-export const TRACE_DRAWER_HELP_GROUPS: HelpGroup[] = HELP_GROUP_ORDER.map((title) => ({
+/** Drawer help groups derived from `TRACE_DRAWER_SHORTCUTS`, plus the header's raw JSON key. */
+export const TRACE_DRAWER_HELP_GROUPS: ShortcutHelpGroup[] = HELP_GROUP_ORDER.map((title) => ({
   title,
   items: TRACE_DRAWER_SHORTCUTS.filter((s) => s.group === title).map((s) => ({
-    keys: s.displayKeys,
     label: s.description,
+    shortcut: definitionFor(s),
     detail: s.detail,
   })),
 }))
   .map((g) =>
     g.title === "Actions"
-      ? {
-          ...g,
-          items: [...g.items, { keys: ["\\"], label: "View raw JSON" }],
-        }
+      ? { ...g, items: [...g.items, { label: "View raw JSON", shortcut: RAW_JSON_SHORTCUT }] }
       : g,
   )
   .filter((g) => g.items.length > 0);

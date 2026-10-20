@@ -57,3 +57,11 @@ Feature: The dashboard widget editor knows the runtime its code runs in
       Given a query that has not run
       When the widget reads a column of its row
       Then the column is unknown rather than guessed
+
+  Rule: The code editor sits in a bordered frame that fills its tab
+
+    @integration
+    Scenario: The code editor is framed by the shared frame card
+      When the widget editor opens on the Code tab
+      Then the editor stands inside one bordered frame that fills the tab
+      And the Queries tab has no such frame

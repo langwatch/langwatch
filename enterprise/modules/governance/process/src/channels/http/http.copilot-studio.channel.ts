@@ -2,8 +2,6 @@
 
 import type { PullResult, PullRunOptions } from "@langwatch/enterprise-governance-contract";
 
-import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
-import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 /**
  * Microsoft Copilot Studio reference puller — built on top of the
  * generic HttpPollingPullerAdapter with the URL + auth shape locked
@@ -19,6 +17,9 @@ import type { GovernanceHttpClient } from "../governance-http.channel.ts";
  *
  * Spec: specs/ai-governance/puller-framework/copilot-studio-reference.feature
  */
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
+import type { CopilotStudioPullerChannel } from "../copilot-studio.channel.ts";
+import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http.polling.channel.ts";
 
 /**
@@ -39,6 +40,8 @@ import { type HttpPollingConfig, HttpPollingPullerAdapter } from "./http.polling
  * absolute URLs and uses them as-is, so we don't need any special
  * pagination handling here.
  */
+const DIRECTORY_AUDITS_PATH = "/v1.0/auditLogs/directoryAudits";
+
 const COPILOT_STUDIO_PULL_CONFIG: HttpPollingConfig = {
   adapter: "http_polling",
   url: "https://graph.microsoft.com/v1.0/auditLogs/directoryAudits",
@@ -78,12 +81,21 @@ export class HttpCopilotStudioChannel
 {
   override readonly id: string = "copilot_studio";
 
-  private constructor(http: GovernanceHttpClient) {
+  private readonly pullConfig: HttpPollingConfig;
+
+  private constructor(http: GovernanceHttpClient, vendorBases: VendorBases) {
     super(http);
+    this.pullConfig = {
+      ...COPILOT_STUDIO_PULL_CONFIG,
+      url: `${vendorBases.microsoftGraph}${DIRECTORY_AUDITS_PATH}`,
+    };
   }
 
-  static override create(options: { http: GovernanceHttpClient }): HttpCopilotStudioChannel {
-    return new HttpCopilotStudioChannel(options.http);
+  static override create(options: {
+    http: GovernanceHttpClient;
+    vendorBases?: VendorBases;
+  }): HttpCopilotStudioChannel {
+    return new HttpCopilotStudioChannel(options.http, options.vendorBases ?? REAL_VENDOR_BASES);
   }
 
   /**
@@ -98,10 +110,10 @@ export class HttpCopilotStudioChannel
    * gets executed by the underlying HttpPollingPullerAdapter.
    */
   override validateConfig(_config: unknown): HttpPollingConfig {
-    return COPILOT_STUDIO_PULL_CONFIG;
+    return this.pullConfig;
   }
 
   override async runOnce(options: PullRunOptions, _config: HttpPollingConfig): Promise<PullResult> {
-    return super.runOnce(options, COPILOT_STUDIO_PULL_CONFIG);
+    return super.runOnce(options, this.pullConfig);
   }
 }

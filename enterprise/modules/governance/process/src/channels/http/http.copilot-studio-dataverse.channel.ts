@@ -73,6 +73,7 @@ import {
 } from "../../features/microsoft/rules/microsoft-graph-seats.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 export { copilotStudioDataversePullConfigSchema } from "@langwatch/enterprise-governance-contract";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { CopilotBotsChannel } from "../copilot-bots.channel.ts";
 import type { CopilotStudioDataversePullerChannel } from "../copilot-studio-dataverse.channel.ts";
 import type {
@@ -270,16 +271,34 @@ export class HttpCopilotStudioDataverseChannel
 
   private constructor(
     private readonly http: GovernanceHttpClient,
-    private readonly directory: MicrosoftDirectoryChannel,
-    private readonly copilotBots: CopilotBotsChannel,
+    private readonly parts: {
+      directory: MicrosoftDirectoryChannel;
+      copilotBots: CopilotBotsChannel;
+      bases: VendorBases;
+    },
   ) {}
 
-  static create(http: GovernanceHttpClient): HttpCopilotStudioDataverseChannel {
-    return new HttpCopilotStudioDataverseChannel(
-      http,
-      HttpMicrosoftDirectoryChannel.create({ http }),
-      HttpCopilotBotsChannel.create({ http }),
-    );
+  private get directory(): MicrosoftDirectoryChannel {
+    return this.parts.directory;
+  }
+
+  private get copilotBots(): CopilotBotsChannel {
+    return this.parts.copilotBots;
+  }
+
+  private get bases(): VendorBases {
+    return this.parts.bases;
+  }
+
+  static create(
+    http: GovernanceHttpClient,
+    vendorBases: VendorBases = REAL_VENDOR_BASES,
+  ): HttpCopilotStudioDataverseChannel {
+    return new HttpCopilotStudioDataverseChannel(http, {
+      directory: HttpMicrosoftDirectoryChannel.create({ http, vendorBases }),
+      copilotBots: HttpCopilotBotsChannel.create({ http, vendorBases }),
+      bases: vendorBases,
+    });
   }
 
   validateConfig(config: unknown): CopilotStudioDataverseConfig {
@@ -287,7 +306,7 @@ export class HttpCopilotStudioDataverseChannel
     // The same check the write path runs, repeated here so a config that
     // reached the adapter by any other route still cannot send the secret
     // somewhere Microsoft does not serve.
-    if (!isEnvironmentOrigin(parsed.environmentUrl)) {
+    if (!isEnvironmentOrigin(parsed.environmentUrl, this.bases.dataverseEnvironment)) {
       throw new Error("environmentUrl must be an https Power Platform environment address");
     }
     return parsed;
@@ -319,6 +338,7 @@ export class HttpCopilotStudioDataverseChannel
         environmentUrl: config.environmentUrl,
         signal: options.signal,
         http: this.http,
+        loginBase: this.bases.microsoftLogin,
       });
       const bots = await this.fetchBots({
         environmentUrl: config.environmentUrl,
@@ -398,6 +418,7 @@ export class HttpCopilotStudioDataverseChannel
         scope: AZURE_MANAGEMENT_SCOPE,
         signal: options.signal,
         http: this.http,
+        loginBase: this.bases.microsoftLogin,
       });
       const window = azureCostReadWindow({
         nowMs,
@@ -542,6 +563,7 @@ export class HttpCopilotStudioDataverseChannel
         scope: MICROSOFT_GRAPH_SCOPE,
         signal: options.signal,
         http: this.http,
+        loginBase: this.bases.microsoftLogin,
       });
       const read = await this.fetchSubscribedSkus({ token, options });
       if (read === null) return held();
@@ -564,7 +586,7 @@ export class HttpCopilotStudioDataverseChannel
   }): Promise<ReturnType<typeof readSubscribedSkuRows> | null> {
     const { token, options } = params;
     const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
-    const response = await this.http.fetch("https://graph.microsoft.com/v1.0/subscribedSkus", {
+    const response = await this.http.fetch(`${this.bases.microsoftGraph}/v1.0/subscribedSkus`, {
       method: "GET",
       headers: { Authorization: `Bearer ${token}`, Accept: "application/json" },
       signal: options.signal ? AbortSignal.any([options.signal, timeout]) : timeout,
@@ -629,6 +651,7 @@ export class HttpCopilotStudioDataverseChannel
         scope: MICROSOFT_GRAPH_SCOPE,
         signal: options.signal,
         http: this.http,
+        loginBase: this.bases.microsoftLogin,
       });
       const users = await this.fetchDirectoryUsers({ token, options });
       if (users === null) return held();
@@ -752,6 +775,7 @@ export class HttpCopilotStudioDataverseChannel
         HttpCopilotStudioDataverseChannel.refusesNextLink({
           link: nextLink,
           environmentUrl: config.environmentUrl,
+          configuredBase: this.bases.dataverseEnvironment,
           walk,
         })
       ) {
@@ -917,8 +941,9 @@ export class HttpCopilotStudioDataverseChannel
     scope?: string;
     signal?: AbortSignal;
     http: GovernanceHttpClient;
+    loginBase: string;
   }): Promise<string> {
-    const { credentials, environmentUrl, signal, http } = params;
+    const { credentials, environmentUrl, signal, http, loginBase } = params;
     const scope = params.scope ?? `${environmentUrl.replace(/\/+$/, "")}/.default`;
     const tenantId = credentials?.tenantId;
     const clientId = credentials?.clientId;
@@ -941,7 +966,7 @@ export class HttpCopilotStudioDataverseChannel
     const timeout = AbortSignal.timeout(TOKEN_TIMEOUT_MS);
 
     const response = await http.fetch(
-      `https://login.microsoftonline.com/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
+      `${loginBase}/${encodeURIComponent(tenantId)}/oauth2/v2.0/token`,
       {
         method: "POST",
         headers: { "content-type": "application/x-www-form-urlencoded" },
@@ -1252,10 +1277,11 @@ export class HttpCopilotStudioDataverseChannel
   private static refusesNextLink(params: {
     link: string | null;
     environmentUrl: string;
+    configuredBase?: string;
     walk: TranscriptWalk;
   }): boolean {
-    const { link, environmentUrl, walk } = params;
-    if (!link || isSameEnvironment({ value: link, environmentUrl })) return false;
+    const { link, environmentUrl, configuredBase, walk } = params;
+    if (!link || isSameEnvironment({ value: link, environmentUrl, configuredBase })) return false;
     walk.errorCount += 1;
     // The host, not the URL: the refused link carries a skip token and query
     // shape that add nothing here, and the host is the whole of what an

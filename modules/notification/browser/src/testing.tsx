@@ -29,7 +29,7 @@ export class FakeNotificationHost extends NotificationHostApi {
 
   project(): NotificationHostProject | undefined {
     if (this.options.project === null) return void 0;
-    return this.options.project ?? { id: "project-1" };
+    return this.options.project ?? { id: "project-1", slug: "web-app" };
   }
 
   hasPermission(permission: string): boolean {

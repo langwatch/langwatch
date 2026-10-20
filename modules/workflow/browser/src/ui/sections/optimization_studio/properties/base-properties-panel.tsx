@@ -46,7 +46,7 @@ export function BasePropertiesPanel(props: BasePropertiesPanelProps) {
       renderNodeName={({ name, onClick, cursor }) => (
         <HoverableBigText
           lineClamp={2}
-          fontSize="15px"
+          textStyle="body"
           fontWeight={500}
           onClick={onClick}
           cursor={cursor}

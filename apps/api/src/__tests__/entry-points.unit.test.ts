@@ -116,16 +116,15 @@ describe("the entry points", () => {
     /** @scenario "The npx server starts its services with no migration phase" */
     it("starts the api and the worker with no migration phase, and lets the worker upgrade", () => {
       const runtime = uncommented(readFromRoot("apps/server/src/services/runtime.ts")).join("\n");
-      const workers = uncommented(
-        readFromRoot("apps/server/src/services/langwatch-workers.ts"),
-      ).join("\n");
+      // One process hosts the api and the worker half, so langwatch.ts starts both.
+      const langwatch = uncommented(readFromRoot("apps/server/src/services/langwatch.ts")).join(
+        "\n",
+      );
 
       expect(runtime).not.toMatch(/runMigrations|migrate\.ts|task upgrade/);
       expect(runtime).toMatch(/startLangwatch\(/);
-      expect(runtime).toMatch(/startLangwatchWorkers\(/);
-      expect(workers).not.toMatch(
-        /SKIP_PRISMA_MIGRATE|SKIP_CLICKHOUSE_MIGRATE|SKIP_LWQL_PROVISION/,
-      );
+      expect(langwatch).toMatch(/WORKER_METRICS_PORT/);
+      expect(langwatch).not.toMatch(/SKIP_LWQL_PROVISION|runMigrations|task upgrade/);
     });
   });
 

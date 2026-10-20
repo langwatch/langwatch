@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/langwatch/langwatch/services/idpsim"
-	"github.com/langwatch/langwatch/services/mailsim"
+	"github.com/langwatch/langwatch/services/sims/idpsim"
+	"github.com/langwatch/langwatch/services/sims/mailsim"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

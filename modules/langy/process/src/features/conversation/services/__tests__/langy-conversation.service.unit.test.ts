@@ -25,6 +25,7 @@ type Row = {
   lastActivityAtMs: number;
   cursorActivityAtMs?: number | null;
   createdAtMs: number;
+  origin?: string;
 };
 
 function makeRepo(
@@ -526,6 +527,47 @@ describe("LangyConversationService", () => {
         messageCount: 3,
       });
       expect(result[0]).not.toHaveProperty("status");
+    });
+
+    /** @scenario "A fork of a run conversation is a run conversation" */
+    it.each([
+      ["a run conversation", "run", { origin: "run" }],
+      ["a chat conversation", "interactive", {}],
+    ])("forks %s into a conversation whose origin is %s", async (_what, origin, named) => {
+      const commands = makeCommands();
+      const repo = makeRepo({
+        getVisibleById: vi.fn().mockResolvedValue(row({ id: "source-1", title: "Costs", origin })),
+      });
+      const svc = LangyConversationService.create({ commands, repository: repo });
+
+      const fork = await svc.forkById({ id: "source-1", projectId: "p1", userId: "alice" });
+
+      expect(fork.conversation.origin).toBe(origin);
+      const sent = vi.mocked(commands.forkConversation).mock.calls[0]![0];
+      expect(sent).toMatchObject({ sourceConversationId: "source-1", userId: "alice", ...named });
+      expect("origin" in sent).toBe(origin === "run");
+    });
+
+    /** @scenario "A run conversation shows in the person's history as a run" */
+    it("lists a run conversation as a run beside the person's own chats", async () => {
+      const repo = makeRepo({
+        findAllForUser: vi
+          .fn()
+          .mockResolvedValue([
+            row({ id: "run-1", title: "Daily insights - Costs - 2026-10-09", origin: "run" }),
+            row({ id: "chat-1", origin: "interactive" }),
+            row({ id: "chat-before-origins" }),
+          ]),
+      });
+      const svc = LangyConversationService.create({ commands: makeCommands(), repository: repo });
+
+      const result = await svc.getAll({ projectId: "p1", userId: "alice" });
+
+      expect(result.map(({ id, origin, isOwn }) => ({ id, origin, isOwn }))).toEqual([
+        { id: "run-1", origin: "run", isOwn: true },
+        { id: "chat-1", origin: "interactive", isOwn: true },
+        { id: "chat-before-origins", origin: "interactive", isOwn: true },
+      ]);
     });
 
     it("falls back to createdAt when lastActivityAt is unset", async () => {

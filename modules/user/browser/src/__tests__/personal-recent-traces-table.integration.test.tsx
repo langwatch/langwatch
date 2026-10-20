@@ -39,18 +39,18 @@ describe("PersonalRecentTracesTable", () => {
     it("links the API-key offer to the api-keys settings page", () => {
       renderEmpty("jane-personal");
 
-      const link = screen.getByText("Create an API key").closest("a");
+      const link = screen.getByRole("link", { name: "Create an API key" });
       // Settings is a top-level route. A project-slug prefix has no route
       // behind it and lands the reader on a 404 or, for a member whose
       // ambient team resolves elsewhere, on a refusal.
-      expect(link?.getAttribute("href")).toBe("/settings/api-keys");
+      expect(link.getAttribute("href")).toBe("/settings/api-keys");
     });
 
     it("renders the two in-page offers as buttons (scroll to the matching section)", () => {
       renderEmpty();
 
-      expect(screen.getByText("Set up a coding assistant").closest("button")).toBeTruthy();
-      expect(screen.getByText("Mint an ingestion key").closest("button")).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Set up a coding assistant" })).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Mint an ingestion key" })).toBeTruthy();
     });
   });
 });

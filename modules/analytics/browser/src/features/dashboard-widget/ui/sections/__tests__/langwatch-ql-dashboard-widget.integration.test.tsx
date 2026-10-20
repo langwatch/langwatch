@@ -222,7 +222,7 @@ describe("the LangWatchQL dashboard widget", () => {
       // asserts what a package can still guarantee — the widget names the
       // failed action, and the wire message (the code slug, #5984) never shows.
       expect(alert).toHaveTextContent("Couldn't run this chart's query");
-      expect(alert).not.toHaveTextContent(/lwql_unparseable/);
+      expect(alert).not.toHaveTextContent("lwql_unparseable");
     });
   });
 

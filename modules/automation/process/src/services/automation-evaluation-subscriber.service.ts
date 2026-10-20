@@ -5,7 +5,7 @@ import type {
   AutomationTraceSubscriberContext,
 } from "@langwatch/automation-contract";
 import type { EvaluationApi, EvaluationStatus } from "@langwatch/evaluation-contract";
-import type { TraceSummaryData } from "@langwatch/trace-contract";
+import type { TraceSummaryData, TraceSummaryLookupInput } from "@langwatch/trace-contract";
 import { passesTraceOriginGuards } from "@langwatch/trace-contract";
 
 import { handleEvaluationAlertTriggerMatch } from "../eventing/evaluation-alert-trigger-match.subscriber.ts";
@@ -54,7 +54,11 @@ export class AutomationEvaluationSubscriberService {
     occurredAt: number;
   }): Promise<void> {
     const { projectId, traceId, occurredAt } = input;
-    const summary = await this.deps.traces.findSummary({ projectId, traceId });
+    const summary = await this.deps.traces.findSummary({
+      projectId,
+      traceId,
+      occurredAtMs: occurredAt,
+    });
     if (!summary) return;
     if (!passesTraceOriginGuards({ type: input.eventType, occurredAt }, summary)) return;
     await this.handleTraceTriggerMatch(
@@ -126,5 +130,5 @@ export class AutomationEvaluationSubscriberService {
  * which carries unused paths.
  */
 export interface AutomationEvaluationTraceSummary {
-  findSummary(input: { projectId: string; traceId: string }): Promise<TraceSummaryData | null>;
+  findSummary(input: TraceSummaryLookupInput): Promise<TraceSummaryData | null>;
 }

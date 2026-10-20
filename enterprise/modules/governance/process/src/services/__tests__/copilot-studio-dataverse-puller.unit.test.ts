@@ -13,7 +13,7 @@
  * Spec: specs/ai-governance/puller-framework/copilot-studio-dataverse.feature
  */
 
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError, z } from "zod";
 
 import type { GovernanceHttpClient } from "../../channels/governance-http.channel.ts";
@@ -282,6 +282,11 @@ beforeEach(() => {
     }),
   }));
 });
+
+// The first import transforms the whole channel graph; on a loaded runner that alone passed 5s.
+beforeAll(async () => {
+  await import("../../channels/http/http.copilot-studio-dataverse.channel.ts");
+}, 60_000);
 
 afterEach(() => {
   vi.useRealTimers();

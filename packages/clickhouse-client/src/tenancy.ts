@@ -42,6 +42,76 @@ export class DuplicateRouteError extends Error {
 /** `CLICKHOUSE_URL__<label>__<organizationId>=<url>`; the label is for humans. */
 export const PRIVATE_ROUTE_ENV_PREFIX = "CLICKHOUSE_URL__";
 
+/** Why a recorded private organization is refused rather than served from the shared server. */
+export type PrivateRouteProblem = "missing" | "malformed";
+
+/** A private route the organization needs but this process cannot use. */
+export interface PrivateRouteRefusal {
+  readonly organizationId: string;
+  /** The variable to set or fix, by name; never its value. */
+  readonly variable: string;
+  readonly problem: PrivateRouteProblem;
+}
+
+/** One private route variable as this process parsed it, by name; never its value. */
+export interface PrivateRouteVariable {
+  readonly organizationId: string;
+  readonly label: string;
+  readonly variable: string;
+  readonly state: "present" | "malformed";
+}
+
+/** Raised when a private organization's route is missing or malformed. Never fall back on this. */
+export class PrivateRouteUnavailableError extends Error {
+  constructor(readonly refusal: PrivateRouteRefusal) {
+    super(
+      `Cannot route ClickHouse statement: organisation "${refusal.organizationId}" keeps its data on ` +
+        `its own server, and ${refusal.variable} is ${refusal.problem}. ` +
+        "Refusing to fall back to the shared instance.",
+    );
+    this.name = "PrivateRouteUnavailableError";
+  }
+}
+
+/** Turns a refused private route into the error a caller sees; the plain error by default. */
+export abstract class PrivateRouteRefusalFactory {
+  abstract create(refusal: PrivateRouteRefusal): unknown;
+}
+
+/** The variable a recorded label names: `<prefix><label>__<organizationId>`. */
+export function privateRouteVariableOf({
+  prefix,
+  label,
+  organizationId,
+}: {
+  prefix: string;
+  label: string;
+  organizationId: string;
+}): string {
+  return label === "" ? `${prefix}${organizationId}` : `${prefix}${label}__${organizationId}`;
+}
+
+/** Splits a family variable's name: the organization follows the last `__`, the label before. */
+export function privateRouteNameOf({ prefix, variable }: { prefix: string; variable: string }): {
+  label: string;
+  organizationId: string;
+} {
+  const suffix = variable.slice(prefix.length);
+  const separator = suffix.lastIndexOf("__");
+  return separator >= 0
+    ? { label: suffix.slice(0, separator), organizationId: suffix.slice(separator + 2) }
+    : { label: "", organizationId: suffix };
+}
+
+function isUrl(value: string): boolean {
+  try {
+    new URL(value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export interface RoutingTable {
   /** organizationId -> connection url. */
   readonly routes: ReadonlyMap<string, string>;
@@ -52,6 +122,10 @@ export interface RoutingTable {
    * the intended organisation's tenants fall through to shared.
    */
   readonly ambiguous: readonly { envVar: string; organizationId: string }[];
+  /** organizationId -> the variable naming its usable route. */
+  readonly variables?: ReadonlyMap<string, string>;
+  /** organizationId -> the variable naming its unusable route: refused, never shared. */
+  readonly malformed?: ReadonlyMap<string, string>;
 }
 
 /**
@@ -61,20 +135,18 @@ export interface RoutingTable {
 export function parseRoutingTable(env: Record<string, string | undefined>): RoutingTable {
   const routes = new Map<string, string>();
   const source = new Map<string, string>();
+  const variables = new Map<string, string>();
+  const malformed = new Map<string, string>();
   const skipped: { envVar: string; reason: string }[] = [];
   const ambiguous: { envVar: string; organizationId: string }[] = [];
 
   for (const [envVar, value] of Object.entries(env)) {
     if (!envVar.startsWith(PRIVATE_ROUTE_ENV_PREFIX)) continue;
 
-    if (value === undefined || value.trim() === "") {
-      skipped.push({ envVar, reason: "empty value" });
-      continue;
-    }
-
-    const suffix = envVar.slice(PRIVATE_ROUTE_ENV_PREFIX.length);
-    const separator = suffix.lastIndexOf("__");
-    const organizationId = separator >= 0 ? suffix.slice(separator + 2) : suffix;
+    const { label, organizationId } = privateRouteNameOf({
+      prefix: PRIVATE_ROUTE_ENV_PREFIX,
+      variable: envVar,
+    });
 
     if (organizationId === "") {
       skipped.push({ envVar, reason: "no organization id in the name" });
@@ -83,8 +155,7 @@ export function parseRoutingTable(env: Record<string, string | undefined>): Rout
 
     // Guessing wrong here is a silent fail-open: the intended organisation
     // gets no route and its tenants fall through to shared.
-    const prefix = suffix.slice(0, Math.max(separator, 0));
-    if (prefix.includes("__")) {
+    if (label.includes("__")) {
       ambiguous.push({ envVar, organizationId });
     }
 
@@ -96,12 +167,20 @@ export function parseRoutingTable(env: Record<string, string | undefined>): Rout
         second: envVar,
       });
     }
-
-    routes.set(organizationId, value.trim());
     source.set(organizationId, envVar);
+
+    const url = value?.trim() ?? "";
+    if (url === "" || !isUrl(url)) {
+      skipped.push({ envVar, reason: url === "" ? "empty value" : "not a URL" });
+      malformed.set(organizationId, envVar);
+      continue;
+    }
+
+    routes.set(organizationId, url);
+    variables.set(organizationId, envVar);
   }
 
-  return { routes, skipped, ambiguous };
+  return { routes, skipped, ambiguous, variables, malformed };
 }
 
 /**
@@ -114,6 +193,17 @@ export const PLATFORM_TENANT = "__platform__" as const;
 export interface TenantDirectory {
   /** Null means "no such tenant" — an error, never a shared fallback. */
   organizationForTenant(tenantId: string): Promise<string | null>;
+  /**
+   * The private labels recorded for an organization the first time it was routed privately
+   * (organization module). Absent: nothing is recorded, as before.
+   */
+  recordedPrivateDataplaneOf?(organizationId: string): Promise<RecordedPrivateDataplane>;
+}
+
+/** An organization's recorded private ClickHouse and S3 labels; null where none was seen. */
+export interface RecordedPrivateDataplane {
+  readonly clickhouseLabel: string | null;
+  readonly s3Label: string | null;
 }
 
 export interface TenantRouterOptions {
@@ -124,10 +214,14 @@ export interface TenantRouterOptions {
    * is fixed at creation), so eviction is the only reason to drop one.
    */
   maxCacheEntries?: number | undefined;
+  /** What a refused private route throws; {@link PrivateRouteUnavailableError} by default. */
+  refusal?: PrivateRouteRefusalFactory | undefined;
 }
 
 export interface TenantRouter {
   route(tenantId: string): Promise<TenantRoute>;
+  /** Where a known organization's statements go; refuses a recorded private one with no route. */
+  routeOrganization(organizationId: string): Promise<TenantRoute>;
   /** The organisation a tenant belongs to, from the same cached directory `route` reads. */
   organizationOf(tenantId: string): Promise<string>;
   /**
@@ -161,23 +255,52 @@ function rememberBounded({
   cache.set(tenantId, organizationId);
 }
 
-/** The platform tenant and any organization without a private route share the cluster. */
-function routeForOrganization({
+class PlainRefusal extends PrivateRouteRefusalFactory {
+  create(refusal: PrivateRouteRefusal): unknown {
+    return new PrivateRouteUnavailableError(refusal);
+  }
+}
+
+/**
+ * The platform tenant and any organization never recorded as private share the cluster. A
+ * malformed route, or a recorded one now missing, is refused: never the shared server.
+ */
+async function routeForOrganization({
   table,
+  directory,
+  refusal,
   organizationId,
 }: {
   table: TenantRouterOptions["table"];
+  directory: TenantDirectory;
+  refusal: PrivateRouteRefusalFactory;
   organizationId: string;
-}): Awaited<ReturnType<TenantRouter["route"]>> {
+}): Promise<TenantRoute> {
   if (organizationId === PLATFORM_TENANT) return { kind: "shared" };
   const url = table.routes.get(organizationId);
-  return url === undefined ? { kind: "shared" } : { kind: "private", organizationId, url };
+  if (url !== undefined) return { kind: "private", organizationId, url };
+
+  const broken = table.malformed?.get(organizationId);
+  if (broken !== undefined) {
+    throw refusal.create({ organizationId, variable: broken, problem: "malformed" });
+  }
+  const recorded = await directory.recordedPrivateDataplaneOf?.(organizationId);
+  if (recorded?.clickhouseLabel != null) {
+    const variable = privateRouteVariableOf({
+      prefix: PRIVATE_ROUTE_ENV_PREFIX,
+      label: recorded.clickhouseLabel,
+      organizationId,
+    });
+    throw refusal.create({ organizationId, variable, problem: "missing" });
+  }
+  return { kind: "shared" };
 }
 
 export function createTenantRouter({
   table,
   directory,
   maxCacheEntries = DEFAULT_MAX_CACHE_ENTRIES,
+  refusal = new PlainRefusal(),
 }: TenantRouterOptions): TenantRouter {
   // `NaN` and `Infinity` both make `cache.size >= maxCacheEntries` false
   // forever, which removes the bound this option exists to impose and lets a
@@ -207,7 +330,11 @@ export function createTenantRouter({
     async route(tenantId) {
       if (tenantId === "") throw new UnknownTenantError(tenantId);
 
-      return routeForOrganization({ table, organizationId: await organizationFor(tenantId) });
+      const organizationId = await organizationFor(tenantId);
+      return routeForOrganization({ table, directory, refusal, organizationId });
+    },
+    routeOrganization(organizationId) {
+      return routeForOrganization({ table, directory, refusal, organizationId });
     },
     async organizationOf(tenantId) {
       if (tenantId === "") throw new UnknownTenantError(tenantId);

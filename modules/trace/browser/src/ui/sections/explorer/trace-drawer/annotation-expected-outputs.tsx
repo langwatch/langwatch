@@ -35,7 +35,7 @@ export function AnnotationExpectedOutputs({
 
   return (
     <VStack gap={3} align="start" paddingBottom={4} width="full">
-      <Text fontWeight="bold">Suggested output</Text>
+      <Text fontWeight="semibold">Suggested output</Text>
       {suggestions.map((annotation) => (
         <HStack width="full" key={annotation.id} align="start" gap={2}>
           <Tooltip content={annotation.user?.name ?? ""}>

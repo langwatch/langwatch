@@ -42,7 +42,7 @@ export function EvaluatorSelectionBox({
         borderRadius="xl"
         cursor="pointer"
         size="2xl"
-        fontSize="14px"
+        textStyle="body"
         boxShadow="inset 0 -2px 5px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 3%, transparent)"
       >
         <HStack justify="space-between" width="full">
@@ -85,7 +85,7 @@ export function EvaluatorSelectionBox({
       borderRadius="xl"
       cursor="pointer"
       size="2xl"
-      fontSize="14px"
+      textStyle="body"
       boxShadow="inset 0 -2px 5px 0px color-mix(in srgb, var(--chakra-colors-bg-scrim) 3%, transparent)"
     >
       <HStack justify="space-between" width="full">

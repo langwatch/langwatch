@@ -55,6 +55,15 @@ export interface EventRepository {
   }): Promise<EventRecord[]>;
 
   /**
+   * Every record of many aggregates of one type in one read, in log order per aggregate; a
+   * record whose tenant and aggregate pair was not asked for is never answered.
+   */
+  findEventRecordsOfAggregates(request: {
+    aggregates: readonly { tenantId: string; aggregateId: string }[];
+    aggregateType: string;
+  }): Promise<EventRecord[]>;
+
+  /**
    * Retrieves event records up to a specific event; occurredAtFromMs prunes
    * partitions. Filters by timestamp and eventId.
    */

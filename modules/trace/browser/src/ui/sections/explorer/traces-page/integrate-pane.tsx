@@ -86,11 +86,11 @@ export const IntegratePane: React.FC = () => {
         <AnalyticsBoundary name="traces_integrate">
           <VStack align="stretch" gap={6}>
             <VStack align="stretch" gap={1.5} minWidth={0}>
-              <Text textStyle="2xl" fontWeight="600" color="fg" letterSpacing="-0.015em">
+              <Text textStyle="pageTitle" color="fg">
                 Instrument your agents in seconds
               </Text>
-              <Text textStyle="sm" color="fg.muted" lineHeight="tall">
-                Mint a token, then hand the setup to your coding agent or follow the SDK
+              <Text textStyle="body" color="fg.muted">
+                Create a token, then hand the setup to your coding agent or follow the SDK
                 instructions.
               </Text>
             </VStack>
@@ -115,7 +115,7 @@ export const IntegratePane: React.FC = () => {
 
 /**
  * The ways forward, under the token because that is the order they happen in, and
- * centred because none of the three is the one everybody takes. They wrap rather than
+ * left-aligned with the page. They wrap rather than
  * shrink, so a phone gets three readable buttons on as many rows as it needs.
  */
 function SetupActions({
@@ -133,7 +133,7 @@ function SetupActions({
   onEnterSampleMode: () => void;
 }) {
   return (
-    <HStack gap={2} justify="center" wrap="wrap">
+    <HStack gap={2} wrap="wrap">
       <SetupWithAgentButton
         surface="traces"
         apiKey={token ?? undefined}
@@ -143,19 +143,7 @@ function SetupActions({
         <Icon as={Code2} boxSize={4} />
         See SDK instructions
       </Button>
-      <Button
-        size="sm"
-        variant="outline"
-        colorPalette="orange"
-        onClick={onEnterSampleMode}
-        transition="all 0.15s ease"
-        _hover={{
-          bg: "orange.subtle",
-          borderColor: "orange.emphasized",
-          transform: "translateY(-1px)",
-        }}
-        _active={{ bg: "orange.muted", transform: "translateY(0)" }}
-      >
+      <Button size="sm" variant="outline" onClick={onEnterSampleMode}>
         <Icon as={Compass} boxSize={4} />
         See sample data
       </Button>

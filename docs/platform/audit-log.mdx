@@ -64,6 +64,6 @@ Click **Export CSV** to download every row that matches the current filters as `
 
 ## Who can see it
 
-Opening **Settings > Audit Log** needs `organization:manage`. Querying the log needs `auditLog:view`, which every built-in team role holds except the Lite Member cap. A custom role can grant `auditLog:view` on its own.
+Opening **Settings > Audit Log** and querying the log both need `auditLog:view`. The log shows every member's actions, so by default only administrators hold it; the built-in Viewer and Member roles do not. The query asks for it at the organization, and again at a project when you filter by one. A custom role can grant `auditLog:view` on its own.
 
 **Also check:** [Access Control (RBAC)](/platform/rbac).

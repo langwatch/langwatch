@@ -125,6 +125,7 @@ export class MemoryAuthSessionRepository implements AuthSessionRepository {
         id: session.id,
         identifierId: session.identifierId ?? null,
         amr: [...(session.amr ?? [])],
+        startedBySignUp: session.startedBySignUp ?? false,
         ipAddress: session.ipAddress ?? null,
         userAgent: session.userAgent ?? null,
         createdAt: instantOf(session.createdAt),

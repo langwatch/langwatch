@@ -102,6 +102,33 @@ describe("supervise", () => {
     });
   });
 
+  describe.skipIf(process.platform === "win32")(
+    "when the child is a wrapper that started its own child",
+    () => {
+      /** @scenario "Ctrl+C cleanly stops every service" */
+      it("stops the process the wrapper started too", async () => {
+        // `pnpm run start` is a shell running node: SIGTERM to the shell alone left node serving.
+        const pidFile = join(paths.root, "grandchild.pid");
+        const handle = supervise({
+          spec: {
+            name: "langwatch",
+            command: "sh",
+            args: ["-c", `node -e "setInterval(() => {}, 1000)" & echo $! > ${pidFile}; wait`],
+            env: process.env,
+          },
+          paths: servicePaths(paths),
+          bus: new EventBus(),
+        });
+        await sleep(300);
+        const grandchild = Number(readFileSync(pidFile, "utf8").trim());
+
+        await handle.stop();
+
+        expect(() => process.kill(grandchild, 0)).toThrow("ESRCH");
+      });
+    },
+  );
+
   describe("when a child exits with a non-zero code", () => {
     it("emits a crashed event with the exit code", async () => {
       const bus = new EventBus();

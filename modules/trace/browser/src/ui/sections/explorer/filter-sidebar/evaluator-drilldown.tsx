@@ -91,7 +91,7 @@ export const EvaluatorDrilldown: React.FC<EvaluatorDrilldownProps> = ({
     // (status-dot + gap) so the drilldown reads as visually attached to
     // the row above; a hairline indent guide replaces the old card box.
     <Box
-      marginLeft="20px"
+      marginLeft="5"
       marginTop={0.5}
       marginBottom={1}
       paddingLeft={2}

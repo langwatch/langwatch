@@ -1,6 +1,7 @@
 import type { z } from "zod";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
+import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { TenantId } from "../domain/tenantId.ts";
 import type { Event, EventMetadataBase } from "../domain/types.ts";
 import type { DeduplicationStrategy } from "../queues/queue.types.ts";
@@ -28,6 +29,8 @@ export interface StagedJobPayload {
 export interface EventSubscriberContext {
   tenantId: string;
   aggregateId: string;
+  /** The queue's 1-based delivery attempt; absent when the subscriber runs outside the queue. */
+  deliveryAttempt?: number;
 }
 
 /**
@@ -80,7 +83,7 @@ export interface EventSubscriberDefinition<E extends Event = Event> {
  * and data schema; the handler reads only the parsed data. Delivered at least once, per aggregate
  * ordered, never replayed, so the handler is idempotent and throws to be retried.
  */
-export interface PeerSubscriberDefinition<Data extends z.ZodType> {
+export interface PeerSubscriberDefinition<Data extends ParsingSchema> {
   eventType: string;
   data: Data;
   handle: (data: z.output<Data>, context: PeerSubscriberContext) => Promise<void>;
@@ -91,7 +94,7 @@ export interface PeerSubscriberDefinition<Data extends z.ZodType> {
 }
 
 /** A peer subscriber's enqueue-time filter, over the data its handler would be handed. */
-export interface PeerSubscriberEnqueueOptions<Data extends z.ZodType> {
+export interface PeerSubscriberEnqueueOptions<Data extends ParsingSchema> {
   /** False mints no job. Data the schema refuses is staged, so the handler's parse reports it. */
   filter?: (data: z.output<Data>) => boolean;
 }

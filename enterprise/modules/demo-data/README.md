@@ -11,7 +11,7 @@ The demo instance's seeding: one run over an allowlisted demo organisation.
 | Classification | enterprise (`modules/catalogue.json`)                                                                        |
 | Subjects       | demo-data                                                                                                    |
 | Halves         | [contract](contract) · [process](process/README.md)                                                          |
-| Api token      | `DemoDataApi` = `moduleApi<DemoDataApi>()("demo-data")`, `contract/src/demo-data-report.ts:40` (1 operation) |
+| Api token      | `DemoDataApi` = `moduleApi<DemoDataApi>()("demo-data")`, `contract/src/demo-data-report.ts:46` (1 operation) |
 | Installed by   | api, worker, tasks (process)                                                                                 |
 
 ## What demo-data owns

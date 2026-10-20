@@ -1,14 +1,8 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Checkbox } from "@langwatch/design-system/checkbox";
-import {
-  Button,
-  createListCollection,
-  Field,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { createListCollection, Field, Text, VStack } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { useState } from "react";
 
 import { replicateReferencesNote } from "../../../model/experiments/replicate-references-note.ts";
@@ -56,6 +50,10 @@ export const CopyExperimentDialog = ({
     targetProjectId: selectedProjectId[0],
   });
 
+  const canReplicate =
+    selectedProjectId.length > 0 &&
+    !!projects.find((p) => p.value === selectedProjectId[0])?.hasManagePermission;
+
   const handleCopy = () => {
     const targetProjectId = selectedProjectId[0];
     if (!targetProjectId || !project) return;
@@ -69,79 +67,65 @@ export const CopyExperimentDialog = ({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={(e) => !e.open && onClose()}>
-      <Dialog.Content onClick={(e) => e.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Replicate Experiment</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align={"start"}>
-            <Field.Root>
-              <Field.Label>Target Project</Field.Label>
-              <Select.Root
-                collection={projectCollection}
-                value={selectedProjectId}
-                onValueChange={(e) => {
-                  const selectedProject = projects.find((p) => p.value === e.value[0]);
-                  // Only allow selection if user has manage permission
-                  if (selectedProject?.hasManagePermission) {
-                    setSelectedProjectId(e.value);
-                  }
-                }}
-              >
-                <Select.Trigger>
-                  <Select.ValueText placeholder="Select project" />
-                </Select.Trigger>
-                <Select.Content>
-                  {projectCollection.items.map((project) => {
-                    const hasPermission = project.hasManagePermission;
-                    return (
-                      <Select.Item
-                        key={project.value}
-                        item={project}
-                        opacity={hasPermission ? 1 : 0.5}
-                        cursor={hasPermission ? "pointer" : "not-allowed"}
-                      >
-                        {project.label}
-                        {!hasPermission && (
-                          <Text display="inline-block" fontSize="sm" color="fg.subtle" ml={2}>
-                            (no permission)
-                          </Text>
-                        )}
-                      </Select.Item>
-                    );
-                  })}
-                </Select.Content>
-              </Select.Root>
-            </Field.Root>
-            <Checkbox checked={copyDatasets} onCheckedChange={(e) => setCopyDatasets(!!e.checked)}>
-              Replicate associated dataset
-            </Checkbox>
-            {note && (
-              <Text fontSize="sm" color="fg.muted">
-                {note}
-              </Text>
-            )}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={handleCopy}
-            loading={isCopying}
-            disabled={
-              !selectedProjectId.length ||
-              !projects.find((p) => p.value === selectedProjectId[0])?.hasManagePermission
-            }
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Replicate Experiment"
+      primaryAction={{
+        label: "Replicate",
+        onClick: handleCopy,
+        loading: isCopying,
+        disabledReason: canReplicate ? undefined : "Choose a project you have permission to manage",
+      }}
+    >
+      <VStack gap={4} align={"start"}>
+        <Field.Root>
+          <Field.Label>Target Project</Field.Label>
+          <Select.Root
+            collection={projectCollection}
+            value={selectedProjectId}
+            onValueChange={(e) => {
+              const selectedProject = projects.find((p) => p.value === e.value[0]);
+              // Only allow selection if user has manage permission
+              if (selectedProject?.hasManagePermission) {
+                setSelectedProjectId(e.value);
+              }
+            }}
           >
-            Replicate
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+            <Select.Trigger>
+              <Select.ValueText placeholder="Select project" />
+            </Select.Trigger>
+            <Select.Content>
+              {projectCollection.items.map((project) => {
+                const hasPermission = project.hasManagePermission;
+                return (
+                  <Select.Item
+                    key={project.value}
+                    item={project}
+                    opacity={hasPermission ? 1 : 0.5}
+                    cursor={hasPermission ? "pointer" : "not-allowed"}
+                  >
+                    {project.label}
+                    {!hasPermission && (
+                      <Text display="inline-block" fontSize="sm" color="fg.subtle" ml={2}>
+                        (no permission)
+                      </Text>
+                    )}
+                  </Select.Item>
+                );
+              })}
+            </Select.Content>
+          </Select.Root>
+        </Field.Root>
+        <Checkbox checked={copyDatasets} onCheckedChange={(e) => setCopyDatasets(!!e.checked)}>
+          Replicate associated dataset
+        </Checkbox>
+        {note && (
+          <Text fontSize="sm" color="fg.muted">
+            {note}
+          </Text>
+        )}
+      </VStack>
+    </Dialog>
   );
 };

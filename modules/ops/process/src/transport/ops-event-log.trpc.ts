@@ -61,6 +61,10 @@ export const opsEventLogTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsE
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app }) => app.getHistory())
 
+    .procedure("getReplayHistoryPage")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.getHistoryPage(input))
+
     .procedure("getReplayRun")
     .withPermission("ops:view", { at: "platform" })
     .handle(({ app, input }) => app.findHistoryEntry({ runId: input.runId }))

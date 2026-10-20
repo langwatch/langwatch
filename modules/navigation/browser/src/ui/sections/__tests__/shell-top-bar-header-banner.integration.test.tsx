@@ -73,6 +73,6 @@ describe("the shell top bar under an impersonation", () => {
     );
 
     expect(screen.getByText("Impersonating Ada")).not.toBeNull();
-    expect(screen.getAllByText("Dev build").length).toBeGreaterThan(0);
+    expect(screen.getAllByText(/Dev build/).length).toBeGreaterThan(0);
   });
 });

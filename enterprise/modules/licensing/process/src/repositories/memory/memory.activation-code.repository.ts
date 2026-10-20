@@ -31,7 +31,6 @@ export class MemoryActivationCodeRepository implements ActivationCodeRepository 
     this.#sequence += 1;
     const row: ActivationCodeRecord & { codeHash: string } = {
       ...input,
-      maxMembersLite: input.maxMembersLite ?? 0,
       services: [...input.services],
       id: `activation-code-${this.#sequence}`,
       redeemedAt: null,

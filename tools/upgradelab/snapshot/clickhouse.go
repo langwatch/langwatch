@@ -112,7 +112,7 @@ func FingerprintQuery(database string, table ClickHouseTable) string {
 	if collapsingEngine.MatchString(table.Engine) {
 		final = " FINAL"
 	}
-	return fmt.Sprintf("SELECT count(), toString(groupBitXor(cityHash64(%s))) FROM %s.`%s`%s FORMAT TSV", key, database, table.Name, final)
+	return fmt.Sprintf("SELECT count(), toString(groupBitXor(cityHash64(%s))) FROM %s.%#q%s FORMAT TSV", key, database, table.Name, final)
 }
 
 // ClickHouseHTTP talks to ClickHouse over its HTTP interface; nothing needs server config.
@@ -222,7 +222,7 @@ func (clickhouse *ClickHouseHTTP) Tables(ctx context.Context) ([]ClickHouseTable
 
 // Export streams SELECT * FORMAT Native, compressed by the server with zstd.
 func (clickhouse *ClickHouseHTTP) Export(ctx context.Context, table string, out io.Writer) error {
-	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("SELECT * FROM %s.`%s` FORMAT Native", clickhouse.database, table), header: http.Header{"Accept-Encoding": {"zstd"}}})
+	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("SELECT * FROM %s.%#q FORMAT Native", clickhouse.database, table), header: http.Header{"Accept-Encoding": {"zstd"}}})
 	if err != nil {
 		return err
 	}
@@ -240,7 +240,7 @@ func (clickhouse *ClickHouseHTTP) Export(ctx context.Context, table string, out 
 
 // Import sends a zstd Native file as INSERT ... FORMAT Native; the server decompresses it.
 func (clickhouse *ClickHouseHTTP) Import(ctx context.Context, table string, in io.Reader) error {
-	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("INSERT INTO %s.`%s` FORMAT Native", clickhouse.database, table), body: in, header: http.Header{"Content-Encoding": {"zstd"}}})
+	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("INSERT INTO %s.%#q FORMAT Native", clickhouse.database, table), body: in, header: http.Header{"Content-Encoding": {"zstd"}}})
 	if err != nil {
 		return err
 	}
@@ -249,7 +249,7 @@ func (clickhouse *ClickHouseHTTP) Import(ctx context.Context, table string, in i
 
 // Cells streams a table as TSVWithNames for the scrub.
 func (clickhouse *ClickHouseHTTP) Cells(ctx context.Context, table string, visit func(Cell)) error {
-	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("SELECT * FROM %s.`%s` FORMAT TSVWithNames", clickhouse.database, table)})
+	response, err := clickhouse.post(ctx, chRequest{query: fmt.Sprintf("SELECT * FROM %s.%#q FORMAT TSVWithNames", clickhouse.database, table)})
 	if err != nil {
 		return err
 	}

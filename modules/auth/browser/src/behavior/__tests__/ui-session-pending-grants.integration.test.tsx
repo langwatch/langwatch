@@ -5,7 +5,6 @@
  */
 
 import type { UiAuthClient } from "@langwatch/auth-contract";
-import { UiFeedback } from "@langwatch/browser-host/capabilities";
 import type { UiActiveScopeReading } from "@langwatch/browser-host/session";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, waitFor } from "@testing-library/react";
@@ -28,13 +27,6 @@ const signedInAsJane: UiAuthClient = {
     throw new Error("A session read ended the session.");
   },
 };
-
-class SilentFeedback extends UiFeedback {
-  succeeded(): void {}
-  warned(): void {}
-  informed(): void {}
-  failed(): void {}
-}
 
 const ON_ACME_APP: UiActiveScopeReading = {
   status: "ready",
@@ -60,7 +52,6 @@ function deferred<T>() {
 
 function SessionProbe({ transport }: { transport: UiFeatureApiTransport }) {
   const reading = useUiSessionReading({
-    feedback: new SilentFeedback(),
     isPublicRoute: true,
     authClient: signedInAsJane,
   });

@@ -8,11 +8,11 @@ user-invocable: true
 
 A local S3 answering the path-style calls the product makes (PUT, GET, HEAD, DELETE
 object; HEAD and PUT bucket; ListObjectsV2, so upgradelab snapshots work against it), with SigV4 (header or presigned) checked against one dev
-key. Code: `services/storagesim`, console `apps/storagesim-web`.
+key. Code: `services/sims/storagesim`, console `apps/sims/src/storage`.
 
 ## Run it
 
-- On by default in haven (`-storage` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`-storage` turns it off). Runs in the `go` lane by default (see `sims`).
 - Console and S3 endpoint: `https://storage.<slug>.langwatch.localhost` (console at `/_sim/`);
   `haven status` shows the loopback port for drivers.
 - Overlay sets `STORED_OBJECTS_BACKEND=s3`, `S3_BUCKET_NAME=langwatch`, `S3_ENDPOINT`, dummy
@@ -49,7 +49,7 @@ key answers `NoSuchKey`.
 
 - Hit the loopback port directly; presign with the AWS SDK against that endpoint.
 - Object operations take one of 64 striped locks, so distinct keys do not serialise.
-  Benchmark: `go test -bench . -benchmem ./services/storagesim`.
+  Benchmark: `go test -bench . -benchmem ./services/sims/storagesim`.
 - Limits: single PUT up to 5 GiB, keys up to 1024 bytes; ListObjectsV2 only (no v1
   listing, no ListBuckets), no multipart or versioning. Listing reads every sidecar per page.
 
@@ -63,6 +63,6 @@ haven sim storage object <bucket> <key> [--raw]     # --raw writes the stored by
 haven sim storage delete <bucket> <key>
 haven sim storage clear [bucket]                    # every bucket without one
 haven sim storage presign <bucket> <key> [--put] [--expires=<s>]   # GET by default, 3600 s
-haven sim storage fault --error <0|4xx|5xx>      # PUT/GET object refused with that status; 0 clears it
+haven sim storage fault <4xx|5xx|off>            # PUT/GET object refused with that status; off clears it
 haven sim storage seed                              # the demo objects, as STORAGESIM_SEED does
 ```

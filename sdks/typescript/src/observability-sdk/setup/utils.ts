@@ -1,6 +1,5 @@
 import { type Attributes } from "@opentelemetry/api";
 import { defaultResource, type Resource, resourceFromAttributes } from "@opentelemetry/resources";
-import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 
 import {
   LANGWATCH_SDK_LANGUAGE,
@@ -13,6 +12,7 @@ import {
   ATTR_LANGWATCH_SDK_VERSION,
   ATTR_LANGWATCH_SDK_LANGUAGE,
 } from "../semconv/attributes";
+import { ATTR_SERVICE_NAME } from "../semconv/otel";
 
 /**
  * Creates a merged resource from the given attributes, service name, and given resource.
@@ -29,7 +29,7 @@ export function createMergedResource(
   });
 
   const userResource = resourceFromAttributes({
-    [semconv.ATTR_SERVICE_NAME]: serviceName ?? DEFAULT_SERVICE_NAME,
+    [ATTR_SERVICE_NAME]: serviceName ?? DEFAULT_SERVICE_NAME,
     ...attributes,
   });
 

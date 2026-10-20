@@ -18,10 +18,10 @@ const avatarStorage: UserAvatarStorage = { store: async () => ({ id: "object-1" 
 function lifecyclePeers() {
   const lifecycle = UserLifecycleNoticeService.create();
   lifecycle.connect({
-    recordUserDeactivated: { send: async () => undefined },
-    recordUserReactivated: { send: async () => undefined },
+    recordUserDeactivated: { send: async () => undefined, sendBatch: async () => undefined },
+    recordUserReactivated: { send: async () => undefined, sendBatch: async () => undefined },
     recordUserRegistered: { send: async () => undefined },
-    recordUserCreated: { send: async () => undefined },
+    recordUserCreated: { send: async () => undefined, sendBatch: async () => undefined },
     recordUserErased: { send: async () => undefined },
   });
 

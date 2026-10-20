@@ -145,17 +145,28 @@ describe("given a source with ingested events", () => {
       fetchPage: fakeServer([makeEvent({ id: "only", ts: BASE_TS })]),
       pageSize: 10,
     });
-    const rowEl = await screen.findByTestId("source-event-row");
+    const toggle = await screen.findByRole("button", { name: "Show details for event only" });
 
-    rowEl.focus();
-    expect(rowEl).toHaveProperty("tabIndex", 0);
+    toggle.focus();
     await user.keyboard("{Enter}");
     expect(screen.getByText("Normalised (OCSF)")).toBeTruthy();
-    expect(rowEl.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
 
     await user.keyboard("{Enter}");
     expect(screen.queryByText("Normalised (OCSF)")).toBeNull();
-    expect(rowEl.getAttribute("aria-expanded")).toBe("false");
+    expect(toggle.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("toggles the detail once when the expand button itself is clicked", async () => {
+    const user = userEvent.setup();
+    renderTable({
+      fetchPage: fakeServer([makeEvent({ id: "only", ts: BASE_TS })]),
+      pageSize: 10,
+    });
+    const toggle = await screen.findByRole("button", { name: "Show details for event only" });
+
+    await user.click(toggle);
+    expect(screen.getByText("Normalised (OCSF)")).toBeTruthy();
   });
 
   it("shows a dash, never 'Invalid Date', for a timestamp that does not parse", async () => {

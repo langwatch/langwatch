@@ -70,6 +70,13 @@ Feature: Secrets Manager
     And the secret is addressed by its id rather than by its name
 
   @integration
+  Scenario: Saving an incomplete secret says what is missing and sends nothing
+    Given I may manage secrets
+    When I save the add dialog with no name, or with no value
+    Then it names the missing field, focuses it and sends nothing
+    And saving the update dialog with no value does the same
+
+  @integration
   Scenario: Permission gate on managing secrets
     Given I may view secrets but not manage them
     When I open Settings > Secrets

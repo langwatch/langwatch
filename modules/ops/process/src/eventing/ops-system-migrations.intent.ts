@@ -12,7 +12,7 @@ const PASS_ROW_RETENTION_MS = 7 * 24 * 60 * 60 * 1000;
 
 interface SystemMigrationPassDeps {
   /** One pass on this worker, gated on the stored state when it is the re-drive. */
-  execute: (input: { redrive: boolean }) => Promise<void>;
+  execute: (input: { redrive: boolean; due: boolean }) => Promise<void>;
   deleteDispatchedBefore: (params: { processName: string; before: number }) => Promise<number>;
   now?: () => number;
 }
@@ -21,11 +21,11 @@ interface SystemMigrationPassDeps {
 export function runSystemMigrationPass(
   deps: SystemMigrationPassDeps,
 ): (payload: z.infer<typeof systemMigrationPassIntentSchema>) => Promise<void> {
-  return async ({ redrive }): Promise<void> => {
+  return async ({ redrive, due }): Promise<void> => {
     const startedAt = (deps.now ?? Date.now)();
 
     try {
-      await deps.execute({ redrive });
+      await deps.execute({ redrive, due });
     } catch (error) {
       logger.error(
         { error: error instanceof Error ? error.message : String(error), redrive },

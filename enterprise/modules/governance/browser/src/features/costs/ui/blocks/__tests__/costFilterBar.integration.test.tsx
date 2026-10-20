@@ -40,8 +40,8 @@ describe("given a page offering both time controls", () => {
     const chips = screen.getAllByRole("button");
     expect(chips.map((b) => b.textContent)).toEqual([
       "Department·All departments",
-      "Time Frame·Last 12 months",
-      "Time Interval·Quarter",
+      "Time frame·Last 12 months",
+      "Time interval·Quarter",
     ]);
     expect(chips[0]?.parentElement).toBe(chips[1]?.parentElement);
     expect(chips[1]?.parentElement).toBe(chips[2]?.parentElement);
@@ -54,7 +54,7 @@ describe("given the Time Frame is Last 3 months", () => {
   it("offers Year disabled and Month available when the interval chip opens", async () => {
     renderBar({ frame: "last_3_months" });
 
-    await userEvent.click(chip("Time Interval"));
+    await userEvent.click(chip("Time interval"));
 
     const year = await screen.findByRole("menuitem", { name: "Year" });
     expect(year).toHaveAttribute("aria-disabled", "true");

@@ -16,11 +16,10 @@ const WAIT = `nothing to do: wait for the run to finish; ${STATUS} shows its pro
 /** What an operator does after each outcome; every failure names a command or a setting. */
 export const UPGRADE_NEXT_ACTION: Readonly<Record<UpgradeOutcomeCode, string>> = {
   done: `start or restart the api and worker; ${STATUS} shows every step and run`,
-  refused_below_floor: `run the LTS release the message names with ${RUN} first, then this image`,
-  refused_image_below_floor: `deploy an image at or above the installation's floor, then run ${RUN}`,
   lease_not_acquired: `wait for the holder's run to finish (${STATUS}), then run ${RUN} again; a dead holder's lease expires by itself`,
   lease_lost: `run ${RUN} again: it resumes from the ledger`,
-  failed_prisma_migration: `run the \`prisma migrate resolve\` command the message names (DATABASE_URL), then ${RUN} again`,
+  failed_prisma_migration: `in packages/prisma-client with DATABASE_URL set, run the \`prisma migrate resolve\` command the message names; a waiting worker then runs the upgrade again by itself within 10 s, or run ${RUN}`,
+  prebuilt_index_differs: `drop or rename each index the message names (nothing drops it for you); a waiting worker then runs the upgrade again by itself, or run ${RUN}`,
   rerunnable_migration_failed: `fix what the named migration's error names (a lock another session holds: lock_timeout), then run ${RUN} again: it marks the migration rolled back and re-runs it itself`,
   schema_failed: `check the named target is reachable (DATABASE_URL, CLICKHOUSE_URL), fix it, then run ${RUN} again`,
   step_failed: `read the step's error with ${STATUS}, fix its cause, then run ${RUN} again: the step resumes from its checkpoint`,
@@ -227,9 +226,17 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
   }
 
   /** A failed row an earlier run left for a re-runnable migration, resolved at preflight. */
-  resolvedBeforeApply({ migration, resolveMs }: { migration: string; resolveMs: number }): void {
+  resolvedBeforeApply({
+    migration,
+    resolveMs,
+    because = "is re-runnable",
+  }: {
+    migration: string;
+    resolveMs: number;
+    because?: string;
+  }): void {
     this.info(
-      `Prisma migration ${migration} failed in an earlier run and is re-runnable: marked it ` +
+      `Prisma migration ${migration} failed in an earlier run and ${because}: marked it ` +
         `rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; this run applies it again`,
       {
         phase: "preflight",
@@ -249,6 +256,7 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     waitMs,
     resolveMs,
     error,
+    because = "is re-runnable",
   }: {
     migration: string;
     attempt: number;
@@ -256,10 +264,11 @@ export class UpgradeRunLog implements UpgradeRunnerLog {
     waitMs: number;
     resolveMs: number;
     error: string | null;
+    because?: string;
   }): void {
     this.warn(
-      `Prisma migration ${migration} failed on attempt ${attempt} of ${attempts} and is ` +
-        `re-runnable: marked it rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; ` +
+      `Prisma migration ${migration} failed on attempt ${attempt} of ${attempts} and ` +
+        `${because}: marked it rolled back (${resolveCommand(migration)}) in ${resolveMs} ms; ` +
         `applying it again in ${waitMs} ms. Error: ${error ?? "none given"}`,
       {
         phase: "postgres-schema",

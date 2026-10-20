@@ -1,15 +1,12 @@
 import { clearTimeout, setTimeout } from "node:timers";
 
 import type { AgentCallSignal } from "@langwatch/agent-contract";
-import { instanceGoneSchema, replyNudgeSchema } from "@langwatch/agent-contract";
-import type { SessionStateStore, Unsubscribe } from "@langwatch/redis-client/session-state";
-import type { z } from "zod";
 
-import {
-  INSTANCE_GONE_CHANNEL,
-  replyChannel,
-  resultKey,
-} from "../rules/connected-agent-keys.rules.ts";
+import type {
+  ConnectedAgentRelayChannel,
+  Unsubscribe,
+} from "../channels/connected-agent-relay.channel.ts";
+import type { ConnectedAgentStateRepository } from "../repositories/connected-agent-state.repository.ts";
 
 type Waiter = {
   resolve: (outcome: WaitOutcome) => void;
@@ -22,12 +19,18 @@ type WaitOutcome =
   | { kind: "timeout" }
   | { kind: "aborted" };
 
-type ReplyOptions = { podId: string; store: SessionStateStore; pollMs: number };
+type ReplyOptions = {
+  podId: string;
+  state: ConnectedAgentStateRepository;
+  relay: ConnectedAgentRelayChannel;
+  pollMs: number;
+};
 
 /** Owns reply subscriptions and outstanding waits for one process. */
 export class ConnectedAgentReplyService {
   readonly #podId: string;
-  readonly #store: SessionStateStore;
+  readonly #state: ConnectedAgentStateRepository;
+  readonly #relay: ConnectedAgentRelayChannel;
   readonly #resultPollMs: number;
   readonly #waiters = new Map<string, Waiter[]>();
   readonly #instanceOfCall = new Map<string, { projectId: string; instanceId: string }>();
@@ -40,7 +43,8 @@ export class ConnectedAgentReplyService {
 
   private constructor(options: ReplyOptions) {
     this.#podId = options.podId;
-    this.#store = options.store;
+    this.#state = options.state;
+    this.#relay = options.relay;
     this.#resultPollMs = options.pollMs;
   }
 
@@ -57,16 +61,13 @@ export class ConnectedAgentReplyService {
     const subscriptions: Unsubscribe[] = [];
     try {
       subscriptions.push(
-        await this.#store.subscribe(replyChannel(this.#podId), (raw) => {
-          const nudge = findParsedFrame(replyNudgeSchema, raw);
-          if (!nudge) return;
-          this.#wake(nudge.callId, { kind: nudge.kind });
+        await this.#relay.listenForReplies({
+          podId: this.#podId,
+          onReply: (nudge) => this.#wake(nudge.callId, { kind: nudge.kind }),
         }),
       );
       subscriptions.push(
-        await this.#store.subscribe(INSTANCE_GONE_CHANNEL, (raw) => {
-          const gone = findParsedFrame(instanceGoneSchema, raw);
-          if (!gone) return;
+        await this.#relay.listenForInstanceGone((gone) => {
           for (const [callId, held] of this.#instanceOfCall) {
             if (held.instanceId === gone.instanceId && held.projectId === gone.projectId) {
               this.#wake(callId, { kind: "gone" });
@@ -150,9 +151,12 @@ export class ConnectedAgentReplyService {
   #pollForResult(projectId: string, callId: string, onResult: () => void): () => void {
     let stopped = false;
     const poll = async (): Promise<void> => {
-      const result = await this.#store.tryGet(resultKey(projectId, callId)).catch(() => null);
+      const written = await this.#state.readResult({ projectId, callId }).then(
+        (lookup) => lookup.kind !== "miss",
+        () => false,
+      );
       if (stopped) return;
-      if (result) {
+      if (written) {
         onResult();
         return;
       }
@@ -167,17 +171,5 @@ export class ConnectedAgentReplyService {
 
   #wake(callId: string, outcome: WaitOutcome): void {
     for (const waiter of this.#waiters.get(callId) ?? []) waiter.resolve(outcome);
-  }
-}
-
-function findParsedFrame<Schema extends z.ZodType>(
-  schema: Schema,
-  raw: string,
-): z.output<Schema> | null {
-  try {
-    const parsed = schema.safeParse(JSON.parse(raw));
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
   }
 }

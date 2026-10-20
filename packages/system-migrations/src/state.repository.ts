@@ -16,6 +16,12 @@ export interface SystemMigrationStateRepository {
   /** Throws `SystemMigrationRecordNotFoundError` when the tenant has no record. */
   getRecord(args: { migrationName: string; tenantId: string }): Promise<TenantMigrationRecord>;
 
+  /** These tenants' stored records for one migration, in one read; absent ones are left out. */
+  findRecords(args: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]>;
+
   upsertRecord(record: TenantMigrationRecord): Promise<void>;
 
   /**

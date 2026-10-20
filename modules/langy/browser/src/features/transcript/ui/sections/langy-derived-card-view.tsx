@@ -1,18 +1,21 @@
 import { Link } from "@langwatch/browser-host/link";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
 /**
  * The derived-block dispatcher — one stamped `langy-card` part in, the card it
  * validates as out (ADR-060 §3).
  */
-import { Box, Grid, Table, Text } from "@langwatch/design-system/primitives";
+import { Box, Grid, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   LangyCardHint,
   LangyChoiceSelection,
   LangyChoicesLockState,
   LangyDerivedCard,
   LangyDerivedChoicesCard,
+  LangyDerivedInsightsCard,
   LangyDerivedStatsCard,
   LangyDerivedTableCard,
+  LangyInsightsCardFinding,
 } from "@langwatch/langy-contract";
 import { ArrowUpRight, BadgeCheck } from "lucide-react";
 import type { ReactNode } from "react";
@@ -125,7 +128,79 @@ function DerivedBlockBody({
       return <DerivedTableBody card={card} />;
     case "stats":
       return <DerivedStatsBody card={card} />;
+    case "insights":
+      return <DerivedInsightsBody card={card} />;
   }
+}
+
+/** Cap so a long list of findings stays a card, not a page. */
+const MAX_FINDING_ROWS = 10;
+
+/** The verdict in words, on its colour: why the reader should care, never a colour to decode. */
+const FINDING_TONE: Record<LangyInsightsCardFinding["tone"], { label: string; color: string }> = {
+  bad: { label: "Warning", color: "red.solid" },
+  watch: { label: "Worth a look", color: "yellow.solid" },
+  good: { label: "Good news", color: "green.solid" },
+};
+
+/** One row per finding: the verdict and topic, the headline, then the body as Langy wrote it. */
+function DerivedInsightsBody({ card }: { card: LangyDerivedInsightsCard }) {
+  if (card.findings.length === 0) {
+    return (
+      <Text textStyle="xs" color="fg.muted">
+        Nothing new to report.
+      </Text>
+    );
+  }
+  const shown = card.findings.slice(0, MAX_FINDING_ROWS);
+  const remaining = card.findings.length - shown.length;
+  return (
+    <VStack as="ul" align="stretch" gap={3} listStyleType="none">
+      {shown.map((finding, index) => (
+        <Box as="li" key={index} data-testid="derived-insight-finding" data-tone={finding.tone}>
+          <HStack gap={2} marginBottom={1}>
+            <Box
+              as="span"
+              flexShrink={0}
+              borderRadius="sm"
+              paddingX="6px"
+              paddingY="2px"
+              textStyle="2xs"
+              fontWeight="700"
+              letterSpacing="0.08em"
+              textTransform="uppercase"
+              color="white"
+              background={FINDING_TONE[finding.tone].color}
+            >
+              {FINDING_TONE[finding.tone].label}
+            </Box>
+            {finding.topic ? (
+              <Text
+                textStyle="2xs"
+                fontWeight="600"
+                letterSpacing="0.08em"
+                textTransform="uppercase"
+                color="fg.subtle"
+              >
+                {finding.topic}
+              </Text>
+            ) : null}
+          </HStack>
+          <Text textStyle="xs" fontWeight="640" color="fg" lineHeight="1.3">
+            {finding.title}
+          </Text>
+          <Text textStyle="xs" color="fg.muted" whiteSpace="pre-wrap" wordBreak="break-word">
+            {finding.body}
+          </Text>
+        </Box>
+      ))}
+      {remaining > 0 ? (
+        <Text as="li" textStyle="2xs" color="fg.subtle">
+          +{remaining.toLocaleString()} more findings in the reply
+        </Text>
+      ) : null}
+    </VStack>
+  );
 }
 
 /** Cap so a runaway model table stays a card, not a page (ADR-060 open q.). */
@@ -143,41 +218,34 @@ function DerivedTableBody({ card }: { card: LangyDerivedTableCard }) {
   const shown = card.rows.slice(0, MAX_TABLE_ROWS);
   const remaining = card.rows.length - shown.length;
   return (
-    <Box overflowX="auto">
-      <Table.Root size="sm" variant="line">
-        <Table.Header>
-          <Table.Row background="transparent">
+    <Box>
+      <ListTable
+        variant="embedded"
+        density="compact"
+        scroll="x"
+        scrollLabel={`${card.title} table`}
+      >
+        <ListTable.Header>
+          <ListTable.Row>
             {card.columns.map((column) => (
-              <Table.ColumnHeader
-                key={column}
-                textStyle="2xs"
-                color="fg.subtle"
-                textTransform="uppercase"
-                letterSpacing="0.03em"
-                fontWeight="500"
-              >
-                {column}
-              </Table.ColumnHeader>
+              <ListTable.ColumnHeader key={column}>{column}</ListTable.ColumnHeader>
             ))}
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {shown.map((row, rowIndex) => (
-            <Table.Row key={rowIndex} background="transparent">
+            <ListTable.Row key={rowIndex}>
               {card.columns.map((_, columnIndex) => (
-                <Table.Cell
-                  key={columnIndex}
-                  textStyle="xs"
-                  color="fg"
-                  fontVariantNumeric="tabular-nums"
-                >
-                  {formatCell(row[columnIndex])}
-                </Table.Cell>
+                <ListTable.Cell key={columnIndex}>
+                  <Text as="span" textStyle="xs" color="fg" fontVariantNumeric="tabular-nums">
+                    {formatCell(row[columnIndex])}
+                  </Text>
+                </ListTable.Cell>
               ))}
-            </Table.Row>
+            </ListTable.Row>
           ))}
-        </Table.Body>
-      </Table.Root>
+        </ListTable.Body>
+      </ListTable>
       {remaining > 0 ? (
         <Text textStyle="2xs" color="fg.subtle" paddingTop={1}>
           +{remaining.toLocaleString()} more rows in the reply

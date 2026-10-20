@@ -1,5 +1,5 @@
 import type { TransportPeers } from "@langwatch/api";
-import { ModuleApiToken, type ResolvedTokens } from "@langwatch/module";
+import { ModuleApiToken, type DependencyIdentity, type ResolvedTokens } from "@langwatch/module";
 import { type StoresMemberSource } from "@langwatch/process-stores";
 
 import { ApplicationBuilder, type BootedRuntime } from "./application.ts";
@@ -493,7 +493,7 @@ export class ProcessSupply<
 }
 
 /** A bound channel's `*Api` on either tier, so `provide()` can stand in for it (record §5). */
-function boundTokens(module: SupplyModule): readonly ModuleApiToken<unknown>[] {
+function boundTokens(module: SupplyModule): readonly DependencyIdentity[] {
   const channels = module.channelRegistry;
   if (channels === undefined) return [];
   return (["live", "memory"] as const).flatMap((tier) =>

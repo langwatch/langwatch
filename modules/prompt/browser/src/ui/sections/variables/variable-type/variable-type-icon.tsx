@@ -70,7 +70,7 @@ export const getTypeLabel = (type: string): string => TYPE_LABELS[type] ?? type;
 export const VariableTypeBadge = ({ type, size = "sm" }: { type: string; size?: "xs" | "sm" }) => (
   <Box
     as="span"
-    fontSize={size === "xs" ? "10px" : "11px"}
+    textStyle="micro"
     fontWeight="medium"
     color="fg.muted"
     bg="bg.muted"

@@ -52,12 +52,22 @@ describe("signInErrorRedirectOf", () => {
 
   describe("given a sign-in refused with a handled error", () => {
     /** @scenario "A handled refusal crosses with its own code" */
-    it.each(["OAuthAccountNotLinked", "account_not_linked", "sso_setup_address_mismatch"])(
-      "lets %s cross as it is",
-      (code) => {
-        expect(redirectTo(`${errorPageUrl}?error=${code}`)).toEqual({ kind: "pass" });
-      },
-    );
+    it.each([
+      "OAuthAccountNotLinked",
+      "account_not_linked",
+      "sso_setup_address_mismatch",
+      "identity_jit_disabled",
+      "identity_link_proposed",
+    ])("lets %s cross as it is", (code) => {
+      expect(redirectTo(`${errorPageUrl}?error=${code}`)).toEqual({ kind: "pass" });
+    });
+  });
+
+  describe("given a sign-in whose state no longer matches this browser", () => {
+    /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
+    it("lets state_mismatch cross as it is, so nothing is logged as unknown", () => {
+      expect(redirectTo(`${errorPageUrl}?error=state_mismatch`)).toEqual({ kind: "pass" });
+    });
   });
 
   describe("given a sign-in that failed for a reason we have not written down", () => {

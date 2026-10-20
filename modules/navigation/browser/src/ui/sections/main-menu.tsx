@@ -6,12 +6,15 @@
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import type { NavigationProject } from "@langwatch/navigation-contract";
 import { projectNavigation } from "@langwatch/project-contract";
-import { nowInstant } from "@langwatch/time";
 import { GitPullRequest, SquareTerminal } from "lucide-react";
 import React from "react";
 
+import { InsightsNavCount } from "../../behavior/lent-insights.tsx";
 import { navigationApi } from "../../behavior/navigation-api.ts";
-import { CODING_AGENT_LINK_WINDOW_DAYS, withinDays } from "../../model/coding-agent-activity.ts";
+import {
+  type CodingAgentLinks,
+  useCodingAgentLinks,
+} from "../../behavior/use-coding-agent-links.ts";
 import { featureIcons } from "../../model/feature-icons.ts";
 import {
   isExperimentsActivePath,
@@ -27,7 +30,7 @@ import { SidebarSection } from "./sidebar-section.tsx";
 /**
  * The project navigation sections the LLM Ops sidebar renders. The Govern group
  * is gone because the product switcher replaces it, and the Ops group because
- * the settings menu holds the operations pages.
+ * the settings menu holds the operations pages. Dashboards is its own product.
  */
 export const MainMenuSections = function MainMenuSections({
   showExpanded,
@@ -61,6 +64,7 @@ export const MainMenuSections = function MainMenuSections({
           showLabel={showExpanded}
         />
       )}
+      {navigation.home && <InsightsMenuLink {...sectionProps} />}
 
       <ObserveSection
         {...sectionProps}
@@ -84,41 +88,25 @@ interface ProjectSectionProps {
   pathname: string;
 }
 
-interface CodingAgentLinks {
-  shouldShowSessions: boolean;
-  shouldShowPullRequests: boolean;
-}
-
 /**
- * Coding-agent destinations are grown by the project, not configured:
- * each needs its own recent signal, so sessions-only or PR-only both
- * appear alone, and each fades once its signal falls out of the window.
+ * Insights sits first, under Home: the inbox is where a day in the product starts. Hidden
+ * until `release_insights` answers on; the unread pill is the one insight lends.
  */
-function useCodingAgentLinks(): CodingAgentLinks {
+function InsightsMenuLink({ showExpanded, project, pathname }: ProjectSectionProps) {
   const host = useNavigationHost();
-  const project = host.project();
-  const codingAgentPagesEnabled = host.featureFlag(
-    FrontendFlags.release_ui_ai_governance_enabled,
-  ).enabled;
-  const canSeeCodingAgentActivity = codingAgentPagesEnabled && host.hasPermission("traces:view");
-  const now = nowInstant();
-
-  return {
-    shouldShowSessions:
-      canSeeCodingAgentActivity &&
-      withinDays({
-        at: project?.lastCodingAgentSessionAt,
-        days: CODING_AGENT_LINK_WINDOW_DAYS,
-        now,
-      }),
-    shouldShowPullRequests:
-      canSeeCodingAgentActivity &&
-      withinDays({
-        at: project?.lastCodingAgentPullRequestAt,
-        days: CODING_AGENT_LINK_WINDOW_DAYS,
-        now,
-      }),
-  };
+  const { enabled, isLoading } = host.featureFlag(FrontendFlags.release_insights);
+  if (isLoading || !enabled || !host.hasPermission("analytics:view")) return null;
+  return (
+    <PageMenuLink
+      path={projectNavItems.insights.path}
+      icon={featureIcons.insights.icon}
+      label={projectNavItems.insights.title}
+      project={project}
+      isActive={pathname.startsWith(projectNavItems.insights.path)}
+      showLabel={showExpanded}
+      rightElement={<InsightsNavCount />}
+    />
+  );
 }
 
 function ObserveSection({
@@ -361,6 +349,7 @@ type PageMenuLinkProps = {
   path: string;
   project?: NavigationProject;
   badgeNumber?: number;
+  rightElement?: React.ReactNode;
   isActive: boolean;
   showLabel?: boolean;
   beta?: string | boolean;
@@ -375,6 +364,7 @@ const PageMenuLink = ({
   path,
   project,
   badgeNumber,
+  rightElement,
   isActive,
   showLabel = true,
   beta,
@@ -392,6 +382,7 @@ const PageMenuLink = ({
       unavailableReason={destination.unavailableReason}
       isActive={isActive}
       badgeNumber={badgeNumber}
+      rightElement={rightElement}
       showLabel={showLabel}
       beta={beta}
       betaLabel={betaLabel}

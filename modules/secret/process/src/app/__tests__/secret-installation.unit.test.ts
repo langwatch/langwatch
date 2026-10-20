@@ -1,5 +1,7 @@
-import { createApp, ResourceScope } from "@langwatch/process";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { bootInstalledProcess, ResourceScope } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { SecretApi, SecretNotFoundError } from "@langwatch/secret-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
@@ -12,10 +14,13 @@ import { teamWithMembers } from "./secret.fixture.ts";
 function process(role: "api" | "worker") {
   const team = teamWithMembers(["user-first"]);
 
-  return createApp({ role })
-    .withModules([secretProcessModule])
-    .withStores(memoryStores())
-    .provide({ authz: team.permissions });
+  return bootInstalledProcess({
+    role,
+    modules: [secretProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [testPeer({ token: AuthzApi, instance: team.permissions })],
+  });
 }
 
 const input = { projectId: "project-1", name: "OPENAI_API_KEY", value: "sk-live" };
@@ -23,7 +28,7 @@ const caller = { id: "user-1" };
 
 describe("secret app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(SecretApi);
@@ -50,8 +55,8 @@ describe("secret app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process("api").boot();
-    const second = await process("api").boot();
+    const first = await process("api");
+    const second = await process("api");
 
     try {
       const created = await first.service(SecretApi).create(input, caller);
@@ -90,7 +95,7 @@ describe("secret app installation", () => {
 
   /** @scenario "The first read returns the secret and the second refuses" */
   it("serves a one-time reveal through the installed app, once", async () => {
-    const runtime = await process("api").boot();
+    const runtime = await process("api");
 
     try {
       const app = runtime.service(SecretApi);
@@ -119,7 +124,7 @@ describe("secret app installation", () => {
 
   /** @scenario "Secret values never leave the boundary" */
   it("answers metadata that carries neither the value nor the ciphertext", async () => {
-    const runtime = await process("api").boot();
+    const runtime = await process("api");
 
     try {
       const app = runtime.service(SecretApi);

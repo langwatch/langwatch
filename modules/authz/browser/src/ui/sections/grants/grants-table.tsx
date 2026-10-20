@@ -4,10 +4,11 @@
  * specs/rbac/roles-and-access-ui.feature
  */
 
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Button, Table, Text } from "@langwatch/design-system/primitives";
+import { Badge, Button, Text } from "@langwatch/design-system/primitives";
 import { format } from "@langwatch/time";
-import { MoreVertical } from "lucide-react";
 
 import { type GrantRow, grantPrincipalText, grantScopeText } from "../../../model/grants/grants.ts";
 
@@ -25,29 +26,29 @@ function grantText(grant: GrantRow): string {
 
 export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: GrantsTableProps) {
   return (
-    <Table.Root variant="line" size="sm" width="full">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Role</Table.ColumnHeader>
-          <Table.ColumnHeader>Where</Table.ColumnHeader>
-          <Table.ColumnHeader>Until</Table.ColumnHeader>
-          <Table.ColumnHeader width="48px" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable variant="embedded" aria-label="Role grants">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Role</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Where</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Until</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {grants.map((grant) => (
-          <Table.Row key={grant.id} data-testid="grant-row">
-            <Table.Cell>
+          <ListTable.Row key={grant.id} data-testid="grant-row">
+            <ListTable.Cell>
               <Badge size="sm" colorPalette={grant.role.builtIn ? "orange" : "purple"}>
                 <Text as="span" truncate maxWidth="200px" title={grant.role.name ?? grant.role.id}>
                   {grant.role.name ?? grant.role.id}
                 </Text>
               </Badge>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Text fontSize="sm">{grantScopeText(grant.scope)}</Text>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               {grant.status === "expired" ? (
                 <Badge size="sm" colorPalette="red">
                   Expired
@@ -57,8 +58,8 @@ export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: Grant
                   {grant.expiresAt ? format(grant.expiresAt, "d MMM yyyy") : "No end date"}
                 </Text>
               )}
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.ActionCell>
               {canManage && (
                 <Menu.Root>
                   <Menu.Trigger asChild>
@@ -68,7 +69,7 @@ export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: Grant
                       aria-label={`Actions for ${grantText(grant)}`}
                       data-testid="grant-row-actions"
                     >
-                      <MoreVertical size={14} />
+                      <MoreVerticalIcon size={14} aria-hidden />
                     </Button>
                   </Menu.Trigger>
                   <Menu.Content>
@@ -90,10 +91,10 @@ export function GrantsTable({ grants, canManage, onChangeRole, onRevoke }: Grant
                   </Menu.Content>
                 </Menu.Root>
               )}
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.ActionCell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 }

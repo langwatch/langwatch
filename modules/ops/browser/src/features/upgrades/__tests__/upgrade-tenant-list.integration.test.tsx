@@ -61,8 +61,8 @@ function renderList() {
     <DesignSystemProvider forcedTheme="light">
       <UpgradeTenantList
         steps={[
-          { name: "ops:first", title: "First step" },
-          { name: "ops:second", title: "Second step" },
+          { name: "ops:first", title: "First step", migratedIsSteady: false },
+          { name: "ops:second", title: "Second step", migratedIsSteady: false },
         ]}
       />
     </DesignSystemProvider>,
@@ -71,7 +71,7 @@ function renderList() {
 
 describe("UpgradeTenantList", () => {
   describe("given a held organization in one step and a finalized one in another", () => {
-    /** @scenario "The Tenant migrations tab lists every tenant's state, filtered by step and state" */
+    /** @scenario "The Organizations tab lists every organization's state, filtered by step and state" */
     it("lists only the held organization, with its step and state, once filtered to held", () => {
       renderList();
       expect(screen.getByTestId("upgrade-tenant-org_done")).toBeTruthy();
@@ -87,13 +87,13 @@ describe("UpgradeTenantList", () => {
   });
 
   describe("given the tenant read fails", () => {
-    /** @scenario "The tenant list names a failed read instead of showing an empty list" */
+    /** @scenario "The organization list names a failed read instead of showing an empty list" */
     it("shows the failure and no empty-state copy", () => {
       failure = new Error("boom");
       renderList();
 
-      expect(screen.getByText("Couldn't load the tenants")).toBeTruthy();
-      expect(screen.queryByText("No tenant has a recorded state here yet.")).toBeNull();
+      expect(screen.getByText("Couldn't load the organizations")).toBeTruthy();
+      expect(screen.queryByText("No organization has a recorded state here yet.")).toBeNull();
     });
   });
 });

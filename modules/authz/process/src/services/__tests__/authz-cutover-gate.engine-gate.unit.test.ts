@@ -6,10 +6,8 @@
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import {
-  type AuthzCutoverDatabase,
-  PrismaAuthzCutoverRepository,
-} from "../../repositories/prisma/prisma.authz-cutover.repository.ts";
+import { AuthzCutoverRepository } from "../../repositories/authz-cutover.repository.ts";
+import { type AuthzEngineSwitch, LEGACY_ENGINE } from "../../rules/authz-engine-switch.rules.ts";
 import {
   AuthzCutoverGateService,
   ENGINE_GATE_CACHE_TTL_MS,
@@ -17,14 +15,31 @@ import {
 
 const ORGANIZATION_ID = "org_acme";
 
-function adapterOver(
-  findUnique: AuthzCutoverDatabase["systemMigrationTenantState"]["findUnique"],
-): AuthzCutoverGateService {
-  return AuthzCutoverGateService.create({
-    repository: PrismaAuthzCutoverRepository.create({
-      database: { systemMigrationTenantState: { findUnique } },
-    }),
-  });
+const ON_ENGINE: AuthzEngineSwitch = { onEngine: true, switchedAt: null };
+
+/** The engine switch as the reads below script it. */
+class ScriptedCutoverRepository extends AuthzCutoverRepository {
+  constructor(private readonly read: () => Promise<AuthzEngineSwitch>) {
+    super();
+  }
+
+  async getEngineSwitch(): Promise<AuthzEngineSwitch> {
+    return this.read();
+  }
+
+  async carryOverEngineSwitch(): Promise<number> {
+    return 0;
+  }
+
+  async switchOnEngine(): Promise<boolean> {
+    return true;
+  }
+
+  async pinEngineSwitch(): Promise<void> {}
+}
+
+function adapterOver(read: () => Promise<AuthzEngineSwitch>): AuthzCutoverGateService {
+  return AuthzCutoverGateService.create({ repository: new ScriptedCutoverRepository(read) });
 }
 
 afterEach(() => {
@@ -35,9 +50,9 @@ describe("given an organization whose migration is still in progress", () => {
   describe("when a permission is checked", () => {
     /** @scenario An organization that has not finalized reads from legacy */
     it("answers from the legacy path", async () => {
-      const findUnique = vi.fn().mockResolvedValue({ status: "in_progress" });
+      const read = vi.fn().mockResolvedValue(LEGACY_ENGINE);
 
-      await expect(adapterOver(findUnique).isOn({ organizationId: ORGANIZATION_ID })).resolves.toBe(
+      await expect(adapterOver(read).isOn({ organizationId: ORGANIZATION_ID })).resolves.toBe(
         false,
       );
     });
@@ -50,11 +65,8 @@ describe("given an organization that completes the migration", () => {
     it("moves its writes onto the ledger", async () => {
       vi.useFakeTimers();
       vi.setSystemTime(new Date("2026-09-05T09:00:00.000Z"));
-      const findUnique = vi
-        .fn()
-        .mockResolvedValueOnce(null)
-        .mockResolvedValue({ status: "finalized" });
-      const adapter = adapterOver(findUnique);
+      const read = vi.fn().mockResolvedValueOnce(LEGACY_ENGINE).mockResolvedValue(ON_ENGINE);
+      const adapter = adapterOver(read);
 
       await expect(adapter.isOn({ organizationId: ORGANIZATION_ID })).resolves.toBe(false);
       // Still the cached answer: the import has landed but this pod has not
@@ -64,7 +76,7 @@ describe("given an organization that completes the migration", () => {
       vi.advanceTimersByTime(ENGINE_GATE_CACHE_TTL_MS + 1_000);
 
       await expect(adapter.isOn({ organizationId: ORGANIZATION_ID })).resolves.toBe(true);
-      expect(findUnique).toHaveBeenCalledTimes(2);
+      expect(read).toHaveBeenCalledTimes(2);
     });
   });
 });

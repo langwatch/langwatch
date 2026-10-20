@@ -1,7 +1,6 @@
-import type { MigrationTenantStatus } from "@langwatch/authz-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
+import { counter } from "@langwatch/observability/metrics";
 import type { Instant } from "@langwatch/time";
-import { Counter, register } from "prom-client";
 
 import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import { PerOrganizationCachedGateService } from "./per-organization-cached-gate.service.ts";
@@ -9,14 +8,11 @@ import { PerOrganizationCachedGateService } from "./per-organization-cached-gate
 export const ENGINE_GATE_CACHE_TTL_MS = 60_000;
 
 /** The metric name is an external interface; dashboards and alerts read it. */
-export const authzEngineGateReadFailuresTotal =
-  (register.getSingleMetric("authz_engine_gate_read_failures_total") as Counter | undefined) ??
-  new Counter({
-    name: "authz_engine_gate_read_failures_total",
-    help: "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
-  });
-
-const ON_ENGINE_STATUSES: readonly MigrationTenantStatus[] = ["finalized"];
+export const authzEngineGateReadFailuresTotal = counter({
+  name: "authz_engine_gate_read_failures_total",
+  description:
+    "Failed reads of an organization's AuthZ migration state; the organization stays on the legacy path for the cache TTL.",
+});
 
 type AuthzCutoverGateOptions = {
   repository: AuthzCutoverRepository;
@@ -48,8 +44,8 @@ export class AuthzCutoverGateService {
   }
 
   async readUncached({ organizationId }: { organizationId: string }): Promise<boolean> {
-    const row = await this.options.repository.findCutover({ organizationId });
-    return row !== null && (ON_ENGINE_STATUSES as readonly string[]).includes(row.status);
+    const engineSwitch = await this.options.repository.getEngineSwitch({ organizationId });
+    return engineSwitch.onEngine;
   }
 
   async query({ organizationId }: { organizationId: string }): Promise<boolean> {
@@ -70,14 +66,26 @@ export class AuthzCutoverGateService {
 
   async findFinalizedAt({ organizationId }: { organizationId: string }): Promise<Instant | null> {
     try {
-      const row = await this.options.repository.findCutover({ organizationId });
-      return row && (ON_ENGINE_STATUSES as readonly string[]).includes(row.status)
-        ? (row.occurredAt ?? null)
-        : null;
+      const engineSwitch = await this.options.repository.getEngineSwitch({ organizationId });
+      return engineSwitch.onEngine ? engineSwitch.switchedAt : null;
     } catch (error) {
       this.report({ organizationId, error });
       return null;
     }
+  }
+
+  /** An operator's rollback, from ops' fact: the organization leaves the engine for good. */
+  async pin({
+    organizationId,
+    at,
+    eventId,
+  }: {
+    organizationId: string;
+    at: Instant;
+    eventId: string;
+  }): Promise<void> {
+    await this.options.repository.pinEngineSwitch({ organizationId, at, eventId });
+    this.invalidate({ organizationId });
   }
 
   invalidate({ organizationId }: { organizationId: string }): void {

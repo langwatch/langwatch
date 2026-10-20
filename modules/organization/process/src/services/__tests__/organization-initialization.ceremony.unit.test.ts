@@ -28,11 +28,16 @@ function request(
 
 function harness(
   overrides: Partial<OrganizationSignals> = {},
-  createAndAssign = vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM })),
+  createAndAssign = vi.fn(async () => ({
+    organization: ORGANIZATION,
+    team: TEAM,
+    grantsConfirmed: true,
+  })),
 ) {
   const signals = {
     trackServerEvent: vi.fn(),
-    sendSlackSignupEvent: vi.fn(async () => undefined),
+    announceNewOrganization: vi.fn(async () => undefined),
+    announceJoin: vi.fn(async () => undefined),
     sendHubspotSignupForm: vi.fn(async () => undefined),
     reportError: vi.fn(),
     ...overrides,
@@ -172,7 +177,11 @@ describe("given the sign-up succeeded", () => {
         signUpData,
       };
 
-      expect(signals.sendSlackSignupEvent).toHaveBeenCalledWith(payload);
+      expect(signals.announceNewOrganization).toHaveBeenCalledWith({
+        ...payload,
+        userId: CALLER.id,
+        organizationId: ORGANIZATION.id,
+      });
       expect(signals.sendHubspotSignupForm).toHaveBeenCalledWith(payload);
     });
 
@@ -180,7 +189,7 @@ describe("given the sign-up succeeded", () => {
     it("completes the ceremony when a notification door is down", async () => {
       const failure = new Error("Slack down");
       const { onboarding, signals } = harness({
-        sendSlackSignupEvent: vi.fn(async () => {
+        announceNewOrganization: vi.fn(async () => {
           throw failure;
         }),
       });
@@ -208,6 +217,24 @@ describe("given the sign-up succeeded", () => {
         signUpData,
         primaryIntent: "AGENT_GOVERNANCE",
       });
+    });
+  });
+});
+
+describe("given a sign-up whose founder grants are still landing", () => {
+  /** @scenario "The sign-up answer says whether the founder's grants are confirmed" */
+  it("answers grantsConfirmed false, and true once they landed in time", async () => {
+    const landing = harness(
+      {},
+      vi.fn(async () => ({ organization: ORGANIZATION, team: TEAM, grantsConfirmed: false })),
+    );
+    const confirmed = harness();
+
+    await expect(landing.onboarding.initialize(request(), CALLER)).resolves.toMatchObject({
+      grantsConfirmed: false,
+    });
+    await expect(confirmed.onboarding.initialize(request(), CALLER)).resolves.toMatchObject({
+      grantsConfirmed: true,
     });
   });
 });

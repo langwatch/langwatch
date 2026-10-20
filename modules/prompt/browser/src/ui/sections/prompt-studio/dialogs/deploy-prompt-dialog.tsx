@@ -1,13 +1,6 @@
+import { CopyButton } from "@langwatch/design-system/copy-button";
 import { DeleteConfirmationDialog } from "@langwatch/design-system/delete-confirmation-dialog";
-import {
-  DialogBody,
-  DialogCloseTrigger,
-  DialogContent,
-  DialogFooter,
-  DialogHeader,
-  DialogRoot,
-  DialogTitle,
-} from "@langwatch/design-system/dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
   Button,
@@ -24,8 +17,6 @@ import { Trash2, UnplugIcon, Info } from "lucide-react";
 import { useMemo } from "react";
 
 import { useDeployTags } from "../../../../behavior/use-deploy-tags.ts";
-import { usePromptHost } from "../../../../model/prompt-host.ts";
-import { CopyButton } from "../../../elements/copy-button.tsx";
 import { GeneratePromptApiSnippetDialog } from "./generate-prompt-api-snippet-dialog.tsx";
 
 interface DeployPromptDialogProps {
@@ -73,7 +64,6 @@ function VersionLabel({ version, commitMessage }: { version: number; commitMessa
 }
 
 function SlugChip({ handle }: { handle: string }) {
-  const host = usePromptHost();
   return (
     <HStack gap={2}>
       <Box borderWidth="1px" borderColor="border" borderRadius="full" paddingX={3} paddingY={1}>
@@ -84,17 +74,7 @@ function SlugChip({ handle }: { handle: string }) {
           <Text fontSize="sm" fontWeight="medium">
             {handle}
           </Text>
-          <CopyButton
-            value={handle}
-            label="Prompt slug"
-            onCopied={(label) => host.succeeded({ title: `${label} copied` })}
-            onRefused={() =>
-              host.failed({
-                error: new Error("Clipboard unavailable"),
-                fallbackTitle: "Couldn't copy the prompt slug",
-              })
-            }
-          />
+          <CopyButton value={handle} label="Prompt slug" aria-label="Copy prompt slug" />
         </HStack>
       </Box>
     </HStack>
@@ -273,63 +253,51 @@ export function DeployPromptDialog({
   const { tagToDelete, setTagToDelete } = tags;
 
   return (
-    <DialogRoot open={isOpen} onOpenChange={(e) => !e.open && onClose()} size="md">
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Deploy prompt</DialogTitle>
-        </DialogHeader>
-        <DialogCloseTrigger />
-        <DialogBody>
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.muted">
-              Use tags to get specific prompt versions via the SDK and API. Prompt versions with the
-              production tag are returned by default.
-            </Text>
+    <>
+      <Dialog
+        open={isOpen}
+        onClose={onClose}
+        title="Deploy prompt"
+        primaryAction={{
+          label: "Save",
+          loading: tags.isSaving,
+          onClick: () => void tags.handleSave(),
+          "data-testid": "prompt-deploy-save",
+        }}
+      >
+        <VStack align="stretch" gap={4}>
+          <Text fontSize="sm" color="fg.muted">
+            Use tags to get specific prompt versions via the SDK and API. Prompt versions with the
+            production tag are returned by default.
+          </Text>
 
-            <SlugChip handle={handle} />
+          <SlugChip handle={handle} />
 
-            <VStack align="stretch" gap={3}>
-              <LatestTagRow latestVersion={tags.latestVersion} />
+          <VStack align="stretch" gap={3}>
+            <LatestTagRow latestVersion={tags.latestVersion} />
 
-              {tags.nonLatestTags.map((tagDef) => (
-                <TagVersionRow
-                  key={tagDef.name}
-                  tagName={tagDef.name}
-                  selectedVersionId={tags.tagSelections[tagDef.name]}
-                  versionItems={tags.versionItems}
-                  onSelect={(versionId) => tags.setTagVersionId(tagDef.name, versionId)}
-                  onDelete={() => setTagToDelete({ name: tagDef.name })}
-                  handle={handle}
-                />
-              ))}
+            {tags.nonLatestTags.map((tagDef) => (
+              <TagVersionRow
+                key={tagDef.name}
+                tagName={tagDef.name}
+                selectedVersionId={tags.tagSelections[tagDef.name]}
+                versionItems={tags.versionItems}
+                onSelect={(versionId) => tags.setTagVersionId(tagDef.name, versionId)}
+                onDelete={() => setTagToDelete({ name: tagDef.name })}
+                handle={handle}
+              />
+            ))}
 
-              <AddTagControl addTag={tags.addTag} />
+            <AddTagControl addTag={tags.addTag} />
 
-              {tags.addTag.addTagError && (
-                <Text fontSize="sm" color="red.fg">
-                  {tags.addTag.addTagError}
-                </Text>
-              )}
-            </VStack>
+            {tags.addTag.addTagError && (
+              <Text fontSize="sm" color="red.fg">
+                {tags.addTag.addTagError}
+              </Text>
+            )}
           </VStack>
-        </DialogBody>
-        <DialogFooter>
-          <HStack gap={2}>
-            <Button variant="ghost" size="sm" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="blue"
-              size="sm"
-              data-testid="prompt-deploy-save"
-              onClick={() => void tags.handleSave()}
-              loading={tags.isSaving}
-            >
-              Save
-            </Button>
-          </HStack>
-        </DialogFooter>
-      </DialogContent>
+        </VStack>
+      </Dialog>
 
       <DeleteConfirmationDialog
         title={`Delete tag "${tagToDelete?.name ?? ""}"?`}
@@ -340,6 +308,6 @@ export function DeployPromptDialog({
           if (tagToDelete) void tags.confirmDeleteTag(tagToDelete.name);
         }}
       />
-    </DialogRoot>
+    </>
   );
 }

@@ -26,14 +26,17 @@ import {
   InMemoryProcessStore,
   testEventSchema,
 } from "@langwatch/eventing/testing";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import {
+  SPAN_RECEIVED_EVENT_TYPE,
+  MONTH_TRACE_IDS_LISTED_EVENT_TYPE,
+} from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
-import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
 import { BillableEventsMeterAppendService } from "../../services/billable-events-meter-append.service.ts";
-import { TraceMeterAppendService } from "../../services/trace-meter-append.service.ts";
+import { TraceUsageService } from "../../services/trace-usage.service.ts";
 import { UsageCountingService } from "../../services/usage-counting.service.ts";
 import { CountMonthCommand, RecordLimitDecisionCommand } from "../usage.commands.ts";
 import { USAGE_AGGREGATE_TYPE } from "../usage.events.ts";
@@ -67,13 +70,13 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
     countMonth: CountMonthCommand.create({
       counting: UsageCountingService.create({
         meter: MemoryBillableEventsMeterRepository.create(),
-        traceMeter: MemoryTraceMeterRepository.create(),
+        traceMeter: MemoryTraceCountRepository.create(),
         plans: { getActivePlan: async () => plan },
         billing: { getPricingModel: async () => ({ pricingModel: PricingModel.TIERED }) },
       }),
     }),
-    traceMeter: TraceMeterAppendService.create({
-      meter: MemoryTraceMeterRepository.create(),
+    traceUsage: TraceUsageService.create({
+      counts: MemoryTraceCountRepository.create(),
       projects,
     }),
     billableEventsMeter:
@@ -91,10 +94,19 @@ function metering({ send }: { send?: Parameters<typeof buildUsagePipeline>[0]["s
   });
 }
 
-/** Trace's pipeline as the trace meter's peer lane needs it: the owner of span_received. */
+/** Trace's pipelines as the trace count's peer lane needs them: the owner of its two facts. */
 function traceStandIn() {
   return definePipeline({ name: "trace_stand_in", aggregate: defineAggregate({ type: "trace" }) })
     .withEvents([testEventSchema(SPAN_RECEIVED_EVENT_TYPE, z.object({}))])
+    .build();
+}
+
+function traceMilestonesStandIn() {
+  return definePipeline({
+    name: "trace_milestones_stand_in",
+    aggregate: defineAggregate({ type: "trace_project_milestone" }),
+  })
+    .withEvents([testEventSchema(MONTH_TRACE_IDS_LISTED_EVENT_TYPE, z.object({}))])
     .build();
 }
 
@@ -122,6 +134,7 @@ function runtime(
     processStore: InMemoryProcessStore.createForTesting(),
   });
   eventing.register(traceStandIn());
+  eventing.register(traceMilestonesStandIn());
   eventing.register(metering({ send }));
   eventing.register(peerStandIn(seen));
   eventing.startConsumers();
@@ -314,7 +327,7 @@ describe("entitlement's stored names for the usage facts", () => {
         "upcast:entitlement:lw.usage.limit_reached",
         "upcast:entitlement:lw.usage.limit_cleared",
       ]);
-      expect(upcasts?.drain).toEqual({ pipeline: "usage", removeAfter: "3.21.0" });
+      expect(upcasts?.drain).toEqual({ pipeline: "usage" });
     });
   });
 });

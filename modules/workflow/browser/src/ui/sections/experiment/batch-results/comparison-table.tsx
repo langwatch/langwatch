@@ -3,6 +3,7 @@
  */
 
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { ListTable, RawTable as Table } from "@langwatch/design-system/list-table";
 import { Box, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
@@ -37,6 +38,7 @@ import {
   type RenderTracePeek,
 } from "./presentation.tsx";
 import { calculateMinTableWidth, getTableStyles } from "./table-utils.ts";
+import { VirtualPaddingRow } from "./virtual-padding-row.tsx";
 
 type ComparisonTableProps = {
   /** Comparison data from multiple runs */
@@ -142,7 +144,7 @@ const buildComparisonColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
+        <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.original.index + 1}
         </Text>
       ),
@@ -159,9 +161,7 @@ const buildComparisonColumns = ({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type="string" />
-            <Text fontSize="13px" fontWeight="medium">
-              {colName}
-            </Text>
+            <Text textStyle="label">{colName}</Text>
           </HStack>
         ),
         size: 210,
@@ -208,11 +208,7 @@ const buildComparisonColumns = ({
     columns.push(
       comparisonColumnHelper.accessor((row) => row.targetsByRun, {
         id: `target_${targetId}`,
-        header: () => (
-          <Text fontSize="13px" fontWeight="medium">
-            {targetCol.displayName ?? targetCol.name}
-          </Text>
-        ),
+        header: () => <Text textStyle="label">{targetCol.displayName ?? targetCol.name}</Text>,
         size: 300,
         minSize: 200,
         cell: ({ row }) => {
@@ -239,7 +235,7 @@ const buildComparisonColumns = ({
                     onOpenTrace={onOpenTrace}
                   />
                 ) : (
-                  <Text fontSize="13px" color="fg.subtle">
+                  <Text textStyle="bodySm" color="fg.subtle">
                     -
                   </Text>
                 ),
@@ -420,7 +416,7 @@ const GroupMeanBadges = ({
       return (
         <VStack key={run.runId} gap={0} align="end">
           {entries.map(([evId, stats]) => (
-            <HStack key={evId} gap={1} fontSize="11px" color="fg.muted">
+            <HStack key={evId} gap={1} textStyle="micro" color="fg.muted">
               <Box width="6px" height="6px" borderRadius="full" bg={run.color} />
               <Text>{stats.evaluatorName}</Text>
               <Text
@@ -456,8 +452,8 @@ const GroupHeaderRow = ({
   collapsed: boolean;
   onToggleCollapse: (value: string) => void;
 }) => (
-  <tr data-testid={`group-header-${value}`}>
-    <td
+  <Table.Row data-testid={`group-header-${value}`}>
+    <Table.Cell
       colSpan={columnCount}
       style={{
         background: "var(--chakra-colors-bg-subtle)",
@@ -472,7 +468,7 @@ const GroupHeaderRow = ({
           aria-label={collapsed ? "Expand" : "Collapse"}
           onClick={() => onToggleCollapse(value)}
           data-testid={`group-header-toggle-${value}`}
-          fontSize="12px"
+          textStyle="caption"
           color="fg.muted"
           paddingX={1}
           cursor="pointer"
@@ -489,18 +485,16 @@ const GroupHeaderRow = ({
             }}
           />
         </Box>
-        <Text fontSize="13px" fontWeight="semibold">
-          {value}
-        </Text>
-        <Text fontSize="12px" color="fg.muted" data-testid={`group-count-${value}`}>
+        <Text textStyle="cardTitle">{value}</Text>
+        <Text textStyle="caption" color="fg.muted" data-testid={`group-count-${value}`}>
           {rowCount}
           {rowCount === 1 ? " row" : " rows"}
         </Text>
         <Spacer />
         <GroupMeanBadges value={value} aggregates={aggregates} comparisonData={comparisonData} />
       </HStack>
-    </td>
-  </tr>
+    </Table.Cell>
+  </Table.Row>
 );
 
 /** One <tbody> per group: header row plus the group's data rows. */
@@ -523,7 +517,7 @@ const GroupSection = ({
   onToggleCollapse: (value: string) => void;
   tableRowByIndex: Map<number, Row<ComparisonRow>>;
 }) => (
-  <tbody data-testid={`group-section-${value}`}>
+  <ListTable.Body data-testid={`group-section-${value}`}>
     <GroupHeaderRow
       value={value}
       rowCount={rows.length}
@@ -538,16 +532,16 @@ const GroupSection = ({
         const tableRow = tableRowByIndex.get(comparisonRow.index);
         if (!tableRow) return null;
         return (
-          <tr key={tableRow.id} data-index={tableRow.index}>
+          <ListTable.Row key={tableRow.id} data-index={tableRow.index}>
             {tableRow.getVisibleCells().map((cell) => (
-              <td key={cell.id} style={{ width: cell.column.getSize() }}>
+              <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                 {flexRender(cell.column.columnDef.cell, cell.getContext())}
-              </td>
+              </Table.Cell>
             ))}
-          </tr>
+          </ListTable.Row>
         );
       })}
-  </tbody>
+  </ListTable.Body>
 );
 
 /**
@@ -749,23 +743,23 @@ export function ComparisonTable({
         minHeight={0}
         css={tableStyles}
       >
-        <table>
-          <thead>
+        <ListTable variant="embedded" scroll="external" stickyHeader>
+          <ListTable.Header>
             {table.getHeaderGroups().map((headerGroup) => (
-              <tr key={headerGroup.id}>
+              <ListTable.Row key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id} style={{ width: header.getSize() }}>
+                  <Table.ColumnHeader key={header.id} style={{ width: header.getSize() }}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
-                  </th>
+                  </Table.ColumnHeader>
                 ))}
-              </tr>
+              </ListTable.Row>
             ))}
-          </thead>
+          </ListTable.Header>
 
           {groupedRows ? (
-            // Grouped mode: one <tbody> per group. Header row spans all
+            // Grouped mode: one body per group. Header row spans all
             // columns and carries the per-run mean badges.
             groupedRows.map(({ value, rows, aggregates }) => (
               <GroupSection
@@ -781,63 +775,51 @@ export function ComparisonTable({
               />
             ))
           ) : (
-            <tbody>
+            <ListTable.Body>
               {disableVirtualization ? (
                 // Test mode: render all rows without virtualization
                 tableRows.map((row) => (
-                  <tr key={row.id} data-index={row.index}>
+                  <ListTable.Row key={row.id} data-index={row.index}>
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                      <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      </Table.Cell>
                     ))}
-                  </tr>
+                  </ListTable.Row>
                 ))
               ) : (
                 <>
                   {/* Top padding row to maintain scroll position */}
                   {paddingTop > 0 && (
-                    <tr>
-                      <td
-                        aria-hidden="true"
-                        style={{ height: `${paddingTop}px`, padding: 0 }}
-                        colSpan={columnCount}
-                      />
-                    </tr>
+                    <VirtualPaddingRow height={paddingTop} columns={columnCount} />
                   )}
                   {/* Render only virtualized rows - empty until container is measured */}
                   {virtualRows.map((virtualRow) => {
                     const row = tableRows[virtualRow.index];
                     if (!row) return null;
                     return (
-                      <tr
+                      <ListTable.Row
                         key={row.id}
                         data-index={virtualRow.index}
                         ref={rowVirtualizer.measureElement}
                       >
                         {row.getVisibleCells().map((cell) => (
-                          <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                          <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                             {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                          </td>
+                          </Table.Cell>
                         ))}
-                      </tr>
+                      </ListTable.Row>
                     );
                   })}
                   {/* Bottom padding row to maintain scroll position */}
                   {paddingBottom > 0 && (
-                    <tr>
-                      <td
-                        aria-hidden="true"
-                        style={{ height: `${paddingBottom}px`, padding: 0 }}
-                        colSpan={columnCount}
-                      />
-                    </tr>
+                    <VirtualPaddingRow height={paddingBottom} columns={columnCount} />
                   )}
                 </>
               )}
-            </tbody>
+            </ListTable.Body>
           )}
-        </table>
+        </ListTable>
       </Box>
     </VStack>
   );

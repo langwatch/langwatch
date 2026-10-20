@@ -29,6 +29,6 @@ export function showSuiteRunError({
   showErrorToast({
     error,
     fallbackTitle,
-    ...(hasNothingRunnable ? { action: { label: "Edit Run Plan", run: onEditRunPlan } } : {}),
+    ...(hasNothingRunnable ? { action: { label: "Edit run plan", run: onEditRunPlan } } : {}),
   });
 }

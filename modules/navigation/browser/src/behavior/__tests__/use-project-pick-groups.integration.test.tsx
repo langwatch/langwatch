@@ -102,3 +102,31 @@ describe("given a reader who may not create projects", () => {
     expect(result.current).toEqual([]);
   });
 });
+
+describe("given an admin who can open colleagues' personal teams", () => {
+  const personalTeamOf = (userId: string) => ({
+    id: `team_personal_${userId}`,
+    name: `${userId}'s Workspace`,
+    isPersonal: true,
+    ownerUserId: userId,
+    members: [],
+    projects: [{ id: `project_${userId}`, slug: userId, name: "Personal", isPersonal: true }],
+  });
+
+  it("lists only the admin's own personal team", () => {
+    const host = StubNavigationHost.create({
+      organization: ORGANIZATION,
+      organizations: [ORGANIZATION],
+      openableTeams: [teamWithProject, personalTeamOf("user_admin"), personalTeamOf("user_jane")],
+      permissions: ["project:create"],
+      currentUserId: "user_admin",
+    });
+
+    const result = renderGroups(host);
+
+    expect(result.current.map((group) => group.team.teamId)).toEqual([
+      "team_a",
+      "team_personal_user_admin",
+    ]);
+  });
+});

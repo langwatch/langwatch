@@ -11,6 +11,7 @@ const emptyQuery = { data: undefined, isLoading: false };
 
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
+    personalWorkspaceFeatures: { get: { useQuery: () => emptyQuery } },
     agents: { getAll: { useQuery: () => emptyQuery } },
     workflow: { getAll: { useQuery: () => emptyQuery } },
   },

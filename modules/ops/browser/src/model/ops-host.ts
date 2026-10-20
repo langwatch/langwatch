@@ -1,7 +1,8 @@
 /** Application port for Ops screens (can't import router/toast/session—ADR-004;
  * testability). Package-wide portable value; two access answers (view+manage). */
 
-import { createContext, useContext } from "react";
+import type { SsoReplacementImportProps } from "@langwatch/enterprise-sso-contract";
+import { createContext, useContext, type ComponentType } from "react";
 
 /**
  * The project the operator is standing in, and the key traces are sent with.
@@ -94,6 +95,9 @@ export abstract class OpsHostApi {
   abstract informed(notice: OpsSuccessNotice): void;
 
   abstract failed(failure: OpsFailureNotice): void;
+
+  /** The replacement import sso lends a carried-over connection; absent, none is drawn. */
+  abstract ssoReplacementImport(): ComponentType<SsoReplacementImportProps> | undefined;
 }
 
 const OpsHostContext = createContext<OpsHostApi | undefined>(void 0);

@@ -34,6 +34,8 @@ export const migrationStepDeclarationSchema = z.object({
   after: z.array(z.string().regex(MIGRATION_STEP_ID)).optional(),
   /** The release a background step must have finished by; the ledger keeps it for the reader. */
   finishBy: releaseVersionSchema.optional(),
+  /** How long a background step waits for the queue work it sent, past the 60 s default. */
+  queueWaitMs: z.number().int().positive().optional(),
 });
 export type MigrationStepDeclaration = z.infer<typeof migrationStepDeclarationSchema>;
 
@@ -57,6 +59,10 @@ export const tenantMigrationStepDeclarationSchema = z.object({
   requiresOperatorConfirmation: z.boolean(),
   runsAutomaticallyOnSelfHosted: z.boolean(),
   enrolledAutomatically: z.boolean(),
+  /** Reports `migrated` every pass by design; those tenants are in step, not held (SWB-F5). */
+  migratedIsSteady: z.boolean().optional(),
+  /** Starts no new page of tenants while more of its own jobs wait (Alex, 2026-10-12). */
+  pauseWhileQueuedAbove: z.number().int().positive().optional(),
 });
 export type TenantMigrationStepDeclaration = z.infer<typeof tenantMigrationStepDeclarationSchema>;
 

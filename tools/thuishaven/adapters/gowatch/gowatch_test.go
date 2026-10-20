@@ -166,3 +166,100 @@ func TestUIFingerprintSeesBrowserSourceButNotTestsOrBackendHalves(t *testing.T) 
 		}
 	}
 }
+
+// BenchmarkFingerprint is one idle poll of the go lane's watch over this checkout.
+func BenchmarkFingerprint(b *testing.B) {
+	root, err := filepath.Abs("../../../..")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = Fingerprint(root)
+	}
+}
+
+// BenchmarkUIFingerprint is one idle poll of the built UI's watch over this checkout.
+func BenchmarkUIFingerprint(b *testing.B) {
+	root, err := filepath.Abs("../../../..")
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = UIFingerprint(root)
+	}
+}
+
+// BenchmarkUITreeIdlePoll is one idle poll of the built UI's watch with the
+// directory listings kept from the poll before.
+func BenchmarkUITreeIdlePoll(b *testing.B) {
+	root, err := filepath.Abs("../../../..")
+	if err != nil {
+		b.Fatal(err)
+	}
+	tree := UITree(root)
+	tree.Fingerprint()
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = tree.Fingerprint()
+	}
+}
+
+// BenchmarkGoTreeIdlePoll is the go lane's idle poll with listings kept.
+func BenchmarkGoTreeIdlePoll(b *testing.B) {
+	root, err := filepath.Abs("../../../..")
+	if err != nil {
+		b.Fatal(err)
+	}
+	tree := GoTree(root)
+	tree.Fingerprint()
+	b.ReportAllocs()
+	for b.Loop() {
+		_ = tree.Fingerprint()
+	}
+}
+
+func TestTreeKeptAcrossPollsSeesEditsNewFilesAndRemovals(t *testing.T) {
+	root := t.TempDir()
+	write := func(rel, body string) {
+		path := filepath.Join(root, rel)
+		if err := os.MkdirAll(filepath.Dir(path), 0o750); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(body), 0o600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	write("src/a.go", "package a\n")
+	tree := PathsTree(root, "src")
+	last := tree.Fingerprint()
+	steps := []struct {
+		name   string
+		change func()
+	}{
+		{"an edit in place", func() { write("src/a.go", "package a // edited\n") }},
+		{"a new file in a known directory", func() { write("src/b.go", "package a\n") }},
+		{"a new nested directory", func() { write("src/deep/c.go", "package deep\n") }},
+		{"an edit inside the nested directory", func() { write("src/deep/c.go", "package deep // edited\n") }},
+		{"a removed file", func() {
+			if err := os.Remove(filepath.Join(root, "src", "b.go")); err != nil {
+				t.Fatal(err)
+			}
+		}},
+	}
+	for _, step := range steps {
+		step.change()
+		fp := tree.Fingerprint()
+		if fp == last {
+			t.Errorf("%s did not change the fingerprint", step.name)
+		}
+		if fp != FingerprintPaths(root, "src") {
+			t.Errorf("after %s the kept tree disagrees with a fresh walk", step.name)
+		}
+		last = fp
+	}
+	if tree.Fingerprint() != last {
+		t.Error("an idle poll changed the fingerprint")
+	}
+}

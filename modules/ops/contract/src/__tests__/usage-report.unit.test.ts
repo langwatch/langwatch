@@ -210,7 +210,6 @@ describe("given ops health from an install older or newer than the upgrade summa
   const upgrade = {
     state: "current",
     release: "3.21.0",
-    floor: "3.20.1",
     failed_steps: 0,
     failed_targets: 0,
     held_tenants: null,

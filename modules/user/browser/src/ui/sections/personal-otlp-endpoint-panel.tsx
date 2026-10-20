@@ -1,11 +1,14 @@
 import { useMintPersonalToken } from "@langwatch/api-key-client";
+import { Banner } from "@langwatch/design-system/banner";
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   API_KEY_PLACEHOLDER,
   PersonalAccessTokenBanner,
 } from "@langwatch/design-system/personal-access-token-banner";
-import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Copy } from "lucide-react";
+import { useState } from "react";
 
 import {
   usePersonalToaster,
@@ -15,6 +18,7 @@ import {
   useCurrentUser,
   usePersonalDeployment,
 } from "../../behavior/personal-workspace-session.ts";
+import { Link } from "../elements/personal-link.tsx";
 
 /** The token lives in this component's memory only, for this project and user. */
 export function PersonalOtlpEndpointPanel({
@@ -32,6 +36,8 @@ export function PersonalOtlpEndpointPanel({
     userId: useCurrentUser()?.id,
     name: "Personal access token",
   });
+  const [copyFailed, setCopyFailed] = useState<string | null>(null);
+  const [envVisible, setEnvVisible] = useState(true);
   const token = minting.token ?? null;
   const { appBaseUrl: baseHost } = usePersonalDeployment();
   const endpoint = baseHost ? `${baseHost}/api/otel` : "";
@@ -49,9 +55,16 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACE
       );
   };
 
-  const copy = (value: string, label: string) => {
-    void navigator.clipboard.writeText(value);
-    toaster.create({ title: `${label} copied to clipboard`, type: "success" });
+  const copy = async ({ text, what }: { text: string; what: string }): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      setCopyFailed(what);
+      return false;
+    }
+    setCopyFailed(null);
+    toaster.create({ title: `${what} copied to clipboard`, type: "success" });
+    return true;
   };
 
   return (
@@ -63,7 +76,7 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACE
         <Button
           size="xs"
           variant="ghost"
-          onClick={() => copy(endpoint, "Endpoint")}
+          onClick={() => void copy({ text: endpoint, what: "Endpoint" })}
           disabled={!endpoint}
         >
           <Copy size={12} /> Copy
@@ -78,37 +91,35 @@ export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer ${token ?? API_KEY_PLACE
       />
 
       {envVars && (
-        <Box
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="sm"
-          padding={3}
-          backgroundColor="bg.subtle"
-        >
-          <HStack alignItems="start" marginBottom={2}>
-            <Text fontSize="xs" color="fg.muted" fontWeight="semibold">
-              .env (bash)
-            </Text>
-            <Spacer />
-            <Button
-              size="xs"
-              variant="ghost"
-              disabled={!token}
-              onClick={() => copy(envVars, "Env vars")}
-            >
-              <Copy size={12} /> Copy
-            </Button>
-          </HStack>
-          <Box as="pre" fontSize="xs" fontFamily="mono" whiteSpace="pre-wrap">
-            {envVars}
-          </Box>
-        </Box>
+        <SnippetPreview
+          code={envVars}
+          filename=".env"
+          codeLanguage="bash"
+          sensitiveValue={token ?? void 0}
+          enableVisibilityToggle={!!token}
+          isVisible={envVisible}
+          onToggleVisibility={() => setEnvVisible(!envVisible)}
+          copyText={envVars}
+          disableActions={!token}
+          copy={copy}
+        />
+      )}
+
+      {copyFailed && (
+        <Banner status="error">
+          Couldn't copy the {copyFailed.toLowerCase()} to the clipboard. Select it and copy it by
+          hand, or try again.
+        </Banner>
       )}
 
       <Text fontSize="xs" color="fg.muted">
         For ad-hoc / custom telemetry. Spans land as-emitted; cost / tokens / model are not
         auto-populated unless your spans already follow <InlineCode>gen_ai.*</InlineCode>{" "}
-        conventions. For tool-specific auto-shape, use the catalog tiles on /me when available.
+        conventions. If your admin has set up tools, tool-specific setup is on{" "}
+        <Link href="/me" fontWeight="medium">
+          Your AI tools
+        </Link>
+        .
       </Text>
     </VStack>
   );

@@ -11,6 +11,8 @@ import type {
   InMemoryDataset,
 } from "@langwatch/dataset-contract";
 import { formatDatasetRowLimit } from "@langwatch/dataset-contract";
+import { Card } from "@langwatch/design-system/card";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Alert,
   Box,
@@ -22,7 +24,6 @@ import {
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { createLogger } from "@langwatch/observability/browser";
 import { DATASET_IMPORT_PURPOSE } from "@langwatch/stored-object-contract";
 import { nowInstant, readableDate } from "@langwatch/time";
@@ -77,7 +78,7 @@ function PreparingRowAction({
   if (!isReady) return null;
 
   return (
-    <Button size="sm" colorPalette="blue" onClick={onViewDataset}>
+    <Button size="sm" colorPalette="orange" variant="solid" onClick={onViewDataset}>
       View dataset
     </Button>
   );
@@ -153,51 +154,39 @@ export function UploadCSVDrawer({
 
   return (
     <>
-      <Drawer.Root
-        open={!addDatasetDrawer.open}
-        onOpenChange={({ open }) => !open && handleClose()}
-        size="xl"
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.CloseTrigger />
-          <Drawer.Header>
-            <Drawer.Title>Upload CSV</Drawer.Title>
-          </Drawer.Header>
-          <Drawer.Body>
-            {processingDatasetId && project ? (
-              <DatasetUploadProcessing
-                projectId={project.id}
-                datasetId={processingDatasetId}
-                onReady={(dataset) => {
-                  onSuccess({
-                    datasetId: dataset.id,
-                    name: dataset.name,
-                    columnTypes: (dataset.columnTypes ?? {}) as DatasetColumns,
-                  });
-                }}
-                onViewDataset={() => {
-                  const datasetId = processingDatasetId;
-                  handleClose();
-                  if (project) {
-                    void router.push(`/${project.slug}/datasets/${datasetId}`);
-                  }
-                }}
-              />
-            ) : (
-              <UploadCSVForm
-                setUploadedDataset={setUploadedDataset}
-                uploadedDataset={uploadedDataset}
-                uploadCSVData={uploadCSVData}
-                onCreateFromScratch={onCreateFromScratch}
-                enableDirectUpload={enableDirectUpload}
-                onClose={onClose}
-                onDirectUploadComplete={setProcessingDatasetId}
-                requestColumnConfirm={setColumnConfirm}
-              />
-            )}
-          </Drawer.Body>
-        </Drawer.Content>
-      </Drawer.Root>
+      <Drawer open={!addDatasetDrawer.open} onClose={handleClose} size="xl" title="Upload CSV">
+        {processingDatasetId && project ? (
+          <DatasetUploadProcessing
+            projectId={project.id}
+            datasetId={processingDatasetId}
+            onReady={(dataset) => {
+              onSuccess({
+                datasetId: dataset.id,
+                name: dataset.name,
+                columnTypes: (dataset.columnTypes ?? {}) as DatasetColumns,
+              });
+            }}
+            onViewDataset={() => {
+              const datasetId = processingDatasetId;
+              handleClose();
+              if (project) {
+                void router.push(`/${project.slug}/datasets/${datasetId}`);
+              }
+            }}
+          />
+        ) : (
+          <UploadCSVForm
+            setUploadedDataset={setUploadedDataset}
+            uploadedDataset={uploadedDataset}
+            uploadCSVData={uploadCSVData}
+            onCreateFromScratch={onCreateFromScratch}
+            enableDirectUpload={enableDirectUpload}
+            onClose={onClose}
+            onDirectUploadComplete={setProcessingDatasetId}
+            requestColumnConfirm={setColumnConfirm}
+          />
+        )}
+      </Drawer>
       {/* Nested panels, not routed drawers: each holds a parsed CSV or a paused
           upload in memory, which the address cannot carry. */}
       <AddOrEditDatasetDrawer
@@ -826,7 +815,8 @@ export function UploadCSVForm({
         )}
         <Spacer />
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           loading={isUploading}
           loadingText="Uploading"
           disabled={!!disabled || isUploading || !canUpload}
@@ -946,7 +936,7 @@ function ParsingCSVReader({
               },
             });
           } catch (error) {
-            console.error("error", error);
+            logger.error({ error }, "Failed to parse JSON file");
             toaster.create({
               title: "Error",
               description: "Failed to parse JSON file",
@@ -1137,16 +1127,8 @@ function DatasetFileRow({
   const isError = status === "error";
   const isUploading = status === "uploading";
   const meta = message ?? metaLabel;
-  return (
-    <HStack
-      width="full"
-      gap={3}
-      padding={3}
-      borderWidth="1px"
-      borderRadius="lg"
-      borderColor={isError ? "border.error" : "border"}
-      bg="bg"
-    >
+  const content = (
+    <HStack width="full" gap={3}>
       <DatasetFileStatusIcon status={status} />
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <Text
@@ -1175,6 +1157,15 @@ function DatasetFileRow({
       </VStack>
       {action}
     </HStack>
+  );
+  return isError ? (
+    <Card variant="nested" tone="red" padding="sm">
+      {content}
+    </Card>
+  ) : (
+    <Card variant="frame" padding="sm">
+      {content}
+    </Card>
   );
 }
 

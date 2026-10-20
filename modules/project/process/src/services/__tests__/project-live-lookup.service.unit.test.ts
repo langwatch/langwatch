@@ -68,7 +68,6 @@ async function seeded() {
       logger: { error: () => void 0 },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
       },
     }),

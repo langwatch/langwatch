@@ -1,6 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { ArrowLeft, Cable, Code, Globe, Mic, Workflow } from "lucide-react";
+import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Cable, Code, Globe, Mic, Workflow } from "lucide-react";
 
 import { useAgentTypeSelection } from "../../behavior/use-agent-type-selection.ts";
 import type { NewAgentType } from "../../model/new-agent-drawer.ts";
@@ -60,78 +61,49 @@ export function AgentTypeSelectorDrawer({
 }: AgentTypeSelectorDrawerProps) {
   const selection = useAgentTypeSelection({ onSelect, onClose, onConnectFromCode });
   return (
-    <Drawer.Root
+    <Drawer
       open={open !== false && open !== undefined}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && selection.close()}
+      onClose={selection.close}
+      onBack={canGoBack ? onGoBack : void 0}
+      backButtonTestId="back-button"
       size="md"
-      modal={false}
+      title="Choose Agent Connection Type"
+      footer={{ cancel: { onClick: selection.close } }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {canGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={onGoBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-              >
-                <ArrowLeft size={20} />
-              </Button>
-            )}
-            <Drawer.Title>Choose Agent Connection Type</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-              Select how you want to integrate your agent for testing.
-            </Text>
+      <VStack gap={4} align="stretch">
+        <Text color="fg.muted" fontSize="sm">
+          Select how you want to integrate your agent for testing.
+        </Text>
 
-            <VStack gap={3} align="stretch" paddingX={6} paddingBottom={4}>
-              <ConnectFromCodeCard onClick={selection.connectFromCode} />
-              {agentTypes
-                .filter((agentType) => agentType.type !== "voice" || selection.voiceEnabled)
-                .map((agentType) => (
-                  <AgentTypeCard
-                    key={agentType.type}
-                    {...agentType}
-                    onClick={() => selection.select(agentType.type)}
-                  />
-                ))}
-            </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={selection.close}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        <VStack gap={3} align="stretch">
+          <ConnectFromCodeCard onClick={selection.connectFromCode} />
+          {agentTypes
+            .filter((agentType) => agentType.type !== "voice" || selection.voiceEnabled)
+            .map((agentType) => (
+              <AgentTypeCard
+                key={agentType.type}
+                {...agentType}
+                onClick={() => selection.select(agentType.type)}
+              />
+            ))}
+        </VStack>
+      </VStack>
+    </Drawer>
   );
 }
 
 /** Connect-from-code reuses the project's already-running agent. */
 function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
   return (
-    <Box
-      as="button"
-      onClick={onClick}
-      padding={4}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="border"
-      bg="bg.panel"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "green.muted", bg: "green.subtle" }}
-      transition="all 0.15s"
-      data-testid="agent-type-connected"
-      cursor="pointer"
+    <Card
+      opener={
+        <button
+          type="button"
+          aria-label="Connect from Code"
+          onClick={onClick}
+          data-testid="agent-type-connected"
+        />
+      }
     >
       <HStack gap={3} align="start">
         <Box padding={1} borderRadius="md" bg="green.subtle" color="green.fg">
@@ -154,7 +126,7 @@ function ConnectFromCodeCard({ onClick }: { onClick: () => void }) {
           </Text>
         </VStack>
       </HStack>
-    </Box>
+    </Card>
   );
 }
 
@@ -172,20 +144,15 @@ type AgentTypeCardProps = {
 
 function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentTypeCardProps) {
   return (
-    <Box
-      as="button"
-      onClick={onClick}
-      padding={4}
-      borderRadius="lg"
-      border="1px solid"
-      borderColor="border"
-      bg="bg.panel"
-      textAlign="left"
-      width="full"
-      _hover={{ borderColor: "blue.muted", bg: "blue.subtle" }}
-      transition="all 0.15s"
-      data-testid={`agent-type-${type}`}
-      cursor="pointer"
+    <Card
+      opener={
+        <button
+          type="button"
+          aria-label={title}
+          onClick={onClick}
+          data-testid={`agent-type-${type}`}
+        />
+      }
     >
       <HStack gap={3} align="start">
         <Box padding={1} borderRadius="md" bg="blue.subtle" color="blue.fg">
@@ -200,6 +167,6 @@ function AgentTypeCard({ type, icon: Icon, title, description, onClick }: AgentT
           </Text>
         </VStack>
       </HStack>
-    </Box>
+    </Card>
   );
 }

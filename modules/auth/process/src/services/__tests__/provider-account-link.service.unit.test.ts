@@ -36,15 +36,15 @@ const proposal = {
 
 describe("given a confirmed link proposal", () => {
   describe("when it names a connection with a registered issuer", () => {
-    it("keys the account by that connection's issuer", async () => {
+    it("keys the account by that connection and its issuer, as its own sign-ins are", async () => {
       const { service, accounts } = linker({ conn_1: "https://idp.acme.test" });
 
-      await service.link({ ...proposal, connectionId: "conn_1", provider: "sso" });
+      await service.link({ ...proposal, connectionId: "conn_1", provider: "oidc" });
 
       expect(accounts.rows).toEqual([
         {
           userId: "user_1",
-          providerId: "sso",
+          providerId: "conn_1",
           issuer: "https://idp.acme.test",
           accountId: "subject-123",
         },

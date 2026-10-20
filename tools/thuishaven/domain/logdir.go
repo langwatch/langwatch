@@ -5,7 +5,7 @@ import "path/filepath"
 // HavenLogsRoot is where a worktree's own logs live: <worktree>/.haven/logs
 // (ruling 2026-09-29). It is rooted in the checkout or worktree the stack runs
 // from, not the shared haven home, so removing that directory — a `haven
-// destroy`, or an apidiff/visualdiff run simply deleting its own worktree —
+// destroy`, or a tool simply deleting its own worktree —
 // takes every log it ever wrote with it.
 func HavenLogsRoot(worktreeDir string) string {
 	return filepath.Join(worktreeDir, ".haven", "logs")
@@ -17,4 +17,10 @@ func HavenLogsRoot(worktreeDir string) string {
 func StackLogPaths(worktreeDir, slug string) (dir, combined string) {
 	root := HavenLogsRoot(worktreeDir)
 	return filepath.Join(root, slug), filepath.Join(root, slug+".log")
+}
+
+// GatewaySpendSpoolDir is one stack's own gateway spend spool, in the owner-only run
+// dir beside the logs, so two stacks' gateways never drain each other's spend.
+func GatewaySpendSpoolDir(worktreeDir, slug string) string {
+	return filepath.Join(filepath.Dir(HavenLogsRoot(worktreeDir)), "run", slug, "gateway-spend-spool")
 }

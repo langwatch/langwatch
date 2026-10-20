@@ -22,8 +22,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts"
   },
   "dependencies": {
     "@aws-sdk/client-cloudwatch-logs": "catalog:",
@@ -41,7 +42,6 @@
     "@langwatch/module": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/plans": "workspace:*",
-    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
@@ -63,6 +63,7 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/prisma-client": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "typescript": "catalog:",
     "vitest": "catalog:"

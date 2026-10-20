@@ -145,6 +145,12 @@ Feature: Local IdP simulator (idpsim)
     And the response's assertion is signed by the tenant's certificate
     And the assertion names the seeded user
 
+  @unit
+  Scenario: A SAML authentication request without a login hint offers the tenant's users
+    When a service provider redirects a person to the tenant's SSO endpoint with no login hint
+    Then the response is the account picker listing the tenant's seeded users, as for authorize
+    And choosing one repeats the same request with the hint and asserts that person, not the first user
+
   # --- SCIM -------------------------------------------------------------
 
   @unit
@@ -438,6 +444,20 @@ Feature: Local IdP simulator (idpsim)
     And a tenant whose clock is skewed by ten minutes
     When the simulator restarts
     Then the tenant's clock is still skewed by ten minutes
+
+  @unit
+  Scenario: A tenant can assert a second factor in its ID tokens
+    Given a tenant whose ID tokens assert no authentication methods
+    When its config sets amr to "pwd" and "mfa"
+    Then the next ID token carries amr ["pwd", "mfa"]
+    And an empty list, or resetting the tenant, stops asserting it
+
+  @unit
+  Scenario: A tenant can say its addresses are unverified in its ID tokens
+    Given a tenant whose ID tokens carry email_verified true, as every tenant's do
+    When its config sets emailVerified to "false"
+    Then the next ID token carries email_verified false
+    And "omit" drops the claim, resetting the tenant restores it, and any other value is refused
 
   @unit
   Scenario: After a key rotation both keys are published and the new one signs

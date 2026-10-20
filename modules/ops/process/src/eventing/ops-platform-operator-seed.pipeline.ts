@@ -7,6 +7,7 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import { USER_CREATED_EVENT_TYPE, userCreatedEventDataSchema } from "@langwatch/user-contract";
 import type { z } from "zod";
 
 import type { OpsModule } from "../app/ops.app.ts";
@@ -40,13 +41,16 @@ type PlatformOperatorSeedPipelineDefinition = StaticPipelineDefinition<
 /**
  * The one-time platform-operator seed (ARCHITECTURE.md, "Operator bootstrap"): wakes ask for an
  * attempt until the seed records its decision as ops's own event, which sets the marker for good
- * and asks for the grants that decision names.
+ * and asks for the grants that decision names; user's created fact may record a first user.
  */
 function buildPlatformOperatorSeed({
   app,
 }: EventingSetup<
   unknown,
-  Pick<OpsModule, "seedPlatformOperators" | "grantSeededPlatformOperators">
+  Pick<
+    OpsModule,
+    "seedPlatformOperators" | "grantSeededPlatformOperators" | "grantFirstUserPlatformOperator"
+  >
 >): PlatformOperatorSeedPipelineDefinition {
   return definePipeline({
     name: PLATFORM_OPERATOR_SEED_PIPELINE_NAME,
@@ -54,6 +58,13 @@ function buildPlatformOperatorSeed({
   })
     .withEvents([platformOperatorSeedRecordedEventSchema])
     .withCommand("recordPlatformOperatorSeed", RecordPlatformOperatorSeedCommand)
+    .withPeerSubscriber("firstUserCreated", {
+      eventType: USER_CREATED_EVENT_TYPE,
+      data: userCreatedEventDataSchema,
+      handle: async ({ userId, backfilled }) => {
+        await app.grantFirstUserPlatformOperator({ userId, backfilled: backfilled ?? false });
+      },
+    })
     .withProcessManager(PLATFORM_OPERATOR_SEED_PROCESS_NAME, (pm) =>
       pm
         .state(platformOperatorSeedStateSchema, { seededAt: null })

@@ -11,25 +11,15 @@
     "noFallthroughCasesInSwitch": true,
     "outDir": "dist",
     "rootDir": ".",
-    "isolatedModules": true
+    "isolatedModules": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "scripts/**/*.ts"],
-  "exclude": ["dist", "node_modules", "test"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

@@ -1,4 +1,7 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { HandledError } from "@langwatch/handled-error";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
+import { createTestLogger } from "@langwatch/test-harness";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type * as metricsModule from "../../../metrics.ts";
 import {
@@ -10,7 +13,13 @@ import {
 } from "../../__tests__/helpers/pilotProcess.fixture.ts";
 import { ProcessManagerService } from "../../processManagerService.ts";
 import { InMemoryProcessStore } from "../../stores/inMemoryProcessStore.ts";
-import { type DispatchableMessage, OutboxDispatcherService } from "../outboxDispatcherService.ts";
+import { runOutsideDelivery, trackDeliveryProgress } from "../deliveryProgress.ts";
+import {
+  type DispatchableMessage,
+  type DispatchReport,
+  type IntentHandler,
+  OutboxDispatcherService,
+} from "../outboxDispatcherService.ts";
 
 const { observeDispatchLag } = vi.hoisted(() => ({
   observeDispatchLag: vi.fn(),
@@ -19,6 +28,111 @@ vi.mock("../../../metrics.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof metricsModule>()),
   observeEsProcessOutboxDispatchLag: observeDispatchLag,
 }));
+
+/** A store whose lease renewals never land: the worker holding the lease is gone. */
+function withoutRenewals(store: InMemoryProcessStore): InMemoryProcessStore {
+  return new Proxy(store, {
+    get(target, property, receiver) {
+      if (property === "renewLease") return () => new Promise(() => undefined);
+      return Reflect.get(target, property, receiver);
+    },
+  });
+}
+
+/** A short lease and silence limit, polled in steps, so a test walks minutes in a few ticks. */
+const SILENCE = { leaseDurationMs: 30_000, maxSilenceMs: 60_000, stepMs: 10_000 } as const;
+
+/** A handler that, until finished, waits a step and, when calling, reads a tracked repository. */
+function repositoryCaller({ calling, stepMs }: { calling: boolean; stepMs: number }) {
+  const repository = trackDeliveryProgress({ read: () => Promise.resolve("row") });
+  let finished = false;
+  const handler = async (): Promise<void> => {
+    while (!finished) {
+      if (calling) await repository.read();
+      await new Promise((resolve) => setTimeout(resolve, stepMs));
+    }
+  };
+  return { handler, finish: () => (finished = true) };
+}
+
+/** A hung handler whose only activity is a lock renewal on a real timer, armed as `arm` says. */
+function lockRenewingHang({
+  everyMs,
+  arm,
+}: {
+  everyMs: number;
+  arm: (start: () => NodeJS.Timeout) => NodeJS.Timeout;
+}) {
+  const renew = vi.fn(() => Promise.resolve(true));
+  const lock = trackDeliveryProgress({ renew });
+  let release: () => void = () => undefined;
+  const handler = async (): Promise<void> => {
+    const timer = arm(() => setInterval(() => void lock.renew(), everyMs));
+    await new Promise<void>((resolve) => (release = resolve));
+    clearInterval(timer);
+  };
+  return { handler, finish: () => release(), renew };
+}
+
+/** Holds a hung handler on real timers past a short silence limit; answers whether it warned. */
+async function holdHungOnRealTimers({
+  store,
+  arm,
+}: {
+  store: InMemoryProcessStore;
+  arm: (start: () => NodeJS.Timeout) => NodeJS.Timeout;
+}) {
+  const { logger, lines } = createTestLogger();
+  const hang = lockRenewingHang({ everyMs: 10, arm });
+  const holder = new OutboxDispatcherService({
+    store,
+    handlers: { "worker-dispatch": hang.handler },
+    leaseDurationMs: 90,
+    maxSilenceMs: 60,
+    logger,
+  });
+  const run = holder.runOnce({ now: Date.now() });
+  await new Promise((resolve) => setTimeout(resolve, 300));
+  hang.finish();
+  await run;
+  return { renewals: hang.renew.mock.calls.length, warned: lines.findLine("warn", "no call") };
+}
+
+/** Runs a holder for three minutes beside a polling rival; reports when the rival took over. */
+async function holdBesideRival({
+  store,
+  caller,
+}: {
+  store: InMemoryProcessStore;
+  caller: { handler: () => Promise<void>; finish: () => void };
+}) {
+  const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
+  const { logger, lines } = createTestLogger();
+  const holder = new OutboxDispatcherService({
+    store,
+    handlers: { "worker-dispatch": caller.handler },
+    leaseDurationMs,
+    maxSilenceMs,
+    logger,
+  });
+  const rivalHandler = vi.fn().mockResolvedValue(undefined);
+  const rival = new OutboxDispatcherService({
+    store,
+    handlers: { "worker-dispatch": rivalHandler },
+    leaseDurationMs,
+  });
+  const startedAt = Date.now();
+  const run = holder.runOnce({ now: startedAt });
+  let takenAfterMs: number | null = null;
+  for (let elapsed = stepMs; elapsed <= 180_000; elapsed += stepMs) {
+    await vi.advanceTimersByTimeAsync(stepMs);
+    await rival.runOnce({ now: Date.now() });
+    takenAfterMs ??= rivalHandler.mock.calls.length > 0 ? Date.now() - startedAt : null;
+  }
+  caller.finish();
+  await vi.advanceTimersByTimeAsync(stepMs);
+  return { report: await run, takenAfterMs, lines };
+}
 
 describe("OutboxDispatcherService", () => {
   let store: InMemoryProcessStore;
@@ -313,6 +427,65 @@ describe("OutboxDispatcherService", () => {
       });
     });
 
+    describe("when the handler is refused because its project no longer exists", () => {
+      /** Shaped as project's contract refusal: a handled error recognised by its code. */
+      class ProjectNotFound extends HandledError {
+        constructor() {
+          super("project_not_found", "Project not found", { httpStatus: 404 });
+        }
+      }
+
+      let meter = createRecordingMeterProvider();
+      beforeEach(() => {
+        meter = createRecordingMeterProvider();
+        meter.install();
+      });
+      afterEach(() => meter.uninstall());
+
+      /** @scenario "A process-manager outbox message whose project no longer exists is retired as completed" */
+      it("retires the message as dispatched with a warning, neither dead nor retried", async () => {
+        const { logger, lines } = createTestLogger();
+        const handler = vi
+          .fn()
+          .mockRejectedValue(new Error("lookup failed", { cause: new ProjectNotFound() }));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+          logger,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first).toMatchObject({ dispatched: ["dispatch:turn_1:1"], dead: [], retried: [] });
+        expect(lines.findLine("warn", "no longer exists")).toBeDefined();
+
+        const second = await dispatcher.runOnce({ now: T0 + 60_000 });
+        expect(second.dispatched).toEqual([]);
+        expect(handler).toHaveBeenCalledTimes(1);
+      });
+
+      /** @scenario "A job or outbox message completed because its project is gone is counted" */
+      it("counts the retirement once, under the outbox queue and its intent type", async () => {
+        const handler = vi.fn().mockRejectedValue(new ProjectNotFound());
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(
+          meter.valueOf("es_jobs_project_gone_total", {
+            queue: "process_outbox",
+            job_type: "worker-dispatch",
+          }),
+        ).toBe(1);
+      });
+    });
+
     describe("when the handler throws a retryable-true error", () => {
       it("classifies it as retried and re-dispatches after the delay", async () => {
         const transient = Object.assign(new Error("HTTP 503"), {
@@ -335,6 +508,73 @@ describe("OutboxDispatcherService", () => {
         const second = await dispatcher.runOnce({ now: T0 + 1_100 });
         expect(second.retried).toEqual(["dispatch:turn_1:1"]);
         expect(handler).toHaveBeenCalledTimes(2);
+      });
+    });
+
+    describe("when the handler is refused as clickhouse_unavailable", () => {
+      /** Shaped as process-stores' refusal: a handled error left at its default `retryable`. */
+      class Unavailable extends HandledError {
+        constructor(reason: Error) {
+          super("clickhouse_unavailable", "Database temporarily unavailable", {
+            httpStatus: 503,
+            fault: "platform",
+            reasons: [reason],
+          });
+        }
+      }
+      const refusedOver = (reason: Error) => new Unavailable(reason);
+
+      /** @scenario "A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt" */
+      it("retries a dropped connection instead of dead-lettering it", async () => {
+        const dropped = Object.assign(new Error("read ECONNRESET"), { code: "ECONNRESET" });
+        const handler = vi.fn().mockRejectedValue(refusedOver(dropped));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(first.dead).toEqual([]);
+      });
+
+      /** @scenario "A platform-fault refusal is retried like the group queue retries it" */
+      it("retries a platform refusal even when its cause looks permanent", async () => {
+        const handler = vi.fn().mockRejectedValue(refusedOver(new Error("Syntax error in SQL")));
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.retried).toEqual(["dispatch:turn_1:1"]);
+        expect(first.dead).toEqual([]);
+      });
+
+      /** @scenario "A customer-fault refusal is dead on its first attempt" */
+      it("retires a customer refusal at once", async () => {
+        class InvalidAction extends HandledError {
+          constructor() {
+            super("invalid_action", "Trigger action parameters are invalid", {
+              httpStatus: 422,
+              fault: "customer",
+            });
+          }
+        }
+        const handler = vi.fn().mockRejectedValue(new InvalidAction());
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": handler },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 10,
+        });
+
+        const first = await dispatcher.runOnce({ now: T0 + 1 });
+        expect(first.dead).toEqual(["dispatch:turn_1:1"]);
       });
     });
 
@@ -666,7 +906,8 @@ describe("OutboxDispatcherService", () => {
         // The crash: the first delivery starts, charging attempt one and
         // observing the commit-to-dispatch lag, and never acknowledges.
         const crashed = new OutboxDispatcherService({
-          store,
+          // A dead worker sends no renewals, so its lease lapses on time.
+          store: withoutRenewals(store),
           handlers: {
             "worker-dispatch": vi.fn().mockReturnValue(new Promise<void>(() => undefined)),
           },
@@ -693,6 +934,258 @@ describe("OutboxDispatcherService", () => {
         expect(message.attempt).toBe(2);
         expect(observeDispatchLag).toHaveBeenCalledTimes(1);
       });
+    });
+  });
+
+  describe("given a delivery that runs for many lease lengths", () => {
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A long-running intent keeps its lease while it runs" */
+    it("renews the lease so no other dispatcher takes the message for the whole hour", async () => {
+      const caller = repositoryCaller({ calling: true, stepMs: 60_000 });
+      const handler = vi.fn<IntentHandler>(caller.handler);
+      const holder = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+      });
+      const rivalHandler = vi.fn().mockResolvedValue(undefined);
+      const rival = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": rivalHandler },
+      });
+
+      const run = holder.runOnce({ now: Date.now() });
+      for (let minute = 0; minute < 60; minute += 1) {
+        await vi.advanceTimersByTimeAsync(60_000);
+        await rival.runOnce({ now: Date.now() });
+      }
+      // Each renewal counts as progress, so the worker never takes this drain for stuck.
+      const quietMs = Date.now() - holder.lastProgressAt();
+      caller.finish();
+      await vi.advanceTimersByTimeAsync(60_000);
+      const report = await run;
+
+      expect(rivalHandler).not.toHaveBeenCalled();
+      expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
+      expect(quietMs).toBeLessThanOrEqual(40_000);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "dispatched", attempts: 1 }),
+      ]);
+    });
+  });
+
+  describe("given a handler that runs past its silence limit", () => {
+    const { leaseDurationMs, maxSilenceMs, stepMs } = SILENCE;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("stops renewing once silent past the limit, so another dispatcher redelivers it", async () => {
+      const { report, takenAfterMs, lines } = await holdBesideRival({
+        store,
+        caller: repositoryCaller({ calling: false, stepMs }),
+      });
+
+      expect(takenAfterMs).toBeGreaterThan(maxSilenceMs);
+      expect(takenAfterMs).toBeLessThanOrEqual(maxSilenceMs + 2 * stepMs + leaseDurationMs);
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(lines.findLine("warn", "no call through its dependencies")).toEqual(
+        expect.objectContaining({
+          processName: pilotRef.processName,
+          messageKey: "dispatch:turn_1:1",
+          maxSilenceMs,
+        }),
+      );
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("keeps the lease for a handler that keeps calling a repository past the same limit", async () => {
+      const { report, takenAfterMs } = await holdBesideRival({
+        store,
+        caller: repositoryCaller({ calling: true, stepMs }),
+      });
+
+      expect(takenAfterMs).toBeNull();
+      expect(report.dispatched).toEqual(["dispatch:turn_1:1"]);
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("defaults the limit to five minutes even under a longer lease", async () => {
+      const { logger, lines } = createTestLogger();
+      let finish: () => void = () => undefined;
+      const holder = new OutboxDispatcherService({
+        store,
+        handlers: {
+          "worker-dispatch": () => new Promise<void>((resolve) => (finish = resolve)),
+        },
+        leaseDurationMs: 30 * 60_000,
+        logger,
+      });
+
+      const run = holder.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(11 * 60_000);
+      finish();
+      await run;
+
+      expect(lines.findLine("warn", "no call through its dependencies")).toEqual(
+        expect.objectContaining({ maxSilenceMs: 5 * 60_000 }),
+      );
+    });
+  });
+
+  describe("given a hung handler whose only activity is a lock renewal timer", () => {
+    beforeEach(commitStartedTurn);
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("stops renewing past the limit when the timer was armed outside the delivery", async () => {
+      const { renewals, warned } = await holdHungOnRealTimers({ store, arm: runOutsideDelivery });
+
+      expect(renewals).toBeGreaterThan(5);
+      expect(warned).toEqual(expect.objectContaining({ maxSilenceMs: 60 }));
+    });
+
+    /** @scenario "A handler silent past its limit loses its lease and the message is redelivered" */
+    it("keeps renewing when the same timer was armed inside it, which is why renewals opt out", async () => {
+      const { warned } = await holdHungOnRealTimers({ store, arm: (start) => start() });
+
+      expect(warned).toBeUndefined();
+    });
+  });
+
+  describe("given a worker that leased a message and died", () => {
+    beforeEach(commitStartedTurn);
+
+    /** @scenario "A crashed worker's intent is taken again within one short lease" */
+    it("is leasable again one lease later, charged a further attempt", async () => {
+      const leaseDurationMs = 120_000;
+      await store.leaseDueMessages({ now: T0 + 1, limit: 1, leaseDurationMs });
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const dispatcher = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+        leaseDurationMs,
+      });
+
+      const early = await dispatcher.runOnce({ now: T0 + leaseDurationMs });
+      const onTime = await dispatcher.runOnce({ now: T0 + 1 + leaseDurationMs });
+
+      expect(early.dispatched).toEqual([]);
+      expect(onTime.dispatched).toEqual(["dispatch:turn_1:1"]);
+      const { message } = handler.mock.calls[0]![0] as { message: DispatchableMessage };
+      expect(message.attempt).toBe(2);
+    });
+
+    /** @scenario "A crashed worker's intent is taken again within one short lease" */
+    it("retires the message once crashes have used every attempt", async () => {
+      const leaseDurationMs = 120_000;
+      for (let crash = 0; crash < 3; crash += 1) {
+        await store.leaseDueMessages({
+          now: T0 + 1 + crash * leaseDurationMs,
+          limit: 1,
+          leaseDurationMs,
+        });
+      }
+      const handler = vi.fn().mockResolvedValue(undefined);
+      const dispatcher = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": handler },
+        leaseDurationMs,
+        maxAttempts: 3,
+      });
+
+      const report = await dispatcher.runOnce({ now: T0 + 1 + 3 * leaseDurationMs });
+
+      expect(report.dead).toEqual(["dispatch:turn_1:1"]);
+      expect(handler).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a worker whose lease was taken over mid-delivery", () => {
+    const leaseDurationMs = 3_000;
+    let blip: boolean;
+    let finish: { resolve: () => void; reject: (error: Error) => void };
+    let holder: OutboxDispatcherService;
+    let run: Promise<DispatchReport>;
+    let rivalToken: string;
+
+    beforeEach(async () => {
+      vi.useFakeTimers({ now: T0 + 1 });
+      await commitStartedTurn();
+      blip = true;
+      // Renewals fail while the database blips, long enough for the lease to lapse.
+      const blippingStore = new Proxy(store, {
+        get(target, property, receiver) {
+          if (property !== "renewLease") return Reflect.get(target, property, receiver);
+          return (params: Parameters<typeof store.renewLease>[0]) =>
+            blip ? Promise.reject(new Error("connection reset")) : target.renewLease(params);
+        },
+      });
+      holder = new OutboxDispatcherService({
+        store: blippingStore,
+        handlers: {
+          "worker-dispatch": () =>
+            new Promise<void>((resolve, reject) => (finish = { resolve, reject })),
+        },
+        leaseDurationMs,
+      });
+    });
+    beforeEach(async () => {
+      run = holder.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(leaseDurationMs + 1);
+      rivalToken = await takeOver();
+    });
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    async function takeOver(): Promise<string> {
+      const rival = new OutboxDispatcherService({
+        store,
+        handlers: { "worker-dispatch": vi.fn(() => new Promise<void>(() => undefined)) },
+        leaseDurationMs,
+      });
+      void rival.runOnce({ now: Date.now() });
+      await vi.advanceTimersByTimeAsync(0);
+      const [row] = await store.findMessagesByRef({ ref: pilotRef });
+      blip = false;
+      await vi.advanceTimersByTimeAsync(leaseDurationMs);
+      return row!.leaseToken!;
+    }
+
+    /** @scenario "A worker whose lease was taken over does not record its result" */
+    it("drops the handler's success and reports the delivery as fenced", async () => {
+      finish.resolve();
+      const report = await run;
+
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(report.dispatched).toEqual([]);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "pending", attempts: 2, leaseToken: rivalToken }),
+      ]);
+    });
+
+    /** @scenario "A worker whose lease was taken over does not record its result" */
+    it("drops the handler's failure instead of scheduling a retry", async () => {
+      finish.reject(new Error("handler failed"));
+      const report = await run;
+
+      expect(report.fenced).toEqual(["dispatch:turn_1:1"]);
+      expect(report.retried).toEqual([]);
+      expect(await store.findMessagesByRef({ ref: pilotRef })).toEqual([
+        expect.objectContaining({ status: "pending", attempts: 2, leaseToken: rivalToken }),
+      ]);
     });
   });
 });

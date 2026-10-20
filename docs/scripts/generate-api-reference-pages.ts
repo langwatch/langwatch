@@ -79,7 +79,7 @@ const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
 const UNDOCUMENTED_DASHBOARD_WIDGETS =
-  "Live surface gated behind the release_custom_chart_playground feature flag, deliberately undocumented until release.";
+  "Live surface gated behind the release_dashboards and release_lwql_workbench feature flags, deliberately undocumented until release.";
 
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
@@ -141,7 +141,7 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/auth/logout": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/session": UNDOCUMENTED_APP_INTERNAL,
   "/api/auth/validate": UNDOCUMENTED_APP_INTERNAL,
-  "/api/elevenlabs/webhook/{modelProviderId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/elevenlabs/webhook/{modelProviderId}": UNDOCUMENTED_APP_INTERNAL,
   "/api/track_event": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/admin/impersonate": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/admin/{resource}": UNDOCUMENTED_APP_INTERNAL,
@@ -180,19 +180,19 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/v1/files/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
   "/api/v1/files/{projectId}/{storedObjectId}": UNDOCUMENTED_STORED_OBJECTS,
   "/api/v1/files/{projectId}/{storedObjectId}/{filename}": UNDOCUMENTED_STORED_OBJECTS,
-  "/api/langy/local/calls": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/langy/local/calls/{callId}": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/langy/local/calls/{callId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/langy/local/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/langy/local/workspace": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
-  "/api/langy/ui/actions": UNDOCUMENTED_APP_INTERNAL,
-  "/api/langy/waits": UNDOCUMENTED_APP_INTERNAL,
-  "/api/langy/waits/{waitId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/langy/local/calls": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/local/calls/{callId}": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/local/calls/{callId}/cancel": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/local/requests": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/local/workspace": UNDOCUMENTED_LANGY_LOCAL_CONTROL,
+  "/api/v1/langy/ui/actions": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/langy/waits": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/langy/waits/{waitId}": UNDOCUMENTED_APP_INTERNAL,
   "/api/internal/langy/credentials/revoke": UNDOCUMENTED_APP_INTERNAL,
   "/api/internal/langy/relay/frames": UNDOCUMENTED_APP_INTERNAL,
   "/api/internal/langy/turn/{turnId}/result": UNDOCUMENTED_APP_INTERNAL,
   "/api/rum/v1/traces": UNDOCUMENTED_APP_INTERNAL,
-  "/api/user-avatar/{projectId}/{userAvatarId}": UNDOCUMENTED_APP_INTERNAL,
+  "/api/v1/user-avatar/{projectId}/{userAvatarId}": UNDOCUMENTED_APP_INTERNAL,
   "/api/v1/webhooks/stripe": UNDOCUMENTED_APP_INTERNAL,
   "/api/webhooks/auth0-scim": UNDOCUMENTED_APP_INTERNAL,
 };
@@ -429,7 +429,7 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
   {
     name: "Projects",
     dirName: "projects",
-    pathPrefixes: ["/api/projects"],
+    pathPrefixes: ["/api/v1/projects"],
     overviewDescription:
       "Manage LangWatch projects. Projects are the top-level containers for traces, evaluators, datasets, and other resources.",
   },

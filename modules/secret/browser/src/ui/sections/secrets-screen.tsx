@@ -4,7 +4,10 @@
  */
 
 import type { WireOf } from "@langwatch/api/web";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -12,20 +15,20 @@ import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
+  Field,
   HStack,
   Input,
   Spacer,
   Skeleton,
   SkeletonText,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { Secret } from "@langwatch/secret-contract";
-import { readableDate } from "@langwatch/time";
+import { toEpochMs } from "@langwatch/time";
 import { Edit, Key, MoreVertical, Plus, Trash2 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 import { secretApi } from "../../behavior/secret-api.ts";
 import { SECRET_MANAGE_PERMISSION, useSecretHost } from "../../model/secret-host.ts";
@@ -38,6 +41,13 @@ import { describeSecretRefusal } from "../../model/secret-refusal-copy.ts";
  */
 function normaliseSecretName(raw: string): string {
   return raw.toUpperCase().replace(/[^A-Z0-9_]/g, "");
+}
+
+/** Puts the cursor on the first empty field; true when one was found. */
+function focusFirstMissing(fields: { value: string; input: RefObject<HTMLInputElement | null> }[]) {
+  const first = fields.find((field) => !field.value);
+  first?.input.current?.focus();
+  return first !== void 0;
 }
 
 type PickedSecret = { id: string; name: string };
@@ -84,8 +94,8 @@ function SecretRow({
   onDelete: (picked: PickedSecret) => void;
 }) {
   return (
-    <Table.Row data-testid="secret-row">
-      <Table.Cell>
+    <ListTable.Row data-testid="secret-row">
+      <ListTable.Cell>
         <HStack gap={3}>
           <Box color="fg.muted" flexShrink={0}>
             <Key size={16} />
@@ -94,14 +104,16 @@ function SecretRow({
             {secret.name}
           </Text>
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
-        <Text>{secret.createdBy?.name ?? "-"}</Text>
-      </Table.Cell>
-      <Table.Cell>
-        <Text color="fg.muted">{readableDate(secret.updatedAt).toLocaleDateString()}</Text>
-      </Table.Cell>
-      <Table.Cell textAlign="right">
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <Text>{secret.createdBy?.name ?? <EmptyValue label="Unknown creator" />}</Text>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <Text color="fg.muted">
+          <FormattedDate value={toEpochMs(secret.updatedAt)} display="date" />
+        </Text>
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {canManage && (
           <Menu.Root>
             <Menu.Trigger asChild>
@@ -122,7 +134,7 @@ function SecretRow({
               >
                 <Box display="flex" alignItems="center" gap={2}>
                   <Edit size={14} />
-                  Update Value
+                  Update value
                 </Box>
               </Menu.Item>
               <Menu.Item
@@ -133,27 +145,27 @@ function SecretRow({
               >
                 <Box display="flex" alignItems="center" gap={2}>
                   <Trash2 size={14} />
-                  Delete Secret
+                  Delete secret
                 </Box>
               </Menu.Item>
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
 function SecretsTableHeader() {
   return (
-    <Table.Header>
-      <Table.Row>
-        <Table.ColumnHeader>Name</Table.ColumnHeader>
-        <Table.ColumnHeader>Created by</Table.ColumnHeader>
-        <Table.ColumnHeader>Last updated</Table.ColumnHeader>
-        <Table.ColumnHeader width={16} />
-      </Table.Row>
-    </Table.Header>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader>Created by</ListTable.ColumnHeader>
+        <ListTable.ColumnHeader>Last updated</ListTable.ColumnHeader>
+        <ListTable.ActionHeader />
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
@@ -209,6 +221,25 @@ export default function SecretsScreen() {
   const [secretToUpdate, setSecretToUpdate] = useState<{ id: string; name: string } | null>(null);
   const [updateValue, setUpdateValue] = useState("");
 
+  const [addAttempted, setAddAttempted] = useState(false);
+  const [updateAttempted, setUpdateAttempted] = useState(false);
+  const nameInputRef = useRef<HTMLInputElement>(null);
+  const valueInputRef = useRef<HTMLInputElement>(null);
+  const updateInputRef = useRef<HTMLInputElement>(null);
+
+  const closeAddDialog = () => {
+    setIsAddDialogOpen(false);
+    setNewSecretName("");
+    setNewSecretValue("");
+    setAddAttempted(false);
+  };
+
+  const closeUpdateDialog = () => {
+    setSecretToUpdate(null);
+    setUpdateValue("");
+    setUpdateAttempted(false);
+  };
+
   /**
    * One place that turns a refusal into words, so the four codes this feature
    * raises read as themselves rather than as "something went wrong on our
@@ -219,15 +250,17 @@ export default function SecretsScreen() {
   };
 
   const handleCreate = async () => {
-    if (!projectId || !newSecretName || !newSecretValue) return;
+    if (createMutation.isPending) return;
+    setAddAttempted(true);
+    const missing = focusFirstMissing([
+      { value: newSecretName, input: nameInputRef },
+      { value: newSecretValue, input: valueInputRef },
+    ]);
+    if (missing || !projectId) return;
     await applySecretChange({
       change: () =>
         createMutation.mutateAsync({ projectId, name: newSecretName, value: newSecretValue }),
-      settle: () => {
-        setIsAddDialogOpen(false);
-        setNewSecretName("");
-        setNewSecretValue("");
-      },
+      settle: closeAddDialog,
       refresh: () => utils.secrets.list.invalidate(),
       report: (error) => reportFailure(error, "Couldn't create the secret"),
     });
@@ -244,14 +277,14 @@ export default function SecretsScreen() {
   };
 
   const handleUpdate = async () => {
-    if (!projectId || !secretToUpdate || !updateValue) return;
+    if (updateMutation.isPending || !secretToUpdate) return;
+    setUpdateAttempted(true);
+    const missing = focusFirstMissing([{ value: updateValue, input: updateInputRef }]);
+    if (missing || !projectId) return;
     await applySecretChange({
       change: () =>
         updateMutation.mutateAsync({ projectId, secretId: secretToUpdate.id, value: updateValue }),
-      settle: () => {
-        setSecretToUpdate(null);
-        setUpdateValue("");
-      },
+      settle: closeUpdateDialog,
       refresh: () => utils.secrets.list.invalidate(),
       report: (error) => reportFailure(error, "Couldn't update the secret"),
     });
@@ -274,7 +307,7 @@ export default function SecretsScreen() {
               onClick={() => setIsAddDialogOpen(true)}
               data-testid="secret-add"
             >
-              <Plus /> Add Secret
+              <Plus /> Add secret
             </PageLayout.HeaderButton>
           </Tooltip>
         )}
@@ -290,9 +323,9 @@ export default function SecretsScreen() {
           />
         )}
         {showSecrets && (
-          <ListTable width="full" containerProps={{ width: "full", overflowX: "auto" }}>
+          <ListTable scroll="x" scrollLabel="Secrets">
             <SecretsTableHeader />
-            <Table.Body>
+            <ListTable.Body>
               {secrets.map((secret) => (
                 <SecretRow
                   key={secret.id}
@@ -305,142 +338,86 @@ export default function SecretsScreen() {
                   onDelete={setSecretToDelete}
                 />
               ))}
-            </Table.Body>
+            </ListTable.Body>
           </ListTable>
         )}
 
-        {/* Add Secret Dialog */}
-        <Dialog.Root
+        <Dialog
           open={isAddDialogOpen}
-          onOpenChange={(details) => {
-            if (!details.open) {
-              setIsAddDialogOpen(false);
-              setNewSecretName("");
-              setNewSecretValue("");
-            }
+          onClose={closeAddDialog}
+          title="Add secret"
+          onSubmit={() => void handleCreate()}
+          primaryAction={{
+            label: "Save",
+            type: "submit",
+            loading: createMutation.isPending,
+            "data-testid": "secret-save",
           }}
         >
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Add Secret</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <VStack gap={4} align="start">
-                <VStack gap={1} align="start" width="full">
-                  <Text fontWeight="medium">Name</Text>
-                  <Input
-                    placeholder="e.g., OPENAI_API_KEY"
-                    data-testid="secret-name"
-                    value={newSecretName}
-                    onChange={(e) => setNewSecretName(normaliseSecretName(e.target.value))}
-                  />
-                </VStack>
-                <VStack gap={1} align="start" width="full">
-                  <Text fontWeight="medium">Value</Text>
-                  {/* `type="password"` on purpose: the value is a live credential
+          <VStack gap={4} align="start">
+            <Field.Root width="full" invalid={addAttempted && !newSecretName}>
+              <Field.Label>Name</Field.Label>
+              <Input
+                ref={nameInputRef}
+                placeholder="e.g., OPENAI_API_KEY"
+                data-testid="secret-name"
+                value={newSecretName}
+                onChange={(e) => setNewSecretName(normaliseSecretName(e.target.value))}
+              />
+              <Field.ErrorText>Enter a name for the secret.</Field.ErrorText>
+            </Field.Root>
+            <Field.Root width="full" invalid={addAttempted && !newSecretValue}>
+              <Field.Label>Value</Field.Label>
+              {/* `type="password"` on purpose: the value is a live credential
                     and there is no reveal anywhere on this page. */}
-                  <Input
-                    type="password"
-                    placeholder="Enter secret value"
-                    data-testid="secret-value"
-                    value={newSecretValue}
-                    onChange={(e) => setNewSecretValue(e.target.value)}
-                  />
-                </VStack>
-              </VStack>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Cancel</Button>
-              </Dialog.ActionTrigger>
-              <Button
-                colorPalette="orange"
-                loading={createMutation.isPending}
-                disabled={!newSecretName || !newSecretValue}
-                data-testid="secret-save"
-                onClick={() => void handleCreate()}
-              >
-                Save
-              </Button>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger />
-          </Dialog.Content>
-        </Dialog.Root>
+              <Input
+                ref={valueInputRef}
+                type="password"
+                placeholder="Enter secret value"
+                data-testid="secret-value"
+                value={newSecretValue}
+                onChange={(e) => setNewSecretValue(e.target.value)}
+              />
+              <Field.ErrorText>Enter the secret's value.</Field.ErrorText>
+            </Field.Root>
+          </VStack>
+        </Dialog>
 
-        {/* Delete Confirmation Dialog */}
-        <Dialog.Root
+        <ConfirmDialog
           open={!!secretToDelete}
-          onOpenChange={(details) => {
-            if (!details.open) setSecretToDelete(null);
-          }}
-        >
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Delete {secretToDelete?.name ?? ""}?</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Text>Code blocks referencing this secret will no longer have access.</Text>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Cancel</Button>
-              </Dialog.ActionTrigger>
-              <Button
-                colorPalette="red"
-                loading={deleteMutation.isPending}
-                data-testid="secret-delete-confirm"
-                onClick={() => void handleDelete()}
-              >
-                Delete
-              </Button>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger />
-          </Dialog.Content>
-        </Dialog.Root>
+          onClose={() => setSecretToDelete(null)}
+          title={`Delete ${secretToDelete?.name ?? ""}?`}
+          description="Code blocks referencing this secret will no longer have access."
+          confirmLabel="Delete"
+          loading={deleteMutation.isPending}
+          onConfirm={() => void handleDelete()}
+        />
 
-        {/* Update Value Dialog */}
-        <Dialog.Root
+        <Dialog
           open={!!secretToUpdate}
-          onOpenChange={(details) => {
-            if (!details.open) {
-              setSecretToUpdate(null);
-              setUpdateValue("");
-            }
+          onClose={closeUpdateDialog}
+          title={`Update value for ${secretToUpdate?.name ?? ""}`}
+          onSubmit={() => void handleUpdate()}
+          primaryAction={{
+            label: "Save",
+            type: "submit",
+            loading: updateMutation.isPending,
+            "data-testid": "secret-update-save",
           }}
         >
-          <Dialog.Content>
-            <Dialog.Header>
-              <Dialog.Title>Update Value for {secretToUpdate?.name ?? ""}</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <VStack gap={1} align="start" width="full">
-                <Text fontWeight="medium">New Value</Text>
-                <Input
-                  type="password"
-                  placeholder="Enter new secret value"
-                  data-testid="secret-update-value"
-                  value={updateValue}
-                  onChange={(e) => setUpdateValue(e.target.value)}
-                />
-              </VStack>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Dialog.ActionTrigger asChild>
-                <Button variant="outline">Cancel</Button>
-              </Dialog.ActionTrigger>
-              <Button
-                colorPalette="orange"
-                loading={updateMutation.isPending}
-                disabled={!updateValue}
-                data-testid="secret-update-save"
-                onClick={() => void handleUpdate()}
-              >
-                Save
-              </Button>
-            </Dialog.Footer>
-            <Dialog.CloseTrigger />
-          </Dialog.Content>
-        </Dialog.Root>
+          <Field.Root invalid={updateAttempted && !updateValue}>
+            <Field.Label>New value</Field.Label>
+            <Input
+              ref={updateInputRef}
+              type="password"
+              placeholder="Enter new secret value"
+              data-testid="secret-update-value"
+              value={updateValue}
+              onChange={(e) => setUpdateValue(e.target.value)}
+            />
+            <Field.ErrorText>Enter the new value.</Field.ErrorText>
+          </Field.Root>
+        </Dialog>
       </VStack>
     </>
   );

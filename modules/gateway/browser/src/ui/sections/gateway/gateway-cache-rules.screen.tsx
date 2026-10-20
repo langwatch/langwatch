@@ -1,18 +1,10 @@
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Badge,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Archive, MoreVertical, Pencil, Plus, Zap } from "lucide-react";
 import { useState } from "react";
@@ -110,7 +102,7 @@ function CacheRulesPage() {
     <AiGatewayLayout>
       <>
         <PageLayout.Header>
-          <PageLayout.Heading>Cache Rules</PageLayout.Heading>
+          <PageLayout.Heading>Cache rules</PageLayout.Heading>
           <Spacer />
           {canCreate && !showRulesEmpty && (
             <PageLayout.HeaderButton primary onClick={() => setCreateOpen(true)}>
@@ -193,13 +185,14 @@ function CacheRulesEmptyState({
       title="No cache rules yet"
       description="Cache rules let operators force, disable, or override cache behaviour across virtual keys, models, principals, or custom request metadata: no client code changes required."
       icon={<Zap size={32} />}
-    >
-      {canCreate && (
-        <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
-          <Plus size={14} /> New rule
-        </PageLayout.HeaderButton>
-      )}
-    </NoDataInfoBlock>
+      primaryAction={
+        canCreate && (
+          <PageLayout.HeaderButton primary onClick={onCreate}>
+            <Plus size={14} /> New rule
+          </PageLayout.HeaderButton>
+        )
+      }
+    />
   );
 }
 
@@ -219,84 +212,77 @@ function CacheRulesTable({
   onArchive: (rule: CacheRuleListRow) => void;
 }) {
   return (
-    <Card.Root variant="showcase" width="full" overflow="hidden">
-      <Card.Body paddingY={0} paddingX={0}>
-        <ListTable
-          containerProps={{ overflowX: "auto", maxWidth: "full" }}
-          variant="line"
-          size="md"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader width="60px">Priority</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Match</Table.ColumnHeader>
-              <Table.ColumnHeader>Action</Table.ColumnHeader>
-              <Table.ColumnHeader>Enabled</Table.ColumnHeader>
-              <Table.ColumnHeader></Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {rows.map((r) => (
-              <Table.Row key={r.id}>
-                <Table.Cell>
-                  <Badge colorPalette="gray">{r.priority}</Badge>
-                </Table.Cell>
-                <Table.Cell>
-                  <VStack align="start" gap={0}>
-                    <Text fontWeight="medium">{r.name}</Text>
-                    {r.description && (
-                      <Text fontSize="xs" color="fg.muted">
-                        {r.description}
-                      </Text>
-                    )}
-                  </VStack>
-                </Table.Cell>
-                <Table.Cell>
-                  <MatcherSummary matchers={r.matchers} />
-                </Table.Cell>
-                <Table.Cell>
-                  <ActionBadge action={r.action} modeEnum={r.modeEnum} />
-                </Table.Cell>
-                <Table.Cell>
-                  <Switch
-                    colorPalette="accent"
-                    checked={r.enabled}
-                    onCheckedChange={() => onToggle(r)}
-                    disabled={!canUpdate}
-                    size="sm"
-                  />
-                </Table.Cell>
-                <Table.Cell>
-                  {(canUpdate || canDelete) && (
-                    <Menu.Root>
-                      <Menu.Trigger asChild>
-                        <Button variant="ghost" size="xs" aria-label="Actions">
-                          <MoreVertical size={14} />
-                        </Button>
-                      </Menu.Trigger>
-                      <Menu.Content>
-                        {canUpdate && (
-                          <Menu.Item value="edit" onClick={() => onEdit(r)}>
-                            <Pencil size={14} /> Edit
-                          </Menu.Item>
-                        )}
-                        {canDelete && (
-                          <Menu.Item value="archive" onClick={() => onArchive(r)}>
-                            <Archive size={14} /> Archive
-                          </Menu.Item>
-                        )}
-                      </Menu.Content>
-                    </Menu.Root>
+    <Card variant="showcase" padding="none">
+      <ListTable variant="embedded" scroll="x" scrollLabel="Cache rules table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width="60px">Priority</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Match</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Action</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Enabled</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader label="Actions" />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {rows.map((r) => (
+            <ListTable.Row key={r.id}>
+              <ListTable.Cell>
+                <Badge colorPalette="gray">{r.priority}</Badge>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <VStack align="start" gap={0}>
+                  <Text fontWeight="medium">{r.name}</Text>
+                  {r.description && (
+                    <Text fontSize="xs" color="fg.muted">
+                      {r.description}
+                    </Text>
                   )}
-                </Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Card.Body>
-    </Card.Root>
+                </VStack>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <MatcherSummary matchers={r.matchers} />
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <ActionBadge action={r.action} modeEnum={r.modeEnum} />
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Switch
+                  colorPalette="accent"
+                  checked={r.enabled}
+                  onCheckedChange={() => onToggle(r)}
+                  disabled={!canUpdate}
+                  size="sm"
+                />
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {(canUpdate || canDelete) && (
+                  <Menu.Root>
+                    <Menu.Trigger asChild>
+                      <Button variant="ghost" size="xs" aria-label="Actions">
+                        <MoreVertical size={14} />
+                      </Button>
+                    </Menu.Trigger>
+                    <Menu.Content>
+                      {canUpdate && (
+                        <Menu.Item value="edit" onClick={() => onEdit(r)}>
+                          <Pencil size={14} /> Edit
+                        </Menu.Item>
+                      )}
+                      {canDelete && (
+                        <Menu.Item value="archive" onClick={() => onArchive(r)}>
+                          <Archive size={14} /> Archive
+                        </Menu.Item>
+                      )}
+                    </Menu.Content>
+                  </Menu.Root>
+                )}
+              </ListTable.Cell>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }
 

@@ -41,6 +41,7 @@ export async function startClickhouse(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     check: httpGetCheck(`http://127.0.0.1:${ctx.ports.clickhouseHttp}/ping`, {
       expectBodyContains: "Ok.",
     }),

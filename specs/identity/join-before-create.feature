@@ -199,6 +199,14 @@ Feature: Join before create - the choice happens before an organization is minte
     Then the application starts the normal sign-out flow
 
   @integration
+  Scenario: Checking again after an approval re-reads the organizations as well as the request
+    Given "sam" is on the waiting screen and an administrator has approved the request
+    When "sam" chooses to check again
+    Then both the request and the organizations "sam" belongs to are read again
+    # Re-reading only the request left a stale empty organization list behind it,
+    # so the welcome screen asked an approved member to create an organization.
+
+  @integration
   Scenario: A pending request for another organization does not block the current organization
     Given "sam" can access "acme" and has a pending request to join "ana"
     When "sam" opens "acme"

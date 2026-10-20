@@ -36,7 +36,7 @@ import { ApiKeyCliService } from "./api-key-cli.service.ts";
 import { ApiKeyEnrichmentService } from "./api-key-enrichment.service.ts";
 import { ApiKeyGrantPolicyService } from "./api-key-grant-policy.service.ts";
 import { ApiKeyLastUsedService } from "./api-key-last-used.service.ts";
-import { ApiKeyLifecycleService } from "./api-key-lifecycle.service.ts";
+import { ApiKeyLifecycleService, type DisabledApiKey } from "./api-key-lifecycle.service.ts";
 import { ApiKeyTokenResolutionService } from "./api-key-token-resolution.service.ts";
 import type { ApiKeyTokenService } from "./api-key-token.service.ts";
 import { ApiKeyVisibilityService } from "./api-key-visibility.service.ts";
@@ -94,6 +94,21 @@ export class ApiKeyService {
 
   async create(input: CreateApiKeyInput): Promise<{ token: string; apiKey: ApiKey }> {
     return this.lifecycle.create(input);
+  }
+
+  /** `create` in two halves, for a caller that retries the grant of the key it already wrote. */
+  async writeDisabled(input: CreateApiKeyInput): Promise<DisabledApiKey> {
+    return this.lifecycle.writeDisabled(input);
+  }
+
+  async reopenDisabled(
+    input: Parameters<ApiKeyLifecycleService["reopenDisabled"]>[0],
+  ): Promise<DisabledApiKey> {
+    return this.lifecycle.reopenDisabled(input);
+  }
+
+  async grantAndActivate(key: DisabledApiKey): Promise<{ token: string; apiKey: ApiKey }> {
+    return this.lifecycle.grantAndActivate(key);
   }
 
   async update(input: UpdateApiKeyInput): Promise<ApiKey> {

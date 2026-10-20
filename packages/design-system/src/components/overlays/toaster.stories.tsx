@@ -163,8 +163,8 @@ const BURST = [
 ] as const;
 
 /**
- * Raise a burst: one card, then one and two peeking behind it, then a count
- * for the rest. Hover or focus the stack to fan it out and hold the timers.
+ * Hover to peek, click or focus to open the list, and swipe a card to dismiss it.
+ * This story holds notices for a minute so the interactions can be explored.
  */
 export const Stacking: Story = {
   render: (args) => (
@@ -176,7 +176,8 @@ export const Stacking: Story = {
             key={count}
             size="sm"
             onClick={() => {
-              for (const toast of BURST.slice(0, count)) toaster.create({ ...toast });
+              for (const toast of BURST.slice(0, count))
+                toaster.create({ ...toast, duration: 60000 });
             }}
           >
             {count === 1 ? "Raise one" : `Raise ${count}`}

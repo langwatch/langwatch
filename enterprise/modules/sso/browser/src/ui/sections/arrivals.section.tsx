@@ -6,6 +6,7 @@
  * own. Asked here, where a proved domain makes the widest answer mean
  * something, and going live waits for it.
  */
+import { Card } from "@langwatch/design-system/card";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { RawRadioGroup as RadioGroup } from "@langwatch/design-system/radio";
 import type { SsoArrivalPolicy, SsoConnectionLifecycleState } from "@langwatch/identity-contract";
@@ -19,7 +20,6 @@ import {
   type ArrivalAnswer,
 } from "../../model/arrivals.ts";
 import { InlineRefusal } from "../elements/refusals.tsx";
-import { SettingsCard } from "../elements/settings-card.tsx";
 
 /**
  * The answer this door recommends, said as a mark rather than by position:
@@ -58,10 +58,12 @@ export function ArrivalsSection({
   const canConfigure = CONFIGURABLE.includes(connectionState);
 
   return (
-    <SettingsCard
+    <Card
+      padding="lg"
+      bodyLayout="spaced"
       title={title}
-      hint="What happens when somebody we have never seen signs in through your identity provider."
-      testId="connection-arrivals"
+      description="What happens when somebody we have never seen signs in through your identity provider."
+      data-testid="connection-arrivals"
     >
       {!canConfigure && (
         <Text color="fg.muted" fontSize="sm" as="output">
@@ -131,7 +133,7 @@ export function ArrivalsSection({
           )}
         </HStack>
       )}
-    </SettingsCard>
+    </Card>
   );
 }
 

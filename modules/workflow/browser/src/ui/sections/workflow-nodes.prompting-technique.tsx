@@ -79,7 +79,7 @@ export function PromptingTechniqueWrapper({
   return (
     <VStack
       position="relative"
-      padding="2px"
+      padding="0.5"
       backgroundColor="bg.subtle"
       borderRadius="12px"
       color="fg.muted"

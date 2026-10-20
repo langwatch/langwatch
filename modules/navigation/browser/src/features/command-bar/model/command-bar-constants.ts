@@ -77,7 +77,6 @@ export const HINTS = [
   // Langy
   "Ask Langy! Type a question, pick “Ask Langy”, and it reads your project to answer.",
   "One Cmd+K Away! “Ask Langy” hands your question straight to the assistant.",
-  "Morning Briefing! Langy reads your project on the home page and flags what needs a look.",
   "Plain English! Describe what's wrong and let Langy dig through traces, evals and runs.",
 
   // Useful tips

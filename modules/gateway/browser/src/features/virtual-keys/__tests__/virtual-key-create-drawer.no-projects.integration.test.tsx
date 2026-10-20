@@ -1,9 +1,10 @@
+import { cleanup, screen, waitFor } from "@testing-library/react";
 /**
  * @vitest-environment jsdom
  * Create drawer with no projects: edge case to verify ownership seed identity guard.
  * Prevents the 100% CPU infinite re-render bug from before the guard was added.
  */
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { fakeGatewayHost, renderWithGatewayHost } from "../../../testing.tsx";
@@ -60,7 +61,7 @@ const host = fakeGatewayHost({
 describe("given an organization with no projects", () => {
   afterEach(() => cleanup());
 
-  it("renders the drawer without looping and keeps Create disabled", async () => {
+  it("renders the drawer without looping and refuses to create", async () => {
     renderWithGatewayHost(
       <VirtualKeyCreateDrawer
         organizationId={ORG_ID}
@@ -74,9 +75,10 @@ describe("given an organization with no projects", () => {
     await waitFor(() => {
       expect(screen.getByText("New virtual key")).toBeInTheDocument();
     });
-    // Create stays disabled: with nothing typed the first unmet
-    // requirement is the name, and even a named draft would still lack a
-    // project for its traces to land in.
-    expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+    // Create stays enabled; with nothing typed the first unmet requirement is the name,
+    // which a press names and focuses, and nothing is created.
+    expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+    await userEvent.click(screen.getByRole("button", { name: "Create" }));
+    expect(screen.getAllByText("Name is required.").length).toBeGreaterThan(0);
   });
 });

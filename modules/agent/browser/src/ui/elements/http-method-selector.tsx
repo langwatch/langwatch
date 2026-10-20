@@ -19,8 +19,7 @@ export function HttpMethodSelector({ value, onChange, disabled = false }: HttpMe
           const method = HTTP_METHODS.find((candidate) => candidate === e.target.value);
           if (method) onChange(method);
         }}
-        fontFamily="mono"
-        fontSize="13px"
+        textStyle="mono"
         fontWeight="medium"
       >
         {HTTP_METHODS.map((method) => (

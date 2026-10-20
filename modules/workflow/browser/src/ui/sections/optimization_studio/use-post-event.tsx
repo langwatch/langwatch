@@ -6,6 +6,7 @@ import {
 import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
 import { usePageVisibility } from "@langwatch/browser-host/page-visibility";
 import { toaster } from "@langwatch/browser-host/toaster";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
 import type {
@@ -13,7 +14,7 @@ import type {
   StudioClientEvent,
   StudioServerEvent,
 } from "@langwatch/workflow-contract";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
 import { useOrganizationTeamProject } from "../../../behavior/studio-host/use-organization-team-project.ts";
@@ -26,6 +27,11 @@ import { explainExecutionStateError, reportableExecutionFailure } from "./execut
 
 const logger = createLogger("langwatch:wizard:usePostEvent");
 let pythonDisconnectedTimeout: NodeJS.Timeout | null = null;
+
+/** A run's access still being set up while the worker catches up: wait, then send it again. */
+const PENDING_ACCESS_CODE = "authz_grant_not_confirmed";
+const PENDING_ACCESS_RESEND_MS = 5_000;
+const PENDING_ACCESS_MAX_RESENDS = 12;
 
 /** The engine's code for "somebody pressed stop", not a failure. */
 const STOP_ERROR_TYPE = "context_canceled";
@@ -84,6 +90,32 @@ export const PostEventProvider = ({ children }: { children: React.ReactNode }) =
   return <>{children}</>;
 };
 
+/**
+ * Pending, not failed: shows the run as waiting and sends the same event again later. False once
+ * the resends are spent or the error is anything else, so the usual error path runs.
+ */
+function resendWhileAccessPending({
+  error,
+  event,
+  resends,
+  resend,
+  setEvaluationState,
+}: {
+  error: Error;
+  event: StudioClientEvent;
+  resends: number;
+  resend: () => void;
+  setEvaluationState: WorkflowStore["setEvaluationState"];
+}): boolean {
+  if (readHandledError(error)?.code !== PENDING_ACCESS_CODE) return false;
+  if (resends >= PENDING_ACCESS_MAX_RESENDS) return false;
+  if (event.type === "execute_evaluation") {
+    setEvaluationState({ status: "waiting", run_id: undefined });
+  }
+  setTimeout(resend, PENDING_ACCESS_RESEND_MS);
+  return true;
+}
+
 export const usePostEvent = () => {
   const { project } = useOrganizationTeamProject();
   const workflowStore = useWorkflowStore();
@@ -101,19 +133,30 @@ export const usePostEvent = () => {
   });
 
   const [isLoading, setIsLoading] = useState(false);
+  // The resend calls the latest postEvent, so the callback itself stays stable.
+  const postEventRef = useRef<PostEvent | undefined>(undefined);
 
-  const postEvent = useCallback(
-    (event: StudioClientEvent) => {
+  const postEvent: PostEvent = useCallback(
+    (event: StudioClientEvent, { resends = 0 }: { resends?: number } = {}) => {
       if (!project) return;
 
       setIsLoading(true);
+      // The heartbeat is nobody's run: what it hears only moves the connection status.
+      const isHeartbeat = event.type === "is_alive";
 
       const onError = (error: Error) => {
+        if (isHeartbeat) {
+          logger.debug({ error }, "is_alive did not reach the engine");
+          return;
+        }
         // showErrorToast suppresses the duplicate toast on its own, but the
         // state writes below must be skipped too: a license-limit rejection
         // opens the upgrade modal, and flipping the studio into an error
         // state behind it is not what the user is looking at.
         if (isHandledByGlobalHandler(error)) return;
+
+        const resend = () => postEventRef.current?.(event, { resends: resends + 1 });
+        if (resendWhileAccessPending({ error, event, resends, resend, setEvaluationState })) return;
 
         showErrorToast({
           error,
@@ -156,7 +199,7 @@ export const usePostEvent = () => {
           logger.debug({ serverEvent, event }, "received message");
 
           // Handle the event with the workflow store
-          handleServerMessage(serverEvent);
+          handleServerMessage(serverEvent, { isHeartbeat });
 
           // Handle evaluation errors
           if (serverEvent.type === "error" && event.type === "execute_evaluation") {
@@ -184,9 +227,14 @@ export const usePostEvent = () => {
     },
     [handleServerMessage, project, setEvaluationState, setComponentExecutionState],
   );
+  useEffect(() => {
+    postEventRef.current = postEvent;
+  }, [postEvent]);
 
   return { postEvent, isLoading, socketStatus };
 };
+
+type PostEvent = (event: StudioClientEvent, options?: { resends?: number }) => void;
 
 type AlertOnComponent = ({
   componentId,
@@ -204,10 +252,35 @@ export const useHandleServerMessage = ({
   alertOnComponent: AlertOnComponent;
 }) =>
   useCallback(
-    (message: StudioServerEvent) =>
-      applyServerMessage({ message, workflowStore, alertOnComponent }),
+    (message: StudioServerEvent, { isHeartbeat = false }: { isHeartbeat?: boolean } = {}) =>
+      isHeartbeat
+        ? applyHeartbeatMessage({ message, workflowStore })
+        : applyServerMessage({ message, workflowStore, alertOnComponent }),
     [workflowStore, alertOnComponent],
   );
+
+/**
+ * What the is_alive stream hears: an answer marks the engine alive, and anything else only
+ * moves the connection status. It never toasts and never touches a run nobody started.
+ */
+function applyHeartbeatMessage({
+  message,
+  workflowStore,
+}: {
+  message: StudioServerEvent;
+  workflowStore: WorkflowStore;
+}) {
+  if (message.type === "is_alive_response") {
+    markPythonAlive(workflowStore);
+    return;
+  }
+  if (message.type === "error") {
+    logger.debug({ message: message.payload.message }, "is_alive answered with an error");
+    workflowStore.setSocketStatus((status) =>
+      status === "connected" ? "connecting-python" : status,
+    );
+  }
+}
 
 /**
  * Reports a failed run (ADR-045); a deliberate STOP keeps the local

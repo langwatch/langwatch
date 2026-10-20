@@ -1,14 +1,15 @@
-import type { AuditLogApi, RecordAuditLogCommand } from "@langwatch/audit-log-contract";
+import { AuditLogApi, type RecordAuditLogCommand } from "@langwatch/audit-log-contract";
 import {
   type IssuedLicenseView,
   issueLicenseInputSchema,
-  type LicensingApi,
+  LicensingApi,
   listActivationCodesInputSchema,
 } from "@langwatch/enterprise-licensing-contract";
 import { EnterpriseOpsApi } from "@langwatch/enterprise-ops-contract";
-import { AdminSurfaceHiddenError, type OpsApi, type OpsOperator } from "@langwatch/ops-contract";
-import { createApp } from "@langwatch/process";
+import { AdminSurfaceHiddenError, OpsApi, type OpsOperator } from "@langwatch/ops-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The Cloud admin license registry: a non-operator is answered with a
@@ -47,6 +48,7 @@ const license: IssuedLicenseView = {
   planType: "ENTERPRISE",
   maxMembers: 10,
   maxMembersLite: 0,
+  liteSeatsUnlimited: false,
   issuedAt: "2026-09-01T00:00:00.000Z",
   expiresAt: "2027-09-01T00:00:00.000Z",
   source: "BACKOFFICE",
@@ -87,7 +89,11 @@ async function build(registry: Partial<Registry> = {}) {
   const licensing = createApiFixture<Registry>({
     listIssuedLicenses: async () => {
       commanded.push("list");
-      return { licenses: [], total: 0 };
+      return {
+        licenses: [],
+        total: 0,
+        counts: { active: 0, inactive: 0, customer: 0, internal: 0, all: 0 },
+      };
     },
     issueLicense: async () => {
       commanded.push("issue");
@@ -103,11 +109,17 @@ async function build(registry: Partial<Registry> = {}) {
     },
     ...registry,
   });
-  const runtime = await createApp({ role: "api" })
-    .withModules([enterpriseOpsProcessModule])
-    .withStores(memoryStores())
-    .provide({ ops, licensing, "audit-log": auditLog })
-    .boot();
+  const runtime = await bootInstalledProcess({
+    role: "api",
+    modules: [enterpriseOpsProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: OpsApi, instance: ops }),
+      testPeer({ token: LicensingApi, instance: licensing }),
+      testPeer({ token: AuditLogApi, instance: auditLog }),
+    ],
+  });
   const app = runtime.service(EnterpriseOpsApi);
   return { app, entries, commanded };
 }
@@ -151,13 +163,19 @@ describe("the Cloud admin license registry", () => {
     it("lists licenses and records the read", async () => {
       const { app, entries } = await build();
 
-      await app.listIssuedLicenses({ page: 0, pageSize: 25, search: "acme", operator });
+      await app.listIssuedLicenses({
+        page: 0,
+        pageSize: 25,
+        search: "acme",
+        status: "active",
+        operator,
+      });
 
       expect(entries).toEqual([
         expect.objectContaining({
           userId: "user_olive",
           action: "licenseRegistry.getAll",
-          args: { page: 0, pageSize: 25, hasSearch: true },
+          args: { page: 0, pageSize: 25, hasSearch: true, status: "active", audience: "all" },
           targetKind: "issuedLicense",
         }),
       ]);

@@ -47,6 +47,9 @@ func runWait(ctx context.Context, d deps, inv invocation) error {
 	if slug == "" {
 		return usageErr("haven wait: no stack here; pass --stack <slug>")
 	}
+	if want == "ready" {
+		defer claimBootWait(ctx, d, slug)()
+	}
 	deadline := time.Now().Add(timeout)
 	for {
 		snap := d.orch.SessionSnapshot(slug)

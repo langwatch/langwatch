@@ -3,7 +3,7 @@
  * open list is the optional collaborator production forgets to supply.
  * `audit` is not on it, since that peer is resolved via `withAudit`.
  */
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import type { ClickHouseQueryClient, PrivateRouteVariable } from "@langwatch/clickhouse-client";
 import type { EventReadSeat, EventSourcing } from "@langwatch/eventing";
 import type { Logger } from "@langwatch/observability";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
@@ -93,6 +93,8 @@ export interface ObjectStorage {
   destination(projectId: string): Promise<ObjectStorageDestination>;
   /** Resolves when the project's destination answers with its credentials, and throws otherwise. */
   probe(projectId: string): Promise<void>;
+  /** Each `DATAPLANE_S3__` variable by name and label, and whether it parsed; never its value. */
+  privateAccountVariables(): readonly PrivateRouteVariable[];
 }
 
 /**

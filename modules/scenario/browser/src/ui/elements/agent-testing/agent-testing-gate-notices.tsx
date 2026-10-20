@@ -5,7 +5,7 @@ import { RestrictedAccess } from "@langwatch/design-system/restricted-access";
 export function PageAbsentNotice() {
   return (
     <VStack paddingY={16} gap={2}>
-      <Heading size="md">Page not found</Heading>
+      <Heading size="sm">Page not found</Heading>
       <Text color="fg.muted">Sorry, this page does not exist.</Text>
     </VStack>
   );
@@ -13,5 +13,5 @@ export function PageAbsentNotice() {
 
 /** What a reader without the grant a page needs is shown. */
 export function PermissionRequiredNotice({ permission }: { permission: string }) {
-  return <RestrictedAccess permission={permission} area="Agent Testing" />;
+  return <RestrictedAccess permission={permission} area="Agent testing" />;
 }

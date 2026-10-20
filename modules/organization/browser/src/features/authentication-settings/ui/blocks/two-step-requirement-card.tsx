@@ -1,11 +1,12 @@
 import { Link } from "@langwatch/browser-host/link";
 import { AccessState } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 /**
  * Whether every member must prove a second factor. The server enforces it; the
  * switch stays available for turning it off after an Enterprise plan lapses.
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
-import { Alert, Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 
@@ -105,20 +106,20 @@ export function TwoStepRequirementCard({
       </Text>
 
       {connection.connected && !connection.assertsSecondFactor ? (
-        <Alert.Root size="sm" status="warning" data-testid="two-step-connection-warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>
+        <Banner
+          status="warning"
+          data-testid="two-step-connection-warning"
+          title={
+            <>
               Your identity provider is not telling us that a second factor was used when your
               members sign in.
-            </Alert.Title>
-            <Alert.Description>
-              Until it does, members who sign in through it are asked to set two-step verification
-              up here as well. You can turn a second factor on at your identity provider instead,
-              and it will count for them the moment it starts confirming one.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
+            </>
+          }
+        >
+          Until it does, members who sign in through it are asked to set two-step verification up
+          here as well. You can turn a second factor on at your identity provider instead, and it
+          will count for them the moment it starts confirming one.
+        </Banner>
       ) : null}
     </PolicySection>
   );

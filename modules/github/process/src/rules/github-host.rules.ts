@@ -1,7 +1,10 @@
 const GITHUB_DOT_COM = "github.com";
 
-type GithubHostConfig = {
+/** `apiBase` and `webBase` name the origins outright (a stand-in); absent, the host decides. */
+export type GithubHostConfig = {
   host?: string;
+  apiBase?: string;
+  webBase?: string;
 };
 
 /** The host arithmetic one deployment's configured GitHub host answers. */
@@ -19,6 +22,11 @@ function hostNameOf({ configured }: { configured?: string }): string {
   return host === "" ? GITHUB_DOT_COM : host;
 }
 
+/** The named origin without trailing slashes; empty when none was named. */
+function cleanBase({ base }: { base: string | undefined }): string {
+  return (base ?? "").trim().replace(/\/+$/, "");
+}
+
 function apiBaseOf({ host }: { host: string }): string {
   return host === GITHUB_DOT_COM ? "https://api.github.com" : `https://${host}/api/v3`;
 }
@@ -27,9 +35,17 @@ function webBaseOf({ host }: { host: string }): string {
   return `https://${host}`;
 }
 
-function appInstallUrlOf({ host, appSlug }: { host: string; appSlug: string }): string {
+function appInstallUrlOf({
+  host,
+  webBase,
+  appSlug,
+}: {
+  host: string;
+  webBase: string;
+  appSlug: string;
+}): string {
   const segment = host === GITHUB_DOT_COM ? "apps" : "github-apps";
-  return `https://${host}/${segment}/${encodeURIComponent(appSlug)}/installations/new`;
+  return `${webBase}/${segment}/${encodeURIComponent(appSlug)}/installations/new`;
 }
 
 function normalizeRepositoryHost({
@@ -56,11 +72,13 @@ function isMappableRepositoryHost({
 /** The configured host's arithmetic, bound once so callers keep asking one object. */
 export function githubHostOf(config: GithubHostConfig = {}): GithubHost {
   const host = hostNameOf({ configured: config.host });
+  const apiBase = cleanBase({ base: config.apiBase }) || apiBaseOf({ host });
+  const webBase = cleanBase({ base: config.webBase }) || webBaseOf({ host });
   return {
     getHost: () => host,
-    getApiBase: () => apiBaseOf({ host }),
-    getWebBase: () => webBaseOf({ host }),
-    getAppInstallUrl: (appSlug) => appInstallUrlOf({ host, appSlug }),
+    getApiBase: () => apiBase,
+    getWebBase: () => webBase,
+    getAppInstallUrl: (appSlug) => appInstallUrlOf({ host, webBase, appSlug }),
     isMappable: (repositoryHost) => isMappableRepositoryHost({ host, repositoryHost }),
     normalize: (repositoryHost) => normalizeRepositoryHost({ host, repositoryHost }),
   };

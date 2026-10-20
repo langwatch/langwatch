@@ -11,15 +11,15 @@
     // edit and the linter. The JSDoc types document the shapes; `checkJs`
     // stays off, exactly as `@langwatch/architecture-enforcer` has it.
     "allowJs": true,
-    "checkJs": false
+    "checkJs": false,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.mjs", "grammar/**/*.mjs", "tests/**/*.mjs"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "../secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.app.json"
     }
   ]
 }

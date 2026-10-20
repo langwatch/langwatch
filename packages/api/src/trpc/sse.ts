@@ -9,6 +9,7 @@ import { TRPCError } from "@trpc/server";
 
 import { credentialClassFor, handlerManagedAuth } from "../access-policy.ts";
 import {
+  ClientOutdatedError,
   LiveStreamCrossSiteBlockedError,
   LiveStreamNotFoundError,
   LiveStreamUnsupportedProcedureError,
@@ -16,6 +17,7 @@ import {
 } from "../errors.ts";
 import { BrowserOriginGuard } from "../policy/browser-origin.ts";
 import { registerRoutePolicy } from "../route-registry.ts";
+import { isOutdatedClientInput } from "./client-outdated.ts";
 
 /** How often the channel writes a comment so an idle proxy keeps it open. */
 const SSE_KEEPALIVE_INTERVAL_MS = 25_000;
@@ -107,6 +109,12 @@ export class SseLane {
 
     const inputParam = url.searchParams.get("input") ?? undefined;
     const input = inputParam ? (JSON.parse(inputParam) as unknown) : undefined;
+
+    if (isOutdatedClientInput(input)) {
+      this.logger.info({ path }, "An outdated client was told to reload");
+      throw new ClientOutdatedError();
+    }
+
     const caller = await this.members.createCaller({ request: raw, signal: raw.signal });
     const procedure = procedureAt(caller, path);
 
@@ -370,8 +378,8 @@ function subscriptionPathOf(url: URL): string {
 
 /**
  * Stream-failure logging, same fault-axis rule as the tRPC and REST request
- * loggers: customer-fault handled errors warn (spike-watched), platform /
- * provider and unhandled errors log at error.
+ * loggers: customer-fault handled errors and access refusals warn
+ * (spike-watched), platform / provider and unhandled errors log at error.
  */
 function logStreamFailure({
   logger,
@@ -385,7 +393,8 @@ function logStreamFailure({
   msg: string;
 }) {
   const handled = handledCauseOf(err);
-  const level = handled && handled.fault === "customer" ? "warn" : "error";
+  const quiet = handled ? handled.fault === "customer" : isAccessRefusal(err);
+  const level = quiet ? "warn" : "error";
 
   logger[level](
     {
@@ -394,6 +403,15 @@ function logStreamFailure({
     },
     msg,
   );
+}
+
+/**
+ * A bare UNAUTHORIZED or FORBIDDEN with no handled cause is the access policy
+ * refusing the subscriber (signed out, or not a member), answered to the
+ * caller and no fault of ours.
+ */
+function isAccessRefusal(err: unknown): boolean {
+  return err instanceof TRPCError && (err.code === "UNAUTHORIZED" || err.code === "FORBIDDEN");
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {

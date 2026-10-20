@@ -1,6 +1,6 @@
 import { useDrawer, useDrawerParams } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, Heading, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Suspense } from "react";
 
 import { HandledErrorAlert } from "../../../behavior/errors.tsx";
@@ -45,7 +45,7 @@ function RunDetailLoadState({ error }: { error: { data?: { code: string } } | nu
     return (
       <VStack gap={2} align="start" w="100%" pt={4}>
         <Drawer.CloseTrigger />
-        <Heading size="md">Run details not available yet</Heading>
+        <Heading size="sm">Run details not available yet</Heading>
         <Text color="fg.muted" fontSize="sm">
           This run may be queued, in progress, or recently cancelled. Details will appear once
           available.

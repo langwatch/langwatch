@@ -318,7 +318,7 @@ function MissingIORow({
     <HStack gap={2} paddingY={1}>
       <Text
         textStyle="2xs"
-        fontWeight="bold"
+        fontWeight="semibold"
         color="fg.muted"
         letterSpacing="wide"
         textTransform="uppercase"

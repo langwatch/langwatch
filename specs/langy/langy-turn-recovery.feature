@@ -494,3 +494,53 @@ Feature: Langy recovers from a failed turn without making the user re-ask
     Given the live connection drops before Langy can say what went wrong
     When the turn's failure is already on the conversation's record
     Then the user sees the card naming that recorded failure, not a generic apology
+
+  # A broken stream is not a failed turn. On a flaky link the worker's relay
+  # reconnects and the answer then arrives in bursts; every streamed piece was
+  # one synchronous re-render, so a burst nested past React's update limit,
+  # which threw inside the stream and showed the generic card under an answer
+  # that went on to complete. The card is for turns that failed, nothing else.
+  @integration
+  Scenario: A burst of streamed text does not fail the turn
+    Given Langy is streaming an answer
+    When many pieces of the answer arrive at once, as they do after a connection catches up
+    Then the whole answer shows
+    And no error card appears
+
+  @unit
+  Scenario: An error the turn outlived clears itself
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn completed and the transcript carries its answer
+    Then the error card goes
+    And the recorded answer replaces the cut-off one
+
+  @unit
+  Scenario: A turn that really failed keeps its error card
+    Given the stream broke while Langy was answering and an error card is showing
+    When the conversation's record shows that turn failed
+    Then the error card stays
+
+  @unit
+  Scenario: The previous turn's completion never clears an error about a new message
+    Given the last turn had already completed when a new message failed to send
+    When the record still shows that last turn completed
+    Then the error card about the new message stays
+
+  @unit
+  Scenario: A deployment with no Langy agent says so instead of an unexpected error
+    Given the api runs without a Langy agent and refuses the turn with langy_agent_not_configured
+    When the refusal reaches the panel, with or without its tRPC envelope
+    Then the card reads "Langy isn't set up on this deployment" and says how to enable the agent
+    And it offers no "Try again", since a retry is refused the same way
+
+  @unit
+  Scenario: Refusals that answer the same way every time offer no retry
+    Given a turn refused with langy_not_enabled, langy_skill_not_available or langy_dispatch_rejected
+    Then the card shows that code's registered copy and no "Try again" action
+
+  @unit
+  Scenario: A bare failure code still reads the reasons on the durable record
+    Given a turn failed and its typed failure is on the durable record
+    When the live error carries only the code langy_agent_errored
+    Then the card is chosen from the durable record's reasons
+    But a turn-start refusal with a different code is shown ahead of an older durable failure

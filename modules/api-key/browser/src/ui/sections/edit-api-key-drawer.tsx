@@ -13,11 +13,12 @@ import {
 } from "@langwatch/api-key-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Input, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { RawSegmentGroup as SegmentGroup } from "@langwatch/design-system/segmented-control";
+import { SettingsField } from "@langwatch/design-system/settings-field";
 import { TriangleAlert } from "lucide-react";
-import { useEffect, useMemo, useState } from "react";
+import { type RefObject, useEffect, useMemo, useRef, useState } from "react";
 
 import {
   bindingsToPermissionMode,
@@ -78,6 +79,40 @@ function highestSelections(userPermissions: string[]): Record<string, Permission
     allSelected[cat.key] = defaultPermissionSelection({ canRead, canWrite });
   }
   return allSelected;
+}
+
+const ACCESS_UNREADABLE = "Your access couldn't be read. Close this drawer and try again.";
+
+function storedSelections({
+  apiKey,
+  mode,
+}: {
+  apiKey: ApiKeyRow;
+  mode: PermissionMode;
+}): Record<string, PermissionSelection> {
+  if (mode !== "restricted") return {};
+  return bindingsToSelections(apiKey, {
+    permissionCategories: PERMISSION_CATEGORIES,
+    selectionsFromPermissions,
+    getTeamRolePermissions: teamRolePermissions,
+  }) as Record<string, PermissionSelection>;
+}
+
+function focusFirstInvalid({
+  nameMissing,
+  name,
+  permissions,
+}: {
+  nameMissing: boolean;
+  name: RefObject<HTMLInputElement | null>;
+  permissions: RefObject<HTMLElement | null>;
+}) {
+  const target = nameMissing
+    ? name.current
+    : permissions.current?.querySelector<HTMLElement>(
+        "button:not([disabled]), input:not([disabled])",
+      );
+  target?.focus();
 }
 
 function updateKeyInput({
@@ -159,6 +194,10 @@ export function EditApiKeyDrawer({
     {},
   );
 
+  const [attempted, setAttempted] = useState(false);
+  const nameRef = useRef<HTMLInputElement>(null);
+  const permissionsRef = useRef<HTMLDivElement>(null);
+
   const isServiceKey = apiKey ? !apiKey.userId : false;
 
   const ceilingScopes = useMemo(
@@ -190,6 +229,7 @@ export function EditApiKeyDrawer({
 
   useEffect(() => {
     if (apiKey) {
+      setAttempted(false);
       setName(apiKey.name);
       setDescription(apiKey.description ?? "");
 
@@ -198,17 +238,7 @@ export function EditApiKeyDrawer({
 
       setSelectedScopes(bindingsToScopes(apiKey.grants));
 
-      if (mode === "restricted") {
-        setCategorySelections(
-          bindingsToSelections(apiKey, {
-            permissionCategories: PERMISSION_CATEGORIES,
-            selectionsFromPermissions,
-            getTeamRolePermissions: teamRolePermissions,
-          }) as Record<string, PermissionSelection>,
-        );
-      } else {
-        setCategorySelections({});
-      }
+      setCategorySelections(storedSelections({ apiKey, mode }));
     }
   }, [apiKey, organizationId, currentTeamId, currentProjectId]);
 
@@ -234,8 +264,18 @@ export function EditApiKeyDrawer({
     if (shouldPreselectAll) setCategorySelections(highestSelections(userPermissions));
   };
 
+  const hasAnySelection =
+    permissionMode === "all" || Object.values(categorySelections).some((v) => v !== "none");
+  const nameMissing = !name.trim();
+  const permissionsMissing = !hasAnySelection;
+
   const handleSave = () => {
-    if (!apiKey) return;
+    if (!apiKey || isUpdating) return;
+    if (nameMissing || permissionsMissing) {
+      setAttempted(true);
+      focusFirstInvalid({ nameMissing, name: nameRef, permissions: permissionsRef });
+      return;
+    }
 
     onSave(
       updateKeyInput({
@@ -247,133 +287,115 @@ export function EditApiKeyDrawer({
     );
   };
 
-  const hasAnySelection =
-    permissionMode === "all" || Object.values(categorySelections).some((v) => v !== "none");
-
-  const canSave = name.trim() && !isUpdating && !myBindings.isError && hasAnySelection;
-
   return (
-    <Drawer.Root
-      placement="end"
+    <Drawer
       size="lg"
       open={!!apiKey}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title="Edit API key"
+      footer={{
+        cancel: { onClick: onClose },
+        busy: isUpdating,
+        primaryAction: {
+          label: "Save",
+          onClick: handleSave,
+          loading: isUpdating,
+          disabledReason: myBindings.isError ? ACCESS_UNREADABLE : void 0,
+        },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Edit API key</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={5} align="start">
-            {myBindings.isError && (
-              <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
-                A key can only carry the access you hold, so it can't be saved until it loads. Close
-                this drawer and try again.
-              </StatusCard>
-            )}
-            {/* Name */}
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Name
-              </Text>
-              <Input value={name} onChange={(e) => setName(e.target.value)} />
-            </VStack>
+      <VStack gap={5} align="start">
+        {myBindings.isError && (
+          <StatusCard palette="red" icon={TriangleAlert} title="Couldn't read your access">
+            A key can only carry the access you hold, so it can't be saved until it loads. Close
+            this drawer and try again.
+          </StatusCard>
+        )}
+        {/* Name */}
+        <SettingsField
+          label="Name"
+          error={attempted && nameMissing ? "Enter a name for this key." : undefined}
+        >
+          <Input ref={nameRef} value={name} onChange={(e) => setName(e.target.value)} />
+        </SettingsField>
 
-            {/* Description */}
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Description{" "}
-                <Text as="span" color="fg.muted" fontWeight="400">
-                  (optional)
-                </Text>
-              </Text>
-              <Textarea
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                maxLength={500}
-                rows={3}
-                resize="vertical"
-              />
-            </VStack>
+        {/* Description */}
+        <SettingsField label="Description (optional)">
+          <Textarea
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            maxLength={500}
+            rows={3}
+            resize="vertical"
+          />
+        </SettingsField>
 
-            {/* Scope */}
-            <VStack gap={1.5} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Scope
-              </Text>
-              <ScopeChipPicker
-                value={selectedScopes}
-                onChange={(next) => {
-                  setSelectedScopes(next);
-                  setCategorySelections({});
-                }}
-                organizationId={organizationId}
-                organizationName={organizationName}
-                availableTeams={orgTeams}
-                availableProjects={orgProjects}
-                label=""
-                showQuickPicks
-                currentOrganizationId={organizationId}
-                currentTeamId={currentTeamId}
-                currentProjectId={currentProjectId}
-              />
-            </VStack>
+        {/* Scope */}
+        <SettingsField label="Scope">
+          <ScopeChipPicker
+            value={selectedScopes}
+            onChange={(next) => {
+              setSelectedScopes(next);
+              setCategorySelections({});
+            }}
+            organizationId={organizationId}
+            organizationName={organizationName}
+            availableTeams={orgTeams}
+            availableProjects={orgProjects}
+            label=""
+            showQuickPicks
+            currentOrganizationId={organizationId}
+            currentTeamId={currentTeamId}
+            currentProjectId={currentProjectId}
+          />
+        </SettingsField>
 
-            {/* Permissions */}
-            <VStack gap={2} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Permissions
-              </Text>
-              <HStack justify="space-between" width="full">
-                <SegmentGroup.Root
-                  size="sm"
-                  value={permissionMode}
-                  onValueChange={(e) => handlePermissionModeChange(e.value as "all" | "restricted")}
-                >
-                  <SegmentGroup.Indicator />
-                  <SegmentGroup.Item value="all">
-                    <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                  <SegmentGroup.Item value="restricted">
-                    <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
-                    <SegmentGroup.ItemHiddenInput />
-                  </SegmentGroup.Item>
-                </SegmentGroup.Root>
-                {permissionMode === "restricted" && (
-                  <PermissionCounter
-                    count={
-                      Object.values(effectiveCategorySelections).filter((v) => v && v !== "none")
-                        .length
-                    }
-                  />
-                )}
-              </HStack>
-
+        {/* Permissions */}
+        <SettingsField
+          label="Permissions"
+          error={
+            attempted && permissionsMissing
+              ? "Choose at least one permission, or switch to All."
+              : undefined
+          }
+        >
+          <VStack ref={permissionsRef} gap={2} align="start" width="full">
+            <HStack justify="space-between" width="full">
+              <SegmentGroup.Root
+                size="sm"
+                value={permissionMode}
+                onValueChange={(e) => handlePermissionModeChange(e.value as "all" | "restricted")}
+              >
+                <SegmentGroup.Indicator />
+                <SegmentGroup.Item value="all">
+                  <SegmentGroup.ItemText>All</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+                <SegmentGroup.Item value="restricted">
+                  <SegmentGroup.ItemText>Restricted</SegmentGroup.ItemText>
+                  <SegmentGroup.ItemHiddenInput />
+                </SegmentGroup.Item>
+              </SegmentGroup.Root>
               {permissionMode === "restricted" && (
-                <PermissionCategoryList
-                  selections={effectiveCategorySelections}
-                  userPermissions={userPermissions}
-                  onChange={setCategorySelections}
+                <PermissionCounter
+                  count={
+                    Object.values(effectiveCategorySelections).filter((v) => v && v !== "none")
+                      .length
+                  }
                 />
               )}
-            </VStack>
+            </HStack>
+
+            {permissionMode === "restricted" && (
+              <PermissionCategoryList
+                selections={effectiveCategorySelections}
+                userPermissions={userPermissions}
+                onChange={setCategorySelections}
+              />
+            )}
           </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full" justify="end" gap={2}>
-            <Button variant="outline" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button colorPalette="blue" onClick={handleSave} disabled={!canSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        </SettingsField>
+      </VStack>
+    </Drawer>
   );
 }

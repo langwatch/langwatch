@@ -6,7 +6,7 @@ The server half of [user](../README.md). Users: profiles and avatars, account an
 
 ## Installation
 
-`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:15`.
+`defineProcessModule("user").withRepositories(userRepositories).withChannels(userChannels).withApi(UserModule).withTransports(meRest, userAvatarRest, userTrpcTransport).withEventing(userLifecycleEventing).withTasks(…).withMigrations(…)`, `src/user.module.ts:19`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -124,7 +124,7 @@ isOperator(input: { userId: string }): Promise<boolean>;
 
 #### `findByEmail`
 
-The account an address belongs to, ignoring case; the exact address wins over case-twins.
+The account holding an address, matched on its stored lower-cased form, however typed.
 
 ```typescript
 findByEmail(input: UserEmailInput): Promise<UserProfile | null>;
@@ -383,7 +383,7 @@ Permission `project:view`. Declared at `src/transport/me.rest.ts:12`.
 Answers at `/api/me/project`, `/api/v1/me/project`; also, undocumented, `/api/me/2026-08-07/project`, `/api/v1/me/2026-08-07/project`, `/api/me/latest/project`, `/api/v1/me/latest/project`.
 
 ```typescript
-// Response: meProjectResponseSchema, ../contract/src/user-rest.schemas.ts:11
+// Response: meProjectResponseSchema, ../contract/src/user-rest.schemas.ts:19
 interface Response {
   id: string;
   name: string;
@@ -405,10 +405,10 @@ interface Response {
 
 Deferred scope: a key reads the avatars its own project stores, which the runtime pins; the object's purpose and owner kind are what gate the bytes. Declared at `src/transport/user-avatar.rest.ts:43`.
 
-Answers at `/api/user-avatar/:projectId/:userAvatarId`.
+Answers at `/api/user-avatar/:projectId/:userAvatarId`, `/api/v1/user-avatar/:projectId/:userAvatarId`.
 
 ```typescript
-// Params: userAvatarRestParamsSchema, ../contract/src/user-rest.schemas.ts:21
+// Params: userAvatarRestParamsSchema, ../contract/src/user-rest.schemas.ts:32
 interface Params {
   projectId: string;
   userAvatarId: string;
@@ -421,7 +421,7 @@ type Response = unknown;
 
 ### `user`
 
-Contract `../contract/src/user.trpc.ts:40`, router `src/transport/user.trpc.ts:36`.
+Contract `../contract/src/user.trpc.ts:39`, router `src/transport/user.trpc.ts:36`.
 
 | Procedure                             | Kind     | Gate                                                                                                                                                           | Input                                         | Output                                 |
 | ------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- | -------------------------------------- |
@@ -435,7 +435,6 @@ Contract `../contract/src/user.trpc.ts:40`, router `src/transport/user.trpc.ts:3
 | `user.getSsoStatus`                   | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userSsoStatusSchema`                  |
 | `user.getAccountInfo`                 | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userAccountInfoSchema`                |
 | `user.getLinkedAccounts`              | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userApiLinkedAccountsSchema`          |
-| `user.unlinkAccount`                  | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiUnlinkAccountInputSchema`             | `userApiSuccessSchema`                 |
 | `user.secureAccountNudge`             | query    | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userSecureAccountOfferSchema`         |
 | `user.dismissSecureAccountNudge`      | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiEmptyInputSchema`                     | `userApiSuccessSchema`                 |
 | `user.updateName`                     | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                          | `userApiUpdateNameInputSchema`                | `userApiUpdatedNameSchema`             |
@@ -449,90 +448,80 @@ Contract `../contract/src/user.trpc.ts:40`, router `src/transport/user.trpc.ts:3
 
 ```typescript
 // user.getAvatarUrl
-type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:21
-// Output: userAvatarUrlSchema, ../contract/src/user.ts:258
+type Input = z.infer<typeof userAvatarRestParamsSchema>; // ../contract/src/user-rest.schemas.ts:32
+// Output: userAvatarUrlSchema, ../contract/src/user.ts:383
 interface Output {
   url: string;
 }
 
 // user.getTraceExplorerTourPreference
-// Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:15
+// Input: userApiEmptyInputSchema, ../contract/src/user.schemas.ts:18
 type Input = Record<string, unknown>;
-// Output: userTourPreferenceSchema, ../contract/src/user.ts:185
+// Output: userTourPreferenceSchema, ../contract/src/user.ts:274
 interface Output {
   dismissed: boolean;
   dismissedAt: unknown | null;
 }
 
 // user.dismissTraceExplorerTour
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:185
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+type Output = z.infer<typeof userTourPreferenceSchema>; // ../contract/src/user.ts:274
 
 // user.getNotificationPreference
-// Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:18
+// Input: userApiNotificationTopicInputSchema, ../contract/src/user.schemas.ts:28
 interface Input {
   topic: "langy";
 }
-// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:205
+// Output: userNotificationPreferenceSchema, ../contract/src/user.ts:299
 interface Output {
   topic: "langy";
   choice: "enabled" | "declined" | null;
 }
 
 // user.setNotificationPreference
-// Input: userApiSetNotificationPreferenceInputSchema, ../contract/src/user.schemas.ts:21
+// Input: userApiSetNotificationPreferenceInputSchema, ../contract/src/user.schemas.ts:39
 interface Input {
   topic: "langy";
   choice: "enabled" | "declined";
 }
-type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:205
+type Output = z.infer<typeof userNotificationPreferenceSchema>; // ../contract/src/user.ts:299
 
 // user.isAdmin
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userApiIsAdminSchema, ../contract/src/user.responses.ts:15
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userApiIsAdminSchema, ../contract/src/user.responses.ts:22
 interface Output {
   isAdmin: boolean;
 }
 
 // user.updateLastLogin
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
 
 // user.getSsoStatus
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userSsoStatusSchema, ../contract/src/user.ts:182
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userSsoStatusSchema, ../contract/src/user.ts:261
 interface Output {
   pendingSsoSetup: boolean;
 }
 
 // user.getAccountInfo
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userAccountInfoSchema, ../contract/src/user.ts:179
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userAccountInfoSchema, ../contract/src/user.ts:256
 interface Output {
   createdAt: unknown;
 }
 
 // user.getLinkedAccounts
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userApiLinkedAccountsSchema, ../contract/src/user.responses.ts:32
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userApiLinkedAccountsSchema, ../contract/src/user.responses.ts:59
 type Output = {
   id: string;
   provider: string;
   providerAccountId: string;
 }[];
 
-// user.unlinkAccount
-// Input: userApiUnlinkAccountInputSchema, ../contract/src/user.schemas.ts:44
-interface Input {
-  accountId: string;
-}
-// Output: userApiSuccessSchema, ../contract/src/user.responses.ts:9
-interface Output {
-  success: true;
-}
-
 // user.secureAccountNudge
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:350
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userSecureAccountOfferSchema, ../contract/src/user.ts:511
 interface Output {
   offer: boolean;
   passkey: boolean;
@@ -541,50 +530,53 @@ interface Output {
 }
 
 // user.dismissSecureAccountNudge
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userApiSuccessSchema, ../contract/src/user.responses.ts:12
+interface Output {
+  success: true;
+}
 
 // user.updateName
-// Input: userApiUpdateNameInputSchema, ../contract/src/user.schemas.ts:27
+// Input: userApiUpdateNameInputSchema, ../contract/src/user.schemas.ts:47
 interface Input {
   name: string;
 }
-// Output: userApiUpdatedNameSchema, ../contract/src/user.responses.ts:21
+// Output: userApiUpdatedNameSchema, ../contract/src/user.responses.ts:38
 interface Output {
   name: string;
 }
 
 // user.hasPassword
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-// Output: userApiHasPasswordSchema, ../contract/src/user.responses.ts:18
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+// Output: userApiHasPasswordSchema, ../contract/src/user.responses.ts:30
 interface Output {
   hasPassword: boolean;
 }
 
 // user.reactivate
-// Input: userApiUserInputSchema, ../contract/src/user.schemas.ts:58
+// Input: userApiUserInputSchema, ../contract/src/user.schemas.ts:100
 interface Input {
   userId: string;
 }
-type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:12
 
 // user.setAvatar
-// Input: userApiSetAvatarInputSchema, ../contract/src/user.schemas.ts:60
+// Input: userApiSetAvatarInputSchema, ../contract/src/user.schemas.ts:114
 interface Input {
   organizationId: string;
   imageDataUrl: string;
 }
-// Output: userAvatarResultSchema, ../contract/src/user.ts:254
+// Output: userAvatarResultSchema, ../contract/src/user.ts:377
 interface Output {
   image: string;
 }
 
 // user.removeAvatar
-type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:15
-type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:9
+type Input = z.infer<typeof userApiEmptyInputSchema>; // ../contract/src/user.schemas.ts:18
+type Output = z.infer<typeof userApiSuccessSchema>; // ../contract/src/user.responses.ts:12
 
 // user.requestBudgetIncrease
-// Input: userApiRequestBudgetIncreaseInputSchema, ../contract/src/user.schemas.ts:73
+// Input: userApiRequestBudgetIncreaseInputSchema, ../contract/src/user.schemas.ts:138
 interface Input {
   organizationId: string;
   scope: string;
@@ -594,28 +586,28 @@ interface Input {
   period?: string;
   message?: string;
 }
-// Output: userApiBudgetIncreaseRequestedSchema, ../contract/src/user.responses.ts:35
+// Output: userApiBudgetIncreaseRequestedSchema, ../contract/src/user.responses.ts:69
 interface Output {
   ok: true;
   sentTo: string;
 }
 
 // user.setLastHomePath
-// Input: userApiSetLastHomePathInputSchema, ../contract/src/user.schemas.ts:83
+// Input: userApiSetLastHomePathInputSchema, ../contract/src/user.schemas.ts:147
 interface Input {
   path: string | null;
 }
-// Output: userApiOkSchema, ../contract/src/user.responses.ts:12
+// Output: userApiOkSchema, ../contract/src/user.responses.ts:17
 interface Output {
   ok: true;
 }
 
 // user.homePagePickerState
-// Input: userApiOrganizationInputSchema, ../contract/src/user.schemas.ts:70
+// Input: userApiOrganizationInputSchema, ../contract/src/user.schemas.ts:122
 interface Input {
   organizationId: string;
 }
-// Output: userApiHomePagePickerStateSchema, ../contract/src/user.responses.ts:40
+// Output: userApiHomePagePickerStateSchema, ../contract/src/user.responses.ts:82
 interface Output {
   lastHomePath: string | null;
   firstProjectSlug: string | null;

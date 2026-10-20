@@ -3,6 +3,7 @@
  */
 
 import {
+  type AnalyticsFeedbackPosition,
   type FilterField,
   isZeroWhenAbsentSeries,
   SeriesPercentageUnsupportedError,
@@ -24,7 +25,10 @@ import {
   TRACE_IDENTITY_COLUMNS,
   tableAliases,
 } from "./clickhouse.field-mappings.mapper.ts";
-import { translateAllFilters } from "./clickhouse.filter-translator.mapper.ts";
+import {
+  type FilterTranslation,
+  translateAllFilters,
+} from "./clickhouse.filter-translator.mapper.ts";
 import {
   latestVersionSubquery,
   parseLatestVersionColumn,
@@ -958,16 +962,20 @@ function translateSeriesMetric({
 function buildScopedFilterWhere({
   ts,
   input,
-  filterWhereClause,
+  filters,
 }: {
   ts: string;
   input: TimeseriesQueryInput;
-  filterWhereClause: string;
+  filters: FilterTranslation;
 }): { filterWhere: string; params: Record<string, unknown> } {
   const conditions: string[] = [];
   const params: Record<string, unknown> = {};
-  if (filterWhereClause !== "1=1") {
-    conditions.push(input.negateFilters ? `NOT (${filterWhereClause})` : filterWhereClause);
+  if (filters.whereClause !== "1=1") {
+    conditions.push(
+      input.negateFilters
+        ? (filters.negatedWhereClause ?? `NOT (${filters.whereClause})`)
+        : filters.whereClause,
+    );
   }
   if (input.traceIds && input.traceIds.length > 0) {
     conditions.push(`${ts}.TraceId IN ({traceIds:Array(String)})`);
@@ -1107,7 +1115,7 @@ export function buildTimeseriesQuery(input: TimeseriesQueryInput): BuiltQuery {
   const scope = buildScopedFilterWhere({
     ts,
     input,
-    filterWhereClause: filterTranslation.whereClause,
+    filters: filterTranslation,
   });
   Object.assign(allTranslationParams, scope.params);
   const filterWhere = scope.filterWhere;
@@ -3495,10 +3503,18 @@ export function buildTopDocumentsQuery({
   };
 }
 
+type FeedbackQueryFilters = Partial<
+  Record<
+    FilterField,
+    string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
+  >
+>;
+
 /**
- * Build a query for feedbacks
+ * The part of a feedbacks read both the capped list and the paged list share: the tenant and
+ * window, the translated filters, and the pruned trace and span sources the events come from.
  */
-export function buildFeedbacksQuery({
+function feedbackQueryParts({
   projectId,
   startDate,
   endDate,
@@ -3507,15 +3523,9 @@ export function buildFeedbacksQuery({
   projectId: string;
   startDate: Date;
   endDate: Date;
-  filters?: Partial<
-    Record<
-      FilterField,
-      string[] | Record<string, string[]> | Record<string, Record<string, string[]>>
-    >
-  >;
-}): BuiltQuery {
+  filters?: FeedbackQueryFilters;
+}): { fromClause: string; filterWhere: string; params: BuiltQuery["params"] } {
   const ts = tableAliases.trace_summaries;
-  const ss = tableAliases.stored_spans;
 
   // Translate filters
   const filterTranslation = translateAllFilters(filters ?? {}, SPAN_TIME_FILTER_START_END);
@@ -3540,6 +3550,42 @@ export function buildFeedbacksQuery({
     spanTimeFilter: SPAN_TIME_FILTER_START_END,
   });
 
+  return {
+    fromClause: `${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
+    ${spanJoin}`,
+    filterWhere,
+    params: {
+      tenantId: projectId,
+      startDate,
+      endDate,
+      ...filterTranslation.params,
+    },
+  };
+}
+
+/**
+ * Build a query for feedbacks
+ */
+export function buildFeedbacksQuery({
+  projectId,
+  startDate,
+  endDate,
+  filters,
+}: {
+  projectId: string;
+  startDate: Date;
+  endDate: Date;
+  filters?: FeedbackQueryFilters;
+}): BuiltQuery {
+  const ts = tableAliases.trace_summaries;
+  const ss = tableAliases.stored_spans;
+  const { fromClause, filterWhere, params } = feedbackQueryParts({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  });
+
   const sql = `
     SELECT
       ${ts}.TraceId AS trace_id,
@@ -3547,8 +3593,7 @@ export function buildFeedbacksQuery({
       toUnixTimestamp64Milli(event_timestamp) AS started_at,
       event_name AS event_type,
       event_attrs AS attributes
-    FROM ${dedupedTraceSummaries(ts, traceColumns, DATE_FILTER_START_END)}
-    ${spanJoin}
+    FROM ${fromClause}
     ARRAY JOIN
       ${ss}."Events.Timestamp" AS event_timestamp,
       ${ss}."Events.Name" AS event_name,
@@ -3563,13 +3608,80 @@ export function buildFeedbacksQuery({
     LIMIT 100
   `;
 
+  return { sql, params };
+}
+
+/**
+ * One page of the feedbacks {@link buildFeedbacksQuery} lists, newest first, in a total order
+ * (timestamp, trace, span, position in the span's event arrays) so equal timestamps neither
+ * repeat nor vanish across pages. It asks for one row more than `limit` to know another follows.
+ */
+export function buildFeedbacksPageQuery({
+  projectId,
+  startDate,
+  endDate,
+  filters,
+  after,
+  limit,
+}: {
+  projectId: string;
+  startDate: Date;
+  endDate: Date;
+  filters?: FeedbackQueryFilters;
+  after?: AnalyticsFeedbackPosition;
+  limit: number;
+}): BuiltQuery {
+  const ts = tableAliases.trace_summaries;
+  const ss = tableAliases.stored_spans;
+  const { fromClause, filterWhere, params } = feedbackQueryParts({
+    projectId,
+    startDate,
+    endDate,
+    filters,
+  });
+
+  const afterWhere = after
+    ? `AND (toUnixTimestamp64Milli(event_timestamp), ${ts}.TraceId, ${ss}.SpanId, event_index) < ({afterStartedAt:Int64}, {afterTraceId:String}, {afterSpanId:String}, {afterEventIndex:UInt32})`
+    : "";
+
+  const sql = `
+    SELECT
+      ${ts}.TraceId AS trace_id,
+      ${ss}.SpanId AS event_id,
+      toUnixTimestamp64Milli(event_timestamp) AS started_at,
+      event_index,
+      event_name AS event_type,
+      event_attrs AS attributes
+    FROM ${fromClause}
+    ARRAY JOIN
+      ${ss}."Events.Timestamp" AS event_timestamp,
+      arrayEnumerate(${ss}."Events.Timestamp") AS event_index,
+      ${ss}."Events.Name" AS event_name,
+      ${ss}."Events.Attributes" AS event_attrs
+    WHERE ${ts}.TenantId = {tenantId:String}
+      AND ${ts}.OccurredAt >= {startDate:DateTime64(3)}
+      AND ${ts}.OccurredAt < {endDate:DateTime64(3)}
+      AND event_name = 'thumbs_up_down'
+      AND mapContains(event_attrs, 'event.metrics.vote')
+      ${filterWhere}
+      ${afterWhere}
+    ORDER BY event_timestamp DESC, ${ts}.TraceId DESC, ${ss}.SpanId DESC, event_index DESC
+    LIMIT {pageLimit:UInt32}
+  `;
+
   return {
     sql,
     params: {
-      tenantId: projectId,
-      startDate,
-      endDate,
-      ...filterTranslation.params,
+      ...params,
+      pageLimit: limit + 1,
+      ...(after
+        ? {
+            afterStartedAt: after.startedAt,
+            afterTraceId: after.traceId,
+            afterSpanId: after.spanId,
+            afterEventIndex: after.eventIndex,
+          }
+        : {}),
     },
   };
 }

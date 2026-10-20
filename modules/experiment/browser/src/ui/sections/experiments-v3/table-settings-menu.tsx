@@ -1,7 +1,7 @@
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Popover } from "@langwatch/design-system/popover";
 /**
- * TableSettingsMenu - "Run Options" popover menu for the workbench toolbar.
+ * TableSettingsMenu - "Run options" popover menu for the workbench toolbar.
  */
 import {
   Box,
@@ -101,7 +101,7 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
           paddingX={3}
           paddingY={2}
           height="auto"
-          fontSize="13px"
+          textStyle="bodySm"
           fontWeight="normal"
           width="100%"
           _hover={{ bg: "bg.subtle" }}
@@ -140,7 +140,7 @@ const ConcurrencyPopover = React.memo(function ConcurrencyPopover({
               flex={1}
             />
           </HStack>
-          <Text fontSize="11px" color="fg.muted">
+          <Text textStyle="micro" color="fg.muted">
             Higher values run more cells in parallel but may cause rate limiting
           </Text>
         </VStack>
@@ -159,7 +159,7 @@ type TableSettingsMenuProps = {
 
 /**
  * Popover menu containing table settings and actions. Surfaced in the toolbar
- * as a "Run Options" button.
+ * as a "Run options" button.
  */
 export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) {
   const {
@@ -206,17 +206,17 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
             color="fg.muted"
             _hover={{ color: "fg", bg: "bg.subtle" }}
             disabled={disabled}
-            aria-label="Run Options"
+            aria-label="Run options"
           >
             <SlidersHorizontal size={18} />
-            Run Options
+            Run options
           </Button>
         </Popover.Trigger>
         <Popover.Content width="auto" padding={3}>
           <VStack align="stretch" gap={3}>
             {/* Row Height Section */}
             <VStack align="stretch" gap={2}>
-              <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+              <Text textStyle="groupLabel" color="fg.muted">
                 Row height
               </Text>
               <HStack gap={2}>
@@ -237,7 +237,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
                       paddingY={3}
                       height="auto"
                       minWidth="80px"
-                      fontSize="12px"
+                      textStyle="caption"
                       disabled={isDisabled}
                       opacity={isDisabled ? 0.5 : 1}
                       cursor={isDisabled ? "not-allowed" : "pointer"}
@@ -267,7 +267,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
 
             {/* Concurrency Section */}
             <Box borderTopWidth="1px" borderColor="border" />
-            <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+            <Text textStyle="groupLabel" color="fg.muted">
               Concurrency
             </Text>
             <VStack align="stretch" gap={1}>
@@ -279,7 +279,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
               <>
                 <Box borderTopWidth="1px" borderColor="border" />
                 <VStack align="stretch" gap={1}>
-                  <Text fontSize="xs" fontWeight="medium" color="fg.muted">
+                  <Text textStyle="groupLabel" color="fg.muted">
                     Automation
                   </Text>
                   <Button
@@ -288,7 +288,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
                     paddingX={3}
                     paddingY={2}
                     height="auto"
-                    fontSize="13px"
+                    textStyle="bodySm"
                     fontWeight="normal"
                     onClick={handleOpenRunDialog}
                     _hover={{ bg: "bg.subtle" }}
@@ -297,7 +297,7 @@ export function TableSettingsMenu({ disabled = false }: TableSettingsMenuProps) 
                       <Terminal size={16} />
                       <VStack align="flex-start" gap={0}>
                         <Text>Run in CI/CD</Text>
-                        <Text fontSize="11px" color="fg.muted">
+                        <Text textStyle="micro" color="fg.muted">
                           Execute from your pipeline
                         </Text>
                       </VStack>

@@ -129,3 +129,9 @@ Feature: Projection replay
     Given a replay that rebuilt rows for a tenant
     When the rebuilt table is optimized
     Then the statement names that tenant
+
+  @unit
+  Scenario: Replay's bounds read over a batch's aggregates is a declared full scan
+    Given a replay batch of aggregates
+    When it reads the occurred-at bounds its later reads prune by
+    Then that read is declared a full scan, since it must see every partition

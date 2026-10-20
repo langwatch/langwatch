@@ -1,6 +1,5 @@
+import type { fixed64Schema } from "@langwatch/otlp/trace-request";
 import type { z } from "zod";
-
-import type { fixed64Schema } from "../trace.otlp.ts";
 
 type Fixed64 = z.infer<typeof fixed64Schema>;
 

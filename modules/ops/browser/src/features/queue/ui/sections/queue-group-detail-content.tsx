@@ -1,4 +1,5 @@
 import { CodePreview } from "@langwatch/design-system/code-preview";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { Badge, Alert, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SummaryList, SummaryListItem } from "@langwatch/design-system/summary-list";
@@ -32,13 +33,13 @@ function GroupStatusRow({
         <Text textStyle="sm">{detail.pipelineName ?? "—"}</Text>
       </SummaryListItem>
       <SummaryListItem label="Pending">
-        <Text textStyle="sm" fontFamily="mono">
+        <Text textStyle="caption" fontVariantNumeric="tabular-nums">
           {detail.pendingJobs}
         </Text>
       </SummaryListItem>
       {classification.attempt > 0 && (
         <SummaryListItem label="Attempts">
-          <Text textStyle="sm" fontFamily="mono" color="fg.warning">
+          <Text textStyle="caption" color="fg.warning" fontVariantNumeric="tabular-nums">
             {classification.attempt}
           </Text>
         </SummaryListItem>
@@ -50,9 +51,7 @@ function GroupStatusRow({
       </SummaryListItem>
       {detail.activeJobId && (
         <SummaryListItem label="Active Job">
-          <Text textStyle="xs" fontFamily="mono" color="green.fg">
-            {detail.activeJobId}
-          </Text>
+          <InlineCode variant="neutral">{detail.activeJobId}</InlineCode>
         </SummaryListItem>
       )}
     </SummaryList>

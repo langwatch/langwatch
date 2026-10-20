@@ -148,6 +148,12 @@ Feature: A Langy health check that sends a real greeting and says what broke
   # ---------------------------------------------------------------------------
 
   @unit
+  Scenario: A held turn settles from the turn-state projection
+    Given a turn the api process is holding a request open for
+    When the worker folds the turn's reply into the turn-state projection
+    Then the hold settles with that reply, read from the projection rather than the event log
+
+  @unit
   Scenario: A user wait settles the wait only when the caller opts in
     Given a turn whose fold records a question wait and no reply
     When the settlement wait opted in to settling on a user wait

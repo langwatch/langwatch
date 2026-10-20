@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The portable signed-license capability supplied to process peers.
 
-Peers call these through the token, declared at `../contract/src/licensing.api.ts:62`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/licensing.api.ts:64`; nothing else in this package is public.
 
 #### `resolve`
 
@@ -187,7 +187,7 @@ getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView>;
 #### `listIssuedLicenses`
 
 ```typescript
-listIssuedLicenses(input: { page: number; pageSize: number; search?: string; }): Promise<IssuedLicensePage>;
+listIssuedLicenses(input: { page: number; pageSize: number; search?: string; } & IssuedLicenseFilters): Promise<IssuedLicensePage>;
 ```
 
 #### `resolveConnectCredential`
@@ -427,13 +427,19 @@ recordUsageReport(input: IncomingUsageReport): Promise<SelfHostedSignal[]>;
 #### `listSelfHostedInstances`
 
 ```typescript
-listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; }): Promise<SelfHostedInstancePage>;
+listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; } & SelfHostedInstanceFilters): Promise<SelfHostedInstancePage>;
 ```
 
 #### `getSelfHostedInstance`
 
 ```typescript
 getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail>;
+```
+
+#### `summarizeSelfHostedInstances`
+
+```typescript
+summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary>;
 ```
 
 ## REST transport
@@ -454,7 +460,7 @@ Authenticated: a self-hosted install presents its license token or activation co
 Answers at `/api/connect/v1/license/sync`.
 
 ```typescript
-// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:16
+// Body: licenseSyncBodySchema, ../contract/src/license-sync.ts:29
 interface Body {
   version: string;
   seats: {
@@ -462,7 +468,7 @@ interface Body {
     liteMembers: number;
   };
 }
-// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:31
+// Response: connectSyncAnswerSchema, ../contract/src/connect-install.ts:38
 interface Response {
   services: string[];
   license?: string;
@@ -471,14 +477,14 @@ interface Response {
 
 #### `POST /api/connect/v1/license/activate` · `redeemActivationCode`
 
-Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:62`.
+Authenticated: a self-hosted install presents its license token or activation code as the bearer; the door verifies it and no permission names a licence holder. Credential `licence_token`. Hidden from the OpenAPI document. Declared at `src/transport/connect-host.rest.ts:63`.
 
 Answers at `/api/connect/v1/license/activate`.
 
 ```typescript
-// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:31
+// Body: connectActivationRequestSchema, ../contract/src/license-sync.ts:39
 type Body = Record<string, unknown>;
-// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:40
+// Response: connectActivationAnswerSchema, ../contract/src/connect-install.ts:54
 interface Response {
   license: string;
   planType: string;
@@ -506,7 +512,7 @@ Contract `../contract/src/connect.trpc.ts:18`, router `src/transport/connect.trp
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:183
+type Output = z.infer<typeof connectStatusSchema>; // ../contract/src/connect-install.ts:236
 
 // connect.setService
 // Input: inline, ../contract/src/connect.trpc.ts:25
@@ -515,7 +521,7 @@ interface Input {
   service: "instant_evals" | "managed_models";
   enabled: boolean;
 }
-// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:198
+// Output: connectServicesSetSchema, ../contract/src/connect-install.ts:245
 interface Output {
   enabledServices: ("instant_evals" | "managed_models")[];
 }
@@ -526,7 +532,7 @@ interface Input {
   organizationId: string;
   capUsd: number;
 }
-// Output: connectCapSetSchema, ../contract/src/connect-install.ts:202
+// Output: connectCapSetSchema, ../contract/src/connect-install.ts:252
 interface Output {
   capUsd: number;
   maximumCapUsd: number;
@@ -535,7 +541,7 @@ interface Output {
 
 ### `license`
 
-Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing.trpc.ts:14`.
+Contract `../contract/src/licensing.trpc.ts:27`, router `src/transport/licensing.trpc.ts:14`.
 
 | Procedure                  | Kind     | Gate                                                                                                                                                                                                                                          | Input                            | Output                        |
 | -------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- | ----------------------------- |
@@ -548,16 +554,16 @@ Contract `../contract/src/licensing.trpc.ts:22`, router `src/transport/licensing
 
 ```typescript
 // license.getStatus
-// Input: licenseOrganizationQuerySchema, ../contract/src/licensing.trpc.ts:17
+// Input: licenseOrganizationQuerySchema, ../contract/src/licensing.trpc.ts:24
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:222
+type Output = z.infer<typeof licenseStatusSchema>; // ../contract/src/license.ts:244
 
 // license.getSsoGateStatus
-// Input: inline, ../contract/src/licensing.trpc.ts:31
+// Input: inline, ../contract/src/licensing.trpc.ts:36
 type Input = Record<string, unknown>;
-// Output: ssoGateStatusSchema, ../contract/src/license.ts:253
+// Output: ssoGateStatusSchema, ../contract/src/license.ts:283
 interface Output {
   configuredProvider: string | null;
   licensed: boolean;
@@ -565,32 +571,32 @@ interface Output {
 }
 
 // license.upload
-// Input: storeLicenseInputSchema, ../contract/src/license.commands.ts:6
+// Input: storeLicenseInputSchema, ../contract/src/license.commands.ts:12
 interface Input {
   organizationId: string;
   licenseKey: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
 
 // license.activate
-// Input: inline, ../contract/src/licensing.trpc.ts:40
+// Input: inline, ../contract/src/licensing.trpc.ts:45
 interface Input {
   organizationId: string;
   code: string;
 }
-type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:269
+type Output = z.infer<typeof licenseUploadedSchema>; // ../contract/src/license.ts:297
 
 // license.remove
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRemovedSchema, ../contract/src/license.ts:274
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
+// Output: licenseRemovedSchema, ../contract/src/license.ts:304
 interface Output {
   success: true;
   removed: true;
 }
 
 // license.refresh
-type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:17
-// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:207
+type Input = z.infer<typeof licenseOrganizationQuerySchema>; // ../contract/src/licensing.trpc.ts:24
+// Output: licenseRefreshOutcomeSchema, ../contract/src/connect-install.ts:262
 type Output =
   | {
       outcome: "unchanged";
@@ -610,12 +616,13 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `license_sync` (aggregate `global`)
 
-Declared at `src/eventing/license-sync.pipeline.ts:57`.
+Declared at `src/eventing/license-sync.pipeline.ts:78`.
 
 | Kind            | Name                        | Handles                                                                                     | Declared at                                |
 | --------------- | --------------------------- | ------------------------------------------------------------------------------------------- | ------------------------------------------ |
-| process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:63` |
-| peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:62` |
+| process manager | `licenseSync`               | every 2 min (`LICENSE_SYNC_FIRST_DELAY_MS = 2 * 60 * 1000`); intents `sync` (outbox)        | `src/eventing/license-sync.pipeline.ts:85` |
+| peer subscriber | `configuredLicenseOnSignUp` | `lw.organization.signed_up` from [organization](../../../../modules/organization/README.md) | `src/eventing/license-sync.pipeline.ts:83` |
+| peer subscriber | `ssoSignInProviderRecorded` | `lw.sso.sign_in_provider.recorded` from [sso](../../sso/README.md)                          | `src/eventing/license-sync.pipeline.ts:84` |
 
 ### Pipeline `licensing_customer` (aggregate `licensing_customer`)
 
@@ -650,16 +657,16 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                     | Environment variable                 | Declared at                              |
 | ------ | ------------------------ | ------------------------------------ | ---------------------------------------- |
-| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:166`           |
-| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:167`           |
+| secret | `instanceLicenseKey`     | `LANGWATCH_LICENSE_KEY`              | `src/app/licensing.app.ts:160`           |
+| secret | `licensePrivateKey`      | `LANGWATCH_LICENSE_PRIVATE_KEY`      | `src/app/licensing.app.ts:161`           |
 | config | `publicKey`              | `LANGWATCH_LICENSE_PUBLIC_KEY`       | `../contract/src/licensing.config.ts:45` |
-| config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:52` |
-| config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:53` |
-| config | `connectLicenseEndpoint` | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:57` |
-| config | `connectInstanceId`      | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:62` |
-| config | `isSaas`                 | `IS_SAAS`                            | `../contract/src/licensing.config.ts:70` |
-| config | `serviceVersion`         | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:72` |
-| config | `otelResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:73` |
-| config | `outboundProxy`          | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:75` |
+| config | `connectDisabled`        | `LANGWATCH_CONNECT_DISABLED`         | `../contract/src/licensing.config.ts:53` |
+| config | `connectGatewayEndpoint` | `LANGWATCH_CONNECT_GATEWAY_ENDPOINT` | `../contract/src/licensing.config.ts:60` |
+| config | `connectLicenseEndpoint` | `LANGWATCH_CONNECT_LICENSE_ENDPOINT` | `../contract/src/licensing.config.ts:64` |
+| config | `connectInstanceId`      | `LANGWATCH_CONNECT_INSTANCE_ID`      | `../contract/src/licensing.config.ts:69` |
+| config | `isSaas`                 | `IS_SAAS`                            | `../contract/src/licensing.config.ts:77` |
+| config | `serviceVersion`         | `SERVICE_VERSION`                    | `../contract/src/licensing.config.ts:79` |
+| config | `otelResourceAttributes` | `OTEL_RESOURCE_ATTRIBUTES`           | `../contract/src/licensing.config.ts:80` |
+| config | `outboundProxy`          | `HTTPS_PROXY`                        | `../contract/src/licensing.config.ts:82` |
 
 <!-- readme:generated:end -->

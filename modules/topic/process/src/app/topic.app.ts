@@ -10,6 +10,8 @@ import type {
   Topic,
   TopicApi,
   TopicClusteringRunHistoryEntry,
+  TopicClusteringRunHistoryPage,
+  TopicClusteringRunHistoryPageInput,
   TopicClusteringRequestInput,
   TopicClusteringStatus,
   TopicClusteringTriggerResult,
@@ -224,5 +226,11 @@ export class TopicModule implements TopicApi, TopicBrowserApi {
 
   getClusteringRunHistory(input: TopicProjectInput): Promise<TopicClusteringRunHistoryEntry[]> {
     return this.#topics.getClusteringRunHistory(input);
+  }
+
+  getClusteringRunHistoryPage(
+    input: TopicClusteringRunHistoryPageInput,
+  ): Promise<TopicClusteringRunHistoryPage> {
+    return this.#topics.getClusteringRunHistoryPage(input);
   }
 }

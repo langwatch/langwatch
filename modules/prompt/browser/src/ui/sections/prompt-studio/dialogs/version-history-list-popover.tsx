@@ -9,12 +9,12 @@ import {
   type ButtonProps,
   HStack,
   Spacer,
-  Spinner,
   Tag,
   Text,
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { Temporal, type Instant } from "@langwatch/time";
 import { MoreVertical } from "lucide-react";
@@ -74,7 +74,7 @@ function VersionTimestamp({ createdAt }: { createdAt?: string | null }) {
   return (
     <Tooltip content={absolute} positioning={{ placement: "top" }}>
       <Text
-        fontSize="11px"
+        textStyle="micro"
         color="fg.subtle"
         whiteSpace="nowrap"
         cursor="help"
@@ -111,7 +111,7 @@ function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }
     <VStack gap={0} align="start">
       <Text fontWeight={600}>{name ?? email ?? "Unknown author"}</Text>
       {name && email && (
-        <Text fontSize="11px" opacity={0.8}>
+        <Text textStyle="micro" opacity={0.8}>
           {email}
         </Text>
       )}
@@ -120,7 +120,7 @@ function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }
 
   return (
     <Tooltip content={tooltipContent} positioning={{ placement: "top" }} showArrow>
-      <HStack fontSize="12px" gap={1.5} minWidth={0} cursor="default">
+      <HStack textStyle="caption" gap={1.5} minWidth={0} cursor="default">
         <Avatar.Root
           size="2xs"
           backgroundColor="orange.solid"
@@ -131,7 +131,7 @@ function VersionAuthor({ author }: { author?: VersionHistoryItemData["author"] }
           {showImage && image && (
             <Avatar.Image src={image} onError={() => setBrokenImageUrl(image)} />
           )}
-          <Avatar.Fallback name={name ?? ""} fontSize="6.4px" />
+          <Avatar.Fallback name={name ?? ""} />
         </Avatar.Root>
         <Text lineClamp={1} color={isKnown ? "fg.muted" : "fg.subtle"}>
           {label}
@@ -158,7 +158,7 @@ function VersionIdentityLine({
   return (
     <HStack gap={2} width="full">
       <Text
-        fontSize="11px"
+        textStyle="micro"
         fontWeight={700}
         letterSpacing="0.04em"
         color="fg.muted"
@@ -168,7 +168,7 @@ function VersionIdentityLine({
       </Text>
       {isCurrent && (
         <Tag.Root size="sm" colorPalette="blue" paddingX={2}>
-          <Tag.Label fontSize="10px" letterSpacing="0.04em">
+          <Tag.Label textStyle="micro" letterSpacing="0.04em">
             Current
           </Tag.Label>
         </Tag.Root>
@@ -256,7 +256,7 @@ function VersionHistoryItem({
 
         <Text
           fontWeight={500}
-          fontSize="13px"
+          textStyle="bodySm"
           color={data.commitMessage ? "fg" : "fg.subtle"}
           wordBreak="break-word"
           // Generous enough that the 200-char message the save dialog allows
@@ -312,7 +312,7 @@ function UnsavedChangesStrip({ onDiscard }: { onDiscard: () => void }) {
       borderBottomWidth="1px"
       borderBottomColor="border.muted"
     >
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         You have unsaved changes
       </Text>
       <Spacer />
@@ -346,11 +346,8 @@ function VersionHistoryList({
 }) {
   if (isLoading) {
     return (
-      <VStack align="center" width="full" padding={8} gap={3}>
-        <Spinner size="md" />
-        <Text fontSize="12px" color="fg.muted">
-          Loading versions
-        </Text>
+      <VStack align="stretch" width="full" padding={4}>
+        <SkeletonRows rows={4} />
       </VStack>
     );
   }
@@ -358,7 +355,7 @@ function VersionHistoryList({
   if (versions.length === 0) {
     return (
       <VStack align="center" width="full" padding={8}>
-        <Text fontSize="12px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           This prompt has no saved versions yet
         </Text>
       </VStack>
@@ -445,7 +442,7 @@ function VersionHistoryContent({
       <Popover.Arrow />
       <Popover.Header
         fontWeight={600}
-        fontSize="14px"
+        textStyle="body"
         paddingY={3}
         borderBottomWidth="1px"
         borderBottomColor="border.muted"

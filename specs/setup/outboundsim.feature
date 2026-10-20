@@ -3,14 +3,14 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
   and the Slack Web API, customer webhook endpoints (signed, retried) and
   customer SQS queues. outboundsim accepts those calls, records each one
   (channel, target, headers with credentials redacted, body, signature verdict,
-  the answer it gave, received time) and keeps them in memory, so a developer,
-  an agent, apidiff and visualdiff can read what was sent. It answers in each
+  the answer it gave, received time) and keeps them in memory, so a developer
+  or an agent can read what was sent. It answers in each
   vendor's own shape and can be told to fail, stall or drop. It checks no
   credential: it is a dev shim. haven runs it from the bundled simulator binary.
 
   # Design: .claude/tmp/handoffs/outboundsim-design.md. To be bound by Go tests in
-  # services/outboundsim, tools/thuishaven/domain/overlay_outbound_test.go,
-  # tools/thuishaven/cmd/sim_outbound_test.go and apps/outboundsim-web.
+  # services/sims/outboundsim, tools/thuishaven/domain/overlay_outbound_test.go,
+  # tools/thuishaven/cmd/sim_outbound_test.go and apps/sims/src/outbound.
 
   Rule: Slack incoming webhooks
 
@@ -252,3 +252,144 @@ Feature: outboundsim, a local stand-in for Slack, webhook receivers and SQS
       Given the stack runs without +outbound
       When an agent runs "haven sim outbound list"
       Then haven exits non-zero and says to run "haven up +outbound"
+
+  Rule: Governance pull vendors (Databricks Genie and usage feeds)
+    # The product's pull sources read these paths; see services/sims/outboundsim/databricks.go.
+    # A word in the token (or a service principal's client id) picks the workspace:
+    # empty, revoked, noscope, ratelimited, down, malformed or cycle; anything else is the seed.
+
+    @unit
+    Scenario: A Genie workspace lists its spaces, conversations and messages to a good token
+      Given outboundsim is running
+      When a pull source reads /api/2.0/genie/spaces, a space's conversations and a conversation's messages with a bearer token naming no tenant word
+      Then outboundsim answers each in Databricks' shape from a seeded workspace of three spaces
+      And a second read of a message reports the same message id and timestamp
+      And each call is a databricks record with the token redacted
+
+    @unit
+    Scenario: Each refusal a pull source names has a credential that triggers it
+      When a pull source reads the spaces with no token, or a token holding revoked, noscope, ratelimited or down
+      Then outboundsim answers 401, 401, 403, 429 with Retry-After, or 503 in Databricks' error shape
+      And a token holding malformed is answered 200 with an HTML sign-in page
+      And a token holding empty is answered an empty list, and one holding cycle repeats its page token
+
+    @unit
+    Scenario: A scripted fault overrides a good token on one Databricks path
+      Given a fault on channel databricks for target /api/2.0/genie/spaces with status 403, once
+      When a pull source reads the spaces with a good token twice
+      Then the first read is refused 403 and the second is served
+
+    @unit
+    Scenario: A service principal signs in and its client id picks the workspace
+      When a pull source posts client credentials to /oidc/v1/token
+      Then outboundsim answers an access token naming the client id
+      And a client id holding revoked is refused 401 invalid_client
+
+    @unit
+    Scenario: The SCIM directory pages by startIndex and can be replaced
+      When a pull source reads /api/2.0/preview/scim/v2/Users with startIndex and count
+      Then outboundsim answers a SCIM list response with the total and that page
+      And PUT /_sim/api/databricks/users replaces the directory, refusing a user without an id or userName with 422
+
+    @unit
+    Scenario: A usage feed serves events after a cursor for a custom HTTP pull
+      When a custom HTTP pull source reads /feeds/<name>?cursor=<n> with a bearer token
+      Then outboundsim answers the events after n and next_cursor
+      And a token holding revoked is refused 401
+
+    @unit
+    Scenario: The overlay points the governance pull vendors at outboundsim
+      Given the worktree's environment names none of the five vendor base settings
+      When the developer runs "haven up +outbound"
+      Then the overlay sets DATABRICKS_WORKSPACE_BASE to outboundsim's origin
+      And OPENAI_ADMIN_API_BASE, ANTHROPIC_ADMIN_API_BASE, MICROSOFT_LOGIN_BASE and MICROSOFT_GRAPH_API_BASE to its /openai, /anthropic, /microsoft-login and /microsoft-graph
+      And a base .env names is left alone
+
+    @unit
+    Scenario: Outboundsim answers the OpenAI, Anthropic and Microsoft calls a pull source makes
+      When a pull source reads member lists, the account lookup, a Microsoft token, Graph users or subscribed SKUs
+      Then outboundsim answers each from a seeded tenant
+      And a key holding revoked, or no credential, is refused 401
+
+    @unit
+    Scenario: Outboundsim serves the OpenAI cost report, paged
+      When a pull source reads /openai/v1/organization/costs with start_time and group_by[]
+      Then outboundsim answers one daily bucket per page with has_more and next_page until the last
+      And a key holding nokeys refuses group_by[]=api_key_id with 400 naming start_time
+      And a key holding flaky is refused 503 after the first page and revoked is refused 401
+
+    @unit
+    Scenario: Outboundsim serves the Anthropic usage and cost reports, paged
+      When a pull source reads the usage_report/messages or cost_report routes with starting_at
+      Then outboundsim answers one bucket per page with has_more and next_page until the last
+      And a key holding cycle repeats the same next_page, and an unreadable starting_at is refused 400
+
+    @unit
+    Scenario: Outboundsim serves the Claude compliance audit log and the Microsoft directory audits, paged
+      When a custom pull source reads /anthropic/v1/organizations/audit_log or /microsoft-graph/v1.0/auditLogs/directoryAudits
+      Then outboundsim answers three events a page with a cursor, or an absolute @odata.nextLink on its own origin
+      And a drained cursor answers no events, noscope is refused 403 and down 503
+
+    @unit
+    Scenario: Outboundsim serves Dataverse bots and conversation transcripts behind the Microsoft token
+      When a Dataverse pull source reads /dataverse/api/data/v9.2/bots and conversationtranscripts
+      Then outboundsim answers the agents, and the transcripts ordered by createdon and id three a page through @odata.nextLink
+      And it honours the createdon cursor and bot ids in $filter, and refuses a revoked or missing token with 401
+
+  Rule: Codex sign-in and turns (the ChatGPT subscription provider)
+
+    @unit
+    Scenario: Outboundsim stands in for Codex device sign-in and model turns
+      When the product starts a Codex device sign-in against /codex-auth and polls it
+      Then outboundsim answers 403 authorization_pending until the code is approved on its verification page
+      And the poll then hands over an authorization code that exchanges for id, access and refresh tokens
+      And a model turn on /codex-api/responses streams Responses SSE ending in response.completed
+
+    @unit
+    Scenario: Outboundsim's Codex refuses as the control API asks
+      Given the control API sets a usage limit, expires the access tokens, revokes refresh or slows polling
+      Then a turn is refused 429 usage_limit_reached, or 401 for an expired token
+      And a refresh is refused 400 invalid_grant, and a poll answers slow_down, expired_token or access_denied
+
+  Rule: Cloud stand-ins (AWS STS, Azure Blob, Web Push)
+
+    @unit
+    Scenario: The overlay points managed Bedrock's STS and Azure Blob storage at outboundsim
+      Given the worktree's environment names none of MANAGED_BEDROCK_STS_BASE, AZURE_BLOB_ENDPOINT or AZURE_BLOB_AUTHORITY_HOST
+      When the developer runs "haven up +outbound"
+      Then the overlay sets MANAGED_BEDROCK_STS_BASE to outboundsim's direct /sts
+      And AZURE_BLOB_ENDPOINT to its haven route's /azure-blob/<account>, the account .env names or simaccount
+      And a base .env names is left alone
+
+    @unit
+    Scenario: Outboundsim answers the STS AssumeRole calls managed Bedrock makes
+      When managed Bedrock assumes its proxy role and then the customer role at /sts/
+      Then outboundsim answers each SigV4-signed AssumeRole with fresh session credentials as STS XML
+      And a role ARN holding denied is refused 403 AccessDenied, and an unsigned call 403 MissingAuthenticationToken
+
+    @unit
+    Scenario: Outboundsim holds Azure Blob accounts the object storage writes, reads and deletes
+      When object storage probes the container, puts, gets and deletes a blob under /azure-blob/<account> with Shared Key
+      Then outboundsim answers 200, 201, 200 with the bytes and 202, and a missing blob 404 BlobNotFound
+      And a browser holding a service or user-delegation SAS can upload and read the blob, with CORS
+
+    @unit
+    Scenario: Outboundsim refuses the wrong Azure account and an expired token
+      When a call is signed with another account's key, or names an account outboundsim does not hold
+      Then it is refused 403 AuthenticationFailed
+      And a managed-identity token from /azure-msi/token lives six minutes, after which a blob call is refused 401
+
+    @unit
+    Scenario: Outboundsim is a push service that records each send per device
+      When the product sends a VAPID-signed aes128gcm message to /push/<device>
+      Then outboundsim answers 201 and /_sim/api/push counts the send against that device
+      And a bad signature or another aud is refused 403, a missing TTL 400
+      And a device named gone, or told to by PUT /_sim/api/push/<device>, answers 410 (or 404, 429)
+
+    @unit
+    Scenario: haven gives outboundsim an https listener on 127.0.0.1 for the push stand-in
+      Given the portless Local CA exists and the stack selects outbound
+      When haven plans the stack
+      Then it issues a 127.0.0.1 certificate from that CA and outboundsim serves its routes over https on a second port
+      And the overlay sets WEB_PUSH_SERVICE_BASE to https://127.0.0.1:<that port>/push unless .env names one
+      And without the CA there is no https listener and no push base

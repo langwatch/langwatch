@@ -15,6 +15,7 @@ import {
   normalizedRequestPathname,
   requestPathname,
   type AuthApi,
+  type SocialProviderBases,
 } from "@langwatch/auth-contract";
 import { HandledError } from "@langwatch/handled-error";
 import {
@@ -46,6 +47,7 @@ import {
   findSubmittedAddresses,
   isLockoutCountedPath,
 } from "../../rules/sign-in-identifier-hash.rules.ts";
+import { withSocialProviderBases } from "../../rules/social-provider-bases.rules.ts";
 import { resolveTrustedOrigins } from "../../rules/trusted-origins.rules.ts";
 import type {
   BetterAuthAnnouncements,
@@ -64,6 +66,7 @@ import {
   type FindGoverningConnections,
   type SessionMintClaims,
   type SignUpPolicy,
+  toConcretePath,
 } from "./http.better-auth-hooks.channel.ts";
 import type { CredentialSessionGuard } from "./http.credential-session-guard.channel.ts";
 import type { IdTokenIssuerRefusalChannel } from "./http.id-token-issuer-refusal.channel.ts";
@@ -87,8 +90,56 @@ import {
   signUpConfirmationPlugin,
   type SignUpAddressConfirmation,
 } from "./http.sign-up-confirmation.channel.ts";
+import { socialProviderBasesPlugin } from "./http.social-provider-bases.channel.ts";
 
 const logger = createLogger("langwatch:better-auth");
+
+/**
+ * Return addresses better-auth's origin check refuses ("Invalid callbackURL: ..."): the caller
+ * is answered and needs nothing from us.
+ */
+const CALLER_REFUSAL_MESSAGES = [
+  /^Invalid (?:callbackURL|errorCallbackURL|newUserCallbackURL|redirectURL)\b/,
+];
+
+/**
+ * better-auth logs "Failed to parse state" for any failure reading a sign-in's state back. Only
+ * these `StateError` codes are the caller's (an expired or tampered attempt, started again);
+ * `state_generation_error` or a non-state error is ours and stays at error.
+ */
+const CALLER_STATE_CODES: ReadonlySet<string> = new Set([
+  "state_not_found",
+  "state_mismatch",
+  "state_invalid",
+  "state_security_mismatch",
+]);
+
+function isCallerStateRefusal({ message, args }: { message: string; args: readonly unknown[] }) {
+  if (!/^Failed to parse state\b/.test(message)) return false;
+  const first = args[0];
+  const code = typeof first === "object" && first !== null && "code" in first ? first.code : void 0;
+  return typeof code === "string" && CALLER_STATE_CODES.has(code);
+}
+
+/** The level a better-auth log line is written at here: its own, but caller refusals warn. */
+export function betterAuthLogLevel({
+  level,
+  message,
+  args = [],
+}: {
+  level: string | undefined;
+  message: string;
+  /** What better-auth logged alongside the message; the state refusal's error is first. */
+  args?: readonly unknown[];
+}): "error" | "warn" | "info" {
+  if (level === "error") {
+    const refused =
+      CALLER_REFUSAL_MESSAGES.some((pattern) => pattern.test(message)) ||
+      isCallerStateRefusal({ message, args });
+    return refused ? "warn" : "error";
+  }
+  return level === "warn" ? "warn" : "info";
+}
 
 /**
  * Everything about this deployment the option set is built from.
@@ -123,6 +174,8 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
   isProduction: boolean;
   /** Social providers this deployment mounted, already built. */
   socialProviders: NonNullable<BetterAuthOptions["socialProviders"]>;
+  /** Where each social provider is reached; unset is the real provider. */
+  socialProviderBases?: Partial<SocialProviderBases> | undefined;
   /** Generic-OIDC connections this deployment mounted, already built. */
   genericOAuthConfigs: readonly Parameters<typeof genericOAuth>[0]["config"][number][];
 }>;
@@ -134,6 +187,17 @@ export type BetterAuthDeploymentConfiguration = Readonly<{
  */
 function refuseDirectEmailSignUp(pathname: string): void {
   if (!pathname.endsWith("/sign-up/email")) return;
+
+  throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
+}
+
+/**
+ * Seals the plugin's raw `/two-factor/disable`: turning it off belongs to identity's
+ * `twoStepVerification.disable`, which refuses where an organization requires it and
+ * re-proves a current code. Server-side calls carry no request URL and pass.
+ */
+export function refuseDirectTwoStepDisable(pathname: string): void {
+  if (!pathname.endsWith("/two-factor/disable")) return;
 
   throw APIError.from("NOT_FOUND", { code: "NOT_FOUND", message: "Not found" });
 }
@@ -161,6 +225,9 @@ function refusesCredentialRoute({
 
 /** Whether an organization's own connection governs this address (D04). */
 type AddressRoutesToConnection = (input: { email: string }) => Promise<boolean>;
+
+/** The two assertion questions the connection's own sign-in route asks of identity. */
+type SsoAssertions = Pick<SsoAssertionApi, "decide" | "resolveUser">;
 
 /**
  * A password reset for an address an organization signs in through its own
@@ -309,6 +376,7 @@ function createBeforeRequestHook({
 
     await refuseLockedOutAddress({ pathname, body: ctx.body, signInLockout });
     refuseDirectEmailSignUp(pathname);
+    refuseDirectTwoStepDisable(pathname);
     await runSignInRouterShadow({ pathname, url, body: ctx.body, shadow });
 
     await refuseConnectionGovernedReset({ pathname, body: ctx.body, addressRoutesToConnection });
@@ -350,6 +418,36 @@ function createBeforeRequestHook({
       });
     }
   };
+}
+
+type CallbackEvidenceArgs = {
+  evidence: SessionMintClaims["evidence"];
+  account: Partial<Record<"providerId" | "accountId" | "idToken", unknown>>;
+  context: { path?: string; params?: Record<string, string | undefined> } | null | undefined;
+};
+
+/**
+ * What an Auth0 or Okta callback proved, kept for the session it is about to mint: the
+ * verified ID token first, then the account it accepted (main's database hooks).
+ */
+export function recordCallbackEvidence({ evidence, account, context }: CallbackEvidenceArgs): void {
+  if (typeof account.providerId !== "string") return;
+  evidence.recordVerifiedCallbackToken({
+    providerId: account.providerId,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
+    verifiedIdToken: typeof account.idToken === "string" ? account.idToken : undefined,
+  });
+  recordCallbackAccount({ evidence, account, context });
+}
+
+/** The written account row: a sign-in's update carries no accountId until after it lands. */
+export function recordCallbackAccount({ evidence, account, context }: CallbackEvidenceArgs): void {
+  if (typeof account.providerId !== "string" || typeof account.accountId !== "string") return;
+  evidence.recordAuthenticatedCallbackAccount({
+    providerId: account.providerId,
+    providerAccountId: account.accountId,
+    path: context?.path === undefined ? undefined : toConcretePath(context.path, context.params),
+  });
 }
 
 /**
@@ -474,6 +572,14 @@ export const createAuthOptions = ({
       amr: { type: "string[]", required: false, input: false },
       // Which of the person's identifiers minted it (D06), written by the same hook only.
       identifierId: { type: "string", required: false, input: false },
+      // The account's first session (specs/identity/passkeys.feature), written by the same hook
+      // only; hidden so get-session stays unchanged.
+      startedBySignUp: {
+        type: "boolean",
+        defaultValue: false,
+        input: false,
+        returned: false,
+      },
     },
     // Preserve NextAuth's 30-day session TTL. BetterAuth defaults to 7 days,
     // which would force users to re-auth more often than before. Match the
@@ -570,7 +676,10 @@ export const createAuthOptions = ({
   },
 
   secondaryStorage: undefined,
-  socialProviders: deployment.socialProviders,
+  socialProviders: withSocialProviderBases({
+    providers: deployment.socialProviders,
+    bases: deployment.socialProviderBases ?? {},
+  }),
   plugins: genericOAuthPlugins(deployment),
 
   databaseHooks: {
@@ -610,6 +719,7 @@ export const createAuthOptions = ({
             findGoverningConnections,
             linkProposals: hooks.linkProposals,
           })(account, context);
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
           // ADR-101 §2: the account row is an identifier attach. Returning
           // the row data pins its id, which is what makes the live identifier id and the backfill's
           // derived id the same id.
@@ -617,7 +727,8 @@ export const createAuthOptions = ({
           const pin = await identity.createAccountIdentifier(account);
           return pin.pinned ? { data: pin.data } : undefined;
         },
-        after: async (account) => {
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           if (!account.userId || !account.providerId || !account.accountId) return;
           await afterAccountCreate({
             repo,
@@ -631,7 +742,12 @@ export const createAuthOptions = ({
         },
       },
       update: {
-        after: async (account) => {
+        before: async (account, context) => {
+          recordCallbackEvidence({ evidence: sessionClaims.evidence, account, context });
+          return undefined;
+        },
+        after: async (account, context) => {
+          recordCallbackAccount({ evidence: sessionClaims.evidence, account, context });
           // BetterAuth refreshes tokens on the linked Account row on every
           // OAuth sign-in. Use that as the trigger to reconcile pendingSsoSetup
           // for users whose correct-provider account is already linked.
@@ -694,8 +810,9 @@ export const createAuthOptions = ({
   // BetterAuth logger wiring
   logger: {
     disabled: false,
-    log: (level, message, ...args) => {
+    log: (stated, message, ...args) => {
       idTokenIssuerRefusals?.note([message, ...args]);
+      const level = betterAuthLogLevel({ level: stated, message, args });
       if (level === "error") {
         logger.error({ args }, message);
       } else if (level === "warn") {
@@ -783,7 +900,7 @@ function ssoPlugin({
   assertions,
   evidence,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   evidence: Pick<SessionCallbackEvidenceChannel, "recordAuthenticatedSsoAccount">;
 }): ReturnType<typeof sso> {
   return sso({
@@ -843,7 +960,7 @@ export async function resolveSsoUser({
   input,
   context,
 }: {
-  assertions: SsoAssertionApi;
+  assertions: SsoAssertions;
   input: SSOUserResolutionInput;
   context: SSOUserResolutionContext;
 }): Promise<SSOUserResolution> {
@@ -921,7 +1038,7 @@ type BetterAuthTransportOptions = Readonly<{
   /** The connection's arrival door every federated sign-in is asked of. */
   arrivals: BetterAuthHookCollaborators["arrivals"];
   /** Whether a customer's identity provider may assert this address at all. */
-  ssoAssertions: SsoAssertionApi;
+  ssoAssertions: SsoAssertions;
   /** Whose registered issuers this request is allowed to reach. */
   ssoIssuers: BetterAuthSsoIssuers;
   /** Where a sign-in through a connection is recorded as having happened. */
@@ -1032,6 +1149,7 @@ const transportOptions = ({
     plugins: [
       samlOwnOriginRepost,
       ...genericOAuthPlugins(deployment),
+      socialProviderBasesPlugin({ bases: deployment.socialProviderBases ?? {} }),
       ...(deployment.mfaEnrollmentOpen ? [twoFactorPlugin()] : []),
       ...(deployment.passkeysEnabled
         ? [

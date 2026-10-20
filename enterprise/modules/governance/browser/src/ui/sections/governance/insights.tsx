@@ -102,8 +102,7 @@ function InboxEmptyBrief({
           <Text
             as="h2"
             fontFamily={SERIF}
-            // 44px mark ÷ φ, the same pairing the panel's greeting uses.
-            fontSize="27px"
+            textStyle="pageTitle"
             fontWeight="500"
             letterSpacing="-0.02em"
             lineHeight="1.2"

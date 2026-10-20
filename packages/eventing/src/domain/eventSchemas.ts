@@ -3,8 +3,16 @@ import type { z } from "zod";
 import type { Event } from "./types.ts";
 
 /** A contract's whole, versioned zod event schema, keyed by its `type` literal (§9). */
-export type PipelineEventSchema<E extends Event = Event> = z.ZodType<E> & {
-  readonly shape: { readonly type: z.ZodLiteral<E["type"]> };
+/** The zod schema surface eventing reads; core-typed so no zod class variance is measured. */
+export interface ParsingSchema<Output = unknown> extends z.core.$ZodType<Output> {
+  parse(data: unknown): z.output<this>;
+  safeParse(data: unknown): z.ZodSafeParseResult<z.output<this>>;
+}
+
+export type PipelineEventSchema<E extends Event = Event> = ParsingSchema<E> & {
+  readonly shape: {
+    readonly type: z.core.$ZodType<E["type"]> & { readonly values: ReadonlySet<E["type"]> };
+  };
 };
 
 export function indexEventSchemas<Schema extends PipelineEventSchema>({

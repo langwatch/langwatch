@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -178,8 +179,8 @@ export function SpanEditorPanel() {
       </Flex>
 
       {span.status === "error" && (
-        <Box rounded="lg" border="1px solid" borderColor="red.muted" bg="red.subtle" p={3}>
-          <Text fontSize="xs" fontWeight="medium" color="fg.error" mb={1}>
+        <Card variant="nested" tone="red" padding="sm">
+          <Text as="h3" fontSize="xs" fontWeight="medium" color="fg.error" mb={1}>
             Exception
           </Text>
           <Input
@@ -209,7 +210,7 @@ export function SpanEditorPanel() {
             fontFamily="mono"
             fontSize="xs"
           />
-        </Box>
+        </Card>
       )}
 
       <Flex gap={3}>

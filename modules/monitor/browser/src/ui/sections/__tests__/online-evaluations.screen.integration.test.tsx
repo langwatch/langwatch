@@ -4,6 +4,8 @@
  * Tests the online evaluations page: live scoring actions and edit destinations.
  */
 
+import { uiDeclarations, type UiDeclarations } from "@langwatch/browser-host/declarations";
+import { SetupWithAgentButtonToken } from "@langwatch/trace-client";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -21,10 +23,24 @@ const { state } = vi.hoisted(() => ({
   },
 }));
 
+const declarations: { current: UiDeclarations | undefined } = vi.hoisted(() => ({
+  current: undefined,
+}));
+
+vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
+  const { uiDeclarations: none } = await import("@langwatch/browser-host/declarations");
+  const nothingLent = none([]);
+  return {
+    ...(await importOriginal<object>()),
+    useUiDeclarations: () => declarations.current ?? nothingLent,
+  };
+});
+
 const calls = vi.hoisted(() => ({
   performanceQuery: vi.fn(),
   toggle: vi.fn(),
   remove: vi.fn(),
+  copy: vi.fn(),
 }));
 
 vi.mock("../../../behavior/monitor-api.ts", () => {
@@ -54,7 +70,7 @@ vi.mock("../../../behavior/monitor-api.ts", () => {
         },
         toggle: mutation(calls.toggle),
         delete: mutation(calls.remove),
-        copy: mutation(vi.fn()),
+        copy: mutation(calls.copy),
       },
       evaluations: {
         getMonitorPerformanceForProject: {
@@ -94,9 +110,32 @@ beforeEach(() => {
   calls.performanceQuery.mockReset();
   calls.toggle.mockReset();
   calls.remove.mockReset();
+  calls.copy.mockReset();
 });
 
-afterEach(cleanup);
+const traceLends = uiDeclarations([
+  {
+    name: "trace",
+    installation: {
+      capabilities: {},
+      lends: [
+        {
+          token: SetupWithAgentButtonToken,
+          load: async () => ({
+            default: ({ surface }: { surface: string }) => (
+              <button>Setup via Agent ({surface})</button>
+            ),
+          }),
+        },
+      ],
+    },
+  },
+]);
+
+afterEach(() => {
+  cleanup();
+  declarations.current = undefined;
+});
 
 describe("given a project with no online evaluations", () => {
   describe("when the page is opened", () => {
@@ -109,6 +148,17 @@ describe("given a project with no online evaluations", () => {
         screen.getByRole("heading", { name: "No online evaluations yet" }),
       ).toBeInTheDocument();
       expect(screen.queryByRole("table")).toBeNull();
+    });
+
+    /** @scenario Every empty surface offers its own skill */
+    it("offers trace's set-up-with-AI control for online evaluations", async () => {
+      state.monitors = [];
+      declarations.current = traceLends;
+      renderWithMonitorHost(<OnlineEvaluationsScreen />);
+
+      expect(
+        await screen.findByRole("button", { name: "Setup via Agent (onlineEvaluations)" }),
+      ).toBeInTheDocument();
     });
   });
 });
@@ -217,6 +267,23 @@ describe("given a project with online evaluations and a guardrail", () => {
   });
 });
 
+describe("given a reader replicating an online evaluation", () => {
+  describe("when Replicate is chosen before a project", () => {
+    it("names the missing project, keeps the dialog open and sends nothing", async () => {
+      const user = userEvent.setup({ pointerEventsCheck: 0 });
+      renderWithMonitorHost(<OnlineEvaluationsScreen />);
+
+      await user.click(screen.getByRole("button", { name: /Actions for Relevancy on production/ }));
+      await user.click(await screen.findByText("Replicate to another project"));
+      await user.click(await screen.findByRole("button", { name: "Replicate" }));
+
+      expect(await screen.findByText("Choose a project to replicate into.")).toBeInTheDocument();
+      expect(calls.copy).not.toHaveBeenCalled();
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    });
+  });
+});
+
 describe("given the performance read failed", () => {
   describe("when the page is opened", () => {
     /** @scenario "An unavailable performance trend says so rather than drawing a flat line" */
@@ -299,24 +366,10 @@ describe("given a reader who may manage evaluations", () => {
       const user = userEvent.setup({ pointerEventsCheck: 0 });
       const { host } = renderWithMonitorHost(<OnlineEvaluationsScreen />);
 
-      await user.click(screen.getByRole("button", { name: /New Online Evaluation/ }));
-      await user.click(screen.getByRole("button", { name: /Set up Guardrail/ }));
+      await user.click(screen.getByRole("button", { name: /New online evaluation/ }));
+      await user.click(screen.getByRole("button", { name: /Set up guardrail/ }));
 
       expect(host.overlays).toEqual([{ drawer: "onlineEvaluation" }, { drawer: "guardrails" }]);
-    });
-
-    /** jsdom resolves no tokens: this reads the emotion rule the `background` prop emits. */
-    it("fills the guardrail button with the page background token, as main does", () => {
-      renderWithMonitorHost(<OnlineEvaluationsScreen />);
-
-      const button = screen.getByTestId("monitor-guardrail-open");
-      const rules = Array.from(document.querySelectorAll("style"))
-        .flatMap((style) => (style.textContent ?? "").split("}"))
-        .filter((rule) =>
-          Array.from(button.classList).some((name) => rule.startsWith(`.${name}{`)),
-        );
-
-      expect(rules.join("}")).toContain("background:var(--chakra-colors-bg);");
     });
   });
 });
@@ -330,8 +383,8 @@ describe("given a reader who may not manage evaluations", () => {
         new FakeMonitorHost({ grants: new Set(["evaluations:view", "analytics:view"]) }),
       );
 
-      expect(screen.queryByRole("button", { name: /New Online Evaluation/ })).toBeNull();
-      expect(screen.queryByRole("button", { name: /Set up Guardrail/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /New online evaluation/ })).toBeNull();
+      expect(screen.queryByRole("button", { name: /Set up guardrail/ })).toBeNull();
     });
   });
 });

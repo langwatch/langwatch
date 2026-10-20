@@ -126,7 +126,7 @@ describe("CodeEvaluatorEditorDrawer", () => {
 
     describe("when required fields are incomplete", () => {
       /** @scenario A disabled code evaluator Create button explains what is missing */
-      it("names the missing requirement and clears it once filled", async () => {
+      it("names the missing requirement on submit and clears it once filled", async () => {
         renderWithDesignSystem(<CodeEvaluatorEditorDrawer open />);
 
         await waitFor(() => {
@@ -134,22 +134,27 @@ describe("CodeEvaluatorEditorDrawer", () => {
         });
 
         // Create mode seeds default code and inputs, so the one outstanding
-        // requirement is the name: the button is disabled and says why, instead
-        // of being a silent dead button.
-        expect(screen.getByTestId("save-code-evaluator")).toBeDisabled();
-        expect(screen.getByTestId("code-evaluator-disabled-reason")).toHaveTextContent(
+        // requirement is the name. Create stays enabled, says nothing until it
+        // is pressed, then names the requirement and puts the cursor on the name.
+        expect(screen.getByTestId("save-code-evaluator")).toBeEnabled();
+        expect(screen.queryByTestId("code-evaluator-disabled-reason")).not.toBeInTheDocument();
+
+        fireEvent.click(screen.getByTestId("save-code-evaluator"));
+
+        expect(await screen.findByTestId("code-evaluator-disabled-reason")).toHaveTextContent(
           "Add a name to create the evaluator.",
         );
+        expect(screen.getByTestId("code-evaluator-name")).toHaveFocus();
 
-        // Filling the name satisfies it: the reason clears and Create enables.
+        // Filling the name satisfies it: the message clears as the author types.
         fireEvent.change(screen.getByTestId("code-evaluator-name"), {
           target: { value: "my eval" },
         });
 
         await waitFor(() => {
-          expect(screen.getByTestId("save-code-evaluator")).toBeEnabled();
+          expect(screen.queryByTestId("code-evaluator-disabled-reason")).not.toBeInTheDocument();
         });
-        expect(screen.queryByTestId("code-evaluator-disabled-reason")).not.toBeInTheDocument();
+        expect(screen.getByTestId("save-code-evaluator")).toBeEnabled();
       });
     });
 

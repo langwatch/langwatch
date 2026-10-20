@@ -11,7 +11,7 @@ export type PropertySectionTitleProps = {
 export function PropertySectionTitle({ children, tooltip, ...props }: PropertySectionTitleProps) {
   return (
     <HStack paddingLeft={2} {...props}>
-      <Text fontSize="12px" fontWeight="bold" textTransform="uppercase" color="fg.muted">
+      <Text textStyle="eyebrow" color="fg.muted">
         {children}
       </Text>
       {tooltip && (

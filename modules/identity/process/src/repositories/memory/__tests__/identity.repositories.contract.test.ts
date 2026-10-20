@@ -54,13 +54,18 @@ describe("given the memory identity repositories", () => {
   });
 
   describe("when an address is held on the legacy branch", () => {
-    it("answers the holder case-insensitively", async () => {
+    /** User stores addresses lower-cased; a row still carrying capitals awaits its step. */
+    it("answers the holder of the exact lower-cased address", async () => {
       const { store, repositories } = scenario();
-      seedUser(store, "user_1", "Sam@Acme.com");
+      seedUser(store, "user_1", "sam@acme.com");
+      seedUser(store, "user_2", "Kim@Acme.com");
 
       expect(
         await repositories.users.findUserIdsByEmail({ normalizedValue: "sam@acme.com" }),
       ).toEqual(["user_1"]);
+      expect(
+        await repositories.users.findUserIdsByEmail({ normalizedValue: "kim@acme.com" }),
+      ).toEqual([]);
     });
   });
 
@@ -169,7 +174,8 @@ describe("given the memory identity repositories", () => {
 
 describe("given the memory identity repositories' reopen sweep", () => {
   describe("when it runs over finalized users", () => {
-    it("reopens only an unproven account, writes nothing on a dry run, and finds nothing twice", async () => {
+    /** @scenario "The reopen sweep leaves an unproven account carrying only its address finalized" */
+    it("reopens only an unproven account carrying a pre-proof method, once", async () => {
       const { store, repositories } = scenario();
       seedUser(store, "user_confirmed", "kim@acme.com");
       store.users.set("user_unproven", {
@@ -189,7 +195,26 @@ describe("given the memory identity repositories' reopen sweep", () => {
         userHashKey: null,
         payload: {},
       });
-      for (const userId of ["user_confirmed", "user_unproven", "user_signed_in"]) {
+      store.accounts.set("user_unproven", [
+        {
+          id: "acc_pre_proof",
+          provider: "credential",
+          issuer: null,
+          providerAccountId: "user_unproven",
+          createdAtMs: 1_700_000_000_000,
+        },
+      ]);
+      // Unproven too, but carrying only its address: finalized under the safe rule, left alone.
+      store.users.set("user_address_only", {
+        id: "user_address_only",
+        email: "ana@acme.com",
+        emailVerified: false,
+        createdAtMs: 1_700_000_000_000,
+        userHashKey: null,
+        payload: {},
+      });
+      const finalized = ["user_confirmed", "user_unproven", "user_signed_in", "user_address_only"];
+      for (const userId of finalized) {
         await repositories.latch.recordFinalized({ userId, report: null });
       }
 
@@ -200,6 +225,7 @@ describe("given the memory identity repositories' reopen sweep", () => {
       expect(await repositories.latch.isFinalized({ userId: "user_unproven" })).toBe(false);
       expect(await repositories.latch.isFinalized({ userId: "user_confirmed" })).toBe(true);
       expect(await repositories.latch.isFinalized({ userId: "user_signed_in" })).toBe(true);
+      expect(await repositories.latch.isFinalized({ userId: "user_address_only" })).toBe(true);
       expect(await repositories.migration.reopenUnprovenAccounts({ dryRun: false })).toBe(0);
     });
   });

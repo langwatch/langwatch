@@ -4,21 +4,19 @@
  *           specs/model-providers/model-default-config-cascade.feature.
  */
 import type { WireOf } from "@langwatch/api/web";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
   Button,
-  Card,
-  EmptyState,
-  Heading,
   HStack,
   IconButton,
-  Skeleton,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SectionTitle } from "@langwatch/design-system/typography";
 import type {
   ModelDefaultConfigSnapshot,
   ModelDefaultFeature,
@@ -168,21 +166,17 @@ export function DefaultModelsSection({
         </Button>
       </HStack>
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingX={0} paddingY={0} overflowX="auto">
-          <AllConfigsView
-            configs={visibleConfigs}
-            allConfigs={data.configs}
-            features={data.features}
-            hierarchy={hierarchy}
-            onEdit={openEdit}
-            onDelete={handleDelete}
-            onAdd={openAdd}
-            enabledProviderKeys={enabledProviderKeys}
-            displayNames={displayNames}
-          />
-        </Card.Body>
-      </Card.Root>
+      <AllConfigsView
+        configs={visibleConfigs}
+        allConfigs={data.configs}
+        features={data.features}
+        hierarchy={hierarchy}
+        onEdit={openEdit}
+        onDelete={handleDelete}
+        onAdd={openAdd}
+        enabledProviderKeys={enabledProviderKeys}
+        displayNames={displayNames}
+      />
     </VStack>
   );
 }
@@ -190,12 +184,10 @@ export function DefaultModelsSection({
 function DefaultModelsHeading() {
   return (
     <VStack align="start" gap={1}>
-      <Heading as="h3" size="md">
-        Default Models
-      </Heading>
-      <Text fontSize="sm" color="fg.muted">
+      <SectionTitle>Default models</SectionTitle>
+      <Text textStyle="body" color="fg.muted">
         AI features across the platform: prompt creation, evaluations, traces search, topic
-        clustering and more
+        clustering and more.
       </Text>
     </VStack>
   );
@@ -227,45 +219,34 @@ function AllConfigsView({
 }) {
   if (configs.length === 0) {
     return (
-      <EmptyState.Root width="full" paddingY={10}>
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <SlidersHorizontal size={24} />
-          </EmptyState.Indicator>
-          <VStack textAlign="center" gap={2}>
-            <EmptyState.Title>No default models configured</EmptyState.Title>
-            <EmptyState.Description>
-              Define a default model for prompt creation, evaluations, traces search, topic
-              clustering and more.
-            </EmptyState.Description>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={onAdd}
-              data-testid="empty-state-add-config"
-            >
-              Select default models
-            </Button>
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        size="inline"
+        icon={<SlidersHorizontal size={24} />}
+        title="No default models configured"
+        description="Define a default model for prompt creation, evaluations, traces search, topic clustering and more."
+        primaryAction={
+          <Button size="sm" variant="outline" onClick={onAdd} data-testid="empty-state-add-config">
+            Select default models
+          </Button>
+        }
+      />
     );
   }
   return (
-    <Table.Root variant="line" size="md" width="full">
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
+    <ListTable scroll="x" scrollLabel="Default models by scope">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
           {MODEL_ROLES.map((role) => (
-            <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
+            <ListTable.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</ListTable.ColumnHeader>
           ))}
-          <Table.ColumnHeader textAlign="right" />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {configs.map((config) => (
-          <Table.Row key={config.id} data-testid={`config-row-${config.id}`}>
-            <Table.Cell>
+          <ListTable.Row key={config.id} data-testid={`config-row-${config.id}`}>
+            <ListTable.Cell>
               <HStack gap={2} flexWrap="wrap">
                 {config.scopes.map((scope) => (
                   <ScopeChip
@@ -275,9 +256,9 @@ function AllConfigsView({
                   />
                 ))}
               </HStack>
-            </Table.Cell>
+            </ListTable.Cell>
             {MODEL_ROLES.map((role) => (
-              <Table.Cell
+              <ListTable.Cell
                 key={role}
                 data-testid={`config-row-${config.id}-cell-${role.toLowerCase()}`}
               >
@@ -292,9 +273,9 @@ function AllConfigsView({
                   enabledProviderKeys={enabledProviderKeys}
                   displayNames={displayNames}
                 />
-              </Table.Cell>
+              </ListTable.Cell>
             ))}
-            <Table.Cell textAlign="right">
+            <ListTable.ActionCell>
               {/* Matches the model-providers table: a vertical 3-dot menu with
                   Edit + Delete rather than a pencil in the row and a Delete
                   button buried in the drawer footer. */}
@@ -339,11 +320,11 @@ function AllConfigsView({
                   </Menu.Item>
                 </Menu.Content>
               </Menu.Root>
-            </Table.Cell>
-          </Table.Row>
+            </ListTable.ActionCell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
-    </Table.Root>
+      </ListTable.Body>
+    </ListTable>
   );
 }
 
@@ -494,37 +475,21 @@ function ScopeChip({ type, name }: { type: ModelProviderScopeType; name: string 
 
 function DefaultModelsTableSkeleton() {
   return (
-    <Card.Root width="full" overflow="hidden" data-testid="default-models-table-skeleton">
-      <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-        <Table.Root variant="line" size="md" width="full">
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-              {MODEL_ROLES.map((role) => (
-                <Table.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</Table.ColumnHeader>
-              ))}
-              <Table.ColumnHeader textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {[0, 1, 2].map((index) => (
-              <Table.Row key={index}>
-                <Table.Cell>
-                  <Skeleton width="100px" height="20px" borderRadius="full" />
-                </Table.Cell>
-                {MODEL_ROLES.map((role) => (
-                  <Table.Cell key={role}>
-                    <Skeleton width="160px" height="16px" />
-                  </Table.Cell>
-                ))}
-                <Table.Cell textAlign="right">
-                  <Skeleton width="24px" height="24px" borderRadius="md" marginLeft="auto" />
-                </Table.Cell>
-              </Table.Row>
+    <Box width="full" data-testid="default-models-table-skeleton">
+      <ListTable scroll="x" scrollLabel="Default models by scope" loading>
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
+            {MODEL_ROLES.map((role) => (
+              <ListTable.ColumnHeader key={role}>{MODEL_ROLE_LABEL[role]}</ListTable.ColumnHeader>
             ))}
-          </Table.Body>
-        </Table.Root>
-      </Card.Body>
-    </Card.Root>
+            <ListTable.ActionHeader />
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          <ListTable.LoadingRows rows={3} columns={MODEL_ROLES.length + 2} />
+        </ListTable.Body>
+      </ListTable>
+    </Box>
   );
 }

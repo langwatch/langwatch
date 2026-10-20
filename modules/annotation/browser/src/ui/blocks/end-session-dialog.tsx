@@ -1,7 +1,6 @@
 /** The question asked before a sitting ends with nothing handed over to a dataset. */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button } from "@langwatch/design-system/primitives";
 
 /** What the reviewer is asked before the session ends with no dataset. */
 export const END_SESSION_QUESTION =
@@ -17,29 +16,13 @@ export function EndSessionDialog({
   onCancel: () => void;
 }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
+      onClose={onCancel}
+      title={END_SESSION_QUESTION}
+      size="sm"
       placement="center"
-      onOpenChange={({ open: nextOpen }) => {
-        if (!nextOpen) onCancel();
-      }}
-    >
-      <Dialog.Content maxWidth="480px">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="sm" fontWeight="500">
-            {END_SESSION_QUESTION}
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button colorPalette="orange" onClick={onConfirm}>
-            Confirm
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      primaryAction={{ label: "Confirm", onClick: onConfirm }}
+    />
   );
 }

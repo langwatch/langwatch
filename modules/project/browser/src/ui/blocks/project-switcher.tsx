@@ -28,7 +28,7 @@ export default function ProjectSwitcher() {
 
   if (!current) return null;
 
-  const pathname = route.reading().pathname ?? "";
+  const { pathname = "", query } = route.reading();
   const follow = (href: string) => (event: MouseEvent<HTMLAnchorElement>) => {
     const isModifiedClick = event.metaKey || event.ctrlKey || event.shiftKey || event.altKey;
     if (isModifiedClick || event.button !== 0) return;
@@ -42,7 +42,7 @@ export default function ProjectSwitcher() {
       <Menu.Trigger asChild>
         <Button
           variant="ghost"
-          fontSize="13px"
+          textStyle="bodySm"
           paddingX={2}
           paddingY={1}
           height="auto"
@@ -68,11 +68,12 @@ export default function ProjectSwitcher() {
               {group.projects.map((project) => {
                 const href = projectSwitchHref({
                   pathname,
+                  query,
                   currentProjectSlug: current.slug,
                   targetSlug: project.slug,
                 });
                 return (
-                  <Menu.Item key={project.id} value={project.id} fontSize="14px" asChild>
+                  <Menu.Item key={project.id} value={project.id} textStyle="body" asChild>
                     <Link href={href} onClick={follow(href)} _hover={{ textDecoration: "none" }}>
                       <HStack gap={2} minWidth={0}>
                         <ProjectAvatar name={project.name} />

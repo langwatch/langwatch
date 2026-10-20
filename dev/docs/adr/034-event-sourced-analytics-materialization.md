@@ -103,6 +103,11 @@ sums:    CostSum, NonBilledCostSum, DurationSum (root span),
 
 The eval rollup also enables `dedupeByIdempotencyKey`: eval terminal events are re-reported by design (deterministic ids, SDK retries), so without it every duplicate append would double-count the bucket — unlike the accepted per-span crash-retry noise on the trace side.
 
+Since the group queue re-runs a job whose worker died (at-least-once, 2026-10-12), a re-run of the
+same event can add its contribution to the trace and evaluation rollups a second time;
+`dedupeByIdempotencyKey` catches two events sharing a key, not one event delivered twice. This rare
+double count stays accepted noise (Alex, 2026-10-12).
+
 ## Consequences
 
 - Native ClickHouse aggregation; no app-level summing of mutable state, no signs.

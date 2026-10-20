@@ -75,7 +75,6 @@ function noticeOver() {
   const notice = ProjectCreatedNoticeService.create({
     logger,
     projects: {
-      findIdsByOrganization: async () => Object.keys(admins),
       findWithTeam: async (id) => {
         const found = admins[id];
         return found ? projectWithTeam({ id, ...found }) : null;
@@ -93,12 +92,14 @@ function noticeOver() {
       send: async (payload) => {
         sent.push(payload);
       },
+      sendBatch: async () => undefined,
     },
     recordProjectLegacyKeyRevoked: { send: async () => undefined },
     recordPresenceSettingChanged: {
       send: async (payload) => {
         presence.push(payload);
       },
+      sendBatch: async () => undefined,
     },
     recordProjectMoved: { send: async () => undefined },
     recordProjectArchived: { send: async () => undefined },
@@ -106,6 +107,7 @@ function noticeOver() {
       send: async (payload) => {
         departments.push(payload);
       },
+      sendBatch: async () => undefined,
     },
     recordProjectTraceSharingDisabled: { send: async () => undefined },
     recordProjectAggregateRuleChanged: { send: async () => undefined },
@@ -116,19 +118,21 @@ function noticeOver() {
 
 describe("ProjectCreatedNoticeService", () => {
   /** @scenario "A failed project created fact logs the catch-up that recovers it" */
-  it("names the backfill-project-created task when recording a new project fails", async () => {
+  it("names the project facts step to retry when recording a new project fails", async () => {
     const { notice, logger } = noticeOver();
+    const idle = { send: async () => undefined, sendBatch: async () => undefined };
     notice.connect({
       recordProjectCreated: {
         send: async () => {
           throw new Error("event store down");
         },
+        sendBatch: async () => undefined,
       },
       recordProjectLegacyKeyRevoked: { send: async () => undefined },
-      recordPresenceSettingChanged: { send: async () => undefined },
+      recordPresenceSettingChanged: idle,
       recordProjectMoved: { send: async () => undefined },
       recordProjectArchived: { send: async () => undefined },
-      recordProjectDepartmentAssigned: { send: async () => undefined },
+      recordProjectDepartmentAssigned: idle,
       recordProjectTraceSharingDisabled: { send: async () => undefined },
       recordProjectAggregateRuleChanged: { send: async () => undefined },
       recordProjectRevived: { send: async () => undefined },
@@ -144,7 +148,7 @@ describe("ProjectCreatedNoticeService", () => {
 
     expect(logger.error).toHaveBeenCalledWith(
       expect.objectContaining({ projectId: "project-1" }),
-      expect.stringContaining("backfill-project-created"),
+      expect.stringContaining("project:record-created-facts"),
     );
   });
 
@@ -158,84 +162,5 @@ describe("ProjectCreatedNoticeService", () => {
       expect.objectContaining({ projectId: "project-1", adminUserId: "admin-1" }),
     ]);
     expect(sent[0]?.backfilled).toBeUndefined();
-  });
-
-  /** @scenario "Existing projects are recorded as created by the backfill, idempotently" */
-  it("records every existing project marked backfilled, the same on every run", async () => {
-    const { notice, sent } = noticeOver();
-
-    await notice.recordExisting({ organizationId: "org-1" });
-    const firstRun = sent.map(({ occurredAt: _at, ...rest }) => rest);
-    sent.length = 0;
-    await notice.recordExisting({ organizationId: "org-1" });
-
-    expect(firstRun).toEqual([
-      {
-        tenantId: "project-1",
-        projectId: "project-1",
-        organizationId: "org-1",
-        adminUserId: "admin-1",
-        backfilled: true,
-      },
-      {
-        tenantId: "project-2",
-        projectId: "project-2",
-        organizationId: "org-1",
-        adminUserId: "admin-1",
-        backfilled: true,
-      },
-    ]);
-    expect(sent.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
-  });
-
-  /** @scenario "Existing projects' presence settings are recorded by the backfill, idempotently" */
-  it("records each project's stored presence setting once per run, marked backfilled", async () => {
-    const { notice, presence } = noticeOver();
-
-    await notice.recordExistingPresenceSettings({ organizationId: "org-1" });
-    const firstRun = presence.map(({ occurredAt: _at, ...rest }) => rest);
-    presence.length = 0;
-    await notice.recordExistingPresenceSettings({ organizationId: "org-1" });
-
-    expect(firstRun).toEqual([
-      {
-        tenantId: "project-1",
-        projectId: "project-1",
-        organizationId: "org-1",
-        presenceEnabled: true,
-        backfilled: true,
-      },
-      {
-        tenantId: "project-2",
-        projectId: "project-2",
-        organizationId: "org-1",
-        presenceEnabled: false,
-        backfilled: true,
-      },
-    ]);
-    expect(presence.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
-  });
-
-  /** @scenario "Existing projects' departments and teams are recorded by the backfill, idempotently" */
-  it("records each project's stored department and team once per run, marked backfilled", async () => {
-    const { notice, departments } = noticeOver();
-
-    await notice.recordExistingDepartmentAssignments({ organizationId: "org-1" });
-    const firstRun = departments.map(({ occurredAt: _at, ...rest }) => rest);
-    departments.length = 0;
-    await notice.recordExistingDepartmentAssignments({ organizationId: "org-1" });
-
-    expect(firstRun).toEqual(
-      ["project-1", "project-2"].map((projectId) => ({
-        tenantId: projectId,
-        projectId,
-        organizationId: "org-1",
-        departmentId: null,
-        teamId: "team-1",
-        isPersonal: false,
-        backfilled: true,
-      })),
-    );
-    expect(departments.map(({ occurredAt: _at, ...rest }) => rest)).toEqual(firstRun);
   });
 });

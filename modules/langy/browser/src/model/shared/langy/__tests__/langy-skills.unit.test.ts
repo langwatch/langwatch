@@ -38,6 +38,7 @@ describe("given the Langy skill catalogue", () => {
   describe("when the worker installs a skill", () => {
     it("offers every one of them, and nothing it does not install", () => {
       const installed = deriveSkills(REPO_ROOT)
+        .filter((skill) => !skill.internal)
         .map((skill) => skill.id)
         .toSorted();
       const offered = LANGY_SKILLS.filter(
@@ -51,6 +52,17 @@ describe("given the Langy skill catalogue", () => {
       expect(offered.length).toBeGreaterThan(1);
       expect(offered).toContain("github");
       expect(offered).toContain("tracing");
+    });
+  });
+
+  describe("when a skill is installed for a module's own brief to name", () => {
+    /** @scenario "The daily-insights skill is installed and never offered in the palette" */
+    it("is in the worker's catalogue, marked internal, and not offered", () => {
+      const installed = deriveSkills(REPO_ROOT).find((skill) => skill.id === "daily-insights");
+
+      expect(installed).toMatchObject({ id: "daily-insights", internal: true });
+      expect(findSkill("daily-insights")).toBeUndefined();
+      expect(LANGY_SKILLS.map((skill) => skill.id)).not.toContain("daily-insights");
     });
   });
 

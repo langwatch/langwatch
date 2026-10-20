@@ -32,7 +32,6 @@ export const noOrgBouncerRoutes = [
   // bounced to onboarding first.
   "/auth/resume",
   "/onboarding/welcome",
-  "/onboarding/[team]/project",
   "/onboarding/product",
   // Org-scoped governance pages — admin in an empty org (no project yet)
   // must still reach /governance/* to set up sources and rules. Bouncing

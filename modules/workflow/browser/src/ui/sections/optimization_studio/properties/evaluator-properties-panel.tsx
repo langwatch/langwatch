@@ -1,4 +1,6 @@
-import { Button, HStack, Spacer, Spinner } from "@langwatch/design-system/primitives";
+import { ActionRow } from "@langwatch/design-system/action-row";
+import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { type EvaluatorEditorValues, type EvaluatorOutputs } from "@langwatch/evaluator-client";
 import {
@@ -72,11 +74,7 @@ function DbEvaluatorPanel({ node, evaluatorRef }: { node: Node<Evaluator>; evalu
   );
 
   if (evaluatorQuery.isLoading) {
-    return (
-      <HStack justify="center" paddingY={8} width="full">
-        <Spinner size="md" />
-      </HStack>
-    );
+    return <SkeletonRows rows={3} />;
   }
 
   // A saved evaluator has a new updatedAt, which remounts the form onto it.
@@ -274,36 +272,31 @@ function DbEvaluatorForm({
   // Register footer with the drawer wrapper
   const footerContent = useMemo(
     () => (
-      <HStack width="full">
-        {hasLocalChanges && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDiscard}
-            data-testid="evaluator-discard-button"
-          >
-            Discard
-          </Button>
-        )}
-        <Spacer />
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleSave}
-          loading={updateMutation.isPending}
-          data-testid="evaluator-save-button"
-        >
-          Save
-        </Button>
-        <Button
-          colorPalette="blue"
-          size="sm"
-          onClick={handleApply}
-          data-testid="evaluator-apply-button"
-        >
-          Apply
-        </Button>
-      </HStack>
+      <ActionRow
+        note={
+          hasLocalChanges && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDiscard}
+              data-testid="evaluator-discard-button"
+            >
+              Discard
+            </Button>
+          )
+        }
+        secondaryAction={{
+          label: "Save",
+          onClick: handleSave,
+          loading: updateMutation.isPending,
+          "data-testid": "evaluator-save-button",
+        }}
+        primaryAction={{
+          label: "Apply",
+          onClick: handleApply,
+          "data-testid": "evaluator-apply-button",
+        }}
+      />
     ),
     [hasLocalChanges, handleDiscard, handleApply, handleSave, updateMutation.isPending],
   );
@@ -418,7 +411,8 @@ export function EvaluatorDrawerFooter({
         Apply
       </Button>
       <Button
-        colorPalette="blue"
+        colorPalette="orange"
+        variant="solid"
         size="sm"
         onClick={onSave}
         loading={isSaving}

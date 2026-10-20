@@ -8,18 +8,18 @@
     "resolveJsonModule": true,
     "rootDir": "src",
     "types": ["node"],
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../time/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

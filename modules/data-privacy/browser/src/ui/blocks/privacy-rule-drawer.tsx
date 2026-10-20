@@ -6,8 +6,8 @@ import type {
   ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Separator, Text, VStack } from "@langwatch/design-system/primitives";
-import { useEffect, useMemo, useState, type ReactNode } from "react";
+import { Alert, Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 
 import { describeAudienceSelection } from "../../model/data-privacy-labels.ts";
 import {
@@ -72,6 +72,7 @@ export function PrivacyRuleDrawer({
 }) {
   const [scopes, setScopes] = useState<PrivacyScopeEntry[]>([]);
   const [form, setForm] = useState<RuleFormState>(inheritFormState);
+  const [attempts, setAttempts] = useState(0);
   const update = (patch: Partial<RuleFormState>) =>
     setForm((previous) => ({ ...previous, ...patch }));
 
@@ -82,6 +83,7 @@ export function PrivacyRuleDrawer({
     if (!open) return;
     setScopes(initialScopes({ editingRule, available, projectId }));
     setForm(editingRule ? configToFormState(editingRule.config) : inheritFormState());
+    setAttempts(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open, editingRule]);
 
@@ -93,99 +95,117 @@ export function PrivacyRuleDrawer({
     effectiveOrganization,
   });
 
-  const config = useMemo<DataPrivacyConfig>(() => buildRuleConfig(form), [form]);
-  const canSave =
-    scopes.length > 0 &&
-    ruleHasChange({ config, editingRule }) &&
-    !formHasInvalidPatterns(form) &&
-    !isSaving;
+  const config: DataPrivacyConfig = buildRuleConfig(form);
+  const noScope = scopes.length === 0;
+  const unchanged = !ruleHasChange({ config, editingRule });
+  const badPatterns = formHasInvalidPatterns(form);
+
+  // Save stays clickable; an attempt with a problem shows it and moves focus there.
+  const scopeRef = useRef<HTMLDivElement>(null);
+  const summaryRef = useRef<HTMLDivElement>(null);
+  const focusScope = useRef(false);
+  const unchangedMessage = editingRule
+    ? "This rule has no changes to save."
+    : "Choose at least one setting other than Inherit.";
+  const summary = [
+    unchanged ? unchangedMessage : null,
+    badPatterns ? "Fix the patterns marked in red." : null,
+  ].filter((message) => message !== null);
+
+  useEffect(() => {
+    if (attempts === 0) return;
+    (focusScope.current ? scopeRef : summaryRef).current?.focus();
+  }, [attempts]);
+
+  const trySave = () => {
+    if (isSaving) return;
+    if (noScope || unchanged || badPatterns) {
+      focusScope.current = noScope;
+      setAttempts((count) => count + 1);
+      return;
+    }
+    onSave(scopes, config);
+  };
 
   return (
-    <Drawer.Root
-      placement="end"
-      size="md"
+    <Drawer
       open={open}
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) onClose();
-      }}
+      onClose={onClose}
+      title={editingRule ? "Edit privacy rule" : "Add privacy rule"}
+      size="md"
+      footer={{ primaryAction: { label: "Save", onClick: trySave, loading: isSaving } }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{editingRule ? "Edit privacy rule" : "Add privacy rule"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack gap={5} align="stretch">
-            {editingRule ? (
-              <VStack gap={1.5} align="start">
-                <Text fontWeight="600" fontSize="sm">
-                  Scope
-                </Text>
-                <RuleScopeLabel rule={editingRule} fontSize="sm" />
-              </VStack>
-            ) : (
-              scopePicker({ value: scopes, onChange: setScopes })
-            )}
-
-            <ContentDispositionFields
-              dispositions={form.dispositions}
-              inheritedBaseline={inheritedBaseline}
-              onChange={(dispositions) => update({ dispositions })}
-            />
-
-            <CustomAttributeRules
-              rows={form.customAttributes}
-              onChange={(customAttributes) => update({ customAttributes })}
-            />
-
-            {formRestrictsContent(form) && (
-              <VStack gap={2} align="stretch">
-                <Text fontWeight="600" fontSize="sm">
-                  Restricted content is visible to
-                </Text>
-                <AudiencePicker
-                  audience={form.audience}
-                  options={audienceOptions}
-                  onChange={(audience) => update({ audience })}
-                />
-                <Text fontSize="xs" color="fg.muted">
-                  {describeAudienceSelection(form.audience, audienceOptions)}
-                </Text>
-              </VStack>
-            )}
-
-            <Separator />
-
-            <PiiRedactionFields
-              form={form}
-              inheritedLevel={inheritedBaseline.pii.level}
-              onChange={update}
-            />
-
-            <SecretsRedactionFields
-              form={form}
-              inheritedEnabled={inheritedBaseline.secrets.enabled}
-              onChange={update}
-            />
+      <VStack gap={5} align="stretch">
+        {attempts > 0 && summary.length > 0 && (
+          <Alert.Root status="error" role="alert" ref={summaryRef} tabIndex={-1}>
+            <Alert.Indicator />
+            <Alert.Content>
+              {summary.map((message) => (
+                <Alert.Description key={message}>{message}</Alert.Description>
+              ))}
+            </Alert.Content>
+          </Alert.Root>
+        )}
+        {editingRule ? (
+          <VStack gap={1.5} align="start">
+            <Text fontWeight="600" fontSize="sm">
+              Scope
+            </Text>
+            <RuleScopeLabel rule={editingRule} fontSize="sm" />
           </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full" justify="end">
-            <Button
-              colorPalette="blue"
-              disabled={!canSave}
-              loading={isSaving}
-              onClick={() => {
-                if (scopes.length === 0) return;
-                onSave(scopes, config);
-              }}
-            >
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        ) : (
+          <Box ref={scopeRef} tabIndex={-1} outline="none">
+            {scopePicker({ value: scopes, onChange: setScopes })}
+            {attempts > 0 && noScope && (
+              <Text role="alert" fontSize="xs" color="fg.error" marginTop={1.5}>
+                Pick at least one scope to save this rule at.
+              </Text>
+            )}
+          </Box>
+        )}
+
+        <ContentDispositionFields
+          dispositions={form.dispositions}
+          inheritedBaseline={inheritedBaseline}
+          onChange={(dispositions) => update({ dispositions })}
+        />
+
+        <CustomAttributeRules
+          rows={form.customAttributes}
+          onChange={(customAttributes) => update({ customAttributes })}
+        />
+
+        {formRestrictsContent(form) && (
+          <VStack gap={2} align="stretch">
+            <Text fontWeight="600" fontSize="sm">
+              Restricted content is visible to
+            </Text>
+            <AudiencePicker
+              audience={form.audience}
+              options={audienceOptions}
+              onChange={(audience) => update({ audience })}
+            />
+            <Text fontSize="xs" color="fg.muted">
+              {describeAudienceSelection(form.audience, audienceOptions)}
+            </Text>
+          </VStack>
+        )}
+
+        <Separator />
+
+        <PiiRedactionFields
+          form={form}
+          inheritedLevel={inheritedBaseline.pii.level}
+          onChange={update}
+        />
+
+        <SecretsRedactionFields
+          form={form}
+          inheritedEnabled={inheritedBaseline.secrets.enabled}
+          onChange={update}
+        />
+      </VStack>
+    </Drawer>
   );
 }
 

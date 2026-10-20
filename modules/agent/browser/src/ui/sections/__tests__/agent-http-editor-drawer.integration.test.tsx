@@ -177,6 +177,35 @@ describe("AgentHttpEditorDrawer", () => {
       });
     });
 
+    describe("when Save is pressed on an incomplete draft", () => {
+      /** @scenario "Saving an HTTP agent without a name or endpoint says what is missing" */
+      it("stays clickable, names each missing field, focuses the name and creates nothing", async () => {
+        const created: unknown[] = [];
+        renderEditor({
+          onCreate: async (input) => {
+            created.push(input);
+            return savedAgent({});
+          },
+        });
+        const save = await screen.findByRole("button", { name: "Create Agent" });
+        fireEvent.change(screen.getByTestId("url-input"), { target: { value: "" } });
+        expect(save).toBeEnabled();
+
+        fireEvent.click(save);
+
+        expect(await screen.findByText("Enter an agent name.")).toBeInTheDocument();
+        expect(screen.getByText("Enter an endpoint URL.")).toBeInTheDocument();
+        await waitFor(() => expect(screen.getByTestId("agent-name-input")).toHaveFocus());
+        expect(created).toEqual([]);
+
+        fireEvent.change(screen.getByTestId("agent-name-input"), { target: { value: "Support" } });
+        fireEvent.click(save);
+
+        await waitFor(() => expect(screen.getByTestId("url-input")).toHaveFocus());
+        expect(created).toEqual([]);
+      });
+    });
+
     describe("when a saved agent holds a credential", () => {
       /** @scenario "The HTTP agent editor never shows a stored credential" */
       it("leaves the token blank and says it is stored", async () => {

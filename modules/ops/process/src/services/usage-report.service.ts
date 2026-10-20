@@ -15,6 +15,10 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import { type Instant, Temporal } from "@langwatch/time";
 
 import type { UsageReportChannel } from "../channels/usage-report.channel.ts";
+import type {
+  CloudLatestRelease,
+  CloudLatestReleaseRepository,
+} from "../repositories/cloud-latest-release.repository.ts";
 import { nextNoonUtc } from "../rules/usage-report-schedule.rules.ts";
 import type { UsageReportCollectionService } from "./usage-report-collection.service.ts";
 
@@ -52,6 +56,7 @@ interface UsageReportServiceDependencies {
   readonly organizations: Pick<OrganizationApi, "listAllIds">;
   readonly channel: UsageReportChannel;
   readonly install: UsageReportInstall;
+  readonly latestReleases: CloudLatestReleaseRepository;
   /** DISABLE_USAGE_STATS. */
   readonly disabled: boolean;
   readonly isSaas: boolean;
@@ -80,7 +85,10 @@ export class UsageReportService {
     if (this.deps.isSaas || this.deps.disabled) return "switched_off";
     const connect = await install.getConnectDeployment();
     // LANGWATCH_CONNECT_DISABLED proves the install calls LangWatch for nothing, this report too.
-    if (!connect.permitted) return "connect_disabled";
+    if (!connect.permitted) {
+      await this.forgetLatestRelease();
+      return "connect_disabled";
+    }
     const { ids: organizationIds } = await this.deps.organizations.listAllIds();
     if (organizationIds.length === 0) return "no_organization";
 
@@ -107,6 +115,9 @@ export class UsageReportService {
         return "refused";
       }
       await install.recordUsageReportOutcome({});
+      await this.deps.latestReleases.save(answer.latestRelease).catch((error: unknown) => {
+        logger.warn({ instanceId, error }, "could not keep the latest release cloud named");
+      });
       logger.info({ instanceId }, "usage stats sent");
       return "sent";
     } catch (error) {
@@ -116,6 +127,16 @@ export class UsageReportService {
         .catch(() => undefined);
       return "unreachable";
     }
+  }
+
+  /** The newest release cloud last named; empty when this install does not report usage. */
+  async findLatestRelease(): Promise<CloudLatestRelease[]> {
+    if (this.deps.isSaas || this.deps.disabled) return [];
+    return this.deps.latestReleases.find();
+  }
+
+  private async forgetLatestRelease(): Promise<void> {
+    await this.deps.latestReleases.save(null).catch(() => undefined);
   }
 
   /**

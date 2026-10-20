@@ -37,7 +37,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json tsconfig.type-tests.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -53,13 +53,13 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
     "@langwatch/secrets": "workspace:*",
+    "@langwatch/time": "workspace:*",
     "@trpc/server": "catalog:",
     "hono": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/test-harness": "workspace:*",
-    "@langwatch/time": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@types/node": "catalog:",
     "typescript": "catalog:",

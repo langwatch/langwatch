@@ -6,8 +6,6 @@
 
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-
 export type MiniBar = {
   key: string;
   color: string;
@@ -51,11 +49,11 @@ function BarColumn({ bar, scale }: { bar: MiniBar; scale: number }) {
   return (
     <VStack flex={1} minWidth={0} maxWidth="28px" gap={1} align="center" justify="flex-end">
       <Text
-        fontSize="10px"
+        textStyle="micro"
         fontWeight="medium"
         fontVariantNumeric="tabular-nums"
         whiteSpace="nowrap"
-        color={bar.value === null ? FG_MUTED : "fg"}
+        color={bar.value === null ? "fg.muted" : "fg"}
       >
         {bar.text}
       </Text>
@@ -111,8 +109,8 @@ function GroupLabels({ groups }: { groups: MiniBarGroup[] }) {
           key={group.key}
           flex={1}
           minWidth={0}
-          fontSize="10px"
-          color={FG_MUTED}
+          textStyle="micro"
+          color="fg.muted"
           textAlign="center"
           truncate
           title={group.title ?? group.label}
@@ -150,7 +148,7 @@ export function MiniBarCard({
       minWidth={0}
       data-testid={testId}
     >
-      <Text fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+      <Text textStyle="micro" fontWeight="semibold" color="fg.muted">
         {title}
       </Text>
       <BarArea groups={groups} scale={fullScale} testId={testId} />

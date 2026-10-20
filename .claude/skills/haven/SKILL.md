@@ -25,7 +25,7 @@ only the part you need.
 | reset, seed presets, connection strings, prune                                                  | `haven-db`                  |
 | seeded data, logins, auto-seed                                                                  | `haven-seed`                |
 | a signed-in storage state (`browser login`)                                                     | `haven-auth`                |
-| a signed-in headless browser, record and replay                                                 | `haven-browser`             |
+| a signed-in headless browser (one per machine): diffs, network, console, profile, lean, replay  | `haven-browser`             |
 | the haven orb: feedback, page console and network                                               | `haven-orb`                 |
 | try a PR: `haven pr`, `haven pr --throwaway`                                                    | `haven-play`                |
 | slots, `haven machine typecheck`, the agent gate, `haven self upgrade`                          | `haven-machine`             |
@@ -39,7 +39,7 @@ only the part you need.
 | One-shot health of every stack              | `haven status --agent` (`--json <fields>` for a machine; bare `--json` lists the fields) |
 | Read a service's log                        | `haven logs api --since 10m --agent`                                                     |
 | Last distinct failures, grouped             | `haven errors --agent`                                                                   |
-| Restart one lane                            | `haven restart sims`                                                                     |
+| Restart one lane                            | `haven restart api`                                                                      |
 | Logins and stack credentials                | `haven db seed --json --reveal`, `haven env --reveal` (never paste)                      |
 | Keyed REST call, key never printed          | `haven api GET /api/... [--key project\|org\|personal] [--project slug]`                 |
 | Which principal and scope a key has         | `haven api whoami --key org`                                                             |
@@ -74,8 +74,8 @@ https://hub.langwatch.localhost               every stack on the machine
 
 `https://<slug>.langwatch.localhost` (`apps/haven-web`) lists every surface with its status. A
 surface that is not live says why (what it waits for and its lane's last warning), and its row has
-Restart, or Start for a surface that was not selected. An api the stack refuses to serve because
-the database is below the LTS floor shows a database reset button. `haven db reset` migrates and
+Restart, or Start for a surface that was not selected.
+`haven db reset` migrates and
 seeds exactly the databases it dropped, also for a stack the hub does not know yet. The daemon
 trusts a pid only together with its process start time, holds its claim as a flock for its whole
 life, and writes stack records atomically, so a recycled pid or a second daemon cannot be mistaken
@@ -88,14 +88,14 @@ Every haven web console is a build served by Go; none runs Vite, Storybook dev o
 | Console                                                                             | Where                                                                    | Served by                                                                                                                                                           |
 | ----------------------------------------------------------------------------------- | ------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Hub, stack home, seed console                                                       | `hub.langwatch.localhost`, `<slug>.langwatch.localhost`                  | the haven daemon (`apps/haven-web`, embedded)                                                                                                                       |
-| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (`apps/<sim>sim-web`, embedded)                                                                                                |
+| Simulators: idp, mail, storage, voice, llm, analytics, outbound, payment, telemetry | `<sim>.<slug>.langwatch.localhost`                                       | the sim's Go binary in the `go` lane (its page of `apps/sims`, embedded)                                                                                            |
 | Design system Storybook (`+design-system`)                                          | `design-system.<slug>` (or `ds.<slug>`), and `/design-system` in the app | the `design-system` lane: `storybook build`, then `haven static`                                                                                                    |
 | Mail studio (`+mail-room`)                                                          | `mail-room.<slug>`                                                       | the `mail-room` lane: `build:studio` renders every fixture at build time, then `haven static`; props are read-only (`pnpm --filter @langwatch/mail dev` edits live) |
 
 - `haven self install --build` builds the hub and every simulator console (nx tag `haven-console`); each
   simulator lane rebuilds its console through the nx cache on start. A console missing its build
   serves a page naming the build command.
-- The design-system lane rebuilds the Storybook only when `packages/design-system/storybook-static`
+- The design-system lane rebuilds the Storybook only when the design system's built Storybook
   is missing or older than its sources (about 10 s, 1.6 GB peak), then serves it at about 30 MB.
   `haven restart design-system` rebuilds after a change; `haven logs design-system` shows the build.
 - The stack home's Seed panel runs `haven db seed --size <tiny|small|medium|large> --persona <all|...>`

@@ -56,7 +56,6 @@ const VIEWER: readonly AuthzPermission[] = [
   "routingPolicies:view",
   "gatewayGuardrails:view",
   "gatewayLogs:view",
-  "auditLog:view",
   "gatewayUsage:view",
   "gatewayCacheRules:view",
 ];
@@ -93,6 +92,9 @@ const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
 ];
 
 const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
+  // The audit log shows every member's actions, so it is an administrator's by default
+  // (Alex, 2026-10-11).
+  "auditLog:view",
   "project:delete",
   "project:manage",
   "team:manage",

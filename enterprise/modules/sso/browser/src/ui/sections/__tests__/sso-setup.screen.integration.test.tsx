@@ -4,7 +4,7 @@
  * read, and each press landing on the command it names.
  */
 
-import { cleanup, fireEvent, screen, within } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 type Call = { name: string; input: unknown };
@@ -21,10 +21,30 @@ const { state } = vi.hoisted(() => ({
     grants: [] as unknown[],
     candidates: [] as unknown[],
     polls: [] as ({ enabled?: boolean } | undefined)[],
+    /** Bumped when a read catches up, so the mounted screen re-renders as React Query would. */
+    version: 0,
+    listeners: new Set<() => void>(),
   },
 }));
 
-vi.mock("../../../behavior/sso-api.ts", () => {
+/** A read catching up: the mounted screen hears it, as it would from the query cache. */
+function publishView(view: unknown) {
+  state.view = view;
+  state.version += 1;
+  for (const listener of state.listeners) listener();
+}
+
+vi.mock("../../../behavior/sso-api.ts", async () => {
+  const { useSyncExternalStore } = await vi.importActual<{
+    useSyncExternalStore: (
+      subscribe: (listener: () => void) => () => void,
+      read: () => number,
+    ) => number;
+  }>("react");
+  const subscribe = (listener: () => void) => {
+    state.listeners.add(listener);
+    return () => state.listeners.delete(listener);
+  };
   const mutation = (name: string) => ({
     useMutation: () => ({
       isPending: false,
@@ -52,10 +72,13 @@ vi.mock("../../../behavior/sso-api.ts", () => {
             },
           },
         },
+        ssoConnections: { invalidate: () => {} },
       }),
+      ssoConnections: { startLegacyMigration: mutation("operatorStartLegacyMigration") },
       ssoSetup: {
         getSetup: {
           useQuery: (_input: unknown, options?: { enabled?: boolean }) => {
+            useSyncExternalStore(subscribe, () => state.version);
             state.polls.push(options);
             return {
               data: state.view,
@@ -169,6 +192,7 @@ function setupView(overrides: Partial<SsoSetupPageView> = {}): SsoSetupPageView 
       activated: false,
     },
     legacyRoute: null,
+    legacyDomainsToMove: [],
     enterpriseRequired: false,
     migration: null,
     availability: { available: true, proof: "dns-txt" },
@@ -221,7 +245,11 @@ describe("the single sign-on setup page", () => {
     it("names the page and says what it is for, above the journey", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
-      expect(screen.getByRole("heading", { name: "Identity provider" })).toBeTruthy();
+      expect(screen.getByRole("heading", { level: 1, name: "Authentication" })).toBeTruthy();
+      expect(screen.getByRole("link", { name: "Identity provider" })).toHaveAttribute(
+        "aria-current",
+        "page",
+      );
       expect(
         screen.getByText(
           "Where your people sign in, and everything it takes to put it in front of them.",
@@ -232,21 +260,21 @@ describe("the single sign-on setup page", () => {
 
   describe("given the page inside the Authentication section", () => {
     /**
-     * @scenario "The Authentication pages share main's rail"
+     * @scenario "The Authentication pages share one row of header tabs"
      * @scenario "Managing a live connection stays on the same page"
      */
-    it("frames it in main's rail with Identity provider as the current entry", () => {
+    it("titles the header Authentication with Identity provider as the current tab", () => {
       renderWithSsoHost(<SsoSetupScreen />);
 
-      const rail = screen.getByRole("navigation", { name: "Authentication navigation" });
-      const links = within(rail).getAllByRole("link");
+      const tabs = screen.getByRole("navigation", { name: "Authentication pages" });
+      const links = within(tabs).getAllByRole("link");
       expect(links.map((link) => [link.textContent, link.getAttribute("href")])).toEqual([
         ["Overview", "/settings/authentication"],
         ["Identity provider", "/settings/authentication/provider"],
         ["Connectors", "/settings/authentication/connectors"],
       ]);
       expect(
-        within(rail).getByRole("link", { name: "Identity provider" }).getAttribute("aria-current"),
+        within(tabs).getByRole("link", { name: "Identity provider" }).getAttribute("aria-current"),
       ).toBe("page");
     });
   });
@@ -353,6 +381,22 @@ describe("the single sign-on setup page", () => {
     });
   });
 
+  describe("given an organization whose legacy domain still has to move onto its connection", () => {
+    /** @scenario "Administrators and LangWatch staff are told a legacy domain still has to move" */
+    it("tells a member who manages single sign-on, and nobody who may only view it", () => {
+      state.view = setupView({ legacyDomainsToMove: ["legacy.acme.com"] });
+
+      const { unmount } = renderWithSsoHost(<SsoSetupScreen />);
+      expect(screen.getByTestId("sso-legacy-domain-to-move")).toHaveTextContent(
+        /add legacy\.acme\.com to your own connection/,
+      );
+      unmount();
+
+      renderWithSsoHost(<SsoSetupScreen />, new FakeSsoHost({ canManage: false }));
+      expect(screen.queryByTestId("sso-legacy-domain-to-move")).toBeNull();
+    });
+  });
+
   describe("given an organization with no connection", () => {
     /** @scenario "An organization with no sign-in route is offered the setup journey" */
     /** @scenario "An organization with no connection gets the journey" */
@@ -427,6 +471,17 @@ describe("the single sign-on setup page", () => {
       expect(screen.queryByTestId("identity-provider-edit")).toBeNull();
     });
 
+    /** @scenario "A SAML connection registered from metadata alone still offers the edit" */
+    it("offers the edit on a SAML connection whose issuer was never recorded", () => {
+      state.view = setupView({ connection: connectionView({ type: "saml", issuer: null }) });
+      renderWithSsoHost(<SsoSetupScreen />);
+
+      expect(
+        within(screen.getByTestId("connection-issuer")).getByText("Not recorded"),
+      ).toBeTruthy();
+      expect(screen.getByTestId("identity-provider-edit")).toBeInTheDocument();
+    });
+
     it("offers no edit on a live connection that is on its way out", () => {
       state.view = setupView({ connection: connectionView({ state: "TEARDOWN_PENDING" }) });
       renderWithSsoHost(<SsoSetupScreen />);
@@ -480,7 +535,7 @@ describe("the single sign-on setup page", () => {
         activated: false,
       };
       state.view = setupView({ goLive: ready });
-      const { rerenderWithSsoHost } = renderWithSsoHost(<SsoSetupScreen />);
+      renderWithSsoHost(<SsoSetupScreen />);
 
       fireEvent.click(screen.getByTestId("connection-go-live-activate"));
 
@@ -488,11 +543,14 @@ describe("the single sign-on setup page", () => {
       expect(screen.getByTestId("connection-go-live-activate")).toHaveProperty("disabled", true);
       expect(state.polls.at(-1)).toEqual({ enabled: true });
 
-      state.view = setupView({
-        connection: connectionView({ state: "ACTIVE" }),
-        goLive: { ...ready, activated: true },
+      act(() => {
+        publishView(
+          setupView({
+            connection: connectionView({ state: "ACTIVE" }),
+            goLive: { ...ready, activated: true },
+          }),
+        );
       });
-      rerenderWithSsoHost(<SsoSetupScreen />);
 
       expect(state.polls.at(-1)).toEqual({ enabled: false });
       expect(screen.queryByText(/Activation accepted/)).toBeNull();

@@ -8,7 +8,6 @@ import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 // The Instant Evals gate reads this flag; stub it enabled so nothing here
 // depends on the tRPC provider this suite doesn't mount.
@@ -40,6 +39,31 @@ vi.mock("../../../../../features/facet/behavior/use-facet-search.ts", () => ({
   useFacetSearch: () => ({ values: [], totalDistinct: 0, isLoading: false }),
 }));
 
+// The model-provider settings and the Instant Eval route are tRPC reads and
+// mutations this suite mounts no provider for; their own suites cover them.
+vi.mock("../../../use-model-providers-settings.ts", () => ({
+  useModelProvidersSettings: () => ({
+    modelProviders: [],
+    customDefaultModel: null,
+    isLoading: false,
+  }),
+}));
+vi.mock("../use-instant-eval-route.ts", () => ({
+  useInstantEvalRoute: () => ({
+    onInstantEvalRoute: vi.fn(),
+    abandonPendingRun: vi.fn(),
+    confirmation: null,
+    confirmRun: vi.fn(),
+    searchWordsInstead: vi.fn(),
+    refusal: null,
+    dismissRefusal: vi.fn(),
+    enableInstantEvals: vi.fn(),
+    isEnabling: false,
+    isEstimating: false,
+    isStarting: false,
+  }),
+}));
+
 // This suite exercises the inline search editor wiring, so Langy is gated
 // off — the gate hooks carry session/tRPC wiring this suite doesn't mount.
 // The Langy-owned ask affordance is covered by SearchBar.integration.
@@ -63,10 +87,51 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", async (importOriginal) =
 });
 
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
+import { TraceHostApi, TraceHostProvider } from "../../../../../behavior/trace-host.ts";
 import { SearchBar } from "../search-bar.tsx";
 
+/** The host the trace screens mount under, signed in to one project. */
+class SignedInTraceHost extends TraceHostApi {
+  project() {
+    return { id: "project_1", slug: "demo", name: "Demo" };
+  }
+  organization() {
+    return void 0;
+  }
+  team() {
+    return void 0;
+  }
+  organizationRole() {
+    return void 0;
+  }
+  currentUser() {
+    return void 0;
+  }
+  hasPermission() {
+    return true;
+  }
+  isLoading() {
+    return false;
+  }
+  route() {
+    return { params: {}, query: {}, pathname: "/demo/traces" };
+  }
+  setQuery() {}
+  navigate() {}
+  succeeded() {}
+  failed() {}
+  registerLangyActions(): () => void {
+    return () => void 0;
+  }
+  askLangy() {}
+}
+
 function renderSearchBar() {
-  return renderWithDesignSystem(<SearchBar />);
+  return renderWithDesignSystem(
+    <TraceHostProvider value={new SignedInTraceHost()}>
+      <SearchBar />
+    </TraceHostProvider>,
+  );
 }
 
 function getEditor(): HTMLElement {
@@ -118,9 +183,12 @@ describe("SearchBar wiring in real Chromium", () => {
       await waitFor(() => {
         expect(useFilterStore.getState().parseError).toBeTruthy();
       });
-      // The parse-error pill exposes itself as a popover trigger.
-      const indicator = document.querySelector('[aria-label="View syntax error"]');
-      expect(indicator).toBeTruthy();
+      // The error banner under the bar reads the parse error and offers to dismiss it.
+      const parseError = useFilterStore.getState().parseError ?? "";
+      await waitFor(() => {
+        expect(document.querySelector('[aria-label="Dismiss error"]')).toBeTruthy();
+      });
+      expect(document.body.textContent).toContain(parseError);
     });
   });
 

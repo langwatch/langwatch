@@ -1,14 +1,13 @@
 /**
  * The rail on the left of Scenarios: the project's suites, then the sets that run from code.
- * It is the shared section rail, so its title, entries, current chip and glass match the
- * other sections; each entry is a link to its own address.
+ * It is the shared section rail, so its entries and current chip match the other sections;
+ * the page header above it names the section. Each entry is a link to its own address.
  * @see specs/features/agent-testing/suites-rail.feature
  * @see specs/suites/test-suites.feature
  */
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { Box, Icon, Skeleton, VStack } from "@langwatch/design-system/primitives";
 import {
-  SECTION_RAIL_WIDTH,
   SectionNavigationRail,
   type SectionNavigationLink,
 } from "@langwatch/design-system/section-navigation-frame";
@@ -24,18 +23,14 @@ import type {
   ExternalSetEntry,
   TestSuiteEntry,
 } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period, PeriodMode, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { SuiteArchiveDialog } from "../../../elements/suite/dialogs/suite-archive-dialog.tsx";
 import type { SuiteLastRun } from "../cases/use-test-cases-data.ts";
 import { SuiteRailFooter } from "./suite-rail-footer.tsx";
 import { SuiteRailMenu } from "./suite-rail-menu.tsx";
 
-/** How wide the rail is when it is open: the shared section rail's width. */
-export const SUITE_RAIL_WIDTH = SECTION_RAIL_WIDTH;
-
 /** What the section of the sets a code run writes into is called. */
-export const FROM_CODE_HEADING = "From Code";
+export const FROM_CODE_HEADING = "From code";
 
 /** What the archive dialog of a test suite says. */
 export const SUITE_ARCHIVE_TITLE = "Archive test suite?";
@@ -91,7 +86,7 @@ export function SuiteRail(props: SuiteRailProps) {
       query: {},
     });
   const iconOf = (as: typeof Folder, label?: string) => (
-    <Icon as={as} boxSize="14px" color={FG_MUTED} flexShrink={0} aria-label={label} />
+    <Icon as={as} boxSize="14px" color="fg.muted" flexShrink={0} aria-label={label} />
   );
 
   const suiteEntries: RailEntry[] = props.isLoading
@@ -129,7 +124,6 @@ export function SuiteRail(props: SuiteRailProps) {
         label: set.setId,
         href: hrefOf(selection),
         icon: iconOf(FolderCode, "Runs from code"),
-        badge: iconOf(FolderCode, "Runs from code"),
         testId: `suite-rail-item-${set.setId}`,
       },
     };
@@ -151,16 +145,18 @@ export function SuiteRail(props: SuiteRailProps) {
     </VStack>
   ) : undefined;
   const newSuite = canManage
-    ? { label: "New Test Suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
+    ? { label: "New test suite", onClick: props.onNewSuite, testId: "agent-testing-rail-new-suite" }
     : undefined;
 
   return (
     <Box data-testid="agent-testing-suite-rail" display="flex" flexShrink={0}>
       <SectionNavigationRail
-        label="Agent Testing"
+        label="Agent testing"
+        showTitle={false}
+        showIcons
         groups={[
           {
-            label: "Test Suites",
+            label: "Test suites",
             links: suiteEntries.map((entry) => entry.link),
             extra: loadingRows,
             add: newSuite,

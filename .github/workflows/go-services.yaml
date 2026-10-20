@@ -179,7 +179,7 @@ jobs:
             ${{ steps.meta.outputs.image }}:${{ steps.meta.outputs.sha_tag }}
             ${{ steps.meta.outputs.image }}:latest
           cache-from: type=gha,scope=gateway
-          cache-to: type=gha,scope=gateway,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=gateway,mode=max' || '' }}
 
   langyagent:
     needs: changes
@@ -212,7 +212,7 @@ jobs:
           build-args: |
             SERVICE_VERSION=${{ github.sha }}
           cache-from: type=gha,scope=langyagent-amd64
-          cache-to: type=gha,scope=langyagent-amd64,mode=max
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,scope=langyagent-amd64,mode=max' || '' }}
 
   helm:
     needs: changes

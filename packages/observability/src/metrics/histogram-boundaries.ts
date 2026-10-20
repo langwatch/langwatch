@@ -43,6 +43,10 @@ export const HISTOGRAM_BOUNDARIES: Readonly<Record<string, readonly number[]>> =
     100, 250, 500, 1_000, 2_500, 5_000, 15_000, 30_000, 60_000, 120_000, 300_000,
   ],
   coding_agent_session_list_read_duration_milliseconds: EVENTING_SLOW_MS,
+  // A run waits for a Langy turn for up to ten minutes; a run that asks Langy nothing is quick.
+  insight_daily_run_duration_milliseconds: [
+    100, 1_000, 5_000, 15_000, 30_000, 60_000, 120_000, 300_000, 600_000, 1_200_000,
+  ],
 
   // --- event sourcing ---
   event_sourcing_store_duration_milliseconds: EVENTING_MS,

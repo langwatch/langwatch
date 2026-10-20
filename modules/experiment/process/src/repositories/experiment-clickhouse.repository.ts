@@ -1,3 +1,5 @@
+import type { ClickHouseColumns } from "@langwatch/clickhouse-client";
+
 export type ExperimentEventingClickHouseResult = {
   json<T>(): Promise<T[]>;
 };
@@ -24,6 +26,8 @@ export type ExperimentEventingClickHouseClient = {
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
   }): Promise<ExperimentEventingClickHouseResult>;
+  /** Absent on a bare driver client (tests): every column is then named. */
+  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 };
 
 /** How the application hands the feature a tenant-scoped ClickHouse client. */

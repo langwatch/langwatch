@@ -4,6 +4,7 @@
  * schemas as its types. Spec: specs/identity/sso-onboarding-tiers.feature.
  */
 
+import { REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE } from "@langwatch/identity-contract";
 import { defineTrpcContract } from "@langwatch/module";
 import { z } from "zod";
 
@@ -29,11 +30,11 @@ import {
 } from "./sso.contract.ts";
 
 export const ssoConnectionTrpc = defineTrpcContract("ssoConnections")
-  .query("getAll")
+  .query("getAll", { invalidatedBy: [REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE] })
   .withInput(listSsoConnectionsInputSchema)
   .withOutput(adminSsoConnectionPageSchema)
 
-  .query("getById")
+  .query("getById", { invalidatedBy: [REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE] })
   .withInput(ssoConnectionByIdSchema)
   .withOutput(adminSsoConnectionSchema.nullable())
 
@@ -42,8 +43,8 @@ export const ssoConnectionTrpc = defineTrpcContract("ssoConnections")
   .withInput(ssoConnectionByIdSchema)
   .withOutput(ssoConnectionHistoryEntrySchema.array().nullable())
 
-  /** Null where the connection is missing or runs no cutover. */
-  .query("getMigrationProgress")
+  /** Null where the connection is missing or runs no cutover; a replacement starts one. */
+  .query("getMigrationProgress", { invalidatedBy: [REPLACEMENT_CONNECTION_REGISTERED_EVENT_TYPE] })
   .withInput(operatorSsoMigrationProgressInputSchema)
   .withOutput(ssoSetupMigrationSchema.nullable())
 

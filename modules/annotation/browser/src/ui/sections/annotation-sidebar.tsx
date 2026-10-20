@@ -80,7 +80,7 @@ export function AnnotationSidebar({
   const standing: SectionNavigationLink[] = [
     { label: "Inbox", href: base, icon: <Inbox size={14} />, badge: countOf(pendingCount) },
     {
-      label: `${reviewerName?.split(" ")[0] ?? ""} (You)`,
+      label: "Assigned to me",
       href: `${base}/me`,
       icon: (
         <ReviewerAvatar
@@ -93,7 +93,7 @@ export function AnnotationSidebar({
       ),
       badge: countOf(assignedCount),
     },
-    { label: "All", href: `${base}/all`, icon: <SquarePen size={14} /> },
+    { label: "All items", href: `${base}/all`, icon: <SquarePen size={14} /> },
   ];
   const queueLinks: SectionNavigationLink[] = queues.map((queue) => ({
     label: queue.name,
@@ -127,10 +127,10 @@ export function AnnotationSidebar({
         links={standing}
         groups={[
           {
-            label: "My Queues",
+            label: "My queues",
             links: queueLinks,
             add: canManageQueues
-              ? { label: "New Queue", onClick: onCreateQueue, testId: "annotation-queue-create" }
+              ? { label: "New queue", onClick: onCreateQueue, testId: "annotation-queue-create" }
               : void 0,
           },
         ]}

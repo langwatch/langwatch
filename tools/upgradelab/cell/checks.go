@@ -18,6 +18,8 @@ import (
 	"time"
 
 	"github.com/langwatch/langwatch/tools/upgradelab/seed"
+
+	"github.com/langwatch/langwatch/tools/upgradelab/snapshot"
 )
 
 const sigStop = syscall.SIGSTOP
@@ -39,13 +41,25 @@ func (cell *run) checks(ctx context.Context) error {
 	cell.report.Queue = cell.queueSummary(ctx)
 	cell.report.Notes = append(cell.report.Notes, lostByPhase(cell.allCalls(), cell.report.Phases, visible)...)
 	cell.report.Verdicts = append(cell.report.Verdicts,
-		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final), cell.rosterVerdict(ctx),
+		cell.holdingVerdict(), ledgerVerdict(final), reopenedVerdict(cell.atReady, final, cell.drills.retried), cell.rosterVerdict(ctx),
 		cell.copyVerdict(ctx), cell.readBackVerdict(ctx), cell.secondRunVerdict(ctx, final), cell.logVerdict(),
-		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), cell.queueVerdict(), cell.opsVerdict(final))
+		cell.apiEarlyVerdict(), cell.crashVerdict(), droppedVerdict(cell.report.Traffic, cell.downExcused()), ingestVerdict(cell.report.Traffic), unansweredVerdict(cell.allCalls()), lostVerdict(cell.report.Traffic), queueVerdict(cell.report.Queue), cell.opsVerdict(final))
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.hybridVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.ssoVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.legacyOrgVerdict(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.licenseVerdict(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.licensedSSOVerdicts(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.scimVerdict(ctx, final)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.retentionVerdict(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.oddityVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.heldTenantVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.queuedJobsVerdict(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.damageVerdicts(ctx)...)
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.signupVerdicts(ctx)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.drillVerdicts(final)...)
 	cell.report.Verdicts = append(cell.report.Verdicts, cell.readModelVerdict(ctx), cell.browserVerdict(), cell.storedEventsVerdict(ctx))
+	cell.report.Verdicts = append(cell.report.Verdicts, cell.upcastVerdict(ctx, final)...) // after I7, which it reads
 	for index := range cell.report.Verdicts {
 		cell.report.Verdicts[index].Scenarios = scenarioIDs[cell.report.Verdicts[index].ID]
 	}
@@ -72,7 +86,8 @@ func (cell *run) holdingVerdict() Verdict {
 // ingestVerdict: ingest never sees a non-2xx, on any attempt.
 func ingestVerdict(summaries []KindSummary) Verdict {
 	var seen []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		if storedTable[each.Kind] != "" && each.NonOK > 0 {
 			seen = append(seen, fmt.Sprintf("%s %d", each.Kind, each.NonOK))
 		}
@@ -83,21 +98,30 @@ func ingestVerdict(summaries []KindSummary) Verdict {
 func ledgerVerdict(rows []LedgerRow) Verdict {
 	left := Outstanding(rows)
 	names := make([]string, 0, len(left))
-	for _, row := range left {
+	for i := range left {
+		row := &left[i]
 		names = append(names, row.ID+"="+row.Status)
 	}
 	return verdict("I2", len(rows) > 0 && len(left) == 0,
 		fmt.Sprintf("%d steps, outstanding: %v", len(rows), names))
 }
 
-func reopenedVerdict(atReady, final []LedgerRow) Verdict {
-	reopened := Reopened(atReady, final)
-	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v", countDone(atReady), reopened))
+// reopenedVerdict leaves out the step the retry drill failed and retried on purpose (D3 judges it).
+func reopenedVerdict(atReady, final []LedgerRow, drilled string) Verdict {
+	reopened := slices.DeleteFunc(Reopened(atReady, final), func(each string) bool {
+		return drilled != "" && strings.HasPrefix(each, drilled+" ")
+	})
+	note := ""
+	if drilled != "" {
+		note = fmt.Sprintf(" (the retry drill's own step %s left to D3)", drilled)
+	}
+	return verdict("I2b", len(reopened) == 0, fmt.Sprintf("%d steps done at ready; reopened: %v%s", countDone(atReady), reopened, note))
 }
 
 func countDone(rows []LedgerRow) int {
 	done := 0
-	for _, row := range rows {
+	for i := range rows {
+		row := &rows[i]
 		if row.Status == "done" {
 			done++
 		}
@@ -123,15 +147,34 @@ func (cell *run) copyVerdict(ctx context.Context) Verdict {
 	if err != nil {
 		return Verdict{ID: "I4", Name: "copy never move", Result: "inconclusive", Detail: err.Error()}
 	}
-	var shrunk []string
-	for store, tables := range cell.before {
-		for table, before := range tables {
-			if now, ok := after[store][table]; !ok || now.Count < before.Count {
-				shrunk = append(shrunk, fmt.Sprintf("%s.%s %d->%d", store, table, before.Count, now.Count))
+	return judgeCopy(cell.before, after, cell.retentionAllowance())
+}
+
+// judgeCopy fails a table that lost rows, beyond what main's own retention TTL may expire (allowance, R1's slices).
+func judgeCopy(before, after snapshot.Fingerprint, allowance map[string]map[string]int64) Verdict {
+	var shrunk, expired []string
+	for store, tables := range before {
+		for table, was := range tables {
+			now, ok := after[store][table]
+			switch {
+			case !ok || now.Count < was.Count-allowance[store][table]:
+				shrunk = append(shrunk, fmt.Sprintf("%s.%s %d->%d", store, table, was.Count, now.Count))
+			case now.Count < was.Count:
+				expired = append(expired, fmt.Sprintf("%s.%s %d->%d (TTL may expire %d)", store, table, was.Count, now.Count, allowance[store][table]))
 			}
 		}
 	}
-	return verdict("I4", len(shrunk) == 0, fmt.Sprintf("%d stores fingerprinted; shrunk: %v", len(cell.before), shrunk))
+	tables := make([]string, 0, len(before))
+	for store, each := range before {
+		tables = append(tables, fmt.Sprintf("%s %d tables", store, len(each)))
+	}
+	slices.Sort(tables)
+	slices.Sort(shrunk)
+	detail := fmt.Sprintf("every table counted at the cut and after (%s); shrunk: %v", strings.Join(tables, ", "), shrunk)
+	if len(expired) > 0 {
+		detail += fmt.Sprintf("; expired by main's own retention TTL only: %v", expired)
+	}
+	return verdict("I4", len(shrunk) == 0, detail)
 }
 
 func (cell *run) readBackVerdict(ctx context.Context) Verdict {
@@ -148,16 +191,24 @@ func errText(err error) string {
 	return err.Error()
 }
 
+// exitText names a command's outcome: "0" when it succeeded, else its error.
+func exitText(err error) string {
+	if err == nil {
+		return "0"
+	}
+	return err.Error()
+}
+
 // secondRunVerdict: a second upgrade exits 0 and changes no ledger row.
 func (cell *run) secondRunVerdict(ctx context.Context, final []LedgerRow) Verdict {
-	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "src/main.ts", "upgrade") // #nosec G204 -- fixed argv.
+	command := exec.CommandContext(ctx, "node", "--experimental-transform-types", "--disable-warning=ExperimentalWarning", "src/main.ts", "upgrade") // #nosec G204 -- fixed argv.
 	command.Dir, command.Env = filepath.Join(cell.options.HeadDir, "apps", "tasks"), cell.envWith(nil)
 	out, err := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("second-upgrade"), out, 0o600)
 	again, ledgerErr := Ledger(ctx, cell.stores)
 	changed := Reopened(final, again)
 	return verdict("I8", err == nil && ledgerErr == nil && len(changed) == 0,
-		fmt.Sprintf("exit %v; changed %v", errText(err), changed))
+		fmt.Sprintf("exit %v; changed %v", exitText(err), changed))
 }
 
 // acceptedLog is an error signature the lab tolerates, with the reason printed in the report.
@@ -172,7 +223,20 @@ var acceptedLogs = []acceptedLog{
 	{"UpgradeInProgressError", "expected 503 upgrade_in_progress while steps run", true},
 }
 
-var logTime = regexp.MustCompile(`"time":(\d{13})`)
+var logTime = regexp.MustCompile(`(?:"time":"?|^\[)(\d{13}|\d{4}-\d\d-\d\dT[0-9:.]+Z)`)
+
+// lineEpochMs is a log line's pino time (epoch ms or ISO), and whether it had one.
+func lineEpochMs(line string) (int64, bool) {
+	match := logTime.FindStringSubmatch(line)
+	if match == nil {
+		return 0, false
+	}
+	if epoch, err := strconv.ParseInt(match[1], 10, 64); err == nil {
+		return epoch, true
+	}
+	at, err := time.Parse(time.RFC3339Nano, match[1])
+	return at.UnixMilli(), err == nil
+}
 
 // accepts answers the accepted entry that covers line, if any; atMs bounds are ms from origin.
 func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog, bool) {
@@ -183,14 +247,28 @@ func accepts(line string, switched, ready int64, origin time.Time) (acceptedLog,
 		if !each.Window {
 			return each, true
 		}
-		if match := logTime.FindStringSubmatch(line); match != nil && switched >= 0 && ready >= 0 {
-			epoch, _ := strconv.ParseInt(match[1], 10, 64)
+		if epoch, ok := lineEpochMs(line); ok && switched >= 0 && ready >= 0 {
 			if at := epoch - origin.UnixMilli(); at >= switched && at <= ready {
 				return each, true
 			}
 		}
 	}
 	return acceptedLog{}, false
+}
+
+// downSignatures: what a line says when it met the private target H8's gate held closed.
+var downSignatures = []string{"ClickHouseUnavailableError", "clickhouse_unavailable", "Cannot connect to ClickHouse at", "[@clickhouse/client][Connection]", "read ECONNRESET"}
+
+// downWindowGrace: a query held at the closed gate fails as it reopens, so its line lands just after upAt.
+const downWindowGrace = int64(5_000)
+
+// inDownWindow: a ClickHouse-unavailable error line logged while H8's gate held the private target closed (as N2 does).
+func inDownWindow(line string, downAt, upAt int64, origin time.Time) bool {
+	if upAt <= 0 || !slices.ContainsFunc(downSignatures, func(each string) bool { return strings.Contains(line, each) }) {
+		return false
+	}
+	epoch, ok := lineEpochMs(line)
+	return ok && epoch-origin.UnixMilli() >= downAt && epoch-origin.UnixMilli() <= upAt+downWindowGrace
 }
 
 // logVerdict counts error lines in head's logs: new ones fail I9, accepted ones are counted apart with their reason.
@@ -212,6 +290,14 @@ func (cell *run) logVerdict() Verdict {
 			}
 			if each, ok := accepts(line, switched, ready, cell.origin); ok {
 				accepted[each.Signature+" ("+each.Reason+")"]++
+				continue
+			}
+			if cell.overlay(OverlayOperatorDamage) && refusalLine(line, ready, cell.origin) {
+				accepted["the upgrade refused on planted operator damage (judged by D1 to D3)"]++
+				continue
+			}
+			if inDownWindow(line, cell.down.downAtMs, cell.down.upAtMs, cell.origin) {
+				accepted["ClickHouseUnavailableError (the private target H8 closed on purpose; judged by H8)"]++
 				continue
 			}
 			counts[name]++
@@ -259,10 +345,12 @@ func unansweredVerdict(calls []Call) Verdict {
 	return verdict("N6", len(unanswered) == 0, fmt.Sprintf("unanswered per kind: %v", unanswered))
 }
 
-func droppedVerdict(summaries []KindSummary) Verdict {
+// droppedVerdict (N2) leaves out the down organization's failed calls inside the H8 window: H8 judges those.
+func droppedVerdict(summaries []KindSummary, excused int) Verdict {
 	failed, sent, retries, window := 0, 0, 0, int64(0)
 	var detail []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		failed += each.Failed
 		sent += each.Sent
 		retries += each.Retries
@@ -271,7 +359,7 @@ func droppedVerdict(summaries []KindSummary) Verdict {
 			detail = append(detail, fmt.Sprintf("%s %d/%d", each.Kind, each.Failed, each.Sent))
 		}
 	}
-	return verdict("N2", failed == 0, fmt.Sprintf("%d of %d failed: %v; %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, retries, window))
+	return verdict("N2", failed-excused <= 0, fmt.Sprintf("%d of %d failed: %v, of them %d the down organization's inside the H8 window (left to H8); %d upgrade_in_progress retries, longest retry window %d ms", failed, sent, detail, excused, retries, window))
 }
 
 // lostByPhase notes, per kind, which api phase each lost write was sent in, and its first and last ms.
@@ -281,7 +369,8 @@ func lostByPhase(calls []Call, phases []PhaseChange, visible map[string]bool) []
 		first, last int64
 	}
 	lost := map[string]*span{}
-	for _, call := range calls {
+	for i := range calls {
+		call := &calls[i]
 		if !call.Write || !call.ok() || visible[call.Kind+"/"+call.ID] {
 			continue
 		}
@@ -303,7 +392,8 @@ func lostByPhase(calls []Call, phases []PhaseChange, visible map[string]bool) []
 func lostVerdict(summaries []KindSummary) Verdict {
 	lost := 0
 	var detail []string
-	for _, each := range summaries {
+	for i := range summaries {
+		each := &summaries[i]
 		lost += each.Lost
 		if each.Lost > 0 {
 			detail = append(detail, fmt.Sprintf("%s %d", each.Kind, each.Lost))
@@ -314,35 +404,88 @@ func lostVerdict(summaries []KindSummary) Verdict {
 
 func (cell *run) queueSummary(ctx context.Context) QueueSummary {
 	cell.queueMu.Lock()
-	samples := append([]QueueSample(nil), cell.queue...)
+	samples, reads := append([]QueueSample(nil), cell.queue...), cell.queueReads
 	cell.queueMu.Unlock()
-	summary := QueueSummary{Samples: samples, DrainedMs: -1, TopKeys: TopQueueKeys(ctx, cell.stores.RedisPort), ByKind: QueueByKind(ctx, cell.stores.RedisPort)}
-	cell.queueMu.Lock()
-	summary.CutJobs = len(cell.cutJobs)
-	cell.queueMu.Unlock()
-	if left, ok := cell.cutJobsStill(ctx); ok {
-		summary.Leftover = LeftByKind(left)
+	summary := summariseQueue(samples, cell.marks["headWorkerStarted"])
+	summary.AtCut, summary.ReadErrors, summary.FirstError = cell.cutDepth, reads.failed, reads.first
+	summary.ByQueue = QueueBreakdown(ctx, cell.stores.RedisPort)
+	byKind, stop := context.WithTimeout(ctx, 2*time.Minute) // one SCAN of the group keys, bounded at a deep backlog
+	defer stop()
+	summary.ByKind = QueueByKind(byKind, cell.stores.RedisPort)
+	return summary
+}
+
+// queueReads counts failed depth reads and keeps the first, so a blind probe cannot read as an empty queue.
+type queueReads struct {
+	failed int
+	first  string
+}
+
+func (reads *queueReads) fail(err error) {
+	if reads.failed++; reads.first == "" {
+		reads.first = err.Error()
 	}
-	worker := cell.marks["headWorkerStarted"]
+}
+
+// queueSlack is the backlog live traffic keeps on top of the baseline. The baseline is 0: the depth
+// before the cut is the restored backlog itself, so it says nothing about the steady state.
+const (
+	queueSlack  = 100
+	queueBase   = 0
+	slopeWindow = int64(10 * 60 * 1000)
+)
+
+func drainLimit(baseline int) int { return baseline + queueSlack }
+
+// queueSlope is the change in jobs per minute over the last ten minutes of readings.
+func queueSlope(samples []QueueSample) float64 {
+	if len(samples) < 2 {
+		return 0
+	}
+	last := samples[len(samples)-1]
+	first := last
 	for _, sample := range samples {
-		if sample.AtMs < cell.marks["fromWorkerPaused"] {
-			summary.Baseline = max(summary.Baseline, sample.Depth)
+		if sample.AtMs >= last.AtMs-slopeWindow {
+			first = sample
+			break
 		}
+	}
+	if last.AtMs == first.AtMs {
+		return 0
+	}
+	return float64(last.Depth-first.Depth) / (float64(last.AtMs-first.AtMs) / 60000)
+}
+
+// summariseQueue finds the peak and when, after head's worker started, the depth fell within the
+// limit and stayed there to the last reading (-1: never, or it grew again).
+func summariseQueue(samples []QueueSample, workerAt int64) QueueSummary {
+	summary := QueueSummary{Samples: samples, Baseline: queueBase, DrainedMs: -1, Final: -1, SlopePerMin: queueSlope(samples)}
+	summary.Limit = drainLimit(summary.Baseline)
+	for _, sample := range samples {
 		if sample.Depth > summary.Peak {
 			summary.Peak, summary.PeakAtMs = sample.Depth, sample.AtMs
 		}
-		if summary.DrainedMs < 0 && sample.AtMs > worker && sample.Left == 0 {
-			summary.DrainedMs = sample.AtMs - worker
+		switch {
+		case workerAt <= 0 || sample.AtMs < workerAt:
+		case sample.Depth > summary.Limit:
+			summary.DrainedMs = -1
+		case summary.DrainedMs < 0:
+			summary.DrainedMs = sample.AtMs - workerAt
 		}
+	}
+	if len(samples) > 0 {
+		summary.Final, summary.FinalNotDue = samples[len(samples)-1].Depth, samples[len(samples)-1].NotDue
 	}
 	return summary
 }
 
-func (cell *run) queueVerdict() Verdict {
-	queue := cell.report.Queue
-	return verdict("N4", queue.DrainedMs >= 0,
-		fmt.Sprintf("%d jobs at the cut; all gone %d ms after the worker started (-1: never); baseline depth %d, peak %d at %d ms; left by kind: %q",
-			queue.CutJobs, queue.DrainedMs, queue.Baseline, queue.Peak, queue.PeakAtMs, queue.Leftover))
+// queueVerdict: the jobs present at the cut were handled, so the depth fell within the slack of the
+// baseline after head's worker started and stayed there to the end.
+func queueVerdict(queue QueueSummary) Verdict {
+	drained := queue.DrainedMs >= 0 && queue.Final >= 0 && queue.Final <= queue.Limit
+	return verdict("N4", drained,
+		fmt.Sprintf("group-queue jobs: baseline %d (limit %d), %d at the cut (-1: unread), peak %d at %d ms, at baseline and staying there %d ms after head's worker started (-1: never), %d due at the end (-1: no reading; %d more scheduled later, not counted), slope over the last 10 min %.1f jobs/min; %d of %d reads failed%s",
+			queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.FinalNotDue, queue.SlopePerMin, queue.ReadErrors, queue.ReadErrors+len(queue.Samples), errSuffix(queue.FirstError)))
 }
 
 // opsVerdict: the Upgrades page answered a state, and after settle a finished one.
@@ -359,6 +502,8 @@ func (cell *run) opsVerdict(final []LedgerRow) Verdict {
 	want := "Up to date"
 	if len(Outstanding(final)) > 0 {
 		want = "Finishing in background"
+	} else if (cell.overlay(OverlayTenantOddities) || cell.overlay(OverlayHeldTenants)) && cell.odd.err == nil {
+		want = "Needs attention" // the planted held organization (A1)
 	}
 	return verdict("O1", states["settled"] == want, fmt.Sprintf("want %q settled; state by phase: %v", want, states))
 }
@@ -376,25 +521,37 @@ func (cell *run) visibleWrites(ctx context.Context) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	privateSpans := map[string]bool{}
+	privateStored := map[string]map[string]bool{}
 	if cell.privateTraffic != nil {
 		private, err := StoredIDs(ctx, cell.stores, cell.privateLabel, cell.privateTraffic.Client.Project)
 		if err != nil {
 			return nil, err
 		}
-		privateSpans = private["spans"]
+		privateStored = private
+	}
+	otherStored := map[string]map[string]bool{}
+	if cell.otherPrivate != nil {
+		if otherStored, err = StoredIDs(ctx, cell.stores, cell.otherPrivateLabel, cell.otherPrivate.Client.Project); err != nil {
+			return nil, err
+		}
 	}
 	visible := map[string]bool{}
 	seen := evidence{stored: stored, versions: cell.promptVersions(ctx)}
-	for _, call := range cell.allCalls() {
+	callsRange := cell.allCalls()
+	for i := range callsRange {
+		call := &callsRange[i]
 		if !call.Write || !call.ok() {
 			continue
 		}
-		if strings.HasPrefix(call.Kind, privatePrefix) {
-			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, call, privateSpans)
+		if strings.HasPrefix(call.Kind, otherPrivatePrefix) {
+			visible[call.Kind+"/"+call.ID] = otherStored[storedTable[strings.TrimPrefix(call.Kind, otherPrivatePrefix)]][call.ID]
 			continue
 		}
-		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, call, seen)
+		if strings.HasPrefix(call.Kind, privatePrefix) {
+			visible[call.Kind+"/"+call.ID] = cell.privateVisible(ctx, *call, privateStored)
+			continue
+		}
+		visible[call.Kind+"/"+call.ID] = cell.isVisible(ctx, *call, seen)
 	}
 	return visible, nil
 }
@@ -455,27 +612,15 @@ func (cell *run) hybridVerdicts(ctx context.Context) []Verdict {
 	if len(cell.private) == 0 {
 		return nil
 	}
-	misplaced, err := cell.misplacedTenants(ctx)
-	placement := verdict("H1", len(misplaced) == 0 && err == nil, fmt.Sprintf("misplaced: %v %s", misplaced, errText(err)))
-	return append([]Verdict{placement, cell.targetsVerdict(ctx)}, cell.isolationVerdicts(ctx)...)
-}
-
-// misplacedTenants names every tenant found on a target other than its own.
-func (cell *run) misplacedTenants(ctx context.Context) ([]string, error) {
-	home := cell.homes()
-	var misplaced []string
-	for _, label := range append([]string{""}, cell.stores.Private...) {
-		tenants, err := tenantsOn(ctx, cell.stores.queryURL(label))
-		if err != nil {
-			return misplaced, err
-		}
-		for tenant := range tenants {
-			if home[tenant] != label {
-				misplaced = append(misplaced, fmt.Sprintf("%s on %q, home %q", tenant, label, home[tenant]))
-			}
-		}
+	verdicts := append(cell.placementVerdicts(ctx), cell.targetsVerdict(ctx))
+	verdicts = append(verdicts, cell.isolationVerdicts(ctx)...)
+	if cell.drill(DrillRouteBroken) {
+		verdicts = append(verdicts, cell.routeVerdict())
 	}
-	return misplaced, nil
+	if cell.drill(DrillPrivateDown) {
+		verdicts = append(verdicts, cell.downVerdict(ctx))
+	}
+	return append(verdicts, cell.dataplanesVerdict(ctx))
 }
 
 // homes maps each private organization and its projects to its target label; an absent tenant is shared ("").
@@ -488,16 +633,6 @@ func (cell *run) homes() map[string]string {
 		}
 	}
 	return home
-}
-
-// tenantsOn lists the TenantIds holding spans or events on one ClickHouse target.
-func tenantsOn(ctx context.Context, target string) (map[string]bool, error) {
-	out, err := clickhouseQuery(ctx, target, "SELECT DISTINCT TenantId FROM (SELECT TenantId FROM stored_spans UNION ALL SELECT TenantId FROM event_log) FORMAT TSV")
-	tenants := map[string]bool{}
-	for _, tenant := range strings.Fields(out) {
-		tenants[tenant] = true
-	}
-	return tenants, err
 }
 
 func (cell *run) targetsVerdict(ctx context.Context) Verdict {
@@ -513,7 +648,9 @@ func (cell *run) targetsVerdict(ctx context.Context) Verdict {
 
 // browserVerdict: the signed-in walk saw no console error and no failed request outside the accepted list.
 func (cell *run) browserVerdict() Verdict {
-	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], FirstAt(cell.report.Phases, "ready"))
+	// upgrade_in_progress stays expected after ready while H8's private target catches up (T7-F18).
+	stepsRunUntil := max(FirstAt(cell.report.Phases, "ready"), cell.down.caughtMs)
+	walks, expected, tolerated, findings, err := BrowserFindings(filepath.Join(cell.options.RunDir, "browser.jsonl"), cell.marks["switched"], stepsRunUntil, cell.profile.StopStart)
 	if err != nil || walks == 0 {
 		return Verdict{ID: "B1", Name: invariantNames["B1"], Result: "inconclusive", Detail: fmt.Sprintf("%d completed walks; %s", walks, errText(err))}
 	}
@@ -521,7 +658,7 @@ func (cell *run) browserVerdict() Verdict {
 	for _, each := range findings[:min(len(findings), 3)] {
 		first = append(first, fmt.Sprintf("%s %s %d %.120s at %s (%d ms, %s)", each.Kind, each.URL, each.Status, each.Text, each.Step, each.AtMs, PhaseAt(cell.report.Phases, each.AtMs)))
 	}
-	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run), other %v", walks, len(findings), first, expected, tolerated))
+	return verdict("B1", len(findings) == 0, fmt.Sprintf("%d walks, %d findings (see browser.jsonl); first: %v; accepted: %d 503 upgrade_in_progress with Retry-After (expected while steps run or a private target catches up), other %v", walks, len(findings), first, expected, tolerated))
 }
 
 // readModelVerdict (I5): the projections an upgrade must leave filled. Any failed part fails it; a part
@@ -545,24 +682,27 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 	var mismatched []string
 	traces := 0
 	for _, label := range append([]string{""}, cell.stores.Private...) {
-		meter, err1 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "usage_trace_meter")
-		summaries, err2 := tenantTraceCounts(ctx, cell.stores.queryURL(label), "trace_summaries")
+		meter, err1 := tenantTraceCounts(ctx, cell.stores.queryURL(label), monthMeterQuery)
+		summaries, err2 := tenantTraceCounts(ctx, cell.stores.queryURL(label), monthTracesQuery)
 		if err1 != nil || err2 != nil {
 			return Verdict{Name: part.Name, Result: "inconclusive", Detail: errText(err1) + " " + errText(err2)}
 		}
 		for tenant, count := range summaries {
+			if cell.agedOnly(tenant) {
+				continue
+			}
 			traces += count
 			if meter[tenant] != count {
 				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces %d", label, tenant, meter[tenant], count))
 			}
 		}
 		for tenant, count := range meter {
-			if _, ok := summaries[tenant]; !ok {
+			if _, ok := summaries[tenant]; !ok && !cell.agedOnly(tenant) {
 				mismatched = append(mismatched, fmt.Sprintf("%s %q meter %d, traces 0", label, tenant, count))
 			}
 		}
 	}
-	part.Detail = fmt.Sprintf("%d traces; mismatched: %v", traces, mismatched)
+	part.Detail = fmt.Sprintf("%d traces first stored this month; mismatched: %v", traces, mismatched)
 	if traces == 0 {
 		part.Result, part.Detail = "inconclusive", "no trace on any target to count"
 	} else if len(mismatched) > 0 {
@@ -571,8 +711,14 @@ func (cell *run) traceMeterPart(ctx context.Context) Verdict {
 	return part
 }
 
-func tenantTraceCounts(ctx context.Context, target, table string) (map[string]int, error) {
-	out, err := clickhouseQuery(ctx, target, "SELECT TenantId, uniqExact(TraceId) FROM "+table+" GROUP BY TenantId FORMAT TSV")
+// The meter holds one row per project, UTC month and trace; a trace counts in the month it was first stored.
+const (
+	monthMeterQuery  = "SELECT TenantId, uniqExact(TraceId) FROM usage_trace_meter WHERE Month = toStartOfMonth(now('UTC')) GROUP BY TenantId FORMAT TSV"
+	monthTracesQuery = "SELECT TenantId, count() FROM (SELECT TenantId, TraceId FROM trace_summaries GROUP BY TenantId, TraceId HAVING min(CreatedAt) >= toStartOfMonth(now('UTC'))) GROUP BY TenantId FORMAT TSV"
+)
+
+func tenantTraceCounts(ctx context.Context, target, query string) (map[string]int, error) {
+	out, err := clickhouseQuery(ctx, target, query)
 	if err != nil {
 		return nil, err
 	}
@@ -610,6 +756,7 @@ func (cell *run) storedEventsVerdict(ctx context.Context) Verdict {
 		"STORED_EVENTS_CLICKHOUSE_URLS": strings.Join(urls, ","),
 		"STORED_EVENTS_REPORT":          reportPath,
 		"VITEST_MAX_WORKERS":            "2",
+		"NX_DAEMON":                     "false", // the suite's setup builds through nx; a daemon would outlive the cell
 	})
 	out, runErr := command.CombinedOutput()
 	_ = os.WriteFile(cell.logPath("stored-events"), out, 0o600)

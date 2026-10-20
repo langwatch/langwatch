@@ -2,7 +2,8 @@
  * The remembered answer to "how should Langy reach my code" (ADR-129), letting the reader take
  * it back. Hangs off the Integrations screen's GitHub card, which reads and clears the choice.
  */
-import { Button, Card, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { GitHub } from "react-feather";
 
 export function LangyCodeAccessPreference({
@@ -34,16 +35,10 @@ export function LangyCodeAccessPreference({
   if (!standalone) return line;
 
   return (
-    <Card.Root id="langy-code-access">
-      <Card.Body>
-        <VStack align="stretch" gap={2}>
-          <HStack gap={2}>
-            <GitHub size={18} />
-            <Heading size="sm">Langy code access</Heading>
-          </HStack>
-          {line}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <Box id="langy-code-access" width="full">
+      <Card title="Langy code access" icon={<GitHub size={18} />} padding="lg">
+        {line}
+      </Card>
+    </Box>
   );
 }

@@ -506,7 +506,7 @@ func TestProjectsService(t *testing.T) {
 	t.Run("given an admin-scoped key", func(t *testing.T) {
 		t.Run("when listing projects", func(t *testing.T) {
 			c := newTestClient(t, func(w http.ResponseWriter, r *http.Request) {
-				assert.Equal(t, "/api/projects", r.URL.Path)
+				assert.Equal(t, "/api/v1/projects", r.URL.Path)
 				_, _ = w.Write([]byte(`{"data":[{"id":"project_1","name":"Prod","slug":"prod"}],"pagination":{"page":1,"limit":10,"total":1}}`))
 			})
 			projects, pg, err := c.Projects.List(context.Background(), ListProjectsParams{})

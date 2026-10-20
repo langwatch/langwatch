@@ -16,11 +16,12 @@ import type {
 } from "../../features/identity/rules/people-listing.rules.ts";
 import { peopleListed, peopleRefused } from "../../features/identity/rules/people-listing.rules.ts";
 import {
-  DIRECTORY_USERS_FIRST_PAGE,
+  directoryUsersFirstPage,
   type DirectoryUser,
   isMicrosoftGraphUrl,
   readDirectoryUserRows,
 } from "../../features/microsoft/rules/microsoft-graph-directory.rules.ts";
+import { REAL_VENDOR_BASES, type VendorBases } from "../../rules/vendor-bases.rules.ts";
 import type { GovernanceHttpClient } from "../governance-http.channel.ts";
 import type {
   MicrosoftDirectoryChannel,
@@ -67,14 +68,15 @@ async function readDirectoryPage(params: {
  */
 async function walkMicrosoftDirectory(params: {
   http: GovernanceHttpClient;
+  graphBase: string;
   token: string;
   signal?: AbortSignal;
 }): Promise<MicrosoftDirectoryRead> {
-  const { http, token, signal } = params;
+  const { http, graphBase, token, signal } = params;
 
   const users: DirectoryUser[] = [];
   let unreadableRows = 0;
-  let url: string = DIRECTORY_USERS_FIRST_PAGE;
+  let url: string = directoryUsersFirstPage({ graphBase });
 
   for (let page = 0; page < MAX_DIRECTORY_PAGES; page += 1) {
     const read = await readDirectoryPage({ http, url, token, signal });
@@ -105,7 +107,7 @@ async function walkMicrosoftDirectory(params: {
     if (read.nextLink === null) {
       return { ok: true, users, unreadableRows, truncated: false };
     }
-    if (!isMicrosoftGraphUrl(read.nextLink)) {
+    if (!isMicrosoftGraphUrl(read.nextLink, { graphBase })) {
       return {
         ok: false,
         failure: {
@@ -147,10 +149,19 @@ export function directoryUsersAsPeople(users: DirectoryUser[]): DiscoveredPerson
 
 /** The directory, over the process's HTTP client. */
 export class HttpMicrosoftDirectoryChannel implements MicrosoftDirectoryChannel {
-  private constructor(private readonly http: GovernanceHttpClient) {}
+  private constructor(
+    private readonly http: GovernanceHttpClient,
+    private readonly graphBase: string,
+  ) {}
 
-  static create({ http }: { http: GovernanceHttpClient }): HttpMicrosoftDirectoryChannel {
-    return new HttpMicrosoftDirectoryChannel(http);
+  static create({
+    http,
+    vendorBases = REAL_VENDOR_BASES,
+  }: {
+    http: GovernanceHttpClient;
+    vendorBases?: VendorBases;
+  }): HttpMicrosoftDirectoryChannel {
+    return new HttpMicrosoftDirectoryChannel(http, vendorBases.microsoftGraph);
   }
 
   /** The whole user list, or why the walk stopped. Transport failures propagate. */
@@ -158,7 +169,7 @@ export class HttpMicrosoftDirectoryChannel implements MicrosoftDirectoryChannel 
     token: string;
     signal?: AbortSignal;
   }): Promise<MicrosoftDirectoryRead> {
-    return walkMicrosoftDirectory({ http: this.http, ...params });
+    return walkMicrosoftDirectory({ http: this.http, graphBase: this.graphBase, ...params });
   }
 
   /**

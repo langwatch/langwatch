@@ -63,23 +63,29 @@ function stubClient(options: {
   failLatch?: boolean;
 }): { client: PrismaClient; calls: Recorded } {
   const calls: Recorded = { latchAnyone: 0, latchUser: 0, identifiers: 0 };
-  const state = {
-    findFirst: (args: unknown) => {
+  // The latch reads identity's switch beside the state row in one raw statement each.
+  const $queryRaw = (query: unknown, ...values: unknown[]): Promise<object[]> => {
+    expect(values).toContain(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
+    const text = Array.isArray(query) ? query.join("?") : String(query);
+    if (text.includes('"anyone"')) {
       calls.latchAnyone += 1;
       if (options.failLatch) return Promise.reject(new Error("state table unreadable"));
-      const where = field(args, "where");
-      expect(field(where, "migrationName")).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
-      expect(field(where, "status")).toBe("finalized");
-      return Promise.resolve(options.anyoneFinalized ? { tenantId: "user-1" } : null);
-    },
-    findUnique: (args: unknown) => {
-      calls.latchUser += 1;
-      if (options.failLatch) return Promise.reject(new Error("state table unreadable"));
-      const key = field(field(args, "where"), "migrationName_tenantId");
-      expect(field(key, "migrationName")).toBe(IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME);
-      const status = options.statusByUser?.[String(field(key, "tenantId"))];
-      return Promise.resolve(status === undefined ? null : { status });
-    },
+      return Promise.resolve([{ anyone: options.anyoneFinalized === true }]);
+    }
+    calls.latchUser += 1;
+    if (options.failLatch) return Promise.reject(new Error("state table unreadable"));
+    const userId = values.find(
+      (value) => typeof value === "string" && value !== IDENTITY_IDENTIFIER_BACKFILL_MIGRATION_NAME,
+    );
+    const status = options.statusByUser?.[String(userId)];
+    return Promise.resolve([
+      {
+        ownOnIdentifiers: null,
+        ownSwitchedAt: null,
+        legacyStatus: status ?? null,
+        legacyOccurredAt: status === undefined ? null : new Date(NOW),
+      },
+    ]);
   };
   const identifiers = {
     findMany: (args: unknown) => {
@@ -88,7 +94,7 @@ function stubClient(options: {
       return Promise.resolve((options.identifiers ?? []).filter((row) => row.userId === userId));
     },
   };
-  const client = prismaDouble({ systemMigrationTenantState: state, identifier: identifiers });
+  const client = prismaDouble({ $queryRaw, identifier: identifiers });
   return { client, calls };
 }
 

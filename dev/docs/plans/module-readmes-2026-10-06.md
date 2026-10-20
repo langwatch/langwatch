@@ -353,7 +353,7 @@ today; 4 are `webhook_endpoints`), and a line that gating is per route, never pe
 A pure-Go parser cannot read this codebase faithfully: values sit one hop away (56 of 67
 pipeline names are imported constants, `everyMs` is arithmetic in another file, paths are
 template literals and `.map()` families), and `*Api` contracts are TypeScript interfaces
-over zod schemas. So the tool copies the pattern `tools/apidiff` already uses:
+over zod schemas. So the tool is split in two:
 
 | Part                                           | Language                | Does                                                                                                                                                       |
 | ---------------------------------------------- | ----------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- |
@@ -489,7 +489,7 @@ About 10 to 14 lane-days; R1 and R2 first, then R3 to R6 in parallel lanes.
   pipelines, factory-built transports). The mounted REST cross-check and the `≈` marker keep
   wrong facts out; the rest is caught in review of the golden tests.
 - **Install cost.** The extractor needs an installed workspace with generated files, as
-  apidiff and `openapi:generate` do; CI already prepares them.
+  `openapi:generate` does; CI already prepares them.
 - **Churn.** Every route or pipeline change regenerates a page. That is intended: the page is
   part of the diff a reviewer reads. GitHub cannot mark half a file as generated, so the pages
   show in diffs in full.

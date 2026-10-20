@@ -23,10 +23,17 @@ export type EmailSuppressionRow = {
   createdAt: TimeInput;
 };
 
+/** Where the next page resumes: the last row of the page before. */
+export type EmailSuppressionCursor = { createdAt: TimeInput; id: string };
+
 export type NotificationApiMap = {
   emailSuppression: {
-    getAll: {
-      query: { input: ProjectScope; output: EmailSuppressionRow[] };
+    /** One page, newest first; `nextCursor` is null on the last page. */
+    getPage: {
+      query: {
+        input: ProjectScope & { limit?: number; cursor?: EmailSuppressionCursor | null };
+        output: { suppressions: EmailSuppressionRow[]; nextCursor: EmailSuppressionCursor | null };
+      };
     };
 
     /** Removing a suppression resumes delivery — a deliberate operator action. */

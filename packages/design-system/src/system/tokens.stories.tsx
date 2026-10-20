@@ -127,7 +127,7 @@ function Section({ title, note, children }: { title: string; note?: string; chil
   return (
     <Stack gap={2}>
       <HStack gap={2} align="baseline">
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         {note ? (
           <Text textStyle="xs" color="fg.muted">
             {note}
@@ -159,6 +159,16 @@ const SEMANTIC_GROUPS: { title: string; note: string; matches: (name: string) =>
     title: "Accent",
     note: 'The brand orange; `colorPalette="accent"` follows it.',
     matches: (n) => n.startsWith("accent."),
+  },
+  {
+    title: "Terminal",
+    note: "Named ANSI colours and screen chrome.",
+    matches: (n) => n.startsWith("terminal."),
+  },
+  {
+    title: "Illustration",
+    note: "Fixed artwork pigments, identical in both modes.",
+    matches: (n) => n.startsWith("illustration."),
   },
   { title: "Status", note: "A state, never decoration.", matches: (n) => n.startsWith("status.") },
   {

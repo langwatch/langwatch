@@ -30,7 +30,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "generate:setup-skill-bodies": "node --experimental-strip-types scripts/generate-setup-skill-bodies.ts"
@@ -59,7 +59,6 @@
     "@langwatch/notification-contract": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/onboarding-contract": "workspace:*",
-    "@langwatch/plans": "workspace:*",
     "@langwatch/presence-contract": "workspace:*",
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
@@ -80,12 +79,12 @@
     "hono": "catalog:",
     "langwatch": "workspace:*",
     "nanoid": "catalog:",
-    "prom-client": "catalog:",
     "ws": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {
     "@langwatch/feature-flag-process": "workspace:*",
+    "@langwatch/plans": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@opentelemetry/sdk-trace-base": "catalog:",

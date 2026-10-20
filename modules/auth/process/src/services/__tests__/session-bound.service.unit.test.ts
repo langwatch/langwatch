@@ -80,6 +80,41 @@ describe("bounding how long a signed-in browser session lasts", () => {
     expect(fixture.touched).toEqual([{ sessionId: "session-1", at: clock }]);
   });
 
+  describe("when the read is the browser's own background poll", () => {
+    /** @scenario "A page that polls on its own does not keep the session alive" */
+    it("judges the session but leaves its last-seen stamp alone", async () => {
+      const fixture = signInSecurityFixture({ now });
+      await fixture.organization({
+        id: "acme",
+        lockout: NO_LOCKOUT,
+        sessionBound: bound(60),
+        members: ["sam"],
+      });
+      minutesPass(20);
+
+      expect(
+        await fixture.sessionBound.enforce({ session: session(SIGNED_IN_AT), background: true }),
+      ).toEqual({ withinBound: true });
+      expect(fixture.touched).toEqual([]);
+    });
+
+    /** @scenario "A page that polls on its own does not keep the session alive" */
+    it("still ends a session the person left idle past its window", async () => {
+      const fixture = signInSecurityFixture({ now });
+      await fixture.organization({
+        id: "acme",
+        lockout: NO_LOCKOUT,
+        sessionBound: bound(60),
+        members: ["sam"],
+      });
+      minutesPass(70);
+
+      expect(
+        await fixture.sessionBound.enforce({ session: session(SIGNED_IN_AT), background: true }),
+      ).toEqual({ withinBound: false, reason: "idle" });
+    });
+  });
+
   /** @scenario "A maximum length is not extended by activity" */
   it("ends a session past its ceiling however recently it was used", async () => {
     const fixture = signInSecurityFixture({ now });

@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 /**
  * @vitest-environment jsdom
  *
- * The refusals on the Explorer's `instant_eval` route: a popover, or the phrase search.
+ * The refusals on the Explorer's `instant_eval` route: a popover over the chip, or a phrase.
  * @see specs/traces-v2/instant-eval-search.feature ("A refusal is a popover, never an error state")
  */
 import { useFilterStore } from "../../../../../behavior/explorer.store.ts";
@@ -51,6 +51,9 @@ const payload: InstantEvalRoutePayload = {
   timeRange: { from: 1_000, to: 2_000 },
 };
 
+/** The bar's query a refusal leaves: the route's chip beside the other terms. */
+const CHIP_QUERY = 'service:api AND eval:"the user is annoyed"';
+
 /** The last estimate request's callbacks. */
 function estimateCallbacks(): MutateOptions {
   const call = mutations.estimate.mutate.mock.calls.at(-1);
@@ -77,8 +80,8 @@ beforeEach(() => {
 });
 
 describe("given the organization has spent its free budget", () => {
-  /** @scenario "A spent free budget opens the budget popover and the phrase search runs" */
-  it("opens the budget popover, and dismissing it applies the phrase search", () => {
+  /** @scenario "A spent free budget opens the budget popover and keeps the eval chip" */
+  it("opens the budget popover over the eval chip, and closing it leaves the chip", () => {
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
     act(() => result.current.onInstantEvalRoute(payload));
     act(() =>
@@ -91,31 +94,52 @@ describe("given the organization has spent its free budget", () => {
     );
 
     expect(result.current.refusal).toEqual({ kind: "budget" });
-    expect(useFilterStore.getState().queryText).toBe("");
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
 
     act(() => result.current.dismissRefusal());
 
     expect(result.current.refusal).toBeNull();
-    expect(useFilterStore.getState().queryText).toBe(payload.fallbackQuery);
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
   });
 });
 
 describe("given the deployment has no classifier", () => {
-  /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+  /** @scenario "A missing classifier opens the model popover and keeps the eval chip" */
   it.each([
     "instant_eval_classifier_unavailable",
     "instant_eval_classifier_not_configured",
     "instant_eval_not_enabled",
-  ])("opens the model popover, and closing it applies the phrase search (%s)", (code) => {
+  ])("opens the model popover over the chip, with no phrase search (%s)", (code) => {
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
     act(() => result.current.onInstantEvalRoute(payload));
     act(() => estimateCallbacks().onError?.(handledError({ code })));
 
     expect(result.current.refusal).toEqual({ kind: "model" });
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
 
     act(() => result.current.dismissRefusal());
 
-    expect(useFilterStore.getState().queryText).toBe(payload.fallbackQuery);
+    expect(useFilterStore.getState().queryText).toBe(CHIP_QUERY);
+  });
+});
+
+describe("given a refusal popover is open over a routed chip", () => {
+  /** @scenario "Skip routes the words again with the eval option left out" */
+  it("closes on Skip and hands the refused payload back for routing, once", () => {
+    const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: true }));
+    act(() => result.current.onInstantEvalRoute(payload));
+    act(() =>
+      estimateCallbacks().onError?.(handledError({ code: "instant_eval_classifier_unavailable" })),
+    );
+
+    let skipped: InstantEvalRoutePayload | null = null;
+    act(() => {
+      skipped = result.current.skipRefusal();
+    });
+
+    expect(result.current.refusal).toBeNull();
+    expect(skipped).toEqual(payload);
+    expect(result.current.skipRefusal()).toBeNull();
   });
 });
 
@@ -146,7 +170,7 @@ describe("given the estimate fails for a reason the registry names", () => {
 
 describe("given the Instant Evals flag is off for the project", () => {
   /** @scenario "Instant Evals off for an enterprise organization open the contact-us popover" */
-  it("opens the unreleased popover with no estimate, and dismissing it leaves the typed query alone", () => {
+  it("opens the unreleased popover with no estimate, and dismissing it leaves the chip alone", () => {
     const typed = 'eval:"the user is annoyed"';
     useFilterStore.getState().applyQueryText(typed);
     const { result } = renderHook(() => useInstantEvalRoute({ isInstantEvalAvailable: false }));
@@ -159,7 +183,7 @@ describe("given the Instant Evals flag is off for the project", () => {
     act(() => result.current.dismissRefusal());
 
     expect(result.current.refusal).toBeNull();
-    expect(useFilterStore.getState().queryText).toBe(typed);
+    expect(useFilterStore.getState().queryText).toContain(typed);
   });
 });
 
@@ -278,7 +302,7 @@ describe("given an eval chip refused on a self-hosted install", () => {
 
 describe("given Instant Evals are off for a self-serve organization", () => {
   /** @scenario "Instant Evals off for a self-serve organization open the enable popover" */
-  it("opens the opt-in popover with no estimate, and dismissing it leaves the typed query alone", () => {
+  it("opens the opt-in popover with no estimate, and dismissing it leaves the chip alone", () => {
     const typed = 'eval:"the user is annoyed"';
     useFilterStore.getState().applyQueryText(typed);
     const { result } = renderHook(() =>
@@ -291,7 +315,7 @@ describe("given Instant Evals are off for a self-serve organization", () => {
 
     act(() => result.current.dismissRefusal());
     expect(result.current.refusal).toBeNull();
-    expect(useFilterStore.getState().queryText).toBe(typed);
+    expect(useFilterStore.getState().queryText).toContain(typed);
   });
 
   /** @scenario "Enable switches the organization on and the judgement goes ahead" */

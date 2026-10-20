@@ -6,6 +6,7 @@
 
 import { PERSISTED_QUERY_MAX_AGE } from "@langwatch/browser-host/cache-tiers";
 import { showErrorToast } from "@langwatch/browser-host/errors";
+import { isServerUnreachable, UI_API_HEALTH_PATH } from "@langwatch/browser-host/navigation";
 import { queryRetryDelay, shouldRetryQuery } from "@langwatch/browser-host/query-retry";
 import { isForbiddenAnswer } from "@langwatch/browser-host/session-version";
 import { hashKey, MutationCache, QueryCache, QueryClient, type Query } from "@tanstack/react-query";
@@ -52,6 +53,7 @@ export function createUiQueryClient({
     mutationCache: new MutationCache({ onError: onMutationError }),
     queryCache: new QueryCache({
       onError: (error, query) => {
+        if (isServerUnreachable(error)) return recover();
         if (!sessionQueryKey || !isForbiddenAnswer(error)) return;
         if (query.queryHash === hashKey(sessionQueryKey)) return;
         if (queryClient.isFetching({ queryKey: sessionQueryKey, exact: true }) > 0) return;
@@ -59,7 +61,52 @@ export function createUiQueryClient({
       },
     }),
   });
+  const recover = recoverWhenServerAnswers({ queryClient });
   return queryClient;
+}
+
+/** The first look for the API after a read could not reach it, and the slowest it eases to. */
+const RECOVERY_FIRST_DELAY_MS = 2_000;
+const RECOVERY_MAX_DELAY_MS = 15_000;
+
+function isUnreachableFailure(query: Query): boolean {
+  return query.state.status === "error" && isServerUnreachable(query.state.error);
+}
+
+/**
+ * While a read's last failure is "nothing answered", polls the API's health route, easing off;
+ * once it answers, the failed reads run again so each screen draws itself. The browser's
+ * `online` event never fires when only the server was down. Spec: specs/ui/api-boot-wait.feature
+ */
+function recoverWhenServerAnswers({ queryClient }: { queryClient: QueryClient }): () => void {
+  let polling = false;
+  const poll = (delay: number): void => {
+    setTimeout(() => {
+      const failed = { predicate: isUnreachableFailure };
+      if (queryClient.getQueryCache().findAll(failed).length === 0) {
+        polling = false;
+        return;
+      }
+      void healthAnswers().then((answered) => {
+        if (!answered) return poll(Math.min(delay * 2, RECOVERY_MAX_DELAY_MS));
+        polling = false;
+        void queryClient.refetchQueries({ ...failed, type: "active" });
+      });
+    }, delay);
+  };
+  return () => {
+    if (polling) return;
+    polling = true;
+    poll(RECOVERY_FIRST_DELAY_MS);
+  };
+}
+
+async function healthAnswers(): Promise<boolean> {
+  try {
+    return (await fetch(UI_API_HEALTH_PATH, { cache: "no-store" })).ok;
+  } catch {
+    return false;
+  }
 }
 
 /**

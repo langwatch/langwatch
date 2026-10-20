@@ -1,6 +1,6 @@
 import type * as actualModule from "@langwatch/browser-host/sse-subscription";
 /**
- * Integration tests for "All Runs" default selection on the Suites page.
+ * Integration tests for "All runs" default selection on the Suites page.
  * @vitest-environment jsdom
  * @see specs/features/suites/all-runs-default-open.feature
  */
@@ -164,7 +164,7 @@ vi.mock("@langwatch/browser-host/use-router", () => ({
 
 // Mock panels to avoid deep dependency trees
 vi.mock("../run-history-panel.tsx", () => ({
-  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All runs Panel</div>,
 }));
 
 vi.mock("../suite-detail-panel.tsx", () => ({

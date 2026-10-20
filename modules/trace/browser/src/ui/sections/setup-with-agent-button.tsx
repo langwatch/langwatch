@@ -298,7 +298,7 @@ function AgentMenuOption({
 }) {
   return (
     <HStack gap={2.5} width="full" align="start">
-      <Box color={accent ? "orange.fg" : "fg.subtle"} display="grid" paddingTop="2px">
+      <Box color={accent ? "orange.fg" : "fg.subtle"} display="grid" paddingTop="0.5">
         <Icon size={13} />
       </Box>
       <Box minWidth={0} flex={1}>

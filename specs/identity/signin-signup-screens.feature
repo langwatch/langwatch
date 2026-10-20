@@ -43,6 +43,19 @@ Feature: The first-party sign-in and sign-up screens - the auth screen is ours
     And a method-picker decision shows the methods it named
     But an unknown-account decision continues to account creation
 
+  @integration
+  Scenario: An address routed to an identity provider is dialled on the router's first answer
+    When I enter an address the router sends to my organization's identity provider
+    Then the provider sign-in starts once, from that answer
+    And the router is not asked again on the way
+
+  @integration
+  Scenario: A signed-in visitor on the sign-in page is sent where they were going
+    Given I already hold a session
+    When I land on the sign-in screen, with or without a return address
+    Then I am sent to the return address, or home when there is none
+    And the router is not asked
+
   # Account-aware routing may name that an address is unknown; it must not turn
   # a credential refusal into an oracle for which half of a submitted pair was
   # wrong. Bound in `betterAuthErrorSweep.unit.test.ts`.

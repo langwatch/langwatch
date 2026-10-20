@@ -3,8 +3,8 @@
 
 /**
  * Seeds realistic synthetic RANDOM traffic through the real collector so
- * analytics charts look alive. NOT idempotent — every run adds new
- * traces. Evaluations are skipped (see seed-trace-evals.ts).
+ * analytics charts and dashboards show every state. NOT idempotent: every
+ * run adds new traces and scenario runs. Evaluations are skipped.
  */
 
 import crypto from "node:crypto";
@@ -72,7 +72,7 @@ function mulberry32(seed) {
 }
 const rand = process.env.SEED
   ? mulberry32(Number(process.env.SEED))
-  : () => crypto.randomInt(0, 2 ** 48) / 2 ** 48;
+  : () => crypto.randomInt(0, 2 ** 47) / 2 ** 47; // randomInt needs max - min below 2 ** 48
 
 function randInt(min, max) {
   return Math.floor(rand() * (max - min + 1)) + min;
@@ -99,14 +99,29 @@ function lognormal(mean, stdev) {
   return Math.exp(mean + stdev * z);
 }
 
-// --- model catalog: weight + per-1k-token rates ($) -----------------------
+// --- models: LangWatch prices the first four from its own price list; the
+// fine-tune has no price, so its traces carry an unpriced span.
 const MODELS = [
-  { value: "gpt-5-mini", weight: 35, inRate: 0.00025, outRate: 0.002 },
-  { value: "gpt-5", weight: 15, inRate: 0.00125, outRate: 0.01 },
-  { value: "claude-sonnet-5", weight: 25, inRate: 0.003, outRate: 0.015 },
-  { value: "claude-haiku-4", weight: 20, inRate: 0.0008, outRate: 0.004 },
-  { value: "gemini-3-flash", weight: 5, inRate: 0.000075, outRate: 0.0003 },
+  { value: "gpt-5-mini", weight: 35 },
+  { value: "gpt-5", weight: 15 },
+  { value: "claude-sonnet-4.5", weight: 30 },
+  { value: "gemini-2.5-pro", weight: 12 },
+  { value: "acme-finetune-v2", weight: 8 },
 ];
+
+// A day with no traffic, so charts show a gap rather than a zero.
+const QUIET_DAYS_AGO = 2;
+// Shares of traces that carry each optional field: some fields arrive on part of the traffic.
+const FIELD_SHARE = { user: 0.85, thread: 0.7, customer: 0.6, labels: 0.8, outcome: 0.4 };
+const OUTCOMES = ["resolved", "resolved", "resolved", "handed off", "abandoned"];
+// Test traffic the noise widget counts: an origin, or a non-production environment.
+const NOISE_SHARE = {
+  playground: 0.02,
+  evaluation: 0.03,
+  simulation: 0.02,
+  staging: 0.03,
+  test: 0.02,
+};
 
 const USER_QUESTIONS = [
   "I was charged twice for my subscription this month, can you help?",
@@ -194,18 +209,18 @@ function nextThread() {
   return t;
 }
 
-function buildLlmSpan(spanId, isError) {
+function buildLlmSpan(spanId, isError, parentId) {
   const model = weightedPick(MODELS);
   const promptTokens = Math.round(lognormal(5.2, 0.6)); // ~ 100-400 typical
   const completionTokens = Math.round(lognormal(4.8, 0.7)); // ~ 60-350 typical
-  const cost = (promptTokens / 1000) * model.inRate + (completionTokens / 1000) * model.outRate;
   const question = pick(USER_QUESTIONS);
   const answer = pick(ASSISTANT_ANSWERS);
   return {
     type: "llm",
     span_id: spanId,
+    parent_id: parentId,
     name: "chat-completion",
-    model: model.value,
+    model,
     input: {
       type: "chat_messages",
       value: [
@@ -222,7 +237,6 @@ function buildLlmSpan(spanId, isError) {
     metrics: {
       prompt_tokens: promptTokens,
       completion_tokens: completionTokens,
-      cost: Number(cost.toFixed(6)),
     },
     ...(isError
       ? {
@@ -239,10 +253,11 @@ function buildLlmSpan(spanId, isError) {
   };
 }
 
-function buildRagSpan(spanId) {
+function buildRagSpan(spanId, parentId) {
   return {
     type: "rag",
     span_id: spanId,
+    parent_id: parentId,
     name: "retrieve-context",
     input: { type: "text", value: pick(USER_QUESTIONS) },
     output: {
@@ -252,13 +267,31 @@ function buildRagSpan(spanId) {
   };
 }
 
-function buildToolSpan(spanId) {
+function buildToolSpan(spanId, parentId, isError = false) {
   return {
     type: "tool",
     span_id: spanId,
+    parent_id: parentId,
     name: "lookup-account",
     input: { type: "text", value: "account_lookup" },
-    output: { type: "text", value: "found: true" },
+    output: { type: "text", value: isError ? "" : "found: true" },
+    ...(isError
+      ? { error: { has_error: true, message: "account service timed out", stacktrace: [] } }
+      : {}),
+  };
+}
+
+// The root span every step hangs under, so a step has a parent to recover in.
+function buildAgentSpan(spanId, isError) {
+  return {
+    type: "agent",
+    span_id: spanId,
+    name: "support-agent",
+    input: { type: "text", value: pick(USER_QUESTIONS) },
+    output: { type: "text", value: isError ? "" : pick(ASSISTANT_ANSWERS) },
+    ...(isError
+      ? { error: { has_error: true, message: "upstream model request failed", stacktrace: [] } }
+      : {}),
   };
 }
 
@@ -304,46 +337,222 @@ function buildTrace(finishedAtMs) {
   );
   const startedAtMs = finishedAtMs - durationMs;
 
-  const spans = [];
-  // deterministic composition: always >=1 llm span, optionally rag/tool
-  spans.push(buildLlmSpan(`${traceId}-llm-1`, isError));
-  if (numSpans >= 2) spans.push(buildRagSpan(`${traceId}-rag-1`));
-  if (numSpans >= 3) spans.push(buildToolSpan(`${traceId}-tool-1`));
-  if (numSpans >= 4) spans.push(buildLlmSpan(`${traceId}-llm-2`, false));
+  const rootId = `${traceId}-agent`;
+  const root = buildAgentSpan(rootId, isError);
+  // deterministic composition: always >=1 llm step, optionally rag/tool; a failed
+  // tool call that is retried is a failure the agent recovered from
+  const steps = [];
+  if (numSpans >= 2) steps.push(buildRagSpan(`${traceId}-rag-1`, rootId));
+  if (numSpans >= 3) {
+    if (rand() < 0.15) steps.push(buildToolSpan(`${traceId}-tool-0`, rootId, true));
+    steps.push(buildToolSpan(`${traceId}-tool-1`, rootId));
+  }
+  steps.push(buildLlmSpan(`${traceId}-llm-1`, isError, rootId));
+  if (numSpans >= 4) steps.push(buildLlmSpan(`${traceId}-llm-2`, false, rootId));
 
-  // spread span timestamps evenly across the trace duration
-  const step = Math.max(1, Math.floor(durationMs / spans.length));
-  spans.forEach((span, i) => {
+  // the root covers the trace; its steps run one after another inside it
+  root.timestamps = { started_at: startedAtMs, finished_at: finishedAtMs };
+  const step = Math.max(1, Math.floor(durationMs / steps.length));
+  steps.forEach((span, i) => {
     const spanStart = startedAtMs + i * step;
-    const spanEnd = i === spans.length - 1 ? finishedAtMs : spanStart + step;
+    const spanEnd = i === steps.length - 1 ? finishedAtMs : spanStart + step;
     span.timestamps = { started_at: spanStart, finished_at: spanEnd };
   });
 
+  const has = (field) => rand() < FIELD_SHARE[field];
+  const environment = rand() < NOISE_SHARE.staging ? "staging" : undefined;
   return {
     trace_id: traceId,
-    spans,
+    spans: [root, ...steps],
     metadata: {
-      user_id: thread.userId,
-      thread_id: thread.threadId,
-      customer_id: thread.customerId,
-      labels: [...pick(LABEL_SETS), "demo-traffic-seed"],
+      ...(has("user") ? { user_id: thread.userId } : {}),
+      ...(has("thread") ? { thread_id: thread.threadId } : {}),
+      ...(has("customer") ? { customer_id: thread.customerId } : {}),
+      ...(has("labels") ? { labels: [...pick(LABEL_SETS), "demo-traffic-seed"] } : {}),
+      ...(has("outcome") ? { outcome: pick(OUTCOMES) } : {}),
+      ...(environment ? { environment } : {}),
     },
   };
 }
 
-async function post(trace) {
-  const response = await fetch(`${endpoint}/api/collector`, {
+// --- OTLP traces: the collector format cannot set an origin or a resource
+// attribute, so test runs and test-environment traffic go in over OTLP.
+const hex = (bytes) => crypto.randomBytes(bytes).toString("hex");
+const str = (key, value) => ({ key, value: { stringValue: value } });
+const int = (key, value) => ({ key, value: { intValue: String(value) } });
+const nanos = (ms) => String(BigInt(ms) * 1000000n);
+
+function buildOtlpTrace(finishedAtMs, { origin, environment }) {
+  const traceId = hex(16);
+  const rootId = hex(8);
+  const durationMs = randInt(800, 6000);
+  const startedAtMs = finishedAtMs - durationMs;
+  const model = weightedPick(MODELS);
+  return {
+    resourceSpans: [
+      {
+        resource: {
+          attributes: [
+            str("service.name", "support-agent"),
+            ...(environment ? [str("deployment.environment", environment)] : []),
+          ],
+        },
+        scopeSpans: [
+          {
+            scope: { name: "demo-traffic-seed" },
+            spans: [
+              {
+                traceId,
+                spanId: rootId,
+                name: "support-agent",
+                kind: 1,
+                startTimeUnixNano: nanos(startedAtMs),
+                endTimeUnixNano: nanos(finishedAtMs),
+                attributes: [
+                  str("langwatch.span.type", "agent"),
+                  ...(origin ? [str("langwatch.origin", origin)] : []),
+                ],
+                status: { code: 1 },
+              },
+              {
+                traceId,
+                spanId: hex(8),
+                parentSpanId: rootId,
+                name: "chat-completion",
+                kind: 3,
+                startTimeUnixNano: nanos(startedAtMs + 100),
+                endTimeUnixNano: nanos(finishedAtMs - 50),
+                attributes: [
+                  str("langwatch.span.type", "llm"),
+                  str("gen_ai.request.model", model),
+                  int("gen_ai.usage.input_tokens", Math.round(lognormal(5.2, 0.6))),
+                  int("gen_ai.usage.output_tokens", Math.round(lognormal(4.8, 0.7))),
+                ],
+                status: { code: 1 },
+              },
+            ],
+          },
+        ],
+      },
+    ],
+  };
+}
+
+/** A test run or test-environment trace, or nothing, in the shares NOISE_SHARE sets. */
+function maybeNoiseTrace(finishedAtMs) {
+  const roll = rand();
+  let edge = 0;
+  for (const origin of ["playground", "evaluation", "simulation"]) {
+    edge += NOISE_SHARE[origin];
+    if (roll < edge) return buildOtlpTrace(finishedAtMs, { origin });
+  }
+  edge += NOISE_SHARE.test;
+  if (roll < edge) return buildOtlpTrace(finishedAtMs, { environment: "test" });
+  return undefined;
+}
+
+// --- scenario runs: a few suites run every few days, so Release check has
+// batches to compare; one scenario is flaky.
+const SUITES = {
+  "checkout-suite": [
+    "refund a double charge",
+    "cancel a plan",
+    "change billing email",
+    "explain an invoice",
+    "apply a coupon",
+  ],
+  "account-suite": [
+    "reset an API key",
+    "invite a teammate",
+    "set up SSO",
+    "export traces",
+    "rotate a webhook secret",
+  ],
+};
+const FLAKY_SCENARIO = "apply a coupon";
+
+function scenarioRunEvents({ suite, scenario, batchRunId, atMs }) {
+  const scenarioRunId = `demo-run-${crypto.randomUUID()}`;
+  const scenarioId = `demo-${scenario.replaceAll(" ", "-")}`;
+  const base = { batchRunId, scenarioId, scenarioRunId, scenarioSetId: suite };
+  const passRate = scenario === FLAKY_SCENARIO ? 0.5 : 0.92;
+  const passed = rand() < passRate;
+  const criterion = `The agent can ${scenario}`;
+  const durationMs = randInt(4000, 25000);
+  return [
+    {
+      ...base,
+      type: "SCENARIO_RUN_STARTED",
+      timestamp: atMs,
+      metadata: { name: scenario, description: `The user asks the agent to ${scenario}.` },
+    },
+    {
+      ...base,
+      type: "SCENARIO_MESSAGE_SNAPSHOT",
+      timestamp: atMs + durationMs - 10,
+      messages: [
+        { id: `${scenarioRunId}-u`, role: "user", content: `Can you ${scenario} for me?` },
+        {
+          id: `${scenarioRunId}-a`,
+          role: "assistant",
+          content: passed ? "Done." : "I cannot do that.",
+        },
+      ],
+    },
+    {
+      ...base,
+      type: "SCENARIO_RUN_FINISHED",
+      timestamp: atMs + durationMs,
+      status: passed ? "SUCCESS" : "FAILED",
+      results: {
+        verdict: passed ? "success" : "failure",
+        reasoning: passed ? "The agent did what was asked." : "The agent refused.",
+        metCriteria: passed ? [criterion] : [],
+        unmetCriteria: passed ? [] : [criterion],
+      },
+    },
+  ];
+}
+
+function scenarioBatches(now, dayMs) {
+  const events = [];
+  for (let d = DAYS - 1; d >= 0; d -= 3) {
+    if (d === QUIET_DAYS_AGO) continue;
+    for (const [suite, scenarios] of Object.entries(SUITES)) {
+      const batchRunId = `demo-batch-${crypto.randomUUID()}`;
+      const atMs = Math.min(now - 60_000, now - d * dayMs + randInt(0, 6) * 3_600_000);
+      for (const scenario of scenarios) {
+        events.push(scenarioRunEvents({ suite, scenario, batchRunId, atMs }));
+      }
+    }
+  }
+  return events;
+}
+
+async function postJson(path, body, { bearer = false } = {}) {
+  const response = await fetch(`${endpoint}${path}`, {
     method: "POST",
     headers: {
       "X-Auth-Token": apiKey,
+      ...(bearer ? { Authorization: `Bearer ${apiKey}` } : {}),
       "Content-Type": "application/json",
     },
-    body: JSON.stringify(trace),
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(15_000),
   });
   if (!response.ok) {
-    throw new Error(`${response.status}: ${await response.text()}`);
+    throw new Error(`${path} ${response.status}: ${await response.text()}`);
   }
+}
+
+/** One item: a collector trace, an OTLP trace or one scenario run's events in order. */
+async function post(item) {
+  if (item.kind === "otlp") return postJson("/api/otel/v1/traces", item.body, { bearer: true });
+  if (item.kind === "scenario") {
+    for (const event of item.body) await postJson("/api/scenario-events", event, { bearer: true });
+    return;
+  }
+  return postJson("/api/collector", item.body);
 }
 
 // small concurrency pool
@@ -374,12 +583,12 @@ async function runPool(items, worker, concurrency) {
 async function main() {
   const now = Date.now();
   const dayMs = 24 * 60 * 60 * 1000;
-  const traces = [];
+  const items = [];
 
   for (let d = DAYS - 1; d >= 0; d--) {
+    if (d === QUIET_DAYS_AGO) continue;
     const dayStart = new Date(now - d * dayMs);
     dayStart.setUTCHours(0, 0, 0, 0);
-    const activity = activityWeight(new Date(dayStart.getTime() + 12 * 60 * 60 * 1000));
     // mild upward trend: more recent days get slightly more traffic
     const trend = 0.8 + 0.4 * ((DAYS - 1 - d) / Math.max(1, DAYS - 1));
     const jitter = 0.75 + rand() * 0.5; // +/-25%
@@ -387,17 +596,21 @@ async function main() {
     const dayWeekdayFactor = dayOfWeek === 0 || dayOfWeek === 6 ? 0.5 : 1.0;
     const count = Math.max(1, Math.round(PER_DAY * trend * jitter * dayWeekdayFactor));
     for (let i = 0; i < count; i++) {
-      const ts = randomTimestampOnDay(dayStart.getTime());
-      traces.push(buildTrace(Math.min(ts, now)));
+      const ts = Math.min(randomTimestampOnDay(dayStart.getTime()), now);
+      const noise = maybeNoiseTrace(ts);
+      items.push(
+        noise ? { kind: "otlp", body: noise } : { kind: "collector", body: buildTrace(ts) },
+      );
     }
-    void activity;
   }
+  for (const events of scenarioBatches(now, dayMs)) items.push({ kind: "scenario", body: events });
+  const traces = items;
 
   console.log(
-    `Seeding ${traces.length} synthetic traces over the last ${DAYS} days into ${endpoint} ...`,
+    `Seeding ${traces.length} synthetic traces and scenario runs over the last ${DAYS} days into ${endpoint} ...`,
   );
 
-  const { succeeded, failed } = await runPool(traces, (trace) => post(trace), 5);
+  const { succeeded, failed } = await runPool(traces, (item) => post(item), 5);
 
   const failRate = failed / traces.length;
   console.log(

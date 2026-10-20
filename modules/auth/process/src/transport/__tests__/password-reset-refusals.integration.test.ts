@@ -71,6 +71,7 @@ function transportOver({ db }: { db: MemoryDb }) {
           deactivatedAt: null,
           pendingSsoSetup: false,
           signupConfirmationPending: false,
+          lastLoginAt: null,
           emailVerified: true,
         }),
       }),

@@ -9,11 +9,13 @@ import type {
   analyticsLwqlTrpc,
   LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import type { DashboardWidgetSource } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
-  dashboardTrpcRowSchema,
-  dashboardTrpcSummarySchema,
+  boardTrpc,
+  dashboardTrpc,
   dashboardWidgetTrpcRowSchema,
+  dashboardWidgetTrpcSchema,
   graphDetailSchema,
   graphListItemSchema,
   savedViewTrpc,
@@ -22,15 +24,15 @@ import type { z } from "zod";
 
 import type { FilterField } from "../model/analytics-filter-definition.ts";
 import type { FilterParam } from "../model/analytics-filter-params.ts";
+import type { AnalyticsScopeGraph } from "../model/analytics-personal-project.ts";
 import type { ChartGridPlacement } from "../model/chart-grid.ts";
 import type { LangWatchQLParameterValue } from "../model/lwql-request-state.ts";
 
 /** Dashboard owns these wire schemas; WireOf maps persisted values to their wire representation. */
-type DashboardSummaryRow = WireOf<z.infer<typeof dashboardTrpcSummarySchema>>;
-type DashboardRow = WireOf<z.infer<typeof dashboardTrpcRowSchema>>;
 type GraphListItem = WireOf<z.infer<typeof graphListItemSchema>>;
 type GraphDetail = WireOf<z.infer<typeof graphDetailSchema>>;
 type DashboardWidgetRow = WireOf<z.infer<typeof dashboardWidgetTrpcRowSchema>>;
+type DashboardWidget = WireOf<z.infer<typeof dashboardWidgetTrpcSchema>>;
 
 /** The project every analytics procedure is scoped to. */
 type ProjectScope = { projectId: string };
@@ -168,36 +170,6 @@ type BorrowedProcedures = {
       };
     };
   };
-  dashboards: {
-    getAll: { query: { input: ProjectScope; output: DashboardSummaryRow[] } };
-    getById: {
-      query: {
-        input: ProjectScope & { dashboardId: string };
-        output: unknown;
-      };
-    };
-    create: {
-      mutation: { input: ProjectScope & { name: string }; output: DashboardRow };
-    };
-    rename: {
-      mutation: {
-        input: ProjectScope & { dashboardId: string; name: string };
-        output: unknown;
-      };
-    };
-    delete: {
-      mutation: { input: ProjectScope & { dashboardId: string }; output: unknown };
-    };
-    reorderDashboards: {
-      mutation: {
-        input: ProjectScope & { dashboardIds: string[] };
-        output: { success: true };
-      };
-    };
-    getOrCreateFirst: {
-      query: { input: ProjectScope; output: DashboardRow | null };
-    };
-  };
   graphs: {
     getAll: {
       query: {
@@ -254,7 +226,13 @@ type BorrowedProcedures = {
     };
   };
   dashboardWidgets: {
-    list: { query: { input: ProjectScope; output: DashboardWidgetRow[] } };
+    list: {
+      query: {
+        /** With `dashboardId`: that board's widgets, read from the project that owns it. */
+        input: ProjectScope & { dashboardId?: string };
+        output: DashboardWidgetRow[];
+      };
+    };
     create: {
       mutation: {
         input: ProjectScope & {
@@ -262,8 +240,11 @@ type BorrowedProcedures = {
           name: string;
           code: string;
           queries: unknown[];
+          description?: string;
+          prompt?: string;
+          source?: DashboardWidgetSource;
         };
-        output: unknown;
+        output: DashboardWidget;
       };
     };
     update: {
@@ -281,12 +262,6 @@ type BorrowedProcedures = {
     batchUpdateLayouts: {
       mutation: {
         input: ProjectScope & { layouts: ChartGridPlacement[] };
-        output: { success: true };
-      };
-    };
-    assignDashboard: {
-      mutation: {
-        input: ProjectScope & { id: string; dashboardId: string };
         output: { success: true };
       };
     };
@@ -311,6 +286,10 @@ type BorrowedProcedures = {
         input: { isDemo?: boolean };
         output: unknown;
       };
+    };
+    /** The shell's scope skeleton, narrowed to what this family reads; shares its cache. */
+    getScopeGraph: {
+      query: { input: Record<string, never>; output: AnalyticsScopeGraph };
     };
   };
   project: {
@@ -337,6 +316,8 @@ type BorrowedProcedures = {
 export type AnalyticsApiMap = ContractApiMap<typeof analyticsTrpc> &
   ContractApiMap<typeof analyticsLwqlTrpc> &
   ContractApiMap<typeof savedViewTrpc> &
+  ContractApiMap<typeof dashboardTrpc> &
+  ContractApiMap<typeof boardTrpc> &
   BorrowedProcedures;
 
 /**

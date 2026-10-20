@@ -48,6 +48,14 @@ Feature: Workspace resolution
     Then it is told the workspace is still resolving
     And it does not draw the not-found page
 
+  @integration @regression
+  Scenario: The demo project resolves for somebody who is not a member of its organization
+    Given the deployment names a demo project
+    And I belong to no organization that holds it
+    When the project chrome opens the demo project's address
+    Then it reads the organization graph that carries the demo project
+    And it finds the project rather than drawing the not-found page
+
   @integration
   Scenario: A workspace whose graph has answered has resolved
     Given my session has resolved

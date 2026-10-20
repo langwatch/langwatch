@@ -6,6 +6,7 @@
 
 import { useColorMode } from "@langwatch/design-system/color-mode";
 import { Box } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { Monaco } from "@monaco-editor/react";
 import type { editor } from "monaco-editor";
 import { lazy, Suspense, useState } from "react";
@@ -24,7 +25,7 @@ const MonacoEditor = lazy(() => import("@monaco-editor/react"));
 
 const EDITOR_OPTIONS: editor.IStandaloneEditorConstructionOptions = {
   minimap: { enabled: false },
-  fontSize: 12,
+  fontSize: TYPE_SCALE_PX.caption,
   wordWrap: "on",
   automaticLayout: true,
   scrollBeyondLastLine: false,

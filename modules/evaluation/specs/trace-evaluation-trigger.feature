@@ -62,6 +62,26 @@ Feature: Triggering online evaluations from an ingested trace
     Then it is the same number
 
   @unit
+  Scenario: A trace whose summary has not folded retries the trigger a bounded number of times
+    Given a span or an origin resolution for a trace
+    And the trace's summary has not folded when the settle window ends
+    When the evaluation trigger runs below the retry bound, or on a delivery carrying no attempt
+    Then no evaluation is dispatched and the job fails so the queue retries it
+
+  @unit
+  Scenario: A trace whose summary never folds completes at the retry bound
+    Given a span or an origin resolution for a trace whose summary has still not folded
+    When the evaluation trigger runs on the bounding attempt
+    Then no evaluation is dispatched and the job completes with a warning
+    And no further retry is scheduled, because unbounded retries blocked a queue group per such trace
+
+  @unit
+  Scenario: A trace whose summary has folded is evaluated on any attempt
+    Given a span for a trace whose summary has folded
+    When the evaluation trigger runs on a first attempt or on the bounding attempt
+    Then the evaluation is dispatched
+
+  @unit
   Scenario: A synthetic event span never re-triggers evaluation
     Given a synthetic feedback span posted through the track-event route
     When the relevance guard runs
@@ -103,6 +123,24 @@ Feature: Triggering online evaluations from an ingested trace
     Given the worker hosts trace and evaluation
     When evaluation's pipeline registers its reactions to trace's span facts
     Then the trigger runs on evaluation_processing's own lanes and none remains on trace_processing
+
+  @unit
+  Scenario: Trigger jobs the previous release queued on trace run on evaluation's lanes
+    Given the previous release queued span_received and origin_resolved jobs under "trace_processing:reactor:evaluationTrigger"
+    When evaluation's pipeline registers its reactions to trace's span facts
+    Then it aliases that key to "traceEvaluationTrigger" for span_received and "traceOriginEvaluationTrigger" for origin_resolved, for one release
+
+  @unit
+  Scenario: SDK-evaluation jobs the previous release queued on trace run on evaluation's lane
+    Given the previous release queued span_received jobs under "trace_processing:reactor:customEvaluationSync"
+    When evaluation's pipeline registers its reactions to trace's span facts
+    Then it aliases that key to "traceCustomEvaluationSync", for one release
+
+  @unit
+  Scenario: A process with no trace reactions declares no alias
+    Given a process where no trace pipeline runs
+    When evaluation's pipeline is built
+    Then it carries no lane alias, so it never claims a job it has no lane for
 
   @unit
   Scenario: The evaluation trigger composes from published services

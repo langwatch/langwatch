@@ -1,18 +1,16 @@
 import { Link } from "@langwatch/browser-host/link";
-import { DetailDrawerHeader } from "@langwatch/design-system/detail-drawer-header";
+import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListPageError, ListPageSkeleton } from "@langwatch/design-system/list-page";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
-  Card,
-  Heading,
   Status,
   HStack,
   SimpleGrid,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -46,28 +44,19 @@ export function InstanceDetailDrawer({
   const instance = query.data?.instance;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={instanceRowId !== null}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      title={instance?.organizationName ?? instance?.hostname ?? "Self-hosted install"}
+      eyebrow={{ label: "Self-hosted instance" }}
       size="lg"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <DetailDrawerHeader
-            kind="Self-hosted instance"
-            title={instance?.organizationName ?? instance?.hostname ?? "Self-hosted install"}
-          />
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          <DrawerContent
-            isLoading={query.isLoading}
-            instance={instance}
-            reports={query.data?.reports ?? []}
-          />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <DrawerContent
+        isLoading={query.isLoading}
+        instance={instance}
+        reports={query.data?.reports ?? []}
+      />
+    </Drawer>
   );
 }
 
@@ -168,31 +157,26 @@ function CustomerValue({ instance }: { instance: SelfHostedInstance }) {
 function DomainsSection({ instance }: { instance: SelfHostedInstance }) {
   const domains = sortedDomains(instance.userEmailDomains);
   return (
-    <Card.Root variant="outline" width="full">
-      <Card.Header>
-        <Heading size="sm">Who uses it</Heading>
-      </Card.Header>
-      <Card.Body>
-        {domains.length === 0 ? (
-          <Text textStyle="sm" color="fg.muted">
-            {instance.optionalMetricsReported
-              ? "No domains reported."
-              : "The optional category is switched off on this install."}
-          </Text>
-        ) : (
-          <VStack align="start" gap={1} width="full">
-            {domains.map(({ domain, count }) => (
-              <HStack key={domain} gap={3} width="full">
-                <Text textStyle="sm">{domain}</Text>
-                <Text textStyle="sm" color="fg.muted">
-                  {count} {count === 1 ? "user" : "users"}
-                </Text>
-              </HStack>
-            ))}
-          </VStack>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card title="Who uses it" titleLevel={3}>
+      {domains.length === 0 ? (
+        <Text textStyle="sm" color="fg.muted">
+          {instance.optionalMetricsReported
+            ? "No domains reported."
+            : "The optional category is switched off on this install."}
+        </Text>
+      ) : (
+        <VStack align="start" gap={1} width="full">
+          {domains.map(({ domain, count }) => (
+            <HStack key={domain} gap={3} width="full">
+              <Text textStyle="sm">{domain}</Text>
+              <Text textStyle="sm" color="fg.muted">
+                {count} {count === 1 ? "user" : "users"}
+              </Text>
+            </HStack>
+          ))}
+        </VStack>
+      )}
+    </Card>
   );
 }
 
@@ -202,34 +186,29 @@ function DomainsSection({ instance }: { instance: SelfHostedInstance }) {
  */
 function LadderSection({ instance }: { instance: SelfHostedInstance }) {
   return (
-    <Card.Root variant="outline" width="full">
-      <Card.Header>
-        <Heading size="sm">Getting started</Heading>
-      </Card.Header>
-      <Card.Body>
-        <VStack align="start" gap={1} width="full">
-          {ONBOARDING_LADDER.map(({ field, label }) => {
-            const reached = reportText(instance.latestReport, field);
-            return (
-              <HStack key={field} gap={3} width="full">
-                <Status.Root
-                  colorPalette={reached ? "green" : "gray"}
-                  aria-label={reached ? "Reached" : "Not reached"}
-                >
-                  <Status.Indicator />
-                </Status.Root>
-                <Text textStyle="sm" flex={1}>
-                  {label}
-                </Text>
-                <Text textStyle="sm" color="fg.muted">
-                  {reached ? <FormattedDate value={reached} display="date" /> : "never reached"}
-                </Text>
-              </HStack>
-            );
-          })}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+    <Card title="Getting started" titleLevel={3}>
+      <VStack align="start" gap={1} width="full">
+        {ONBOARDING_LADDER.map(({ field, label }) => {
+          const reached = reportText(instance.latestReport, field);
+          return (
+            <HStack key={field} gap={3} width="full">
+              <Status.Root
+                colorPalette={reached ? "green" : "gray"}
+                aria-label={reached ? "Reached" : "Not reached"}
+              >
+                <Status.Indicator />
+              </Status.Root>
+              <Text textStyle="sm" flex={1}>
+                {label}
+              </Text>
+              <Text textStyle="sm" color="fg.muted">
+                {reached ? <FormattedDate value={reached} display="date" /> : "never reached"}
+              </Text>
+            </HStack>
+          );
+        })}
+      </VStack>
+    </Card>
   );
 }
 
@@ -240,31 +219,26 @@ function UsageSection({ instance }: { instance: SelfHostedInstance }) {
   })).filter((row) => row.value !== null);
 
   return (
-    <Card.Root variant="outline" width="full">
-      <Card.Header>
-        <Heading size="sm">What they do</Heading>
-      </Card.Header>
-      <Card.Body>
-        {rows.length === 0 ? (
-          <Text textStyle="sm" color="fg.muted">
-            No usage numbers in the last report.
-          </Text>
-        ) : (
-          <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} width="full">
-            {rows.map((row) => (
-              <HStack key={row.label} gap={3}>
-                <Text textStyle="sm" color="fg.muted" flex={1}>
-                  {row.label}
-                </Text>
-                <Text textStyle="sm">
-                  <FormattedNumber value={row.value ?? 0} />
-                </Text>
-              </HStack>
-            ))}
-          </SimpleGrid>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card title="What they do" titleLevel={3}>
+      {rows.length === 0 ? (
+        <Text textStyle="sm" color="fg.muted">
+          No usage numbers in the last report.
+        </Text>
+      ) : (
+        <SimpleGrid columns={{ base: 1, md: 2 }} gap={2} width="full">
+          {rows.map((row) => (
+            <HStack key={row.label} gap={3}>
+              <Text textStyle="sm" color="fg.muted" flex={1}>
+                {row.label}
+              </Text>
+              <Text textStyle="sm">
+                <FormattedNumber value={row.value ?? 0} />
+              </Text>
+            </HStack>
+          ))}
+        </SimpleGrid>
+      )}
+    </Card>
   );
 }
 
@@ -274,40 +248,36 @@ function HistorySection({
   reports: { id: string; receivedAt: string; version: string | null; unknownFields: number }[];
 }) {
   return (
-    <Card.Root variant="outline" width="full">
-      <Card.Header>
-        <Heading size="sm">Reports</Heading>
-      </Card.Header>
-      <Card.Body>
-        {reports.length === 0 ? (
-          <Text textStyle="sm" color="fg.muted">
-            No reports stored yet.
-          </Text>
-        ) : (
-          <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Received</Table.ColumnHeader>
-                <Table.ColumnHeader>Release</Table.ColumnHeader>
-                <Table.ColumnHeader>Fields we had no name for</Table.ColumnHeader>
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {reports.map((report) => (
-                <Table.Row key={report.id}>
-                  <Table.Cell>
-                    <FormattedDate value={report.receivedAt} />
-                  </Table.Cell>
-                  <Table.Cell>{report.version ?? "not reported"}</Table.Cell>
-                  <Table.Cell>
-                    <FormattedNumber value={report.unknownFields} />
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </ListTable>
-        )}
-      </Card.Body>
-    </Card.Root>
+    <Card title="Reports" titleLevel={3} padding={reports.length === 0 ? "md" : "none"}>
+      {reports.length === 0 ? (
+        <NoDataInfoBlock
+          size="line"
+          title="No reports stored yet. Ask the instance administrator to check that usage reporting is configured and the instance can reach LangWatch."
+        />
+      ) : (
+        <ListTable variant="embedded" density="compact" scroll="x" scrollLabel="Reports table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Received</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Release</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Fields we had no name for</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {reports.map((report) => (
+              <ListTable.Row key={report.id}>
+                <ListTable.Cell>
+                  <FormattedDate value={report.receivedAt} />
+                </ListTable.Cell>
+                <ListTable.Cell>{report.version ?? "not reported"}</ListTable.Cell>
+                <ListTable.Cell>
+                  <FormattedNumber value={report.unknownFields} />
+                </ListTable.Cell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      )}
+    </Card>
   );
 }

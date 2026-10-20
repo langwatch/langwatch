@@ -27,7 +27,11 @@ import { GraphTriggerSentRepository } from "../../repositories/graph-trigger-sen
 import { MemoryAutomationPersistCapRepository } from "../../repositories/memory/memory.automation-persist-cap.repository.ts";
 import { TriggerFireHistoryRepository } from "../../repositories/trigger-fire-history.repository.ts";
 import { TriggerRepository } from "../../repositories/trigger.repository.ts";
-import type { ReportScheduleTarget } from "../../repositories/trigger.repository.ts";
+import type {
+  ReportScheduleTarget,
+  TriggerJsonText,
+  TriggerJsonTextOutcome,
+} from "../../repositories/trigger.repository.ts";
 import { UnsubscribeTokenVerifier } from "../../services/unsubscribe-token.service.ts";
 import { AutomationTemplateService } from "../automation-template.service.ts";
 import { AutomationService } from "../automation.service.ts";
@@ -97,6 +101,9 @@ class Suppressions extends EmailSuppressionRepository {
   findAll() {
     return Promise.resolve(this.rows);
   }
+  findPage() {
+    return Promise.resolve(this.rows);
+  }
   findMatching(input: { triggerId: string }) {
     return Promise.resolve(
       this.rows.filter((row) => row.triggerId === null || row.triggerId === input.triggerId),
@@ -161,6 +168,12 @@ class Triggers extends TriggerRepository {
   }
   replaceActionParamsIfUnchanged(): Promise<boolean> {
     return Promise.resolve(false);
+  }
+  findJsonTextPage(): Promise<TriggerJsonText[]> {
+    return Promise.resolve([]);
+  }
+  unwrapJsonText(): Promise<TriggerJsonTextOutcome> {
+    return Promise.resolve("changed");
   }
   findClaimedTraceIds() {
     return Promise.resolve(new Set<string>());

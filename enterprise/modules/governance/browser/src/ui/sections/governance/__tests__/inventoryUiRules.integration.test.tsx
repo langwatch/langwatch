@@ -10,11 +10,14 @@
  *
  * Spec: specs/ai-governance/dashboard/governance-ui-controls.feature
  */
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import "@testing-library/jest-dom/vitest";
 import { screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 
+import { AddIngestionSourceMenu } from "../../../../features/ingestion-sources/ui/elements/add-ingestion-source-menu.tsx";
+import { fakeGovernanceHost, renderWithGovernanceHost } from "../../../../testing.tsx";
 import {
   connectTools,
   emptyWithSamplesOff,
@@ -24,6 +27,34 @@ import {
   renderScreen,
   renderScreenWithReferences,
 } from "./inventoryScreenHarness";
+
+/**
+ * The header's own buttons of known weight, drawn in a header of their own so
+ * the page's controls are compared with the same size and palette.
+ */
+function renderHeaderReferences() {
+  renderWithGovernanceHost(
+    <PageLayout.Header>
+      <PageLayout.Heading>references</PageLayout.Heading>
+      <PageLayout.HeaderButton primary>primary reference</PageLayout.HeaderButton>
+      <PageLayout.HeaderButton>outline reference</PageLayout.HeaderButton>
+      <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
+        <PageLayout.HeaderButton primary>primary trigger reference</PageLayout.HeaderButton>
+      </AddIngestionSourceMenu>
+      <AddIngestionSourceMenu isEnterprise onPick={() => undefined}>
+        <PageLayout.HeaderButton>outline trigger reference</PageLayout.HeaderButton>
+      </AddIngestionSourceMenu>
+    </PageLayout.Header>,
+    { host: fakeGovernanceHost() },
+  );
+  const text = (name: string) => screen.getByText(name).closest("button")!.className;
+  return {
+    primary: text("primary reference"),
+    outline: text("outline reference"),
+    primaryTrigger: text("primary trigger reference"),
+    outlineTrigger: text("outline trigger reference"),
+  };
+}
 
 describe("given an admin on the Inventory page", () => {
   describe("when the section's shared UI rules are checked", () => {
@@ -37,6 +68,7 @@ describe("given an admin on the Inventory page", () => {
     it("puts the page actions at the right of the header, small, none solid", async () => {
       connectTools();
       renderScreenWithReferences();
+      const refs = renderHeaderReferences();
       const heading = screen.getByRole("heading", { name: "Inventory" });
       const headerRow = heading.closest("div");
       expect(headerRow).not.toBeNull();
@@ -50,40 +82,31 @@ describe("given an admin on the Inventory page", () => {
       expect(actions?.contains(sampleToggle)).toBe(true);
       expect(actions?.contains(addSource)).toBe(true);
 
-      const outlineSmall = screen.getByText("reference outline small").className;
       const ghostSmall = screen.getByText("reference ghost small").className;
       const subtleSmall = screen.getByText("reference subtle small").className;
       const solidSmall = screen.getByText("reference solid small").className;
-      const solidSmallTrigger = screen.getByText("reference solid small trigger").className;
-      const outlineSmallTrigger = screen.getByText("reference outline small trigger").className;
 
-      // Asserted against the reference rather than as "differs from the
-      // toggle": any two buttons that differ at all would pass that, a grey
-      // create as happily as a solid orange one. The create action is the
-      // house header button, outline and small with a leading plus, and solid
-      // orange is gone from the section.
-      expect(addSource.className).toBe(outlineSmallTrigger);
-      // Ghost rather than outline: the toggle changes what the page shows
-      // rather than anything about the organization, and outline is what marks
-      // the create action out now that nothing in the row is filled.
+      // The references must differ or the comparisons below prove nothing. The
+      // header draws even its primary button outline, so solid is the one to avoid.
+      expect(refs.outline).not.toBe(solidSmall);
+      expect(refs.outline).not.toBe(ghostSmall);
+      expect(refs.primary).toBe(refs.outline);
+      expect(refs.primaryTrigger).toBe(refs.outlineTrigger);
+      // The create action is the house header button, outline, and the toggle
+      // beside it is ghost: the toggle changes what the page shows rather than
+      // anything about the organization.
+      expect(addSource.className).toBe(refs.outlineTrigger);
       expect(sampleToggle.className).toBe(ghostSmall);
 
-      // Exactly one OUTLINE, which is what carries the weight solid used to.
-      // Asserted as a count for the same reason it always was: a row where
-      // nothing stands out reads as a row with no primary action.
+      // Exactly one outline, which is what marks the create action out, and
+      // nothing solid in the row, in the branded or the plain form.
       const headerButtons = actions ? Array.from(actions.querySelectorAll("button")) : [];
       expect(
         headerButtons.filter(
-          (button) => button.className === outlineSmall || button.className === outlineSmallTrigger,
+          (button) => button.className === refs.outline || button.className === refs.outlineTrigger,
         ),
       ).toHaveLength(1);
-      // And nothing in the row is solid, in either the branded or the plain
-      // form. This is the half that fails if solid orange creeps back.
-      expect(
-        headerButtons.filter(
-          (button) => button.className === solidSmall || button.className === solidSmallTrigger,
-        ),
-      ).toHaveLength(0);
+      expect(headerButtons.filter((button) => button.className === solidSmall)).toHaveLength(0);
 
       // Pressed, the kit draws the toggle subtle rather than ghost, so that a
       // page showing invented figures says so in the control that caused it.
@@ -143,6 +166,30 @@ describe("given an admin on the Inventory page", () => {
       // The sources table repeats the header's control in its own header, so
       // this is the pane the rule exists for.
       assertOneDoor("Add source");
+    });
+
+    /** @scenario "Primary page actions sit top-right in the page header" */
+    it("keeps Add source outline on Catalog and Sources and Add environment outline beside it on Environments", async () => {
+      connectTools();
+      renderScreen();
+      const header = () =>
+        screen.getByRole("heading", { name: "Inventory" }).closest("div")
+          ?.parentElement as HTMLElement;
+      const addSource = () => within(header()).getByRole("button", { name: /Add source/ });
+      const refs = renderHeaderReferences();
+
+      expect(addSource().className).toBe(refs.outlineTrigger);
+
+      await openTab(/Environments/);
+      const addEnvironment = within(header()).getByRole("button", { name: /Add environment/ });
+      // Both stay reachable and outline: no solid fill competes in the row.
+      expect(addSource()).toBeEnabled();
+      expect(addSource().className).toBe(refs.outlineTrigger);
+      expect(addEnvironment.className).toBe(refs.outline);
+
+      await openTab(/Sources/);
+      expect(addSource().className).toBe(refs.outlineTrigger);
+      expect(within(header()).queryByRole("button", { name: /Add environment/ })).toBeNull();
     });
 
     // A source is where what the inventory lists arrives from, so connecting

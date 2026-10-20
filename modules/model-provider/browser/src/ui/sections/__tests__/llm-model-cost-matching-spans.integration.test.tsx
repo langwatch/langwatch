@@ -123,7 +123,7 @@ describe("Feature: Model cost regex matching spans preview", () => {
       const row = screen.getByTestId("matching-span-row");
       expect(row).toHaveTextContent("bedrock/eu.anthropic.claude-sonnet-4-6");
       expect(row).toHaveTextContent("chat completion");
-      expect(row).toHaveTextContent("1.0K");
+      expect(row).toHaveTextContent("1K");
       expect(row).toHaveTextContent("200");
       expect(row).toHaveTextContent("$0.0060");
       expect(screen.getByText("12 spans across 1 model in the last 7 days")).toBeInTheDocument();

@@ -1,5 +1,6 @@
-# No entry point runs the upgrade before serving any more: the new worker runs `pnpm task upgrade`
-# under the runner's lease while the api holds (in-app-upgrade.feature; UPGRADE-IN-WORKER, UIW-1..11,
+# No entry point runs the upgrade before serving any more: the new worker runs the upgrade in its own
+# process under the runner's lease while the api holds; `pnpm task upgrade` starts the worker to run
+# it once (Alex, 2026-10-11) (in-app-upgrade.feature; UPGRADE-IN-WORKER, UIW-1..11,
 # Alex 2026-10-09; dev/docs/plans/upgrade-in-worker-2026-10-09.md).
 #
 #   the image           CMD -> apps/api `start` -> the api alone; it never runs a step
@@ -75,10 +76,10 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
     And the development api service runs the upgrade instead of its own migrations
 
   @unimplemented
-  Scenario: A serving process refused below the floor closes its ledger connection
-    Given an installation whose ledger recorded a floor above this image's release
+  Scenario: A refused serving process closes its ledger connection
+    Given a database role that cannot create the upgrade ledger
     When the worker's gate asks
-    Then it refuses, naming the floor
+    Then it refuses, naming the refusal
     And it closes its ledger connection
 
   @integration
@@ -104,8 +105,8 @@ Feature: The worker runs the upgrade from every entry point; the api never migra
   @unimplemented
   Scenario: A first install whose upgrade failed leaves the worker waiting for a Retry
     Given an empty ledger on an empty schema
-    When the worker's gate runs the upgrade and the upgrade exits non-zero
-    Then the worker names the command and the exit code and waits for a Retry
+    When the worker's gate runs the upgrade and the run does not end done
+    Then the worker names the command and the run's outcome and waits for a Retry
     And the api holds and offers the token console
 
   @integration

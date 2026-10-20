@@ -52,8 +52,8 @@ Feature: The suppression-states-why lint rule
     Then they print what, why and fix alone
 
   @unit
-  Scenario: No house rule opts in to a disable yet
+  Scenario: Only the route-door rule opts in to a disable
     Given the registered plugin
     When its rules are read
     Then the suppression rule is registered
-    And no existing rule accepts a disable
+    And access-escape-kind is the only rule that accepts a disable

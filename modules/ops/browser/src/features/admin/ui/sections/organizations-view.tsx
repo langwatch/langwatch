@@ -1,10 +1,10 @@
 import { Drawer } from "@langwatch/design-system/drawer";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
-  Button,
   Field,
   Heading,
   HStack,
@@ -12,7 +12,6 @@ import {
   NativeSelect,
   Separator,
   Spacer,
-  Table,
   Text,
   Textarea,
   VStack,
@@ -30,10 +29,12 @@ import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
+import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { Currency, PricingModel } from "../../model/admin-enums.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-enums.ts";
+import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
+import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit
@@ -96,50 +97,43 @@ export default function OrganizationsView() {
           onPageChange: setPage,
         }}
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          variant="line"
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Slug</Table.ColumnHeader>
-              <Table.ColumnHeader>Plan model</Table.ColumnHeader>
-              <Table.ColumnHeader>Currency</Table.ColumnHeader>
-              <Table.ColumnHeader>SSO domain</Table.ColumnHeader>
-              <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Organizations table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Slug</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Plan model</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Currency</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>SSO domain</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={8}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No organizations match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={8}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No organizations match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((org) => (
-              <Table.Row key={org.id}>
-                <Table.Cell fontSize="xs" color="fg.muted">
-                  {org.id}
-                </Table.Cell>
-                <Table.Cell>{org.name}</Table.Cell>
-                <Table.Cell>{org.slug}</Table.Cell>
-                <Table.Cell>{org.pricingModel}</Table.Cell>
-                <Table.Cell>{org.currency}</Table.Cell>
-                <Table.Cell>{org.ssoDomain ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{formatDate(org.createdAt)}</Table.Cell>
-                <Table.Cell textAlign="right">
+              <ListTable.Row key={org.id}>
+                <ListTable.IdCell value={org.id} label="organization ID" />
+                <ListTable.Cell>{org.name}</ListTable.Cell>
+                <ListTable.Cell>
+                  {org.slug && <InlineCode variant="neutral">{org.slug}</InlineCode>}
+                </ListTable.Cell>
+                <ListTable.Cell>{PRICING_MODEL_LABELS[org.pricingModel]}</ListTable.Cell>
+                <ListTable.Cell>{org.currency}</ListTable.Cell>
+                <ListTable.Cell>{org.ssoDomain ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
+                  <AdminDate value={org.createdAt} display="date" />
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
@@ -153,10 +147,10 @@ export default function OrganizationsView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 
@@ -369,56 +363,35 @@ export function OrganizationEditDrawer({
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!organization}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title="Edit Organization"
+      footer={{
+        primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending },
+        cancel: { onClick: onClose },
       }}
-      size="md"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Edit Organization</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {organization && form && (
-            <VStack gap={4} align="stretch">
-              <IdentityFields form={form} setField={setField} />
-              <BillingFields form={form} setField={setField} />
-              <LimitFields
-                form={form}
-                setField={setField}
-                error={fieldErrors.datasetAttachmentMaxMb}
-              />
-              <AuthenticationSection />
-              <LicenseFields form={form} setField={setField} />
-              <CustomS3Fields form={form} setField={setField} />
-              <Separator my={2} />
-              <VStack align="start" gap={0}>
-                <Text fontSize="xs" color="fg.muted">
-                  Organization ID: {organization.id}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Created: {formatDate(organization.createdAt)}
-                </Text>
-              </VStack>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={update.isPending} onClick={handleSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {organization && form && (
+        <VStack gap={4} align="stretch">
+          <IdentityFields form={form} setField={setField} />
+          <BillingFields form={form} setField={setField} />
+          <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
+          <AuthenticationSection organization={organization} />
+          <LicenseFields form={form} setField={setField} />
+          <CustomS3Fields form={form} setField={setField} />
+          <Separator my={2} />
+          <VStack align="start" gap={0}>
+            <Text fontSize="xs" color="fg.muted">
+              Organization ID: {organization.id}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Created: {formatDate(organization.createdAt)}
+            </Text>
+          </VStack>
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
@@ -533,10 +506,18 @@ function LimitFields({ form, setField, error }: SectionProps & { error: string |
   );
 }
 
-function AuthenticationSection() {
+function AuthenticationSection({ organization }: { organization: AdminOrganization }) {
+  // Cloud staff only: on self-hosted the organization's administrators see it in settings.
+  const cloudOps = useOpsHost().cloudOps();
   return (
     <>
       <SectionHeading>Authentication</SectionHeading>
+      {cloudOps && organization.ssoDomain && (
+        <LegacySsoDomainNotice
+          organizationId={organization.id}
+          legacySsoDomain={organization.ssoDomain}
+        />
+      )}
       {/* SSO is a guarded connection lifecycle now, not a free-text
           field; editing one here is refused once routing is enforced. */}
       <Text fontSize="sm" color="fg.muted">

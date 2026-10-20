@@ -22,7 +22,7 @@ describe("formatTokens", () => {
 
   describe("given thousands of tokens", () => {
     it("reads in thousands", () => {
-      expect(formatTokens(1_000)).toBe("1.0K");
+      expect(formatTokens(1_000)).toBe("1K");
       expect(formatTokens(156_800)).toBe("156.8K");
       expect(formatTokens(999_900)).toBe("999.9K");
     });
@@ -33,7 +33,7 @@ describe("formatTokens", () => {
     it("reads in millions rather than thousands", () => {
       expect(formatTokens(1_100_000)).toBe("1.1M");
       expect(formatTokens(2_400_000)).toBe("2.4M");
-      expect(formatTokens(6_000_000)).toBe("6.0M");
+      expect(formatTokens(6_000_000)).toBe("6M");
     });
   });
 });

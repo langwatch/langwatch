@@ -97,6 +97,7 @@ export * from "./features/event-log/ops-event-log.ts";
 export * from "./ops-feature-flag.ts";
 export * from "./ops-operators.ts";
 export * from "./features/migrations/ops-system-migration.ts";
+export * from "./features/migrations/ops-tenant-migration.events.ts";
 export * from "./ops-scheduler.ts";
 export * from "./ops-scheduler.errors.ts";
 export * from "./features/dashboard/ops-snapshot.ts";

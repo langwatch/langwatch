@@ -39,6 +39,7 @@ export function createMockEventStore<T extends Event>(): {
     storeEvents: vi.fn().mockResolvedValue(void 0),
     getEvent: vi.fn(),
     getEvents: vi.fn().mockResolvedValue([]),
+    findEventsOfAggregates: vi.fn().mockResolvedValue([]),
     getEventsOccurredSince: vi.fn().mockResolvedValue([]),
     getEventsUpTo: vi
       .fn()

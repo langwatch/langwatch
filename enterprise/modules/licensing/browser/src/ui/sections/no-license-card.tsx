@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -10,7 +11,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SegmentedControl } from "@langwatch/design-system/segmented-control";
-import { SettingsCard, StatusChip } from "@langwatch/design-system/settings-card";
+import { StatusChip } from "@langwatch/design-system/settings-card";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   CONTACT_SALES_URL,
@@ -121,13 +122,13 @@ export function NoLicenseCard({
   const isActivateDisabled = isActivating || !hasInput[activationMethod];
 
   return (
-    <SettingsCard
+    <Card
       title="No license installed"
-      hint="Running without a license. Some features may be limited."
-      tone="neutral"
-      leading={<KeyRound size={16} />}
+      description="Running without a license. Some features may be limited."
+      status="neutral"
+      icon={<KeyRound size={16} />}
       badge={<StatusChip label="Open source" tone="neutral" />}
-      actions={
+      footer={
         <>
           <Button
             variant="outline"
@@ -162,129 +163,125 @@ export function NoLicenseCard({
         </>
       }
     >
-      <VStack align="start" gap={3} width="full">
-        <SegmentedControl
-          size="sm"
-          value={activationMethod}
-          onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
-          disabled={isActivating}
-          items={[
-            { value: "code", label: "Activation code" },
-            { value: "file", label: "License file" },
-            { value: "key", label: "License key" },
-          ]}
-        />
+      <VStack align="stretch" gap={2}>
+        <VStack align="start" gap={3} width="full">
+          <SegmentedControl
+            size="sm"
+            value={activationMethod}
+            onValueChange={(e) => handleMethodChange(e.value as ActivationMethod)}
+            disabled={isActivating}
+            items={[
+              { value: "code", label: "Activation code" },
+              { value: "file", label: "License file" },
+              { value: "key", label: "License key" },
+            ]}
+          />
 
-        {activationMethod === "file" && (
-          <Box width="full">
-            <input
-              ref={fileInputRef}
-              type="file"
-              accept=".langwatch-license"
-              style={{ display: "none" }}
-              onChange={handleFileInputChange}
-            />
-            {uploadedFile ? (
-              <Box
-                borderWidth="1px"
-                borderRadius="lg"
-                padding={4}
-                width="full"
-                backgroundColor="bg.subtle"
-              >
-                <HStack justify="space-between" width="full">
-                  <HStack gap={3}>
-                    <Upload size={20} />
-                    <VStack align="start" gap={0}>
-                      <Text fontSize="sm" fontWeight="medium">
-                        {uploadedFile.name}
-                      </Text>
-                      <Text fontSize="xs" color="fg.muted">
-                        {formatFileSize(uploadedFile.size)}
-                      </Text>
-                    </VStack>
+          {activationMethod === "file" && (
+            <Box width="full">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".langwatch-license"
+                style={{ display: "none" }}
+                onChange={handleFileInputChange}
+              />
+              {uploadedFile ? (
+                <Card variant="nested">
+                  <HStack justify="space-between" width="full">
+                    <HStack gap={3}>
+                      <Upload size={20} />
+                      <VStack align="start" gap={0}>
+                        <Text fontSize="sm" fontWeight="medium">
+                          {uploadedFile.name}
+                        </Text>
+                        <Text fontSize="xs" color="fg.muted">
+                          {formatFileSize(uploadedFile.size)}
+                        </Text>
+                      </VStack>
+                    </HStack>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={handleRemoveFile}
+                      disabled={isActivating}
+                      aria-label="Remove file"
+                    >
+                      <X size={16} />
+                    </Button>
                   </HStack>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={handleRemoveFile}
-                    disabled={isActivating}
-                    aria-label="Remove file"
-                  >
-                    <X size={16} />
-                  </Button>
-                </HStack>
-              </Box>
-            ) : (
-              <Box
-                borderWidth="2px"
-                borderStyle="dashed"
-                borderRadius="lg"
-                padding={6}
-                width="full"
-                cursor="pointer"
-                onClick={handleDropzoneClick}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                borderColor={isDragging ? "orange.emphasized" : "border"}
-                backgroundColor={isDragging ? "orange.subtle" : "transparent"}
-                transition="all 0.2s"
-                _hover={{ borderColor: "orange.emphasized" }}
-              >
-                <VStack gap={2}>
-                  <Box color="fg.muted">
-                    <Upload size={24} />
-                  </Box>
-                  <Text fontSize="sm" color="fg.muted" textAlign="center">
-                    Drop your license here
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Click to browse
-                  </Text>
-                </VStack>
-              </Box>
-            )}
-          </Box>
-        )}
+                </Card>
+              ) : (
+                <Box
+                  borderWidth="2px"
+                  borderStyle="dashed"
+                  borderRadius="lg"
+                  padding={6}
+                  width="full"
+                  cursor="pointer"
+                  onClick={handleDropzoneClick}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  borderColor={isDragging ? "orange.emphasized" : "border"}
+                  backgroundColor={isDragging ? "orange.subtle" : "transparent"}
+                  transition="all 0.2s"
+                  _hover={{ borderColor: "orange.emphasized" }}
+                >
+                  <VStack gap={2}>
+                    <Box color="fg.muted">
+                      <Upload size={24} />
+                    </Box>
+                    <Text fontSize="sm" color="fg.muted" textAlign="center">
+                      Drop your license here
+                    </Text>
+                    <Text fontSize="xs" color="fg.muted">
+                      Click to browse
+                    </Text>
+                  </VStack>
+                </Box>
+              )}
+            </Box>
+          )}
 
-        {activationMethod === "code" && (
-          <Field.Root width="full">
-            <Field.Label srOnly>Activation code</Field.Label>
-            <Input
-              value={activationCode}
-              onChange={(e) => onActivationCodeChange(e.target.value)}
-              placeholder="LW-XXXX-XXXX-XXXX-XXXX"
-              data-testid="license-activation-code"
-              fontFamily="mono"
-              maxWidth="360px"
-              disabled={isActivating}
-            />
-            <Field.HelperText>
-              Your code was sent with your order. This install asks LangWatch for the license it
-              covers, so it needs to reach the internet. If it cannot, upload the license file
-              instead.
-            </Field.HelperText>
-          </Field.Root>
-        )}
+          {activationMethod === "code" && (
+            <Field.Root width="full">
+              <Field.Label srOnly>Activation code</Field.Label>
+              <Input
+                value={activationCode}
+                onChange={(e) => onActivationCodeChange(e.target.value)}
+                placeholder="LW-XXXX-XXXX-XXXX-XXXX"
+                data-testid="license-activation-code"
+                fontFamily="mono"
+                maxWidth="360px"
+                disabled={isActivating}
+              />
+              <Field.HelperText>
+                Your code was sent with your order. This install asks LangWatch for the license it
+                covers, so it needs to reach the internet. If it cannot, upload the license file
+                instead.
+              </Field.HelperText>
+            </Field.Root>
+          )}
 
-        {activationMethod === "key" && (
-          <Field.Root width="full">
-            <Field.Label srOnly>License key</Field.Label>
-            <Textarea
-              value={licenseKey}
-              onChange={(e) => onLicenseKeyChange(e.target.value)}
-              placeholder="Paste your license key"
-              data-testid="license-key-input"
-              rows={4}
-              fontFamily="mono"
-              fontSize="xs"
-              disabled={isActivating}
-            />
-          </Field.Root>
-        )}
+          {activationMethod === "key" && (
+            <Field.Root width="full">
+              <Field.Label srOnly>License key</Field.Label>
+              <Textarea
+                value={licenseKey}
+                onChange={(e) => onLicenseKeyChange(e.target.value)}
+                placeholder="Paste your license key"
+                data-testid="license-key-input"
+                rows={4}
+                fontFamily="mono"
+                fontSize="xs"
+                disabled={isActivating}
+              />
+            </Field.Root>
+          )}
+        </VStack>
       </VStack>
-    </SettingsCard>
+    </Card>
   );
 }
 

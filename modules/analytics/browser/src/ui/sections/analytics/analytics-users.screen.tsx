@@ -1,12 +1,7 @@
-import {
-  Card,
-  EmptyState,
-  GridItem,
-  Heading,
-  HStack,
-  SimpleGrid,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, GridItem, HStack, SimpleGrid } from "@langwatch/design-system/primitives";
+import { Users } from "lucide-react";
 
 import { ChartCard } from "../../../ui/elements/chart-card.tsx";
 import AnalyticsLayout from "../../../ui/sections/analytics-layout.tsx";
@@ -196,52 +191,36 @@ const tracesByCustomer: CustomGraphInput = {
 };
 
 const userEmptyState = (
-  <EmptyState.Root size="sm" paddingY={10}>
-    <EmptyState.Content>
-      <VStack textAlign="center">
-        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
-        <EmptyState.Description textStyle="xs">
-          Start tracking users to see metrics here.{" "}
-          <a
-            href="https://langwatch.ai/docs/integration/metadata-and-labels"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "underline" }}
-          >
-            Learn how to set up
-          </a>
-        </EmptyState.Description>
-      </VStack>
-    </EmptyState.Content>
-  </EmptyState.Root>
+  <NoDataInfoBlock
+    size="inline"
+    bordered={false}
+    icon={<Users size={20} />}
+    title="No user data yet"
+    description="Start tracking users to see metrics here."
+    docsHref="https://langwatch.ai/docs/integration/metadata-and-labels"
+  />
 );
 
 function UsersContent() {
   return (
-    <AnalyticsLayout title="Users" railEntry="users">
+    <AnalyticsLayout tab="users">
       <HStack alignItems="start" width="full" gap={6}>
         <SimpleGrid templateColumns="repeat(4, 1fr)" gap={5} width="100%">
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <Heading size="sm">User Traces</Heading>
-              </Card.Header>
-              <Card.Body>
+            <Card padding="lg" title="User traces">
+              <Box overflow="auto">
                 <CustomGraph input={messagesCount} emptyState={userEmptyState} />
-              </Card.Body>
-            </Card.Root>
+              </Box>
+            </Card>
           </GridItem>
           <GridItem colSpan={2} display="inline-grid">
-            <Card.Root overflow="auto">
-              <Card.Header>
-                <Heading size="sm">User Threads</Heading>
-              </Card.Header>
-              <Card.Body>
+            <Card padding="lg" title="User threads">
+              <Box overflow="auto">
                 <CustomGraph input={userThreads} emptyState={userEmptyState} />
-              </Card.Body>
-            </Card.Root>
+              </Box>
+            </Card>
           </GridItem>
-          <ChartCard title="Daily Users" colSpan={2}>
+          <ChartCard title="Daily users" colSpan={2}>
             <CustomGraph input={userCountGraph} emptyState={userEmptyState} />
           </ChartCard>
           <ChartCard title="Daily Threads" colSpan={2}>

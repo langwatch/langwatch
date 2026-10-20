@@ -48,6 +48,7 @@ export async function startLangevals(
   });
 
   const ready = await pollUntilHealthy({
+    handle,
     // 120s. Langevals' fastapi boot + evaluator discovery is normally
     // ~25-30s but a parallel boot with nlp + langwatch app can push it
     // past the previous 60s ceiling under load.

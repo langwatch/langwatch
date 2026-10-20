@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import type { CustomGraphInput } from "../custom-graph.ts";
 import {
+  parseStoredTimeScale,
   resolveGraphTimeScale,
   shouldSkipPreviousPeriod,
   withGroupedPipeline,
@@ -98,6 +99,52 @@ describe("resolveGraphTimeScale", () => {
 
     it("still reads a numeric string the way the UI stores one", () => {
       expect(badScale("1440")).toBe(1440);
+    });
+  });
+});
+
+describe("parseStoredTimeScale", () => {
+  describe("when the stored value is the full period", () => {
+    it("reads full", () => {
+      expect(parseStoredTimeScale("full")).toBe("full");
+    });
+  });
+
+  describe("when the stored value is a positive whole number of minutes", () => {
+    it("reads a number as itself", () => {
+      expect(parseStoredTimeScale(1440)).toBe(1440);
+    });
+
+    it("reads numeric text as that number", () => {
+      expect(parseStoredTimeScale("60")).toBe(60);
+    });
+
+    it("reads numeric text padded with whitespace", () => {
+      expect(parseStoredTimeScale(" 30 ")).toBe(30);
+    });
+  });
+
+  describe("when the stored value is not a usable bucket size", () => {
+    it("refuses a non-integer", () => {
+      expect(parseStoredTimeScale(1.5)).toBeNull();
+      expect(parseStoredTimeScale("1.5")).toBeNull();
+    });
+
+    it("refuses text with a trailing unit rather than reading its prefix", () => {
+      expect(parseStoredTimeScale("60m")).toBeNull();
+    });
+
+    it("refuses zero and negative sizes", () => {
+      expect(parseStoredTimeScale(0)).toBeNull();
+      expect(parseStoredTimeScale("0")).toBeNull();
+      expect(parseStoredTimeScale(-60)).toBeNull();
+      expect(parseStoredTimeScale("-60")).toBeNull();
+    });
+
+    it("refuses null, undefined and other text", () => {
+      expect(parseStoredTimeScale(null)).toBeNull();
+      expect(parseStoredTimeScale(undefined)).toBeNull();
+      expect(parseStoredTimeScale("hourly")).toBeNull();
     });
   });
 });

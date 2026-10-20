@@ -7,12 +7,18 @@ export interface EventingClickHouseClient {
     query: string;
     query_params?: Record<string, unknown>;
     format: "JSONEachRow";
+    /** Set when the read must walk every partition; see the member's cold-scan warning. */
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
+    /** The tenant set a `TenantId IN {...:Array(String)}` read binds, resolving tenant included. */
+    tenantIds?: readonly string[] | undefined;
   }) => Promise<EventingClickHouseQueryResult>;
   insert(request: {
     table: string;
     values: readonly Record<string, unknown>[];
     format: "JSONEachRow";
     clickhouse_settings: Record<string, number>;
+    /** The tenant set a batch of several tenants' rows declares, resolving tenant included. */
+    tenantIds?: readonly string[] | undefined;
   }): Promise<unknown>;
 }
 
@@ -34,6 +40,8 @@ export interface EventingClickHouseReplayStatement {
   params?: Record<string, unknown> | undefined;
   /** Set when the statement genuinely spans tenants; see the member's tenant-scope guard. */
   SKIP_TENANT_CHECK?: true | undefined;
+  /** Set when the read must walk every partition; see the member's cold-scan warning. */
+  SKIP_COLD_SCAN_CHECK?: true | undefined;
 }
 
 /**

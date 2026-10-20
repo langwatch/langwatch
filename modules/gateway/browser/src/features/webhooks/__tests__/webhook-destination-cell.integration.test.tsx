@@ -1,10 +1,10 @@
+import { Table } from "@langwatch/design-system/primitives";
 /**
  * @vitest-environment jsdom
  * The list's destination column: what an operator reads to tell one
  * endpoint's transport from another's at a glance.
  */
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
-import { Table } from "@langwatch/design-system/primitives";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 

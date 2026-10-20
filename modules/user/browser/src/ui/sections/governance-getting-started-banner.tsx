@@ -88,7 +88,7 @@ export function GovernanceGettingStartedBanner() {
         </Box>
 
         <VStack align="start" gap={1.5} flex={1} minWidth={0}>
-          <Heading as="h2" size="md" color="fg" letterSpacing="-0.01em" lineHeight={1.2}>
+          <Heading as="h2" size="sm" color="fg" letterSpacing="-0.01em" lineHeight={1.2}>
             Getting started with LangWatch AI Governance
           </Heading>
           <Text textStyle="sm" color="fg.muted" lineHeight={1.5}>

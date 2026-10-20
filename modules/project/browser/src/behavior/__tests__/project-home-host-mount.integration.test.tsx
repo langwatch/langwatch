@@ -79,7 +79,7 @@ function BaseHost() {
 function LangyGate() {
   const { show, isResolving } = useProjectHomeHost().langyVisibility();
   if (isResolving) return <output aria-label="langy">resolving</output>;
-  return <output aria-label="langy">{show ? "langy" : "classic"}</output>;
+  return <output aria-label="langy">{show ? "langy" : "no langy"}</output>;
 }
 
 function renderGate({ organizationRole }: { organizationRole: string }) {
@@ -125,10 +125,10 @@ describe("ProjectHomeHostMount", () => {
 
 describe("ProjectHomeHostMount Langy gate", () => {
   describe("when an organization member holding langy:view is not on the project's team", () => {
-    it("paints the classic home", () => {
+    it("hides Langy", () => {
       reading.flag = true;
 
-      expect(renderGate({ organizationRole: "MEMBER" })).toHaveTextContent("classic");
+      expect(renderGate({ organizationRole: "MEMBER" })).toHaveTextContent("no langy");
     });
   });
 
@@ -149,7 +149,7 @@ describe("ProjectHomeHostMount Langy gate", () => {
   });
 
   describe("when permissions are still loading", () => {
-    it("reads as resolving rather than classic", () => {
+    it("reads as resolving rather than no Langy", () => {
       Object.assign(reading, { team: { id: "team-1" }, settled: false, granted: false });
 
       expect(renderGate({ organizationRole: "MEMBER" })).toHaveTextContent("resolving");

@@ -5,6 +5,7 @@
  */
 
 import type { ReplayEventLean } from "@langwatch/eventing/server";
+import type { OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
 import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 import {
   LOG_RECORD_RECEIVED_EVENT_TYPE,
@@ -12,7 +13,6 @@ import {
   SPAN_RECEIVED_EVENT_TYPE,
   traceEventReferenceKey,
 } from "@langwatch/trace-contract";
-import type { OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
 
 import { clonePayload } from "../../../rules/payload-clone.rules.ts";
 import {
@@ -30,8 +30,8 @@ type LeanableEvent = { id: string; type: string; data: unknown };
 export const IO_PREVIEW_BYTES = 64 * 1024;
 
 /**
- * Set of span attribute keys that are considered "IO" and receive the wide IO_PREVIEW_BYTES
- * budget. Non-IO attributes stay at the existing 2 KB cap.
+ * Span attribute keys that are previewed past IO_PREVIEW_BYTES. Any other top-level string is
+ * previewed past DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES; both keep an eventref to the full value.
  */
 export const IO_ATTR_KEYS = new Set([
   "langwatch.input",
@@ -89,9 +89,9 @@ function clampLongStrings(value: unknown, depth = 0): unknown {
 }
 
 /**
- * Leans a SpanReceived event: over-threshold IO attributes are truncated with eventref pointers
- * first, then remaining oversized non-IO values are capped without one. The original attributes
- * are scanned before anything is allocated, so the sub-threshold path stays allocation-free.
+ * Leans a SpanReceived event: oversized top-level text becomes a preview with an eventref, then
+ * what is left oversized (binary, nested, events, links, resource) is capped without one. The
+ * scan runs before anything is allocated, so the sub-threshold path stays allocation-free.
  */
 function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
   const data = event.data as { span?: OtlpSpan; resource?: OtlpResource | null };
@@ -100,15 +100,15 @@ function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
     return event;
   }
 
-  // Scan only, before anything is allocated: does any IO attribute exceed the preview budget, and
-  // does any surface the cap walks need the larger cap?
-  const hasLargeIoAttr = (data.span.attributes ?? []).some(isOversizedIoAttribute);
+  // Scan only, before anything is allocated: does any attribute need a preview, and does any
+  // surface the cap walks need the cap?
+  const hasOffloadable = (data.span.attributes ?? []).some(isOffloadableAttribute);
   const needsNonIoCap = hasOversizedAttribute(
     data.span,
     data.resource ?? null,
     DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
   );
-  if (!hasLargeIoAttr && !needsNonIoCap) {
+  if (!hasOffloadable && !needsNonIoCap) {
     return event;
   }
 
@@ -116,34 +116,42 @@ function leanSpanReceivedEvent(event: LeanableEvent): LeanableEvent {
   // object references left back to the input event.
   const clonedSpan: OtlpSpan = clonePayload(data.span);
   const clonedResource: OtlpResource | null = data.resource ? clonePayload(data.resource) : null;
-  if (hasLargeIoAttr) {
-    clonedSpan.attributes = leanIoAttributes({
+  if (hasOffloadable) {
+    clonedSpan.attributes = leanOffloadableAttributes({
       attributes: clonedSpan.attributes,
       eventId: event.id,
     });
   }
 
-  // IO attributes are already under the preview budget, so the cap never touches them.
+  // Previewed attributes are already under the cap, so it never touches them.
   capOversizedAttributes(clonedSpan, clonedResource);
 
   return { ...event, data: { ...data, span: clonedSpan, resource: clonedResource } };
 }
 
-/** An IO attribute whose string value is past the preview budget. */
-function isOversizedIoAttribute(attr: OtlpSpan["attributes"][number]): boolean {
+/** A base64 data URL: a preview of it has nothing to read, so the cap replaces it instead. */
+const BASE64_DATA_URL = /^data:[^,]*;base64,/;
+
+/**
+ * A top-level string attribute past its preview budget: IO keys past IO_PREVIEW_BYTES, any other
+ * text past DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES. Base64 data URLs outside IO keys stay with the cap.
+ */
+function isOffloadableAttribute(attr: OtlpSpan["attributes"][number]): boolean {
+  const value = attr.value.stringValue;
+  if (typeof value !== "string") return false;
+  if (IO_ATTR_KEYS.has(attr.key)) return Buffer.byteLength(value, "utf8") > IO_PREVIEW_BYTES;
   return (
-    IO_ATTR_KEYS.has(attr.key) &&
-    typeof attr.value.stringValue === "string" &&
-    Buffer.byteLength(attr.value.stringValue, "utf8") > IO_PREVIEW_BYTES
+    Buffer.byteLength(value, "utf8") > DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES &&
+    !BASE64_DATA_URL.test(value)
   );
 }
 
 /**
- * The span's attributes with every oversized IO value replaced by a preview and followed by its
+ * The span's attributes with every offloadable value replaced by a preview and followed by its
  * eventref. The structure-preserving preview is tried first, so a JSON chat payload stays valid
  * JSON under the budget and the fold still extracts real text; the byte cut is the fallback.
  */
-function leanIoAttributes({
+function leanOffloadableAttributes({
   attributes,
   eventId,
 }: {
@@ -153,7 +161,7 @@ function leanIoAttributes({
   const leaned: OtlpSpan["attributes"] = [];
   const eventrefs: OtlpSpan["attributes"] = [];
   for (const attr of attributes) {
-    if (!isOversizedIoAttribute(attr)) {
+    if (!isOffloadableAttribute(attr)) {
       leaned.push(attr);
       continue;
     }

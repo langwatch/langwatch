@@ -10,6 +10,7 @@ import type { TraceCanonicalisationService, TraceSummaryData } from "@langwatch/
 import type { TraceTokenCounter } from "../channels/token-counter.channel.ts";
 import { TraceIoExtractionAdapterService } from "../features/derivation/services/trace-io-extraction-adapter.service.ts";
 import { TraceModelCostService } from "../features/derivation/services/trace-model-cost.service.ts";
+import type { TraceBlobStoreService } from "../features/media/services/trace-blob-store.service.ts";
 import { TraceMediaReferenceService } from "../features/media/services/trace-media-reference.service.ts";
 import { leanForProjection } from "../features/projection/rules/trace-projection-lean.rules.ts";
 import { OtlpSpanCostEnrichmentService } from "../features/span/services/span-cost-enrichment.service.ts";
@@ -22,7 +23,11 @@ import {
   createProjectMetadataHandler,
   type ProjectMetadataSubscriberDeps,
 } from "./project-metadata.subscriber.ts";
-import type { TraceSpanCostEnrichment, TraceSpanTokenEstimation } from "./record-span.commands.ts";
+import type {
+  TraceSpanCostEnrichment,
+  TraceSpanSpool,
+  TraceSpanTokenEstimation,
+} from "./record-span.commands.ts";
 import { EventingRecordSpanAdapter } from "./record-span.commands.ts";
 import { createSpanStorageBroadcastHandler } from "./span-storage-broadcast.subscriber.ts";
 import { SpanStorageStore } from "./span-storage.store.ts";
@@ -65,11 +70,20 @@ export interface TraceProcessingPipelineInput {
   >;
   canonicalisation: TraceCanonicalisationService;
   commands: TraceProcessingCommandsService;
-  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  /**
+   * The ADR-022 spool the ingestion door writes an over-threshold command to. Required: a
+   * record-span command built without it refuses every spooled span, and the group blocks.
+   */
+  spool: Pick<TraceBlobStoreService, "getSpool" | "deleteSpool">;
+  findSummary: (input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }) => Promise<TraceSummaryData | null>;
   recordTrackedEvent: TrackedEventSyncSubscriberDeps["recordTrackedEvent"];
   /** Tells a tenant's open tabs a trace moved; presence relays it in the serving process. */
   broadcast: Pick<PresenceApi, "publishProjectEvent">;
-  /** Where a project's first and later traces are recorded as trace's own events. */
+  /** Where a project's first and later traces are recorded. */
   milestones: ProjectMetadataSubscriberDeps["milestones"];
   /** Mints the own-only proof the summary and analytics fold stores read back through. */
   authorizeFoldRead: FoldReadAuthorizer;
@@ -134,12 +148,21 @@ export class TraceProcessingRuntimeAdapter {
         },
         costEnrichment: this.#costEnrichment(),
         tokenEstimation: this.#tokenEstimation(),
+        spool: this.#spool(),
       }),
     })
       .build()
       .withRetention({
         resolve: (tenantId) => peers.dataRetention.getResolvedForProject({ projectId: tenantId }),
       });
+  }
+
+  #spool(): TraceSpanSpool {
+    const { spool } = this.input;
+    return {
+      read: async (identity) => (await spool.getSpool(identity)).toString("utf8"),
+      delete: (identity) => spool.deleteSpool(identity),
+    };
   }
 
   #tokenEstimation(): TraceSpanTokenEstimation {
@@ -163,8 +186,12 @@ export class TraceProcessingRuntimeAdapter {
     const { peers, commands } = this.input;
     const resolveOrigin = createDeferredOriginHandler((data) => commands.resolveOrigin(data));
     return {
-      resolveDeferredOrigin: async ({ tenantId, traceId }) => {
-        const summary = await this.input.findSummary({ projectId: tenantId, traceId });
+      resolveDeferredOrigin: async ({ tenantId, traceId, occurredAtMs }) => {
+        const summary = await this.input.findSummary({
+          projectId: tenantId,
+          traceId,
+          occurredAtMs,
+        });
         if (summary?.attributes["langwatch.origin"]) return;
         await resolveOrigin({ id: traceId, tenantId, traceId });
       },

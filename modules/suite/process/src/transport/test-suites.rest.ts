@@ -1,9 +1,3 @@
-/**
- * The `/api/v1/test-suites` REST family: the suites scenarios are filed into,
- * and the runs they start. Addressed only under `/api/v1`, like run plans.
- */
-import { randomUUID } from "node:crypto";
-
 import {
   badRequestSchema,
   defineRestRouter,
@@ -13,6 +7,11 @@ import {
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+/**
+ * The `/api/v1/test-suites` REST family: the suites scenarios are filed into,
+ * and the runs they start. Addressed only under `/api/v1`, like run plans.
+ */
+import { generate } from "@langwatch/ksuid";
 import { deriveRunActor, type ScenarioTestSuite } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
@@ -183,7 +182,7 @@ async function runTestSuite(params: {
       ...(input.simulatorModel !== undefined && { simulatorModel: input.simulatorModel }),
       ...(input.judgeModel !== undefined && { judgeModel: input.judgeModel }),
     },
-    idempotencyKey: input.idempotencyKey ?? `api-${randomUUID()}`,
+    idempotencyKey: input.idempotencyKey ?? `api-${generate("suite").toString()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),
     ...(input.note !== undefined && { note: input.note }),
     ...(actor !== undefined && { actor }),

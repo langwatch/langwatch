@@ -72,7 +72,6 @@ describe("source health during a historical provider import", () => {
           await ClickHouseMigrateTask.createFromConfig({
             config: {
               buildTime: false,
-              skipped: false,
               sharedUrl: endpoint.url,
               privateEndpoints: [],
               settings: {

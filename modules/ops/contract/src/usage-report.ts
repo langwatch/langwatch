@@ -571,7 +571,6 @@ const byOwnName = <T extends z.ZodType>(entry: T) =>
 const usageReportUpgradeSchemaDefinition = z.object({
   state: z.string().max(50).describe("The installation state the upgrade reader names."),
   release: z.string().max(100).nullable().describe("The release the ledger records as installed."),
-  floor: z.string().max(100).nullable().describe("The oldest release this install may run."),
   failed_steps: count.describe("Upgrade steps that failed."),
   failed_targets: count.describe("Targets a failed step failed on."),
   held_tenants: count

@@ -8,7 +8,7 @@
  * @see specs/api-reference/openapi-document-generation.feature
  */
 import { Hono } from "hono";
-import { generateSpecs, validator } from "hono-openapi";
+import { validator } from "hono-openapi";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 
@@ -24,6 +24,7 @@ import {
   restRouteDocumentation,
 } from "../openapi.ts";
 import { buildStandardSuccessResponse } from "../response.ts";
+import { generateSpecs } from "./generate-specs.ts";
 
 /** A webhook intake: the signature is over the exact characters, so nothing parses them. */
 function rawBodyRoute(docs?: RestTransportDocs): RestTransportRoute<unknown> {
@@ -553,7 +554,8 @@ type PublishedOperation = Readonly<{
 
 /** The operation the generated document publishes for one declared route. */
 async function publishedOperation(route: RestTransportRoute<unknown>): Promise<PublishedOperation> {
-  const app = new Hono().on(route.method.toUpperCase(), route.path, documentRoute({ route }), (c) =>
+  const app = new Hono();
+  app.on(route.method.toUpperCase(), route.path, documentRoute({ route }), (c) =>
     c.body(null, 204),
   );
   const document = JSON.parse(JSON.stringify(await generateSpecs(app))) as {
@@ -573,7 +575,8 @@ describe("documents generated more than once from one declaration", () => {
       responses: documentedResponses({ 200: z.object({ id: z.string() }).meta({ id: "Widget" }) }),
     });
     const generate = async () => {
-      const app = new Hono().get(route.path, documentRoute({ route }), (c) => c.body(null, 204));
+      const app = new Hono();
+      app.get(route.path, documentRoute({ route }), (c) => c.body(null, 204));
 
       return JSON.parse(JSON.stringify(await generateSpecs(app))) as {
         components?: { schemas?: Record<string, unknown> };
@@ -720,7 +723,8 @@ describe("publishEnumRecordKeys", () => {
 
   /** The body schema a validator-published JSON body carries in a generated document. */
   async function publishedBody(body: z.ZodType): Promise<Record<string, unknown>> {
-    const app = new Hono().post("/timeseries", validator("json", body), (c) => c.body(null, 204));
+    const app = new Hono();
+    app.post("/timeseries", validator("json", body), (c) => c.body(null, 204));
     const document: unknown = JSON.parse(JSON.stringify(await generateSpecs(app)));
 
     publishEnumRecordKeys(document);

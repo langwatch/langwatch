@@ -128,7 +128,7 @@ async function application({ plan = {} }: { plan?: Partial<Plan> } = {}) {
     recordPersonalWorkspaceArchived: accepts,
     recordPersonalWorkspaceRevived: accepts,
     recordPersonalWorkspaceFeaturesChanged: accepts,
-    recordPresenceSettingChanged: accepts,
+    recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
     recordTraceSharingDisabled: accepts,
     recordMemberDisabled: { send: async (data) => void disabledMembers.push(data) },
     recordMemberEnabled: accepts,

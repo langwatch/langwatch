@@ -4,7 +4,8 @@
  * Both sentences are the host's, from the error registry; this component just arranges them.
  */
 
-import { EmptyState, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { VStack } from "@langwatch/design-system/primitives";
 import { MessageSquareOff } from "lucide-react";
 
 export function PromptPlaygroundChatUnavailable({
@@ -16,17 +17,20 @@ export function PromptPlaygroundChatUnavailable({
 }) {
   return (
     <VStack height="full" width="full" justify="center" padding={6}>
-      <EmptyState.Root size="sm">
-        <EmptyState.Content>
-          <EmptyState.Indicator>
-            <MessageSquareOff />
-          </EmptyState.Indicator>
-          <VStack textAlign="center" gap={1}>
-            <EmptyState.Title>{title}</EmptyState.Title>
-            {description ? <EmptyState.Description>{description}</EmptyState.Description> : null}
-          </VStack>
-        </EmptyState.Content>
-      </EmptyState.Root>
+      <NoDataInfoBlock
+        size="inline"
+        bordered={false}
+        icon={<MessageSquareOff />}
+        title={title}
+        description={description}
+        next={[
+          {
+            kind: "docs",
+            label: "Prompt playground",
+            href: "https://docs.langwatch.ai/prompt-management/prompt-playground",
+          },
+        ]}
+      />
     </VStack>
   );
 }

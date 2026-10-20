@@ -15,7 +15,9 @@ import {
   type RoleFact,
 } from "@langwatch/authz-contract";
 import type { SystemMigration, TenantMigrationOutcome } from "@langwatch/system-migrations";
+import { Temporal } from "@langwatch/time";
 
+import type { AuthzCutoverRepository } from "../repositories/authz-cutover.repository.ts";
 import type {
   AuthzMigrationRepository,
   ExternalMemberFact,
@@ -50,6 +52,36 @@ const ACTOR: LedgerActor = {
 /** Commands in flight at once. Sends are queue enqueues, so this bounds
  *  memory and connection pressure, not throughput. */
 const SEND_CONCURRENCY = 100;
+
+/** Commands one organization sends before it waits for the pass's queue room again. */
+export const SEND_PAGE_SIZE = 500;
+
+/** One pass's sends for one organization: aborted by `signal`, paced a page at a time. */
+type SendPacing = {
+  signal: AbortSignal | undefined;
+  beforeChunk: (input: { size: number }) => Promise<void>;
+};
+
+/** Waits for room before a chunk that would carry the organization a page past its last wait. */
+function sendPacing({
+  signal,
+  waitForRoom,
+}: {
+  signal: AbortSignal | undefined;
+  waitForRoom: (() => Promise<void>) | undefined;
+}): SendPacing {
+  let sinceRoom = 0;
+  return {
+    signal,
+    beforeChunk: async ({ size }) => {
+      if (waitForRoom !== undefined && sinceRoom + size > SEND_PAGE_SIZE) {
+        await waitForRoom();
+        sinceRoom = 0;
+      }
+      sinceRoom += size;
+    },
+  };
+}
 
 const grantIdentity = AuthzGrantIdentityService.create();
 
@@ -112,6 +144,8 @@ export interface AuthzEngineLedger {
 
 type LegacyImportAuthzGrantMigrationOptions = {
   store: AuthzMigrationRepository;
+  /** Authz's own switch: the migration answers from it and turns it on once proven. */
+  engineSwitch: Pick<AuthzCutoverRepository, "getEngineSwitch" | "switchOnEngine">;
   ledger: AuthzEngineLedger;
   now: () => number;
 };
@@ -140,11 +174,17 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
   async migrateTenant({
     tenantId,
     signal,
+    waitForRoom,
   }: {
     tenantId: string;
     signal?: AbortSignal;
+    waitForRoom?: () => Promise<void>;
   }): Promise<TenantMigrationOutcome> {
     const organizationId = tenantId;
+    // Already on the engine (proven by an earlier pass, an older image or the carry-over): done.
+    if ((await this.deps.engineSwitch.getEngineSwitch({ organizationId })).onEngine) {
+      return { status: "finalized", report: { kind: "authz_engine_already_on" } };
+    }
     const inventory = await this.readInventory(organizationId);
     const expected = assemble({
       organizationId,
@@ -170,9 +210,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     // is the design, not a shortcut.
     const heads = await this.readHeads(organizationId);
 
-    await this.state({ organizationId, expected, heads, signal });
-    await this.reconcileStale({ organizationId, expected, heads, signal });
-    await this.repairDrift({ organizationId, expected, heads, signal });
+    // One organization can be tens of thousands of commands: sent a page at a time, each page
+    // waiting for the pass's queue room, so the proof below still runs once, after all of them.
+    const sends = sendPacing({ signal, waitForRoom });
+    await this.state({ organizationId, expected, heads, sends });
+    await this.reconcileStale({ organizationId, expected, heads, sends });
+    await this.repairDrift({ organizationId, expected, heads, sends });
 
     const { outstanding, diffs } = this.check({
       organizationId,
@@ -200,6 +243,11 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
           diffs: diffs.slice(0, MAX_REPORTED),
         },
       };
+    }
+    const at = Temporal.Instant.fromEpochMilliseconds(this.deps.now());
+    if (!(await this.deps.engineSwitch.switchOnEngine({ organizationId, at }))) {
+      // An operator pinned it off while this pass ran; the pin wins and the tenant stays held.
+      return { status: "migrated", report: { kind: "authz_engine_pinned", ...counts } };
     }
     return { status: "finalized", report: { kind: "authz_engine", ...counts } };
   }
@@ -255,12 +303,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     organizationId,
     expected,
     heads,
-    signal,
+    sends,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
     heads: HeadState;
-    signal?: AbortSignal;
+    sends: SendPacing;
   }): Promise<void> {
     const { roles, grants } = unstated({
       organizationId,
@@ -269,7 +317,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     });
     await this.each({
       items: roles,
-      signal,
+      sends,
       send: (role) =>
         this.deps.ledger.defineRole({
           organizationId,
@@ -284,7 +332,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     });
     await this.each({
       items: grants,
-      signal,
+      sends,
       send: (fact) =>
         this.deps.ledger.attachGrant({
           organizationId,
@@ -307,12 +355,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     organizationId,
     expected,
     heads,
-    signal,
+    sends,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
     heads: HeadState;
-    signal?: AbortSignal;
+    sends: SendPacing;
   }): Promise<void> {
     const occurredAtMs = this.deps.now();
 
@@ -335,7 +383,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     ].toSorted();
     await this.each({
       items: staleGrants,
-      signal,
+      sends,
       send: (grantId) =>
         this.deps.ledger.revokeGrant({
           organizationId,
@@ -363,7 +411,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
       .toSorted();
     await this.each({
       items: staleRoles,
-      signal,
+      sends,
       send: (roleId) =>
         this.deps.ledger.deleteRole({
           organizationId,
@@ -387,12 +435,12 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     organizationId,
     expected,
     heads,
-    signal,
+    sends,
   }: {
     organizationId: string;
     expected: ExpectedFacts;
     heads: HeadState;
-    signal?: AbortSignal;
+    sends: SendPacing;
   }): Promise<void> {
     const occurredAtMs = this.deps.now();
 
@@ -406,7 +454,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     });
     await this.each({
       items: rekeys,
-      signal,
+      sends,
       send: (rekey) =>
         this.deps.ledger.changeGrantRole({
           organizationId,
@@ -434,7 +482,7 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     });
     await this.each({
       items: redefines,
-      signal,
+      sends,
       send: (role) =>
         this.deps.ledger.defineRole({
           organizationId,
@@ -483,22 +531,24 @@ export class LegacyImportAuthzGrantMigration implements SystemMigration {
     };
   }
 
-  /** Bounded fan-out, aborted between chunks — the runner will not
+  /** Bounded fan-out, paced and aborted between chunks — the runner will not
    *  interrupt an in-flight send, so the boundary is the chunk. */
   private async each<T>({
     items,
-    signal,
+    sends,
     send,
   }: {
     items: readonly T[];
-    signal: AbortSignal | undefined;
+    sends: SendPacing;
     send: (item: T) => Promise<void>;
   }): Promise<void> {
     for (let i = 0; i < items.length; i += SEND_CONCURRENCY) {
-      if (signal?.aborted) {
+      const chunk = items.slice(i, i + SEND_CONCURRENCY);
+      await sends.beforeChunk({ size: chunk.length });
+      if (sends.signal?.aborted) {
         throw new Error("authz-engine migration aborted; organization parked for retry");
       }
-      await Promise.all(items.slice(i, i + SEND_CONCURRENCY).map(send));
+      await Promise.all(chunk.map(send));
     }
   }
 }

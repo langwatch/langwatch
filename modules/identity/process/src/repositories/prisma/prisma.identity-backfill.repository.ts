@@ -8,6 +8,36 @@ import type {
   IdentityBackfillRepository,
 } from "../identity-backfill.repository.ts";
 
+const BACKFILL_USER_COLUMNS = {
+  id: true,
+  email: true,
+  emailVerified: true,
+  createdAt: true,
+  userHashKey: true,
+  lastLoginAt: true,
+  passkeySignupClaimHash: true,
+} as const;
+
+function backfillUserRow(user: {
+  id: string;
+  email: string | null;
+  emailVerified: boolean;
+  createdAt: Date;
+  userHashKey: string | null;
+  lastLoginAt: Date | null;
+  passkeySignupClaimHash: string | null;
+}): BackfillUserRow {
+  return {
+    id: user.id,
+    email: user.email,
+    emailVerified: user.emailVerified,
+    createdAtMs: user.createdAt.getTime(),
+    userHashKey: user.userHashKey,
+    lastLoginAtMs: user.lastLoginAt?.getTime() ?? null,
+    passkeySignupPending: user.passkeySignupClaimHash !== null,
+  };
+}
+
 /**
  * The backfill's reads over the legacy truth (`User`/`Account`) and the
  * `Identifier` projection it proves itself against. Reads only: the one
@@ -23,24 +53,39 @@ export class PrismaIdentityBackfillRepository implements IdentityBackfillReposit
   async getUser({ userId }: { userId: string }): Promise<BackfillUserRow> {
     const user = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: {
-        id: true,
-        email: true,
-        emailVerified: true,
-        createdAt: true,
-        userHashKey: true,
-        lastLoginAt: true,
-      },
+      select: BACKFILL_USER_COLUMNS,
     });
     if (!user) throw new UserNotFoundError(userId);
-    return {
-      id: user.id,
-      email: user.email,
-      emailVerified: user.emailVerified,
-      createdAtMs: user.createdAt.getTime(),
-      userHashKey: user.userHashKey,
-      lastLoginAtMs: user.lastLoginAt?.getTime() ?? null,
-    };
+    return backfillUserRow(user);
+  }
+
+  async findAddressSharers({
+    normalizedValue,
+  }: {
+    normalizedValue: string;
+  }): Promise<BackfillUserRow[]> {
+    const users = await this.prisma.user.findMany({
+      where: { email: normalizedValue },
+      select: BACKFILL_USER_COLUMNS,
+      orderBy: { id: "asc" },
+    });
+    return users.map(backfillUserRow);
+  }
+
+  async findAddressLockHolders({
+    normalizedValue,
+  }: {
+    normalizedValue: string;
+  }): Promise<string[]> {
+    const lock = await this.prisma.identifierReservation.findUnique({
+      where: { normalizedValue },
+      select: { userId: true },
+    });
+    return lock ? [lock.userId] : [];
+  }
+
+  async countPasskeys({ userId }: { userId: string }): Promise<number> {
+    return this.prisma.passkey.count({ where: { userId } });
   }
 
   async findAccountRows({ userId }: { userId: string }): Promise<BackfillAccountRow[]> {

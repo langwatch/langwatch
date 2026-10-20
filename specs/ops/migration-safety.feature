@@ -9,9 +9,11 @@
 #   packages/prisma-client/src/__tests__/migration-safety.{rules.ts,unit.test.ts}
 #   packages/clickhouse-migrations/src/__tests__/migration-safety.{rules.ts,unit.test.ts}
 #
-# A retirement note is checked against the LTS floor in
-# packages/upgrade/releases/lts-floor.json (ADR-155 amendment, plan S9): the drop may ship
-# only once every release the window still serves has stopped reading the thing.
+# Nothing is deleted automatically (Alex, 2026-10-11): a new DROP TABLE or DROP COLUMN in a
+# Prisma folder or goose file is refused; a drop is an operator step confirmed in Ops once safe.
+# Released history (up to the newest langwatch@v* tag) keeps its drops, which answered to the
+# retirement and archive notes. Dropping an index, constraint, default, type, projection or view
+# holds no data and stays allowed, as does a table the same migration creates.
 #
 # Teaching: .claude/skills/postgres-migration, .claude/skills/clickhouse-migration.
 # Ruling: dev/docs/adr/155-migrations-are-never-breaking.md.
@@ -33,10 +35,10 @@ Feature: Migration safety
     And the fix says to ship the code that stopped using it one release earlier
 
   @unit
-  Scenario: A drop retired a release earlier is accepted
+  Scenario: A drop retired a release earlier was accepted in released history
     Given a "-- contract: retired in <release>" note above the statement
     When the migration drops that column
-    Then the scanner reports nothing
+    Then the retirement and archive rules report nothing, leaving only the no-drop rule
 
   @unit
   Scenario: A Postgres drop without an archive note is refused by name
@@ -69,16 +71,24 @@ Feature: Migration safety
     Then the scanner reports nothing
 
   @unit
-  Scenario: A retirement note above the LTS floor is refused by name
-    Given the LTS floor is a release in packages/upgrade/releases/lts-floor.json
-    When a drop or a ClickHouse type change carries a note naming a release above the floor
-    Then the scanner names the migration, the object, the note's release and the floor
-    And the fix names the first release the drop may ship in
-    And a note that names no release is refused the same way
+  Scenario: A drop under a retirement note naming any release was accepted in released history
+    When a drop carries a retirement note naming a release
+    Then the retirement and archive rules report nothing, leaving only the no-drop rule
 
   @unit
-  Scenario: A retirement note at or below the LTS floor is accepted
-    When a drop carries a note naming the floor itself or an older release
+  Scenario: A new drop of a table or a column is refused by name, even under a retirement note
+    When a migration above the newest release tag drops a table or a column
+    Then the scanner names the migration and the object
+    And the fix says to declare an operator step that drops it once an operator confirms it is safe
+
+  @unit
+  Scenario: Dropping an index, a constraint, a default or a type, or a table the migration creates, is accepted
+    When a migration drops something that holds no data
+    Then the scanner reports nothing
+
+  @unit
+  Scenario: A commented rollback note that drops is accepted
+    When a drop appears only inside a comment
     Then the scanner reports nothing
 
   @unit
@@ -202,6 +212,35 @@ Feature: Migration safety
   Scenario: Dropping a ClickHouse column or table without a note is refused by name
     When the up migration drops a column, a table or a view with no retirement note
     Then the scanner names the migration and the object
+
+  @unit
+  Scenario: A ClickHouse drop under a retirement note naming any release was accepted in released history
+    When an up migration's drop carries a retirement note naming a release
+    Then the retirement rule reports nothing, leaving only the no-drop rule
+
+  @unit
+  Scenario: A new ClickHouse drop of a table or a column is refused by name, even under a retirement note
+    When a goose file above the newest release tag drops a table or a column in its up half
+    Then the scanner names the migration and the object
+    And the fix says to declare an operator step that drops it once an operator confirms it is safe
+
+  @unit
+  Scenario: Dropping a ClickHouse index, projection or view, or a table the file creates, is accepted
+    # A view here is a plain view or a materialised view writing TO a table.
+    When a goose file drops something that holds no data of its own
+    Then the scanner reports nothing
+
+  @unit
+  Scenario: Dropping a ClickHouse materialised view that owns an inner table is refused by name
+    Given a materialised view the tree created without TO, so its rows live in its inner table
+    When a goose file above the newest release tag drops that view
+    Then the scanner names the migration and the view
+    And dropping a materialised view that writes TO a table, or a plain view, is accepted
+
+  @unit
+  Scenario: A commented ClickHouse rollback note that drops is accepted
+    When a drop appears only in a comment or the commented-out down half
+    Then the scanner reports nothing
 
   @unit
   Scenario: Changing a ClickHouse column type without a note is refused by name
@@ -334,6 +373,18 @@ Feature: Migration safety
     When the graceful rules scan them
     Then they report findings, and the tree scan skips them up to that tag's newest migration, which is on disk
     # Released history is never rewritten; the cutoff is read from git, never a constant.
+
+  @unit
+  Scenario: Released history keeps its drops
+    Given Postgres migrations shipped in the newest langwatch@v* release tag that drop a table or a column
+    When the no-drop rule scans them
+    Then it reports them, and the tree scan skips them up to that tag's newest migration
+
+  @unit
+  Scenario: Released ClickHouse history keeps its drops
+    Given goose files shipped in the newest langwatch@v* release tag that drop a table or a column
+    When the no-drop rule scans them
+    Then it reports them, and the tree scan skips them up to that tag's newest file
 
   @unit
   Scenario: ClickHouse floor history answers only to the older rules

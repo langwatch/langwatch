@@ -1,6 +1,6 @@
 import { moduleApi } from "@langwatch/module";
 import type { OtlpDoorRefusal, OtlpDoorRequest } from "@langwatch/otlp";
-import type { OtlpIngestCredential } from "@langwatch/trace-contract";
+import type { OtlpIngestCredential } from "@langwatch/otlp/door";
 
 import type { LogPiiRedactionLevel, LogPreparation, CanonicalLogRecord } from "./log-record.ts";
 

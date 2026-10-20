@@ -11,8 +11,10 @@ import {
   LicenseOverageMaxRequiresOverageError,
   LicenseSigningNotConfiguredError,
   type IssuedLicenseCustomerRecord,
+  type IssuedLicenseFilters,
 } from "@langwatch/enterprise-licensing-contract";
 import { registryHashForToken } from "@langwatch/gateway-contract";
+import { UNLIMITED } from "@langwatch/plans";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -158,6 +160,47 @@ describe("the license registry", () => {
     expect(license.instanceId).toBeNull();
     expect(organizations.marked).toEqual(["org-acme"]);
     expect(contractBudgets.synced).toEqual(["org-acme"]);
+  });
+
+  async function threeLicenses() {
+    const harnessed = harness();
+    const { registry } = harnessed;
+    await registry.issue(issueInput({ email: "ops@customer.com" }));
+    const { license: revoked } = await registry.issue(issueInput({ email: "it@customer.com" }));
+    await registry.revoke({ id: revoked.id, reason: "test", operatorId: "operator-1" });
+    await registry.issue(issueInput({ email: "selfhost-dogfood@langwatch.ai" }));
+    return harnessed;
+  }
+
+  const emails = (page: { licenses: { email: string }[] }) =>
+    page.licenses.map((license) => license.email).toSorted();
+
+  /** @scenario The license list filters by status and by who the license is for */
+  it("lists by status and by audience, each alone or together", async () => {
+    const { registry } = await threeLicenses();
+    const list = (filters: IssuedLicenseFilters) =>
+      registry.list({ page: 0, pageSize: 10, ...filters });
+
+    expect(emails(await list({ status: "active", audience: "customer" }))).toEqual([
+      "ops@customer.com",
+    ]);
+    expect(emails(await list({ status: "inactive" }))).toEqual(["it@customer.com"]);
+    expect(emails(await list({ audience: "internal" }))).toEqual(["selfhost-dogfood@langwatch.ai"]);
+    expect((await list({})).total).toBe(3);
+  });
+
+  /** @scenario Each license filter choice says how many licenses it would list */
+  it("counts each choice with the other filter applied", async () => {
+    const { registry } = await threeLicenses();
+
+    const page = await registry.list({
+      page: 0,
+      pageSize: 10,
+      status: "active",
+      audience: "customer",
+    });
+
+    expect(page.counts).toEqual({ active: 1, inactive: 1, customer: 1, internal: 1, all: 3 });
   });
 
   /** @scenario A license is written only once its customer is marked */
@@ -462,6 +505,36 @@ describe("licenses another flow signed", () => {
       issuedById: null,
       maxMembers: 10,
     });
+  });
+
+  /** @scenario A purchased GROWTH licence is recorded with unlimited lite seats */
+  it("records a purchased GROWTH license's unlimited lite seats as the flag", async () => {
+    const { registry, repository } = harness();
+
+    const license = await registry.record({ licenseKey: purchased(), source: "PURCHASE" });
+
+    expect(license).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
+    expect(await repository.findById(license.id)).toMatchObject({
+      maxMembersLite: null,
+      liteSeatsUnlimited: true,
+    });
+  });
+
+  /** @scenario A replacement for a licence with unlimited lite seats is signed unlimited */
+  it("signs a replacement for an unlimited license with unlimited lite seats", async () => {
+    const { registry, cryptography } = harness();
+    const license = await registry.record({ licenseKey: purchased(), source: "PURCHASE" });
+
+    const reissued = await registry.reissue({
+      id: license.id,
+      expiresAt: Temporal.Instant.from("2028-01-01T00:00:00.000Z"),
+      operatorId: "operator-3",
+    });
+
+    expect(cryptography.parseLicenseKey(reissued.licenseKey)?.data.plan.maxMembersLite).toBe(
+      UNLIMITED,
+    );
+    expect(reissued.license).toMatchObject({ maxMembersLite: null, liteSeatsUnlimited: true });
   });
 
   /** @scenario "A license minted by the command line script is recorded" */

@@ -228,6 +228,16 @@ describe("given one of the assertion refusals the boundary admits", () => {
     expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 
+  it.each([
+    ["identity_jit_disabled", "This workspace does not create accounts automatically"],
+    ["identity_link_proposed", "An administrator needs to confirm this sign-in"],
+  ])("tells a newcomer the arrival policy's answer for %s", (code, title) => {
+    renderError(code);
+
+    expect(screen.getByText(title)).toBeTruthy();
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+
   it("still refuses a registered code the boundary would not admit", () => {
     renderError("validation_error");
 
@@ -255,5 +265,24 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
     expect(screen.getByText("Account already exists")).toBeTruthy();
     expect(screen.getByRole("link", { name: /sign out.*try again/i })).toBeTruthy();
     expect(document.body.textContent).not.toContain("OAuthAccountNotLinked");
+  });
+});
+
+describe("given a sign-in whose state no longer matches this browser", () => {
+  /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
+  it("crosses as itself and offers to start again from the sign-in page", () => {
+    expect(signInErrorMayCross("state_mismatch")).toBe(true);
+
+    renderError("state_mismatch", { callbackUrl: "/dashboard" });
+
+    expect(screen.getByText("Your sign-in expired")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your sign-in expired or was started in another tab or browser. Start again.",
+      ),
+    ).toBeTruthy();
+    const restart = screen.getByRole("link", { name: /start again/i });
+    expect(restart.getAttribute("href")).toBe("/auth/signin?callbackUrl=%2Fdashboard");
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
   });
 });

@@ -142,6 +142,15 @@ describe("Dataset editor screen", () => {
       expect(screen.getByText(/no longer available/i)).toBeInTheDocument();
       expect(screen.queryByTestId("dataset-editor-table")).not.toBeInTheDocument();
     });
+
+    it("offers the way back to the datasets list", async () => {
+      const user = userEvent.setup();
+      const { host } = renderWithDatasetHost(<DatasetEditorScreen />, { route: ROUTE });
+
+      await user.click(screen.getByRole("link", { name: "Back to datasets" }));
+
+      expect(host.navigations).toEqual(["/test-project/datasets"]);
+    });
   });
 
   describe("given the dataset failed to prepare", () => {

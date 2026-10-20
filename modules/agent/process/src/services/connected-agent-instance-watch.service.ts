@@ -4,20 +4,14 @@ import {
   type AgentCallSignal,
   AgentSessionUnknownError,
   type InstanceNudge,
-  instanceNudgeSchema,
 } from "@langwatch/agent-contract";
 /**
  * The watches this pod holds on connected-agent instances: one subscription per instance,
  * refreshed by every poll and expired when the polls stop.
  */
 import { createLogger } from "@langwatch/observability";
-import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 
-import {
-  instanceMetaKey,
-  pendingKey,
-  instanceChannel,
-} from "../rules/connected-agent-keys.rules.ts";
+import type { Unsubscribe } from "../channels/connected-agent-relay.channel.ts";
 import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:instance-watch");
@@ -88,21 +82,15 @@ export class InstanceWatchService {
     }
 
     const waiters = new Set<(nudge: InstanceNudge) => void>();
-    const subscription = this.#core.runtime.store.subscribe(
-      instanceChannel(session.projectId, session.instanceId),
-      (raw) => {
-        let nudge: InstanceNudge;
-        try {
-          nudge = instanceNudgeSchema.parse(JSON.parse(raw));
-        } catch {
-          return;
-        }
-
+    const subscription = this.#core.runtime.relay.listenToInstance({
+      projectId: session.projectId,
+      instanceId: session.instanceId,
+      onNudge: (nudge) => {
         for (const waiter of waiters) {
           waiter(nudge);
         }
       },
-    );
+    });
     const watch: Watch = {
       session,
       subscription,
@@ -147,15 +135,16 @@ export class InstanceWatchService {
     this.#watches.delete(watchKey);
     await this.#release(watch);
     const { projectId, instanceId } = watch.session;
-    const live = await this.#core.runtime.store.tryHgetall(instanceMetaKey(projectId, instanceId));
-    if (live) {
+    const live = await this.#core.runtime.state.findInstance({ projectId, instanceId });
+    if (live.length > 0) {
       return;
     }
 
-    const pending = await this.#core.runtime.store.zrangebyscore(
-      pendingKey(projectId, instanceId),
-      0,
-    );
+    const pending = await this.#core.runtime.state.findPendingCallIds({
+      projectId,
+      instanceId,
+      from: 0,
+    });
     logger.info({ instanceId }, "instance stopped polling, retiring it");
     await this.#core.retire(watch.session, pending);
   }

@@ -2,15 +2,11 @@ import type { LangWatchQLGranularityStep, FilterField } from "@langwatch/analyti
 import { customGraphInputSchema } from "@langwatch/dashboard-contract";
 import { Box, Card } from "@langwatch/design-system/primitives";
 
-import { DashboardWidgetFrame } from "../../features/dashboard-widget/ui/sections/dashboard-widget-frame.tsx";
-import { DashboardWidgetInPlaceEditor } from "../../features/dashboard-widget/ui/sections/dashboard-widget-in-place-editor.tsx";
 import { LangWatchQLDashboardWidget } from "../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-widget.tsx";
 import { chartGridCardHeightPx } from "../../model/chart-grid.ts";
-import { DASHBOARD_SRCDOC_CHART_KIND, WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
-import type { DashboardWidgetDraft } from "../../model/dashboard-widget-draft.ts";
+import { WORKBENCH_SQL_CHART_KIND } from "../../model/chart-kinds.ts";
 import { CustomGraph } from "./custom-graph.tsx";
 import { GraphCardHeader } from "./graph-card-header.tsx";
-import { useDraggableGraphCard } from "./use-draggable-graph-card";
 
 interface GraphData {
   id: string;
@@ -58,21 +54,6 @@ export function DraggableGraphCard({
   onGranularityChange,
   isDeleting,
 }: DraggableGraphCardProps) {
-  // A dashboard widget is edited in place: the menu's Edit opens the same
-  // drawer the create flow uses, over this exact row's `graph` column. Every
-  // write (a rename from the title, a save from the drawer) goes through one
-  // mutation and one pair of invalidations — all owned by this hook.
-  const {
-    isEditOpen,
-    openEditor,
-    closeEditor,
-    timeWindow,
-    persistedWidget,
-    saveWidget,
-    handleRename,
-    isSaving,
-  } = useDraggableGraphCard({ graph, projectId });
-
   return (
     <Box height="full" minWidth={0}>
       <GraphCardBody
@@ -80,27 +61,10 @@ export function DraggableGraphCard({
         projectId={projectId}
         projectSlug={projectSlug}
         dashboardId={dashboardId}
-        persistedWidget={persistedWidget}
-        onRename={handleRename}
-        onEdit={openEditor}
         onGranularityChange={onGranularityChange}
         onDelete={onDelete}
         isDeleting={isDeleting}
       />
-
-      {persistedWidget && (
-        <DashboardWidgetInPlaceEditor
-          open={isEditOpen}
-          id={graph.id}
-          widget={persistedWidget}
-          projectId={projectId}
-          projectSlug={projectSlug}
-          timeWindow={timeWindow}
-          isSaving={isSaving}
-          onClose={closeEditor}
-          onSave={({ draft, onSuccess }) => saveWidget(draft, { onSuccess })}
-        />
-      )}
     </Box>
   );
 }
@@ -111,9 +75,6 @@ function GraphCardBody({
   projectId,
   projectSlug,
   dashboardId,
-  persistedWidget,
-  onRename,
-  onEdit,
   onGranularityChange,
   onDelete,
   isDeleting,
@@ -122,9 +83,6 @@ function GraphCardBody({
   projectId: string;
   projectSlug: string;
   dashboardId?: string;
-  persistedWidget: DashboardWidgetDraft | null;
-  onRename: (newName: string) => void;
-  onEdit: () => void;
   onGranularityChange?: (granularitySeconds: number) => void;
   onDelete: () => void;
   isDeleting: boolean;
@@ -140,36 +98,28 @@ function GraphCardBody({
         minWidth={0}
         overflow="hidden"
         paddingX={4}
-        paddingTop="10px"
+        paddingTop="2.5"
         paddingBottom={3}
       >
         <GraphCardHeader
           graphId={graph.id}
           name={graph.name}
           graph={graph.graph}
-          projectId={projectId}
           projectSlug={projectSlug}
           dashboardId={dashboardId}
           filters={graph.filters}
           trigger={graph.trigger ?? null}
           isWorkbenchChart={isWorkbenchChart}
-          isDashboardWidget={persistedWidget !== null}
           {...(graph.granularitySeconds == null
             ? {}
             : { granularitySeconds: graph.granularitySeconds })}
-          {...(persistedWidget ? { onRename, onEdit } : {})}
           {...(onGranularityChange ? { onGranularityChange } : {})}
           onDelete={onDelete}
           isDeleting={isDeleting}
         />
 
         <Box flex={1} minHeight={0}>
-          <GraphCardChartArea
-            graph={graph}
-            projectId={projectId}
-            projectSlug={projectSlug}
-            dashboardId={dashboardId}
-          />
+          <GraphCardChartArea graph={graph} projectId={projectId} />
         </Box>
       </Card.Body>
     </Card.Root>
@@ -186,20 +136,9 @@ const chartHeightPx = (rowSpan: number): number =>
 
 /**
  * The card's chart, routed by the row's kind: a placed workbench chart mounts
- * the live LangWatchQL widget, a dashboard widget mounts its sandboxed
- * frame, and every other row is a builder graph.
+ * the live LangWatchQL widget, and every other row is a builder graph.
  */
-function GraphCardChartArea({
-  graph,
-  projectId,
-  projectSlug,
-  dashboardId,
-}: {
-  graph: GraphData;
-  projectId: string;
-  projectSlug: string;
-  dashboardId?: string;
-}) {
+function GraphCardChartArea({ graph, projectId }: { graph: GraphData; projectId: string }) {
   if (graph.kind === WORKBENCH_SQL_CHART_KIND) {
     return (
       <LangWatchQLDashboardWidget
@@ -210,21 +149,6 @@ function GraphCardChartArea({
           ? {}
           : { granularitySeconds: graph.granularitySeconds })}
         name={graph.name}
-      />
-    );
-  }
-
-  if (graph.kind === DASHBOARD_SRCDOC_CHART_KIND) {
-    return (
-      <DashboardWidgetFrame
-        key={graph.id}
-        id={graph.id}
-        graph={graph.graph}
-        projectId={projectId}
-        projectSlug={projectSlug}
-        dashboardId={dashboardId}
-        widgetName={graph.name}
-        maxHeight={chartHeightPx(graph.rowSpan)}
       />
     );
   }

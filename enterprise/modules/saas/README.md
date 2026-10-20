@@ -11,15 +11,15 @@ LangWatch Cloud's own surface. Every operation refuses on any other deployment.
 | Classification | enterprise (`modules/catalogue.json`)                                                   |
 | Subjects       | saas                                                                                    |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser)                |
-| Api token      | `SaasApi` = `moduleApi<SaasApi>()("saas")`, `contract/src/saas.api.ts:46` (1 operation) |
+| Api token      | `SaasApi` = `moduleApi<SaasApi>()("saas")`, `contract/src/saas.api.ts:62` (1 operation) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                              |
 
 ## What saas owns
 
-| Kind            | Name                                                                                                                                                              | Declared at                                                 |
-| --------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
-| Stores required | rateLimiter                                                                                                                                                       | `process/src/repositories/live/live.saas.repositories.ts:9` |
-| Config          | `isSaas` (IS_SAAS), `latestRelease` (LANGWATCH_LATEST_RELEASE), `latestReleaseCommit` (LANGWATCH_LATEST_RELEASE_COMMIT), `releaseFloor` (LANGWATCH_RELEASE_FLOOR) | `contract/src/saas.config.ts:18`                            |
+| Kind            | Name                                                                                                                    | Declared at                                                 |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------- |
+| Stores required | rateLimiter                                                                                                             | `process/src/repositories/live/live.saas.repositories.ts:9` |
+| Config          | `isSaas` (IS_SAAS), `latestRelease` (LANGWATCH_LATEST_RELEASE), `latestReleaseCommit` (LANGWATCH_LATEST_RELEASE_COMMIT) | `contract/src/saas.config.ts:18`                            |
 
 Anything else saas needs belongs to another module and is reached through its `*Api`.
 

@@ -461,7 +461,14 @@ function SpanTooltipBody({
       {(totalTokens > 0 || (span.cost ?? 0) > 0) && (
         <Box marginTop={1.5} display="grid" gridTemplateColumns="auto 1fr" gap={0.5} columnGap={3}>
           {span.inputTokens != null && (
-            <TipCell label="Input" value={span.inputTokens.toLocaleString()} />
+            <TipCell
+              label={
+                (span.cacheReadTokens ?? 0) > 0 || (span.cacheCreationTokens ?? 0) > 0
+                  ? "Uncached input"
+                  : "Input"
+              }
+              value={span.inputTokens.toLocaleString()}
+            />
           )}
           {span.outputTokens != null && (
             <TipCell label="Output" value={span.outputTokens.toLocaleString()} />
@@ -779,7 +786,7 @@ function RowHoverActions({
       // above it and the pointer crosses into it without passing over the row
       // beneath. It is a child of the row it belongs to, which is what keeps
       // the row hovered while the pointer is in here.
-      marginTop="-8px"
+      marginTop="-2"
       gap={0}
       paddingRight={1}
       // Opaque and lifted: it hangs over the row below, which must not read

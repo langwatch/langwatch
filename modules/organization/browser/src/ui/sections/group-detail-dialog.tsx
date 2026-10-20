@@ -1,16 +1,17 @@
-import { Dialog } from "@langwatch/design-system/dialog";
+import { Dialog, type DialogProps } from "@langwatch/design-system/dialog";
 import { InputGroup } from "@langwatch/design-system/input-group";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
   Button,
   createListCollection,
   HStack,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Search, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
@@ -175,6 +176,57 @@ function AddMemberPicker({
   );
 }
 
+/** A manager saves or cancels; anybody else can only close what they are reading. */
+function footerOf({
+  canManage,
+  isSaving,
+  onSave,
+}: {
+  canManage: boolean;
+  isSaving: boolean;
+  onSave: () => void;
+}): { cancelLabel: string; primaryAction: DialogProps["primaryAction"] } {
+  if (!canManage) return { cancelLabel: "Close", primaryAction: void 0 };
+  return {
+    cancelLabel: "Cancel",
+    primaryAction: { label: "Save", loading: isSaving, onClick: onSave },
+  };
+}
+
+function EmptyGroupAccess() {
+  return (
+    <NoDataInfoBlock
+      size="line"
+      title="No access configured yet."
+      next={[
+        { kind: "docs", label: "How roles work", href: "https://langwatch.ai/docs/platform/rbac" },
+      ]}
+    />
+  );
+}
+
+function EmptyGroupMembers({ scimSource }: { scimSource: string | null }) {
+  return (
+    <NoDataInfoBlock
+      size="line"
+      title="No members yet."
+      next={[
+        scimSource
+          ? {
+              kind: "docs",
+              label: "How directory groups sync",
+              href: "https://langwatch.ai/docs/platform/scim-groups",
+            }
+          : {
+              kind: "docs",
+              label: "How groups and teams work",
+              href: "https://langwatch.ai/docs/platform/members-and-teams",
+            },
+      ]}
+    />
+  );
+}
+
 export function GroupDetailDialog({
   group,
   organizationId,
@@ -254,6 +306,12 @@ export function GroupDetailDialog({
       ? [...pendingGrantAdditions, uncommitted]
       : pendingGrantAdditions;
 
+    if (!hasChanges && !uncommitted) {
+      reset();
+      onClose();
+      return;
+    }
+
     setIsSaving(true);
     try {
       await applyEdits.mutateAsync({
@@ -312,168 +370,138 @@ export function GroupDetailDialog({
 
   const isLoadingDetail = detail.isLoading;
 
+  const footer = footerOf({ canManage, isSaving, onSave: () => void handleSave() });
+  const closeAndReset = () => {
+    reset();
+    onClose();
+  };
+
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) {
-          reset();
-          onClose();
-        }
-      }}
+      onClose={closeAndReset}
+      title={group.name}
       size="lg"
+      cancelLabel={footer.cancelLabel}
+      primaryAction={footer.primaryAction}
     >
-      <Dialog.Content maxHeight="90vh" overflowY="auto">
-        <Dialog.Header>
-          <Dialog.Title>{group.name}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body pb={6}>
-          {isLoadingDetail && <Spinner />}
-          {!isLoadingDetail && d && (
-            <VStack gap={5} align="stretch">
-              {canManage && !d.scimSource && (
-                <Input
-                  value={pendingName}
-                  onChange={(e) => setPendingName(e.target.value)}
-                  placeholder="Group name"
-                  size="md"
-                />
-              )}
-              <HStack>
-                <SourceBadge scimSource={d.scimSource} />
-                <Text fontSize="sm" color="fg.muted">
-                  {Math.max(0, d.members.length - pendingRemovals.size + pendingAdditions.length)}{" "}
-                  members
-                </Text>
-              </HStack>
-
-              {/* ── Access grants ── */}
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" mb={3}>
-                  Access granted
-                </Text>
-
-                {d.grants.length === 0 && pendingGrantAdditions.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-                    No access configured yet.
-                  </Text>
-                ) : (
-                  <VStack gap={2} align="stretch">
-                    {d.grants.map((b) => (
-                      <DirectGrantRow
-                        key={b.id}
-                        grant={b}
-                        markedForRemoval={pendingGrantRemovals.has(b.id)}
-                        removable={canManage}
-                        onToggle={() => toggleGrantRemoval(b.id)}
-                      />
-                    ))}
-                    {pendingGrantAdditions.map((b, i) => (
-                      <StagedGrantRow
-                        key={i}
-                        grant={b}
-                        onUndo={() =>
-                          setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== i))
-                        }
-                      />
-                    ))}
-                  </VStack>
-                )}
-
-                {canManage && (
-                  <GrantInputRow
-                    ref={grantInputRef}
-                    organizationId={organizationId}
-                    onAdd={(b) => setPendingGrantAdditions((prev) => [...prev, b])}
-                  />
-                )}
-              </Box>
-
-              {/* ── Members ── */}
-              <Box>
-                <Text fontSize="sm" fontWeight="semibold" mb={3}>
-                  Members
-                </Text>
-                {d.scimSource && (
-                  <Box
-                    px={3}
-                    py={2}
-                    bg="bg.muted"
-                    borderRadius="md"
-                    mb={3}
-                    fontSize="sm"
-                    color="fg.muted"
-                  >
-                    {directoryOwnershipCopy({ source: d.scimSource })}
-                  </Box>
-                )}
-
-                {d.members.length === 0 && pendingAdditions.length === 0 ? (
-                  <Text fontSize="sm" color="fg.muted" fontStyle="italic">
-                    No members yet.
-                  </Text>
-                ) : (
-                  <>
-                    {d.members.map((m) => (
-                      <GroupMemberRow
-                        key={m.userId}
-                        member={m}
-                        markedForRemoval={pendingRemovals.has(m.userId)}
-                        removable={canManage && !d.scimSource}
-                        onToggle={() => toggleMemberRemoval(m.userId)}
-                      />
-                    ))}
-                    {pendingAdditions.map((a) => (
-                      <StagedMemberRow
-                        key={a.userId}
-                        addition={a}
-                        onUndo={() =>
-                          setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))
-                        }
-                      />
-                    ))}
-                  </>
-                )}
-
-                {canManage && !d.scimSource && (
-                  <AddMemberPicker
-                    candidates={orgMembers.data?.members ?? []}
-                    existingMemberIds={existingMemberIds}
-                    search={memberSearch}
-                    onSearch={setMemberSearch}
-                    selected={addMemberId}
-                    onSelect={setAddMemberId}
-                    onAdd={stageMemberAdd}
-                  />
-                )}
-              </Box>
-            </VStack>
+      {isLoadingDetail && <SkeletonRows rows={2} />}
+      {!isLoadingDetail && d && (
+        <VStack gap={5} align="stretch">
+          {canManage && !d.scimSource && (
+            <Input
+              value={pendingName}
+              onChange={(e) => setPendingName(e.target.value)}
+              placeholder="Group name"
+              size="md"
+            />
           )}
-        </Dialog.Body>
+          <HStack>
+            <SourceBadge scimSource={d.scimSource} />
+            <Text fontSize="sm" color="fg.muted">
+              {Math.max(0, d.members.length - pendingRemovals.size + pendingAdditions.length)}{" "}
+              members
+            </Text>
+          </HStack>
 
-        {canManage && (
-          <Dialog.Footer>
-            <Button
-              variant="outline"
-              onClick={() => {
-                reset();
-                onClose();
-              }}
-            >
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              disabled={!hasChanges}
-              loading={isSaving}
-              onClick={() => void handleSave()}
-            >
-              Save
-            </Button>
-          </Dialog.Footer>
-        )}
-      </Dialog.Content>
-    </Dialog.Root>
+          {/* ── Access grants ── */}
+          <Box>
+            <Text fontSize="sm" fontWeight="semibold" mb={3}>
+              Access granted
+            </Text>
+
+            {d.grants.length === 0 && pendingGrantAdditions.length === 0 ? (
+              <EmptyGroupAccess />
+            ) : (
+              <VStack gap={2} align="stretch">
+                {d.grants.map((b) => (
+                  <DirectGrantRow
+                    key={b.id}
+                    grant={b}
+                    markedForRemoval={pendingGrantRemovals.has(b.id)}
+                    removable={canManage}
+                    onToggle={() => toggleGrantRemoval(b.id)}
+                  />
+                ))}
+                {pendingGrantAdditions.map((b, i) => (
+                  <StagedGrantRow
+                    key={i}
+                    grant={b}
+                    onUndo={() =>
+                      setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== i))
+                    }
+                  />
+                ))}
+              </VStack>
+            )}
+
+            {canManage && (
+              <GrantInputRow
+                ref={grantInputRef}
+                organizationId={organizationId}
+                onAdd={(b) => setPendingGrantAdditions((prev) => [...prev, b])}
+              />
+            )}
+          </Box>
+
+          {/* ── Members ── */}
+          <Box>
+            <Text fontSize="sm" fontWeight="semibold" mb={3}>
+              Members
+            </Text>
+            {d.scimSource && (
+              <Box
+                px={3}
+                py={2}
+                bg="bg.muted"
+                borderRadius="md"
+                mb={3}
+                fontSize="sm"
+                color="fg.muted"
+              >
+                {directoryOwnershipCopy({ source: d.scimSource })}
+              </Box>
+            )}
+
+            {d.members.length === 0 && pendingAdditions.length === 0 ? (
+              <EmptyGroupMembers scimSource={d.scimSource} />
+            ) : (
+              <>
+                {d.members.map((m) => (
+                  <GroupMemberRow
+                    key={m.userId}
+                    member={m}
+                    markedForRemoval={pendingRemovals.has(m.userId)}
+                    removable={canManage && !d.scimSource}
+                    onToggle={() => toggleMemberRemoval(m.userId)}
+                  />
+                ))}
+                {pendingAdditions.map((a) => (
+                  <StagedMemberRow
+                    key={a.userId}
+                    addition={a}
+                    onUndo={() =>
+                      setPendingAdditions((prev) => prev.filter((x) => x.userId !== a.userId))
+                    }
+                  />
+                ))}
+              </>
+            )}
+
+            {canManage && !d.scimSource && (
+              <AddMemberPicker
+                candidates={orgMembers.data?.members ?? []}
+                existingMemberIds={existingMemberIds}
+                search={memberSearch}
+                onSearch={setMemberSearch}
+                selected={addMemberId}
+                onSelect={setAddMemberId}
+                onAdd={stageMemberAdd}
+              />
+            )}
+          </Box>
+        </VStack>
+      )}
+    </Dialog>
   );
 }

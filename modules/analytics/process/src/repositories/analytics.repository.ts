@@ -1,4 +1,6 @@
 import type {
+  AnalyticsFeedbackEvent,
+  AnalyticsFeedbackPosition,
   AnalyticsFeedbacksResult,
   AnalyticsFilters,
   AnalyticsTopDocumentsResult,
@@ -26,6 +28,24 @@ export interface AnalyticsLegacyReadInput {
   readonly filters?: AnalyticsFilters;
 }
 
+export interface AnalyticsFeedbackPageReadInput extends AnalyticsLegacyReadInput {
+  /** Resume strictly after this feedback; absent for the newest page. */
+  readonly after: AnalyticsFeedbackPosition | undefined;
+  readonly limit: number;
+}
+
+/** One feedback of a page with the position a following page resumes after. */
+export interface AnalyticsFeedbackPageRow {
+  readonly event: AnalyticsFeedbackEvent;
+  readonly position: AnalyticsFeedbackPosition;
+}
+
+/** At most `limit` rows, newest first, and whether the history goes on past them. */
+export interface AnalyticsFeedbackPageRead {
+  readonly rows: readonly AnalyticsFeedbackPageRow[];
+  readonly hasMore: boolean;
+}
+
 /** The single persistence capability owned by Analytics. */
 export abstract class AnalyticsRepository {
   /**
@@ -38,6 +58,10 @@ export abstract class AnalyticsRepository {
   abstract runTimeseries(query: AnalyticsTimeseriesQuery): Promise<AnalyticsTimeseriesResult>;
 
   abstract findFeedbackEvents(input: AnalyticsLegacyReadInput): Promise<AnalyticsFeedbacksResult>;
+
+  abstract findFeedbackEventsPage(
+    input: AnalyticsFeedbackPageReadInput,
+  ): Promise<AnalyticsFeedbackPageRead>;
 
   abstract findTopDocuments(input: AnalyticsLegacyReadInput): Promise<AnalyticsTopDocumentsResult>;
 }

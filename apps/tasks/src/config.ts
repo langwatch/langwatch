@@ -6,15 +6,15 @@ import {
   type ConfigOf,
 } from "@langwatch/config";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
+import { storesOwner } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
-import { Secret, type SecretsChain } from "@langwatch/secrets";
+import type { SecretsChain } from "@langwatch/secrets";
 import type { UpgradePostgres } from "@langwatch/upgrade";
 import { z } from "zod";
 
 /** The migration runner's own controls. Connection strings are not among them. */
 export const tasksConfig = Config.define((c) => ({
   isSaaS: c.env("IS_SAAS", environmentOneOrTrueSchema),
-  skipPrismaMigrate: c.env("SKIP_PRISMA_MIGRATE", environmentOneOrTrueSchema),
   skipLwqlProvision: c.env("SKIP_LWQL_PROVISION", environmentOneOrTrueSchema),
   nodeEnvironment: c.env("NODE_ENV", nodeEnvironmentSchema),
   /** Routing, not a secret: which 1Password account the secrets chain asks. */
@@ -26,13 +26,13 @@ export const tasksConfig = Config.define((c) => ({
 export type TasksConfig = ConfigOf<typeof tasksConfig>;
 
 /**
- * The two connections this runner opens. Declared beside the config so one file states
- * everything the deployment supplies; resolved at the boot seam and never handed to a task
- * as a string.
+ * The connections this runner opens, read from the handles the stores already declare so the
+ * two cannot drift. Resolved at the boot seam and never handed to a task as a string.
  */
 export const tasksSecrets = {
-  databaseUrl: Secret.load("DATABASE_URL", { optional: true }),
-  redisUrl: Secret.load("REDIS_URL", { optional: true }),
+  databaseUrl: storesOwner.secrets.database,
+  redisUrl: storesOwner.secrets.redis,
+  redisClusterEndpoints: storesOwner.secrets.redisClusterEndpoints,
 } as const;
 
 export function resolveTasksConfig(source: Readonly<Record<string, unknown>>): TasksConfig {

@@ -203,6 +203,28 @@ describe("given a free organization with sixty cents of budget left", () => {
     });
   });
 
+  describe("when three runs estimated at forty cents each are started at once", () => {
+    /** @scenario "Runs accepted together share the budget" */
+    it("accepts one and refuses two", async () => {
+      const { service } = serviceWith({ spentNanoUsd: 0.4 * NANO });
+
+      const starts = await Promise.allSettled(
+        ["run_a", "run_b", "run_c"].map((reservationId) =>
+          service.reserve({ projectId: "proj_1", reservationId, priceUsd: 0.4 }),
+        ),
+      );
+
+      expect(starts.filter((start) => start.status === "fulfilled")).toHaveLength(1);
+      const refusals = starts.flatMap((start) =>
+        start.status === "rejected" ? [start.reason] : [],
+      );
+      expect(refusals.map((reason: { code?: unknown }) => reason.code)).toEqual([
+        "instant_eval_free_budget_exhausted",
+        "instant_eval_free_budget_exhausted",
+      ]);
+    });
+  });
+
   describe("when a run under way checks its next page beside another run's hold", () => {
     /** @scenario "A run under way counts the runs accepted beside it" */
     /** @scenario "A run under way stops when its own judging crosses the budget" */
@@ -250,6 +272,43 @@ describe("given a free organization with sixty cents of budget left", () => {
         service.reserve({ projectId: "proj_1", reservationId: "run_b", priceUsd: 0.5 }),
       ).resolves.toBeUndefined();
       expect(sumSpendNanoUsdByRequestType.mock.calls.length).toBe(before + 1);
+    });
+  });
+});
+
+describe("given an api and a worker that share the holds but each cache the spend", () => {
+  describe("when the worker finishes the one run the budget covers and releases its hold", () => {
+    /** @scenario "A hold the worker released does not admit the api's next run against a stale spend" */
+    it("refuses the api's next two starts inside the cached minute", async () => {
+      const ledger = { nanoUsd: 0.6 * NANO };
+      const reservations = MemoryInstantEvalBudgetReservationsRepository.create({
+        now: () => Temporal.Instant.fromEpochMilliseconds(0),
+      });
+      const process = () =>
+        InstantEvalFreeBudgetService.create({
+          peers: {
+            findOrganizationId: async () => "org_1",
+            listProjectIds: async () => ["proj_1"],
+            isFreePlan: async () => true,
+            sumSpendNanoUsdByRequestType: async () => ledger.nanoUsd,
+          },
+          reservations,
+          now: () => Temporal.Instant.fromEpochMilliseconds(0),
+        });
+      const api = process();
+      const worker = process();
+      await api.assertWithinBudget({ projectId: "proj_1" });
+
+      await api.reserve({ projectId: "proj_1", reservationId: "run_a", priceUsd: 0.4 });
+      ledger.nanoUsd += 0.4 * NANO;
+      await worker.release({ projectId: "proj_1", reservationId: "run_a" });
+
+      await api.assertWithinBudget({ projectId: "proj_1" });
+      for (const reservationId of ["run_b", "run_c"]) {
+        expect(
+          await codeOf(() => api.reserve({ projectId: "proj_1", reservationId, priceUsd: 0.4 })),
+        ).toBe("instant_eval_free_budget_exhausted");
+      }
     });
   });
 });

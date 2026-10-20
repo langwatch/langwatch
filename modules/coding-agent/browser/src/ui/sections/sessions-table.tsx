@@ -1,7 +1,7 @@
 import { ListTable } from "@langwatch/design-system/list-table";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Pagination } from "@langwatch/design-system/pagination";
-import { Skeleton, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { SquareTerminal } from "lucide-react";
 import type React from "react";
 import { useMemo, useState } from "react";
@@ -31,6 +31,14 @@ import { SessionsToolbar } from "../blocks/sessions-toolbar.tsx";
 import { PullRequestDetailDrawer } from "./pull-request-detail-drawer.tsx";
 
 /** Sessions table (last quarter); answers "on what" for spend. Replays in terminal. */
+
+const SESSIONS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How sessions are recorded",
+    href: "https://docs.langwatch.ai/coding-agents/sessions",
+  },
+];
 
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100] as const;
 const DEFAULT_PAGE_SIZE = 25;
@@ -69,6 +77,7 @@ export function SessionsTable({
         title="No sessions recorded yet"
         icon={<SquareTerminal />}
         description="Sessions show up here once your coding agent reports one."
+        next={SESSIONS_NEXT}
       />
     );
   }
@@ -128,9 +137,19 @@ const ListedSessions: React.FC<{
         }}
       />
       {sorted.length === 0 ? (
-        <Text fontSize="sm" color="fg.muted">
-          No sessions match
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No sessions match"
+          action={{
+            label: "Clear filters",
+            onClick: () => {
+              setSearch("");
+              setPeriodSelection(null);
+              setPage(1);
+            },
+          }}
+          next={SESSIONS_NEXT}
+        />
       ) : (
         <OnePageOfSessions
           projectId={projectId}
@@ -195,7 +214,7 @@ const OnePageOfSessions: React.FC<{
     <>
       <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
         <SessionsTableHeader sort={sort} onSort={onSort} />
-        <Table.Body>
+        <ListTable.Body>
           {rows.map((row) => (
             <SessionRow
               key={row.sessionId}
@@ -217,7 +236,7 @@ const OnePageOfSessions: React.FC<{
               onPrefetch={() => replay.prefetch(row)}
             />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
       <Pagination
         page={page}

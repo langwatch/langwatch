@@ -157,12 +157,15 @@ function application(
   });
 
   app.connectLifecycle({
-    recordProjectCreated: { send: async () => undefined },
+    recordProjectCreated: { send: async () => undefined, sendBatch: async () => undefined },
     recordProjectLegacyKeyRevoked: { send: options.revoked ?? (async () => undefined) },
-    recordPresenceSettingChanged: { send: async () => undefined },
+    recordPresenceSettingChanged: { send: async () => undefined, sendBatch: async () => undefined },
     recordProjectMoved: { send: async () => undefined },
     recordProjectArchived: { send: async () => undefined },
-    recordProjectDepartmentAssigned: { send: async () => undefined },
+    recordProjectDepartmentAssigned: {
+      send: async () => undefined,
+      sendBatch: async () => undefined,
+    },
     recordProjectTraceSharingDisabled: { send: async () => undefined },
     recordProjectAggregateRuleChanged: { send: async () => undefined },
     recordProjectRevived: { send: async () => undefined },

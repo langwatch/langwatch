@@ -106,6 +106,7 @@ function serviceOver({
       markRunning: (input) => runner.markRunning(input),
       setStatus: (input) => runner.setStatus(input),
       saveReport: (input) => runner.saveReport(input),
+      reopen: (input) => runner.reopenDoneSteps({ ...input, from: "running" }),
     },
     steps: [step],
     serving: () => true,
@@ -332,6 +333,7 @@ describe.skipIf(!DB_URL)("BackgroundStepsService over a ledger", () => {
 
   describe("given a step whose run is refused once", () => {
     /** @scenario "A transient failure over the ledger is retried after its backoff" */
+    /** @scenario "A step retried after a failed attempt resumes from its last saved checkpoint" */
     it("leaves it pending until the backoff passes, then resumes it to done", async () => {
       await recordStep({ status: "pending" });
       let clock = 0;

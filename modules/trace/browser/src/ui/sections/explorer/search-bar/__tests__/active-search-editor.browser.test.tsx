@@ -7,7 +7,6 @@ import { cleanup, waitFor } from "@testing-library/react";
 import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { userEvent } from "vitest/browser";
-import "@testing-library/jest-dom/vitest";
 
 import { ActiveSearchEditor } from "../active-search-editor.tsx";
 
@@ -1207,12 +1206,12 @@ describe("SearchBar in real Chromium", () => {
       await userEvent.keyboard("[ArrowRight][ArrowLeft]");
 
       await waitFor(() => {
-        // Value-mode suggestions for `status` include "warning" / "ok" /
-        // "error" — at least one should render in a dropdown row outside
-        // the chip itself.
-        const dropdownText = document.body.textContent ?? "";
-        // Non-chip occurrence of one of the static status values.
-        expect(dropdownText.includes("warning")).toBeTruthy();
+        // A value-mode row for `status`, outside the editor, offering the static
+        // value that matches what precedes the caret (`err`).
+        const valueRows = Array.from(document.body.querySelectorAll("p")).filter(
+          (row) => !editor.contains(row) && row.textContent === "status:error",
+        );
+        expect(valueRows).not.toHaveLength(0);
       });
     });
 

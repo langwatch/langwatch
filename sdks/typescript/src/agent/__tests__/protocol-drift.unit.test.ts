@@ -34,7 +34,9 @@ function bracedBody({ source, from }: { source: string; from: number }): string 
 
 /** The top-level keys of one zod object literal in the platform source, by schema name. */
 function platformKeys({ source, schema }: { source: string; schema: string }): string[] {
-  const start = source.indexOf(`export const ${schema} =`);
+  // A named schema keeps its object literal in `<schema>Definition`.
+  const definition = source.indexOf(`const ${schema}Definition =`);
+  const start = definition === -1 ? source.indexOf(`export const ${schema} =`) : definition;
   if (start === -1) throw new Error(`platform protocol has no ${schema}`);
   const body = bracedBody({ source, from: start });
   const keys: string[] = [];

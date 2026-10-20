@@ -22,7 +22,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -42,7 +42,6 @@
     "@langwatch/prisma-client": "workspace:*",
     "@langwatch/process": "workspace:*",
     "@langwatch/project-contract": "workspace:*",
-    "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@trpc/server": "catalog:",

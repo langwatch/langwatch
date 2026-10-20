@@ -23,11 +23,11 @@ const CRITERIA_GROUPS: readonly {
   mark: string;
   color: ConsoleColor;
 }[] = [
-  { status: "passed", title: "Met Criteria", mark: "✓", color: CONSOLE_COLORS.successColor },
-  { status: "failed", title: "Unmet Criteria", mark: "✗", color: CONSOLE_COLORS.failureColor },
+  { status: "passed", title: "Met criteria", mark: "✓", color: CONSOLE_COLORS.successColor },
+  { status: "failed", title: "Unmet criteria", mark: "✗", color: CONSOLE_COLORS.failureColor },
   {
     status: "inconclusive",
-    title: "Could Not Check",
+    title: "Could not check",
     mark: "?",
     color: CONSOLE_COLORS.warningColor,
   },

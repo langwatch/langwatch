@@ -34,7 +34,7 @@ var simRenames = map[string][]verbRename{
 // faultStyle is how a simulator's `fault` reaches the command that injects it.
 var faultStyle = map[string]string{
 	"mail": "error", "llm": "error", "analytics": "error", "storage": "error",
-	"lambda": "error-none", "payment": "payment", "idp": "idp", "outbound": "native",
+	"lambda": "error-none", "payment": "payment", "idp": "idp", "outbound": "native", "github": "native",
 }
 
 // simPublicVerbs is each simulator's verb list as help and `haven sim` show it.
@@ -44,10 +44,12 @@ var simPublicVerbs = map[string]string{
 	"analytics": "status|list|clear|wait|fault",
 	"outbound":  "status|list|deliveries|clear|wait|fault|receiver|urls",
 	"lambda":    "status|list|get|clear|fault",
+	"github":    "status|list|pulls|deliveries|calls|deliver|pr|install|fault|clear",
 	"payment":   "status|list|customers|subscriptions|checkouts|invoices|usage|complete|retry|advance|fault|deliver|hold|release|clear",
 	"storage":   "list|buckets|objects|object|presign|delete|clear|seed|fault",
 	"voice":     "status|list|get|clear",
 	"telemetry": "status|list|get|send|load|fuzz|post|fixtures|fixture|stop|console",
+	"mcp":       "status|list|get|connect|stream|refresh|double-refresh|reconnect|idle|soak|oauth|grant|forget|stop|clear|console",
 }
 
 // simCommand turns one simulator's command into `haven sim <name>`.

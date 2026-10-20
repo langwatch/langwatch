@@ -15,19 +15,10 @@
 
   "references": [
     {
-      "path": "../tsconfig.declarations.json"
+      "path": "../tsconfig.build.json"
     },
     {
       "path": "../../design-system-internal/tsconfig.build.json"
-    },
-    {
-      "path": "../../egress/tsconfig.build.json"
-    },
-    {
-      "path": "../../observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../time/tsconfig.build.json"
     }
   ]
 }

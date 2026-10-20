@@ -81,7 +81,7 @@ The root `pnpm lint` is `dev/nx/lint.mjs`: `nx run-many -t lint` plus one oxlint
 the files outside every project. A project with a `lint` script of its own (the
 architecture enforcer, the SDK's eslint) keeps it, because Nx lets a package.json script
 outrank a plugin; the runner excludes those two from the target and the outside-files run
-covers them. `lint:changed` and CI's PR step run `nx affected` (`--files` from the
+covers them. `lint:types --changed` and CI's PR step run `nx affected` (`--files` from the
 working copy and branch, or `--base`); a changed-only run misses a finding that
 only appears when an unrelated file changes and no input above names it.
 
@@ -315,6 +315,7 @@ changed. Each such reader declares the globs in the `reads` table in
 `dev/nx/test-reads-plugin.mjs`, keyed by package name; the plugin exposes them
 as the `testReads` named input that `test` and `test:unit` take, so adding a
 reader is one row. The rows come from tracing real test runs, not from guessing.
+A suite that walks the whole source tree gets no row: it runs as the uncached `test:repo` target (`vitest.repo.config.ts`).
 
 CI keeps the table true: `package-suites` loads `dev/nx/test-reads-hook.cjs` into the suites a
 change reaches, and `.github/scripts/check-test-reads.ts` fails the leg with the row to add.
@@ -333,7 +334,7 @@ correctness tier off). `.oxlintrc.jsonc` extends all three for the editor,
 the last `categories` wins, and the root keeps `ignorePatterns` because `extends`
 does not carry them. `pnpm lint` (`dev/nx/lint.mjs`) runs native and plugin as two
 parallel processes over the tree; `--changed` and `--base` narrow both to the
-projects `nx show projects --affected` names plus the files no project owns. It no
+changed files (the tree when a `lintGlobals` file changed; only `--types` keeps dependants). It no
 longer runs the per-project `lint` target: cold, that was 213 to 280 s against
 about 35 s whole-tree; the `lint` and `lint:types` targets stay for cached
 per-project runs.
@@ -386,3 +387,62 @@ packages export fixtures from it. Nx 23.2 has no task-level affected
 (`NX_LEGACY_AFFECTED` is ignored), but legacy affected already selects the readers of
 `{workspaceRoot}` inputs, so CI's global-input guard only adds the root tsconfigs and
 `dev/nx`, and now gates the plain lint step as well as the type-aware one.
+
+## Amendment, 2026-10-10: `nx sync` writes the project references
+
+**The Go reference sync is gone.** `tools/devscripts/syncreferences.go` (the
+`sync-references` subcommand), its golden tests, the architecture-enforcer
+`declaration-project-references` policy and the derive half of its
+`tsconfig-references.ts` are deleted (the workspace-member reader three other
+policies use is now `workspace/workspace-members.ts`). `pnpm sync:references` runs `nx sync`; the
+`@nx/js:typescript-sync` generator writes every reference between packages from
+the Nx project graph, `workspace:typecheck` names it in `syncGenerators` (so
+`pnpm typecheck` syncs first; `sync.applyChanges` is on), and CI runs
+`nx sync:check` where the policy ran. Only the sync is adopted: no
+`@nx/js/typescript` plugin, so no inferred per-project `typecheck` or `build`.
+
+**The layout is Nx's.** Every package's `tsconfig.json` is a composite
+container (`files: []`, `include: []`, `noEmit: false`) that keeps the compiler
+options its configs extend and references them: `tsconfig.build.json`, the
+declaration producer everywhere, and `tsconfig.test.json` (sources and tests,
+referencing only `./tsconfig.build.json`); a package with no build config has
+`tsconfig.app.json` instead. `runtimeTsConfigFileNames` is those two names, so
+each build or app config references its dependencies' build configs (every
+dependency kind, devDependencies included) and the root `tsconfig.json`
+references every container. A JavaScript-emitting build moved aside to
+`tsconfig.js.json` (`packages/mail`, `services/langyworker`); mail's declaration
+config took the name. The cyclic web group (`dev/tsconfig.web-declarations.json`)
+is dissolved into eleven ordinary producers; no member depends on another, and
+the `langwatch-declaration-source` export condition stays as a source locator.
+Mail's container references `./preview/tsconfig.json`, so the root's
+`langwatchExtraReferences` is gone. Cycle dropping went with the Go tool: it
+dropped no edge, TypeScript reports a cycle (TS6202) and §17 refuses peer cycles.
+`build:types` builds `modules/*/contract/tsconfig.build.json` by glob and the
+generated root `tsconfig.build.json` is deleted; `dev/nx/workspace-plugin.mjs`
+is keyed on `nx.json`. `dev/scripts/nx-sync-codemod.mjs` did the reshape and is
+idempotent, so a merge that brings old-shape packages can run it again.
+
+**TypeScript 6 for the generator only.** It calls `ts.sys`, `readConfigFile`
+and `parseJsonConfigFileContent`, which TypeScript 7's root export lacks; pnpm
+`packageExtensions` gives `@nx/js` its own `typescript@6.0.3`, and the root
+`tsc` stays 7.0.2.
+
+**Escape hatch.** A dependency whose reference would be wrong is opted out in
+the dependent's runtime config with `nx.sync.ignoredDependencies`:
+`modules/langy/browser` ignores `@langwatch/skills`, which it reads files from
+but which emits no declarations.
+
+## Amendment, 2026-10-13: an outside input makes the project affected
+
+`nx show projects --affected` marks a project touched when a changed file matches
+any `{workspaceRoot}/...` input of any of its targets, cached or not, and then
+marks every dependant too. A `reads` row or a target input that names
+`modules/**` therefore pulls a package and its whole dependant tree into every
+module change: one process-only change in #8655 reached 70 projects, 63 of them
+through the design system. A suite or target that reads the whole tree is
+uncached and names no outside input: the whole-tree suites of the design system
+and the authz, entitlement, identity, workflow and stored-object process
+packages run as `test:repo`, and `build:storybook` (whose adoption counts grep
+every source tree) is `cache: false`. The same change now reaches 8 projects.
+The architecture enforcer keeps its whole-tree row: nothing depends on it, so it
+costs only its own run.

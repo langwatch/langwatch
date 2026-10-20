@@ -8,16 +8,18 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "verbatimModuleSyntax": true,
     "rootDir": ".",
-    "outDir": "dist"
+    "outDir": "dist",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
-  "exclude": ["tests/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

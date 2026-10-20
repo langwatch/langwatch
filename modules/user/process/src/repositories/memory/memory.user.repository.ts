@@ -31,8 +31,9 @@ import type {
   CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
-  UserCreatedRow,
-  UserStandingRow,
+  UserAddressReplacement,
+  UserAddressRow,
+  UserBackfillRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -77,34 +78,52 @@ export class MemoryUserRepository implements UserRepository {
     return this.#database.rows().length > 0;
   }
 
-  async findCreatedPage({
+  async findBackfillPage({
     afterId,
     limit,
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<UserCreatedRow[]> {
+  }): Promise<UserBackfillRow[]> {
     return this.#database
       .rows()
       .filter((row) => afterId === null || row.id > afterId)
       .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
       .slice(0, limit)
-      .map((row) => ({ id: row.id, createdAt: row.createdAt }));
+      .map((row) => ({ id: row.id, createdAt: row.createdAt, deactivatedAt: row.deactivatedAt }));
   }
 
-  async findStandingPage({
+  async findMixedCaseAddressPage({
     afterId,
     limit,
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<UserStandingRow[]> {
+  }): Promise<UserAddressRow[]> {
     return this.#database
       .rows()
       .filter((row) => afterId === null || row.id > afterId)
       .toSorted((a, b) => Number(a.id > b.id) - Number(a.id < b.id))
-      .slice(0, limit)
-      .map((row) => ({ id: row.id, deactivatedAt: row.deactivatedAt }));
+      .flatMap(({ id, email }) =>
+        email === null || email === email.toLowerCase() ? [] : [{ id, email }],
+      )
+      .slice(0, limit);
+  }
+
+  async replaceAddress({
+    id,
+    from,
+    to,
+  }: {
+    id: string;
+    from: string;
+    to: string;
+  }): Promise<UserAddressReplacement> {
+    const [row] = this.#database.usersById([id]);
+    if (!row || row.email !== from) return "changed";
+    if (this.#database.usersWithEmail(to).some((other) => other.id !== id)) return "taken";
+    this.#database.writeUser({ ...row, email: to, updatedAt: nowInstant() });
+    return "replaced";
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
@@ -125,9 +144,18 @@ export class MemoryUserRepository implements UserRepository {
       .map((row) => userProfileSchema.parse(profileOf(row)));
   }
 
+  async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
+    const wanted = email.toLowerCase();
+
+    return this.#database
+      .rows()
+      .filter((row) => row.email?.toLowerCase() === wanted)
+      .toSorted((a, b) => a.createdAt.epochMilliseconds - b.createdAt.epochMilliseconds)
+      .map((row) => userProfileSchema.parse(profileOf(row)));
+  }
+
   async create(input: CreateUserInput): Promise<UserProfile> {
-    // The store's email is unique as written, so only an exact twin collides.
-    if (this.#database.usersWithEmail(input.email).some((row) => row.email === input.email)) {
+    if (this.#database.usersWithEmail(input.email).length > 0) {
       throw new EmailAlreadyRegisteredError();
     }
     const row = this.#insertUser({ name: input.name, email: input.email, emailVerified: false });
@@ -245,6 +273,7 @@ export class MemoryUserRepository implements UserRepository {
       ...row,
       ...(input.name === undefined ? {} : { name: input.name }),
       ...(input.email === undefined ? {} : { email: input.email }),
+      ...(input.emailVerified === undefined ? {} : { emailVerified: input.emailVerified }),
       updatedAt: nowInstant(),
     };
     this.#database.writeUser(updated);

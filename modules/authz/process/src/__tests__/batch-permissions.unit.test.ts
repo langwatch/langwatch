@@ -58,8 +58,9 @@ describe("AuthzService.canBatchPermissionsByIds", () => {
       // batch is that 40 projects and 2 permissions cost the same reads as 1.
       expect(stub.findApiKeyBindings).toHaveBeenCalledTimes(1);
       expect(stub.findApiKeyOwner).toHaveBeenCalledTimes(1);
-      // Every project's team was given, so no scope needed resolving.
-      expect(stub.findProjectLineage).not.toHaveBeenCalled();
+      // Every team was given; only the two projects the key may open read their kind for the
+      // aggregate gate (ADR-177 decision 5), never the 38 it is refused.
+      expect(stub.findProjectLineage).toHaveBeenCalledTimes(2);
     });
 
     it("answers each permission per project from the same snapshot", async () => {

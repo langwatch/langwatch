@@ -1,6 +1,7 @@
 import type { Named } from "@langwatch/module";
 /** The license registry (ADR-156). `licensing` is an enterprise module, so
  * every shape here is declared locally rather than imported from it. */
+import { statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
 
 const issuedLicenseSourceSchema = z.enum(["BACKOFFICE", "PURCHASE", "SCRIPT", "LEGACY_IMPORT"]);
@@ -19,7 +20,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   email: z.string(),
   planType: z.string(),
   maxMembers: z.number(),
-  maxMembersLite: z.number(),
+  maxMembersLite: z.number().nullable(),
+  liteSeatsUnlimited: z.boolean(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
@@ -54,6 +56,15 @@ export type IssuedLicenseView = z.infer<typeof issuedLicenseViewSchema>;
 const issuedLicensePageSchemaDefinition = z.object({
   licenses: z.array(issuedLicenseViewSchema),
   total: z.number(),
+  /** How many licenses each filter choice would list, the search and the other filter applied. */
+  counts: z.object({
+    active: z.number(),
+    inactive: z.number(),
+    customer: z.number(),
+    internal: z.number(),
+    /** What the search alone matches, whatever the filters. */
+    all: z.number(),
+  }),
 });
 export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
@@ -61,8 +72,12 @@ export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
 
 const listIssuedLicensesInputSchemaDefinition = z.object({
   page: z.number().int().min(0).default(0),
-  pageSize: z.number().int().min(1).max(200).default(25),
-  search: z.string().optional(),
+  pageSize: z.number().int().min(1).max(100).default(25),
+  search: z.string().max(200).optional(),
+  /** Absent lists every status: active, or the rest (revoked, superseded or expired). */
+  status: z.enum(["active", "inactive"]).optional(),
+  /** Absent lists both: customers' licenses, or internal test ones. */
+  audience: z.enum(["customer", "internal"]).optional(),
 });
 export interface ListIssuedLicensesInputSchema extends Named<
   typeof listIssuedLicensesInputSchemaDefinition
@@ -96,7 +111,7 @@ const issueLicenseInputSchemaDefinition = z.object({
   email: z.string().min(1),
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
-  maxMembersLite: z.number().int().min(0).optional(),
+  maxMembersLite: statedLiteSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
@@ -128,7 +143,7 @@ export const revokeIssuedLicenseInputSchema: RevokeIssuedLicenseInputSchema =
 const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
-  maxMembersLite: z.number().int().min(0).optional(),
+  maxMembersLite: statedLiteSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),

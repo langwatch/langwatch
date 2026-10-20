@@ -5,7 +5,7 @@
  */
 
 import { ProvisioningSetupDrawerToken } from "@langwatch/enterprise-scim-contract";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { FakeScimHost, renderWithScimHost } from "../../../testing.tsx";
@@ -39,6 +39,6 @@ describe("the provisioning-setup drawer", () => {
 
     fireEvent.click(await screen.findByRole("button", { name: /close/i }));
 
-    expect(host.closedOverlays).toBeGreaterThan(0);
+    await waitFor(() => expect(host.closedOverlays).toBeGreaterThan(0));
   });
 });

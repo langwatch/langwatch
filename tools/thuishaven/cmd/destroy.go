@@ -12,8 +12,8 @@ import (
 )
 
 // `haven down --destroy` is `haven down` plus the data. Naming the stack with
-// --stack is what lets apidiff's teardown take exactly the run-scoped stack it
-// booted inside somebody else's worktree, and nothing else.
+// --stack is what lets a tool's teardown take exactly the stack it booted
+// inside somebody else's worktree, and nothing else.
 //
 // It is destructive, so a person types the slug (a plain y does not count), a
 // script passes --yes, and an agent gets no prompt at all: only the flag.

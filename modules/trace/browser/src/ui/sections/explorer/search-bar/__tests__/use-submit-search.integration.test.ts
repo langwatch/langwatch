@@ -502,3 +502,58 @@ describe("given an Instant Eval estimate is still in flight", () => {
     });
   });
 });
+
+describe("given the reader pressed Skip on a refused judgement", () => {
+  /** @scenario "Skip routes the words again with the eval option left out" */
+  it("routes the sentence and its terms again with Instant Evals unavailable and no classifier", () => {
+    const { result } = renderSubmit();
+    act(() =>
+      result.current.submitWithoutInstantEval({
+        projectId: "project-1",
+        sentence: "frustrated users",
+        question: { instructions: "the user is frustrated" },
+        target: "traces",
+        otherQuery: "service:api",
+        fallbackQuery: 'service:api AND "frustrated users"',
+        timeRange: { from: 1_000, to: 2_000 },
+      }),
+    );
+
+    expect(classifyMutation.mutate).not.toHaveBeenCalled();
+    expect(lastCall().input).toMatchObject({
+      text: "service:api AND frustrated users",
+      isInstantEvalAvailable: false,
+    });
+
+    act(() =>
+      lastCall().options.onSuccess?.({
+        kind: "filter",
+        query: "service:api AND label:frustrated",
+        decidedBy: "model",
+      }),
+    );
+
+    expect(useFilterStore.getState().queryText).toBe("service:api AND label:frustrated");
+    expect(handlers.onInstantEval).not.toHaveBeenCalled();
+  });
+
+  it("keeps an OR between the other terms grouped when the words join them", () => {
+    const { result } = renderSubmit();
+    act(() =>
+      result.current.submitWithoutInstantEval({
+        projectId: "project-1",
+        sentence: "frustrated users",
+        question: { instructions: "the user is frustrated" },
+        target: "traces",
+        otherQuery: "service:api OR status:error",
+        fallbackQuery: '(service:api OR status:error) AND "frustrated users"',
+        timeRange: { from: 1_000, to: 2_000 },
+      }),
+    );
+
+    expect(lastCall().input).toMatchObject({
+      text: "(service:api OR status:error) AND frustrated users",
+      isInstantEvalAvailable: false,
+    });
+  });
+});

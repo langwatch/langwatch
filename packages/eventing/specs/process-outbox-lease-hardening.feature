@@ -52,6 +52,13 @@ Feature: Process outbox lease hardening
     And the abandonment is counted
     And a drain that is merely slow but under the threshold is not abandoned
 
+  @unit @stuck-drain
+  Scenario: A drain still renewing its lease is never taken for stuck
+    Given a drain whose delivery runs for an hour and renews its lease throughout
+    When the stuck-drain threshold passes many times over
+    Then the worker raises no stuck-drain alarm
+    And a drain that stops renewing is abandoned once the threshold passes with no progress
+
   @unit @poll-phase
   Scenario: Outbox workers registered together do not poll in lockstep
     Given several process managers whose outbox workers start in the same tick
@@ -73,6 +80,56 @@ Feature: Process outbox lease hardening
     Then the claim is issued as a single locking statement
     And no interactive transaction is opened for it
     And a poll cannot fail for want of a transaction slot while the pool has connections
+
+  @unit @lease-renewal
+  Scenario: A long-running intent keeps its lease while it runs
+    Given a dispatcher delivering a message whose handler runs for an hour on a short lease
+    And the handler calls a repository every minute
+    When other dispatchers poll while the handler runs
+    Then the holder renews its lease every third of the lease length
+    And no other dispatcher leases the message while the handler runs
+    And the delivery is acknowledged as dispatched once the handler finishes
+
+  @unit @lease-renewal
+  Scenario: A handler silent past its limit loses its lease and the message is redelivered
+    Given a dispatcher delivering a message whose handler awaits nothing through its dependencies
+    And a silence limit of 5 minutes unless the process manager sets its own
+    When the silence limit passes
+    Then the holder stops renewing the lease and logs a warning naming the process and message
+    And once the lease lapses another dispatcher leases and delivers the message
+    And a handler that keeps calling a repository past the same limit keeps its lease
+    And a hung handler whose only activity is a lock renewal armed outside the delivery loses its lease
+
+  @unit @lease-renewal
+  Scenario: Only calls made inside a delivery mark its progress
+    Given a repository tracked for delivery progress and shared by two running deliveries
+    When one delivery calls it
+    Then that delivery's progress is marked when the call starts and when it settles
+    And the other delivery's progress is not marked
+    And a call made outside any delivery marks nothing and passes straight through
+
+  @unit @lease-renewal
+  Scenario: A crashed worker's intent is taken again within one short lease
+    Given a worker that leased a message and died without renewing it
+    When one lease length has passed
+    Then another dispatcher leases and delivers the message
+    And the new delivery is charged a further attempt
+    And a message whose crashes used every attempt retires as dead
+
+  @unit @lease-renewal
+  Scenario: A worker whose lease was taken over does not record its result
+    Given a worker whose renewals failed until another dispatcher leased its message
+    When its next renewal is refused
+    Then it stops renewing
+    And neither its handler's success nor its failure is written to the message
+    And the delivery is reported as fenced
+
+  @integration @lease-renewal
+  Scenario: Renewing a lease is fenced on the lease token
+    Given a leased outbox message in Postgres
+    When its holder renews the lease
+    Then the message stays leased one more lease length from the renewal
+    And a renewal by a holder whose lease was taken over is refused and changes nothing
 
   # outboxDispatcherService.ts, processOutboxWorker.ts, processWakeWorker.ts,
   # failureDiagnostic.ts, commandDispatcher.ts, process-manager-maintenance.pipeline.ts
@@ -100,6 +157,24 @@ Feature: Process outbox lease hardening
     Given an outbox message whose dispatch keeps failing
     When it reaches its attempt ceiling
     Then it stops being retried and its failure is reported with a diagnosis
+
+  @unit
+  Scenario: A message whose ClickHouse is unavailable is retried, never dead-lettered on its first attempt
+    Given an outbox message whose dispatch is refused as clickhouse_unavailable over a dropped connection
+    When the dispatcher delivers it
+    Then it is scheduled for retry with the usual backoff
+
+  @unit
+  Scenario: A platform-fault refusal is retried like the group queue retries it
+    Given an outbox message whose dispatch is refused with a platform fault and retryable false
+    When the dispatcher delivers it
+    Then it is scheduled for retry, as the group queue's refusal rule decides
+
+  @unit
+  Scenario: A customer-fault refusal is dead on its first attempt
+    Given an outbox message whose dispatch is refused with a customer fault and retryable false
+    When the dispatcher delivers it
+    Then it is dead on its first attempt instead of retrying ten times
 
   @unit @unimplemented
   Scenario: A wake scheduled for a process that no longer exists is discarded

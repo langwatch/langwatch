@@ -100,7 +100,7 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
       align="stretch"
       gap={0}
       paddingY={2}
-      paddingLeft="40px"
+      paddingLeft="10"
       paddingRight={4}
       css={{
         animation: "peekSlideDown 0.15s ease-out",
@@ -132,7 +132,7 @@ const InlinePeekContent: React.FC<{ trace: TraceListItem }> = ({ trace }) => {
               bg="red.subtle"
               align="start"
             >
-              <Circle size="6px" bg="red.solid" flexShrink={0} marginTop="4px" />
+              <Circle size="6px" bg="red.solid" flexShrink={0} marginTop="1" />
               <VStack align="start" gap={0} minWidth={0}>
                 {trace.errorSpanName && (
                   <Text textStyle="2xs" color="red.fg" fontWeight="medium">
@@ -185,7 +185,7 @@ const PeekSkeleton: React.FC<{ spanCount?: number }> = ({ spanCount }) => {
       ? Math.min(spanCount, 30)
       : PEEK_SKELETON_SHAPES.length;
   return (
-    <VStack align="stretch" gap="6px" paddingY={1}>
+    <VStack align="stretch" gap="1.5" paddingY={1}>
       {Array.from({ length: rowCount }, (_, i) => {
         const shape = PEEK_SKELETON_SHAPES[i % PEEK_SKELETON_SHAPES.length]!;
         return (

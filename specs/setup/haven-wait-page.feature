@@ -30,6 +30,13 @@ Feature: Haven wait page for a service that is not answering
     Then the app route points at the app's port
 
   @unit
+  Scenario: a live service whose route went missing gets it back
+    Given a live stack "feat-x" whose app is listening
+    And the proxy has no route for the app, lost to a racing teardown or a concurrent write
+    When the daemon reconciles the stack's routes
+    Then the app route points at the app's port
+
+  @unit
   Scenario: a route haven did not set is left alone
     Given a live stack "feat-x" whose app route points at another stack's port
     When the daemon reconciles the stack's routes

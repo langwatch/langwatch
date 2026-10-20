@@ -17,7 +17,7 @@ export const ErrorTextCell = {
     }
     return (
       <HStack gap={1.5} align="start">
-        <Icon boxSize="14px" color="red.solid" flexShrink={0} marginTop="2px">
+        <Icon boxSize="14px" color="red.solid" flexShrink={0} marginTop="0.5">
           <AlertTriangle />
         </Icon>
         <Text textStyle="sm" color="red.fg" lineClamp={2}>

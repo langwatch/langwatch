@@ -1,5 +1,4 @@
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Box, Table } from "@langwatch/design-system/primitives";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 
 import { BlobRow } from "./blob-row.tsx";
@@ -14,37 +13,29 @@ export function BlobTable({
   onDelete: (blob: OpsBlobSummary) => void;
 }) {
   return (
-    <Box overflowX="auto">
-      <ListTable
-        density="compact"
-        columnRules={false}
-        containerProps={{ overflowX: "auto" }}
-        variant="line"
-        size="sm"
-      >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Project</Table.ColumnHeader>
-            <Table.ColumnHeader>Payload</Table.ColumnHeader>
-            <Table.ColumnHeader>Size</Table.ColumnHeader>
-            <Table.ColumnHeader>Expires in</Table.ColumnHeader>
-            <Table.ColumnHeader>Referenced by</Table.ColumnHeader>
-            <Table.ColumnHeader>Holder stopped</Table.ColumnHeader>
-            <Table.ColumnHeader>Next cleanup</Table.ColumnHeader>
-            <Table.ColumnHeader />
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
-          {blobs.map((blob) => (
-            <BlobRow
-              key={`${blob.projectId}/${blob.hash}`}
-              blob={blob}
-              canManage={canManage}
-              onDelete={onDelete}
-            />
-          ))}
-        </Table.Body>
-      </ListTable>
-    </Box>
+    <ListTable density="compact" scroll="x" scrollLabel="Stored payloads table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Project</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Payload</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Size</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Expires in</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Referenced by</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Holder stopped</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Next cleanup</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {blobs.map((blob) => (
+          <BlobRow
+            key={`${blob.projectId}/${blob.hash}`}
+            blob={blob}
+            canManage={canManage}
+            onDelete={onDelete}
+          />
+        ))}
+      </ListTable.Body>
+    </ListTable>
   );
 }

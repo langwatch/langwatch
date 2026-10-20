@@ -5,6 +5,7 @@ export interface ReplayRedisPipeline {
   sadd(key: string, ...members: string[]): ReplayRedisPipeline;
   smembers(key: string): ReplayRedisPipeline;
   get(key: string): ReplayRedisPipeline;
+  hget(key: string, field: string): ReplayRedisPipeline;
   set(key: string, value: string, expiry: "EX", seconds: number): ReplayRedisPipeline;
   expire(key: string, seconds: number): ReplayRedisPipeline;
   exec(): Promise<readonly [Error | null, unknown][] | null>;

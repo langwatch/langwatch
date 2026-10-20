@@ -30,7 +30,7 @@ test("complex product areas share one local navigation layout", async ({ page },
     name: string;
     navigationWidth: number;
     containerWidth: number;
-    borderColor: string;
+    ground: { fill: string; rule: string };
   }[] = [];
 
   for (const section of sections) {
@@ -64,9 +64,11 @@ test("complex product areas share one local navigation layout", async ({ page },
       name: section.name,
       navigationWidth: navigationBox!.width,
       containerWidth: containerBox!.width,
-      borderColor: await navigation.evaluate(
-        (element) => getComputedStyle(element).borderRightColor,
-      ),
+      // The rail sits on the page's ground with no rule against the content (#8588).
+      ground: await navigation.evaluate((element) => ({
+        fill: getComputedStyle(element).backgroundColor,
+        rule: getComputedStyle(element, "::after").content,
+      })),
     });
 
     await page.screenshot({
@@ -75,14 +77,13 @@ test("complex product areas share one local navigation layout", async ({ page },
     });
   }
 
-  expect(measurements.map(({ navigationWidth }) => navigationWidth)).toEqual(
-    sections.map(() => 200),
-  );
+  // One shared rail width; the exact pixel count is the design system's to choose.
+  expect(new Set(measurements.map(({ navigationWidth }) => navigationWidth)).size).toBe(1);
+  for (const { navigationWidth } of measurements) expect(navigationWidth).toBeGreaterThan(0);
   expect(new Set(measurements.map(({ containerWidth }) => containerWidth)).size).toBe(1);
-  expect(new Set(measurements.map(({ borderColor }) => borderColor)).size).toBe(1);
-  for (const { borderColor } of measurements) {
-    expect(borderColor).not.toBe("rgb(0, 0, 0)");
-    expect(borderColor).not.toBe("rgba(0, 0, 0, 0)");
+  for (const { ground } of measurements) {
+    expect(ground.fill).toBe("rgba(0, 0, 0, 0)");
+    expect(ground.rule).toBe("none");
   }
 
   // The rail marks the page it is on: following one of its links moves the
@@ -93,19 +94,13 @@ test("complex product areas share one local navigation layout", async ({ page },
   await automationsNavigation.getByRole("link", { name: "Reports", exact: true }).click();
   await expect(page).toHaveURL(`/${projectSlug}/automations/schedules`);
 
-  // The URL flips synchronously on pushState, but the router only commits the
-  // new location once the lazily-loaded route resolves; until then the nav
-  // still renders the previous page's active state. Poll instead of sampling
-  // once so the assertion waits for that commit like every other matcher here.
-  await expect(async () => {
-    const overviewBackground = await automationsNavigation
-      .getByRole("link", { name: "Overview", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    const activeBackground = await automationsNavigation
-      .getByRole("link", { name: "Reports", exact: true })
-      .evaluate((element) => getComputedStyle(element).backgroundColor);
-    expect(overviewBackground).not.toBe(activeBackground);
-  }).toPass({ timeout: 15_000 });
+  // The rail marks the current entry with aria-current, not a fill of its own.
+  await expect(
+    automationsNavigation.getByRole("link", { name: "Reports", exact: true }),
+  ).toHaveAttribute("aria-current", "page", { timeout: 15_000 });
+  await expect(
+    automationsNavigation.getByRole("link", { name: "Overview", exact: true }),
+  ).not.toHaveAttribute("aria-current", "page");
 
   await page.goto(sections[0]!.path(projectSlug));
   await page.getByRole("radio", { name: "Set theme to dark" }).click();

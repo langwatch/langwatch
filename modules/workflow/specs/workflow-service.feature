@@ -51,6 +51,12 @@ Feature: Workflow service boundary
     Then the first version is updated in place and the workflow still has one version
 
   @unit
+  Scenario: Repeated autosaves keep the autosaved version's number
+    Given a workflow whose autosaved version is numbered 1
+    When two more autosaves are written into it
+    Then the autosaved version is still numbered 1
+
+  @unit
   Scenario: Published version selection is tenant scoped
     Given a workflow with a published version in a project
     When the service resolves its published version
@@ -407,6 +413,13 @@ Feature: Workflow service boundary
     And the project's legacy key is not in the run
 
   @unit
+  Scenario: A run whose starter is no user on the project is refused its key
+    Given a run whose recorded starter is a made-up name rather than a member
+    When its target is prepared to run
+    Then api_key_permission_denied names traces:create
+    And no key is minted
+
+  @unit
   Scenario: A run nobody started in a personal workspace acts as the system, not the owner
     Given a monitor in a member's personal workspace
     When its run's key is minted
@@ -540,3 +553,10 @@ Feature: Workflow service boundary
     Given Workflow already archived the graph for an agent archived fact
     When the same fact is delivered again
     Then both deliveries share one deduplication id and the graph is not archived a second time
+
+  @unit
+  Scenario: A side effect refused for a reason the customer fixes is a warning, not an error
+    Given a workflow side effect nothing waits on, such as studio code completion
+    When it fails with a handled error the customer can act on, such as no model configured
+    Then the failure is logged as a warning
+    And a failure that is ours or a provider's is still logged as an error

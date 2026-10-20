@@ -36,33 +36,31 @@ func (o *Orchestrator) StartWorktreeStack(worktreeDir string) error {
 	return o.sys.SpawnDetached(o.cfg.UpArgv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
 }
 
-// StartStackService adds one service to a running stack: `haven up +<service>`
-// detached in its worktree. The selection is sticky, so up restarts the stack
-// with the service added; progress is read from the registry, as for Start.
+// StartStackService turns one service on in a running stack: `haven service on
+// <service>` detached in its worktree. The selection is sticky, and the stack
+// starts only the lanes the service changes; progress is read from the registry.
 func (o *Orchestrator) StartStackService(slug, service string) error {
+	return o.switchStackService(slug, service, "on")
+}
+
+// StopStackService is StartStackService's `haven service off <service>`.
+func (o *Orchestrator) StopStackService(slug, service string) error {
+	return o.switchStackService(slug, service, "off")
+}
+
+func (o *Orchestrator) switchStackService(slug, service, verb string) error {
 	if !slices.Contains(domain.SelectableServices, service) {
 		return fmt.Errorf("unknown service %q", service)
 	}
+	if len(o.cfg.ServiceArgv) == 0 {
+		return fmt.Errorf("this haven cannot switch a service")
+	}
 	dir, err := o.registeredWorktree(slug)
 	if err != nil {
 		return err
 	}
-	argv := append(slices.Clone(o.cfg.UpArgv), "+"+service)
+	argv := append(slices.Clone(o.cfg.ServiceArgv), verb, service)
 	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "up-from-dashboard.log"))
-}
-
-// ResetStackDatabases runs `haven db reset --yes` detached in a stack's
-// worktree. The slug is pinned in the child's env: an inherited LANGWATCH_SLUG
-// must not make the reset drop a different stack's databases.
-func (o *Orchestrator) ResetStackDatabases(slug string) error {
-	dir, err := o.registeredWorktree(slug)
-	if err != nil {
-		return err
-	}
-	haven := o.cfg.UpArgv[:len(o.cfg.UpArgv)-1]
-	argv := append([]string{"/usr/bin/env", "LANGWATCH_SLUG=" + slug}, haven...)
-	argv = append(argv, "db", "reset", "--yes")
-	return o.sys.SpawnDetached(argv, dir, filepath.Join(o.cfg.Home, "reset-from-dashboard.log"))
 }
 
 // registeredWorktree is the worktree a registered stack runs from, checked
@@ -114,7 +112,7 @@ func (o *Orchestrator) stackByDir(dir string) (domain.Stack, bool) {
 // SeedStack runs `haven db seed --size <size> --persona <persona>` detached in a
 // stack's worktree, for the stack home's seed console. The flags are checked by
 // seedgen's own parser first, so a bad request spawns nothing; the slug is
-// pinned as for ResetStackDatabases.
+// pinned so an inherited LANGWATCH_SLUG cannot redirect it.
 func (o *Orchestrator) SeedStack(slug, size, persona string) error {
 	args := []string{"--size", size, "--persona", persona}
 	if _, err := seedgen.ParseFlags(args, o.sys.Now().UTC()); err != nil {

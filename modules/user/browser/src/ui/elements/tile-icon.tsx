@@ -1,5 +1,5 @@
 import { Box, Image } from "@langwatch/design-system/primitives";
-import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { isProviderKey, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import type { AiToolType } from "@langwatch/enterprise-governance-contract";
 import { Bot, Boxes, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
@@ -57,7 +57,7 @@ export function TileIcon({
    * Preferred over the legacy `iconKey` lookup; falls through if null.
    */
   iconAsset?: string | null;
-  /** Legacy preset-key lookup (modelProviderIcons map). */
+  /** Legacy preset-key lookup (provider key). */
   iconKey?: string | null;
   type: AiToolType;
   size?: number;
@@ -79,8 +79,11 @@ export function TileIcon({
   } else if (resolved?.kind === "node") {
     inner = resolved.node;
   } else if (iconKey) {
-    const brand = modelProviderIcons[iconKey as keyof typeof modelProviderIcons];
-    inner = brand ?? FALLBACK_ICONS[type];
+    inner = isProviderKey(iconKey) ? (
+      <ProviderIconGlyph provider={iconKey} size={`${size - 8}px`} />
+    ) : (
+      FALLBACK_ICONS[type]
+    );
   } else {
     inner = FALLBACK_ICONS[type];
   }

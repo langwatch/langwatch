@@ -26,6 +26,14 @@ Feature: Experiment entry addresses forward where main sent them
     Then no experiment is created
 
   @integration
+  Scenario: A dataset link whose dataset cannot be loaded says so and offers to try again
+    Given I open "/:project/experiments/workbench?datasetId=ds-1"
+    When the dataset fails to load
+    Then the failure is shown under "Couldn't load the dataset for this experiment" with Try again
+    And no experiment is created
+    And Try again reads the dataset again
+
+  @integration
   Scenario: A refused create shows why and stays on the new-experiment address
     Given I open "/:project/experiments/workbench"
     When creating the experiment is refused

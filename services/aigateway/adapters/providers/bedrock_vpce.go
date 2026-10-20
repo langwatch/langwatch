@@ -40,9 +40,10 @@ import (
 // bedrockRuntimeEndpoint returns the customer's Bedrock runtime VPC endpoint
 // from the credential's Extra map. Two nlpgo paths name the key differently, so
 // we accept both. Returns "" when no endpoint is configured (the common
-// non-managed Bedrock case, which stays on bifrost).
+// non-managed Bedrock case, which stays on bifrost). A generic base_url (a
+// stand-in such as llmsim) names the runtime host the same way.
 func bedrockRuntimeEndpoint(cred domain.Credential) string {
-	return credExtra(cred, "bedrock_runtime_endpoint", "aws_bedrock_runtime_endpoint")
+	return credExtra(cred, "bedrock_runtime_endpoint", "aws_bedrock_runtime_endpoint", "base_url")
 }
 
 // credExtra reads the first non-empty value among the given Extra keys.
@@ -84,8 +85,9 @@ func newBedrockRuntimeClient(cred domain.Credential, endpoint string) *bedrockru
 // host — an SSRF surface. Public Bedrock (bedrock-runtime.<region>.amazonaws.com)
 // and PrivateLink VPC endpoints (vpce-*.vpce.amazonaws.com) both live under the
 // AWS-controlled amazonaws.com domain, so the endpoint must be an http/https URL
-// whose host is within .amazonaws.com; anything else is rejected (fail closed).
-func validateBedrockEndpoint(endpoint string) error {
+// whose host is within .amazonaws.com, or a host the operator put on the
+// customer-endpoint allowlist (ALLOWED_PROXY_HOSTS); anything else is rejected.
+func validateBedrockEndpoint(endpoint string, policy customerEndpointPolicy) error {
 	u, err := url.Parse(endpoint)
 	if err != nil {
 		return fmt.Errorf("bedrock vpce: invalid runtime endpoint %q: %w", endpoint, err)
@@ -96,6 +98,9 @@ func validateBedrockEndpoint(endpoint string) error {
 	host := strings.ToLower(u.Hostname())
 	if host == "" {
 		return fmt.Errorf("bedrock vpce: runtime endpoint %q has no host", endpoint)
+	}
+	if _, allowlisted := policy.allowedHosts[normalizeEndpointHost(host)]; allowlisted {
+		return nil
 	}
 	if !strings.HasSuffix(host, ".amazonaws.com") {
 		return fmt.Errorf("bedrock vpce: runtime endpoint host %q is not an amazonaws.com endpoint", host)
@@ -115,7 +120,7 @@ func validateBedrockEndpoint(endpoint string) error {
 // Bedrock credential carrying a valid endpoint, "" to stay on the bifrost path,
 // or an error when an endpoint is present but fails validation (fail closed, so
 // an untrusted endpoint is rejected rather than silently routed elsewhere).
-func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
+func bedrockVPCEEndpoint(cred domain.Credential, policy customerEndpointPolicy) (string, error) {
 	if cred.ProviderID != domain.ProviderBedrock {
 		return "", nil
 	}
@@ -123,7 +128,7 @@ func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
 	if endpoint == "" {
 		return "", nil
 	}
-	if err := validateBedrockEndpoint(endpoint); err != nil {
+	if err := validateBedrockEndpoint(endpoint, policy); err != nil {
 		return "", err
 	}
 	return endpoint, nil
@@ -139,8 +144,8 @@ func bedrockVPCEEndpoint(cred domain.Credential) (string, error) {
 // permission, while a Bedrock credential is normally granted
 // bedrock:InvokeModel only. Converse serves the same models with that grant.
 // Returns "" to stay on bifrost.
-func bedrockConverseEndpoint(cred domain.Credential, model string) (string, error) {
-	endpoint, err := bedrockVPCEEndpoint(cred)
+func bedrockConverseEndpoint(cred domain.Credential, model string, policy customerEndpointPolicy) (string, error) {
+	endpoint, err := bedrockVPCEEndpoint(cred, policy)
 	if err != nil || endpoint != "" {
 		return endpoint, err
 	}
@@ -148,7 +153,7 @@ func bedrockConverseEndpoint(cred domain.Credential, model string) (string, erro
 		return "", nil
 	}
 	public := "https://bedrock-runtime." + bedrockRegion(cred) + ".amazonaws.com"
-	if err := validateBedrockEndpoint(public); err != nil {
+	if err := validateBedrockEndpoint(public, policy); err != nil {
 		return "", err
 	}
 	return public, nil

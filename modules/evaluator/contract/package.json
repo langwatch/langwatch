@@ -20,7 +20,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "generate:evaluators": "cp ../../../services/langevals/ts-integration/evaluators.generated.ts src/evaluators.generated.ts"
   },

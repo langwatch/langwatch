@@ -3,7 +3,8 @@
  */
 
 import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
-import { Box, HStack, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, HStack, Table, Text } from "@langwatch/design-system/primitives";
 import {
   createColumnHelper,
   flexRender,
@@ -43,6 +44,7 @@ import {
   type RenderTracePeek,
 } from "./presentation.tsx";
 import { calculateMinTableWidth, getTableStyles, inferColumnType } from "./table-utils.ts";
+import { VirtualPaddingRow } from "./virtual-padding-row.tsx";
 
 type SingleRunTableProps = {
   /** Transformed batch evaluation data */
@@ -145,7 +147,7 @@ const buildColumns = ({
       header: "",
       size: 32,
       cell: ({ row }) => (
-        <Text fontSize="12px" color="fg.muted" textAlign="right" paddingRight={1}>
+        <Text textStyle="caption" color="fg.muted" textAlign="right" paddingRight={1}>
           {row.index + 1}
         </Text>
       ),
@@ -164,9 +166,7 @@ const buildColumns = ({
         header: () => (
           <HStack gap={1}>
             <ColumnTypeIcon type={columnType} />
-            <Text fontSize="13px" fontWeight="medium">
-              {col.name}
-            </Text>
+            <Text textStyle="label">{col.name}</Text>
           </HStack>
         ),
         size: 210,
@@ -236,7 +236,7 @@ const buildColumns = ({
           }
           if (!targetOutput) {
             return (
-              <Text fontSize="13px" color="fg.subtle">
+              <Text textStyle="bodySm" color="fg.subtle">
                 -
               </Text>
             );
@@ -270,7 +270,7 @@ const buildColumns = ({
         header: () => (
           <HStack gap={1.5}>
             <Swords size={14} />
-            <Text fontSize="12px" fontWeight="600">
+            <Text textStyle="caption" fontWeight="600">
               {column.name}
             </Text>
           </HStack>
@@ -460,76 +460,62 @@ export function SingleRunTable({
       height="100%"
       css={tableStyles}
     >
-      <table>
-        <thead>
+      <ListTable variant="embedded" stickyHeader containerProps={{ overflow: "visible" }}>
+        <Table.Header>
           {table.getHeaderGroups().map((headerGroup) => (
-            <tr key={headerGroup.id}>
+            <Table.Row key={headerGroup.id}>
               {headerGroup.headers.map((header) => (
-                <th key={header.id} style={{ width: `${header.getSize()}px` }}>
+                <Table.ColumnHeader key={header.id} style={{ width: `${header.getSize()}px` }}>
                   {header.isPlaceholder
                     ? null
                     : flexRender(header.column.columnDef.header, header.getContext())}
-                </th>
+                </Table.ColumnHeader>
               ))}
-            </tr>
+            </Table.Row>
           ))}
-        </thead>
-        <tbody>
+        </Table.Header>
+        <Table.Body>
           {disableVirtualization ? (
             // Test mode: render all rows without virtualization
             rows.map((row) => (
-              <tr key={row.id} data-index={row.index}>
+              <Table.Row key={row.id} data-index={row.index}>
                 {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                  <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                     {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
+                  </Table.Cell>
                 ))}
-              </tr>
+              </Table.Row>
             ))
           ) : (
             <>
               {/* Top padding row to maintain scroll position */}
-              {paddingTop > 0 && (
-                <tr>
-                  <td
-                    aria-hidden="true"
-                    style={{ height: `${paddingTop}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
-                </tr>
-              )}
+              {paddingTop > 0 && <VirtualPaddingRow height={paddingTop} columns={columnCount} />}
               {/* Render only virtualized rows - empty until container is measured */}
               {virtualRows.map((virtualRow) => {
                 const row = rows[virtualRow.index];
                 if (!row) return null;
                 return (
-                  <tr
+                  <Table.Row
                     key={row.id}
                     data-index={virtualRow.index}
                     ref={rowVirtualizer.measureElement}
                   >
                     {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} style={{ width: cell.column.getSize() }}>
+                      <Table.Cell key={cell.id} style={{ width: cell.column.getSize() }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
+                      </Table.Cell>
                     ))}
-                  </tr>
+                  </Table.Row>
                 );
               })}
               {/* Bottom padding row to maintain scroll position */}
               {paddingBottom > 0 && (
-                <tr>
-                  <td
-                    aria-hidden="true"
-                    style={{ height: `${paddingBottom}px`, padding: 0 }}
-                    colSpan={columnCount}
-                  />
-                </tr>
+                <VirtualPaddingRow height={paddingBottom} columns={columnCount} />
               )}
             </>
           )}
-        </tbody>
-      </table>
+        </Table.Body>
+      </ListTable>
     </Box>
   );
 }

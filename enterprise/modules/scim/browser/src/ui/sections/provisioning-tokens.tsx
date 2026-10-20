@@ -1,6 +1,9 @@
 import { Link } from "@langwatch/browser-host/link";
 import { UpgradeRequired } from "@langwatch/design-system/access-state";
+import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import { ListTable } from "@langwatch/design-system/list-table";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * The provisioning tokens an organization holds, and the two acts on them.
@@ -10,22 +13,18 @@ import { Dialog } from "@langwatch/design-system/dialog";
  * Shown once when issued; unrecoverable after the dialog closes.
  */
 import {
-  Alert,
   Badge,
   Button,
-  Card,
   Heading,
   HStack,
   Input,
   NativeSelect,
   Spacer,
-  Table,
   Text,
   useDisclosure,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { HandledErrorAlert } from "@langwatch/error-views";
-import { readableDate } from "@langwatch/time";
 import { Key, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
 
@@ -35,6 +34,12 @@ import { connectionLabel } from "../../model/display-formatters.ts";
 import { isEnterpriseGateError } from "../../model/enterprise-gate.ts";
 import { useScimHost } from "../../model/scim-host.ts";
 import { CopyInput } from "../elements/copy-input.tsx";
+
+const HELD_REASON = {
+  choose: "Choose which connection this token provisions for.",
+  none: "Finish setting up a single sign-on connection first.",
+} as const;
+const SCIM_DOCS_URL = "https://docs.langwatch.ai/platform/scim";
 
 export function ProvisioningTokens({
   organizationId,
@@ -50,7 +55,7 @@ export function ProvisioningTokens({
     <>
       <VStack width="full" align="stretch" gap={2}>
         <HStack width="full">
-          <Heading size="sm">Provisioning tokens</Heading>
+          <Heading textStyle="cardTitle">Provisioning tokens</Heading>
           <Spacer />
           {mayManage && (
             <Button size="sm" onClick={onGenerateOpen} data-testid="scim-generate-open">
@@ -91,81 +96,78 @@ export function ProvisioningTokens({
           />
         )}
 
-      <Card.Root width="full" overflow="hidden">
-        <Card.Body paddingY={0} paddingX={0} overflowX="auto">
-          <Table.Root variant="line" size="md" width="full">
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Description</Table.ColumnHeader>
-                <Table.ColumnHeader>Connection</Table.ColumnHeader>
-                <Table.ColumnHeader>Issued</Table.ColumnHeader>
-                <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                {mayManage && <Table.ColumnHeader width="80px" />}
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {!list.isError && list.data?.length === 0 && (
-                <Table.Row>
-                  <Table.Cell colSpan={mayManage ? 5 : 4}>
-                    <Text color="fg.muted" textAlign="center" paddingY={4}>
-                      No provisioning token has been issued yet.
+      <ListTable scroll="x" scrollLabel="Provisioning tokens table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Description</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Connection</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Issued</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+            {mayManage && <ListTable.ActionHeader label="Revoke" />}
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {!list.isError && list.data?.length === 0 && (
+            <ListTable.EmptyRow
+              columns={mayManage ? 5 : 4}
+              state="empty"
+              title="No provisioning token has been issued yet"
+              next={[{ kind: "docs", label: "How provisioning works", href: SCIM_DOCS_URL }]}
+            />
+          )}
+          {list.data?.map((token) => (
+            <ListTable.Row key={token.id}>
+              <ListTable.Cell>
+                <HStack>
+                  <Key size={14} />
+                  <Text>{token.description ?? "No description"}</Text>
+                </HStack>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {token.connectionId ? (
+                  <Text>{labelFor(token.connectionId)}</Text>
+                ) : (
+                  <Badge size="sm" colorPalette="gray">
+                    Every connection
+                  </Badge>
+                )}
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <FormattedDate value={token.createdAt} display="date" />
+              </ListTable.Cell>
+              <ListTable.Cell>
+                {token.lastUsedAt ? (
+                  <FormattedDate value={token.lastUsedAt} display="date" />
+                ) : (
+                  <VStack align="start" gap={0}>
+                    <Badge size="sm" colorPalette="gray">
+                      Never
+                    </Badge>
+                    <Text fontSize="xs" color="fg.muted">
+                      Nothing has presented this token yet. If your identity provider says it is
+                      syncing, check the token it is using.
                     </Text>
-                  </Table.Cell>
-                </Table.Row>
+                  </VStack>
+                )}
+              </ListTable.Cell>
+              {mayManage && (
+                <ListTable.ActionCell>
+                  <Button
+                    size="xs"
+                    variant="ghost"
+                    colorPalette="red"
+                    data-testid="scim-token-revoke"
+                    aria-label={`Revoke ${token.description ?? "token"}`}
+                    onClick={() => setTokenToRevoke(token.id)}
+                  >
+                    <Trash2 size={14} />
+                  </Button>
+                </ListTable.ActionCell>
               )}
-              {list.data?.map((token) => (
-                <Table.Row key={token.id}>
-                  <Table.Cell>
-                    <HStack>
-                      <Key size={14} />
-                      <Text>{token.description ?? "No description"}</Text>
-                    </HStack>
-                  </Table.Cell>
-                  <Table.Cell>
-                    {token.connectionId ? (
-                      <Text>{labelFor(token.connectionId)}</Text>
-                    ) : (
-                      <Badge size="sm" colorPalette="gray">
-                        Every connection
-                      </Badge>
-                    )}
-                  </Table.Cell>
-                  <Table.Cell>{readableDate(token.createdAt).toLocaleDateString()}</Table.Cell>
-                  <Table.Cell>
-                    {token.lastUsedAt ? (
-                      readableDate(token.lastUsedAt).toLocaleDateString()
-                    ) : (
-                      <VStack align="start" gap={0}>
-                        <Badge size="sm" colorPalette="gray">
-                          Never
-                        </Badge>
-                        <Text fontSize="xs" color="fg.muted">
-                          Nothing has presented this token yet. If your identity provider says it is
-                          syncing, check the token it is using.
-                        </Text>
-                      </VStack>
-                    )}
-                  </Table.Cell>
-                  {mayManage && (
-                    <Table.Cell>
-                      <Button
-                        size="xs"
-                        variant="ghost"
-                        colorPalette="red"
-                        data-testid="scim-token-revoke"
-                        aria-label={`Revoke ${token.description ?? "token"}`}
-                        onClick={() => setTokenToRevoke(token.id)}
-                      >
-                        <Trash2 size={14} />
-                      </Button>
-                    </Table.Cell>
-                  )}
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
 
       {mayManage && <TokenDialogs tokens={tokens} />}
     </>
@@ -273,65 +275,45 @@ function TokenDialogs({ tokens }: { tokens: ScimTokens }) {
     <>
       <GenerateTokenDialog tokens={tokens} />
 
-      <Dialog.Root
+      <Dialog
         open={!!tokens.newToken}
-        onOpenChange={({ open }) => {
-          if (!open) {
-            tokens.setNewToken(null);
-            tokens.onGenerateClose();
-          }
+        onClose={() => {
+          tokens.setNewToken(null);
+          tokens.onGenerateClose();
         }}
+        size="md"
+        title="Token issued"
+        cancelLabel={null}
+        closeOnInteractOutside={false}
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Token issued</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <VStack gap={4} align="start">
-              <Text color="fg.warning" fontWeight="medium">
-                Copy this token now. It is shown once and never again.
-              </Text>
-              {tokens.newToken && <CopyInput value={tokens.newToken} label="Provisioning token" />}
-            </VStack>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+        <VStack gap={4} align="start">
+          <Text color="fg.warning" fontWeight="medium">
+            Copy this token now. It is shown once and never again.
+          </Text>
+          {tokens.newToken && <CopyInput value={tokens.newToken} label="Provisioning token" />}
+        </VStack>
+      </Dialog>
 
-      <Dialog.Root
+      <Dialog
         open={!!tokens.tokenToRevoke}
-        onOpenChange={({ open }) => {
-          if (!open) tokens.setTokenToRevoke(null);
+        onClose={() => tokens.setTokenToRevoke(null)}
+        size="md"
+        title="Revoke this token?"
+        primaryAction={{
+          label: "Revoke",
+          onClick: () => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke),
+          loading: tokens.revokeMutation.isPending,
+          danger: true,
+          "data-testid": "scim-token-revoke-confirm",
         }}
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Revoke this token?</Dialog.Title>
-          </Dialog.Header>
-          <Dialog.CloseTrigger />
-          <Dialog.Body>
-            <VStack gap={4} align="start">
-              <Text>
-                The identity provider using it stops being able to provision anyone through this
-                connection, immediately.
-              </Text>
-            </VStack>
-          </Dialog.Body>
-          <Dialog.Footer>
-            <Button variant="outline" onClick={() => tokens.setTokenToRevoke(null)}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              onClick={() => tokens.tokenToRevoke && tokens.handleRevoke(tokens.tokenToRevoke)}
-              loading={tokens.revokeMutation.isPending}
-              data-testid="scim-token-revoke-confirm"
-            >
-              Revoke
-            </Button>
-          </Dialog.Footer>
-        </Dialog.Content>
-      </Dialog.Root>
+        <VStack gap={4} align="start">
+          <Text>
+            The identity provider using it stops being able to provision anyone through this
+            connection, immediately.
+          </Text>
+        </VStack>
+      </Dialog>
     </>
   );
 }
@@ -339,120 +321,102 @@ function TokenDialogs({ tokens }: { tokens: ScimTokens }) {
 function GenerateTokenDialog({ tokens }: { tokens: ScimTokens }) {
   const hasSecret = tokens.secret.trim().length > 0;
   const held = !tokens.hasIssuableConnection || !tokens.chosenConnectionId;
+  const heldReason = held ? HELD_REASON[tokens.hasIssuableConnection ? "choose" : "none"] : void 0;
+
+  const closeGenerate = () => {
+    tokens.onGenerateClose();
+    tokens.setDescription("");
+    tokens.setConnectionId("");
+    tokens.setSecret("");
+  };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={tokens.isGenerateOpen && !tokens.newToken}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          tokens.onGenerateClose();
-          tokens.setDescription("");
-          tokens.setConnectionId("");
-          tokens.setSecret("");
-        }
+      onClose={closeGenerate}
+      size="md"
+      title="Issue a provisioning token"
+      primaryAction={{
+        label: hasSecret ? "Save token" : "Generate token",
+        onClick: tokens.handleGenerate,
+        loading: tokens.generateMutation.isPending,
+        disabledReason: heldReason,
+        "data-testid": "scim-generate-submit",
       }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Issue a provisioning token</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body>
-          <VStack gap={4} align="start">
-            <Text>
-              This token manages the people its connection provisioned, and can take on members no
-              directory has claimed yet, so choose the connection your identity provider syncs from.
-            </Text>
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Connection
-              </Text>
-              {tokens.hasIssuableConnection ? (
-                <NativeSelect.Root>
-                  <NativeSelect.Field
-                    aria-label="Connection"
-                    data-testid="scim-connection-select"
-                    value={tokens.chosenConnectionId}
-                    onChange={(event) => tokens.setConnectionId(event.target.value)}
-                  >
-                    <option value="">Choose a connection</option>
-                    {tokens.issuableConnections.map((option) => (
-                      <option key={option.connectionId} value={option.connectionId}>
-                        {connectionLabel({
-                          displayName: option.displayName,
-                          connectionType: option.type,
-                        })}
-                      </option>
-                    ))}
-                  </NativeSelect.Field>
-                  <NativeSelect.Indicator />
-                </NativeSelect.Root>
-              ) : (
-                <Alert.Root status="info">
-                  <Alert.Indicator />
-                  <Alert.Content>
-                    <Alert.Title>Waiting for single sign-on</Alert.Title>
-                    <Alert.Description>
-                      Finish setting up and activate an identity provider connection before issuing
-                      a directory sync token.
-                    </Alert.Description>
-                  </Alert.Content>
-                </Alert.Root>
-              )}
-            </VStack>
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Description (optional)
-              </Text>
-              <Input
-                aria-label="Description"
-                placeholder="For example, Okta production"
-                data-testid="scim-token-description"
-                value={tokens.description}
-                onChange={(event) => tokens.setDescription(event.target.value)}
-              />
-            </VStack>
-            <VStack gap={1} align="start" width="full">
-              <Text fontWeight="600" fontSize="sm">
-                Token
-              </Text>
-              <Input
-                aria-label="Token"
-                type="password"
-                placeholder="Leave empty and we will generate one"
-                value={tokens.secret}
-                onChange={(event) => tokens.setSecret(event.target.value)}
-              />
-              <Text color="fg.muted" fontSize="xs">
-                {hasSecret
-                  ? "We store only a hash of it, the same as one we generate. It cannot be read back."
-                  : "Paste the value from your identity provider if it already has one, or leave this empty."}
-              </Text>
-            </VStack>
-            {!tokens.generateMutation.isPending && held && (
-              <Text color="fg.muted" fontSize="xs">
-                {tokens.hasIssuableConnection
-                  ? "Choose which connection this token provisions for, above."
-                  : "A token provisions people for one single sign-on connection, so there has to be a live one first."}
-              </Text>
-            )}
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={tokens.onGenerateClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={tokens.handleGenerate}
-            loading={tokens.generateMutation.isPending}
-            disabled={held}
-            data-testid="scim-generate-submit"
-          >
-            {hasSecret ? "Save token" : "Generate token"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack gap={4} align="start">
+        <Text>
+          This token manages the people its connection provisioned, and can take on members no
+          directory has claimed yet, so choose the connection your identity provider syncs from.
+        </Text>
+        <VStack gap={1} align="start" width="full">
+          <Text fontWeight="600" fontSize="sm">
+            Connection
+          </Text>
+          {tokens.hasIssuableConnection ? (
+            <NativeSelect.Root>
+              <NativeSelect.Field
+                aria-label="Connection"
+                data-testid="scim-connection-select"
+                value={tokens.chosenConnectionId}
+                onChange={(event) => tokens.setConnectionId(event.target.value)}
+              >
+                <option value="">Choose a connection</option>
+                {tokens.issuableConnections.map((option) => (
+                  <option key={option.connectionId} value={option.connectionId}>
+                    {connectionLabel({
+                      displayName: option.displayName,
+                      connectionType: option.type,
+                    })}
+                  </option>
+                ))}
+              </NativeSelect.Field>
+              <NativeSelect.Indicator />
+            </NativeSelect.Root>
+          ) : (
+            <Banner status="info" title="Waiting for single sign-on">
+              Finish setting up and activate an identity provider connection before issuing a
+              directory sync token.
+            </Banner>
+          )}
+        </VStack>
+        <VStack gap={1} align="start" width="full">
+          <Text fontWeight="600" fontSize="sm">
+            Description (optional)
+          </Text>
+          <Input
+            aria-label="Description"
+            placeholder="For example, Okta production"
+            data-testid="scim-token-description"
+            value={tokens.description}
+            onChange={(event) => tokens.setDescription(event.target.value)}
+          />
+        </VStack>
+        <VStack gap={1} align="start" width="full">
+          <Text fontWeight="600" fontSize="sm">
+            Token
+          </Text>
+          <Input
+            aria-label="Token"
+            type="password"
+            placeholder="Leave empty and we will generate one"
+            value={tokens.secret}
+            onChange={(event) => tokens.setSecret(event.target.value)}
+          />
+          <Text color="fg.muted" fontSize="xs">
+            {hasSecret
+              ? "We store only a hash of it, the same as one we generate. It cannot be read back."
+              : "Paste the value from your identity provider if it already has one, or leave this empty."}
+          </Text>
+        </VStack>
+        {!tokens.generateMutation.isPending && held && (
+          <Text color="fg.muted" fontSize="xs">
+            {tokens.hasIssuableConnection
+              ? "Choose which connection this token provisions for, above."
+              : "A token provisions people for one single sign-on connection, so there has to be a live one first."}
+          </Text>
+        )}
+      </VStack>
+    </Dialog>
   );
 }

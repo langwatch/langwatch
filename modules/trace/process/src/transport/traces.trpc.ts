@@ -12,7 +12,6 @@ import {
   distinctFieldNamesResultSchema,
   evaluationSchema,
   facetValuesResultSchema,
-  TraceAiQueryUnavailableError,
   TraceApi,
   traceListPageSchema,
   traceSummaryReadSchema,
@@ -312,10 +311,11 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
         userId: actor.id,
         authorization,
       });
-      const filterWhere = app.compileExplorerTraceFilter({
+      const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
+        protections,
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -354,11 +354,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("newCount")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) => {
-      const filterWhere = app.compileExplorerTraceFilter({
+    .handle(async ({ app, input, actor, authorization }) => {
+      const filterWhere = await app.compileExplorerTraceFilter({
         query: input.query ?? "",
         tenantId: input.projectId,
         timeRange: input.timeRange,
+        protections: await app.resolveViewerProtections({
+          projectId: input.projectId,
+          userId: actor.id,
+          authorization,
+        }),
         evalRuns: await app.findExplorerEvalRuns({
           projectId: input.projectId,
           evalRuns: input.evalRuns,
@@ -406,11 +411,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("discover")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       discoverResultSchema.parse(
         await app.readDiscoverForQuery({
           projectId: input.projectId,
           authorization,
+          protections: await app.resolveViewerProtections({
+            projectId: input.projectId,
+            userId: actor.id,
+            authorization,
+          }),
           timeRange: input.timeRange,
           query: input.query,
           evalRuns: input.evalRuns,
@@ -434,11 +444,16 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
 
     .procedure("facets")
     .withPermission("traces:view")
-    .handle(async ({ app, input, authorization }) =>
+    .handle(async ({ app, input, actor, authorization }) =>
       discoverResultSchema.parse(
         await app.readFilteredFacets({
           projectId: input.projectId,
           authorization,
+          protections: await app.resolveViewerProtections({
+            projectId: input.projectId,
+            userId: actor.id,
+            authorization,
+          }),
           timeRange: input.timeRange,
           query: input.query ?? "",
           evalRuns: await app.findExplorerEvalRuns({
@@ -464,32 +479,31 @@ export const tracesTrpcTransport: TrpcRouterDeclaration<TraceApi, typeof tracesT
       ),
     )
 
-    /**
-     * No model-invocation capability is wired into this transport yet — see
-     * the merge-traces-v2 handoff. Declared (not dropped) so the namespace
-     * carries the full `traces` shape; refuses by name instead of 404ing.
-     */
     .procedure("aiQuery")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) =>
+      app.aiQuery({
+        projectId: input.projectId,
+        authorization,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      }),
+    )
 
     .procedure("aiAction")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) =>
+      app.aiAction({
+        projectId: input.projectId,
+        authorization,
+        prompt: input.prompt,
+        timeRange: { from: input.timeRange.from, to: input.timeRange.to },
+      }),
+    )
 
-    /**
-     * Enter on a sentence, routed. Refuses for the same reason `aiQuery` does:
-     * every route but the phrase needs a model this transport cannot call yet.
-     */
     .procedure("routeSearch")
     .withPermission("traces:view")
-    .handle(() => {
-      throw new TraceAiQueryUnavailableError();
-    })
+    .handle(({ app, input, authorization }) => app.routeSearch({ ...input, authorization }))
 
     .procedure("header")
     .withPermission("traces:view")

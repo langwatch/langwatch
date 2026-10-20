@@ -52,7 +52,7 @@ describe("PrismaProjectRepository trace destinations", () => {
     });
   });
 
-  it("finds a live project only inside the named organization", async () => {
+  it("finds a live project only inside the named organization, never an aggregate", async () => {
     const { repository, project } = repositoryWithQueries({ findFirst: [destination] });
 
     await expect(
@@ -67,6 +67,7 @@ describe("PrismaProjectRepository trace destinations", () => {
           id: destination.id,
           team: { organizationId: "org_1" },
           archivedAt: null,
+          kind: { not: "aggregate" },
         },
       }),
     );

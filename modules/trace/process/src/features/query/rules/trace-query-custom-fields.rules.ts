@@ -1,6 +1,6 @@
 import { type FieldDef, UNSUPPORTED } from "@langwatch/trace-contract";
 
-import { boundedSubquery } from "./trace-query-subquery.rules.ts";
+import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   extractStringValue,
   likeMatch,
@@ -74,7 +74,7 @@ export const EVALUATOR_DEF: FieldDef = {
     validateValueLength(value);
     const p = nextParam(ctx, "evaluatorId");
     ctx.params[p] = value;
-    return wrap(
+    return wrapMembership(
       boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorId = {${p}:String}`),
       negated,
     );

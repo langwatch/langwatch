@@ -14,23 +14,54 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
 
 ## Rules that matter
 
+0. **The design system is the source of truth for components** (Alex,
+   2026-10-10). Every component comes from `@langwatch/design-system`; a
+   module never hand-rolls one. A missing need (a variant, a prop) is added to
+   the design-system component first, with its story, never as a local copy:
+
+   | Need                               | Use                                                                         |
+   | ---------------------------------- | --------------------------------------------------------------------------- |
+   | Page or section notice             | `Banner` + `BannerAction` (`/banner`)                                       |
+   | Form or task message, load failure | `Alert` (`/primitives`), `status` + `size="sm"` when dense                  |
+   | Something just happened            | `toaster` (`/toaster`)                                                      |
+   | Dialog, confirm                    | `Dialog` (`/dialog`), `/confirm-dialog`, `/delete-confirmation-dialog`      |
+   | Drawer                             | `Drawer` (`/drawer`)                                                        |
+   | Card, tile, footer buttons         | `Card`, `CardGrid` (`/card`), `/resource-tile`, `ActionRow` (`/action-row`) |
+   | Empty or no-access state           | `EmptyState` (`/primitives`), `/no-data-info-block`, `/restricted-access`   |
+   | Menu, popover                      | `/menu`, `/popover`                                                         |
+   | Picker                             | `/select`, `/option-list`, `/scope-chip-picker`, `/provider-model-selector` |
+   | Table, list page                   | `/list-table`, `/list-page`, `/pagination`                                  |
+
+   `Drawer`, `Dialog` and `Card` are **callable shapes with closed props** (no style prop, so a
+   restyle does not compile). Teach and write only those; their props, size and padding scales
+   and the legacy shapes being removed are in `references/component-apis.md`. The old part
+   statics (`Drawer.Root`, `Dialog.Root`, `Card.Root`), the `studio-drawer` and `studio-dialog`
+   subpaths and the `DetailDrawerHeader`, `SettingsCard` and `WorkflowCard` aliases are legacy.
+
+   A `Box`/`Flex`/`Card` with a status tint, border and icon is a hand-rolled
+   alert: replace it. Never restyle an alert at the call site
+   (`dev/docs/best_practices/alerts-toasts-and-field-errors.md`).
+
 1. **Only `packages/design-system` imports `@chakra-ui/*` or `@emotion/*`.**
    Feature browsers, apps and tests import `@langwatch/design-system/<subpath>`
-   (named subpaths, never a deep path). Enforced by `no-direct-chakra`, which is
-   ruled but not live yet (§10.2: it turns on once Chakra waves 2-3 are green).
-   A few direct imports remain (some enterprise billing tests); they are debt,
-   not precedent. New code never adds one.
+   (named subpaths, never a deep path). `no-direct-chakra` is ruled but there is no
+   such rule in `packages/oxlint-rules` yet (the record's §2 and §17 wording differ on
+   when it lands), so nothing mechanical stops you: hold the line by hand. New code
+   never adds a direct import.
 2. **Primitives and wrappers.** `@langwatch/design-system/primitives`
-   re-exports Chakra's primitives and raw parts unchanged (`Box`, `Flex`,
-   `Button`, `Table`, `Heading`, ...) until real components replace them. A
-   wrapped part (Checkbox, Switch, Tooltip, Menu, Dialog, Avatar, Drawer)
-   comes from its own subpath. Look for a named component before using a
-   primitive.
+   re-exports most of Chakra's primitives and raw parts unchanged (`Box`, `Flex`,
+   `Table`, `Heading`, ...) until real components replace them. Not all are
+   unchanged: `Button` is the design system's own (it fixes the loading label for
+   assistive technology), and `Card` there is `CardParts`, the legacy composable
+   family. The product `Card` is `@langwatch/design-system/card`: same name, different
+   thing. A wrapped part (Checkbox, Switch, Tooltip, Menu, Dialog, Avatar, Drawer)
+   comes from its own subpath. `Alert` and `EmptyState` are compound: use their parts
+   (`Alert.Root`, `Alert.Title`...). Look for a named component before using a primitive.
 3. **Colour is made only here.** Elsewhere, name a semantic token: `fg.*`,
    `bg.*`, `border.*`, `fg|bg|border.<status>`, `<palette>.<role>` (`red.solid`),
    `chart.N`, `accent.*`, `bg.scrim`. Never a scale step, hex, `rgb()` or bare
-   white or black (`no-raw-color`, ruled in §2 but, like `no-direct-chakra`, not
-   in `packages/oxlint-rules` yet). A library that needs a string takes
+   white or black (`no-raw-color`: ruled, and like `no-direct-chakra` not in
+   `packages/oxlint-rules` yet). A library that needs a string takes
    `useToken` / `system.token.var` (a CSS variable that follows the mode) or
    `getRawColorValue` / `useColorRawValue` from `@langwatch/design-system/color-mode`
    (a literal for the current mode). A new colour need is a semantic token in
@@ -40,8 +71,9 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
    it restates contract types structurally). Data meets layout in a module's
    `ui/sections`, see `browser-module`.
 5. **A component two modules need goes here, not into a kit.** Kits are gone
-   (§3.4). Adding one: one kebab-case file in `src/components/`, a subpath in
-   `package.json` `exports`, a `.stories.tsx` beside it covering each real
+   (§3.4). Adding one: one kebab-case file under the right concern folder of
+   `src/components/` (`forms/`, `layout/`, `overlays/`, `display/`, `states/`, ...),
+   a stable subpath in `package.json` `exports` mapping to it, a `.stories.tsx` beside it covering each real
    state (default, loading, empty, error, disabled, long text, narrow), and a
    scenario in `packages/design-system/specs/`. The catalogue spec fails a
    component with no story or one that will not render in both modes.
@@ -56,14 +88,24 @@ bullet; ADR-001, `packages/design-system/adrs/001-design-system-boundary.md`, as
 Check here first, every time: reuse what exists, and build a component any
 other module would reuse here rather than in your module (rule 5).
 
-- `packages/design-system/src/components/`: one file per component
-  (`avatar`, `drawer`, `cached-view`, `section-navigation-frame`, `list-table`, ...).
+- `packages/design-system/src/components/<concern>/`: one file per component, grouped
+  (`layout/card.tsx`, `overlays/views/drawer-view.tsx`, `layout/list-table.tsx`,
+  `layout/section-navigation-frame.tsx`, ...). Import by the stable subpath, not the path.
 - `packages/design-system/src/system/` (tokens, recipes, `config.ts`),
   `src/provider/`, `src/color-mode/`, `src/testing/`.
 - `packages/design-system/src/index.ts` and sibling files: formatters and small
   pure helpers (money, metrics, slugify, text overflow). Do not reimplement.
 - `pnpm --filter @langwatch/design-system storybook`, or `/design-system` while
   the dev server runs, to see what each looks like.
+
+## Component API reference
+
+`references/component-apis.md` (beside this file): current Drawer, Dialog, Card and footer-row
+props, the width and padding scales, close and busy semantics, and the legacy-to-current table.
+Read it before writing or converting any drawer, dialog or card.
+
+`references/internal-console.md`: the separate internal-console design language (haven and simulator
+consoles), for when the screen is not the product.
 
 ## Pattern docs to read first
 
@@ -91,12 +133,18 @@ no data) and each owning page renders it with the same entries (§10).
 
 - **`import { Box } from "@chakra-ui/react"` in a module.** Take it from
   `@langwatch/design-system/primitives`.
-- **The `chakra-ui-builder` and `chakra-ui-refactor` skills tell you to import `@chakra-ui/react`.** In this repo that is wrong
-  (rule 1); use them for Chakra v3 API knowledge only.
+- **The `chakra-ui-builder` and `chakra-ui-refactor` skills use `@chakra-ui/react`.** They are
+  for editing files inside `packages/design-system` only, where that import is allowed. In a
+  module or app, never copy their examples (rule 1).
 - **A colour from a scale step or hex "just here".** Add a semantic token.
+- **A `*Banner`, `*Notice` or `*Callout` in a module that draws its own box.**
+  It wraps `Banner` or `Alert` and adds only words and wiring, or it goes.
 - **Pattern docs lag the record.** Where one disagrees, the record wins:
-  browser packages are `*-browser` (§16), and `best_practices/drawers.md` no
-  longer exists: drawers are routed singletons, see `browser-module`.
+  browser packages are `*-browser` (§16). `dev/docs/best_practices/drawers.md` exists
+  and covers drawer routing and chrome; drawers are routed singletons, see
+  `browser-module`, and their props are in `references/component-apis.md`.
 - **Fetching or reading `*HostApi` inside a shared component.** The owner lends
   it by token (§10.1) and the consumer renders what it is handed.
-- **Mail has its own expressive design system.** See the `mail-template` skill.
+- **Mail and the internal consoles have their own design languages.** Email: the
+  `mail-template` skill. Haven and simulator consoles: `packages/design-system-internal`
+  (React and CSS, no Chakra; see its README and ADR-160). Neither uses the product look.

@@ -305,8 +305,8 @@ describe("when an administrator takes a domain back out", () => {
   });
 });
 
-/** @scenario "A verified domain cannot be removed from a connection that decides sign-in" */
 describe("given a proved domain on a connection that decides sign-in", () => {
+  /** @scenario "A verified domain cannot be removed from a connection that decides sign-in" */
   it("offers no removal and points at removing the connection instead", () => {
     renderSection({
       live: true,

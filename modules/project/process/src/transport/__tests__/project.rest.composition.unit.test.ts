@@ -248,12 +248,18 @@ describe("the projects REST family over the application the composition builds",
       recorded.mockClear();
       app = application().app;
       app.connectLifecycle({
-        recordProjectCreated: { send: recorded },
+        recordProjectCreated: { send: recorded, sendBatch: async () => undefined },
         recordProjectLegacyKeyRevoked: { send: async () => undefined },
-        recordPresenceSettingChanged: { send: async () => undefined },
+        recordPresenceSettingChanged: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectMoved: { send: async () => undefined },
         recordProjectArchived: { send: async () => undefined },
-        recordProjectDepartmentAssigned: { send: async () => undefined },
+        recordProjectDepartmentAssigned: {
+          send: async () => undefined,
+          sendBatch: async () => undefined,
+        },
         recordProjectTraceSharingDisabled: { send: async () => undefined },
         recordProjectAggregateRuleChanged: { send: async () => undefined },
         recordProjectRevived: { send: async () => undefined },

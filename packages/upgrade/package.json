@@ -21,14 +21,19 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
   "dependencies": {
+    "@clickhouse/client": "catalog:",
+    "@langwatch/clickhouse-migrations": "workspace:*",
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
+    "@langwatch/observability": "workspace:*",
     "@langwatch/process-stores": "workspace:*",
+    "@langwatch/redis-client": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/system-migrations": "workspace:*",
     "@langwatch/time": "workspace:*",
@@ -37,7 +42,6 @@
     "zod": "catalog:"
   },
   "devDependencies": {
-    "@clickhouse/client": "catalog:",
     "@langwatch/vitest-config": "workspace:*",
     "@prisma/adapter-pg": "catalog:",
     "@prisma/client": "catalog:",

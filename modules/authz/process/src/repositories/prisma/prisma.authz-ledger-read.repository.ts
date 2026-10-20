@@ -1,4 +1,5 @@
-import { OffboardIncompleteError } from "@langwatch/authz-contract";
+import { grantConditionSchema } from "@langwatch/authorization";
+import { type AuthzSharedProjectGrant, OffboardIncompleteError } from "@langwatch/authz-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { type Instant, fromDate, toDate } from "@langwatch/time";
 import { z } from "zod";
@@ -20,7 +21,9 @@ import {
 } from "./prisma.authz-grant.mapper.ts";
 import type { AuthzGrantFilter } from "./prisma.authz-ledger.mapper.ts";
 
-const sharedProjectGrantRowsSchema = z.array(z.object({ id: z.string(), scopeId: z.string() }));
+const sharedProjectGrantRowsSchema = z.array(
+  z.object({ id: z.string(), scopeId: z.string(), condition: z.unknown().optional() }),
+);
 
 /**
  * Membership deletion needs an explicit budget (timeout + maxWait) because
@@ -151,15 +154,19 @@ export class PrismaAuthzLedgerReadRepository extends AuthzLedgerReadRepository {
   }: {
     organizationId: string;
     readerProjectId: string;
-  }): Promise<{ grantId: string; memberProjectId: string }[]> {
+  }): Promise<AuthzSharedProjectGrant[]> {
     const rows = sharedProjectGrantRowsSchema.parse(
       await liveGrants(this.prisma).findMany({
         where: sharedProjectReadsOf({ organizationId, readerProjectId }),
-        select: { id: true, scopeId: true },
+        select: { id: true, scopeId: true, condition: true },
         orderBy: { scopeId: "asc" },
       }),
     );
-    return rows.map((row) => ({ grantId: row.id, memberProjectId: row.scopeId }));
+    return rows.map((row) => ({
+      grantId: row.id,
+      memberProjectId: row.scopeId,
+      condition: grantConditionSchema.safeParse(row.condition).data ?? null,
+    }));
   }
 
   async findLiveGrantIds({ where }: { where: AuthzGrantFilter }): Promise<string[]> {

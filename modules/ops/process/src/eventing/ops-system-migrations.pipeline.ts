@@ -7,17 +7,21 @@ import {
   type Projection,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
+import type { TenantMigrationRolledBackEventData } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import type { z } from "zod";
 
 import type { OpsModule } from "../app/ops.app.ts";
 import type { OpsRepositories } from "../repositories/ops.repositories.ts";
 import {
+  RecordTenantMigrationRolledBackCommand,
   RequestSystemMigrationPassCommand,
   SYSTEM_MIGRATION_PASS_AGGREGATE_TYPE,
   type SystemMigrationPassRequestedEvent,
   type systemMigrationPassRequestedEventDataSchema,
   systemMigrationPassRequestedEventSchema,
+  type TenantMigrationRolledBackEvent,
+  tenantMigrationRolledBackEventSchema,
 } from "./ops-system-migrations.commands.ts";
 import {
   SYSTEM_MIGRATION_PASS_PROCESS_NAME,
@@ -25,7 +29,7 @@ import {
 } from "./ops-system-migrations.intent.ts";
 import {
   SYSTEM_MIGRATION_PASS_INITIAL_STATE,
-  SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS,
+  SYSTEM_MIGRATION_WAKE_INTERVAL_MS,
   systemMigrationPassIntentSchema,
   systemMigrationPassRequested,
   systemMigrationPassStateSchema,
@@ -35,17 +39,22 @@ import {
 export const SYSTEM_MIGRATIONS_PIPELINE_NAME = "ops_system_migrations";
 
 type SystemMigrationsPipelineDefinition = StaticPipelineDefinition<
-  SystemMigrationPassRequestedEvent,
+  SystemMigrationPassRequestedEvent | TenantMigrationRolledBackEvent,
   Record<string, Projection>,
-  {
-    name: "requestSystemMigrationPass";
-    payload: z.infer<typeof systemMigrationPassRequestedEventDataSchema> & CommandEnvelope;
-  }
+  | {
+      name: "requestSystemMigrationPass";
+      payload: z.infer<typeof systemMigrationPassRequestedEventDataSchema> & CommandEnvelope;
+    }
+  | {
+      name: "recordTenantMigrationRolledBack";
+      payload: TenantMigrationRolledBackEventData & CommandEnvelope;
+    }
 >;
 
 /**
- * The migration pass as one scheduled process: the hourly re-drive wakes it once across the fleet,
- * and an operator's kick is a command whose event asks the same intent. Only a worker hosts it.
+ * The migration pass as one scheduled process: a short wake once across the fleet runs a pass while
+ * one is pending and hourly once nothing is, and an operator's kick is a command whose event asks
+ * the same intent. Only a worker hosts it.
  */
 export function buildSystemMigrations({
   app,
@@ -58,12 +67,13 @@ export function buildSystemMigrations({
     name: SYSTEM_MIGRATIONS_PIPELINE_NAME,
     aggregate: defineAggregate({ type: SYSTEM_MIGRATION_PASS_AGGREGATE_TYPE }),
   })
-    .withEvents([systemMigrationPassRequestedEventSchema])
+    .withEvents([systemMigrationPassRequestedEventSchema, tenantMigrationRolledBackEventSchema])
     .withCommand("requestSystemMigrationPass", RequestSystemMigrationPassCommand)
+    .withCommand("recordTenantMigrationRolledBack", RecordTenantMigrationRolledBackCommand)
     .withProcessManager(SYSTEM_MIGRATION_PASS_PROCESS_NAME, (pm) =>
       pm
         .state(systemMigrationPassStateSchema, SYSTEM_MIGRATION_PASS_INITIAL_STATE)
-        .schedule({ everyMs: SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS })
+        .schedule({ everyMs: SYSTEM_MIGRATION_WAKE_INTERVAL_MS })
         .onWake(systemMigrationRedriveWake)
         .intent(
           "runPass",
@@ -75,13 +85,9 @@ export function buildSystemMigrations({
           }),
         )
         .on(systemMigrationPassRequestedEventSchema, systemMigrationPassRequested)
-        // One pass at a time; a lease as long as the cadence, since a pass can sweep the fleet.
-        .outbox({
-          leaseDurationMs: SYSTEM_MIGRATION_REDRIVE_INTERVAL_MS,
-          maxAttempts: 3,
-          concurrency: 1,
-          batchSize: 1,
-        }),
+        // One pass at a time on a short, renewed lease. Tenant steps work in pages through
+        // their repositories, so each call keeps the lease and the default silence limit holds.
+        .outbox({ maxAttempts: 3, concurrency: 1, batchSize: 1 }),
     )
     .build();
 }

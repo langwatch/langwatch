@@ -1,6 +1,6 @@
 import { zodResolver } from "@hookform/resolvers/zod";
-import { Button, Field, Input } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Field, Input } from "@langwatch/design-system/primitives";
 import { useCallback } from "react";
 import { useForm } from "react-hook-form";
 import { z } from "zod";
@@ -35,7 +35,7 @@ export function SaveVersionDialog({
   const {
     register,
     handleSubmit,
-    formState: { errors, isSubmitting, isDirty },
+    formState: { errors, isSubmitting },
     reset,
   } = useForm<z.infer<typeof saveVersionFormSchema>>({
     defaultValues: {
@@ -57,60 +57,39 @@ export function SaveVersionDialog({
     [onSubmit, clear],
   );
 
+  const closeAndClear = () => {
+    clear();
+    onClose();
+  };
+
   return (
-    <Dialog.Root
+    <Dialog
       open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) {
-          clear();
-          onClose();
-        }
+      onClose={closeAndClear}
+      title="Save version"
+      onSubmit={() => void handleSubmit(submitCallback)()}
+      primaryAction={{
+        label: nextVersion !== undefined ? `Update to v${nextVersion}` : "Save",
+        type: "submit",
+        tone: "success",
+        loading: isSubmitting,
+        "data-testid": "prompt-save-version-submit",
       }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Save Version</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body>
-          <form
-            onSubmit={(e) => {
-              e.preventDefault();
-              void handleSubmit(submitCallback)();
-            }}
-          >
-            <Field.Root>
-              <Field.Label>Description</Field.Label>
-              <Input
-                placeholder="Enter a description for this version"
-                data-testid="prompt-save-version-message"
-
-                maxLength={200}
-                {...register("commitMessage", {
-                  required: "Description is required",
-                })}
-              />
-              {errors.commitMessage && (
-                <Field.ErrorText>{errors.commitMessage.message?.toString()}</Field.ErrorText>
-              )}
-            </Field.Root>
-          </form>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="green"
-            data-testid="prompt-save-version-submit"
-            onClick={() => void handleSubmit(submitCallback)()}
-            loading={isSubmitting}
-            disabled={!isDirty}
-          >
-            {nextVersion !== undefined ? `Update to v${nextVersion}` : "Save"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Field.Root invalid={!!errors.commitMessage}>
+        <Field.Label>Description</Field.Label>
+        <Input
+          placeholder="Enter a description for this version"
+          data-testid="prompt-save-version-message"
+          maxLength={200}
+          {...register("commitMessage", {
+            required: "Description is required",
+          })}
+        />
+        {errors.commitMessage && (
+          <Field.ErrorText>{errors.commitMessage.message?.toString()}</Field.ErrorText>
+        )}
+      </Field.Root>
+    </Dialog>
   );
 }

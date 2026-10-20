@@ -120,6 +120,17 @@ func TestRetentionComesBeforeEveryCellAndTimesStayInTheWindow(t *testing.T) {
 	}
 }
 
+func TestNoTierPlansPrivateOrgsUnlessAsked(t *testing.T) {
+	for _, tier := range Tiers {
+		if got := mustPlan(t, "--size", tier.Name).Flags.Private; got != 0 {
+			t.Errorf("%s plans %d private orgs by default, want 0", tier.Name, got)
+		}
+	}
+	if got := mustPlan(t, "--size", "small", "--private", "2").Flags.Private; got != 2 {
+		t.Errorf("--private 2 planned %d", got)
+	}
+}
+
 func TestPrivateOrgsAreNeverCreated(t *testing.T) {
 	plan := mustPlan(t, "--size", "small", "--private", "1")
 	for step := range plan.Steps() {
@@ -223,7 +234,7 @@ func TestOrgFlagsReplaceTheTierOrgs(t *testing.T) {
 	if plan.Orgs[0].Key != "acme" || plan.Orgs[1].Persona != "enterprise" {
 		t.Fatalf("orgs %+v %+v", plan.Orgs[0], plan.Orgs[1])
 	}
-	for _, refused := range []string{"name=Acme", "name=acme,plan=enterprise", "name=acme,users=0", "name=acme,colour=red",
+	for _, refused := range []string{"name=Acme", "name=acme,plan=enterprise", "name=acme,users=0", "name=acme,color=red",
 		"name=acme,persona=nosuch", "acme"} {
 		if _, err := ParseFlags([]string{"--org", refused}, anchor); !isFlagError(err, "org") {
 			t.Errorf("--org %s: want a refusal naming --org, got %v", refused, err)
@@ -303,6 +314,25 @@ func TestConversationsShareOneIDAcrossTheirTurns(t *testing.T) {
 }
 
 // @scenario "haven db seed gives a test stack a second, a Free and an Enterprise org"
+// A free Cloud org sells two seats and no Lite ones, so a tier org on it refuses its members.
+func TestTierOrgsSeedOnAPlanThatAdmitsTheirMembers(t *testing.T) {
+	for shape, want := range map[string]int{"saas": 6, "sh-licensed": 6, "sh-free": 0} {
+		plan := mustPlan(t, "--size", "small", "--shape", shape, "--admin", "admin@example.test")
+		licensed := map[string]int{}
+		for step := range plan.Steps() {
+			if a := step.Action; a != nil && a.Kind == KindLicenseIssue {
+				licensed[a.Org]++
+			}
+		}
+		if len(licensed) != want {
+			t.Errorf("--shape %s licenses %d tier orgs, want %d", shape, len(licensed), want)
+		}
+		if licensed["$org:private-1"] != 0 {
+			t.Errorf("--shape %s licenses the private org, which the plan never creates", shape)
+		}
+	}
+}
+
 func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	plan := mustPlan(t, "--size", "tiny", "--admin", "admin@example.test",
 		"--org", "name=sso-test-org,plan=licence,owner=admin@acme1.test",
@@ -337,7 +367,7 @@ func TestTestStackOrgsCarryTheirPlans(t *testing.T) {
 	want := map[string]int{"$org:sso-test-org": 1, "$org:free-test-org": 0, "$org:enterprise-test-org": 1}
 	for org, n := range want {
 		if licensed[org] != n {
-			t.Errorf("%s licences = %d, want %d", org, licensed[org], n)
+			t.Errorf("%s licenses = %d, want %d", org, licensed[org], n)
 		}
 		if got := members[org]; len(got) == 0 || got[len(got)-1] != AdminRef {
 			t.Errorf("%s members %v: the seeded admin must join", org, got)

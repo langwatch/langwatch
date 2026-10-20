@@ -40,34 +40,19 @@ export function SlackConnectionDrawer({
   const title = connectionId ? (connection?.name ?? "Slack connection") : "Add Slack connection";
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
-      size="md"
-      onOpenChange={({ open }) => {
-        if (!open) close();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>{title}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <SlackConnectionDrawerContent
-            error={list.error}
-            list={list.data}
-            projectId={projectId}
-            connectionId={connectionId}
-            onSaved={(saved) => {
-              onSuccess?.(saved);
-              close();
-            }}
-            onDeleted={close}
-          />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open onClose={close} size="md" title={title}>
+      <SlackConnectionDrawerContent
+        error={list.error}
+        list={list.data}
+        projectId={projectId}
+        connectionId={connectionId}
+        onSaved={(saved) => {
+          onSuccess?.(saved);
+          close();
+        }}
+        onDeleted={close}
+      />
+    </Drawer>
   );
 }
 

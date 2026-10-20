@@ -22,9 +22,12 @@ vi.mock("../../../../features/trace-drawer/behavior/use-trace-drawer-url-hydrato
   useTraceDrawerUrlHydrator: () => undefined,
 }));
 
-vi.mock("../trace-drawer/index.ts", () => ({
-  TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" />,
-}));
+const shellModule = vi.hoisted(() => ({ loads: 0 }));
+
+vi.mock("../trace-drawer/index.ts", () => {
+  shellModule.loads += 1;
+  return { TraceV2DrawerShell: () => <div data-testid="trace-v2-shell" /> };
+});
 
 import { setWindowAddress } from "../../../../__tests__/window-location-router.ts";
 import { traceWeb } from "../../../../trace.web.ts";
@@ -48,6 +51,19 @@ afterEach(() => {
 });
 
 describe("the declared trace drawer", () => {
+  // Runs first: the module registry is per file, so a later test would have loaded it.
+  describe("when no trace has opened on the page yet", () => {
+    /** @scenario "A page loads the trace drawer only when a trace opens" */
+    it("does not load the drawer's code", async () => {
+      setWindowAddress({ url: "/my-project/dashboards" });
+
+      renderWithDesignSystem(<CurrentDrawer drawers={drawers} />);
+      await act(async () => undefined);
+
+      expect(shellModule.loads).toBe(0);
+    });
+  });
+
   describe("when a trace is open on the optimization studio page", () => {
     /** @scenario "The default applies to every trace entry point, not only the traces table" */
     it("renders the v2 drawer shell", async () => {

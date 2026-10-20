@@ -4,7 +4,7 @@ import type {
   PlanTypes as PrismaPlanTypes,
   SubscriptionStatus as PrismaSubscriptionStatus,
 } from "@langwatch/prisma-client/generated";
-import { fromDate } from "@langwatch/time";
+import { fromDate, nowInstant, toDate } from "@langwatch/time";
 
 import {
   BillingSubscriptionRepository,
@@ -163,7 +163,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       lastPaymentFailedDate: null,
     };
     if (input.previousStatus !== SubscriptionStatus.ACTIVE) {
-      data.startDate = new Date();
+      data.startDate = toDate(nowInstant());
     }
     const row = await this.prisma.subscription.update({
       where: { id: input.id },
@@ -182,7 +182,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
           input.currentStatus === SubscriptionStatus.ACTIVE
             ? (SubscriptionStatus.ACTIVE as PrismaSubscriptionStatus)
             : (SubscriptionStatus.FAILED as PrismaSubscriptionStatus),
-        lastPaymentFailedDate: new Date(),
+        lastPaymentFailedDate: toDate(nowInstant()),
       },
     });
   }
@@ -192,7 +192,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
       where: { id: input.id },
       data: {
         status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-        endDate: new Date(),
+        endDate: toDate(nowInstant()),
         ...Object.fromEntries(NUMERIC_OVERRIDE_FIELDS.map((f) => [f, null])),
       },
     });
@@ -234,7 +234,7 @@ export class PrismaBillingSubscriptionRepository extends BillingSubscriptionRepo
           where: { id: oldSub.id },
           data: {
             status: SubscriptionStatus.CANCELLED as PrismaSubscriptionStatus,
-            endDate: new Date(),
+            endDate: toDate(nowInstant()),
           },
         });
       }

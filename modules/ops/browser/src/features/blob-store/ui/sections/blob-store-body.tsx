@@ -1,5 +1,6 @@
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Button, Center, EmptyState, Flex, Spinner } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { OpsBlobSummary } from "@langwatch/ops-contract";
 import { Database } from "lucide-react";
 
@@ -23,18 +24,7 @@ export function BlobStoreBody({
   isLoadingMore: boolean;
 }) {
   if (isLoading) {
-    return (
-      <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Indicator>
-              <Spinner size="lg" />
-            </EmptyState.Indicator>
-            <EmptyState.Title>Loading payloads</EmptyState.Title>
-          </EmptyState.Content>
-        </EmptyState.Root>
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   if (blobs.length === 0) {
@@ -50,13 +40,7 @@ export function BlobStoreBody({
   return (
     <>
       <BlobTable blobs={blobs} canManage={canManage} onDelete={onDelete} />
-      {hasMore && (
-        <Flex justify="center" paddingY={4}>
-          <Button size="sm" variant="outline" loading={isLoadingMore} onClick={onLoadMore}>
-            Load more
-          </Button>
-        </Flex>
-      )}
+      <LoadMore hasMore={hasMore} loading={isLoadingMore} onLoadMore={onLoadMore} />
     </>
   );
 }

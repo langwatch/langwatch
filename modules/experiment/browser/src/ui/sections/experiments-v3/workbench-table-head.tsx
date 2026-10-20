@@ -1,4 +1,7 @@
 /** The workbench table's column widths and header cells, resize handles included. */
+// TanStack mutates one table instance, so React Compiler caches would serve stale headers.
+"use no memo";
+
 import { Link } from "@langwatch/design-system/primitives";
 import { flexRender, type Header, type Table } from "@tanstack/react-table";
 
@@ -133,8 +136,8 @@ export function WorkbenchHeaderFiller({
   if (!hasTargets) {
     return (
       <th colSpan={2} style={{ width: `calc(${DRAWER_WIDTH}px + ${TARGET_COL_DEFAULT_PCT}%)` }}>
-        <Link fontSize="xs" color="fg.subtle" fontStyle="italic" onClick={onAddClick}>
-          Click "+ Add" above to get started
+        <Link textStyle="caption" color="fg.muted" onClick={onAddClick}>
+          Add a prompt or agent to compare its outputs
         </Link>
       </th>
     );

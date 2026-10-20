@@ -1,6 +1,10 @@
 import { Buffer } from "node:buffer";
 
-import { queryWindowed, type WindowFragment } from "@langwatch/clickhouse-client";
+import {
+  ClickHouseColumns,
+  queryWindowed,
+  type WindowFragment,
+} from "@langwatch/clickhouse-client";
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
@@ -15,13 +19,14 @@ import {
   type SimulationSetData,
   type SimulationExportRun,
 } from "@langwatch/scenario-contract";
+import { nowInstant } from "@langwatch/time";
 
 import {
   EVALUATION_COLUMNS_SQL,
   EVALUATION_LIST_COLUMNS_SQL,
 } from "../../rules/simulation-evaluation-columns.rules.ts";
 import { SimulationRepository } from "../simulation.repository.ts";
-import { CRITERIA_COLUMNS_SQL } from "./simulation-criteria.mapper.ts";
+import { CRITERIA_COLUMNS } from "./simulation-criteria.mapper.ts";
 import {
   type ClickHouseSimulationRunRow,
   mapClickHouseRowToScenarioRunData,
@@ -96,7 +101,8 @@ type BatchAggregateRow = {
   MaxStartedAt: string;
 };
 
-const RUN_COLUMNS = `
+/** A whole run's columns, given the criteria select list its target answers. */
+const runColumns = (criteria: string) => `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
   \`Messages.Id\`, \`Messages.Role\`, \`Messages.Content\`,
@@ -104,20 +110,20 @@ const RUN_COLUMNS = `
   TraceIds,
   Verdict, Reasoning, MetCriteria, UnmetCriteria, InconclusiveCriteria, Error,
   ${EVALUATION_COLUMNS_SQL},
-  ${CRITERIA_COLUMNS_SQL},
+  ${criteria},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
+  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt`;
 
 /**
  * Columns for list/grid views: truncated messages (first 6), excludes heavy JSON data.
  * `TotalMessageCount` must be table-qualified or it measures the sliced array only.
  */
-const LIST_COLUMNS = `
+const listColumns = (criteria: string) => `
   ScenarioRunId, ScenarioId, BatchRunId, ScenarioSetId,
   Status, Name, Description, Metadata,
   toString(length(t.\`Messages.Role\`)) AS TotalMessageCount,
@@ -132,14 +138,14 @@ const LIST_COLUMNS = `
   MetCriteria, UnmetCriteria, InconclusiveCriteria,
   CAST(NULL AS Nullable(String)) AS Error,
   ${EVALUATION_LIST_COLUMNS_SQL},
-  ${CRITERIA_COLUMNS_SQL},
+  ${criteria},
   toString(DurationMs) AS DurationMs,
   TotalCost, RoleCosts, RoleLatencies,
   toString(toUnixTimestamp64Milli(StartedAt)) AS StartedAt,
   toString(toUnixTimestamp64Milli(CreatedAt)) AS CreatedAt,
   toString(toUnixTimestamp64Milli(UpdatedAt)) AS UpdatedAt,
   toString(toUnixTimestamp64Milli(FinishedAt)) AS FinishedAt,
-  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt` as const;
+  toString(toUnixTimestamp64Milli(ArchivedAt)) AS ArchivedAt`;
 
 /**
  * The run note, read server-side from run metadata so only the short
@@ -225,7 +231,11 @@ export type SimulationClickHouseClient = {
     format: "JSONEachRow";
     /** A declared tenant set: one organization's projects, bound by `TenantId IN (...)`. */
     tenantIds?: readonly string[];
+    /** Set when the read must walk every partition; see the member's cold-scan warning. */
+    SKIP_COLD_SCAN_CHECK?: true | undefined;
   }): Promise<{ json<Result>(): Promise<Result[]> }>;
+  /** Absent on a bare driver client (tests): every column is then named. */
+  select?(input: Parameters<ClickHouseColumns["select"]>[0]): Promise<string>;
 };
 
 type SimulationClickHouseClientResolver = (tenantId: string) => Promise<SimulationClickHouseClient>;
@@ -320,15 +330,24 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     return this.resolveClient(tenantId);
   }
 
+  /** The criteria select list the tenant's target answers (goose 00101; NO-HOLDS). */
+  private async criteriaColumns(tenantId: string): Promise<string> {
+    const client = await this.getClient(tenantId);
+    const input = { table: TABLE_NAME, columns: CRITERIA_COLUMNS };
+    return client.select?.(input) ?? ClickHouseColumns.named(input);
+  }
+
   private async queryRows<T>(
     query: string,
     params: { tenantId: string } & Record<string, string | string[]>,
+    options: { declaresFullScan?: boolean } = {},
   ): Promise<T[]> {
     const client = await this.getClient(params.tenantId);
     const result = await client.query({
       query,
       query_params: params,
       format: "JSONEachRow",
+      ...(options.declaresFullScan === true ? { SKIP_COLD_SCAN_CHECK: true as const } : {}),
     });
     return result.json<T>();
   }
@@ -369,6 +388,8 @@ export class SimulationClickHouseRepository extends SimulationRepository {
        GROUP BY NormalizedSetId
        ORDER BY LastRunAt DESC`,
       { tenantId: projectId, ...dateFilter.params },
+      // As on main: with no start date this lists every set the tenant ever ran.
+      { declaresFullScan: startDate === undefined },
     );
 
     return rows.map((row) => ({
@@ -389,8 +410,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // pattern that read all heavy columns (Messages, RoleCosts, etc.) across
     // entire granules (~8K rows) for dedup, causing OOM on parts with large
     // payloads.
+    const criteria = await this.criteriaColumns(projectId);
     const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${RUN_COLUMNS},
+      `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
@@ -690,8 +712,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         : SimulationClickHouseRepository.expandSetIdFilter(scenarioSetId);
     const setFilter = (alias: string) =>
       scenarioSetIds ? `AND ${alias}ScenarioSetId IN ({scenarioSetIds:Array(String)})` : "";
+    const criteria = await this.criteriaColumns(projectId);
     const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${RUN_COLUMNS},
+      `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
@@ -756,8 +779,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     projectId: string;
     scenarioSetId: string;
   }): Promise<SimulationRunData[]> {
+    const criteria = await this.criteriaColumns(projectId);
     const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${RUN_COLUMNS},
+      `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
@@ -1104,7 +1128,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
     // (scanning every partition, including cold storage) is never acceptable
     // here — floor the window at 30 days when the caller omits it.
     const dateFilter = SimulationClickHouseRepository.buildDateFilter({
-      startDate: startDate ?? Date.now() - 30 * 24 * 60 * 60 * 1000,
+      startDate: startDate ?? nowInstant().subtract({ hours: 30 * 24 }).epochMilliseconds,
       endDate,
     });
     const setFilter = scenarioSetId ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})" : "";
@@ -1473,7 +1497,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
 
   /**
    * Forward-only CSV export via keyset pagination (not OFFSET) on (StartedAt, ScenarioRunId),
-   * reading RUN_COLUMNS (not LIST_COLUMNS), unlike findRunDataForAllSuites which is capped.
+   * reading runColumns (not listColumns), unlike findRunDataForAllSuites which is capped.
    */
   async listRunsForExport({
     projectId,
@@ -1513,8 +1537,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
         )`
       : "";
 
+    const criteria = await this.criteriaColumns(projectId);
     const rows = await this.queryRows<ClickHouseSimulationRunRow & { ExportSortKey: string }>(
-      `SELECT ${RUN_COLUMNS},
+      `SELECT ${runColumns(criteria)},
         toString(${EXPORT_SORT_KEY}) AS ExportSortKey
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
@@ -1673,8 +1698,9 @@ export class SimulationClickHouseRepository extends SimulationRepository {
       ? "AND ScenarioSetId IN ({scenarioSetIds:Array(String)})"
       : "";
 
+    const criteria = await this.criteriaColumns(projectId);
     const rows = await this.queryRows<ClickHouseSimulationRunRow>(
-      `SELECT ${shouldIncludeMessages ? RUN_COLUMNS : LIST_COLUMNS}
+      `SELECT ${shouldIncludeMessages ? runColumns(criteria) : listColumns(criteria)}
        FROM ${TABLE_NAME} AS t
        WHERE t.TenantId = {tenantId:String}
          AND t.BatchRunId IN ({batchRunIds:Array(String)})
@@ -1748,7 +1774,7 @@ export class SimulationClickHouseRepository extends SimulationRepository {
   }
 
   /**
-   * Dedup predicate with `t.`-qualified outer columns (RUN_COLUMNS aliases timestamps).
+   * Dedup predicate with `t.`-qualified outer columns (runColumns aliases timestamps).
    * Unqualified columns silently match zero rows instead of erroring.
    */
   private static qualifiedDedupPredicate(whereFilters: string): string {

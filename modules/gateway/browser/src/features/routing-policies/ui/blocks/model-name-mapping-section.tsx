@@ -1,4 +1,5 @@
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Button,
   HStack,
@@ -46,9 +47,10 @@ export function ModelNameMappingSection({
       </Text>
 
       {fields.length === 0 && (
-        <Text fontSize="xs" color="fg.muted">
-          No mappings yet. Clients ask for models by their own names.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No mappings yet. Clients ask for models by their own names."
+        />
       )}
 
       {fields.map((field, index) => (

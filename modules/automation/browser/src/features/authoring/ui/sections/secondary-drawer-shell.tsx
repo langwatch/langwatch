@@ -1,11 +1,8 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Spacer } from "@langwatch/design-system/primitives";
-import { ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
+import { Button } from "@langwatch/design-system/primitives";
+import { Maximize2, Minimize2 } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
-// Chakra v3's Drawer accepts xs|sm|md|lg|xl|full but not 2xl. Use `full`
-// for the expanded width — it pins the drawer to the viewport which is
-// what the editor-mode wants anyway, and avoids the unsupported size.
 type DrawerSize = "md" | "lg" | "xl" | "full";
 
 // Reusable shell for secondary drawers with optional width-toggle between default and
@@ -15,7 +12,6 @@ export function SecondaryDrawerShell({
   title,
   onClose,
   onDone,
-  doneDisabled = false,
   headerRight,
   size = "xl",
   children,
@@ -24,8 +20,6 @@ export function SecondaryDrawerShell({
   title: string;
   onClose: () => void;
   onDone: () => void;
-  /** Disables the footer Done action — e.g. a required field isn't set yet. */
-  doneDisabled?: boolean;
   headerRight?: ReactNode;
   size?: DrawerSize;
   children: ReactNode;
@@ -34,49 +28,31 @@ export function SecondaryDrawerShell({
   const effectiveSize: DrawerSize = expanded ? "full" : size;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      placement="end"
       size={effectiveSize}
+      title={title}
+      onClose={onClose}
+      onBack={onClose}
       onExitComplete={() => setExpanded(false)}
-      onOpenChange={({ open: o }) => {
-        if (!o) onClose();
+      headerTools={
+        <>
+          {headerRight}
+          <Button
+            variant="ghost"
+            size="sm"
+            aria-label={expanded ? "Shrink drawer" : "Expand drawer"}
+            onClick={() => setExpanded((e) => !e)}
+          >
+            {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+          </Button>
+        </>
+      }
+      footer={{
+        primaryAction: { label: "Done", "data-testid": "automation-setup-done", onClick: onDone },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack width="full" gap={3}>
-            <Button variant="ghost" size="sm" aria-label="Back" onClick={onClose}>
-              <ArrowLeft size={16} />
-            </Button>
-            <Drawer.Title>{title}</Drawer.Title>
-            <Spacer />
-            {headerRight}
-            <Button
-              variant="ghost"
-              size="sm"
-              aria-label={expanded ? "Shrink drawer" : "Expand drawer"}
-              onClick={() => setExpanded((e) => !e)}
-            >
-              {expanded ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
-            </Button>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>{children}</Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button
-              colorPalette="orange"
-              data-testid="automation-setup-done"
-              onClick={onDone}
-              disabled={doneDisabled}
-            >
-              Done
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {children}
+    </Drawer>
   );
 }

@@ -1,85 +1,24 @@
-import { Dialog as ChakraDialog, Portal } from "@chakra-ui/react";
-import * as React from "react";
+import { Dialog as ChakraDialog } from "@chakra-ui/react";
 
-import { CloseButton } from "./close-button.tsx";
-
-export type DialogRootProps = Omit<ChakraDialog.RootProps, "size"> & {
-  size?: "xs" | "sm" | "md" | "lg" | "xl" | "5xl" | "6xl" | "cover" | "full";
-};
-
-export function DialogRoot(props: DialogRootProps) {
-  return <ChakraDialog.Root {...(props as ChakraDialog.RootProps)} />;
-}
-
-export interface DialogContentProps extends ChakraDialog.ContentProps {
-  portalled?: boolean;
-  portalRef?: React.RefObject<HTMLElement>;
-  backdrop?: boolean;
-  backdropProps?: Omit<ChakraDialog.BackdropProps, "bg" | "background" | "backgroundColor">;
-  positionerProps?: ChakraDialog.PositionerProps;
-}
-
-export const DialogContent = React.forwardRef<HTMLDivElement, DialogContentProps>(
-  function DialogContent(
-    {
-      portalled = true,
-      portalRef,
-      backdrop = true,
-      backdropProps,
-      positionerProps,
-      ...contentProps
-    },
-    ref,
-  ) {
-    return (
-      <Portal disabled={!portalled} container={portalRef}>
-        {backdrop && (
-          <ChakraDialog.Backdrop
-            backdropFilter="var(--lw-backdrop-blur, blur(8px))"
-            {...backdropProps}
-            background="transparent"
-          />
-        )}
-        <ChakraDialog.Positioner {...positionerProps}>
-          <ChakraDialog.Content ref={ref} {...contentProps} />
-        </ChakraDialog.Positioner>
-      </Portal>
-    );
-  },
-);
-
-export const DialogCloseTrigger = React.forwardRef<
-  HTMLButtonElement,
-  ChakraDialog.CloseTriggerProps
->(function DialogCloseTrigger(props, ref) {
-  return (
-    <ChakraDialog.CloseTrigger position="absolute" top="2" insetEnd="2" {...props} asChild>
-      <CloseButton ref={ref} size="sm">
-        {props.children}
-      </CloseButton>
-    </ChakraDialog.CloseTrigger>
-  );
-});
-
-export const DialogFooter = ChakraDialog.Footer;
-export const DialogHeader = ChakraDialog.Header;
-export const DialogBody = ChakraDialog.Body;
-export const DialogTitle = ChakraDialog.Title;
-export const DialogDescription = ChakraDialog.Description;
-export const DialogTrigger = ChakraDialog.Trigger;
-export const DialogActionTrigger = ChakraDialog.ActionTrigger;
-
-export const Dialog = {
-  Root: DialogRoot,
-  Content: DialogContent,
-  CloseTrigger: DialogCloseTrigger,
-  Footer: DialogFooter,
-  Header: DialogHeader,
-  Body: DialogBody,
-  Title: DialogTitle,
-  Description: DialogDescription,
-  Trigger: DialogTrigger,
-  ActionTrigger: DialogActionTrigger,
-};
-
+/**
+ * The published `dialog` subpath. Only components live in `views/dialog-view.tsx`, so an
+ * edit there hot-swaps; the Chakra part aliases and hooks re-exported here would not.
+ */
+export * from "./views/dialog-view.tsx";
 export { Dialog as RawDialog } from "@chakra-ui/react";
+export { useOverlayPortalTarget } from "../../overlays/portal-target.ts";
+
+/** @deprecated Use the shape's actions. */
+export const DialogFooter = ChakraDialog.Footer;
+/** @deprecated Use the shape's `title`, `icon`, `onBack`. */
+export const DialogHeader = ChakraDialog.Header;
+/** @deprecated The shape's children are its body. */
+export const DialogBody = ChakraDialog.Body;
+/** @deprecated Use the shape's `title`. */
+export const DialogTitle = ChakraDialog.Title;
+/** @deprecated Use the shape's `description`. */
+export const DialogDescription = ChakraDialog.Description;
+/** @deprecated Open a dialog from state: `open` and `onClose`. */
+export const DialogTrigger = ChakraDialog.Trigger;
+/** @deprecated The shape draws Cancel. */
+export const DialogActionTrigger = ChakraDialog.ActionTrigger;

@@ -123,7 +123,7 @@ const GroupedItems: React.FC<{
               )}
               <Text
                 textStyle="2xs"
-                fontWeight="700"
+                fontWeight="semibold"
                 color="fg.subtle"
                 textTransform="uppercase"
                 letterSpacing="0.1em"

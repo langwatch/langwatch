@@ -44,7 +44,7 @@ export function TradeoffSummaryLine({
         as={isActionable ? LuScissors : LuInfo}
         boxSize="14px"
         color={isActionable ? "orange.fg" : "fg.muted"}
-        marginTop="2px"
+        marginTop="0.5"
         flexShrink={0}
       />
       <Text fontSize="sm">{summary.headline}</Text>

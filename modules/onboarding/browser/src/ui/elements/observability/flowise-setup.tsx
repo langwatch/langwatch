@@ -1,5 +1,26 @@
-import { Card, Separator, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Separator, Text, VStack } from "@langwatch/design-system/primitives";
 import type React from "react";
+
+function Screenshot({ src, alt }: { src: string; alt: string }): React.ReactElement {
+  return (
+    <Box maxW="840px" alignSelf="start" minWidth={0}>
+      <Card variant="image-frame">
+        <img
+          src={src}
+          alt={alt}
+          style={{
+            maxWidth: "100%",
+            height: "auto",
+            display: "block",
+            maxHeight: "360px",
+            objectFit: "contain",
+          }}
+        />
+      </Card>
+    </Box>
+  );
+}
 
 /**
  * FlowiseSetup Component
@@ -25,26 +46,7 @@ export function FlowiseSetup(): React.ReactElement {
             At the top right corner of your Chatflow or Agentflow, click{" "}
             <strong>Settings &gt; Configuration</strong>
           </Text>
-          <Card.Root
-            overflow="hidden"
-            borderWidth="1px"
-            rounded="lg"
-            bg="bg.subtle"
-            maxW="840px"
-            alignSelf="start"
-          >
-            <img
-              src="/images/onboarding/flowise/flowise-1.png"
-              alt="Flowise settings"
-              style={{
-                maxWidth: "100%",
-                height: "auto",
-                display: "block",
-                maxHeight: "360px",
-                objectFit: "contain",
-              }}
-            />
-          </Card.Root>
+          <Screenshot src="/images/onboarding/flowise/flowise-1.png" alt="Flowise settings" />
         </VStack>
 
         <Separator />
@@ -55,26 +57,10 @@ export function FlowiseSetup(): React.ReactElement {
             Navigate to the <strong>Analyse Chatflow</strong> tab to find the LangWatch integration
             option
           </Text>
-          <Card.Root
-            overflow="hidden"
-            borderWidth="1px"
-            rounded="lg"
-            bg="bg.subtle"
-            maxW="840px"
-            alignSelf="start"
-          >
-            <img
-              src="/images/onboarding/flowise/flowise-2.png"
-              alt="Flowise Analyse Chatflow tab"
-              style={{
-                maxWidth: "100%",
-                height: "auto",
-                display: "block",
-                maxHeight: "360px",
-                objectFit: "contain",
-              }}
-            />
-          </Card.Root>
+          <Screenshot
+            src="/images/onboarding/flowise/flowise-2.png"
+            alt="Flowise Analyse Chatflow tab"
+          />
         </VStack>
 
         <Separator />
@@ -84,26 +70,10 @@ export function FlowiseSetup(): React.ReactElement {
           <Text fontSize="sm" color="fg.muted">
             Add your API key to create the LangWatch credential and enable the integration
           </Text>
-          <Card.Root
-            overflow="hidden"
-            borderWidth="1px"
-            rounded="lg"
-            bg="bg.subtle"
-            maxW="840px"
-            alignSelf="start"
-          >
-            <img
-              src="/images/onboarding/flowise/flowise-3.png"
-              alt="Flowise add integration credential"
-              style={{
-                maxWidth: "100%",
-                height: "auto",
-                display: "block",
-                maxHeight: "360px",
-                objectFit: "contain",
-              }}
-            />
-          </Card.Root>
+          <Screenshot
+            src="/images/onboarding/flowise/flowise-3.png"
+            alt="Flowise add integration credential"
+          />
         </VStack>
 
         <Separator />

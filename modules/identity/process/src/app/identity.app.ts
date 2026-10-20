@@ -84,6 +84,10 @@ import { JoinRequestGuardsService } from "../features/join-request/services/join
 import { JoinRequestNotifierService } from "../features/join-request/services/join-request-notifier.service.ts";
 import { JoinRequestService } from "../features/join-request/services/join-request.service.ts";
 import { JoinRequestsService } from "../features/join-request/services/join-requests.service.ts";
+import {
+  defineTwoStepRequirementPipeline,
+  type TwoStepRequirementPipeline,
+} from "../features/mfa/eventing/two-step-requirement.pipeline.ts";
 import { MfaGuardsService } from "../features/mfa/services/mfa-guards.service.ts";
 import { OrganizationMfaNotifierService } from "../features/mfa/services/organization-mfa-notifier.service.ts";
 import { OrganizationMfaService } from "../features/mfa/services/organization-mfa.service.ts";
@@ -102,6 +106,7 @@ import { ssoMethodDialWith } from "../features/sso-arrival/rules/sso-method-dial
 import { InProcessBreakGlassLimiterService } from "../features/sso-arrival/services/in-process-break-glass-limiter.service.ts";
 import { LegacySsoDomainRoutingService } from "../features/sso-arrival/services/legacy-sso-domain-routing.service.ts";
 import { SsoArrivalAdoptionService } from "../features/sso-arrival/services/sso-arrival-adoption.service.ts";
+import { SsoArrivalNoticeService } from "../features/sso-arrival/services/sso-arrival-notice.service.ts";
 import { SsoArrivalService } from "../features/sso-arrival/services/sso-arrival.service.ts";
 import { SsoAssertionService } from "../features/sso-arrival/services/sso-assertion.service.ts";
 import { SsoAuthenticationActivityService } from "../features/sso-arrival/services/sso-authentication-activity.service.ts";
@@ -211,6 +216,9 @@ type IdentityAppParts = {
   newbornSweep: IdentityNewbornReconciliationService;
   signUpIdentifiers: SignUpIdentifierService;
   backfill: IdentityBackfillService;
+  /** Identity's own sign-in switch, which the identifier backfill answers from and turns on. */
+  signInLatch: IdentityRepositories["latch"];
+  backfillMaxQueuedJobs: number;
   secrets: IdentitySecretCarryService;
   ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService;
   ssoConnectionGrandfather: SsoConnectionGrandfatherService | null;
@@ -242,7 +250,7 @@ type IdentityAppParts = {
   pipelines: IdentityPipelineBuilders;
 };
 
-/** The three pipelines' definitions over the module's own rows, in every role (2026-09-27). */
+/** The pipelines' definitions over the module's own rows, in every role (2026-09-27). */
 type IdentityPipelineBuilders = {
   eventing: ConnectedIdentityEventing;
   /** Each pipeline's own event store, kept as the process builds it (record §7). */
@@ -250,6 +258,7 @@ type IdentityPipelineBuilders = {
   identity: () => IdentityPipeline;
   joinRequests: () => JoinRequestPipeline;
   ssoConnections: () => SsoConnectionPipeline;
+  twoStepRequirement: () => TwoStepRequirementPipeline;
 };
 
 /**
@@ -541,12 +550,22 @@ export class IdentityModule
     const newbornSweep = IdentityNewbornReconciliationService.create({ reservations });
     const signUpIdentifiers = SignUpIdentifierService.create({ identity });
     const secrets = IdentitySecretCarryService.create(setup.repositories.secretCarry);
+    // The backfill stages without the read-your-writes wait: its proof, or the next pass, sees
+    // the fold (modules/identity/specs/identifier-backfill-throughput.feature).
+    const backfillLedger = IdentityLedgerStore.create({
+      projectionStore: setup.repositories.identityProjection,
+      heads: setup.repositories.heads,
+      eventing: identityEventing,
+      convergence: null,
+    });
     const backfill = IdentityBackfillService.create({
       reads: setup.repositories.backfill,
       users: setup.repositories.users,
-      identity,
+      identity: IdentityService.create(identityGuards, backfillLedger),
       secrets,
       plan: IdentityBackfillPlanService.create(CryptoIdentifierIdentityService.create()),
+      userApi: setup.dependencies.users,
+      auditLog: setup.dependencies.auditLog,
     });
     const joinRequestGuards = JoinRequestGuardsService.create({
       requests: setup.repositories.joinRequests,
@@ -675,6 +694,13 @@ export class IdentityModule
     });
     // `notifications` is unanswered on purpose: an automatic admission's
     // durable notice needs a mail this process does not compose.
+    const joinRequestNotifier = JoinRequestNotifierService.create({
+      audience: setup.repositories.joinRequestAudience,
+      context: setup.repositories.joinRequestNotificationContext,
+      mail: setup.channels.joinRequestMail,
+      baseHost: setup.config.publicBaseUrl ?? "",
+      plans: setup.dependencies.entitlements,
+    });
     const ssoArrival = SsoArrivalService.create({
       joinRequests,
       connections: setup.repositories.ssoConnections,
@@ -685,6 +711,7 @@ export class IdentityModule
         latch: setup.repositories.latch,
       }),
       signups: signupAnnouncements,
+      notifications: SsoArrivalNoticeService.create({ notifier: joinRequestNotifier }),
     });
     const ssoTestArrival = SsoTestArrivalService.create({
       accounts: testArrivalAccounts(setup.channels.authReads),
@@ -755,6 +782,7 @@ export class IdentityModule
       breakGlass: setup.repositories.ssoBreakGlass,
       activity: setup.repositories.ssoMigrationEvidence,
       migrations: ssoMigrationProgress,
+      legacy: setup.repositories.legacySsoOrganizations,
       entitled: async ({ organizationId }) =>
         isEnterpriseTier(
           (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
@@ -781,6 +809,7 @@ export class IdentityModule
     const ssoConnectionGrandfather = ssoConnections
       ? SsoConnectionGrandfatherService.create({
           connections: ssoConnections,
+          connectionReads: setup.repositories.ssoConnections,
           legacy: setup.repositories.legacySsoOrganizations,
           legacyRouting: legacyDomainRouting,
           connectionRouting: connectionDomainRouting,
@@ -855,6 +884,8 @@ export class IdentityModule
       newbornSweep,
       signUpIdentifiers,
       backfill,
+      backfillMaxQueuedJobs: setup.config.identifierBackfillMaxQueuedJobs,
+      signInLatch: setup.repositories.latch,
       secrets,
       ssoDomainOwnershipBackfill: SsoDomainOwnershipBackfillService.create(
         setup.repositories.ssoDomainOwnership,
@@ -922,11 +953,7 @@ export class IdentityModule
             setup.channels.authReads.findAssertedAmrForIdentifiers(args),
           offersTwoStepVerification: () => setup.config.mfaEnrollmentOpen,
         },
-        notifier: OrganizationMfaNotifierService.create({
-          accounts: setup.repositories.twoStepVerification,
-          mail: setup.channels.organizationMfaMail,
-          emails,
-        }),
+        eventing: identityEventing,
         entitled: async ({ organizationId }) =>
           isEnterpriseTier(
             (await setup.dependencies.entitlements.getActivePlan({ organizationId })).type,
@@ -948,15 +975,17 @@ export class IdentityModule
             repositories: setup.repositories,
             eventStore: eventStores.of({ pipeline: JOIN_REQUEST_PIPELINE_NAME }),
             commands: identityEventing,
-            notifier: JoinRequestNotifierService.create({
-              audience: setup.repositories.joinRequestAudience,
-              context: setup.repositories.joinRequestNotificationContext,
-              mail: setup.channels.joinRequestMail,
-              baseHost: setup.config.publicBaseUrl ?? "",
-              plans: setup.dependencies.entitlements,
-            }),
+            notifier: joinRequestNotifier,
           }),
         ssoConnections: ssoConnectionGraph.pipeline,
+        twoStepRequirement: () =>
+          defineTwoStepRequirementPipeline({
+            notices: OrganizationMfaNotifierService.create({
+              accounts: setup.repositories.twoStepVerification,
+              mail: setup.channels.organizationMfaMail,
+              emails,
+            }),
+          }),
       },
     });
   }
@@ -971,6 +1000,10 @@ export class IdentityModule
 
   ssoConnectionPipeline(): SsoConnectionPipeline {
     return this.#parts.pipelines.ssoConnections();
+  }
+
+  twoStepRequirementPipeline(): TwoStepRequirementPipeline {
+    return this.#parts.pipelines.twoStepRequirement();
   }
 
   /** Keeps a built pipeline's own event store; a build only to be listed keeps nothing. */
@@ -1161,22 +1194,31 @@ export class IdentityModule
     return this.#parts.signUpIdentifiers;
   }
 
-  userMigrations(): readonly SystemMigration[] {
-    return [
-      IdentityIdentifierBackfillMigrationService.create(this.#parts.backfill),
-      IdentitySecretHealMigrationService.create(this.#parts.secrets),
-    ] as const;
+  /** D01, declared by identity.module.ts as the `identity:identifier-backfill` tenant step. */
+  identifierBackfillMigration(): SystemMigration {
+    return IdentityIdentifierBackfillMigrationService.create({
+      backfill: this.#parts.backfill,
+      latch: this.#parts.signInLatch,
+      maxQueuedJobs: this.#parts.backfillMaxQueuedJobs,
+    });
   }
 
-  registeredMigrations(): readonly SystemMigration[] {
-    const { ssoConnectionGrandfather, ssoDomainOwnershipBackfill } = this.#parts;
+  /** D01's reverse leg, declared as the `identity:secret-heal` tenant step. */
+  secretHealMigration(): SystemMigration {
+    return IdentitySecretHealMigrationService.create(this.#parts.secrets);
+  }
 
-    return [
-      ...(ssoConnectionGrandfather
-        ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
-        : []),
-      SsoDomainOwnershipMigrationService.create(ssoDomainOwnershipBackfill),
-    ];
+  /** D04, declared as `identity:connection-grandfather` only where its store is composed. */
+  findConnectionGrandfatherMigrations(): readonly SystemMigration[] {
+    const { ssoConnectionGrandfather } = this.#parts;
+    return ssoConnectionGrandfather
+      ? [IdentityConnectionGrandfatherMigrationService.create(ssoConnectionGrandfather)]
+      : [];
+  }
+
+  /** Declared as the `identity:sso-domain-ownership-backfill` tenant step. */
+  ssoDomainOwnershipMigration(): SystemMigration {
+    return SsoDomainOwnershipMigrationService.create(this.#parts.ssoDomainOwnershipBackfill);
   }
 
   joinRequestGuards(): JoinRequestGuardsService {

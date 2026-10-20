@@ -42,8 +42,10 @@ export function middleTail({ text, tail }: { text: string; tail?: number }): num
 
 const SELECT_ALL = { userSelect: "all", WebkitUserSelect: "all" } as const;
 const ACCENT = {
-  verticalAlign: "baseline",
+  verticalAlign: "middle",
   paddingX: "1",
+  paddingY: "2px",
+  marginY: "-2px",
   borderRadius: "xs",
   bg: "bg.control",
   color: "blue.fg",
@@ -60,8 +62,7 @@ const NEUTRAL = {
   borderWidth: 0,
   bg: "bg.control",
   color: "fg",
-  fontSize: "12px",
-  lineHeight: "16px",
+  textStyle: "monoSm",
 } as const;
 
 /**
@@ -81,8 +82,11 @@ export function InlineCode({
     title: children,
     "data-truncate": truncate,
     maxWidth: "full",
+    width: "fit-content",
     whiteSpace: "nowrap",
     fontFamily: "mono",
+    fontVariantNumeric: "normal",
+    letterSpacing: "normal",
     css: selectOnClick ? SELECT_ALL : undefined,
     ...(variant === "neutral" ? NEUTRAL : ACCENT),
   } as const;

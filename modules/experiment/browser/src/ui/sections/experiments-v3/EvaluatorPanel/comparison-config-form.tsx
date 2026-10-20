@@ -176,7 +176,7 @@ function VariantsMultiSelect({
 
   return (
     <Field.Root required flex="1">
-      <Field.Label fontSize="13px" color="fg.muted" marginBottom={2}>
+      <Field.Label textStyle="bodySm" color="fg.muted" marginBottom={2}>
         Variants (pick 2 or more)
         <FieldInfoTooltip
           testId="comparison-variants-info"
@@ -226,13 +226,15 @@ function VariantsMultiSelect({
             disabled={remaining.length === 0}
           >
             <Plus size={14} />
-            <Text fontSize="13px">{selected.length === 0 ? "Add a variant" : "Add another"}</Text>
+            <Text textStyle="bodySm">
+              {selected.length === 0 ? "Add a variant" : "Add another"}
+            </Text>
           </Button>
         </Menu.Trigger>
         <Menu.Content portalled={true} maxHeight="240px" overflowY="auto">
           {remaining.length === 0 ? (
             <Menu.Item value="__empty__" disabled>
-              <Text fontSize="13px" color="fg.subtle">
+              <Text textStyle="bodySm" color="fg.subtle">
                 All targets already added
               </Text>
             </Menu.Item>
@@ -302,7 +304,7 @@ function VariantCard({
       data-testid={`comparison-variant-card-${target.id}`}
     >
       <HStack justify="space-between" gap={1}>
-        <Text fontSize="13px" fontWeight="medium" lineClamp={1} title={label}>
+        <Text textStyle="label" lineClamp={1} title={label}>
           {label}
         </Text>
         <Button
@@ -394,7 +396,7 @@ function VariantMenuItem({ target, onAdd }: { target: TargetConfig; onAdd: () =>
       onClick={onAdd}
       data-testid={`comparison-variant-option-${target.id}`}
     >
-      <Text fontSize="13px">{name}</Text>
+      <Text textStyle="bodySm">{name}</Text>
     </Menu.Item>
   );
 }
@@ -499,7 +501,7 @@ function GoldenAnswerSection({
   return (
     <Box>
       <Field.Root required flex="1">
-        <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+        <Field.Label textStyle="bodySm" color="fg.muted" marginBottom={1}>
           Golden field
           <FieldInfoTooltip
             testId="comparison-golden-field-info"
@@ -560,7 +562,7 @@ function InputContextSection({
   return (
     <Box>
       <Field.Root flex="1">
-        <Field.Label fontSize="13px" color="fg.muted" marginBottom={1}>
+        <Field.Label textStyle="bodySm" color="fg.muted" marginBottom={1}>
           Input field
           <FieldInfoTooltip
             testId="comparison-input-field-info"
@@ -621,9 +623,7 @@ function RandomizeOrderSection({
     <Box paddingTop={2}>
       <HStack justify="space-between" align="start">
         <HStack gap={0} align="center">
-          <Text fontSize="13px" fontWeight="medium">
-            Shuffle candidate order
-          </Text>
+          <Text textStyle="label">Shuffle candidate order</Text>
           <FieldInfoTooltip
             testId="comparison-randomize-order-info"
             trigger="hover"
@@ -683,10 +683,8 @@ function MetricsSection({
     <Box paddingTop={2}>
       <HStack gap={0} align="center" marginBottom={2}>
         <Text
-          fontSize="11px"
-          fontWeight="bold"
-          textTransform="uppercase"
-          letterSpacing="wide"
+          textStyle="eyebrow"
+
           color="fg.muted"
         >
           Include metrics during judgment
@@ -699,7 +697,7 @@ function MetricsSection({
       </HStack>
       <VStack align="stretch" gap={2}>
         <HStack justify="space-between">
-          <Text fontSize="13px">Include cost</Text>
+          <Text textStyle="bodySm">Include cost</Text>
           <Switch
             checked={current.includes("cost")}
             onCheckedChange={({ checked }) => toggle({ metric: "cost", on: checked })}
@@ -708,7 +706,7 @@ function MetricsSection({
           />
         </HStack>
         <HStack justify="space-between">
-          <Text fontSize="13px">Include duration</Text>
+          <Text textStyle="bodySm">Include duration</Text>
           <Switch
             checked={current.includes("duration")}
             onCheckedChange={({ checked }) => toggle({ metric: "duration", on: checked })}

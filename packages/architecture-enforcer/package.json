@@ -18,7 +18,7 @@
   "scripts": {
     "lint": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../..",
     "review:test-quality": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/cli.ts --root ../.. --review-test-quality",
-    "typecheck": "pnpm -w exec tsc -b packages/architecture-enforcer",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB pnpm -w exec tsc -b packages/architecture-enforcer",
     "test": "vitest run",
     "check:feature-parity": "node --experimental-transform-types src/tools/check-feature-parity.ts",
     "print:table-owners": "node --disable-warning=ExperimentalWarning --experimental-transform-types src/tools/print-table-owners.ts",

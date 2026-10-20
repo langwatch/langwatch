@@ -10,6 +10,7 @@ import {
   posthogKey,
   publicBaseUrl,
   serviceVersion,
+  slackApiBase,
   type ConfigOf,
 } from "@langwatch/config";
 import { defineBrowserConfig } from "@langwatch/config/public-app-config";
@@ -47,6 +48,8 @@ export const opsConfig = Config.define((c) => ({
   grafana,
   /** The Slack channel a new bug report is announced in; blank means `#dev`. */
   bugReportSlackChannel: c.env("SLACK_BUG_REPORTS_CHANNEL", z.string().optional()),
+  /** Slack's Web API, or the stand-in a dev stack names (outboundsim). */
+  slackApiBase,
   /** Asks for Cloud admin; boot refuses unless the licence private key matches (§3.5). */
   cloudOps: c.env("LANGWATCH_CLOUD_OPS", z.stringbool().default(false)),
   /** Read only by the one-time platform-operator seed; set afterwards, boot warns it is ignored. */

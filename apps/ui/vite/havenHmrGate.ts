@@ -71,6 +71,8 @@ export function createHmrGate(options?: HmrGateOptions): {
       server = s;
     },
     hotUpdate(modules) {
+      // A save no browser module imports (backend, tests, docs) is no update: never a reload.
+      if (modules.length === 0) return modules;
       const now = Date.now();
 
       const sinceLast = now - lastUpdateAt;

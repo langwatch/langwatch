@@ -129,7 +129,7 @@ export const contractSchemaNamedRule = defineRule({
     unnamedSchema: {
       what: "The exported schema `{{name}}` has no interface name.",
       why: "Its whole Zod tree is printed into every declaration that uses it, so contracts emit huge, unstable types.",
-      fix: "Run `pnpm exec oxlint --fix` on this file; it names the schema with `Named` from @langwatch/module.",
+      fix: "Run `pnpm exec oxlint --fix` on this file; it names the schema with `Named` from @langwatch/module. See the `contract` skill.",
     },
   },
   create(context) {

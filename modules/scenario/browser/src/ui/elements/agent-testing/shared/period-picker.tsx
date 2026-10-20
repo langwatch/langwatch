@@ -1,6 +1,5 @@
 import { differenceInCalendarDays, type Instant } from "@langwatch/time";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 /**
  * The window the Results tab reads, in the two forms the surface uses.
  * @see specs/features/agent-testing/results-tabs.feature
@@ -83,9 +82,9 @@ export function AgentTestingPeriodPicker({
               height: "auto",
               paddingX: 1.5,
               paddingY: 1,
-              fontSize: "11px",
+              textStyle: "micro",
               fontWeight: "medium",
-              color: FG_MUTED,
+              color: "fg.muted",
             }
           : {
               ...TOOLBAR_BUTTON_PROPS,

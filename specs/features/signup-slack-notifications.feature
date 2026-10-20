@@ -46,3 +46,8 @@ Feature: Internal Slack notifications for new signups
     When the onboarding flow completes successfully
     Then the organization is created successfully
     And the failure is captured for observability
+
+  Scenario: The signup notice carries the message and none of the client's options
+    Given the signup Slack webhook is configured
+    When the notice is posted
+    Then the body the webhook receives has no "timeout" field

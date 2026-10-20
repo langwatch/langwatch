@@ -19,7 +19,7 @@ func seedSpec() commandSpec {
 		{long: "--spans", takesValue: true, value: "<n>", summary: "exact span count, 1 to 2000000"},
 		{long: "--days", takesValue: true, value: "<d>", summary: "days of history before the anchor (default 30)"},
 		{long: "--persona", takesValue: true, value: "<list>", summary: "startup,enterprise,gateway,agent-eval or all"},
-		{long: "--private", takesValue: true, value: "<n>", summary: "organizations on private stores"},
+		{long: "--private", takesValue: true, value: "<n>", summary: "organizations on private stores (default 0)"},
 		{long: "--seed", takesValue: true, value: "<s>", summary: "the seed: the same seed gives the same content"},
 		{long: "--anchor", takesValue: true, value: "<rfc3339>", summary: "the moment history ends at"},
 		{long: "--age", takesValue: true, value: "<n>d", summary: "history ends n days ago, so retention can be tested (default 0d)"},
@@ -28,6 +28,7 @@ func seedSpec() commandSpec {
 		{long: "--shape", takesValue: true, value: "saas|sh-licensed|sh-free", summary: "deployment shape"},
 		{long: "--org", takesValue: true, value: "name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]", summary: "create this org instead of the tier's (repeatable)"},
 		{long: "--into", takesValue: true, value: "<org-id>/<project-id>", summary: "send telemetry only, into an existing project"},
+		{long: "--resume", summary: "continue the last run of these flags on this stack, keeping its anchor and run id"},
 		{long: "--live", summary: "stream a gentle live load into the last seed's orgs"},
 		{long: "--dry-run", summary: "print the plan's counts, rows, bytes and duration; write nothing"},
 		{long: "--json", summary: "end with the logins and credentials as one JSON object"},
@@ -51,7 +52,7 @@ func runSeed(ctx context.Context, d deps, inv invocation) error {
 		}
 		return d.orch.SeedStatus(d.params)
 	}
-	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live"), JSON: inv.has("--json") || d.isAgent, Reveal: inv.has("--reveal")})
+	err := d.orch.Seed(ctx, d.params, app.SeedRequest{Args: seedgenArgs(inv), Live: inv.has("--live"), JSON: inv.has("--json") || d.isAgent, Reveal: inv.has("--reveal"), Resume: inv.has("--resume")})
 	if code := seedExitCode(err); code > 1 {
 		fmt.Fprintln(os.Stderr, "haven:", err)
 		os.Exit(code)

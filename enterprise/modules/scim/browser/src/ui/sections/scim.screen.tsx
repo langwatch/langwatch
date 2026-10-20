@@ -62,7 +62,7 @@ export function ScimSettingsContent({
           {mayReadMembership && <DirectoryMembers organizationId={organizationId} />}
 
           <VStack gap={2} align="stretch" width="full">
-            <Heading size="sm">Where your identity provider sends it</Heading>
+            <Heading textStyle="cardTitle">Where your identity provider sends it</Heading>
             <Text color="fg.muted" fontSize="sm">
               Your identity provider talks to us over SCIM. Each token works against one single
               sign-on connection: it manages the people that connection provisioned, and can take on

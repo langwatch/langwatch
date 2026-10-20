@@ -1,5 +1,6 @@
 import { HandledError } from "@langwatch/handled-error";
 import {
+  LANGY_CONVERSATION_ORIGIN,
   LANGY_CONVERSATION_STATUS,
   LangyConversationNotFoundError,
   LangyConversationNotOwnedError,
@@ -162,6 +163,8 @@ export class LangyConversationLifecycleService {
       userId,
       title,
       runToken: mintRunToken(),
+      // The copy holds the run's unvetted history, so its turns keep the run's limits.
+      ...(source.origin === LANGY_CONVERSATION_ORIGIN.RUN ? { origin: source.origin } : {}),
     });
 
     const importedMessages: LangyMessageRow[] = [];
@@ -196,6 +199,7 @@ export class LangyConversationLifecycleService {
         title,
         isShared: false,
         isOwn: true,
+        origin: source.origin,
         lastActivityAt,
         messageCount: importedMessages.length,
         status: LANGY_CONVERSATION_STATUS.IDLE,

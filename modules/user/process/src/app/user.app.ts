@@ -7,7 +7,7 @@ import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import type { ProjectIdentity } from "@langwatch/project-contract";
 import { StoredObjectApi } from "@langwatch/stored-object-contract";
-import { fromDate, nowInstant, Temporal, type Instant } from "@langwatch/time";
+import { nowInstant, type Instant } from "@langwatch/time";
 import type {
   AdoptUnconfirmedAccountOutcome,
   CreatePasskeyUserInput,
@@ -86,11 +86,6 @@ import {
 import { UserOrganizationDirectoryService } from "../services/user-organization-directory.service.ts";
 import { type UserPasswordHasher, UserPasswordService } from "../services/user-password.service.ts";
 import { UserCredentialService } from "../services/user-signin-credential.service.ts";
-import {
-  UserStandingFactBackfillService,
-  type UserStandingFactBackfillReport,
-  type UserStandingFactBackfillRun,
-} from "../services/user-standing-fact-backfill.service.ts";
 import { UserService } from "../services/user.service.ts";
 
 const logger = createLogger("langwatch:user-app");
@@ -101,9 +96,6 @@ const logger = createLogger("langwatch:user-app");
  * on signup day is asked again once they have something worth protecting.
  */
 const PASSKEY_NUDGE_INTERVAL_DAYS = 30;
-
-/** A session started this soon after the account was created is the sign-up's own. */
-const SIGN_UP_SESSION_WINDOW_MS = 60_000;
 
 /** Each upload writes bytes to object storage and updates the row. */
 const AVATAR_UPLOAD_BUDGET = { windowSeconds: 60, max: 10 } as const;
@@ -216,14 +208,10 @@ export class UserModule implements UserApi {
       lifecycle,
       createdFactBackfill: UserCreatedFactBackfillService.create({
         users: repositories.users,
-        lifecycle,
-      }),
-      lifecycleLog,
-      standingFactBackfill: UserStandingFactBackfillService.create({
-        users: repositories.users,
         standings: lifecycleLog,
         lifecycle,
       }),
+      lifecycleLog,
       credentials: UserCredentialService.create({
         repository: repositories.credentials,
         passwords,
@@ -246,7 +234,6 @@ export class UserModule implements UserApi {
   readonly #lifecycle: UserLifecycleNoticeService;
   readonly #createdFactBackfill: UserCreatedFactBackfillService;
   readonly #lifecycleLog: EventingUserStandingRepository;
-  readonly #standingFactBackfill: UserStandingFactBackfillService;
   readonly #credentials: UserCredentialService;
   readonly #account: UserAccountService;
   readonly #peers: UserAppDependencies;
@@ -264,7 +251,6 @@ export class UserModule implements UserApi {
     lifecycle: UserLifecycleNoticeService;
     createdFactBackfill: UserCreatedFactBackfillService;
     lifecycleLog: EventingUserStandingRepository;
-    standingFactBackfill: UserStandingFactBackfillService;
     credentials: UserCredentialService;
     directory: UserOrganizationDirectoryService;
     avatarObjects: UserAvatarObjectService;
@@ -280,7 +266,6 @@ export class UserModule implements UserApi {
     this.#lifecycle = input.lifecycle;
     this.#createdFactBackfill = input.createdFactBackfill;
     this.#lifecycleLog = input.lifecycleLog;
-    this.#standingFactBackfill = input.standingFactBackfill;
     this.#credentials = input.credentials;
     this.#account = UserAccountService.create();
     this.#peers = input.dependencies;
@@ -409,13 +394,8 @@ export class UserModule implements UserApi {
 
   /** Mints the account auth's register door cleared, its address proof already spent (D-A1U-2). */
   async registerCredentialAccount(input: CredentialAccountInput): Promise<CreatedUser> {
-    // Sign-in lowercases the address on every lookup, so an account stored as
-    // typed is one sign-in can never find, no matter the password.
-    const email = input.email.toLowerCase();
-
-    // Case-insensitive on purpose: rows written before the lowercasing above
-    // may carry capitals, and minting a case-twin beside one would leave two
-    // accounts answering for one person.
+    // The user service's parse lower-cases the address for the check and the mint alike.
+    const { email } = input;
     if (await this.#users.emailIsTaken({ email })) throw new EmailAlreadyRegisteredError();
 
     const account = {
@@ -457,9 +437,8 @@ export class UserModule implements UserApi {
     const passkey = this.#facts.passkeysEnabled && !nudge.hasPasskey;
     const twoStep = this.#facts.mfaEnrollmentOpen && !nudge.twoStepEnabled;
     if (!passkey && !twoStep) return { offer: false, passkey, twoStep, signedInWith };
-    // A brand-new account is onboarding: the offer waits for its next sign-in.
-    const accountCreatedAt = fromDate(nudge.accountCreatedAt);
-    if (await this.#isSignUpSession({ ...input, accountCreatedAt })) {
+    // The session the sign-up started is onboarding: the offer waits for the next sign-in.
+    if (await this.#isSignUpSession(input)) {
       return { offer: false, passkey, twoStep, signedInWith };
     }
 
@@ -473,21 +452,14 @@ export class UserModule implements UserApi {
   async #isSignUpSession({
     id,
     sessionId,
-    accountCreatedAt,
-  }: UserIdInput & { sessionId: string | null; accountCreatedAt: Instant }): Promise<boolean> {
+  }: UserIdInput & { sessionId: string | null }): Promise<boolean> {
     if (!sessionId) return false;
     const sessions = await this.#authReads.listBrowserSessions({
       userId: id,
       currentSessionId: sessionId,
     });
-    const current = sessions.find((session) => session.sessionId === sessionId);
-    if (!current) return false;
 
-    const signedInAt = Temporal.Instant.from(current.signedInAt);
-
-    return (
-      signedInAt.epochMilliseconds - accountCreatedAt.epochMilliseconds < SIGN_UP_SESSION_WINDOW_MS
-    );
+    return sessions.some((session) => session.sessionId === sessionId && session.startedBySignUp);
   }
 
   /** "Not now" to the whole offer, dated rather than flagged: it comes back. */
@@ -544,7 +516,7 @@ export class UserModule implements UserApi {
     this.#lifecycle.connect(senders);
   }
 
-  /** The `user:record-created-facts` step's body: every stored account recorded as created. */
+  /** The `user:record-created-facts` step's body: each account's created fact and standing. */
   recordExistingCreatedFacts(
     input: UserCreatedFactBackfillRun,
   ): Promise<UserCreatedFactBackfillReport> {
@@ -554,16 +526,9 @@ export class UserModule implements UserApi {
   /** Keeps user_lifecycle's own event store as the process builds it; a listing keeps none. */
   keepLifecycleEventStore(input: {
     participation: EventingParticipation;
-    eventStore: Pick<OwnEventStore, "read"> | undefined;
+    eventStore: Pick<OwnEventStore, "findAggregates"> | undefined;
   }): void {
     this.#lifecycleLog.keep(input);
-  }
-
-  /** The `user:record-standing-facts` step's body: each account's standing re-stated. */
-  recordExistingStandingFacts(
-    input: UserStandingFactBackfillRun,
-  ): Promise<UserStandingFactBackfillReport> {
-    return this.#standingFactBackfill.recordExisting(input);
   }
 
   /** The fact outbox's delivery, on the worker: one committed fact recorded on user_lifecycle. */

@@ -91,7 +91,8 @@ export function EvaluatorEditorActions({
           Save
         </Button>
         <Button
-          colorPalette="blue"
+          colorPalette="orange"
+          variant="solid"
           size="sm"
           onClick={onApply}
           disabled={isLoading || (isComparisonEditor && (!isValid || isSaving))}
@@ -133,7 +134,7 @@ export function EvaluatorEditorHeading({
 }: EvaluatorEditorHeadingProps) {
   return (
     <>
-      <Heading>{title}</Heading>
+      <Heading size="sm">{title}</Heading>
       {showUnpublishedBadge && (
         <Tooltip
           content="Unpublished modifications"

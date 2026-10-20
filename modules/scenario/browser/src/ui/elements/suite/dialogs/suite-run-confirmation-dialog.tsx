@@ -6,9 +6,10 @@
 
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Popover } from "@langwatch/design-system/popover";
-import { Button, HStack, Input, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScenarioParameterDefinition } from "@langwatch/scenario-contract";
 import { Crosshair, FileText, Info, Lock, Repeat } from "lucide-react";
+import { type Ref, useRef } from "react";
 
 function ParameterInfoTooltip({ description, testId }: { description: string; testId: string }) {
   return (
@@ -75,101 +76,85 @@ export function SuiteRunConfirmationDialog({
     (parameter) => parameter.secret === true && (parameterValues[parameter.name] ?? "") === "",
   );
 
-  return (
-    <Dialog.Root
-      open={open}
-      onOpenChange={() => {
-        if (!isLoading) onClose();
-      }}
-      placement="center"
-    >
-      <Dialog.Content maxWidth="500px" onClick={(e) => e.stopPropagation()}>
-        {!isLoading && <Dialog.CloseTrigger />}
-        <Dialog.Header>
-          <Dialog.Title>{suiteName}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            <Text fontWeight="semibold">
-              {" "}
-              Run {estimatedJobs} {estimatedJobs === 1 ? "simulation" : "simulations"}?
-            </Text>
-            <HStack gap={6}>
-              <VStack gap={0} align="start">
-                <HStack gap={1.5} align="center">
-                  <FileText size={14} color="var(--chakra-colors-fg-muted)" />
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {scenarioCount}
-                  </Text>
-                </HStack>
-                <Text color="fg.muted" fontSize="sm">
-                  {scenarioCount === 1 ? "scenario" : "scenarios"}
-                </Text>
-              </VStack>
-              <VStack gap={0} align="start">
-                <HStack gap={1.5} align="center">
-                  <Crosshair size={14} color="var(--chakra-colors-fg-muted)" />
-                  <Text fontSize="lg" fontWeight="semibold">
-                    {targetCount}
-                  </Text>
-                </HStack>
-                <Text color="fg.muted" fontSize="sm">
-                  {targetCount === 1 ? "target" : "targets"}
-                </Text>
-              </VStack>
-              {repeatCount > 1 && (
-                <VStack gap={0} align="start">
-                  <HStack gap={1.5} align="center">
-                    <Repeat size={14} color="var(--chakra-colors-fg-muted)" />
-                    <Text fontSize="lg" fontWeight="semibold">
-                      {repeatCount}x
-                    </Text>
-                  </HStack>
-                  <Text color="fg.muted" fontSize="sm">
-                    repeats
-                  </Text>
-                </VStack>
-              )}
-            </HStack>
+  const parametersRef = useRef<HTMLDivElement>(null);
 
-            {parameters.length > 0 && (
-              <RunParameterFields
-                parameters={parameters}
-                values={parameterValues}
-                onChange={onParameterChange}
-                disabled={isLoading}
-              />
-            )}
+  // A run with a secret still empty stays on this dialog: focus the first one.
+  const handleConfirm = () => {
+    if (missingSecrets) {
+      parametersRef.current?.querySelector<HTMLInputElement>('input[aria-invalid="true"]')?.focus();
+      return;
+    }
+    onConfirm();
+  };
+
+  return (
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={suiteName}
+      size="md"
+      placement="center"
+      busy={isLoading}
+      primaryAction={{
+        label: `Run ${estimatedJobs} ${estimatedJobs === 1 ? "job" : "jobs"}`,
+        loading: isLoading,
+        onClick: handleConfirm,
+      }}
+    >
+      <VStack align="stretch" gap={4}>
+        <Text fontWeight="semibold">
+          {" "}
+          Run {estimatedJobs} {estimatedJobs === 1 ? "simulation" : "simulations"}?
+        </Text>
+        <HStack gap={6}>
+          <VStack gap={0} align="start">
+            <HStack gap={1.5} align="center">
+              <FileText size={14} color="var(--chakra-colors-fg-muted)" />
+              <Text fontSize="lg" fontWeight="semibold">
+                {scenarioCount}
+              </Text>
+            </HStack>
+            <Text color="fg.muted" fontSize="sm">
+              {scenarioCount === 1 ? "scenario" : "scenarios"}
+            </Text>
           </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
+          <VStack gap={0} align="start">
+            <HStack gap={1.5} align="center">
+              <Crosshair size={14} color="var(--chakra-colors-fg-muted)" />
+              <Text fontSize="lg" fontWeight="semibold">
+                {targetCount}
+              </Text>
+            </HStack>
+            <Text color="fg.muted" fontSize="sm">
+              {targetCount === 1 ? "target" : "targets"}
+            </Text>
+          </VStack>
+          {repeatCount > 1 && (
+            <VStack gap={0} align="start">
+              <HStack gap={1.5} align="center">
+                <Repeat size={14} color="var(--chakra-colors-fg-muted)" />
+                <Text fontSize="lg" fontWeight="semibold">
+                  {repeatCount}x
+                </Text>
+              </HStack>
+              <Text color="fg.muted" fontSize="sm">
+                repeats
+              </Text>
+            </VStack>
+          )}
+        </HStack>
+
+        {parameters.length > 0 && (
+          <RunParameterFields
+            ref={parametersRef}
+            parameters={parameters}
+            values={parameterValues}
+            onChange={onParameterChange}
             disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={(e) => {
-              e.stopPropagation();
-              onConfirm();
-            }}
-            disabled={isLoading || missingSecrets}
-          >
-            {isLoading ? (
-              <Spinner size="sm" />
-            ) : (
-              `Run ${estimatedJobs} ${estimatedJobs === 1 ? "Job" : "Jobs"}`
-            )}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+          />
+        )}
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -179,11 +164,13 @@ export function SuiteRunConfirmationDialog({
  * its field hides what is typed, and the run waits for it.
  */
 function RunParameterFields({
+  ref,
   parameters,
   values,
   onChange,
   disabled,
 }: {
+  ref: Ref<HTMLDivElement>;
   parameters: ScenarioParameterDefinition[];
   values: Record<string, string>;
   onChange?: (name: string, value: string) => void;
@@ -191,6 +178,7 @@ function RunParameterFields({
 }) {
   return (
     <VStack
+      ref={ref}
       align="stretch"
       gap={2}
       data-testid="suite-run-parameters"
@@ -199,7 +187,7 @@ function RunParameterFields({
       paddingTop={4}
     >
       <Text
-        fontSize="11px"
+        textStyle="micro"
         fontWeight="bold"
         textTransform="uppercase"
         color="fg.muted"
@@ -254,7 +242,7 @@ function RunParameterField({
           size="sm"
           flex={1}
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           type={isSecret ? "password" : "text"}
           autoComplete={isSecret ? "new-password" : undefined}
           required={isSecret}

@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { upgradeGateComponent, type UpgradeGateVerdict } from "../upgrade-gate.ts";
+import {
+  outstandingSummary,
+  upgradeGateComponent,
+  type UpgradeGateVerdict,
+} from "../upgrade-gate.ts";
 
 const logger = { info: vi.fn(), error: vi.fn() };
 const upgrading: UpgradeGateVerdict = {
@@ -53,6 +57,26 @@ describe("an api's upgrade gate in upgrading mode", () => {
 
         expect(release).not.toHaveBeenCalled();
       });
+    });
+  });
+});
+
+describe("the upgrading line", () => {
+  describe("given 482 outstanding steps", () => {
+    /** @scenario "The upgrading line names a count and at most five step ids" */
+    it("names the count and the first five ids", () => {
+      const outstanding = Array.from({ length: 482 }, (_, index) => `prisma:${index}`);
+      expect(outstandingSummary({ outstanding })).toBe(
+        "482 steps outstanding: prisma:0, prisma:1, prisma:2, prisma:3, prisma:4, …",
+      );
+    });
+  });
+
+  describe("given one outstanding step", () => {
+    it("names it without an ellipsis", () => {
+      expect(outstandingSummary({ outstanding: ["trace:fill-cost"] })).toBe(
+        "1 step outstanding: trace:fill-cost",
+      );
     });
   });
 });

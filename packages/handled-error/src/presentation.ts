@@ -55,6 +55,23 @@ export interface ErrorPresentation {
   describe?: (error: HandledErrorShape) => string;
 }
 
+/** `codex_auth_failed` by `meta.kind`: the ones the customer ends by signing in again. */
+const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; description: string }>> = {
+  refresh_rejected: {
+    title: "Your OpenAI session expired",
+    description:
+      "Codex runs on your OpenAI account, and its sign-in has expired. Sign in to Codex again to keep using it.",
+  },
+  sign_in_expired: {
+    title: "The sign-in code expired",
+    description: "It wasn't approved in time. Start the sign-in again for a new code.",
+  },
+  sign_in_denied: {
+    title: "The sign-in wasn't approved",
+    description: "OpenAI says the code was declined. Start the sign-in again to try once more.",
+  },
+};
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -207,6 +224,14 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
       hasReasonCode(reason.reasons ?? [], codes),
   );
 
+/** The providers' own limit codes: when one is named, it says more than the proxy's reason. */
+const PROVIDER_LIMIT_CODES: ReadonlySet<string> = new Set([
+  "usage_limit_reached",
+  "codex_plan_limit",
+  "insufficient_quota",
+  "billing_hard_limit_reached",
+]);
+
 /**
  * The provider discriminants meaning "this account has nothing left to spend"
  * — a plan allowance, a prepaid balance, a hard billing cap.
@@ -217,11 +242,10 @@ const hasReasonCode = (reasons: readonly SerializedReason[], codes: ReadonlySet<
  * balance is too low" beats "try again"), and naming the discriminants is how
  * we keep that meaning without carrying the sentence that came with it.
  */
-const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
-  "usage_limit_reached",
-  "codex_plan_limit",
-  "insufficient_quota",
-  "billing_hard_limit_reached",
+export const PROVIDER_ALLOWANCE_REASONS: ReadonlySet<string> = new Set([
+  ...PROVIDER_LIMIT_CODES,
+  // The proxy's own name for a spent balance a provider states only in prose.
+  "llm_provider_out_of_credit",
 ]);
 
 /**
@@ -267,6 +291,8 @@ export const PROVIDER_CREDENTIAL_REASONS: ReadonlySet<string> = new Set([
   // Google's statuses for the same two refusals.
   "UNAUTHENTICATED",
   "PERMISSION_DENIED",
+  // The proxy's own name for a refused key a provider answers with a 400.
+  "llm_provider_key_rejected",
 ]);
 
 /**
@@ -305,12 +331,14 @@ const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
 
 /**
  * The provider refused the request itself as malformed: Bedrock's
- * "ValidationException", or a 422 status. Deterministic, so the fix is another
- * model, not a retry. The broad "invalid_request_error" and bare 400 are left
- * out: Anthropic files a spent balance under them, and that one can pass.
+ * "ValidationException", Anthropic's "invalid_request_error", a 400 or a 422.
+ * Deterministic, so the fix is another model, not a retry. A spent balance
+ * Anthropic files under the same 400 carries `llm_provider_out_of_credit` too.
  */
 export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
+  "upstream_bad_request",
   "upstream_unprocessable_entity",
+  "invalid_request_error",
   "ValidationException",
 ]);
 
@@ -441,6 +469,11 @@ const presentations = {
         : "Check the column names against the dataset's columns.";
     },
   },
+  lwql_invalid_query: {
+    title: "The database couldn't run this query",
+    describe: () =>
+      "The SQL reads, but the database rejected it as written, for example an aggregate in WHERE or mismatched types. Adjust the query and try again.",
+  },
   lwql_unparseable: {
     title: "This query couldn't be read",
     describe: () => "Check the SQL syntax and try again.",
@@ -453,6 +486,15 @@ const presentations = {
     title: "This query isn't allowed here",
     describe: () =>
       "This endpoint runs one read-only SELECT over the analytics datasets. Remove anything else and try again.",
+  },
+  lwql_parameter_invalid: {
+    title: "A parameter value doesn't fit its type",
+    describe: (error) => {
+      const parameter = str(error, "parameter", "");
+      return parameter
+        ? `The value given for "${parameter}" can't be read as the type the query declares. Fix the value or the type and try again.`
+        : "A value can't be read as the type the query declares for it. Fix the value or the type and try again.";
+    },
   },
   lwql_parameter_missing: {
     title: "This query is missing a value",
@@ -573,6 +615,27 @@ const presentations = {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
   },
+  dashboard_read_only_here: {
+    title: "This dashboard is read-only here",
+    describe: () =>
+      "Another project owns it, so it can be changed only there. Duplicate it to get a copy you can edit in this project.",
+  },
+  dashboard_scope_author_only: {
+    title: "Only the person who made this dashboard can change its scope",
+    describe: () => "Ask them to change who can see it, or duplicate it to get your own copy.",
+  },
+  dashboards_not_enabled: {
+    title: "Dashboards aren't switched on here",
+    describe: () => "This project doesn't have Dashboards enabled yet.",
+  },
+  insight_not_found: {
+    title: "Insight not found",
+    describe: () => "It may have been removed. Reload to see the current inbox.",
+  },
+  insights_not_enabled: {
+    title: "Insights aren't switched on here",
+    describe: () => "This project doesn't have Insights enabled yet.",
+  },
   dashboard_reorder_unknown_ids: {
     title: "Some of those dashboards are gone",
     describe: () =>
@@ -643,6 +706,12 @@ const presentations = {
   clickhouse_overloaded: {
     title: "Too much running at once",
     describe: () => "We paused this one to keep the rest responsive. Try again.",
+  },
+  client_outdated: {
+    // fault: customer. A tab left open across an upgrade still speaks the
+    // earlier release's wire format; reloading fetches this one.
+    title: "This page is out of date: reload to continue",
+    describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
   },
   broadcaster_not_active: {
     title: "Live updates disconnected",
@@ -1098,19 +1167,6 @@ const presentations = {
     title: "That sign-in method is already gone",
     describe: () => "Reload to see the ones still on your account.",
   },
-  federated_password_account_missing: {
-    // The person holds only social identities, whose passwords live with the
-    // upstream provider. Nothing here can change one, and nothing they do in
-    // this app will add one.
-    title: "There's no password on this account",
-    describe: () => "You sign in through another provider, so change your password with them.",
-  },
-  federated_password_change_unavailable: {
-    // fault: platform. The identity provider refused for a reason only whoever
-    // configured it can fix, so the copy sends the reader to them.
-    title: "We couldn't change your password",
-    describe: () => "Ask whoever set up LangWatch here to check the sign-in configuration.",
-  },
   prompt_not_found: {
     title: "Prompt not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -1309,7 +1365,9 @@ const presentations = {
     // in the sign-in round trip, not the customer's input — so the copy points
     // at retrying the connection rather than fixing a field.
     title: "OpenAI sign-in didn't go through",
-    describe: () =>
+    titleFor: (error) => CODEX_AUTH_FAILURE_COPY[String(error.meta.kind)]?.title,
+    describe: (error) =>
+      CODEX_AUTH_FAILURE_COPY[String(error.meta.kind)]?.description ??
       "Codex couldn't reach or verify your OpenAI account. Connect it again to continue.",
   },
 
@@ -1676,6 +1734,10 @@ const presentations = {
     title: "Your license has expired",
     describe: () => "Renew it to carry on, or talk to your account team.",
   },
+  license_expiry_in_past: {
+    title: "That end date has already passed",
+    describe: () => "A license can only end on a future date. Pick a later one and try again.",
+  },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
     describe: () => "Paste the whole key, including its BEGIN and END lines.",
@@ -1689,14 +1751,9 @@ const presentations = {
     describe: () => "Check it is the license signing key and was copied in full.",
   },
   custom_chart_playground_not_enabled: {
-    title: "Custom chart playground isn't switched on here",
+    title: "Dashboard widgets aren't switched on here",
     describe: () =>
-      "This project doesn't have the custom chart playground enabled yet. Ask your administrator to switch it on.",
-  },
-  custom_graph_writes_disabled_for_playground: {
-    title: "Dashboard graph editing is off while the playground is on",
-    describe: () =>
-      "This project has the custom chart playground enabled, which turns off creating or editing dashboard graphs. Use the playground to build a chart instead.",
+      "This project needs both Dashboards and LangWatchQL switched on for dashboard widgets. Ask your administrator to switch them on.",
   },
   custom_role_not_found: {
     title: "Custom role not found",
@@ -1919,11 +1976,6 @@ const presentations = {
         : "It is already enrolled for that migration, so the next pass will process it. Nothing to do.";
     },
   },
-  migration_enrollment_cloud_only: {
-    title: "Enrollment does not apply to this installation",
-    describe: () =>
-      "Self-hosted installations run released migrations automatically for every organization, so there is nothing to enroll or withdraw.",
-  },
   migration_enrollment_not_found: {
     title: "This organization is not enrolled",
     describe: (error) => {
@@ -2097,11 +2149,6 @@ const presentations = {
     title: "That team isn't in this organization",
     describe: () => "Pick a team that belongs to this organization.",
   },
-  user_email_ambiguous: {
-    title: "More than one account uses this address",
-    describe: () =>
-      "Two or more accounts hold this email address in different letter case. Change one of their addresses, then try again.",
-  },
   user_last_platform_operator: {
     title: "This is the last platform operator",
     describe: () =>
@@ -2195,7 +2242,7 @@ const presentations = {
   authz_grant_not_confirmed: {
     title: "Access could not be confirmed",
     describe: () =>
-      "We could not confirm the access change in time, so nothing was granted. Try again in a moment.",
+      "Your access change is still processing. Refresh to check its status before trying again.",
   },
   auth_rate_limited: {
     title: "Too many attempts",
@@ -2392,6 +2439,11 @@ const presentations = {
         ? `Ask an organization admin to grant you "${permission}" on this project.`
         : "Ask an organization admin to grant you access to this project.";
     },
+  },
+  evaluation_report_unavailable: {
+    title: "The result could not be saved",
+    describe: () =>
+      "The evaluation ran, but its result could not be recorded just now. Send the same request again in a few seconds.",
   },
   evaluation_trace_not_evaluatable: {
     title: "This trace cannot be evaluated",
@@ -2977,15 +3029,6 @@ const presentations = {
     title: "That is the browser you are using",
     describe: () =>
       "Signing out of this one is a different action. Use the sign-out control instead.",
-  },
-
-  session_read_failed: {
-    // Read by somebody who has just been shown a sign-in screen they did not
-    // ask for. The words have to explain that: we could not find out whether
-    // they were signed in, so we treated them as signed out.
-    title: "We couldn't check whether you're signed in",
-    describe: () =>
-      "You've been signed out for now because we couldn't reach the service that answers that. Reload the page in a moment, and log in again if it still asks.",
   },
 
   subscription_service_unavailable: {
@@ -3609,7 +3652,7 @@ const presentations = {
   platform_operator_user_not_found: {
     title: "No active user has that address",
     describe: () =>
-      "Only an existing, active account can be made a platform operator. Ask them to sign up first.",
+      "Only an existing, active account with a verified address can be made a platform operator; on LangWatch Cloud, only a staff account.",
   },
   platform_permission_not_assignable: {
     title: "Operations permissions cannot be added to a role",
@@ -3831,6 +3874,10 @@ const presentations = {
     describe: () =>
       "This dataset has no failed or stuck import. Upload the file again to add its rows.",
   },
+  dataset_invalid_column: {
+    title: "That column is not in this dataset",
+    describe: () => "Add the column to the dataset, or remove it from the row, and try again.",
+  },
   dataset_name_taken: {
     title: "That name is taken",
     describe: () => "Pick a different name for this dataset.",
@@ -3945,6 +3992,13 @@ const presentations = {
       const subject = subjects[target] ?? "What you picked is";
       return `${subject} no longer in this organization, so it cannot be put in a department. Reload and try again.`;
     },
+  },
+  private_dataplane_unavailable: {
+    // fault: platform. The organization keeps its data on its own servers and this
+    // deployment cannot reach them; nothing is served from the shared ones instead.
+    title: "Your organization's data store can't be reached",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to restore the connection to your organization's own data store.",
   },
   storage_not_writable: {
     // fault: platform. Storage for this deployment was never provisioned, so
@@ -4305,7 +4359,7 @@ const presentations = {
       safeProse(str(error, "message", "")) || "Check the destination and try again.",
   },
   test_fire_unavailable: {
-    title: "Nothing to test yet",
+    title: "Test message not sent",
     // `meta.reason` is the sentence the service wrote for this exact scenario
     // ("This automation has no email recipients to test-fire to.") — it names
     // WHICH piece is missing, which the generic line cannot. It is also the
@@ -4635,6 +4689,11 @@ const presentations = {
     describe: () =>
       "Langy can only drive this page while it is answering you. Send it a message and ask again.",
   },
+  langy_ui_run_conversation: {
+    title: "This conversation can't change a page",
+    describe: () =>
+      "Langy ran this conversation on its own, so no page is open for it to change. Start a new conversation and ask there.",
+  },
   langy_ui_action_unknown: {
     title: "Langy tried something this page doesn't do",
     describe: () =>
@@ -4680,6 +4739,11 @@ const presentations = {
     describe: () =>
       "Too many conversations are running at once. Give it a few seconds and try again.",
   },
+  langy_agent_not_configured: {
+    title: "Langy isn't set up on this deployment",
+    describe: () =>
+      "This LangWatch install runs no Langy agent, so messages can't be answered. On a self-hosted install, enable the Langy agent and reload. In local development, run `haven up +langy` and reload the api.",
+  },
   langy_agent_unavailable: {
     title: "Langy is unavailable",
     describe: () =>
@@ -4712,6 +4776,22 @@ const presentations = {
     title: "Key owner is gone",
     describe: () =>
       "The user who owns this key no longer exists, so the turn has no one to act as. Mint a new key under a current user.",
+  },
+  // An unattended turn refused before it started; the reader is whoever asked for the run.
+  langy_unattended_actor_missing: {
+    title: "Person no longer exists",
+    describe: () =>
+      "The person this run acts as no longer exists, so nothing ran. Request the run for a current member.",
+  },
+  langy_unattended_actor_deactivated: {
+    title: "Account is deactivated",
+    describe: () =>
+      "The person this run acts as has a deactivated account, so nothing ran. Reactivate the account, or request the run for another member.",
+  },
+  langy_unattended_no_langy_access: {
+    title: "No Langy access",
+    describe: () =>
+      "The person this run acts as cannot use Langy in this project, so nothing ran. A workspace admin can grant that access.",
   },
   langy_api_request_invalid: {
     title: "Invalid request body",
@@ -4884,6 +4964,10 @@ const presentations = {
       return field ? `There's a problem with ${field}.` : "Some of the values aren't valid.";
     },
   },
+  request_body_unreadable: {
+    title: "The request did not arrive in full",
+    describe: () => "The connection closed before the whole request was sent. Send it again.",
+  },
   malformed_request: {
     title: "That request couldn't be read",
     describe: () => "Check the format of what was sent, then try again.",
@@ -4891,6 +4975,57 @@ const presentations = {
   unsupported_media_type: {
     title: "That request was sent in the wrong format",
     describe: () => "Send the body with the Content-Type this endpoint reads, then try again.",
+  },
+  // ==========================================================================
+  // Hosted MCP. Read by an MCP client and the person who configured it, not on
+  // a LangWatch page, so the words say what to do in the client.
+  // ==========================================================================
+  mcp_authorization_required: {
+    title: "Sign in to use the LangWatch MCP server",
+    describe: () =>
+      "Connect your MCP client to LangWatch, or send a project API key as the bearer.",
+  },
+  mcp_invalid_token: {
+    title: "Your MCP sign-in has expired",
+    describe: () => "Sign in to LangWatch again from your MCP client.",
+  },
+  mcp_invalid_api_key: {
+    title: "That API key isn't valid",
+    describe: () => "Check the project API key your MCP client sends, or create a new one.",
+  },
+  mcp_grant_revoked: {
+    title: "Your access to this project has ended",
+    describe: () =>
+      "You no longer have access to the project this sign-in was for. Ask an admin, then sign in again.",
+  },
+  mcp_session_not_found: {
+    title: "This MCP session has ended",
+    describe: () => "Your MCP client opens a new session on its own. Reconnect if it does not.",
+  },
+  mcp_route_not_found: {
+    title: "Not found",
+    describe: () => "Check the MCP server URL your client is configured with.",
+  },
+  mcp_metadata_unpublished: {
+    title: "No document is published here",
+    describe: () => "LangWatch publishes its OAuth metadata at the protected-resource path.",
+  },
+  mcp_session_id_required: {
+    title: "That MCP request needs a session",
+    describe: () => "Send an initialize request first, then the session id it returns.",
+  },
+  mcp_method_not_allowed: {
+    title: "That method isn't supported here",
+    describe: () => "Check the MCP server URL and the request your client sends.",
+  },
+  mcp_session_limit_reached: {
+    title: "Too many open MCP sessions",
+    describe: (error) =>
+      `This key already has ${num(error, "maxSessions", 0) || "the most"} open sessions. Close some, then try again.`,
+  },
+  mcp_store_unavailable: {
+    title: "The MCP server is briefly unavailable",
+    describe: () => "Your MCP client retries on its own. Try again in a moment.",
   },
   upgrade_in_progress: {
     title: "LangWatch is upgrading",
@@ -5668,10 +5803,17 @@ const presentations = {
     // the customer better than a sentence we cannot vouch for.
     title: "The model provider rejected that",
     // A refused key has one fix, so the headline names it like the body does.
-    titleFor: (error) =>
-      hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
+    titleFor: (error) => {
+      if (hasReasonCode(error.reasons, PROVIDER_LIMIT_CODES)) {
+        return "This provider account has no allowance left";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
+        return "This provider account is out of credit";
+      }
+      return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
         ? "This provider rejected the API key"
-        : undefined,
+        : undefined;
+    },
     describe: (error) => {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.";
@@ -5693,6 +5835,18 @@ const presentations = {
       }
       return "Try again, or pick a different model.";
     },
+  },
+  llm_provider_out_of_credit: {
+    // A reason under `llm_upstream_error`; read on its own only by a surface
+    // that renders reasons one by one.
+    title: "This provider account is out of credit",
+    describe: () =>
+      "The model provider took the key and refused to generate: the account behind it has no credit left. Top it up with the provider, or pick a model from a different provider.",
+  },
+  llm_provider_key_rejected: {
+    title: "This provider rejected the API key",
+    describe: () =>
+      "The model provider says the API key is not valid. Check the key saved for it in the model provider settings.",
   },
   lwql_app_function_hydration_failed: {
     // Deliberately says nothing about retrying a different way: the query
@@ -5970,16 +6124,6 @@ const presentations = {
     title: "Hosted services are still being set up",
     describe: () =>
       "Your license is valid and its key is being prepared. Try again in a few seconds.",
-  },
-  below_lts_floor: {
-    title: "This version is too old to upgrade from",
-    describe: () =>
-      "Upgrade to the oldest supported long-term release first, then continue to this version.",
-  },
-  image_below_ledger_floor: {
-    title: "This image is older than the database",
-    describe: () =>
-      "The database has already been upgraded past what this image supports. Start an image at or above the version last run.",
   },
   step_after_unknown: {
     title: "An upgrade step depends on a step that doesn't exist",

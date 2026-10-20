@@ -9,9 +9,9 @@ import {
   showErrorToast,
 } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { Drawer } from "@langwatch/design-system/drawer";
 import {
   Box,
-  Button,
   Collapsible,
   HStack,
   Input,
@@ -20,9 +20,9 @@ import {
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { toaster } from "@langwatch/design-system/toaster";
 import { readHandledError } from "@langwatch/handled-error/read-handled-error";
+import { generate } from "@langwatch/ksuid";
 import { MAX_SUITE_REPEAT_COUNT } from "@langwatch/suite-contract";
 import { ChevronDown, ChevronRight, Play } from "lucide-react";
 import { useCallback, useRef, useState } from "react";
@@ -74,7 +74,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   const { project } = useOrganizationTeamProject();
   const { closeDrawer, drawerOpen, openDrawer } = useDrawer();
   const [scenarioEditorOpen, setScenarioEditorOpen] = useState(false);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey] = useState(() => generate("suite").toString());
   const params = useDrawerParams();
 
   const isOpen = drawerOpen("suiteEditor");
@@ -113,7 +113,7 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
   });
 
   const isEditMode = !!suiteId;
-  const title = isEditMode ? "Edit Run Plan" : "New Run Plan";
+  const title = isEditMode ? "Edit run plan" : "New run plan";
 
   const suiteForm = useSuiteForm({
     suite: suite ?? null,
@@ -152,254 +152,240 @@ export function SuiteFormDrawer(props: SuiteFormDrawerProps) {
 
   return (
     <>
-      <Drawer.Root
+      <Drawer
         open={isOpen}
-        onOpenChange={(e) => {
-          if (!e.open) closeDrawer();
-        }}
-        placement="end"
+        onClose={closeDrawer}
+        title={title}
         size="lg"
+        footer={{
+          secondaryAction: { label: "Save", onClick: handleSave, loading: isSaving },
+          primaryAction: {
+            label: "Run now",
+            icon: <Play size={14} />,
+            onClick: handleRunNow,
+            loading: isSaving,
+          },
+        }}
       >
-        <Drawer.Content bg="bg">
-          <Drawer.Header>
-            <Drawer.Title>{title}</Drawer.Title>
-            <Drawer.CloseTrigger />
-          </Drawer.Header>
+        {isEditMode && isSuiteLoading ? (
+          <VStack gap={4} align="stretch">
+            <Skeleton height="20px" width="60px" />
+            <Skeleton height="40px" />
+            <Skeleton height="20px" width="80px" />
+            <Skeleton height="80px" />
+            <Skeleton height="20px" width="70px" />
+            <Skeleton height="120px" />
+            <Skeleton height="20px" width="60px" />
+            <Skeleton height="120px" />
+          </VStack>
+        ) : (
+          <VStack gap={4} align="stretch">
+            <FormServerError form={form} />
 
-          <Drawer.Body>
-            {isEditMode && isSuiteLoading ? (
-              <VStack gap={4} align="stretch">
-                <Skeleton height="20px" width="60px" />
-                <Skeleton height="40px" />
-                <Skeleton height="20px" width="80px" />
-                <Skeleton height="80px" />
-                <Skeleton height="20px" width="70px" />
-                <Skeleton height="120px" />
-                <Skeleton height="20px" width="60px" />
-                <Skeleton height="120px" />
-              </VStack>
-            ) : (
-              <VStack gap={4} align="stretch">
-                <FormServerError form={form} />
-
-                {/* Name */}
-                <VStack align="start" gap={1}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Name *
-                  </Text>
-                  {/* Controllers, not `register`: the compiler memoises register's ref, and the
+            {/* Name */}
+            <VStack align="start" gap={1}>
+              <Text fontSize="sm" fontWeight="medium">
+                Name *
+              </Text>
+              {/* Controllers, not `register`: the compiler memoises register's ref, and the
                       form resets once the suite loads, which would drop every keystroke after. */}
-                  <Controller
-                    control={form.control}
-                    name="name"
-                    render={({ field }) => (
-                      <Input
-                        placeholder="e.g., Critical Path Run Plan"
-                        {...field}
-                        borderColor={errors.name ? "red.fg" : undefined}
-                      />
-                    )}
+              <Controller
+                control={form.control}
+                name="name"
+                render={({ field }) => (
+                  <Input
+                    placeholder="e.g., Critical Path Run Plan"
+                    {...field}
+                    borderColor={errors.name ? "red.fg" : undefined}
                   />
-                  {errors.name && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.name.message}
-                    </Text>
-                  )}
-                </VStack>
+                )}
+              />
+              {errors.name && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.name.message}
+                </Text>
+              )}
+            </VStack>
 
-                {/* Description */}
-                <VStack align="start" gap={1}>
+            {/* Description */}
+            <VStack align="start" gap={1}>
+              <Text fontSize="sm" fontWeight="medium">
+                Description (optional)
+              </Text>
+              <Controller
+                control={form.control}
+                name="description"
+                render={({ field }) => (
+                  <Textarea
+                    placeholder="Core journeys that must pass before deploy"
+                    {...field}
+                    rows={2}
+                  />
+                )}
+              />
+              {errors.description && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.description.message}
+                </Text>
+              )}
+            </VStack>
+
+            {/* Scenarios */}
+            <VStack align="start" gap={1}>
+              <Text fontSize="sm" fontWeight="medium">
+                Scenarios *
+              </Text>
+              <ScenarioPicker
+                scenarios={suiteForm.filteredScenarios}
+                selectedIds={suiteForm.selectedScenarioIds}
+                totalCount={suiteForm.totalScenarioCount}
+                onToggle={suiteForm.toggleScenario}
+                onSelectAll={suiteForm.selectAllScenarios}
+                onClear={suiteForm.clearScenarios}
+                searchQuery={suiteForm.scenarioSearch}
+                onSearchChange={suiteForm.setScenarioSearch}
+                allLabels={suiteForm.allLabels}
+                activeLabelFilter={suiteForm.activeLabelFilter}
+                onLabelFilterChange={suiteForm.setActiveLabelFilter}
+                onCreateNew={() => setScenarioEditorOpen(true)}
+                hasError={!!errors.selectedScenarioIds}
+                archivedIds={archivedScenariosWithNames}
+                onRemoveArchived={suiteForm.removeArchivedScenario}
+                testSuites={testSuites}
+              />
+              {errors.selectedScenarioIds && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.selectedScenarioIds.message}
+                </Text>
+              )}
+            </VStack>
+
+            {/* Targets */}
+            <VStack align="start" gap={1}>
+              <Text fontSize="sm" fontWeight="medium">
+                Target(s) *
+              </Text>
+              <TargetPicker
+                targets={suiteForm.filteredTargets}
+                selectedTargets={suiteForm.selectedTargets}
+                totalCount={suiteForm.availableTargets.length}
+                isTargetSelected={suiteForm.isTargetSelected}
+                onToggle={suiteForm.toggleTarget}
+                onSelectAll={suiteForm.selectAllTargets}
+                onClear={suiteForm.clearTargets}
+                searchQuery={suiteForm.targetSearch}
+                onSearchChange={suiteForm.setTargetSearch}
+                onAddTarget={openHttpAgentEditor}
+                hasError={!!errors.selectedTargets}
+                archivedTargets={archivedTargetsWithNames}
+                onRemoveArchived={suiteForm.removeArchivedTarget}
+              />
+              {errors.selectedTargets && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.selectedTargets.message}
+                </Text>
+              )}
+            </VStack>
+
+            <PromptTargetMappingSection
+              selectedTargets={suiteForm.selectedTargets}
+              prompts={prompts}
+              onMappingChange={suiteForm.setTargetMapping}
+            />
+
+            {/* Models */}
+            <VStack align="start" gap={2}>
+              <Text fontSize="sm" fontWeight="medium">
+                Models
+              </Text>
+              <Text fontSize="xs" color="fg.muted">
+                Choose the models that role-play the user and judge the runs. Both default to your
+                project&apos;s Default model.
+              </Text>
+              <SimulationModelSelect
+                label="User simulator"
+                featureKey="scenarios.user_simulator"
+                value={suiteForm.simulatorModel}
+                onChange={suiteForm.setSimulatorModel}
+              />
+              {errors.simulatorModel && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.simulatorModel.message}
+                </Text>
+              )}
+              <SimulationModelSelect
+                label="Judge"
+                featureKey="scenarios.judge"
+                value={suiteForm.judgeModel}
+                onChange={suiteForm.setJudgeModel}
+              />
+              {errors.judgeModel && (
+                <Text fontSize="xs" color="red.fg">
+                  {errors.judgeModel.message}
+                </Text>
+              )}
+            </VStack>
+
+            {/* Execution Options */}
+            <Collapsible.Root
+              open={suiteForm.executionOptionsOpen}
+              onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
+            >
+              <Collapsible.Trigger asChild>
+                <HStack cursor="pointer" gap={2}>
+                  {suiteForm.executionOptionsOpen ? (
+                    <ChevronDown size={14} />
+                  ) : (
+                    <ChevronRight size={14} />
+                  )}
                   <Text fontSize="sm" fontWeight="medium">
-                    Description (optional)
+                    Execution options
                   </Text>
-                  <Controller
-                    control={form.control}
-                    name="description"
-                    render={({ field }) => (
-                      <Textarea
-                        placeholder="Core journeys that must pass before deploy"
-                        {...field}
-                        rows={2}
-                      />
-                    )}
-                  />
-                  {errors.description && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.description.message}
-                    </Text>
-                  )}
-                </VStack>
-
-                {/* Scenarios */}
-                <VStack align="start" gap={1}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Scenarios *
-                  </Text>
-                  <ScenarioPicker
-                    scenarios={suiteForm.filteredScenarios}
-                    selectedIds={suiteForm.selectedScenarioIds}
-                    totalCount={suiteForm.totalScenarioCount}
-                    onToggle={suiteForm.toggleScenario}
-                    onSelectAll={suiteForm.selectAllScenarios}
-                    onClear={suiteForm.clearScenarios}
-                    searchQuery={suiteForm.scenarioSearch}
-                    onSearchChange={suiteForm.setScenarioSearch}
-                    allLabels={suiteForm.allLabels}
-                    activeLabelFilter={suiteForm.activeLabelFilter}
-                    onLabelFilterChange={suiteForm.setActiveLabelFilter}
-                    onCreateNew={() => setScenarioEditorOpen(true)}
-                    hasError={!!errors.selectedScenarioIds}
-                    archivedIds={archivedScenariosWithNames}
-                    onRemoveArchived={suiteForm.removeArchivedScenario}
-                    testSuites={testSuites}
-                  />
-                  {errors.selectedScenarioIds && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.selectedScenarioIds.message}
-                    </Text>
-                  )}
-                </VStack>
-
-                {/* Targets */}
-                <VStack align="start" gap={1}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Target(s) *
-                  </Text>
-                  <TargetPicker
-                    targets={suiteForm.filteredTargets}
-                    selectedTargets={suiteForm.selectedTargets}
-                    totalCount={suiteForm.availableTargets.length}
-                    isTargetSelected={suiteForm.isTargetSelected}
-                    onToggle={suiteForm.toggleTarget}
-                    onSelectAll={suiteForm.selectAllTargets}
-                    onClear={suiteForm.clearTargets}
-                    searchQuery={suiteForm.targetSearch}
-                    onSearchChange={suiteForm.setTargetSearch}
-                    onAddTarget={openHttpAgentEditor}
-                    hasError={!!errors.selectedTargets}
-                    archivedTargets={archivedTargetsWithNames}
-                    onRemoveArchived={suiteForm.removeArchivedTarget}
-                  />
-                  {errors.selectedTargets && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.selectedTargets.message}
-                    </Text>
-                  )}
-                </VStack>
-
-                <PromptTargetMappingSection
-                  selectedTargets={suiteForm.selectedTargets}
-                  prompts={prompts}
-                  onMappingChange={suiteForm.setTargetMapping}
-                />
-
-                {/* Models */}
-                <VStack align="start" gap={2}>
-                  <Text fontSize="sm" fontWeight="medium">
-                    Models
-                  </Text>
-                  <Text fontSize="xs" color="fg.muted">
-                    Choose the models that role-play the user and judge the runs. Both default to
-                    your project&apos;s Default model.
-                  </Text>
-                  <SimulationModelSelect
-                    label="User simulator"
-                    featureKey="scenarios.user_simulator"
-                    value={suiteForm.simulatorModel}
-                    onChange={suiteForm.setSimulatorModel}
-                  />
-                  {errors.simulatorModel && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.simulatorModel.message}
-                    </Text>
-                  )}
-                  <SimulationModelSelect
-                    label="Judge"
-                    featureKey="scenarios.judge"
-                    value={suiteForm.judgeModel}
-                    onChange={suiteForm.setJudgeModel}
-                  />
-                  {errors.judgeModel && (
-                    <Text fontSize="xs" color="red.fg">
-                      {errors.judgeModel.message}
-                    </Text>
-                  )}
-                </VStack>
-
-                {/* Execution Options */}
-                <Collapsible.Root
-                  open={suiteForm.executionOptionsOpen}
-                  onOpenChange={(d) => suiteForm.setExecutionOptionsOpen(d.open)}
+                </HStack>
+              </Collapsible.Trigger>
+              <Collapsible.Content>
+                <Box
+                  border="1px solid"
+                  borderColor="border"
+                  borderRadius="md"
+                  padding={3}
+                  marginTop={2}
                 >
-                  <Collapsible.Trigger asChild>
-                    <HStack cursor="pointer" gap={2}>
-                      {suiteForm.executionOptionsOpen ? (
-                        <ChevronDown size={14} />
-                      ) : (
-                        <ChevronRight size={14} />
-                      )}
-                      <Text fontSize="sm" fontWeight="medium">
-                        Execution Options
+                  <VStack align="start" gap={1}>
+                    <HStack gap={2} align="center">
+                      <Text fontSize="sm">Repeat count</Text>
+                      <Controller
+                        control={form.control}
+                        name="repeatCount"
+                        render={({ field }) => (
+                          <Input
+                            type="number"
+                            size="sm"
+                            width="80px"
+                            min={1}
+                            max={MAX_SUITE_REPEAT_COUNT}
+                            {...field}
+                            onChange={(event) => field.onChange(event.target.valueAsNumber)}
+                            borderColor={errors.repeatCount ? "red.fg" : undefined}
+                          />
+                        )}
+                      />
+                      <Text fontSize="xs" color="fg.muted">
+                        times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})
                       </Text>
                     </HStack>
-                  </Collapsible.Trigger>
-                  <Collapsible.Content>
-                    <Box
-                      border="1px solid"
-                      borderColor="border"
-                      borderRadius="md"
-                      padding={3}
-                      marginTop={2}
-                    >
-                      <VStack align="start" gap={1}>
-                        <HStack gap={2} align="center">
-                          <Text fontSize="sm">Repeat count</Text>
-                          <Controller
-                            control={form.control}
-                            name="repeatCount"
-                            render={({ field }) => (
-                              <Input
-                                type="number"
-                                size="sm"
-                                width="80px"
-                                min={1}
-                                max={MAX_SUITE_REPEAT_COUNT}
-                                {...field}
-                                onChange={(event) => field.onChange(event.target.valueAsNumber)}
-                                borderColor={errors.repeatCount ? "red.fg" : undefined}
-                              />
-                            )}
-                          />
-                          <Text fontSize="xs" color="fg.muted">
-                            times per scenario x target (max {MAX_SUITE_REPEAT_COUNT})
-                          </Text>
-                        </HStack>
-                        {errors.repeatCount && (
-                          <Text fontSize="xs" color="red.fg">
-                            {errors.repeatCount.message}
-                          </Text>
-                        )}
-                      </VStack>
-                    </Box>
-                  </Collapsible.Content>
-                </Collapsible.Root>
-              </VStack>
-            )}
-          </Drawer.Body>
-
-          <Drawer.Footer>
-            <HStack gap={2}>
-              <Button variant="outline" onClick={handleSave} loading={isSaving}>
-                Save
-              </Button>
-              <Button colorPalette="blue" onClick={handleRunNow} loading={isSaving}>
-                <Play size={14} />
-                Run Now
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Root>
+                    {errors.repeatCount && (
+                      <Text fontSize="xs" color="red.fg">
+                        {errors.repeatCount.message}
+                      </Text>
+                    )}
+                  </VStack>
+                </Box>
+              </Collapsible.Content>
+            </Collapsible.Root>
+          </VStack>
+        )}
+      </Drawer>
 
       {/* Child drawer: Scenario Editor -- managed via local state */}
       <ScenarioFormDrawer open={scenarioEditorOpen} onClose={() => setScenarioEditorOpen(false)} />

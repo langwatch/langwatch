@@ -2,6 +2,7 @@ import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useLentHooks } from "@langwatch/browser-host/lent";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
+import { createLogger } from "@langwatch/observability/browser";
 import { promptClient } from "@langwatch/prompt-client";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { useCallback, useRef, useState } from "react";
@@ -15,6 +16,8 @@ import {
 } from "../../prompt-form.ts";
 import { promptApi } from "../prompt-api.ts";
 import type { usePromptConfigForm } from "../use-prompt-config-form.ts";
+
+const logger = createLogger("langwatch:prompt:editor-save");
 
 type SavedPrompt = {
   id: string;
@@ -245,7 +248,7 @@ function useVersionSwitching({
       resetToSaved(versionedPromptToPromptConfigFormValuesWithSystemMessage(latestPrompt));
       onVersionChange?.(versionChangeOf(latestPrompt));
     } catch (error) {
-      console.error("Failed to upgrade to latest version:", error);
+      logger.error({ error }, "Failed to upgrade to latest version");
     }
   }, [promptId, project?.id, utils.prompts.getByIdOrHandle, resetToSaved, onVersionChange]);
 

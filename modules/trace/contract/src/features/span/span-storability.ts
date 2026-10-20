@@ -1,10 +1,10 @@
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { Temporal } from "@langwatch/time";
 
 import {
   convertUnixNanoToUnixMs,
   normalizeOtlpUnixNano,
 } from "../../otlp-decoding/otlp-span-identity.ts";
-import type { OtlpSpan } from "../../trace.otlp.ts";
 import type { SpanReceivedEvent } from "../ingest/trace-ingress.events.ts";
 
 /**

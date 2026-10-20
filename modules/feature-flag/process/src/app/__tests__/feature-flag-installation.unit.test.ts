@@ -1,6 +1,9 @@
+import { AuthzApi } from "@langwatch/authz-contract";
 import { FeatureFlagApi, UnknownFeatureFlagError } from "@langwatch/feature-flag-contract";
-import { createApp } from "@langwatch/process";
+import { OrganizationApi } from "@langwatch/organization-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { describe, expect, it } from "vitest";
 
 import { featureFlagProcessModule } from "../../feature-flag.module.ts";
@@ -9,19 +12,21 @@ import { createFeatureFlagTestAuthz, TestOrganizations } from "./feature-flag.fi
 const SYSTEM_FLAG = "ops_es_causality_loop_guard_disabled";
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([featureFlagProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } })
-    .provide({
-      authz: createFeatureFlagTestAuthz(),
-      organization: TestOrganizations.create().api(),
-    });
+  return bootInstalledProcess({
+    role,
+    modules: [featureFlagProcessModule],
+    config: { "feature-flag": { forceEnable: [], overrides: {}, legacy: {} } },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: createFeatureFlagTestAuthz() }),
+      testPeer({ token: OrganizationApi, instance: TestOrganizations.create().api() }),
+    ],
+  });
 }
 
 describe("feature flag app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(FeatureFlagApi);
@@ -39,8 +44,8 @@ describe("feature flag app installation", () => {
   });
 
   it("allocates independent memory repositories for each installation", async () => {
-    const first = await process("api").boot();
-    const second = await process("api").boot();
+    const first = await process("api");
+    const second = await process("api");
 
     try {
       await first
@@ -59,7 +64,7 @@ describe("feature flag app installation", () => {
   });
 
   it("refuses a key the registry does not define", async () => {
-    const runtime = await process("api").boot();
+    const runtime = await process("api");
 
     try {
       await expect(

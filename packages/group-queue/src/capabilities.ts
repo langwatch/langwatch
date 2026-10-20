@@ -4,6 +4,7 @@ import type {
   GroupQueueHandlerContext,
   GroupQueueRuntimeDefinition,
   JobDelivery,
+  ListedRun,
   QueueSendOptions,
 } from "./contracts.ts";
 import { GroupQueueProcessor } from "./groupQueue.ts";
@@ -82,6 +83,7 @@ function processorOptions<Payload extends Record<string, unknown>, Destination>(
     drainTimeoutMs: dependencies.policy?.drainTimeoutMs,
     policy: dependencies.policy,
     dispatchGroupAllowListKey: dependencies.dispatchGroupAllowListKey,
+    dispatchListed: dependencies.dispatchListed,
   };
 }
 
@@ -132,6 +134,15 @@ export class GroupQueueProducer<Payload extends Record<string, unknown>, Destina
   /** See GroupQueueProcessor.waitUntilPreflightIdle. */
   waitUntilPreflightIdle(): Promise<void> {
     return this.#processor.waitUntilPreflightIdle();
+  }
+
+  /** See GroupQueueProcessor.runListedWork. */
+  runListedWork<Result>(input: {
+    name: string;
+    timeoutMs: number;
+    work: (list?: ListedRun) => Promise<Result>;
+  }): Promise<Result> {
+    return this.#processor.runListedWork(input);
   }
 
   close(): Promise<void> {

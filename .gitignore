@@ -31,36 +31,9 @@ dist/
 !/tools/thuishaven/adapters/dashboard/web/dist/
 /tools/thuishaven/adapters/dashboard/web/dist/*
 !/tools/thuishaven/adapters/dashboard/web/dist/.gitkeep
-!/services/mailsim/web/dist/
-/services/mailsim/web/dist/*
-!/services/mailsim/web/dist/.gitkeep
-!/services/idpsim/web/dist/
-/services/idpsim/web/dist/*
-!/services/idpsim/web/dist/.gitkeep
-!/services/storagesim/web/dist/
-/services/storagesim/web/dist/*
-!/services/storagesim/web/dist/.gitkeep
-!/services/voicesim/web/dist/
-/services/voicesim/web/dist/*
-!/services/voicesim/web/dist/.gitkeep
-!/services/lambdasim/web/dist/
-/services/lambdasim/web/dist/*
-!/services/lambdasim/web/dist/.gitkeep
-!/services/llmsim/web/dist/
-/services/llmsim/web/dist/*
-!/services/llmsim/web/dist/.gitkeep
-!/services/analyticssim/web/dist/
-/services/analyticssim/web/dist/*
-!/services/analyticssim/web/dist/.gitkeep
-!/services/telemetrysim/web/dist/
-/services/telemetrysim/web/dist/*
-!/services/telemetrysim/web/dist/.gitkeep
-!/services/outboundsim/web/dist/
-/services/outboundsim/web/dist/*
-!/services/outboundsim/web/dist/.gitkeep
-!/services/paymentsim/web/dist/
-/services/paymentsim/web/dist/*
-!/services/paymentsim/web/dist/.gitkeep
+!/services/sims/simconsole/dist/
+/services/sims/simconsole/dist/*
+!/services/sims/simconsole/dist/.gitkeep
 /dev/.cache/
 
 langwatch_server/
@@ -201,10 +174,9 @@ server.log
 # .bin/<name>/<name> (haven, the Go services under `make service-watch`, the
 # bun-compiled langy-worker and langwatch CLIs). Release pipelines still pass
 # their own --outfile; this is the default so a stray build can never be
-# committed the way a 9.8 MB `apidiff` once was.
+# committed by accident.
 /.bin/
 # A bare `go build ./cmd/<name>` drops its binary at the root; these are those names.
-/apidiff
 /ciguard
 /docscheck
 /haven
@@ -212,24 +184,7 @@ server.log
 /importext
 /linkcheck
 /migrationorder
-/openapidiff
 /service
-/visualdiff
-
-# apidiff scratch: worktrees, instance logs, generated compose overrides
-.apidiff/
-
-# visualdiff run directories: worktrees, screenshots, reports
-.visualdiff/
-
-# fuzz and interactionsimulator run directories: findings, screenshots, coverage
-.fuzz/
-.interactionsimulator/
-# diff tool binaries a bare `go build ./cmd/<tool>` drops at the root (build into .bin/ instead)
-/apidiff
-/visualdiff
-/fuzz
-/interactionsimulator
 
 # Prisma client output: prepare regenerates it (pnpm start:prepare:files), never commit it
 packages/prisma-client/src/generated/
@@ -293,3 +248,16 @@ dev/docs/plans/handover-*.md
 # The OpenAPI document is generated from the route declarations and never
 # committed: `pnpm --filter @langwatch/platform-api openapi:generate` writes it.
 /specs/api-reference/openapi-document.json
+
+# Coordinator, lane manifests and handoffs are local working state: each folder keeps its README
+# and templates as the example; dated queues, rulings and handoffs stay on the machine that wrote them.
+.claude/coordinator/*
+!.claude/coordinator/README.md
+!.claude/coordinator/COORDINATOR.md
+!.claude/coordinator/LANE.md
+!.claude/coordinator/handoff-template.md
+!.claude/coordinator/manifest-template.md
+.claude/handoffs/*
+!.claude/handoffs/README.md
+.claude/manifests/*
+!.claude/manifests/README.md

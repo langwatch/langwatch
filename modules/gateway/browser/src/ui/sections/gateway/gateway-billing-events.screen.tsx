@@ -1,16 +1,16 @@
+import { Card } from "@langwatch/design-system/card";
 import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { LoadMore } from "@langwatch/design-system/load-more";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
   Button,
-  Card,
   createListCollection,
   HStack,
   Input,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -307,11 +307,11 @@ function BillingEventRow({
   projectSlug: string | undefined;
 }) {
   return (
-    <Table.Row>
-      <Table.Cell whiteSpace="nowrap">
+    <ListTable.Row>
+      <ListTable.Cell nowrap>
         <FormattedDate value={row.occurredAt} display="auto" seconds={false} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {row.traceId && projectSlug ? (
           <Link href={`/${projectSlug}/traces/${row.traceId}`} fontFamily="mono" fontSize="xs">
             {row.gatewayRequestId.slice(0, 12)}
@@ -321,18 +321,18 @@ function BillingEventRow({
             {row.gatewayRequestId.slice(0, 12)}
           </Text>
         )}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text truncate title={spendKeyLabel({ row, virtualKeyName })}>
           {spendKeyLabel({ row, virtualKeyName })}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text truncate title={row.endUserId || ""}>
           {row.endUserId || "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <VStack align="start" gap={1} minWidth={0}>
           <Text fontSize="sm" truncate maxWidth="full" title={row.model}>
             {row.model}
@@ -343,8 +343,8 @@ function BillingEventRow({
             </Badge>
           )}
         </VStack>
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
         <UITooltip
           content={`${tokensSummary(row)} · input / output / cache read / cache write / reasoning`}
         >
@@ -352,14 +352,14 @@ function BillingEventRow({
             {tokensSummary(row)}
           </Text>
         </UITooltip>
-      </Table.Cell>
-      <Table.Cell textAlign="right" whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell align="end" nowrap>
         {formatCost(row.costUsd)}
-      </Table.Cell>
-      <Table.Cell whiteSpace="nowrap">
+      </ListTable.Cell>
+      <ListTable.Cell nowrap>
         <SpendStatusBadge row={row} />
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -373,52 +373,31 @@ function BillingEventsTable({
   projectSlug: string | undefined;
 }) {
   return (
-    <Card.Root variant="showcase" width="full" overflowX="auto">
+    <Card variant="showcase" padding="none">
       <ListTable
-        containerProps={{
-          overflowX: "auto",
-          maxWidth: "full",
-          tabIndex: 0,
-          role: "region",
-          "aria-label": "Billing events table",
-        }}
-        variant="line"
-        size="sm"
-        width="full"
+        variant="embedded"
+        scroll="x"
+        scrollLabel="Billing events table"
         minWidth="960px"
         tableLayout="fixed"
         density="compact"
         data-testid="billing-events-table"
       >
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader width="120px" whiteSpace="nowrap">
-              Time
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
-              Request
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="120px" whiteSpace="nowrap">
-              Virtual key
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
-              End user
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="180px" whiteSpace="nowrap">
-              Model
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="110px" whiteSpace="nowrap">
-              Tokens
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="105px" textAlign="right" whiteSpace="nowrap">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width="120px">Time</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="110px">Request</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="120px">Virtual key</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="110px">End user</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="180px">Model</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="110px">Tokens</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="105px" align="end">
               Cost
-            </Table.ColumnHeader>
-            <Table.ColumnHeader width="105px" whiteSpace="nowrap">
-              Status
-            </Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+            </ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="105px">Status</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {rows.map((row) => (
             <BillingEventRow
               key={row.gatewayRequestId}
@@ -427,9 +406,9 @@ function BillingEventsTable({
               projectSlug={projectSlug}
             />
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
-    </Card.Root>
+    </Card>
   );
 }
 
@@ -445,7 +424,7 @@ function BillingEventsPage() {
   return (
     <AiGatewayLayout>
       <PageLayout.Header>
-        <PageLayout.Heading>Billing Events</PageLayout.Heading>
+        <PageLayout.Heading>Billing events</PageLayout.Heading>
       </PageLayout.Header>
 
       <PageLayout.Container>
@@ -485,17 +464,12 @@ function BillingEventsPage() {
             />
           )}
 
-          {ledger.hasMore && (
-            <Button
-              size="sm"
-              variant="outline"
-              loading={ledger.query.isFetching}
-              onClick={ledger.loadMore}
-              data-testid="billing-events-load-more"
-            >
-              Load more
-            </Button>
-          )}
+          <LoadMore
+            hasMore={ledger.hasMore}
+            loading={ledger.query.isFetching}
+            onLoadMore={ledger.loadMore}
+            data-testid="billing-events-load-more"
+          />
         </VStack>
       </PageLayout.Container>
     </AiGatewayLayout>

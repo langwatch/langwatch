@@ -4,7 +4,7 @@
  * @see modules/presence/specs/presence.feature
  */
 import { PresenceApi } from "@langwatch/presence-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { describe, expect, it } from "vitest";
 
@@ -20,10 +20,12 @@ const heartbeat = {
 
 /** Presence over memory, no peer supplied and no owners' rows handed in. */
 function bootPresence() {
-  return createApp({ role: "api" })
-    .withModules([presenceProcessModule])
-    .withStores(memoryStores())
-    .boot();
+  return bootInstalledProcess({
+    role: "api",
+    modules: [presenceProcessModule],
+    config: {},
+    stores: memoryStores(),
+  });
 }
 
 describe("given a process that installs presence", () => {

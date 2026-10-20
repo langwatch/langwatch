@@ -39,7 +39,25 @@ function samUser(overrides?: Partial<BackfillUserRow>): BackfillUserRow {
     createdAtMs: USER_CREATED_AT,
     userHashKey: "a-hash-key",
     lastLoginAtMs: null,
+    passkeySignupPending: false,
     ...overrides,
+  };
+}
+
+const TWIN = "user_sam_twin";
+
+/** A second account on Sam's address, differing only in case. */
+function twinUser(overrides?: Partial<BackfillUserRow>): BackfillUserRow {
+  return samUser({ id: TWIN, email: "sam.j@acme.com", ...overrides });
+}
+
+function githubAccount(): BackfillAccountRow {
+  return {
+    id: "acc_github",
+    provider: "github",
+    issuer: "https://github.com",
+    providerAccountId: "gh-4242",
+    createdAtMs: ACCOUNT_CREATED_AT,
   };
 }
 
@@ -63,6 +81,9 @@ function googleAccount(): BackfillAccountRow {
 function harness(options?: {
   user?: BackfillUserRow | null;
   accounts?: BackfillAccountRow[];
+  passkeys?: number;
+  sharers?: { user: BackfillUserRow; accounts?: BackfillAccountRow[] }[];
+  lockHolders?: string[];
   applyCeremonies?: boolean;
   presetRows?: BackfillIdentifierRow[];
   secretCarry?: IdentitySecretCarryRepository;
@@ -118,15 +139,49 @@ function harness(options?: {
     return [];
   });
 
+  const people = new Map<string, BackfillUserRow>();
+  if (user) people.set(user.id, user);
+  const sharerAccounts = new Map<string, BackfillAccountRow[]>();
+  for (const sharer of options?.sharers ?? []) {
+    people.set(sharer.user.id, sharer.user);
+    sharerAccounts.set(sharer.user.id, sharer.accounts ?? []);
+  }
+  const updateEmail = vi.fn(async ({ id, email }: { id: string; email: string }) => {
+    const person = people.get(id);
+    if (person) person.email = email;
+    return {
+      id,
+      name: null,
+      email,
+      emailVerified: person?.emailVerified ?? false,
+      image: null,
+      pendingSsoSetup: false,
+      createdAt: new Date(USER_CREATED_AT),
+      updatedAt: new Date(USER_CREATED_AT),
+      lastLoginAt: null,
+      deactivatedAt: null,
+    };
+  });
+  const audited: { userId: string; action: string; args: unknown }[] = [];
+
   const carried: string[] = [];
   const droppedCredentials: string[][] = [];
   const service = IdentityBackfillService.create({
     reads: {
       getUser: async ({ userId }) => {
-        if (!user) throw new UserNotFoundError(userId);
-        return user;
+        const found = people.get(userId);
+        if (!found) throw new UserNotFoundError(userId);
+        return found;
       },
-      findAccountRows: async () => accounts,
+      findAccountRows: async ({ userId }) =>
+        userId === USER ? accounts : (sharerAccounts.get(userId) ?? []),
+      countPasskeys: async () => options?.passkeys ?? 0,
+      findAddressSharers: async ({ normalizedValue }) =>
+        [...people.values()].filter(
+          (person) =>
+            person.email !== null && normalizeIdentifierValue(person.email) === normalizedValue,
+        ),
+      findAddressLockHolders: async () => options?.lockHolders ?? [],
       findIdentifierRows: async () => [...rows.values()],
     },
     users: {
@@ -161,11 +216,21 @@ function harness(options?: {
       },
     ),
     plan: IdentityBackfillPlanService.create(identifierIdentity),
+    userApi: { updateEmail },
+    auditLog: {
+      record: async ({ userId, action, args }) => {
+        audited.push({ userId: userId ?? "", action, args });
+        return { id: `audit_${audited.length}`, occurredAt: USER_CREATED_AT };
+      },
+    },
     deps: { now: () => 1_800_000_000_000 },
   });
 
   return {
     service,
+    people,
+    updateEmail,
+    audited,
     rows,
     landProjection: () => {
       apply = true;
@@ -270,7 +335,7 @@ describe("the identifier backfill pass", () => {
   });
 
   describe("when nobody has proven the account (never confirmed, never signed into)", () => {
-    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
     it("holds the user at migrated and writes nothing", async () => {
       const { service, attachIdentifier, verifyIdentifier, minted, carried } = harness({
         user: samUser({ emailVerified: false, userHashKey: null }),
@@ -285,7 +350,25 @@ describe("the identifier backfill pass", () => {
       expect(carried).toEqual([]);
     });
 
-    /** @scenario "The backfill never finalizes an account nobody has proven" */
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
+    it("holds one carrying only a passkey, or a passkey sign-up in flight", async () => {
+      const withPasskey = harness({
+        user: samUser({ emailVerified: false }),
+        accounts: [],
+        passkeys: 1,
+      });
+      const midSignUp = harness({
+        user: samUser({ emailVerified: false, passkeySignupPending: true }),
+        accounts: [],
+      });
+
+      expect((await withPasskey.service.migrateUser({ userId: USER })).status).toBe("migrated");
+      expect((await midSignUp.service.migrateUser({ userId: USER })).status).toBe("migrated");
+      expect(withPasskey.attachIdentifier).not.toHaveBeenCalled();
+      expect(midSignUp.attachIdentifier).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The backfill holds an unproven account carrying a sign-in method set before the proof" */
     it("finalizes as before on a later pass once the address is confirmed", async () => {
       const user = samUser({ emailVerified: false });
       const { service } = harness({ user });
@@ -295,6 +378,26 @@ describe("the identifier backfill pass", () => {
       const later = await service.migrateUser({ userId: USER });
 
       expect(later.status).toBe("finalized");
+    });
+
+    /** @scenario "The backfill finalizes an unproven account carrying only its address, unverified" */
+    it("finalizes one carrying only its address, with the address left unverified", async () => {
+      const { service, attachIdentifier, verifyIdentifier, rows, carried } = harness({
+        user: samUser({ emailVerified: false }),
+        accounts: [],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toEqual({ status: "finalized", report: { kind: "adopted", identifiers: 1 } });
+      expect(attachIdentifier).toHaveBeenCalledTimes(1);
+      expect(attachIdentifier.mock.calls[0]?.[0]).toMatchObject({ provider: "email" });
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect([...rows.values()].map((row) => [row.provider, row.state])).toEqual([
+        ["email", "ATTACHED"],
+      ]);
+      // Nothing set before the proof, so the latch has no secret to carry.
+      expect(carried).toEqual(["looked"]);
     });
 
     it("still backfills an account that was signed into without confirming", async () => {
@@ -481,6 +584,162 @@ describe("the identifier backfill pass", () => {
       const outcome = await service.migrateUser({ userId: USER });
       expect(outcome.status).toBe("finalized");
       expect(outcome.report).toMatchObject({ kind: "user_missing" });
+    });
+  });
+});
+
+describe("when another account shares the address", () => {
+  const EARLIER = Date.UTC(2024, 0, 1);
+  const LATER = Date.UTC(2025, 0, 1);
+
+  describe("and the other account signed in more recently", () => {
+    /** @scenario "Two accounts sharing an address: the most recent sign-in keeps it and the other finalizes without it" */
+    it("finalizes without claiming the address and records only user ids", async () => {
+      const { service, attachIdentifier, verifyIdentifier, rows } = harness({
+        user: samUser({ lastLoginAtMs: EARLIER }),
+        accounts: [githubAccount()],
+        sharers: [{ user: twinUser({ lastLoginAtMs: LATER }), accounts: [googleAccount()] }],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toEqual({
+        status: "finalized",
+        report: {
+          kind: "adopted",
+          identifiers: 1,
+          sharedAddress: { kind: "yielded", userIds: [TWIN] },
+        },
+      });
+      expect(attachIdentifier.mock.calls.map(([data]) => data.provider)).toEqual(["email"]);
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect([...rows.values()].map((row) => row.state)).toEqual(["ATTACHED"]);
+      expect(JSON.stringify(outcome)).not.toContain("@");
+    });
+  });
+
+  describe("and this account signed in most recently", () => {
+    /** @scenario "Two accounts sharing an address: the most recent sign-in keeps it and the other finalizes without it" */
+    it("keeps the address, verified, with its own sign-in methods", async () => {
+      const { service, verifyIdentifier } = harness({
+        user: samUser({ lastLoginAtMs: LATER }),
+        accounts: [githubAccount()],
+        sharers: [{ user: twinUser({ lastLoginAtMs: EARLIER }), accounts: [googleAccount()] }],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toMatchObject({
+        status: "finalized",
+        report: { identifiers: 2, sharedAddress: { kind: "kept", userIds: [TWIN] } },
+      });
+      expect(verifyIdentifier).toHaveBeenCalledTimes(1);
+    });
+
+    it("still yields to an account that already holds the address lock", async () => {
+      const { service } = harness({
+        user: samUser({ lastLoginAtMs: LATER }),
+        accounts: [githubAccount()],
+        sharers: [{ user: twinUser({ lastLoginAtMs: EARLIER }), accounts: [googleAccount()] }],
+        lockHolders: [TWIN],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toMatchObject({ report: { sharedAddress: { kind: "yielded" } } });
+    });
+  });
+
+  describe("and neither account was ever signed into", () => {
+    it("lets the older account keep the address", async () => {
+      const { service } = harness({
+        user: samUser({ createdAtMs: LATER }),
+        accounts: [githubAccount()],
+        sharers: [{ user: twinUser({ createdAtMs: EARLIER }), accounts: [googleAccount()] }],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(outcome).toMatchObject({ report: { sharedAddress: { kind: "yielded" } } });
+    });
+  });
+
+  describe("and the account yielding it holds a GitHub link", () => {
+    /** @scenario "the other still signs in with its own GitHub link" */
+    it("states nothing about the link, so its Account row and credential stay", async () => {
+      const { service, attachIdentifier, detachIdentifier, droppedCredentials } = harness({
+        user: samUser({ lastLoginAtMs: EARLIER }),
+        accounts: [githubAccount()],
+        sharers: [{ user: twinUser({ lastLoginAtMs: LATER }), accounts: [googleAccount()] }],
+      });
+
+      await service.migrateUser({ userId: USER });
+
+      // An attach would lose the lock race and dead-end, and the fold drops a dead end's row.
+      expect(attachIdentifier.mock.calls.map(([data]) => data.accountId)).toEqual([null]);
+      expect(detachIdentifier).not.toHaveBeenCalled();
+      expect(droppedCredentials.flat()).not.toContain("acc_github");
+    });
+  });
+
+  describe("and every account on it carries only the address", () => {
+    /** @scenario "Two email-only accounts sharing an address each get a plus-tagged duplicate address" */
+    it("gives each a plus-tagged duplicate, most recent first, unverified and audited", async () => {
+      const { service, people, audited, verifyIdentifier } = harness({
+        user: samUser({ emailVerified: false, createdAtMs: LATER }),
+        accounts: [],
+        sharers: [{ user: twinUser({ emailVerified: false, createdAtMs: EARLIER }) }],
+      });
+
+      const outcome = await service.migrateUser({ userId: USER });
+
+      expect(people.get(TWIN)?.email).toBe("sam.j+duplicate-1@acme.com");
+      // The double keeps the case the real updateEmail would lower.
+      expect(people.get(USER)?.email).toBe("Sam.J+duplicate-2@Acme.com");
+      expect(outcome).toMatchObject({
+        status: "finalized",
+        report: { sharedAddress: { kind: "retagged", userIds: [TWIN] } },
+      });
+      expect(JSON.stringify(outcome)).not.toContain("@");
+      expect(verifyIdentifier).not.toHaveBeenCalled();
+      expect(audited).toEqual([
+        {
+          userId: TWIN,
+          action: "user.email.duplicate_address_tagged",
+          args: { from: "sam.j@acme.com", to: "sam.j+duplicate-1@acme.com" },
+        },
+        {
+          userId: USER,
+          action: "user.email.duplicate_address_tagged",
+          args: { from: "Sam.J@Acme.com", to: "Sam.J+duplicate-2@Acme.com" },
+        },
+      ]);
+    });
+
+    /** @scenario "Two email-only accounts sharing an address each get a plus-tagged duplicate address" */
+    it("extends an existing tag and skips a duplicate address already taken", async () => {
+      const { service, people } = harness({
+        user: samUser({ email: "sam+work@acme.com", emailVerified: false, createdAtMs: LATER }),
+        accounts: [],
+        sharers: [
+          {
+            user: twinUser({
+              email: "SAM+work@acme.com",
+              emailVerified: false,
+              createdAtMs: EARLIER,
+            }),
+          },
+          {
+            user: samUser({ id: "user_other", email: "sam+work-duplicate-1@acme.com" }),
+            accounts: [githubAccount()],
+          },
+        ],
+      });
+
+      await service.migrateUser({ userId: USER });
+
+      expect(people.get(TWIN)?.email).toBe("SAM+work-duplicate-2@acme.com");
+      expect(people.get(USER)?.email).toBe("sam+work-duplicate-3@acme.com");
     });
   });
 });

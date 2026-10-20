@@ -74,6 +74,29 @@ describe("the platform-operator seed process", () => {
       expect(second.intents).toBeUndefined();
     });
 
+    /** @scenario "Two users signing up at once never both become operators" */
+    it("grants only the first of two first-user records", () => {
+      const first = platformOperatorSeedRecorded(
+        { seededAt: null },
+        { via: "first-user", userIds: ["ana"] },
+        context(5_000),
+      );
+      const second = platformOperatorSeedRecorded(
+        first.state,
+        { via: "first-user", userIds: ["bo"] },
+        context(5_001),
+      );
+
+      expect(first.intents).toEqual([
+        {
+          messageKey: PLATFORM_OPERATOR_SEED_GRANT_KEY,
+          intentType: "grant",
+          payload: { via: "first-user", userIds: ["ana"] },
+        },
+      ]);
+      expect(second.intents).toBeUndefined();
+    });
+
     /** @scenario "With several organizations nobody is seeded and the way in is logged" */
     it("latches a nobody decision without asking for any grant", () => {
       const none = platformOperatorSeedRecorded(

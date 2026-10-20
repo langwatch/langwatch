@@ -1,3 +1,4 @@
+import { runOutsideDelivery } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -48,10 +49,13 @@ export class ReplayLockHeartbeatService {
   }
 
   start(): void {
-    this.timer = setInterval(() => {
-      this.refreshLock();
-      this.pollCancelled();
-    }, LOCK_REFRESH_INTERVAL_MS);
+    // A lock refresh is not the replay's progress: a hung replay must still go silent.
+    this.timer = runOutsideDelivery(() =>
+      setInterval(() => {
+        this.refreshLock();
+        this.pollCancelled();
+      }, LOCK_REFRESH_INTERVAL_MS),
+    );
     this.timer.unref();
   }
 

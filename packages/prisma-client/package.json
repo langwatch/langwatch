@@ -31,7 +31,7 @@
   },
   "scripts": {
     "prisma:generate": "prisma generate --config ./prisma.config.ts && node scripts/generate-table-catalogue.mjs",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
     "test:integration": "vitest run --config vitest.integration.config.ts",
     "db:seed": "pnpm --silent --filter @langwatch/tasks task storage-seed"

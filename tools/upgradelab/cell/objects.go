@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"maps"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -89,16 +90,37 @@ func (stores Stores) objectKeys(ctx context.Context, label string) ([]string, er
 const privatePrefix = "private-"
 
 // privateClient speaks as the first live project of the first private organization, with its project key.
-func (cell *run) privateClient() (Client, string, bool) {
-	for label, organization := range cell.private {
-		for index := range cell.tenancy.Projects {
-			project := cell.tenancy.Projects[index]
-			if !project.Archived && slices.Contains(cell.tenancy.ProjectsOf(organization), project.ID) {
-				return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: RunSeed(cell.options.Seed+1_000_000, cell.origin)}, label, true
-			}
+func (cell *run) privateClient() (Client, string, bool) { return cell.privateClientAt(0) }
+
+// privateClientAt speaks as the first live project of the private organization at index, labels sorted.
+func (cell *run) privateClientAt(at int) (Client, string, bool) {
+	labels := slices.Sorted(maps.Keys(cell.private))
+	if at >= len(labels) {
+		return Client{}, "", false
+	}
+	label := labels[at]
+	organization := cell.private[label]
+	for index := range cell.tenancy.Projects {
+		project := cell.tenancy.Projects[index]
+		if !project.Archived && slices.Contains(cell.tenancy.ProjectsOf(organization), project.ID) {
+			return Client{URL: cell.url(), APIKey: project.APIKey, Project: project.ID, Seed: RunSeed(cell.options.Seed+1_000_000*int64(at+1), cell.origin)}, label, true
 		}
 	}
 	return Client{}, "", false
+}
+
+// otherPrivatePrefix names the traffic the second private organization's project sends (tier M, T7-F9). It is not
+// privatePrefix, so the down-target drill counts it with the organizations that must keep working.
+const otherPrivatePrefix = "other-private-"
+
+// OtherPrivateMix is the second private project's telemetry: traces, logs, metrics and a logged evaluation.
+func OtherPrivateMix(rate time.Duration) []Kind {
+	return []Kind{
+		{Name: otherPrivatePrefix + "otlp-trace", Every: 2 * rate, Write: true, Do: otlpTrace},
+		{Name: otherPrivatePrefix + "otlp-log", Every: 4 * rate, Write: true, Do: otlpLog},
+		{Name: otherPrivatePrefix + "otlp-metric", Every: 4 * rate, Write: true, Do: otlpMetric},
+		{Name: otherPrivatePrefix + "collector-eval", Every: 8 * rate, Write: true, Do: collectorEval},
+	}
 }
 
 // PrivateMix is a private project's traffic: traces, datasets with rows (objects), and reads.
@@ -107,6 +129,9 @@ func PrivateMix(rate time.Duration) []Kind {
 		{Name: privatePrefix + "otlp-trace", Every: rate, Write: true, Do: otlpTrace},
 		{Name: privatePrefix + "dataset", Every: 4 * rate, Write: true, Do: datasetWithRows},
 		{Name: privatePrefix + "rest-read", Every: 2 * rate, Do: restRead},
+		{Name: privatePrefix + "otlp-log", Every: 2 * rate, Write: true, Do: otlpLog},
+		{Name: privatePrefix + "otlp-metric", Every: 2 * rate, Write: true, Do: otlpMetric},
+		{Name: privatePrefix + "collector-eval", Every: 4 * rate, Write: true, Do: collectorEval},
 	}
 }
 
@@ -130,10 +155,10 @@ func datasetWithRows(ctx context.Context, client Client, n int) (*http.Request, 
 	return request, name, err
 }
 
-// privateVisible: a private trace is on the private target; a private dataset reads back with its own key.
-func (cell *run) privateVisible(ctx context.Context, call Call, spans map[string]bool) bool {
-	if call.Kind == privatePrefix+"otlp-trace" {
-		return spans[call.ID]
+// privateVisible: a private ingest id is on the private target; a private dataset reads back with its own key.
+func (cell *run) privateVisible(ctx context.Context, call Call, stored map[string]map[string]bool) bool {
+	if table := storedTable[strings.TrimPrefix(call.Kind, privatePrefix)]; table != "" {
+		return stored[table][call.ID]
 	}
 	return cell.foundAs(ctx, "/api/dataset/"+call.ID, cell.privateTraffic.Client.APIKey) == http.StatusOK
 }
@@ -159,11 +184,9 @@ func (cell *run) isolationVerdicts(ctx context.Context) []Verdict {
 		return []Verdict{{ID: "H3", Name: invariantNames["H3"], Result: "inconclusive", Detail: "no private project in the tenancy"}}
 	}
 	trace, dataset := cell.firstPrivateWrites()
-	own := map[string]int{"trace": cell.foundAs(ctx, "/api/traces/"+trace, cell.privateTraffic.Client.APIKey), "dataset": cell.foundAs(ctx, "/api/dataset/"+dataset, cell.privateTraffic.Client.APIKey)}
 	other := map[string]int{"trace": cell.foundAs(ctx, "/api/traces/"+trace, cell.client.APIKey), "dataset": cell.foundAs(ctx, "/api/dataset/"+dataset, cell.client.APIKey)}
 	return []Verdict{
-		verdict("H3", trace != "" && dataset != "" && own["trace"] == http.StatusOK && own["dataset"] == http.StatusOK,
-			fmt.Sprintf("private key reading trace %q and dataset %q answered %v", trace, dataset, own)),
+		cell.privateReadsVerdict(ctx),
 		cell.objectsVerdict(ctx),
 		verdict("H5", trace != "" && dataset != "" && other["trace"]/100 == 4 && other["dataset"]/100 == 4,
 			fmt.Sprintf("shared project's key reading the private trace and dataset answered %v (want 4xx)", other)),
@@ -172,7 +195,9 @@ func (cell *run) isolationVerdicts(ctx context.Context) []Verdict {
 
 // firstPrivateWrites is one stored private trace id and one created private dataset name.
 func (cell *run) firstPrivateWrites() (trace, dataset string) {
-	for _, call := range cell.privateTraffic.Calls() {
+	callsRange := cell.privateTraffic.Calls()
+	for i := range callsRange {
+		call := &callsRange[i]
 		switch {
 		case call.ok() && trace == "" && call.Kind == privatePrefix+"otlp-trace":
 			trace = call.ID

@@ -1,4 +1,5 @@
-import { Box, Card, Collapsible, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Collapsible, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ChevronDown } from "lucide-react";
 import { useState } from "react";
 
@@ -44,14 +45,14 @@ export function ReplayWizardContent() {
               </Box>
             </Collapsible.Trigger>
             <Collapsible.Content>
-              <Card.Root marginTop={2}>
-                <Card.Body padding={4}>
+              <Box marginTop={2}>
+                <Card>
                   <SingleAggregateReplay
                     projections={projections}
                     onReplayStarted={() => setDrawerOpen(true)}
                   />
-                </Card.Body>
-              </Card.Root>
+                </Card>
+              </Box>
             </Collapsible.Content>
           </Collapsible.Root>
         )}

@@ -1,4 +1,5 @@
 import { createTenantId } from "@langwatch/eventing";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import {
   NormalizedSpanKind,
   SPAN_RECEIVED_EVENT_TYPE,
@@ -6,7 +7,6 @@ import {
 } from "@langwatch/trace-contract";
 import type {
   NormalizedSpan,
-  OtlpSpan,
   SpanReceivedEvent,
   TraceSummaryData,
 } from "@langwatch/trace-contract";
@@ -52,6 +52,8 @@ export function createInitState(): TraceSummaryData {
     models: [],
     totalCost: null,
     nonBilledCost: null,
+    unpricedSpanCount: 0,
+    unpricedModels: [],
     tokensEstimated: false,
     totalPromptTokenCount: null,
     totalCompletionTokenCount: null,

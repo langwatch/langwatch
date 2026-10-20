@@ -9,16 +9,8 @@ import { BlobStoreContent } from "./blob-store-content.tsx";
  */
 export function OpsBlobsDrawer({ onClose }: { onClose: () => void }) {
   return (
-    <Drawer.Root open={true} placement="end" size="xl" onOpenChange={() => onClose()}>
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Payload store</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <BlobStoreContent />
-        </Drawer.Body>
-        <Drawer.CloseTrigger />
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer onClose={onClose} size="xl" title="Payload store">
+      <BlobStoreContent />
+    </Drawer>
   );
 }

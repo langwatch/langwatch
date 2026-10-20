@@ -1,4 +1,7 @@
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useRef, useState } from "react";
+
+const logger = createLogger("langwatch:scenario:ai-generation");
 
 type ModalState = "idle" | "generating" | "error";
 const GENERATION_TIMEOUT_MS = 60000;
@@ -54,7 +57,7 @@ export function useAiGeneration({
     try {
       await Promise.race([generationPromise, timeoutPromise]);
     } catch (error) {
-      console.error("[AICreateModal] generation error:", error);
+      logger.error({ error }, "AICreateModal generation error");
       setModalState("error");
       setCapturedError(error);
     } finally {

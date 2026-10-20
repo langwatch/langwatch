@@ -83,6 +83,14 @@ Feature: A module fills a new read model at deploy by replaying a projection lan
     When the step replays the lane
     Then both tenants are discovered and replayed, each under its own tenant id
 
+  # T7-F14: a private route naming an organisation that does not exist must not fail the step.
+  @unit
+  Scenario: A tenant with no known organisation is skipped and the replay finishes
+    Given the tenant directory lists a tenant whose organisation does not exist
+    When the lane is replayed
+    Then that tenant is skipped with a warning and nothing is deleted
+    And every other tenant is replayed and the step completes
+
   @unit
   Scenario: A tenant listed by both the shared log and the tenant directory is replayed once
     Given the shared log and the tenant directory both list the same tenant

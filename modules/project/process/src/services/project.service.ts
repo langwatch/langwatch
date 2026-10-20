@@ -2,10 +2,7 @@ import type { PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import {
-  PROJECT_KIND,
   activeProjectsByScopesInputSchema,
-  internalProjectKindSchema,
-  internalProjectQuerySchema,
   projectPaginationSchema,
   liveProjectIdsByOrganizationInputSchema,
   projectIdsByOrganizationInputSchema,
@@ -50,6 +47,7 @@ import { codingAgentActivityStaleBefore } from "../rules/coding-agent-activity.r
 import { isLegacyKeyRevoked } from "../rules/legacy-project-key.rules.ts";
 import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 import type { ProjectCredentials } from "./project-credentials.service.ts";
+import { ProjectInternalService } from "./project-internal.service.ts";
 import { ProjectMetadataService } from "./project-metadata.service.ts";
 import { ProjectWriteService } from "./project-write.service.ts";
 
@@ -91,31 +89,35 @@ export class ProjectService {
 
   private readonly metadata: ProjectMetadataService;
   private readonly writes: ProjectWriteService;
+  private readonly internal: ProjectInternalService;
   private readonly repository: ProjectRepository;
-  private readonly credentials: ProjectCredentials;
   private readonly organizations: OrganizationApi;
+  private readonly authorization: Pick<AuthzApi, "listUserBindings">;
   private readonly created: ProjectCreatedNoticeService;
 
   private constructor({
     metadata,
     writes,
+    internal,
     repository,
-    credentials,
     organizations,
+    authorization,
     created,
   }: {
     metadata: ProjectMetadataService;
     writes: ProjectWriteService;
+    internal: ProjectInternalService;
     repository: ProjectRepository;
-    credentials: ProjectCredentials;
     organizations: OrganizationApi;
+    authorization: Pick<AuthzApi, "listUserBindings">;
     created: ProjectCreatedNoticeService;
   }) {
     this.metadata = metadata;
     this.writes = writes;
+    this.internal = internal;
     this.repository = repository;
-    this.credentials = credentials;
     this.organizations = organizations;
+    this.authorization = authorization;
     this.created = created;
   }
 
@@ -123,7 +125,7 @@ export class ProjectService {
     repository: ProjectRepository;
     credentials: ProjectCredentials;
     organizations: OrganizationApi;
-    authorization: Pick<AuthzApi, "checkByIds">;
+    authorization: Pick<AuthzApi, "checkByIds" | "listUserBindings">;
     created: ProjectCreatedNoticeService;
     storedObjects?: ProjectStoredObjects;
     diagnostics?: ProjectDiagnostics;
@@ -134,23 +136,20 @@ export class ProjectService {
         ...(options.diagnostics ? { diagnostics: options.diagnostics } : {}),
       }),
       writes: ProjectWriteService.create(options),
+      internal: ProjectInternalService.create(options),
       repository: options.repository,
-      credentials: options.credentials,
       organizations: options.organizations,
+      authorization: options.authorization,
       created: options.created,
     });
   }
 
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null> {
-    const parsed = internalProjectQuerySchema.parse(input);
-
-    return this.repository.findInternalByOrganization(parsed.organizationId);
+    return this.internal.findInternal(input);
   }
 
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]> {
-    return this.repository.findLiveInternalIds({
-      kind: internalProjectKindSchema.parse(input.kind),
-    });
+    return this.internal.findInternalIds(input);
   }
 
   async resolveTraceDestination(input: TraceDestinationInput): Promise<TraceDestinationDecision> {
@@ -198,29 +197,8 @@ export class ProjectService {
     return this.repository.findTraceDestinations([...new Set(parsed)]);
   }
 
-  async ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
-    const parsed = internalProjectQuerySchema.parse(input);
-    const existing = await this.repository.findInternalByOrganization(parsed.organizationId);
-    if (existing) {
-      return existing;
-    }
-
-    const teamId = await this.organizations.getOldestTeamId({
-      organizationId: parsed.organizationId,
-    });
-    const slug = `governance-${parsed.organizationId}`;
-    const bySlug = await this.repository.findInternalBySlug(slug);
-    if (bySlug?.kind === PROJECT_KIND.INTERNAL_GOVERNANCE) {
-      return bySlug;
-    }
-
-    return this.repository.createInternalOrFindWinner({
-      id: this.credentials.generateProjectId(),
-      name: "Governance (internal)",
-      slug,
-      apiKey: this.credentials.generateApiKey(),
-      teamId,
-    });
+  ensureInternal(input: InternalProjectQuery): Promise<InternalProject> {
+    return this.internal.ensureInternal(input);
   }
 
   isPresenceEnabled(input: { projectId: string }): Promise<boolean> {
@@ -246,6 +224,22 @@ export class ProjectService {
 
   findOrganizationId(projectId: string): Promise<string | undefined> {
     return this.repository.findOrganizationId(projectId);
+  }
+
+  /**
+   * Whether the user belongs to the team that owns this project. The team roster
+   * is the organisation's, read here because the project's team is this module's
+   * own fact; an absent project is nobody's team.
+   */
+  async isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    const project = await this.findWithTeam(input.projectId);
+    if (!project) return false;
+
+    const teamIds = await this.organizations.findMemberTeamIds({
+      organizationId: project.team.organizationId,
+      userId: input.userId,
+    });
+    return teamIds.includes(project.teamId);
   }
 
   findIdentity(id: string): Promise<ProjectIdentity | null> {
@@ -350,12 +344,30 @@ export class ProjectService {
     return this.repository.listLwqlKeys(input);
   }
 
-  findSharedProjectSlugs(input: {
+  /** A member's projects are those its own grants name, at their team or the project itself. */
+  async findSharedProjectSlugs({
+    organizationId,
+    memberUserId,
+    limit,
+  }: {
     organizationId: string;
     memberUserId?: string;
     limit: number;
   }): Promise<string[]> {
-    return this.repository.findSharedProjectSlugs(input);
+    if (memberUserId === undefined) {
+      return this.repository.findSharedProjectSlugs({ organizationId, limit });
+    }
+
+    const bindings = await this.authorization.listUserBindings({
+      organizationId,
+      userId: memberUserId,
+    });
+    const scopeIds = (scopeType: "TEAM" | "PROJECT") =>
+      bindings.filter((binding) => binding.scopeType === scopeType).map(({ scopeId }) => scopeId);
+    const member = { teamIds: scopeIds("TEAM"), projectIds: scopeIds("PROJECT") };
+    if (member.teamIds.length === 0 && member.projectIds.length === 0) return [];
+
+    return this.repository.findSharedProjectSlugs({ organizationId, member, limit });
   }
 
   listIdsByOrganization(input: { organizationId: string }): Promise<string[]> {

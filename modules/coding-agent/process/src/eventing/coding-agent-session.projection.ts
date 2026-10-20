@@ -45,6 +45,11 @@ export const CODING_AGENT_SESSION_PROJECTION_VERSION_PRE_STAMP = "2026-07-21";
 /** StartedAt drift window (±7 days); declared once for all callers to share. */
 const CODING_AGENT_SESSION_READ_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
 
+/** Past the window, the anchored lookup's 21- and 30-day steps (trace ruling, 2026-10-10). */
+const CODING_AGENT_SESSION_FALLBACK_LOOKBACK_STEPS_MS = [21, 30].map(
+  (days) => days * 24 * 60 * 60 * 1000,
+);
+
 /** Coalesce max batch; limited to ~few KB per version to avoid watermark bloat. */
 const CODING_AGENT_SESSION_COALESCE_MAX_BATCH = 128;
 
@@ -92,12 +97,15 @@ export class CodingAgentSessionFoldProjection
   /**
    * Read back committed state per ADR-066. A schema-gated miss refolds once;
    * steady-state delivery never reads `event_log`. Out-of-order refolds stay
-   * off since accumulators commute, and the window retries unbounded on a miss.
+   * off since accumulators commute. A miss widens back to 30 days, then rebuilds from the log.
    */
   override options: FoldProjectionOptions = {
     refoldOnStoreMiss: true,
     refoldOnOutOfOrder: false,
-    readWindow: { widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS },
+    readWindow: {
+      widthMs: CODING_AGENT_SESSION_READ_WINDOW_MS,
+      fallbackLookbackStepsMs: CODING_AGENT_SESSION_FALLBACK_LOOKBACK_STEPS_MS,
+    },
     coalesceMaxBatch: CODING_AGENT_SESSION_COALESCE_MAX_BATCH,
   };
 

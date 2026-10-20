@@ -14,8 +14,6 @@ import {
   ImpersonationCannotChangeCredentialsError,
   type SetOwnFirstPasswordInput,
   type UserApi,
-  UserFederatedPasswordAccountMissingError,
-  UserFederatedPasswordChangeUnavailableError,
   UserPasswordAlreadySetError,
   UserPasswordAttemptsThrottledError,
   UserPasswordAuthUnavailableError,
@@ -23,9 +21,7 @@ import {
   UserPasswordNotSetError,
 } from "@langwatch/user-contract";
 
-import { changeTargetsBrokeredPassword } from "../rules/password-change-target.rules.ts";
-
-type PasswordReads = Pick<UserApi, "findById" | "hasPassword">;
+type PasswordReads = Pick<UserApi, "findById">;
 
 /**
  * Better Auth's own account storage: its adapter routes a user moved onto the identity branch to
@@ -47,11 +43,7 @@ export interface CredentialAccounts {
 }
 type PasswordDoors = Pick<
   AuthApi,
-  | "resolveAuthProvider"
-  | "route"
-  | "isWithinBudget"
-  | "changeFederatedPassword"
-  | "revokeOtherBrowserSessions"
+  "resolveAuthProvider" | "route" | "isWithinBudget" | "revokeOtherBrowserSessions"
 >;
 
 const PASSWORD_BUDGET = { windowSeconds: 60 * 15, max: 5 } as const;
@@ -129,21 +121,13 @@ export class OwnPasswordService {
     const provider = await this.auth.resolveAuthProvider();
 
     // A denied SSO deployment is coerced to email mode (ADR-027); the current password is
-    // demanded, so a recovered credential account may always be changed.
+    // demanded, so a recovered credential account may always be changed. An Auth0 user's
+    // password was imported into our own rows (D10), so it changes here like any other.
     if (provider !== "email" && provider !== "auth0" && !this.issuesOwnPasswords()) {
       throw new UserPasswordAuthUnavailableError();
     }
 
     await this.#meter(`user.changePassword:${input.userId}`);
-
-    const holdsOwnPassword = await this.users.hasPassword({ id: input.userId });
-
-    if (changeTargetsBrokeredPassword({ provider, holdsOwnPassword })) {
-      await this.#changeFederated(input);
-      await this.#endOtherSessions(input);
-
-      return;
-    }
 
     const credential = await this.credentials.findCredential({ userId: input.userId });
 
@@ -185,29 +169,5 @@ export class OwnPasswordService {
       userId: input.userId,
       keepSessionId: input.keepSessionId,
     });
-  }
-
-  async #changeFederated(input: ChangeOwnPasswordInput): Promise<void> {
-    const profile = await this.users.findById({ id: input.userId });
-    const result = await this.auth.changeFederatedPassword({
-      userId: input.userId,
-      email: profile?.email ?? null,
-      currentPassword: input.currentPassword,
-      newPassword: input.newPassword,
-    });
-
-    if (result.outcome === "changed") return;
-    if (result.outcome === "no_federated_account") {
-      throw new UserFederatedPasswordAccountMissingError(input.userId);
-    }
-    // Nothing the caller sent causes an account with no address, so it is the generic failure.
-    if (result.outcome === "no_address_on_record") {
-      throw new Error("the authenticated account carries no email address");
-    }
-    if (result.outcome === "wrong_password") throw new UserPasswordIncorrectError();
-    // The provider's policy rejected the NEW password; its wording says what to fix.
-    if (result.outcome === "weak_password") throw new ValidationError(result.message);
-
-    throw new UserFederatedPasswordChangeUnavailableError(result.outcome);
   }
 }

@@ -192,7 +192,7 @@ function LogEntry({
         {entry.traceId}
       </Text>
       {canCopy && (
-        <Text fontSize="10px" color={copied ? "green.fg" : "fg.muted"} flexShrink={0}>
+        <Text textStyle="micro" color={copied ? "green.fg" : "fg.muted"} flexShrink={0}>
           {copied ? "Copied!" : "Copy ID"}
         </Text>
       )}

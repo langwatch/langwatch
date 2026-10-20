@@ -13,7 +13,13 @@ type Call = {
 };
 
 const { state } = vi.hoisted(() => ({
-  state: { calls: [] as Call[], migrations: [] as Call[], refusal: null as unknown },
+  state: {
+    calls: [] as Call[],
+    migrations: [] as Call[],
+    operatorMigrations: [] as Call[],
+    invalidated: 0,
+    refusal: null as unknown,
+  },
 }));
 
 vi.mock("../../../behavior/sso-api.ts", () => {
@@ -34,10 +40,18 @@ vi.mock("../../../behavior/sso-api.ts", () => {
 
   return {
     ssoApi: {
+      useUtils: () => ({
+        ssoConnections: {
+          invalidate: async () => {
+            state.invalidated += 1;
+          },
+        },
+      }),
       ssoSetup: {
         register: recorder(state.calls),
         startLegacyMigration: recorder(state.migrations),
       },
+      ssoConnections: { startLegacyMigration: recorder(state.operatorMigrations) },
     },
   };
 });
@@ -58,6 +72,7 @@ function renderSection(
   overrides: {
     canManage?: boolean;
     replacesConnectionId?: string;
+    mode?: "customer" | "operator";
     onRegistered?: () => Promise<unknown> | void;
   } = {},
 ) {
@@ -67,6 +82,7 @@ function renderSection(
       serviceProvider={SERVICE_PROVIDER}
       canManage={overrides.canManage ?? true}
       replacesConnectionId={overrides.replacesConnectionId}
+      mode={overrides.mode}
       onRegistered={overrides.onRegistered}
     />,
     new FakeSsoHost({ canManage: overrides.canManage ?? true }),
@@ -80,6 +96,8 @@ function fill(label: string | RegExp, value: string) {
 beforeEach(() => {
   state.calls.length = 0;
   state.migrations.length = 0;
+  state.operatorMigrations.length = 0;
+  state.invalidated = 0;
   state.refusal = null;
 });
 
@@ -317,6 +335,38 @@ describe("registering an identity provider", () => {
         {
           title: "Replacement registered",
           description: "Your current sign-in keeps working until you switch everyone over.",
+        },
+      ]);
+    });
+  });
+
+  describe("when an operator imports the replacement from the back office", () => {
+    /** @scenario "An operator's import starts the guarded migration from the back office" */
+    it("runs the back office's migration and shows none of our addresses", async () => {
+      const { host } = renderSection({ replacesConnectionId: "ssoc_legacy", mode: "operator" });
+
+      fireEvent.click(screen.getByTestId("identity-provider-saml"));
+      fill("Connection name", "Corporate sign-in");
+      fill("Sign-in address", "https://sso.acme.com/saml2/sso");
+
+      expect(screen.queryByTestId("sso-register-console")).toBeNull();
+
+      fireEvent.click(screen.getByText("Import replacement"));
+      await state.operatorMigrations[0]?.options?.onSuccess?.();
+
+      expect(state.calls).toEqual([]);
+      expect(state.migrations).toEqual([]);
+      expect(state.operatorMigrations[0]?.input).toMatchObject({
+        organizationId: "org-1",
+        legacyConnectionId: "ssoc_legacy",
+        providerId: "Corporate sign-in",
+      });
+      expect(state.invalidated).toBe(1);
+      expect(host.acknowledgements).toEqual([
+        {
+          title: "Replacement imported",
+          description:
+            "The organization's current sign-in keeps working until it is switched over.",
         },
       ]);
     });

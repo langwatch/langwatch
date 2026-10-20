@@ -1,10 +1,10 @@
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Radio, RadioGroup } from "@langwatch/design-system/radio";
 import { Download } from "lucide-react";
 import { useState } from "react";
 
 import type { ExportFormat, ExportMode } from "../../../model/export-types.ts";
-import { Dialog } from "../dialog.tsx";
 
 interface ExportConfigDialogProps {
   isOpen: boolean;
@@ -52,68 +52,59 @@ export function ExportConfigDialog({
   };
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Export Traces</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={5}>
-            <Text color="fg.muted" fontSize="sm">
-              {formatTraceCount({ traceCount, isSelectedExport })}
-            </Text>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title="Export Traces"
+      primaryAction={{
+        label: "Export",
+        icon: <Download size={16} />,
+        onClick: handleExport,
+        "data-testid": "trace-export-submit",
+      }}
+    >
+      <VStack align="stretch" gap={5}>
+        <Text color="fg.muted" fontSize="sm">
+          {formatTraceCount({ traceCount, isSelectedExport })}
+        </Text>
 
+        <VStack align="stretch" gap={2}>
+          <Text fontWeight="medium" fontSize="sm">
+            Mode
+          </Text>
+          <RadioGroup value={mode} onValueChange={({ value }) => setMode(value as ExportMode)}>
             <VStack align="stretch" gap={2}>
-              <Text fontWeight="medium" fontSize="sm">
-                Mode
-              </Text>
-              <RadioGroup value={mode} onValueChange={({ value }) => setMode(value as ExportMode)}>
-                <VStack align="stretch" gap={2}>
-                  <HStack gap={2}>
-                    <Radio value="summary">Summary</Radio>
-                    <Text color="fg.muted" fontSize="xs">
-                      One row per trace
-                    </Text>
-                  </HStack>
-                  <HStack gap={2}>
-                    <Radio value="full">Full</Radio>
-                    <Text color="fg.muted" fontSize="xs">
-                      One row per span, includes inputs/outputs
-                    </Text>
-                  </HStack>
-                </VStack>
-              </RadioGroup>
+              <HStack gap={2}>
+                <Radio value="summary">Summary</Radio>
+                <Text color="fg.muted" fontSize="xs">
+                  One row per trace
+                </Text>
+              </HStack>
+              <HStack gap={2}>
+                <Radio value="full">Full</Radio>
+                <Text color="fg.muted" fontSize="xs">
+                  One row per span, includes inputs/outputs
+                </Text>
+              </HStack>
             </VStack>
+          </RadioGroup>
+        </VStack>
 
-            <VStack align="stretch" gap={2}>
-              <Text fontWeight="medium" fontSize="sm">
-                Format
-              </Text>
-              <RadioGroup
-                value={format}
-                onValueChange={({ value }) => setFormat(value as ExportFormat)}
-              >
-                <HStack gap={4}>
-                  <Radio value="csv">CSV</Radio>
-                  <Radio value="json">JSON</Radio>
-                </HStack>
-              </RadioGroup>
-            </VStack>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3}>
-            <Button variant="outline" onClick={onClose} data-testid="trace-export-cancel">
-              Cancel
-            </Button>
-            <Button colorPalette="orange" onClick={handleExport} data-testid="trace-export-submit">
-              <Download size={16} />
-              Export
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+        <VStack align="stretch" gap={2}>
+          <Text fontWeight="medium" fontSize="sm">
+            Format
+          </Text>
+          <RadioGroup
+            value={format}
+            onValueChange={({ value }) => setFormat(value as ExportFormat)}
+          >
+            <HStack gap={4}>
+              <Radio value="csv">CSV</Radio>
+              <Radio value="json">JSON</Radio>
+            </HStack>
+          </RadioGroup>
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }

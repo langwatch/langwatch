@@ -2,6 +2,7 @@ import type { Named } from "@langwatch/module";
 /** Activation codes (ADR-156, section 5), as the license registry's admin console
  * reads and writes them. `licensing` is enterprise, so every shape here is
  * declared locally rather than imported from it (as `license-registry.ts`). */
+import { statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
 
 const activationCodeStatusSchema = z.enum(["active", "redeemed", "expired", "revoked"]);
@@ -15,7 +16,8 @@ const activationCodeViewSchemaDefinition = z.object({
   email: z.string(),
   planType: z.string(),
   maxMembers: z.number(),
-  maxMembersLite: z.number(),
+  maxMembersLite: z.number().nullable(),
+  liteSeatsUnlimited: z.boolean(),
   licenseTermDays: z.number(),
   services: z.array(z.string()),
   expiresAt: z.string(),
@@ -64,7 +66,7 @@ const issueActivationCodeInputSchemaDefinition = z.object({
   email: z.string().min(1),
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
-  maxMembersLite: z.number().int().min(0).optional(),
+  maxMembersLite: statedLiteSeatsSchema.optional(),
   licenseTermDays: z.number().int().min(1),
   services: z.array(z.string()).optional(),
   /** ISO 8601. The instant the code stops working. */

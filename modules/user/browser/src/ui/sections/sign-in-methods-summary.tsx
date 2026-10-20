@@ -5,8 +5,9 @@
  */
 
 import { Link } from "@langwatch/browser-host/link";
-import { Badge, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingsSection, SettingsSectionRow } from "@langwatch/design-system/settings-section";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { KeyRound } from "lucide-react";
 import { useEffect, useState } from "react";
 
@@ -89,7 +90,7 @@ export function SignInMethodsSummary() {
       data-testid="sign-in-methods-summary"
     >
       {identifiers.isPending || confirmation.isPending ? (
-        <Spinner size="sm" />
+        <SkeletonRows rows={2} />
       ) : (
         <VStack align="stretch" gap={2} width="full">
           {rows.map(({ key, ...row }) => (

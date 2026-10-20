@@ -13,7 +13,10 @@ Record: `dev/docs/ARCHITECTURE.md` §3.1 (the contract), §8 (transports), §12
 
 The contract is **everything another module or a browser may know** about you:
 schemas, portable types, errors, the tRPC declarations, the `*Api` interface.
-It imports no framework runtime and no other half (see the `module` skill).
+It imports no framework runtime and no other half (see the `module` skill); the light
+`@langwatch/module` core is its one framework import, plus the portable surfaces record §2 names
+(config and secret handles, errors, `@langwatch/eventing/tables`). A browser also reads a module's
+`<name>-client` and lent tokens, which sit beside the contract, not in it.
 
 ## What lives in `contract/src/`
 
@@ -61,12 +64,14 @@ suffix (`.repository`, `.channel`, `.rules`...) in a contract is refused.
    transport (§8). REST wire schemas stay distinct from domain schemas.
 7. **A known failure is a `HandledError` subclass with a stable code**
    (§12). `message` is customer-safe. Tests assert the `code`, not prose.
-   A ported code keeps main's spelling. A 5xx sets `fault` explicitly.
+   A ported code keeps main's spelling. A 5xx sets `fault` explicitly (`customer` is allowed
+   where the customer caused it).
 8. **A new `*Api` operation is a design choice.** Ask first, unless it is a
    one-to-one port of logic main kept in a handler (§8: pre-approved).
 9. **Contract `package.json` names no runtime**: no `prisma-client`,
-   `clickhouse-client`, `redis-client`, `eventing`, `group-queue`, `process-*`
-   (§3; the `manifests` policy refuses it).
+   `clickhouse-client`, `redis-client`, the eventing runtime, `group-queue`, `process-*`
+   (§3; the `manifests` policy refuses it). The plain-data subpath
+   `@langwatch/eventing/tables` is allowed (§2; `modules/data-retention/contract`).
 
 ## Worked example: an error and its code
 
@@ -87,9 +92,10 @@ export class MonitorNotFoundError extends HandledError {
 }
 ```
 
-Then add the code to the registry (customer copy, tips) in
-`packages/handled-error/src/remediation.ts`. `remediation("<code>")` is typed
-over that registry, so an unregistered code does not compile. A 404 can also
+Then register the code in three places, in the same change: `packages/handled-error/src/app-codes.ts`
+(sorted), the customer copy in `presentation.ts`, and the tips and docs link in `remediation.ts`.
+`remediation("<code>")` is typed over the remediation registry, so an unregistered code does not
+compile. A 404 can also
 extend `NotFoundError` (`organization/contract/src/team.errors.ts`).
 Presentation copy: `dev/docs/best_practices/error-handling.md`.
 

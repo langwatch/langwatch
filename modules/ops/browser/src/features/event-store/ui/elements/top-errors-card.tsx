@@ -1,5 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Card, HStack, Table, Text } from "@langwatch/design-system/primitives";
+import { HStack, Text } from "@langwatch/design-system/primitives";
 import type { DashboardData } from "@langwatch/ops-contract";
 
 /**
@@ -22,7 +23,7 @@ export function TopErrorsCard({
   const truncated = known > shown;
 
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none" overflow="hidden">
+    <Card padding="none">
       <HStack paddingX={4} paddingTop={3} paddingBottom={2}>
         <Text textStyle="xs" fontWeight="medium" color="fg.muted">
           Top errors
@@ -33,41 +34,32 @@ export function TopErrorsCard({
           </Text>
         )}
       </HStack>
-      <Table.ScrollArea>
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          size="sm"
-          variant="line"
-          css={{ "& tr:last-child td": { borderBottom: "none" } }}
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader width="60px">Count</Table.ColumnHeader>
-              <Table.ColumnHeader>Error</Table.ColumnHeader>
-              <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {topErrors.slice(0, VISIBLE_ROWS).map((err) => (
-              <Table.Row key={`${err.queueName}::${err.normalizedMessage}`}>
-                <Table.Cell>
-                  <Text color="red.fg" fontWeight="medium">
-                    {err.count}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell>
-                  <Text truncate maxWidth="400px">
-                    {err.sampleMessage}
-                  </Text>
-                </Table.Cell>
-                <Table.Cell color="fg.muted">{err.pipelineName ?? "—"}</Table.Cell>
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </ListTable>
-      </Table.ScrollArea>
-    </Card.Root>
+      <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Top errors">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width={60}>Count</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Error</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {topErrors.slice(0, VISIBLE_ROWS).map((err) => (
+            <ListTable.Row key={`${err.queueName}::${err.normalizedMessage}`}>
+              <ListTable.Cell>
+                <Text color="red.fg" fontWeight="medium">
+                  {err.count}
+                </Text>
+              </ListTable.Cell>
+              <ListTable.Cell>
+                <Text truncate maxWidth="400px">
+                  {err.sampleMessage}
+                </Text>
+              </ListTable.Cell>
+              <ListTable.Cell tone="muted">{err.pipelineName ?? "—"}</ListTable.Cell>
+            </ListTable.Row>
+          ))}
+        </ListTable.Body>
+      </ListTable>
+    </Card>
   );
 }

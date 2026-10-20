@@ -4,6 +4,8 @@ import {
   createTenantRouter,
   DuplicateRouteError,
   parseRoutingTable,
+  PrivateRouteRefusalFactory,
+  PrivateRouteUnavailableError,
   type TenantDirectory,
   UnknownTenantError,
 } from "../tenancy.ts";
@@ -320,6 +322,113 @@ describe("createTenantRouter", () => {
 
         expect(router.size()).toBeLessThanOrEqual(3);
       });
+    });
+  });
+});
+
+describe("createTenantRouter, given organizations recorded as private", () => {
+  const recordedDirectory = (
+    recorded: Record<string, string>,
+  ): TenantDirectory & { asked: string[] } => {
+    const asked: string[] = [];
+    return {
+      asked,
+      organizationForTenant: async (tenantId) => (tenantId.startsWith("project_") ? "org_1" : null),
+      recordedPrivateDataplaneOf: async (organizationId) => {
+        asked.push(organizationId);
+        return { clickhouseLabel: recorded[organizationId] ?? null, s3Label: null };
+      },
+    };
+  };
+
+  describe("when the recorded organization's route is present", () => {
+    /** @scenario "A recorded private organization with its route present routes to its own server" */
+    it("routes it to its own server without asking for the record", async () => {
+      const directory = recordedDirectory({ org_1: "acme" });
+      const router = createTenantRouter({
+        table: tableOf({ org_1: "http://acme:8123" }),
+        directory,
+      });
+
+      await expect(router.route("project_a")).resolves.toEqual({
+        kind: "private",
+        organizationId: "org_1",
+        url: "http://acme:8123",
+      });
+      expect(directory.asked).toEqual([]);
+    });
+  });
+
+  describe("when the recorded organization's route is missing", () => {
+    /** @scenario "A recorded private organization whose route is missing is refused, naming the variable" */
+    it("refuses, naming the variable as missing, and never answers shared", async () => {
+      const router = createTenantRouter({
+        table: tableOf({}),
+        directory: recordedDirectory({ org_1: "acme" }),
+      });
+
+      await expect(router.route("project_a")).rejects.toMatchObject({
+        name: "PrivateRouteUnavailableError",
+        refusal: {
+          organizationId: "org_1",
+          variable: "CLICKHOUSE_URL__acme__org_1",
+          problem: "missing",
+        },
+      });
+    });
+
+    it("refuses a declared tenant set through the same check", async () => {
+      const router = createTenantRouter({
+        table: tableOf({}),
+        directory: recordedDirectory({ org_1: "acme" }),
+      });
+
+      await expect(router.routeOrganization("org_1")).rejects.toBeInstanceOf(
+        PrivateRouteUnavailableError,
+      );
+    });
+
+    it("throws what the refusal factory builds", async () => {
+      class Refusal extends PrivateRouteRefusalFactory {
+        create(refusal: { variable: string }): unknown {
+          return new Error(`refused ${refusal.variable}`);
+        }
+      }
+      const router = createTenantRouter({
+        table: tableOf({}),
+        directory: recordedDirectory({ org_1: "acme" }),
+        refusal: new Refusal(),
+      });
+
+      await expect(router.route("project_a")).rejects.toThrow(
+        "refused CLICKHOUSE_URL__acme__org_1",
+      );
+    });
+  });
+
+  describe("when the organization's route variable is malformed", () => {
+    /** @scenario "An organization whose route variable is malformed is refused, naming the variable" */
+    it("parses it as malformed and refuses, naming the variable", async () => {
+      const table = parseRoutingTable({
+        CLICKHOUSE_URL__acme__org_1: "clickhouse-private-route-is-not-a-url",
+      });
+      expect(table.routes.size).toBe(0);
+      expect(table.malformed?.get("org_1")).toBe("CLICKHOUSE_URL__acme__org_1");
+
+      const router = createTenantRouter({ table, directory: recordedDirectory({}) });
+
+      await expect(router.route("project_a")).rejects.toMatchObject({
+        refusal: { variable: "CLICKHOUSE_URL__acme__org_1", problem: "malformed" },
+      });
+    });
+  });
+
+  describe("when the organization was never recorded and has no route", () => {
+    /** @scenario "An organization never recorded as private and with no route stays on the shared server" */
+    it("routes it to the shared server, as before", async () => {
+      const router = createTenantRouter({ table: tableOf({}), directory: recordedDirectory({}) });
+
+      await expect(router.route("project_a")).resolves.toEqual({ kind: "shared" });
     });
   });
 });

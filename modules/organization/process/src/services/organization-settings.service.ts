@@ -15,7 +15,7 @@ import type { OrganizationLifecycleNoticeService } from "./organization-lifecycl
 /** Where a stored presence switch is recorded, so presence folds it from its own side (§9). */
 export type OrganizationSettingsNotices = Pick<
   OrganizationLifecycleNoticeService,
-  "presenceSettingChanged" | "recordStoredPresenceSetting"
+  "presenceSettingChanged" | "recordStoredPresenceSettings"
 >;
 
 export class OrganizationSettingsService {
@@ -74,15 +74,27 @@ export class OrganizationSettingsService {
     return { traceShareRevocationRequired: wasSharingEnabled };
   }
 
-  async recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
-    const stored = await this.deps.repository.findStoredSettings(input.organizationId);
-    if (!stored) return false;
-    if (!this.deps.settingsNotices) throw new Error("organization settings notices are not wired");
-    await this.deps.settingsNotices.recordStoredPresenceSetting({
-      organizationId: input.organizationId,
-      presenceEnabled: stored.presenceEnabled,
+  /**
+   * One page of stored presence switches after `afterOrganizationId`, recorded as one batch; a
+   * dry run reads the page and records nothing. Answers the page's last organization.
+   */
+  async recordStoredPresenceSettingPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ lastOrganizationId: string | null; organizations: number }> {
+    const page = await this.deps.repository.findPresenceSettingPage({
+      afterId: input.afterOrganizationId,
+      limit: input.limit,
     });
-    return true;
+    if (!input.dryRun && page.length > 0) {
+      if (!this.deps.settingsNotices)
+        throw new Error("organization settings notices are not wired");
+      await this.deps.settingsNotices.recordStoredPresenceSettings(
+        page.map((row) => ({ organizationId: row.id, presenceEnabled: row.presenceEnabled })),
+      );
+    }
+    return { lastOrganizationId: page.at(-1)?.id ?? null, organizations: page.length };
   }
 
   /** As `/me` read it: the configured contact, else the longest-seated enabled administrator. */

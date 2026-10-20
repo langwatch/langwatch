@@ -9,12 +9,12 @@ user-invocable: true
 One Go process playing the customer's IdP across independent tenants (`/t/1` to `/t/N`):
 an OIDC provider, a SAML identity provider, a SCIM 2.0 directory (it also pushes at
 LangWatch's SCIM endpoint) and a fake domain owner (`acme<n>.test`, DNS TXT and a
-well-known token). Permissive by design: never expose it. Code: `services/idpsim` (the
-README there is the full reference), console `apps/idpsim-web` (ADR-160).
+well-known token). Permissive by design: never expose it. Code: `services/sims/idpsim` (the
+README there is the full reference), console `apps/sims/src/idp` (ADR-160).
 
 ## Run it
 
-- On by default in haven (`haven up -idp` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`haven up -idp` turns it off). Runs in the `go` lane by default (see `sims`).
 - Console: `https://idp.<slug>.langwatch.localhost`; tenant pages at `/t/<n>/`. `haven status`
   shows the loopback port and the DNS port (default `:15353`).
 - The overlay sets `LANGWATCH_IDPSIM_URL`, `SSO_TRUSTED_IDP_ORIGINS` and
@@ -33,7 +33,13 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 - SAML: sign-in `<base>/t/<n>/saml/sso`, metadata `<base>/t/<n>/saml/metadata`.
 - Zero-click login in a test: `login_hint=<email>`. Seeded users per tenant:
   `admin@acme<n>.test`, `member@acme<n>.test`.
+- Social sign-in (Google, GitHub, GitLab, Microsoft): `+idp` points `GOOGLE_SIGN_IN_BASE`,
+  `GITHUB_SIGN_IN_BASE`, `GITLAB_SIGN_IN_BASE` and `MICROSOFT_SIGN_IN_BASE` at tenant 1's
+  `/t/1/social/<provider>`. Set `AUTH_PROVIDER` to a non-email provider and any
+  `<PROVIDER>_CLIENT_ID`/`_SECRET` (idpsim accepts anything), then press the provider's button;
+  `login_hint=admin@acme1.test` skips the picker. Read `social.<provider>.*` in the activity feed.
 - Activity (every authorize, token, assertion, SCIM call with an outcome and a reason):
+- On an IS_SAAS stack also set LOCAL_PASSWORDS_ENABLED=on, or admin password sign-in is refused (EMAIL_PASSWORD_DISABLED).
   `GET /control/t/<n>/activity`, or the tenant page's activity tab. Read it first when a
   login fails: it says whether the request even arrived.
 
@@ -45,6 +51,8 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
   with a "Post it to the ACS" form, lists sign-in links (as `haven sim idp signin`) and resets.
   After any reload its skew and break inputs show the tenant's values again.
 - `POST /control/t/<n>/tamper {"mode":"saml-bad-signature|saml-unsigned|saml-wrong-audience|saml-wrong-recipient|saml-expired|saml-not-yet-valid|saml-replayed-assertion|saml-wrong-in-response-to"}` breaks the next SAML response once (`haven sim idp fault <n> <mode>`).
+- `POST /control/t/<n>/config {"amr":["pwd","mfa"]}` makes the tenant's OIDC ID tokens assert those
+  authentication methods (an IdP-verified second factor); `{"amr":[]}` or a reset stops it. Survives a restart.
 - `POST /control/t/<n>/config {"skewSeconds":600}` runs the tenant clock ahead (negative = behind) for ID tokens and SAML assertions (`haven sim idp skew <n> <seconds>`).
 - `POST /control/t/<n>/rotate-key {}` makes a new signing key current while JWKS and SAML metadata still publish the old one; `{"dropPrevious":true}` stops publishing it (`haven sim idp rotate-key <n> [--drop-previous]`). Reset clears skew but keeps keys.
 - `POST /control/t/<n>/user-active {"user":"<email>","active":false}` disables a user at the IdP; OIDC and SAML sign-in refuse them (`haven sim idp user disable|enable <n> <email>`).
@@ -70,11 +78,13 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 ## From a terminal or agent
 
 `haven sim idp <verb>` drives a running idpsim (`--json` on reads, `--stack <slug>` for another stack):
-`tenants` (every tenant, as the console's landing page lists them), `tenant show <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
+`list` (every tenant, as the console's landing page lists them), `get <t>` (also prints signing keys, skew and the armed break), `apps add|remove`, `populate`, `churn`, `user add`, `scim target set|clear`,
 `scim push|pull|sync`, `scim-event <t> <kind> [--style okta|entra] [--user] [--group] [--set k=v]`,
 `dns add|remove`, `verification set|clear`, `activity`, `signin <t> --user <email>` (prints the IdP-initiated URL),
-`reset`, `samlp <t> on|off`. Full table: `services/idpsim/README.md`.
+`clear` (resets), `samlp <t> on|off`. The retired spellings `tenants`, `tenant show` and `reset` are refused. Full table: `services/sims/idpsim/README.md`.
 
+- SAML sign-in (redirect binding) with no `login_hint` lands on the same account picker as OIDC;
+  scripts skip it with `login_hint=<email>` on the SSO URL. A POST-binding request without a hint still asserts the first active user.
 - Legacy SSO: `haven sim idp legacy provider <t> auth0|okta|cognito|onelogin|azure|show`, then
   `haven sim idp legacy env <t>` for the env lines (apply with `haven down` then `haven up`).
   `azure` is Entra: the product's authority host is hard-wired, so resolve
@@ -99,4 +109,4 @@ README there is the full reference), console `apps/idpsim-web` (ADR-160).
 
 ## Spec and tests
 
-`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/idpsim`.
+`specs/setup/idp-simulator.feature`. Go tests: `go test ./services/sims/idpsim`.

@@ -1,25 +1,28 @@
+import { AnalyticsApi } from "@langwatch/analytics-contract";
 /**
  * @vitest-environment node
  * One Evaluation service is composed when the feature installs; every read afterwards,
  * in either role, goes through it and builds nothing.
  */
-import type { AnalyticsApi } from "@langwatch/analytics-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EvaluationApi, type EvaluationRunData } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { MonitorApi } from "@langwatch/monitor-contract";
-import { createApp } from "@langwatch/process";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { MonitorApi } from "@langwatch/monitor-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.ts";
 import { evaluationProcessModule } from "../../evaluation.module.ts";
 import { EvaluationExecutionService } from "../../features/execution/services/evaluation-execution.service.ts";
 import { ClickHouseEvaluationRepository } from "../../repositories/clickhouse/evaluation.repository.ts";
@@ -54,25 +57,36 @@ const RUN: EvaluationRunData = {
 };
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([installableEvaluation])
-    .withConfig({ evaluation: EVALUATION_TEST_CONFIG })
-    .withStores(memoryStores())
-    .provide({
-      workflow: createApiFixture<WorkflowApi>(),
-      trace: createApiFixture<TraceApi>(),
-      "model-provider": createApiFixture<ModelProviderApi>(),
-      "feature-flag": createApiFixture<FeatureFlagApi>(),
-      evaluator: createApiFixture<EvaluatorApi>(),
-      monitor: createApiFixture<MonitorApi>(),
-      dataset: createApiFixture<DatasetApi>(),
-      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
-      analytics: createApiFixture<AnalyticsApi>(),
-      project: createApiFixture<ProjectApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>({
-        getPlatformDefaultRetentionDays: () => 30,
+  return bootInstalledProcess({
+    role,
+    modules: [installableEvaluation],
+    config: { evaluation: EVALUATION_TEST_CONFIG },
+    stores: memoryStores(),
+    peers: [
+      testPeer({
+        token: AuthzApi,
+        instance: createApiFixture<AuthzApi>({
+          authorizeInternal: async ({ projectId }) => ownProof({ projectId }),
+        }),
       }),
-    });
+      testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+      testPeer({ token: FeatureFlagApi, instance: createApiFixture<FeatureFlagApi>() }),
+      testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+      testPeer({ token: MonitorApi, instance: createApiFixture<MonitorApi>() }),
+      testPeer({ token: DatasetApi, instance: createApiFixture<DatasetApi>() }),
+      testPeer({ token: InstantEvalJudgeApi, instance: createApiFixture<InstantEvalJudgeApi>() }),
+      testPeer({ token: AnalyticsApi, instance: createApiFixture<AnalyticsApi>() }),
+      testPeer({ token: ProjectApi, instance: createApiFixture<ProjectApi>() }),
+      testPeer({
+        token: DataRetentionApi,
+        instance: createApiFixture<DataRetentionApi>({
+          getPlatformDefaultRetentionDays: () => 30,
+        }),
+      }),
+    ],
+  });
 }
 
 afterEach(() => {
@@ -88,7 +102,7 @@ describe("given a process that composed one Evaluation service", () => {
         const runStore = vi.spyOn(MemoryEvaluationRunRepository, "create");
         const clickHouseStore = vi.spyOn(ClickHouseEvaluationRepository, "create");
         const executionEngine = vi.spyOn(EvaluationExecutionService, "create");
-        const runtime = await process(role).boot();
+        const runtime = await process(role);
 
         try {
           const app = runtime.service(EvaluationApi);

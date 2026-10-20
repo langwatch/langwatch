@@ -6,16 +6,14 @@ import {
   PROTOCOL_VERSION,
   type PlatformFrame,
   type InstanceNudge,
-  instanceNudgeSchema,
   type AgentConnection,
   type AgentConnectAdmission,
   type AgentConnectCaller,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
-import type { Unsubscribe } from "@langwatch/redis-client/session-state";
 
+import type { Unsubscribe } from "../channels/connected-agent-relay.channel.ts";
 import { readSdkFrame, UNREADABLE_RESULT_MESSAGE } from "../rules/connected-agent-frame.rules.ts";
-import { instanceChannel, pendingKey } from "../rules/connected-agent-keys.rules.ts";
 import type { AgentSessionService, SessionInfo } from "./connected-agent-session.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:gateway");
@@ -130,13 +128,14 @@ export class ConnectedAgentConnectionService {
     };
     this.#sessions.add(session);
     try {
-      session.unsubscribe = await this.#core.runtime.store.subscribe(
-        instanceChannel(info.projectId, info.instanceId),
-        (message) =>
-          void this.#onInstanceNudge(session, message).catch((error: unknown) => {
+      session.unsubscribe = await this.#core.runtime.relay.listenToInstance({
+        projectId: info.projectId,
+        instanceId: info.instanceId,
+        onNudge: (nudge) =>
+          void this.#onInstanceNudge(session, nudge).catch((error: unknown) => {
             logger.warn({ error, instanceId: info.instanceId }, "instance nudge failed");
           }),
-      );
+      });
     } catch (error) {
       await this.#onClose(session).catch((cleanupError: unknown) => {
         logger.warn(
@@ -192,10 +191,11 @@ export class ConnectedAgentConnectionService {
 
   /** Sends every call still pending for this instance. */
   async #deliverPending(session: Session): Promise<void> {
-    const callIds = await this.#core.runtime.store.zrangebyscore(
-      pendingKey(session.info.projectId, session.info.instanceId),
-      this.#core.now(),
-    );
+    const callIds = await this.#core.runtime.state.findPendingCallIds({
+      projectId: session.info.projectId,
+      instanceId: session.info.instanceId,
+      from: this.#core.now(),
+    });
     for (const callId of callIds) {
       if (session.activeCallIds.has(callId)) continue;
       await this.#deliverCall(session, callId);
@@ -217,13 +217,7 @@ export class ConnectedAgentConnectionService {
     session.activeCallIds.add(callId);
   }
 
-  async #onInstanceNudge(session: Session, raw: string): Promise<void> {
-    let nudge: InstanceNudge;
-    try {
-      nudge = instanceNudgeSchema.parse(JSON.parse(raw));
-    } catch {
-      return;
-    }
+  async #onInstanceNudge(session: Session, nudge: InstanceNudge): Promise<void> {
     if ("call" in nudge) {
       await this.#deliverCall(session, nudge.call);
       return;

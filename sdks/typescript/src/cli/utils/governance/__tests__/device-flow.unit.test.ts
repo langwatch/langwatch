@@ -156,6 +156,15 @@ describe("exchange", () => {
     });
   }
 
+  it("keeps polling when the approved key's grants have not landed yet", async () => {
+    const fetchImpl = vi
+      .fn()
+      .mockResolvedValue(jsonResponse(503, { error: "authz_grant_not_confirmed" }));
+    await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({
+      kind: "pending",
+    });
+  });
+
   it("throws DeviceFlowError(other) on unexpected status", async () => {
     const fetchImpl = vi.fn().mockResolvedValue(jsonResponse(500, { error: "boom" }));
     await expect(exchange({ baseUrl: url, fetchImpl }, "DC")).rejects.toMatchObject({

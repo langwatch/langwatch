@@ -26,6 +26,9 @@ import {
   type InstantEvalStatementValidator,
 } from "../instant-eval-statement.service.ts";
 
+/** Instant Evals released for every project: the gate a pass states, open. */
+const OPEN_GATE = { isEnabled: () => Promise.resolve(true) };
+
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const PROTECTIONS = { catalogue: { permissions: [] } };
 const SQL =
@@ -122,7 +125,7 @@ function harness(options?: {
   const runner = new ProbeOnlyRunner(options?.columns ?? PROJECTION);
   const statements = InstantEvalStatementService.create({
     analytics,
-    rowSource: InstantEvalRowSourceService.create({ analytics: runner }),
+    rowSource: InstantEvalRowSourceService.create({ analytics: runner, access: OPEN_GATE }),
   });
 
   return { analytics, runner, statements };

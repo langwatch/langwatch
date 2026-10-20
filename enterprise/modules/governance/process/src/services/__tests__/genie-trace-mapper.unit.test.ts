@@ -17,7 +17,7 @@
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
 import { estimateModelCost, getStaticModelCostRates } from "@langwatch/model-provider-contract";
-import { spanSchema } from "@langwatch/trace-contract";
+import { spanSchema } from "@langwatch/otlp/trace-request";
 import { describe, expect, it } from "vitest";
 
 import { GENIE_QUERY_SPAN_NAME } from "../../features/databricks-genie/rules/genie-span-attributes-service.rules.ts";

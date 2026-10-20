@@ -34,7 +34,6 @@ const RUN_COLUMNS = [
   `"id"`,
   `"kind"`,
   `"release"`,
-  `"floor"`,
   utc("started_at", "startedAt"),
   utc("finished_at", "finishedAt"),
   `"outcome"`,
@@ -110,18 +109,12 @@ export class UpgradeLedgerRepository {
     return createLedgerTables({ postgres: this.postgres });
   }
 
-  async startRun({
-    kind,
-    floor,
-  }: {
-    kind: UpgradeRunKind;
-    floor?: string | null;
-  }): Promise<UpgradeRun> {
+  async startRun({ kind }: { kind: UpgradeRunKind }): Promise<UpgradeRun> {
     const { rows } = await this.query<object>(
-      (t) => `INSERT INTO ${t.run} ("id", "kind", "floor", "started_at")
-       VALUES ($1, $2, $3, ${NOW_UTC})
+      (t) => `INSERT INTO ${t.run} ("id", "kind", "started_at")
+       VALUES ($1, $2, ${NOW_UTC})
        RETURNING ${RUN_COLUMNS}`,
-      [generate("upgraderun").toString(), kind, floor ?? null],
+      [generate("upgraderun").toString(), kind],
     );
     return upgradeRunSchema.parse(rows[0]);
   }
@@ -285,6 +278,15 @@ export class UpgradeLedgerRepository {
       (t) => `SELECT ${TARGET_COLUMNS} FROM ${t.target}
         WHERE "step_id" = $1 ORDER BY "target"`,
       [stepId],
+    );
+    return rows.map((row) => upgradeTargetSchema.parse(row));
+  }
+
+  /** Every ClickHouse step a target has not applied yet: a held private target's backlog. */
+  async findTargetsBehind(): Promise<UpgradeTarget[]> {
+    const { rows } = await this.query<object>(
+      (t) => `SELECT ${TARGET_COLUMNS} FROM ${t.target}
+        WHERE "status" <> 'done' AND "step_id" LIKE 'clickhouse:%' ORDER BY "target", "step_id"`,
     );
     return rows.map((row) => upgradeTargetSchema.parse(row));
   }

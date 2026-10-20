@@ -13,6 +13,8 @@ import { usePublicEnv } from "../../behavior/use-public-env.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
 import { AddMembersForm } from "./add-members-form.tsx";
 
+const INVITE_FORM_ID = "invite-members-form";
+
 /** Invite drawer: stable deep-link from members page, command bar, or inline box. */
 export function InviteMemberDrawer({
   open = true,
@@ -21,7 +23,7 @@ export function InviteMemberDrawer({
   const { organization } = useOrganizationTeamProject();
   const host = useOrganizationHost();
   const { closeDrawer } = useDrawer();
-  const bodyRef = useRef<HTMLDivElement>(null);
+  const contentRef = useRef<HTMLDivElement>(null);
   const queryClient = api.useUtils();
   const publicEnv = usePublicEnv();
   const hasEmailProvider = publicEnv.data?.HAS_EMAIL_PROVIDER_KEY ?? false;
@@ -55,38 +57,39 @@ export function InviteMemberDrawer({
   });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      placement="end"
+      onClose={closeDrawer}
+      title="Add members"
       size="lg"
+      contentRef={contentRef}
       // Else the dialog focuses its Close button and typing from the inline box is lost.
-      initialFocusEl={() => bodyRef.current?.querySelector("input") ?? null}
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
+      initialFocusEl={() => contentRef.current?.querySelector("input") ?? null}
+      footer={{
+        cancel: { onClick: closeDrawer },
+        busy: isSubmitting,
+        primaryAction: {
+          label: hasEmailProvider ? "Send invites" : "Create invites",
+          type: "submit",
+          form: INVITE_FORM_ID,
+          loading: isSubmitting,
+          "data-testid": "members-invite-submit",
+        },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title textStyle="lg" fontWeight="semibold">
-            Add members
-          </Drawer.Title>
-          <Drawer.CloseTrigger onClick={closeDrawer} />
-        </Drawer.Header>
-        <Drawer.Body ref={bodyRef}>
-          {organization && (
-            <AddMembersForm
-              teamOptions={teamOptions}
-              organizationId={organization.id}
-              onSubmit={onSubmit}
-              isLoading={isSubmitting}
-              hasEmailProvider={hasEmailProvider}
-              onClose={closeDrawer}
-              isInviterAdmin={isAdmin}
-              initialEmails={initialEmail}
-            />
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      {organization && (
+        <AddMembersForm
+          teamOptions={teamOptions}
+          organizationId={organization.id}
+          onSubmit={onSubmit}
+          isLoading={isSubmitting}
+          formId={INVITE_FORM_ID}
+          hasEmailProvider={hasEmailProvider}
+          onClose={closeDrawer}
+          isInviterAdmin={isAdmin}
+          initialEmails={initialEmail}
+        />
+      )}
+    </Drawer>
   );
 }

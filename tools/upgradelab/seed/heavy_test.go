@@ -2,8 +2,10 @@ package seed
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"sync"
 	"testing"
@@ -70,5 +72,111 @@ func TestHeavySeedsTelemetryAndEveryDoorKind(t *testing.T) {
 	}
 	if result.Refused["product.report"] != 12 {
 		t.Errorf("report refused %d times", result.Refused["product.report"])
+	}
+}
+
+func TestHeavyVolumesScaleByTier(t *testing.T) {
+	if HeavySpans("M") != 30_000 || HeavySpans("L") != 30_000 || HeavySpans("XL") != 300_000 {
+		t.Fatalf("tier volumes: M %d, L %d", HeavySpans("M"), HeavySpans("L"))
+	}
+}
+
+func TestPaceVerdict(t *testing.T) {
+	boom := errors.New("redis down")
+	for name, c := range map[string]struct {
+		depth  int
+		err    error
+		waited time.Duration
+		want   paceState
+	}{
+		"below goes":        {10_000, nil, 0, paceGo},
+		"at the line goes":  {50_000, nil, 0, paceGo},
+		"above waits":       {50_001, nil, time.Minute, paceWait},
+		"above too long":    {90_000, nil, time.Hour, paceExpired},
+		"unread never held": {0, boom, time.Hour, paceGo},
+	} {
+		if got := paceVerdict(c.depth, c.err, 50_000, c.waited, 30*time.Minute); got != c.want {
+			t.Errorf("%s: got %d, want %d", name, got, c.want)
+		}
+	}
+}
+
+func heavyDoorServer(t *testing.T, onHit func(path string) bool) *httptest.Server {
+	t.Helper()
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		path := strings.TrimPrefix(r.URL.Path, "/api/trpc/")
+		switch {
+		case !onHit(r.URL.Path):
+			http.Error(w, "access change still processing", http.StatusForbidden)
+		case r.URL.Path == "/api/auth/sign-in/email":
+			w.Header().Set("Set-Cookie", "better-auth.session_token=x")
+		case path == "organization.getAll":
+			_, _ = w.Write([]byte(`{"result":{"data":{"json":[{"teams":[{"projects":[{"id":"p1","slug":"s"}]}]}]}}}`))
+		case path == "project.getProjectAPIKey":
+			_, _ = w.Write([]byte(`{"result":{"data":{"json":{"apiKey":"k"}}}}`))
+		case strings.HasPrefix(r.URL.Path, "/api/trpc/"):
+			_, _ = w.Write([]byte(`{"result":{"data":{"json":{"id":"x","projectSlug":"s"}}}}`))
+		default:
+			_, _ = w.Write([]byte(`{}`))
+		}
+	}))
+	t.Cleanup(server.Close)
+	return server
+}
+
+// @scenario "Tier M makes its organizations before any telemetry and sends the telemetry in waves"
+func TestHeavyMakesOrganizationsBeforeTelemetryAndPaces(t *testing.T) {
+	var mu sync.Mutex
+	var order []string
+	server := heavyDoorServer(t, func(path string) bool {
+		mu.Lock()
+		defer mu.Unlock()
+		switch path {
+		case "/api/trpc/onboarding.initializeOrganization":
+			order = append(order, "org")
+		case "/api/otel/v1/traces":
+			order = append(order, "otel")
+		}
+		return true
+	})
+	reads := 0
+	pace := &Pace{Above: 100, WaveChunks: 1, Poll: time.Millisecond, Within: time.Minute,
+		Depth: func(context.Context) (int, error) {
+			reads++
+			return map[bool]int{true: 500, false: 0}[reads%2 == 1], nil
+		}}
+	var log strings.Builder
+	tenancy := BuildTenancy(TenancyInput{Shape: "saas", Seed: 1, Anchor: time.Now(), Cloud: true, Volume: "M"})
+	_, err := Heavy(context.Background(), HeavyInput{App: server.URL, Email: "a@b.test", Password: "pw", Tenancy: tenancy, Seed: 1,
+		Anchor: time.Now(), Spans: 30000, Workers: 1, Pace: pace, Log: &log})
+	if err != nil {
+		t.Fatal(err)
+	}
+	firstOtel := slices.Index(order, "otel")
+	if firstOtel < 0 || slices.Contains(order[:firstOtel], "otel") || slices.Contains(order[firstOtel:], "org") {
+		t.Fatalf("organizations must all come before telemetry: %v", order)
+	}
+	if reads < 2 || !strings.Contains(log.String(), "waiting") || !strings.Contains(log.String(), "next wave goes") {
+		t.Errorf("pacing not logged (%d depth reads): %q", reads, log.String())
+	}
+}
+
+func TestHeavyRefusedOrganizationStopsBeforeTelemetry(t *testing.T) {
+	orgBackoff, orgBackoffMax = time.Millisecond, time.Millisecond
+	t.Cleanup(func() { orgBackoff, orgBackoffMax = 2*time.Second, 30*time.Second })
+	var mu sync.Mutex
+	otel := 0
+	server := heavyDoorServer(t, func(path string) bool {
+		mu.Lock()
+		defer mu.Unlock()
+		if path == "/api/otel/v1/traces" {
+			otel++
+		}
+		return path != "/api/trpc/onboarding.initializeOrganization"
+	})
+	tenancy := BuildTenancy(TenancyInput{Shape: "saas", Seed: 1, Anchor: time.Now(), Cloud: true, Volume: "M"})
+	_, err := Heavy(context.Background(), HeavyInput{App: server.URL, Email: "a@b.test", Password: "pw", Tenancy: tenancy, Seed: 1, Anchor: time.Now(), Spans: 400})
+	if !errors.Is(err, ErrOrganizationsRefused) || otel != 0 {
+		t.Fatalf("err %v, %d telemetry requests", err, otel)
 	}
 }

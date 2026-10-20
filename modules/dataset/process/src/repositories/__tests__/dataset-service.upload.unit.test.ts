@@ -43,6 +43,7 @@ class Repo implements DatasetRepository {
   findById = vi.fn(async () => row());
   findBySlug = vi.fn(async () => row());
   findAll = vi.fn(async () => []);
+  findRecordCountColumns = async () => [];
   create = vi.fn(async () => row());
   update = vi.fn(async () => row());
   archive = vi.fn(async () => row());
@@ -54,6 +55,7 @@ class Repo implements DatasetRepository {
   }
 }
 class Records implements DatasetRecordRepository {
+  countByDataset = async () => [];
   async count(): Promise<number> {
     return 0;
   }

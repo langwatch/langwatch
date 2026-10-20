@@ -88,6 +88,29 @@ export class EventRepositoryMemory implements EventRepository {
     return filtered.map((record) => ({ ...record }));
   }
 
+  async findEventRecordsOfAggregates({
+    aggregates,
+    aggregateType,
+  }: {
+    aggregates: readonly { tenantId: string; aggregateId: string }[];
+    aggregateType: string;
+  }): Promise<EventRecord[]> {
+    const keys = new Set(
+      aggregates.map(
+        ({ tenantId, aggregateId }) => `${tenantId}:${aggregateType}:${String(aggregateId)}`,
+      ),
+    );
+    return [...keys].flatMap((key) =>
+      [...(this.eventsByKey.get(key) ?? [])]
+        .toSorted((a, b) =>
+          a.EventTimestamp === b.EventTimestamp
+            ? compareOrdinal(a.EventId, b.EventId)
+            : a.EventTimestamp - b.EventTimestamp,
+        )
+        .map((record) => ({ ...record })),
+    );
+  }
+
   async getEventRecordsUpTo(request: {
     tenantId: string;
     aggregateType: string;

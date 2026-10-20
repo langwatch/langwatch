@@ -156,7 +156,6 @@ function harness({ ottl = MemoryOttlTransformChannel.create() } = {}) {
 }
 
 describe("IngestionSourceService", () => {
-  /** @scenario "Saving a source refuses OTTL the gateway parser rejects" */
   describe("when the gateway parser rejects a statement", () => {
     const rejecting = MemoryOttlTransformChannel.create({
       validationResult: {
@@ -173,6 +172,7 @@ describe("IngestionSourceService", () => {
     });
     const statements = ['set(attributes["a"], 1)', "set(attributes[ this is not ottl"];
 
+    /** @scenario "Saving a source refuses OTTL the gateway parser rejects" */
     it("refuses the edit by name, points at the statement, and stores nothing", async () => {
       const { service, repository } = harness({ ottl: rejecting });
 

@@ -263,7 +263,7 @@ export const MetricStatsTooltip = ({
   ];
 
   return (
-    <VStack align="stretch" gap={1} fontSize="11px" minWidth="140px">
+    <VStack align="stretch" gap={1} textStyle="micro" minWidth="140px">
       {rows.map(({ label, value }) => (
         <HStack key={label} justify="space-between">
           <Text color="fg.muted">{label}</Text>

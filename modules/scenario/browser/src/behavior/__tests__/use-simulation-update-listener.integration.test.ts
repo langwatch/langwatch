@@ -65,7 +65,7 @@ import type * as actualModule1 from "@langwatch/browser-host/sse-subscription";
 
 import { useSimulationUpdateListener } from "../use-simulation-update-listener.ts";
 
-function simulateSSEEvent(payload: { event: string }) {
+function simulateSSEEvent(payload: object) {
   capturedOnData?.({ event: JSON.stringify(payload) });
 }
 
@@ -137,6 +137,50 @@ describe("useSimulationUpdateListener()", () => {
         });
 
         expect(refetchSpy).toHaveBeenCalledTimes(2);
+      });
+    });
+  });
+
+  describe("given a streaming handler", () => {
+    function renderWithHandler() {
+      const onStreamingEvent = vi.fn();
+      renderHook(() =>
+        useSimulationUpdateListener({
+          projectId: "proj_1",
+          refetch: refetchSpy,
+          filter: { scenarioRunId: "run_1" },
+          onStreamingEvent,
+        }),
+      );
+      return onStreamingEvent;
+    }
+
+    describe("when a stored snapshot frame arrives", () => {
+      /** @scenario "A stored message snapshot frame refetches the run" */
+      it("hands it on and refetches the run's stored state", () => {
+        const onStreamingEvent = renderWithHandler();
+
+        act(() => {
+          simulateSSEEvent({ e: "R", r: "run_1", b: "batch_1" });
+        });
+
+        expect(onStreamingEvent).toHaveBeenCalledWith({ e: "R", r: "run_1", b: "batch_1" });
+        expect(mockInvalidateRunState).toHaveBeenCalledWith({ scenarioRunId: "run_1" });
+        expect(refetchSpy).toHaveBeenCalledTimes(1);
+      });
+    });
+
+    describe("when a message delta arrives", () => {
+      it("hands it on without a refetch", () => {
+        const onStreamingEvent = renderWithHandler();
+
+        act(() => {
+          simulateSSEEvent({ e: "C", r: "run_1", b: "batch_1", m: "m1", d: "x" });
+        });
+
+        expect(onStreamingEvent).toHaveBeenCalledTimes(1);
+        expect(mockInvalidateRunState).not.toHaveBeenCalled();
+        expect(refetchSpy).not.toHaveBeenCalled();
       });
     });
   });

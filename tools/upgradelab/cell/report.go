@@ -55,7 +55,8 @@ type KindSummary struct {
 	Failed     int    `json:"failed"`
 	Write      bool   `json:"write"`
 	Visible    int    `json:"visible"`
-	Lost       int    `json:"lost"` // answered 2xx, never visible
+	Lost       int    `json:"lost"`                // answered 2xx, never visible
+	Unchecked  bool   `json:"unchecked,omitempty"` // a stopped cell never asked the stores, so Visible and Lost mean nothing
 	MaxLatency int64  `json:"maxLatencyMs"`
 	FirstError string `json:"firstError,omitempty"`
 	// Upgrade-in-progress answers retried, the longest retry window, and every non-2xx seen on any attempt.
@@ -71,17 +72,22 @@ type PhaseStatuses struct {
 	Statuses map[string]int `json:"statuses"`
 }
 
-// QueueSummary is the waiting work: its peak and how long the jobs present at the cut took to drain once head's worker started.
+// QueueSummary is the group queues' waiting jobs over the run and when they fell back around the baseline.
 type QueueSummary struct {
-	Samples   []QueueSample `json:"samples"`
-	Baseline  int           `json:"baseline"`
-	Peak      int           `json:"peak"`
-	PeakAtMs  int64         `json:"peakAtMs"`
-	DrainedMs int64         `json:"drainedAfterWorkerMs"` // -1: never drained
-	TopKeys   string        `json:"topKeysAtEnd"`
-	CutJobs   int           `json:"jobsAtCut"`
-	Leftover  string        `json:"cutJobsLeftByKindAtEnd"`
-	ByKind    string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
+	Samples     []QueueSample `json:"samples"`
+	Baseline    int           `json:"baseline"`   // steady-state depth: 0, the pre-cut depth is the backlog
+	Limit       int           `json:"drainLimit"` // "around the baseline": drainLimit(Baseline)
+	AtCut       int           `json:"depthAtCut"` // -1: unread
+	Peak        int           `json:"peak"`
+	PeakAtMs    int64         `json:"peakAtMs"`
+	DrainedMs   int64         `json:"drainedAfterWorkerMs"` // -1: never within the limit and staying
+	SlopePerMin float64       `json:"slopeLast10MinPerMin"`
+	Final       int           `json:"finalDepth"`  // -1: no reading
+	FinalNotDue int           `json:"finalNotDue"` // jobs scheduled later at the last reading, left out of Final
+	ReadErrors  int           `json:"readErrors"`
+	FirstError  string        `json:"firstReadError,omitempty"`
+	ByQueue     string        `json:"byQueueAtEnd"`
+	ByKind      string        `json:"byKindAtEnd"` // waiting group-queue jobs per job kind, with when they are due
 }
 
 // Shot is one screenshot and the Upgrades page state it showed.
@@ -109,7 +115,7 @@ var invariantNames = map[string]string{
 	"I0":  "the api serves everything from boot while the upgrade runs: no holding page",
 	"B1":  "no browser console error and no failed request during the walk",
 	"I7":  "every stored event parses under head's schemas and upcasts",
-	"I5":  "read models are filled: trace meter equals the trace count, open suite runs counted",
+	"I5":  "read models are filled: trace meter equals this month's trace count, open suite runs counted",
 	"I2":  "ledger current: every step done or not-needed (operator steps aside)",
 	"I2b": "nothing reopened after ready",
 	"I3":  "api ready and every live roster row declares the image's steps",
@@ -125,7 +131,12 @@ var invariantNames = map[string]string{
 	"N3":  "no lost write: every 2xx write visible after settle",
 	"N4":  "queued work drains once head's worker runs",
 	"O1":  "Ops > Upgrades shows the right state",
-	"H3":  "a private organization reads its own trace and dataset through head",
+	"P1":  "the first sign-up of an empty self-hosted install operates; no later sign-up does",
+	"H3":  "a private organization reads its traces list, a trace, analytics, a logged evaluation and a dataset's rows through head",
+	"H6":  "every private kind (spans, traces, logs, metrics, evaluations, events) sits on the organization's own target",
+	"H7":  "a private organization whose route is missing or malformed is refused clearly, never served from the shared target",
+	"H8":  "a private target down during the upgrade holds only that organization; the rest finish and it catches up when back",
+	"H9":  "Ops > Upgrades shows a Dataplanes tab naming every private target",
 	"H4":  "objects land only in their tenant's S3: the private bucket holds the private project's, the shared none of them",
 	"H5":  "the shared tenant cannot read the private tenant's trace or dataset",
 	"D1":  "api before worker: a read meets 503 upgrade_in_progress with Retry-After and succeeds on retry",
@@ -137,6 +148,24 @@ var invariantNames = map[string]string{
 	"E4":  "custom roles and grants behave as on main: a key with no grant is refused",
 	"E6":  "a plain member signs in through the deployment's SSO on main and again on head after the migrations; main's cookie reads cleanly",
 	"E7":  "a plain member signs in through their organization's own SSO connection before and after the upgrade",
+	"E8":  "a member who signed in through main's deployment-wide Auth0 signs in on head through it: same organization, same role, API keys answer",
+	"E9":  "a member signs in through their organization's own SAML connection before and after the upgrade",
+	"E10": "the seed account signs in with its password on head beside both SSO doors: same organization and role",
+	"E12": "email/password stays closed on a licensed SSO install: a password on an address an ACTIVE connection governs opens no session on head",
+	"E13": "a custom role made on main keeps its permissions and bindings on head",
+	"E14": "SCIM: users and a group provisioned on main keep their membership on head through main's token, and a push on head lands",
+	"E11": "an organization on main's old per-organization SSO (legacy columns, no connection) is grandfathered onto a connection, its member signs in on head and Ops shows the migration inventory",
+	"E15": "the mixed legacy-SSO organization's administrator sees the hint to move its legacy domain in SSO settings",
+	"A1":  "tenant oddities: the held organization stays held alone and Ops > Upgrades > Organizations names it (Home's Action needed card is for operator steps, not held organizations)",
+	"A2":  "tenant oddities: plaintext provider keys are sealed and still read through head",
+	"A3":  "tenant oddities: dataset rows main kept in Postgres are kept and read through head",
+	"A4":  "tenant oddities: an organization with prompts and no tags gets its tags and its prompt still opens",
+	"Q1":  "queued-jobs-v1: every job main queued before the switch, in main's format, ran on head's worker or was left safely (none still due in its group, none dead-lettered, none blocked)",
+	"V1":  "upcast-events: every stored type head reads through an upcast is settled in its ledger, main's rows under it are kept, and I7 refused none",
+	"F1":  "empty origin: every data step ends done over zero rows (or not-needed)",
+	"F3":  "empty origin: an organization made just after ready keeps its founder (membership and role bindings) after settle",
+	"R2":  "the oldest aged trace each organization keeps reads back through head's API",
+	"R1":  "aged data: no organization's age slice loses rows across the upgrade beyond what main's own retention TTL expires",
 	"E5":  "the seed account is a platform operator after the upgrade (ADMIN_EMAILS set, or the sole-organization bootstrap)",
 	"U1":  "the holding and upgrading pages are branded, centered and say what is happening (Haiku reads the shots)",
 	"U2":  "every command of docs/self-hosting/upgrade.mdx ran as written and exited 0",
@@ -151,8 +180,8 @@ var scenarioIDs = map[string][]string{
 	"N1": {"S1"}, "N6": {"S1"}, "N7": {"S1"}, "N5": {"S2"}, "N2": {"S3"}, "D1": {"S3"}, "N3": {"S4"}, "N4": {"S5"},
 	"I0": {"S6"}, "I2": {"S7", "F1"}, "I2b": {"S7"}, "I4": {"S8"}, "I6": {"S9"}, "I5": {"S10"}, "I7": {"S14"}, "I9": {"S11"}, "B1": {"S11"},
 	"O1": {"S12"}, "I8": {"S13", "F2"}, "D3": {"U3"},
-	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"},
-	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"}, "E6": {"E6"}, "E7": {"E7"},
+	"H1": {"H1"}, "H2": {"H2"}, "H3": {"H3"}, "H4": {"H4"}, "H5": {"H5"}, "H6": {"H6"}, "H7": {"H7"}, "H8": {"H8"}, "H9": {"H9"},
+	"E1": {"E1"}, "E2": {"E2"}, "E3": {"E3"}, "E4": {"E4"}, "E5": {"E5"}, "E6": {"E6"}, "E7": {"E7"}, "E12": {"E12"}, "E13": {"E13"}, "E14": {"E14"},
 	"U1": {"U1"}, "U2": {"U2"}, "U3": {"U3"}, "U4": {"U4"}, "U5": {"U5"}, "U6": {"U6"},
 }
 
@@ -161,19 +190,20 @@ func Summarize(calls []Call, timeline []PhaseChange, visible map[string]bool) ([
 	kinds := map[string]*KindSummary{}
 	phases := map[string]map[string]int{}
 	var order []string
-	for _, call := range calls {
+	for i := range calls {
+		call := &calls[i]
 		summary := kinds[call.Kind]
 		if summary == nil {
-			summary = &KindSummary{Kind: call.Kind, Write: call.Write}
+			summary = &KindSummary{Kind: call.Kind, Write: call.Write, Unchecked: visible == nil}
 			kinds[call.Kind] = summary
 		}
-		summary.add(call, visible)
+		summary.add(*call, visible)
 		phase := PhaseAt(timeline, call.AtMs)
 		if phases[phase] == nil {
 			phases[phase] = map[string]int{}
 			order = append(order, phase)
 		}
-		phases[phase][statusName(call)]++
+		phases[phase][statusName(*call)]++
 	}
 	var summaries []KindSummary
 	for _, name := range slices.Sorted(maps.Keys(kinds)) {
@@ -202,7 +232,7 @@ func (summary *KindSummary) add(call Call, visible map[string]bool) {
 		return
 	}
 	summary.OK++
-	if !call.Write {
+	if !call.Write || visible == nil {
 		return
 	}
 	if visible[call.Kind+"/"+call.ID] {
@@ -231,9 +261,10 @@ func (report *Report) Markdown() string {
 		fmt.Fprintf(&text, "| %s | %s | %s | %s | %s |\n", each.ID, strings.Join(each.Scenarios, ", "), each.Name, each.Result, strings.ReplaceAll(each.Detail, "|", "/"))
 	}
 	text.WriteString("\n| Kind | Sent | 2xx (final) | Failed | Visible | Lost | Non-2xx seen | upgrade_in_progress | Retries | Max retry window ms | Max latency ms |\n|" + strings.Repeat(" --- |", 11) + "\n")
-	for _, each := range report.Traffic {
+	for i := range report.Traffic {
+		each := &report.Traffic[i]
 		fmt.Fprintf(&text, "| %s | %d | %d | %d | %s | %s | %d | %d | %d | %d | %d |\n", each.Kind, each.Sent, each.OK, each.Failed,
-			writeCell(each, each.Visible), writeCell(each, each.Lost), each.NonOK, each.UpgradeInProgress, each.Retries, each.MaxRetryWindowMs, each.MaxLatency)
+			writeCell(*each, each.Visible), writeCell(*each, each.Lost), each.NonOK, each.UpgradeInProgress, each.Retries, each.MaxRetryWindowMs, each.MaxLatency)
 	}
 	report.writeTimeline(&text)
 	if report.Ribbon != "" {
@@ -245,15 +276,13 @@ func (report *Report) Markdown() string {
 			text.WriteString(peak.String() + "\n")
 		}
 	}
-	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\nQueue: baseline %d, peak %d at %d ms, drained %d ms after head's worker started\n\n",
-		report.Marks, report.Queue.Baseline, report.Queue.Peak, report.Queue.PeakAtMs, report.Queue.DrainedMs)
-	if report.Queue.ByKind != "" {
-		fmt.Fprintf(&text, "Waiting at the end, by job kind:\n\n```\n%s\n```\n\n", report.Queue.ByKind)
-	}
+	fmt.Fprintf(&text, "\nMarks (ms from start): %v\n\n", report.Marks)
+	report.Queue.write(&text)
 	for _, shot := range report.Shots {
 		fmt.Fprintf(&text, "- shot %s at %d ms: %s state %q %s\n", shot.Phase, shot.AtMs, shot.File, shot.State, shot.Error)
 	}
-	for _, each := range report.Traffic {
+	for i := range report.Traffic {
+		each := &report.Traffic[i]
 		if each.FirstError != "" {
 			fmt.Fprintf(&text, "- first failure %s: %s\n", each.Kind, strings.ReplaceAll(each.FirstError, "\n", " "))
 		}
@@ -279,9 +308,58 @@ func (report *Report) writeTimeline(text *strings.Builder) {
 	}
 }
 
+// write renders the backlog: its figures, a sampled table over time and what waited at the end.
+func (queue QueueSummary) write(text *strings.Builder) {
+	fmt.Fprintf(text, "Queue (group-queue jobs): baseline %d, limit %d, at the cut %d, peak %d at %d ms, at baseline and staying %d ms after head's worker started, %d at the end, slope %.1f jobs/min over the last 10 min; %d failed reads\n\n",
+		queue.Baseline, queue.Limit, queue.AtCut, queue.Peak, queue.PeakAtMs, queue.DrainedMs, queue.Final, queue.SlopePerMin, queue.ReadErrors)
+	if rows := queueRows(queue.Samples, queueTableRows); len(rows) > 0 {
+		text.WriteString("| Ms from start | Waiting jobs |\n| --- | --- |\n")
+		for _, sample := range rows {
+			fmt.Fprintf(text, "| %d | %d |\n", sample.AtMs, sample.Depth)
+		}
+		text.WriteString("\n")
+	}
+	if queue.ByQueue != "" {
+		fmt.Fprintf(text, "Waiting at the end, by queue:\n\n```\n%s\n```\n\n", queue.ByQueue)
+	}
+	if queue.ByKind != "" {
+		fmt.Fprintf(text, "Waiting at the end, by job kind:\n\n```\n%s\n```\n\n", queue.ByKind)
+	}
+}
+
+const queueTableRows = 24
+
+// queueRows thins samples to about limit evenly spaced rows, always keeping the peak and the last.
+func queueRows(samples []QueueSample, limit int) []QueueSample {
+	if len(samples) <= limit {
+		return samples
+	}
+	peak := 0
+	for i, sample := range samples {
+		if sample.Depth > samples[peak].Depth {
+			peak = i
+		}
+	}
+	var rows []QueueSample
+	step := float64(len(samples)-1) / float64(limit-1)
+	for row, next := 0, 0; row < limit; row++ {
+		at := int(float64(row)*step + 0.5)
+		for ; next <= at; next++ {
+			if next == peak && next != at {
+				rows = append(rows, samples[next])
+			}
+		}
+		rows = append(rows, samples[at])
+	}
+	return rows
+}
+
 func writeCell(summary KindSummary, value int) string {
 	if !summary.Write {
 		return "-"
+	}
+	if summary.Unchecked {
+		return "unchecked"
 	}
 	return fmt.Sprint(value)
 }

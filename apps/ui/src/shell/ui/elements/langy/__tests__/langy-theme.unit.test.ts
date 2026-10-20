@@ -10,6 +10,7 @@ const css = system.getTokenCss() as Record<string, Record<string, Record<string,
 const baseCss = base.getTokenCss() as typeof css;
 
 describe("Langy palette", () => {
+  /** @scenario "Both modes inherit the app palette" */
   it("inherits the app surfaces, text, borders and status colours in both modes", () => {
     for (const [selector, values] of Object.entries(baseCss["@layer tokens"] ?? {})) {
       const shared = Object.entries(values).filter(([name]) =>
@@ -22,6 +23,7 @@ describe("Langy palette", () => {
     expect(Object.keys(langyThemeConfig.theme?.semanticTokens?.colors ?? {})).toEqual(["langy"]);
   });
 
+  /** @scenario "Identity artwork and semantic data colours coexist" */
   it("emits identity colours and semantic aliases for the data and conversation surfaces", () => {
     const emitted = Object.assign({}, ...Object.values(css["@layer tokens"] ?? {}));
     expect(emitted["--chakra-colors-langy-ai-blue"]).toBeTruthy();

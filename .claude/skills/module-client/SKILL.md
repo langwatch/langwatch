@@ -9,8 +9,8 @@ argument-hint: "<module name or data question>"
 
 Read `dev/docs/ARCHITECTURE.md` §2 (the Web row), §3.4 ("No kits; data through
 clients") and §10 (the cache and wire rulings). Exemplars:
-`modules/prompt/client` and `modules/dataset/client` (about 30 lines of source
-each). A module with tRPC procedures gets `modules/<name>/client`, package
+`modules/dataset/client` (about 30 lines of source) and `modules/prompt/client` (the same
+derived client plus lent drawers and prompt-studio tokens). A module with tRPC procedures gets `modules/<name>/client`, package
 `@langwatch/<name>-client`. A module nothing else reads has none
 (integration, §3).
 
@@ -33,16 +33,16 @@ contract (<name>Trpc)  --ContractApiMap-->  createModuleApi()  -->  hooks (useQu
 
 Each rule lives in the record or an ADR; this table only points at it.
 
-| Rule                                                                                                                                           | Source                                          |
-| ---------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------- |
-| Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`                                                        | ADR-130 (`130-the-api-router-type-is-declared`) |
-| Holds the derived hooks plus a few thin ones and the owner's lent tokens, never a component                                                    | §3.4, §10.1                                     |
-| Imports its own contract, `@langwatch/api/web`, `@langwatch/browser-host` and React only; a two-module hook lives in the screen                | §2, §3.4                                        |
-| Read only by browser packages and apps/ui; the linters' `client` role refuses any other reader                                                 | §2, §17                                         |
-| One call per request over `httpLink`; no batching, the server refuses it                                                                       | §10                                             |
-| Every read is mirrored to disk by default (`UI_QUERY_MIRROR_EXCLUDED` names the exceptions); no per-read `staleTime`; no credential in a query | §10, §10.2                                      |
-| One entity, one key: opaque id plus tenant scope; hints never enter a key                                                                      | §10.2                                           |
-| A procedure another module owns sits in a `BorrowedProcedures` type: debt, not a pattern                                                       | (convention; the record is silent)              |
+| Rule                                                                                                                                                                           | Source                                          |
+| ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------- |
+| Derived from `ContractApiMap<typeof <name>Trpc>`, never hand-written, never `AppRouter`                                                                                        | ADR-130 (`130-the-api-router-type-is-declared`) |
+| Holds the derived hooks plus a few thin ones and the owner's lent tokens, never a component                                                                                    | §3.4, §10.1                                     |
+| Imports its own contract, `@langwatch/module` (for the tokens it lends), `@langwatch/api/web`, `@langwatch/browser-host` and React only; a two-module hook lives in the screen | §2, §3.4                                        |
+| Read only by browser packages and apps/ui; the linters' `client` role refuses any other reader                                                                                 | §2, §17                                         |
+| One call per request over `httpLink`; no batching, the server refuses it                                                                                                       | §10                                             |
+| Every read is mirrored to disk by default (`UI_QUERY_MIRROR_EXCLUDED` names the exceptions); no per-read `staleTime`; no credential in a query                                 | §10, §10.2                                      |
+| One entity, one key: opaque id plus tenant scope; hints never enter a key                                                                                                      | §10.2                                           |
+| A procedure another module owns sits in a `BorrowedProcedures` type: debt, not a pattern                                                                                       | (convention; the record is silent)              |
 
 ## Worked example
 
@@ -61,9 +61,10 @@ export const promptClient: ModuleApi<PromptApiMap> = createModuleApi<PromptApiMa
 export type PromptOutputs = OutputsFromMap<PromptApiMap>; // PromptInputs likewise
 ```
 
-`src/index.ts` re-exports the three names and nothing else. `package.json`
-has `main` and one `exports["."]`, dependencies `@langwatch/api` and
-`@langwatch/prompt-contract` only. A consuming browser package lists
+The minimal `src/index.ts` (dataset's) re-exports the client and its output and input types and
+nothing else. Prompt's also exports its lent drawers and prompt-studio tokens, so its
+`package.json` adds `@langwatch/module` to `@langwatch/api` and `@langwatch/prompt-contract`. Each
+has `main` and one `exports["."]`. A consuming browser package lists
 `@langwatch/prompt-client` and calls `promptClient.<proc>.useQuery(...)`
 inside its own `behavior/` hook; its declaration still names its own api
 (`.withApi(...)`, §10). There is no per-contract cache policy: every read is
@@ -72,8 +73,9 @@ mirrored by default (§10.2), and `TrpcCachePolicy` is deleted (§15).
 To add one: copy `modules/dataset/client`, rename, point `ContractApiMap` at
 every `*Trpc` object the contract exports, run `pnpm sync:references`
 (new workspace package) and `pnpm generate:modules` if the catalogue changed.
-Not every module with a contract has landed a client; today api-key, dataset,
-evaluator, prompt and scenario have one.
+Not every module with a contract has a client. There are about thirty across core and
+Enterprise modules; find one with `ls modules/*/client enterprise/modules/*/client`, and a
+module's page in `modules/README.md` says whether it has one.
 
 ## Traps
 

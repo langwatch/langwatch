@@ -1,31 +1,31 @@
+import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 /**
- * "Choose Prompt": the picker every flow opens, a REGISTERED drawer
+ * "Choose prompt": the picker every flow opens, a REGISTERED drawer
  * belonging to the family that owns prompts. KNOWN GAP: "New Prompt"
  * still asks for `promptEditor`, whose own navigation isn't wired here yet.
  */
-
-import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { Drawer } from "@langwatch/design-system/drawer";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
   Button,
   Collapsible,
   HStack,
-  Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { modelProviderIcons } from "@langwatch/design-system/provider-icons";
+import { SearchInput } from "@langwatch/design-system/search-input";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import {
   PromptEditorDrawerToken,
   PromptListDrawerToken,
   type PromptListDrawerProps,
 } from "@langwatch/prompt-client";
 import groupBy from "lodash-es/groupBy";
-import { ChevronRight, FileText, FolderOpen, Plus, Search } from "lucide-react";
+import { ChevronRight, FileText, FolderOpen, Plus } from "lucide-react";
 import { useMemo, useState } from "react";
-import { LuArrowLeft } from "react-icons/lu";
 
 import { useAllPromptsForProject } from "../../behavior/use-all-prompts-for-project.ts";
 import { getDisplayHandle } from "../../prompt-reference.ts";
@@ -106,120 +106,64 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      onBack={canGoBack ? goBack : void 0}
+      backButtonTestId="back-button"
       size="md"
-      modal={false}
+      title="Choose prompt"
+      headerAction={{
+        label: "New Prompt",
+        icon: <Plus size={14} />,
+        onClick: onCreateNew,
+        "data-testid": "new-prompt-button",
+      }}
+      toolbar={
+        hasPrompts ? (
+          <SearchInput
+            placeholder="Search prompts..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            data-testid="prompt-search-input"
+          />
+        ) : (
+          void 0
+        )
+      }
+      footer={{ cancel: { onClick: onClose } }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2} justify="space-between" width="full">
-            <HStack gap={2}>
-              {canGoBack && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  padding={1}
-                  minWidth="auto"
-                  data-testid="back-button"
-                >
-                  <LuArrowLeft size={20} />
-                </Button>
-              )}
-              <Drawer.Title>Choose Prompt</Drawer.Title>
-            </HStack>
-            <Button
-              size="sm"
-              colorPalette="blue"
-              onClick={onCreateNew}
-              data-testid="new-prompt-button"
-            >
-              <Plus size={16} />
-              New Prompt
-            </Button>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <VStack gap={2} align="stretch" paddingX={6} paddingTop={4}>
-              <Text color="fg.muted" fontSize="sm">
-                Select an existing prompt or create a new one.
+      <VStack gap={4} align="stretch">
+        <Text color="fg.muted" fontSize="sm">
+          Select an existing prompt or create a new one.
+        </Text>
+        <VStack gap={2} align="stretch">
+          {isLoading && <SkeletonRows rows={5} />}
+          {!isLoading && !hasPrompts && <EmptyState onCreateNew={onCreateNew} />}
+          {!isLoading && hasPrompts && filteredCount === 0 && (
+            <VStack paddingY={8} gap={2} textAlign="center">
+              <Text color="fg.muted" data-testid="no-search-results">
+                No prompts match "{searchQuery}"
               </Text>
-
-              {/* Search input */}
-              {hasPrompts && (
-                <HStack
-                  border="1px solid"
-                  borderColor="border"
-                  borderRadius="md"
-                  paddingX={3}
-                  paddingY={2}
-                  bg="bg.panel"
-                >
-                  <Search size={16} color="currentColor" />
-                  <Input
-                    placeholder="Search prompts..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    variant="flushed"
-                    size="sm"
-                    border="none"
-                    _focus={{ boxShadow: "none" }}
-                    data-testid="prompt-search-input"
-                  />
-                </HStack>
-              )}
+              <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
+                Clear search
+              </Button>
             </VStack>
-
-            {/* Prompt list - scrollable */}
-            <VStack
-              gap={2}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingBottom={4}
-            >
-              {isLoading && (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              )}
-              {!isLoading && !hasPrompts && <EmptyState onCreateNew={onCreateNew} />}
-              {!isLoading && hasPrompts && filteredCount === 0 && (
-                <VStack paddingY={8} gap={2} textAlign="center">
-                  <Text color="fg.muted" data-testid="no-search-results">
-                    No prompts match "{searchQuery}"
-                  </Text>
-                  <Button variant="ghost" size="sm" onClick={() => setSearchQuery("")}>
-                    Clear search
-                  </Button>
-                </VStack>
-              )}
-              {!isLoading &&
-                hasPrompts &&
-                filteredCount > 0 &&
-                groupedPrompts.map(([folder, folderPrompts]) => (
-                  <PromptFolder
-                    key={folder}
-                    folder={folder}
-                    prompts={folderPrompts}
-                    onSelect={handleSelectPrompt}
-                  />
-                ))}
-            </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          )}
+          {!isLoading &&
+            hasPrompts &&
+            filteredCount > 0 &&
+            groupedPrompts.map(([folder, folderPrompts]) => (
+              <PromptFolder
+                key={folder}
+                folder={folder}
+                prompts={folderPrompts}
+                onSelect={handleSelectPrompt}
+              />
+            ))}
+        </VStack>
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -228,24 +172,33 @@ export function PromptListDrawer(props: PromptListDrawerProps) {
 // ============================================================================
 
 function EmptyState({ onCreateNew }: { onCreateNew: () => void }) {
+  const accent = useProductAccent();
   return (
-    <VStack paddingY={12} gap={4} textAlign="center">
-      <Box padding={4} borderRadius="full" bg="bg.muted" color="fg.muted">
-        <FileText size={32} />
-      </Box>
-      <VStack gap={1}>
-        <Text fontWeight="medium" color="fg">
-          No prompts yet
-        </Text>
-        <Text fontSize="sm" color="fg.muted">
-          Create your first prompt to get started
-        </Text>
-      </VStack>
-      <Button colorPalette="blue" onClick={onCreateNew} data-testid="create-first-prompt-button">
-        <Plus size={16} />
-        Create your first prompt
-      </Button>
-    </VStack>
+    <NoDataInfoBlock
+      size="inline"
+      bordered={false}
+      icon={<FileText size={24} />}
+      title="No prompts yet"
+      description="Create your first prompt to get started"
+      primaryAction={
+        <Button
+          colorPalette={accent.colorPalette}
+          variant="solid"
+          onClick={onCreateNew}
+          data-testid="create-first-prompt-button"
+        >
+          <Plus size={16} />
+          Create your first prompt
+        </Button>
+      }
+      next={[
+        {
+          kind: "docs",
+          label: "Prompt management",
+          href: "https://docs.langwatch.ai/prompt-management/overview",
+        },
+      ]}
+    />
   );
 }
 

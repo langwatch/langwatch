@@ -38,8 +38,6 @@ function status(overrides: Partial<UpgradeStatus> = {}): UpgradeStatus {
     installed: "3.21.0",
     origin: "recorded",
     image: "3.21.0",
-    floor: "3.20.1",
-    ledgerFloor: null,
     lease: null,
     lastRun: null,
     counts: { done: 4 },
@@ -79,13 +77,13 @@ describe("previewUpgradeTo()", () => {
 });
 
 describe("preflightFrom()", () => {
-  describe("when the installation is below the floor, a step failed and a lease is held", () => {
-    /** @scenario "The preflight refuses an installation below the floor, a failed step and a live lease, naming each fix" */
-    it("refuses the floor, failed-step and lease rows, each with a fix", () => {
+  describe("when a step failed and a lease is held", () => {
+    /** @scenario "The preflight refuses a failed step and a live lease, naming each fix" */
+    it("refuses the failed-step and lease rows, each with a fix", () => {
       const rows = preflightFrom({
         status: status({
-          state: "unsupported",
-          reason: "installed-below-floor",
+          state: "needs-attention",
+          reason: "failed-step",
           installed: "3.16.0",
           failedStepIds: ["dataset:copy-keys"],
           lease: {
@@ -99,9 +97,9 @@ describe("preflightFrom()", () => {
         }),
       });
       const refused = rows.filter((row) => row.outcome === "refused");
-      expect(refused.map((row) => row.id)).toEqual(["floor", "failed-steps", "lease"]);
+      expect(refused.map((row) => row.id)).toEqual(["failed-steps", "lease"]);
       for (const row of refused) expect(row.fix).toBeTruthy();
-      expect(refused[1]?.detail).toContain("dataset:copy-keys");
+      expect(refused[0]?.detail).toContain("dataset:copy-keys");
     });
   });
 
@@ -110,12 +108,41 @@ describe("preflightFrom()", () => {
     it("verifies every row but the backup, which is unchecked and names the upgrade docs", () => {
       const rows = preflightFrom({ status: status() });
       expect(rows.map((row) => [row.id, row.outcome])).toEqual([
-        ["floor", "verified"],
         ["failed-steps", "verified"],
         ["lease", "verified"],
         ["backup", "unchecked"],
       ]);
       expect(rows.at(-1)?.docsPath).toBe("/self-hosting/upgrade");
+    });
+  });
+});
+
+describe("previewUpgradeTo() from an unreleased image", () => {
+  const manifests = [{ release: "3.22.0" }, { release: "3.23.0" }, { release: "3.21.0" }];
+
+  describe("when the target is newer than the newest manifest the image ships", () => {
+    /** @scenario "An unreleased image refuses a preview to a release newer than its newest manifest" */
+    it("refuses with the command that previews from the target image", () => {
+      const preview = previewUpgradeTo({ plan, image: { release: null }, manifests, to: "3.24.0" });
+      expect(preview).toMatchObject({
+        outcome: "refused",
+        code: "target_not_in_image",
+        stopAt: "3.24.0",
+      });
+      expect(preview.outcome === "refused" && preview.message).toContain(
+        "this image is unreleased and ships no manifest for 3.24.0",
+      );
+    });
+  });
+
+  describe("when the target is a manifest the image ships", () => {
+    /** @scenario "An unreleased image previews to a release it ships a manifest for" */
+    it("narrows the plan to that release", () => {
+      const preview = previewUpgradeTo({ plan, image: { release: null }, manifests, to: "3.22.0" });
+      expect(preview.outcome === "planned" && preview.releases.map((r) => r.release)).toEqual([
+        "3.21.0",
+        "3.22.0",
+      ]);
     });
   });
 });

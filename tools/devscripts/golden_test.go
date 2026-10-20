@@ -1,8 +1,7 @@
 package devscripts
 
 // Fixtures and golden text below were produced by running the original Node
-// scripts (dev/scripts/generate-modules.mjs, sync-tsconfig-references.mjs and
-// the tsconfig-references render) over the same inputs.
+// script (dev/scripts/generate-modules.mjs) over the same inputs.
 
 var generateModulesFixture = map[string]string{
 	"pnpm-workspace.yaml":                             "packages:\n  - x\n",
@@ -45,60 +44,6 @@ var generateModulesGolden = map[string]string{
 }
 
 const generateModulesStdout = "Wrote apps/api/src/process-modules.generated.ts\nWrote apps/api/package.json\nWrote apps/worker/src/process-modules.generated.ts\nWrote apps/worker/package.json\nWrote apps/tasks/src/process-modules.generated.ts\nWrote apps/tasks/package.json\nWrote apps/ui/src/browser-modules.generated.ts\nWrote apps/ui/package.json\n"
-
-var syncReferencesFixture = map[string]string{
-	"pnpm-workspace.yaml":                    "packages:\n  - \"pkgs/*\"\n  - 'modules/*/*'\n  - skipped\n\ncatalog:\n  - nope\n",
-	"pkgs/a/package.json":                    "{\n  \"name\": \"@f/a\",\n  \"dependencies\": {\n    \"@f/b\": \"workspace:*\",\n    \"ext\": \"^1\"\n  },\n  \"scripts\": {\n    \"typecheck\": \"tsc\"\n  }\n}\n",
-	"pkgs/a/tsconfig.json":                   "{\n  // comment\n  \"extends\": \"./tsconfig.build.json\",\n  \"references\": [{ \"path\": \"./stale\" }],\n}\n",
-	"pkgs/a/tsconfig.build.json":             "{\n  \"compilerOptions\": { \"composite\": true },\n  \"references\": []\n}\n",
-	"pkgs/b/package.json":                    "{\n  \"name\": \"@f/b\",\n  \"dependencies\": {\n    \"@f/a\": \"workspace:*\"\n  },\n  \"devDependencies\": {\n    \"@f/c\": \"workspace:*\"\n  },\n  \"scripts\": {\n    \"typecheck\": \"tsc\"\n  }\n}\n",
-	"pkgs/b/tsconfig.json":                   "{\n\t\"extends\": \"./tsconfig.build.json\"\n}\n",
-	"pkgs/b/tsconfig.test.json":              "{\n\t\"extends\": \"./tsconfig.json\",\n\t\"langwatchExtraReferences\": [{ \"path\": \"./extra.json\" }]\n}\n",
-	"pkgs/b/tsconfig.build.json":             "{\n  \"compilerOptions\": { \"composite\": true }\n}\n",
-	"pkgs/c/package.json":                    "{\n  \"name\": \"@f/c\",\n  \"dependencies\": {\n    \"@f/b\": \"workspace:*\"\n  }\n}\n",
-	"pkgs/c/tsconfig.json":                   "{ \"extends\": \"./tsconfig.build.json\" }\n",
-	"pkgs/c/tsconfig.build.json":             "{ \"compilerOptions\": { \"declaration\": false } }\n",
-	"pkgs/c/tsconfig.declarations.json":      "{\r\n  \"compilerOptions\": {},\r\n  \"references\": [{ \"path\": \"../a/tsconfig.build.json\" }]\r\n}\r\n",
-	"modules/m/contract/package.json":        "{\n  \"name\": \"@f/m-contract\",\n  \"dependencies\": {\n    \"@f/a\": \"workspace:*\"\n  },\n  \"scripts\": {\n    \"typecheck\": \"tsc\"\n  }\n}\n",
-	"modules/m/contract/tsconfig.json":       "{}\n",
-	"modules/m/contract/tsconfig.build.json": "{\n  \"compilerOptions\": { \"composite\": true }\n}\n",
-	"tsconfig.json":                          "{\n  \"files\": [],\n  \"langwatchExtraReferences\": [{ \"path\": \"./preview/tsconfig.json\" }],\n  \"references\": []\n}\n",
-}
-
-var syncReferencesGolden = map[string]string{
-	"pkgs/a/tsconfig.json":                   "{\n  // comment\n  \"extends\": \"./tsconfig.build.json\",\n  \"references\": [\n    {\n      \"path\": \"tsconfig.build.json\"\n    },\n    {\n      \"path\": \"../b/tsconfig.build.json\"\n    }\n  ],\n}\n",
-	"pkgs/a/tsconfig.build.json":             "{\n  \"compilerOptions\": { \"composite\": true },\n  \"references\": []\n}\n",
-	"pkgs/b/tsconfig.json":                   "{\n\t\"extends\": \"./tsconfig.build.json\",\n\t\"references\": [\n\t\t{\n\t\t\t\"path\": \"tsconfig.build.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"../a/tsconfig.build.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"../c/tsconfig.declarations.json\"\n\t\t}\n\t]\n}\n",
-	"pkgs/b/tsconfig.test.json":              "{\n\t\"extends\": \"./tsconfig.json\",\n\t\"langwatchExtraReferences\": [{ \"path\": \"./extra.json\" }],\n\t\"references\": [\n\t\t{\n\t\t\t\"path\": \"tsconfig.build.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"../a/tsconfig.build.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"../c/tsconfig.declarations.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"extra.json\"\n\t\t}\n\t]\n}\n",
-	"pkgs/b/tsconfig.build.json":             "{\n  \"compilerOptions\": { \"composite\": true },\n  \"references\": [\n    {\n      \"path\": \"../a/tsconfig.build.json\"\n    }\n  ]\n}\n",
-	"pkgs/c/tsconfig.json":                   "{ \"extends\": \"./tsconfig.build.json\",\n  \"references\": [\n    {\n      \"path\": \"tsconfig.declarations.json\"\n    },\n    {\n      \"path\": \"../b/tsconfig.build.json\"\n    }\n  ]\n}\n",
-	"pkgs/c/tsconfig.build.json":             "{ \"compilerOptions\": { \"declaration\": false } }\n",
-	"pkgs/c/tsconfig.declarations.json":      "{\r\n  \"compilerOptions\": {},\r\n  \"references\": [\n    {\n      \"path\": \"../b/tsconfig.build.json\"\n    }\n  ]\r\n}\r\n",
-	"modules/m/contract/tsconfig.json":       "{\n  \"references\": [\n    {\n      \"path\": \"tsconfig.build.json\"\n    },\n    {\n      \"path\": \"../../../pkgs/a/tsconfig.build.json\"\n    }\n  ]\n}\n",
-	"modules/m/contract/tsconfig.build.json": "{\n  \"compilerOptions\": { \"composite\": true },\n  \"references\": [\n    {\n      \"path\": \"../../../pkgs/a/tsconfig.build.json\"\n    }\n  ]\n}\n",
-	"tsconfig.json":                          "{\n  \"files\": [],\n  \"langwatchExtraReferences\": [{ \"path\": \"./preview/tsconfig.json\" }],\n  \"references\": [\n    {\n      \"path\": \"pkgs/a/tsconfig.json\"\n    },\n    {\n      \"path\": \"pkgs/b/tsconfig.test.json\"\n    },\n    {\n      \"path\": \"modules/m/contract/tsconfig.json\"\n    },\n    {\n      \"path\": \"preview/tsconfig.json\"\n    }\n  ]\n}\n",
-	"tsconfig.build.json":                    "// The build solution: the module contracts, in one project graph, so their\n// declarations are emitted by a single `tsc -b` instead of one compiler\n// process per package. `pnpm build:types` runs it.\n//\n// Generated by `pnpm sync:references` (tools/devscripts). Do not edit: add a\n// package to the workspace and re-run `pnpm sync:references`.\n{\n  \"files\": [],\n  \"references\": [\n    {\n      \"path\": \"modules/m/contract/tsconfig.build.json\"\n    }\n  ]\n}\n",
-}
-
-const (
-	syncReferencesCheckStdout = "--- a/pkgs/a/tsconfig.json\n+++ b/pkgs/a/tsconfig.json\n@@ -4,1 +4,8 @@\n-  \"references\": [{ \"path\": \"./stale\" }],\n+  \"references\": [\n+    {\n+      \"path\": \"tsconfig.build.json\"\n+    },\n+    {\n+      \"path\": \"../b/tsconfig.build.json\"\n+    }\n+  ],\n\n--- a/pkgs/b/tsconfig.build.json\n+++ b/pkgs/b/tsconfig.build.json\n@@ -2,1 +2,6 @@\n-  \"compilerOptions\": { \"composite\": true }\n+  \"compilerOptions\": { \"composite\": true },\n+  \"references\": [\n+    {\n+      \"path\": \"../a/tsconfig.build.json\"\n+    }\n+  ]\n\n--- a/pkgs/b/tsconfig.json\n+++ b/pkgs/b/tsconfig.json\n@@ -2,1 +2,12 @@\n-\t\"extends\": \"./tsconfig.build.json\"\n+\t\"extends\": \"./tsconfig.build.json\",\n+\t\"references\": [\n+\t\t{\n+\t\t\t\"path\": \"tsconfig.build.json\"\n+\t\t},\n+\t\t{\n+\t\t\t\"path\": \"../a/tsconfig.build.json\"\n+\t\t},\n+\t\t{\n+\t\t\t\"path\": \"../c/tsconfig.declarations.json\"\n+\t\t}\n+\t]\n\n--- a/pkgs/b/tsconfig.test.json\n+++ b/pkgs/b/tsconfig.test.json\n@@ -3,1 +3,15 @@\n-\t\"langwatchExtraReferences\": [{ \"path\": \"./extra.json\" }]\n+\t\"langwatchExtraReferences\": [{ \"path\": \"./extra.json\" }],\n+\t\"references\": [\n+\t\t{\n+\t\t\t\"path\": \"tsconfig.build.json\"\n+\t\t},\n+\t\t{\n+\t\t\t\"path\": \"../a/tsconfig.build.json\"\n+\t\t},\n+\t\t{\n+\t\t\t\"path\": \"../c/tsconfig.declarations.json\"\n+\t\t},\n+\t\t{\n+\t\t\t\"path\": \"extra.json\"\n+\t\t}\n+\t]\n\n--- a/pkgs/c/tsconfig.json\n+++ b/pkgs/c/tsconfig.json\n@@ -1,1 +1,10 @@\n-{ \"extends\": \"./tsconfig.build.json\" }\n+{ \"extends\": \"./tsconfig.build.json\",\n+  \"references\": [\n+    {\n+      \"path\": \"tsconfig.declarations.json\"\n+    },\n+    {\n+      \"path\": \"../b/tsconfig.build.json\"\n+    }\n+  ]\n+}\n\n--- a/pkgs/c/tsconfig.declarations.json\n+++ b/pkgs/c/tsconfig.declarations.json\n@@ -3,1 +3,5 @@\n-  \"references\": [{ \"path\": \"../a/tsconfig.build.json\" }]\r\n+  \"references\": [\n+    {\n+      \"path\": \"../b/tsconfig.build.json\"\n+    }\n+  ]\r\n\n--- a/modules/m/contract/tsconfig.build.json\n+++ b/modules/m/contract/tsconfig.build.json\n@@ -2,1 +2,6 @@\n-  \"compilerOptions\": { \"composite\": true }\n+  \"compilerOptions\": { \"composite\": true },\n+  \"references\": [\n+    {\n+      \"path\": \"../../../pkgs/a/tsconfig.build.json\"\n+    }\n+  ]\n\n--- a/modules/m/contract/tsconfig.json\n+++ b/modules/m/contract/tsconfig.json\n@@ -1,1 +1,10 @@\n-{}\n+{\n+  \"references\": [\n+    {\n+      \"path\": \"tsconfig.build.json\"\n+    },\n+    {\n+      \"path\": \"../../../pkgs/a/tsconfig.build.json\"\n+    }\n+  ]\n+}\n\n--- a/tsconfig.json\n+++ b/tsconfig.json\n@@ -4,1 +4,14 @@\n-  \"references\": []\n+  \"references\": [\n+    {\n+      \"path\": \"pkgs/a/tsconfig.json\"\n+    },\n+    {\n+      \"path\": \"pkgs/b/tsconfig.test.json\"\n+    },\n+    {\n+      \"path\": \"modules/m/contract/tsconfig.json\"\n+    },\n+    {\n+      \"path\": \"preview/tsconfig.json\"\n+    }\n+  ]\n\n--- a/tsconfig.build.json\n+++ b/tsconfig.build.json\n@@ -1,0 +1,14 @@\n+// The build solution: the module contracts, in one project graph, so their\n+// declarations are emitted by a single `tsc -b` instead of one compiler\n+// process per package. `pnpm build:types` runs it.\n+//\n+// Generated by `pnpm sync:references` (tools/devscripts). Do not edit: add a\n+// package to the workspace and re-run `pnpm sync:references`.\n+{\n+  \"files\": [],\n+  \"references\": [\n+    {\n+      \"path\": \"modules/m/contract/tsconfig.build.json\"\n+    }\n+  ]\n+}\n\nUndeducible reference in pkgs/a/tsconfig.json: stale. Keep it under langwatchExtraReferences.\nUndeducible reference in pkgs/c/tsconfig.declarations.json: ../a/tsconfig.build.json. Keep it under langwatchExtraReferences.\n10 of 10 tsconfig files differ; 2 undeducible entries.\n"
-	syncReferencesCheckCode   = 1
-	syncReferencesWriteStdout = "Wrote 10 of 10 tsconfig files.\nUndeducible reference in pkgs/a/tsconfig.json: stale. Keep it under langwatchExtraReferences.\nUndeducible reference in pkgs/c/tsconfig.declarations.json: ../a/tsconfig.build.json. Keep it under langwatchExtraReferences.\n10 of 10 tsconfig files differ; 2 undeducible entries.\n"
-)
-
-var renderReferencesCases = []struct {
-	name, in string
-	refs     []string
-	want     string
-}{
-	{"replace", "{\n  \"extends\": \"./a.json\",\n  \"references\": [\n    { \"path\": \"./old\" }\n  ],\n  \"include\": [\"src\"]\n}\n", []string{"../a/tsconfig.json", "./b\"q"}, "{\n  \"extends\": \"./a.json\",\n  \"references\": [\n    {\n      \"path\": \"../a/tsconfig.json\"\n    },\n    {\n      \"path\": \"./b\\\"q\"\n    }\n  ],\n  \"include\": [\"src\"]\n}\n"},
-	{"insert", "{\n\t\"extends\": \"./a.json\"\n}\n", []string{"../a/tsconfig.json", "./b\"q"}, "{\n\t\"extends\": \"./a.json\",\n\t\"references\": [\n\t\t{\n\t\t\t\"path\": \"../a/tsconfig.json\"\n\t\t},\n\t\t{\n\t\t\t\"path\": \"./b\\\"q\"\n\t\t}\n\t]\n}\n"},
-	{"insertAfterComma", "{\n  \"a\": 1,\n}\n", []string{"../a/tsconfig.json", "./b\"q"}, "{\n  \"a\": 1,,\n  \"references\": [\n    {\n      \"path\": \"../a/tsconfig.json\"\n    },\n    {\n      \"path\": \"./b\\\"q\"\n    }\n  ]\n}\n"},
-	{"comments", "// c\n{\n  /* x */ \"references\": [ // t\n    {\"path\": \"a\"},\n  ],\n  \"b\": 2\n}\n", []string{"../a/tsconfig.json", "./b\"q"}, "// c\n{\n  /* x */ \"references\": [\n  {\n    \"path\": \"../a/tsconfig.json\"\n  },\n  {\n    \"path\": \"./b\\\"q\"\n  }\n],\n  \"b\": 2\n}\n"},
-	{"empty", "{\n  \"references\": [{\"path\":\"x\"}]\n}\n", []string{}, "{\n  \"references\": []\n}\n"},
-	{"crlf", "{\r\n  \"extends\": \"x\",\r\n  \"references\": []\r\n}\r\n", []string{"../a/tsconfig.json", "./b\"q"}, "{\r\n  \"extends\": \"x\",\r\n  \"references\": [\n    {\n      \"path\": \"../a/tsconfig.json\"\n    },\n    {\n      \"path\": \"./b\\\"q\"\n    }\n  ]\r\n}\r\n"},
-	{"nested", "{\n  \"compilerOptions\": { \"references\": 1 },\n  \"references\": []\n}\n", []string{"../a/tsconfig.json", "./b\"q"}, "{\n  \"compilerOptions\": { \"references\": 1 },\n  \"references\": [\n    {\n      \"path\": \"../a/tsconfig.json\"\n    },\n    {\n      \"path\": \"./b\\\"q\"\n    }\n  ]\n}\n"},
-}
 
 var localeCompareCases = []struct {
 	a, b string

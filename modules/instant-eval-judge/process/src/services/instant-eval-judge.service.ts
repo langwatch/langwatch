@@ -83,7 +83,7 @@ export class InstantEvalJudgeService {
       // The project catch-up teaches it: the log names the job, so the gap shows on first refusal.
       this.logger.warn(
         { projectId },
-        "Instant Evals judge refused a project it has not learned; re-run backfill-project-created",
+        "Instant Evals judge refused a project it has not learned; retry the project:record-created-facts step in Ops",
       );
       return refused({ code: "instant_eval_project_unknown", message: PROJECT_UNKNOWN_MESSAGE });
     }

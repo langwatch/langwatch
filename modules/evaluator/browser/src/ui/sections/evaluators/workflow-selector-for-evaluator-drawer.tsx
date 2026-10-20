@@ -2,29 +2,21 @@ import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  Textarea,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { EmojiPicker } from "@langwatch/design-system/emoji-picker";
+import { Field, HStack, Input, Text, Textarea, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
+import { createLogger } from "@langwatch/observability/browser";
 import type { StudioWorkflow } from "@langwatch/workflow-contract";
 import { useCallback, useState } from "react";
 import { useForm } from "react-hook-form";
-import { LuArrowLeft } from "react-icons/lu";
 
 import { evaluatorApi } from "../../../behavior/evaluator-api.ts";
 import { getRandomWorkflowIcon } from "../../../model/workflow/random-workflow-icon.ts";
 import { customEvaluatorTemplate } from "../../../model/workflow/templates/custom-evaluator.template.ts";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
-import { EmojiPickerModal } from "../workflow/optimization_studio/properties/modals/emoji-picker-modal.tsx";
+
+const logger = createLogger("langwatch:evaluator:workflow-selector");
 
 /** What a caller hands evaluator's drawer that creates a workflow-based evaluator. */
 export type WorkflowSelectorForEvaluatorDrawerProps = {
@@ -52,7 +44,6 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   const complexProps = getComplexProps();
   const utils = evaluatorClient.useUtils();
   const router = useRouter();
-  const emojiPicker = useDisclosure();
 
   const onClose = props.onClose ?? closeDrawer;
   const flowCallbacks = getFlowCallbacks("workflowSelectorForEvaluator");
@@ -80,7 +71,6 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
   } = form;
 
   const icon = watch("icon");
-  const name = watch("name");
 
   const createWorkflowMutation = evaluatorApi.workflow.create.useMutation();
   const createEvaluatorMutation = evaluatorClient.evaluators.create.useMutation({
@@ -140,7 +130,7 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
         onClose();
         void router.push(`/${project.slug}/studio/${createdWorkflow.workflow.id}`);
       } catch (error) {
-        console.error("Error creating workflow evaluator:", error);
+        logger.error({ error }, "Error creating workflow evaluator");
         if (applyHandledErrorToForm({ error, form, hasFormErrorSlot: true })) return;
         showErrorToast({
           error,
@@ -151,101 +141,56 @@ export function WorkflowSelectorForEvaluatorDrawer(props: WorkflowSelectorForEva
     [project, defaultIcon, createWorkflowMutation, createEvaluatorMutation, onClose, router, form],
   );
 
-  const isValid = name?.trim().length > 0;
-
   return (
-    <>
-      <Drawer.Root
-        open={isOpen}
-        onOpenChange={({ open }) => !open && onClose()}
-        size="md"
-        modal={false}
-      >
-        <Drawer.Content bg="bg">
-          <Drawer.CloseTrigger />
-          <Drawer.Header>
-            <HStack gap={2}>
-              {canGoBack && (
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={goBack}
-                  padding={1}
-                  minWidth="auto"
-                  data-testid="back-button"
-                >
-                  <LuArrowLeft size={20} />
-                </Button>
-              )}
-              <Drawer.Title>Create Workflow Evaluator</Drawer.Title>
-            </HStack>
-          </Drawer.Header>
-          <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-            <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-              <Text color="fg.muted" fontSize="sm" paddingX={6} paddingTop={4}>
-                Create a new workflow to use as a custom evaluator. You&apos;ll be taken to the
-                workflow editor to configure the evaluation logic.
-              </Text>
+    <Drawer
+      open={isOpen}
+      onClose={onClose}
+      onBack={canGoBack ? goBack : void 0}
+      backButtonTestId="back-button"
+      size="md"
+      title="Create Workflow Evaluator"
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: "Create & Open Editor",
+          onClick: () => {
+            if (isSaving) return;
+            void handleSubmit(onSubmit)();
+          },
+          loading: isSaving,
+          "data-testid": "save-evaluator-button",
+        },
+      }}
+    >
+      <VStack gap={4} align="stretch">
+        <Text color="fg.muted" fontSize="sm">
+          Create a new workflow to use as a custom evaluator. You&apos;ll be taken to the workflow
+          editor to configure the evaluation logic.
+        </Text>
 
-              <Box paddingX={6}>
-                <VStack gap={4} align="stretch">
-                  <FormServerError form={form} />
+        <FormServerError form={form} />
 
-                  <Field.Root invalid={!!errors.name || !!errors.icon}>
-                    <EmojiPickerModal
-                      open={emojiPicker.open}
-                      onClose={emojiPicker.onClose}
-                      onChange={(emoji) => {
-                        setValue("icon", emoji);
-                        emojiPicker.onClose();
-                      }}
-                    />
-                    <Field.Label>Name and Icon</Field.Label>
-                    <HStack>
-                      <Button variant="outline" onClick={emojiPicker.onOpen} fontSize="18px">
-                        {icon}
-                      </Button>
-                      <Input
-                        {...register("name", { required: "Name is required" })}
-                        placeholder="Enter evaluator name"
-                        data-testid="evaluator-name-input"
-                      />
-                    </HStack>
-                    <Field.ErrorText>
-                      {errors.name?.message ?? errors.icon?.message}
-                    </Field.ErrorText>
-                  </Field.Root>
+        <Field.Root invalid={!!errors.name || !!errors.icon}>
+          <Field.Label>Name and icon</Field.Label>
+          <HStack>
+            <EmojiPicker value={icon} onChange={(emoji) => setValue("icon", emoji)} />
+            <Input
+              {...register("name", {
+                validate: (value) => value.trim().length > 0 || "Enter a name for the evaluator.",
+              })}
+              placeholder="Enter evaluator name"
+              data-testid="evaluator-name-input"
+            />
+          </HStack>
+          <Field.ErrorText>{errors.name?.message ?? errors.icon?.message}</Field.ErrorText>
+        </Field.Root>
 
-                  <Field.Root invalid={!!errors.description}>
-                    <Field.Label>Description (optional)</Field.Label>
-                    <Textarea
-                      {...register("description")}
-                      placeholder="What does this evaluator check?"
-                    />
-                    <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
-                  </Field.Root>
-                </VStack>
-              </Box>
-            </VStack>
-          </Drawer.Body>
-          <Drawer.Footer>
-            <HStack gap={3}>
-              <Button variant="outline" onClick={onClose}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="green"
-                onClick={() => void handleSubmit(onSubmit)()}
-                disabled={!isValid || isSaving}
-                loading={isSaving}
-                data-testid="save-evaluator-button"
-              >
-                Create & Open Editor
-              </Button>
-            </HStack>
-          </Drawer.Footer>
-        </Drawer.Content>
-      </Drawer.Root>
-    </>
+        <Field.Root invalid={!!errors.description}>
+          <Field.Label>Description (optional)</Field.Label>
+          <Textarea {...register("description")} placeholder="What does this evaluator check?" />
+          <Field.ErrorText>{errors.description?.message}</Field.ErrorText>
+        </Field.Root>
+      </VStack>
+    </Drawer>
   );
 }

@@ -132,36 +132,9 @@ describe("given the hosted MCP approval step", () => {
   });
 
   describe("when the approving person may only view the project", () => {
-    /** @scenario "A project viewer cannot mint an MCP authorization code" */
-    it("refuses the approval and stores no authorization code", async () => {
-      const app = mount(["project:view"]);
-
-      const response = await approve(app);
-
-      expect(response.status).toBe(403);
-      expect(((await response.json()) as { error: string }).error).toBe("access_denied");
-      expect([...harness.stored.keys()].filter((key) => key.startsWith("mcp:auth_code:"))).toEqual(
-        [],
-      );
-    });
-  });
-
-  describe("when the approval is evaluated", () => {
-    /** @scenario "The approval step names the update grain, not the view grain" */
-    it("probes the permission that reveals the project's API key", async () => {
-      const app = mount(["project:update"]);
-
-      await approve(app);
-
-      expect(harness.probed).toEqual(["project:update"]);
-      expect(MCP_AUTHORIZE_PERMISSION).toBe("project:update");
-    });
-  });
-
-  describe("when the approving person may update the project", () => {
-    /** @scenario "A person who may update the project mints a code" */
+    /** @scenario "A project viewer mints an MCP authorization code" */
     it("stores a code bound to the client and redirect URI it approved", async () => {
-      const app = mount(["project:update"]);
+      const app = mount(["project:view"]);
 
       const response = await approve(app);
 
@@ -180,9 +153,34 @@ describe("given the hosted MCP approval step", () => {
     });
   });
 
+  describe("when the approval is evaluated", () => {
+    /** @scenario "The approval step names the view grain" */
+    it("probes the permission that lets the person see the project", async () => {
+      const app = mount(["project:view"]);
+
+      await approve(app);
+
+      expect(harness.probed).toEqual(["project:view"]);
+      expect(MCP_AUTHORIZE_PERMISSION).toBe("project:view");
+    });
+  });
+
+  describe("when the approving person holds no permission on the project", () => {
+    /** @scenario "A person who cannot see the project mints no code" */
+    it("refuses the approval and stores no authorization code", async () => {
+      const app = mount([]);
+
+      const response = await approve(app);
+
+      expect(response.status).toBe(403);
+      expect(((await response.json()) as { error: string }).error).toBe("access_denied");
+      expect(mintedCodes(harness.stored)).toEqual([]);
+    });
+  });
+
   describe("when nobody is signed in", () => {
     it("refuses before any registration is looked up", async () => {
-      const harnessed = harnessFor({ held: ["project:update"], approver: null });
+      const harnessed = harnessFor({ held: ["project:view"], approver: null });
 
       const response = await approve(harnessed.app);
 
@@ -194,7 +192,7 @@ describe("given the hosted MCP approval step", () => {
 
   describe("when the posted body is not JSON", () => {
     it("refuses it as an invalid body", async () => {
-      const harnessed = harnessFor({ held: ["project:update"] });
+      const harnessed = harnessFor({ held: ["project:view"] });
 
       const response = await harnessed.app.request("/api/mcp/authorize", {
         method: "POST",
@@ -219,7 +217,7 @@ describe("given an authorization request naming a client and a redirect URI", ()
      * @scenario Authorization succeeds when redirect_uri exactly matches the registered client
      */
     it("issues an authorization code", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app);
 
@@ -233,7 +231,7 @@ describe("given an authorization request naming a client and a redirect URI", ()
      * @scenario Authorization is rejected when redirect_uri does not match the registered client
      */
     it("refuses it and never mints a code", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, {
         redirect_uri: "https://attacker.invalid/callback",
@@ -260,7 +258,7 @@ describe("given an authorization request naming a client and a redirect URI", ()
      * @scenario Authorization is rejected when redirect_uri uses a scheme the browser executes
      */
     it("refuses it before the client registry is consulted", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, { redirect_uri });
 
@@ -275,7 +273,7 @@ describe("given an authorization request naming a client and a redirect URI", ()
   describe("when the client was never registered", () => {
     /** @scenario "Authorization is rejected for an unregistered client_id" */
     it("refuses it and never mints a code", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, { client_id: "mcp_never_registered" });
 
@@ -290,7 +288,7 @@ describe("given an authorization request naming a client and a redirect URI", ()
   describe("when the request names no client at all", () => {
     /** @scenario "Authorization is rejected when client_id is missing" */
     it("refuses it before any registration is looked up", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, { client_id: undefined });
 
@@ -309,7 +307,7 @@ describe("given a verified client whose approval then fails", () => {
   describe("when the request carries no code challenge", () => {
     /** @scenario "A consent failure a client can be told about is redirected back to the client" */
     it("sends the browser back to the registered redirect URI with the OAuth error", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, { code_challenge: undefined });
 
@@ -335,7 +333,7 @@ describe("given a verified client whose approval then fails", () => {
      * @scenario A code challenge method other than S256 is refused at the authorization request
      */
     it("refuses it now rather than at the exchange", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const response = await approve(harness.app, { code_challenge_method: "plain" });
 
@@ -371,7 +369,7 @@ describe("given a failure the client cannot be told about", () => {
      * @scenario A consent failure that cannot be attributed to a client stays on the LangWatch page
      */
     it("carries no redirect for the browser to follow", async () => {
-      const harness = harnessFor({ held: ["project:update"] });
+      const harness = harnessFor({ held: ["project:view"] });
 
       const unregisteredClient = await approve(harness.app, {
         client_id: "mcp_never_registered",

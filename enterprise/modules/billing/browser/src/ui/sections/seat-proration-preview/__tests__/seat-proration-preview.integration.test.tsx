@@ -1,11 +1,10 @@
 /**
  * @vitest-environment jsdom
- * The seat-update dialog's body, against a mocked `billingApi`.
+ * The seat-update dialog, against a mocked `billingApi`.
  * @see specs/licensing/proration-preview.feature
  */
 import "@testing-library/jest-dom/vitest";
 import type * as errorsModule from "@langwatch/browser-host/errors";
-import { Dialog } from "@langwatch/design-system/dialog";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import type { SeatProrationPreviewProps } from "@langwatch/enterprise-billing-client";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
@@ -58,11 +57,7 @@ const seatUpdate = (
 const renderPreview = (variant: UpgradeModalSeatsVariant, onClose = vi.fn()) => {
   render(
     <DesignSystemProvider forcedTheme="light">
-      <Dialog.Root open={true}>
-        <Dialog.Content>
-          <SeatProrationPreview variant={variant} open={true} onClose={onClose} />
-        </Dialog.Content>
-      </Dialog.Root>
+      <SeatProrationPreview variant={variant} open={true} onClose={onClose} />
     </DesignSystemProvider>,
   );
   return { onClose };

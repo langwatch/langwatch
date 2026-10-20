@@ -7,7 +7,6 @@
 /** S9's floor and lock rules and W-01's foreign-key rule, held only above the rules marker. */
 export const FLOOR_AND_LOCK_RULES: ReadonlySet<string> = new Set([
   "new-foreign-key",
-  "retirement-note-above-floor",
   "contract-without-archive-note",
   "set-not-null-on-populated-column",
   "enum-recreated",
@@ -23,6 +22,9 @@ export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
   "several-alters-on-one-table",
   "lock-timeout-above-ceiling",
 ]);
+
+/** Nothing is deleted automatically (Alex, 2026-10-11): refused above the newest release tag. */
+export const NOTHING_DELETED_RULES: ReadonlySet<string> = new Set(["drop-table-or-column"]);
 
 /** The runner's lock_timeout; a migration never waits longer for a lock. */
 export const LOCK_TIMEOUT_CEILING_MS = 2_000;
@@ -98,22 +100,6 @@ export function parseRelease(text: string): [number, number, number] | null {
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
-function releaseAtOrBelow({ release, floor }: { release: string; floor: string }): boolean {
-  const note = parseRelease(release);
-  const bound = parseRelease(floor);
-  if (!note || !bound) return false;
-  for (const [index, part] of note.entries()) {
-    if (part !== bound[index]) return part < bound[index]!;
-  }
-  return true;
-}
-
-function noteBefore(sql: string, statementOffset: number): string | undefined {
-  return [...sql.matchAll(RETIREMENT_MARKER)]
-    .filter((match) => match.index < statementOffset)
-    .at(-1)?.[1];
-}
-
 const IDENT = '(?:"[^"]+"|\\w+)(?:\\s*\\.\\s*(?:"[^"]+"|\\w+))?';
 
 /** `"public"."Project"` and `Project` both become `project`. */
@@ -157,15 +143,7 @@ function hasPrebuildNote({ sql, offset, index }: { sql: string; offset: number; 
   return /INDEX\s+CONCURRENTLY/i.test(comments) && comments.includes(index);
 }
 
-function dropFindings({
-  sql,
-  live,
-  floor,
-}: {
-  sql: string;
-  live: string;
-  floor: string;
-}): Finding[] {
+function dropFindings({ sql, live }: { sql: string; live: string }): Finding[] {
   const pattern = /\bDROP\s+(COLUMN|TABLE|TYPE)\s+(?:IF\s+EXISTS\s+)?"?([\w.]+)"?/gi;
   const first = [...live.matchAll(pattern)].find((match) => match[1]!.toUpperCase() !== "TYPE");
   const unarchived: Finding[] =
@@ -189,25 +167,36 @@ function dropFindings({
         },
       ];
     }
-    const release = noteBefore(sql, match.index)!;
-    if (releaseAtOrBelow({ release, floor })) return [];
-    const unparsed = parseRelease(release) === null;
-    return [
-      {
-        rule: "retirement-note-above-floor",
-        problem: unparsed
-          ? `drops ${what} under a note naming "${release}", which is not a release`
-          : `drops ${what} under a note naming ${release}, above the LTS floor ${floor}`,
-        fix: unparsed
-          ? "name the release that stopped using it as MAJOR.MINOR.PATCH, for example `-- contract: retired in 3.21.0`."
-          : `an installation on ${floor} still reads it, and the floor is the oldest release the ` +
-            `window promises to serve. Keep the ${match[1]!.toLowerCase()} until ` +
-            `packages/upgrade/releases/lts-floor.json names ${release} or later; the first ` +
-            `release cut after the floor reaches ${release} is the first one this drop may ship in.`,
-      },
-    ];
+    return [];
   });
   return [...retirements, ...unarchived];
+}
+
+const NO_DROP_FIX =
+  "nothing is deleted automatically: leave it in place and stop reading and writing it, then " +
+  'declare an operator step (`mode: "operator"`) in the owning module that drops it, which an ' +
+  "operator confirms on Ops > Upgrades once it is safe. Dropping an index, a constraint, a " +
+  "default or a type holds no data and is fine, and so is dropping a table this migration creates.";
+
+/** A DROP TABLE or DROP COLUMN, the only drops that lose data (Alex, 2026-10-11). */
+function noDropFindings({ live, created }: Scoped): Finding[] {
+  const dropTable = new RegExp(`^\\s*DROP\\s+TABLE\\s+(?:IF\\s+EXISTS\\s+)?(${IDENT})`, "i");
+  const dropColumn =
+    /\bDROP\s+(?!CONSTRAINT\b|DEFAULT\b|NOT\s+NULL\b|IDENTITY\b|EXPRESSION\b)(?:COLUMN\s+)?(?:IF\s+EXISTS\s+)?"?(\w+)"?/gi;
+  return statementsOf(live).flatMap(({ text }): Finding[] => {
+    const table = dropTable.exec(text)?.[1];
+    if (table) {
+      if (created.has(bareName(table))) return [];
+      return [{ rule: "drop-table-or-column", problem: `drops table ${table}`, fix: NO_DROP_FIX }];
+    }
+    const altered = alteredTable(text);
+    if (!altered || created.has(altered)) return [];
+    return [...text.matchAll(dropColumn)].map((match) => ({
+      rule: "drop-table-or-column",
+      problem: `drops column ${altered}.${match[1]}`,
+      fix: NO_DROP_FIX,
+    }));
+  });
 }
 
 function notNullFindings(live: string): Finding[] {
@@ -488,19 +477,13 @@ function lockTimeoutFindings(live: string): Finding[] {
   });
 }
 
-/**
- * Every rule the Postgres scanner applies to one migration folder's SQL. `floor` is the
- * LTS floor release: a retirement note must name a release at or below it.
- */
-export function scanPostgresMigration({
-  name,
-  sql,
-  floor,
-}: MigrationSource & { floor: string }): MigrationFinding[] {
+/** Every rule the Postgres scanner applies to one migration folder's SQL. */
+export function scanPostgresMigration({ name, sql }: MigrationSource): MigrationFinding[] {
   const live = maskComments(sql);
   const created = createdTables(live);
   return [
-    ...dropFindings({ sql, live, floor }),
+    ...noDropFindings({ live, created }),
+    ...dropFindings({ sql, live }),
     ...notNullFindings(live),
     ...setNotNullFindings({ live, created }),
     ...alterTypeFindings({ live, created }),

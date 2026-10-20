@@ -46,7 +46,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   email: z.string(),
   planType: z.string(),
   maxMembers: z.number(),
-  maxMembersLite: z.number(),
+  maxMembersLite: z.number().nullable(),
+  liteSeatsUnlimited: z.boolean(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
@@ -82,6 +83,18 @@ export type IssuedLicenseView = z.infer<typeof issuedLicenseViewSchema>;
 const issuedLicensePageSchemaDefinition = z.object({
   licenses: z.array(issuedLicenseViewSchema),
   total: z.number(),
+  /**
+   * How many licenses each filter choice would list, with the search and the
+   * other filter applied, so the console can say what a filter hides.
+   */
+  counts: z.object({
+    active: z.number(),
+    inactive: z.number(),
+    customer: z.number(),
+    internal: z.number(),
+    /** What the search alone matches, whatever the filters. */
+    all: z.number(),
+  }),
 });
 export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;

@@ -31,6 +31,7 @@ type RunConfig struct {
 	Log        io.Writer
 	Tick       time.Duration // the guard's read interval; 2 s
 	Backoff    time.Duration // the first retry's wait; 1 s
+	GrantWait  time.Duration // how long a member.add waits for the owner's grant to land; 3 min
 	Now        func() time.Time
 	Drain      bool // wait for the worker backlog to empty after the last ack
 	// Backlog, when set, scopes the drain to the seed's own tenants; without it the drain waits on
@@ -57,6 +58,12 @@ func (e *StallError) Error() string {
 }
 
 const retries = 5
+
+// grantNotLanded is what the product answers a member.add while the owner's grant is still on the worker's queue.
+const grantNotLanded = "grant_exceeds_caller_permissions"
+
+// maxGrantBackoff caps the doubling wait between member.add attempts.
+const maxGrantBackoff = 15 * time.Second
 
 // Run walks the plan, skips what the checkpoint holds, and sends each step within the guard's window.
 func Run(ctx context.Context, cfg RunConfig) (Result, error) {
@@ -107,6 +114,7 @@ func Run(ctx context.Context, cfg RunConfig) (Result, error) {
 func (cfg RunConfig) withDefaults() RunConfig {
 	cfg.Tick = cmp.Or(cfg.Tick, 2*time.Second)
 	cfg.Backoff = cmp.Or(cfg.Backoff, time.Second)
+	cfg.GrantWait = cmp.Or(cfg.GrantWait, 3*time.Minute)
 	if cfg.Now == nil {
 		cfg.Now = time.Now
 	}
@@ -308,13 +316,23 @@ func (r *run) chunks(step Step, scope Action) iter.Seq2[Action, error] {
 	}
 }
 
-// send retries a retryable refusal with doubling back-off; the guard counts each one.
+// send retries a retryable refusal with doubling back-off; the guard counts each one. A member.add
+// refused because the owner's grant has not landed waits for it up to GrantWait; other refusals stay final.
 func (r *run) send(ctx context.Context, action Action) (Reply, error) {
 	wait := r.cfg.Backoff
+	var waited time.Duration
 	for attempt := 1; ; attempt++ {
 		reply, err := r.cfg.Executor.Send(ctx, action)
-		if err != nil || reply.OK || !reply.Retryable || attempt == retries {
+		if err != nil || reply.OK {
 			return reply, err
+		}
+		grantBehind := action.Kind == KindMemberAdd && reply.Code == grantNotLanded
+		if grantBehind {
+			if waited >= r.cfg.GrantWait {
+				return reply, nil
+			}
+		} else if !reply.Retryable || attempt == retries {
+			return reply, nil
 		}
 		r.mu.Lock()
 		r.retryable++
@@ -324,7 +342,11 @@ func (r *run) send(ctx context.Context, action Action) (Reply, error) {
 			return reply, ctx.Err()
 		case <-time.After(wait):
 		}
+		waited += wait
 		wait *= 2
+		if grantBehind {
+			wait = min(wait, maxGrantBackoff)
+		}
 	}
 }
 

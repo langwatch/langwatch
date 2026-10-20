@@ -27,7 +27,13 @@ import { PrismaJoinRequestProjectionRepository } from "./prisma.join-request-pro
  * reads as no proof: this is the decision that grants authority over a domain.
  */
 function connectionHasQualifiedProof(
-  row: { source: string; verifiedDomains: string[]; domainVerifications: unknown },
+  row: {
+    organizationId: string;
+    replacesConnectionId: string | null;
+    source: string;
+    verifiedDomains: string[];
+    domainVerifications: unknown;
+  },
   domain: string,
 ): boolean {
   const verifications = z.array(ssoDomainVerificationSchema).safeParse(row.domainVerifications);
@@ -36,6 +42,8 @@ function connectionHasQualifiedProof(
   return (
     qualifySsoDomainOwnership({
       state: {
+        organizationId: row.organizationId,
+        replacesConnectionId: row.replacesConnectionId,
         source: source.success ? source.data : "self-serve",
         verifiedDomains: row.verifiedDomains,
         domainVerifications: verifications.success ? verifications.data : [],
@@ -267,6 +275,7 @@ export class PrismaJoinCandidateRepository implements JoinCandidateRepository {
         },
         select: {
           organizationId: true,
+          replacesConnectionId: true,
           source: true,
           verifiedDomains: true,
           domainVerifications: true,

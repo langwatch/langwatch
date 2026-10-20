@@ -37,19 +37,37 @@ const SCALED_JOIN_BYTES = "30000000";
 
 /**
  * Model-grouped chart: its span-model join stacks three aggregations, and merging spilled parts
- * costs memory per part. At 100 MB spill (production: 500 MB) it peaks near 145 MiB on
- * ClickHouse 25.10 against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
+ * costs memory per part. At 100 MB spill (production: 500 MB) it peaks at 145-193 MiB across
+ * runs against ~520 MiB unspilled, so this cap still fails a query that stops spilling.
  */
 const MODEL_GROUPED_SETTINGS = {
-  max_memory_usage: "200000000",
+  max_memory_usage: "250000000",
   max_bytes_before_external_group_by: "100000000",
 } as const;
 
+/** The spilling count panels peak near 146 MiB on CI; the cap leaves them about a quarter more. */
 const CAPPED_SETTINGS = {
   max_threads: 2,
-  max_memory_usage: "150000000",
+  max_memory_usage: "190000000",
   max_bytes_before_external_group_by: "30000000",
 } as const;
+
+/** The seed writes on one thread in 16k-row blocks: one default INSERT outgrows 1 GiB. */
+const SEED_SETTINGS = {
+  max_threads: 1,
+  max_insert_threads: "1",
+  max_block_size: "16384",
+  min_insert_block_size_rows: "16384",
+  min_insert_block_size_bytes: "0",
+} as const;
+
+const SEEDED_TABLES = ["trace_analytics", "trace_summaries", "stored_spans"] as const;
+
+/**
+ * Writing a wide part of these tables buffers up to 1 MiB per column stream, about 230 MiB a
+ * part, and the server merges four at once. 64 KiB buffers fit the test server's 1 GiB.
+ */
+const SEED_COMPRESS_BLOCK_BYTES = 65_536;
 
 const end = new Date(Math.floor(Date.now() / DAY_MS) * DAY_MS);
 const start = new Date(end.getTime() - RANGE_DAYS * DAY_MS);
@@ -161,6 +179,11 @@ describe("dashboard panels under a memory cap", () => {
 
   beforeAll(async () => {
     ch = (await startMigratedClickHouse()).client;
+    for (const table of SEEDED_TABLES) {
+      await ch.command({
+        query: `ALTER TABLE ${table} MODIFY SETTING max_compress_block_size = ${SEED_COMPRESS_BLOCK_BYTES}`,
+      });
+    }
 
     // Trace t occurs t * 60d / N before `end`, so the traces fill both
     // windows evenly. Even traces get a second, newer version.
@@ -182,6 +205,7 @@ describe("dashboard panels under a memory cap", () => {
         WHERE v = 0 OR t % 2 = 0
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -195,6 +219,7 @@ describe("dashboard panels under a memory cap", () => {
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -209,6 +234,7 @@ describe("dashboard panels under a memory cap", () => {
         WHERE t % ${RAG_TRACE_EVERY} = 0
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     await ch.exec({
@@ -223,35 +249,48 @@ describe("dashboard panels under a memory cap", () => {
         FROM (SELECT number AS t, ${traceId} AS tid, ${occurredAt} AS occ FROM numbers(${TRACE_COUNT}))
       `,
       query_params: params,
+      clickhouse_settings: SEED_SETTINGS,
     });
 
     // Ground truth straight from the seed, without any dedup machinery: the
-    // second version of a trace keeps its OccurredAt.
-    const [truth] = await (
-      await ch.query({
-        query: `
-          SELECT
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)}) AS currentTraces,
-            uniqExactIf(TraceId, OccurredAt < {start:DateTime64(3)}) AS previousTraces,
-            uniqExactIf(TraceId, OccurredAt >= {start:DateTime64(3)} AND HasError) AS currentErrorTraces,
-            uniqExactIf(UserId, OccurredAt >= {start:DateTime64(3)}) AS currentUsers
-          FROM trace_analytics
-          WHERE TenantId = {tenantId:String}
-            AND OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}
-        `,
-        query_params: {
-          tenantId: TENANT_ID,
-          start,
-          end,
-          previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
-        },
-        format: "JSONEachRow",
-      })
-    ).json<Record<keyof typeof expected, string>>();
-    expected.currentTraces = Number(truth?.currentTraces);
-    expected.previousTraces = Number(truth?.previousTraces);
-    expected.currentErrorTraces = Number(truth?.currentErrorTraces);
-    expected.currentUsers = Number(truth?.currentUsers);
+    // second version of a trace keeps its OccurredAt. Each figure is a grouped
+    // count allowed to spill, so the truth stays exact without holding four
+    // million-key hash sets on the 1 GiB test server at once.
+    const window = {
+      current: "OccurredAt >= {start:DateTime64(3)} AND OccurredAt < {end:DateTime64(3)}",
+      previous:
+        "OccurredAt >= {previousStart:DateTime64(3)} AND OccurredAt < {start:DateTime64(3)}",
+    };
+    const distinctCount = async ({ column, where }: { column: string; where: string }) => {
+      const [row] = await (
+        await ch.query({
+          query: `
+            SELECT count() AS total FROM (
+              SELECT ${column} FROM trace_analytics
+              WHERE TenantId = {tenantId:String} AND ${where}
+              GROUP BY ${column}
+            )
+          `,
+          query_params: {
+            tenantId: TENANT_ID,
+            start,
+            end,
+            previousStart: new Date(start.getTime() - RANGE_DAYS * DAY_MS),
+          },
+          // One thread and a spilling group-by keep the million-key truth inside the 1 GiB server.
+          clickhouse_settings: { max_threads: 1, max_bytes_before_external_group_by: "50000000" },
+          format: "JSONEachRow",
+        })
+      ).json<{ total: string }>();
+      return Number(row?.total);
+    };
+    expected.currentTraces = await distinctCount({ column: "TraceId", where: window.current });
+    expected.previousTraces = await distinctCount({ column: "TraceId", where: window.previous });
+    expected.currentErrorTraces = await distinctCount({
+      column: "TraceId",
+      where: `${window.current} AND HasError`,
+    });
+    expected.currentUsers = await distinctCount({ column: "UserId", where: window.current });
     if (expected.currentTraces < 400_000) {
       throw new Error(`seed produced ${expected.currentTraces} traces in the current window`);
     }
@@ -259,11 +298,10 @@ describe("dashboard panels under a memory cap", () => {
 
   afterAll(async () => {
     if (!ch) return;
-    await deleteMigratedTenantRows({
-      client: ch,
-      tenantId: TENANT_ID,
-      tables: ["trace_analytics", "trace_summaries", "stored_spans"],
-    });
+    await deleteMigratedTenantRows({ client: ch, tenantId: TENANT_ID, tables: SEEDED_TABLES });
+    for (const table of SEEDED_TABLES) {
+      await ch.command({ query: `ALTER TABLE ${table} RESET SETTING max_compress_block_size` });
+    }
   }, 120_000);
 
   describe("when the trace count summary compares against the previous period", () => {

@@ -1,5 +1,6 @@
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -8,17 +9,14 @@ import {
   Badge,
   Box,
   Button,
-  Card,
   HStack,
   Spacer,
-  Table,
-  Tabs,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
-import { TabCount } from "@langwatch/design-system/tab-count";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { formatBudgetUsd, type VirtualKeySpendThisMonth } from "@langwatch/gateway-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 import {
@@ -117,7 +115,7 @@ function VirtualKeysHeader({
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Virtual Keys</PageLayout.Heading>
+        <PageLayout.Heading>Virtual keys</PageLayout.Heading>
         <Spacer />
         {canCreate && (
           <PageLayout.HeaderButton
@@ -200,6 +198,7 @@ function VirtualKeysPage() {
     name: string;
   } | null>(null);
   const [statusTab, setStatusTab] = useState<"active" | "revoked">("active");
+  const accent = useProductAccent();
 
   const allRows = listQuery.data ?? [];
   // A disabled key belongs with the live ones: it is paused, not finished,
@@ -270,97 +269,67 @@ function VirtualKeysPage() {
               onRetry={() => listQuery.refetch()}
             />
           )}
-          {listView === "empty" && (
-            <VirtualKeysEmptyState canCreate={canCreate} onCreate={() => setCreateOpen(true)} />
-          )}
+          {listView === "empty" && <VirtualKeysEmptyState />}
           {listView === "list" && (
             <VStack align="stretch" gap={3} width="full">
-              <Tabs.Root
+              <FilterChips
+                groupLabel="Filter keys by status"
+                countNoun={{ singular: "key", plural: "keys" }}
+                colorPalette={accent.colorPalette}
                 value={statusTab}
-                onValueChange={(d) => setStatusTab(d.value === "revoked" ? "revoked" : "active")}
-                colorPalette="orange"
-                width="full"
-              >
-                <Tabs.List>
-                  <Tabs.Trigger value="active" gap={2}>
-                    Active <TabCount value={activeRows.length} />
-                  </Tabs.Trigger>
-                  <Tabs.Trigger value="revoked" gap={2}>
-                    Revoked <TabCount value={revokedRows.length} />
-                  </Tabs.Trigger>
-                </Tabs.List>
-              </Tabs.Root>
+                onChange={(next) => setStatusTab(next === "revoked" ? "revoked" : "active")}
+                items={[
+                  { value: "active", label: "Active", count: activeRows.length },
+                  { value: "revoked", label: "Revoked", count: revokedRows.length },
+                ]}
+              />
               {rows.length === 0 ? (
-                <Card.Root variant="showcase" width="full">
-                  <Card.Body>
-                    <NoDataInfoBlock
-                      icon={<KeyRound />}
-                      title={`No ${statusTab} keys.`}
-                      description="Keys with this status will appear here."
-                    />
-                  </Card.Body>
-                </Card.Root>
+                <NoDataInfoBlock
+                  icon={<KeyRound />}
+                  title={`No ${statusTab} keys.`}
+                  description="Keys with this status will appear here."
+                />
               ) : (
-                <Card.Root variant="showcase" width="full" overflow="hidden">
-                  {/* The card clips; the body scrolls. Without this the
-                      right-hand columns are simply unreachable on a narrow
-                      window instead of scrolling into view. Focusable so the
-                      scroll is reachable from the keyboard alone. */}
-                  <Card.Body
-                    paddingY={0}
-                    paddingX={0}
-                    overflowX="auto"
-                    as="section"
-                    tabIndex={0}
-                    aria-label="Virtual keys table"
-                  >
-                    <ListTable
-                      containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                      variant="line"
-                      size="md"
-                      width="full"
-                    >
-                      <Table.Header>
-                        <Table.Row>
-                          <Table.ColumnHeader>Name</Table.ColumnHeader>
-                          <Table.ColumnHeader>Prefix</Table.ColumnHeader>
-                          <Table.ColumnHeader>Status</Table.ColumnHeader>
-                          <Table.ColumnHeader>Scopes</Table.ColumnHeader>
-                          <Table.ColumnHeader>Routing</Table.ColumnHeader>
-                          <Table.ColumnHeader>
-                            <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
-                              <Text as="span">Spent this month</Text>
-                            </Tooltip>
-                          </Table.ColumnHeader>
-                          <Table.ColumnHeader>Last used</Table.ColumnHeader>
-                          <Table.ColumnHeader></Table.ColumnHeader>
-                        </Table.Row>
-                      </Table.Header>
-                      <Table.Body>
-                        {rows.map((vk) => (
-                          <VirtualKeyTableRow
-                            key={vk.id}
-                            vk={vk}
-                            scopes={scopeEntriesWithNames(vk.scopes)}
-                            policyNameById={policyNameById}
-                            spend={spendByKeyId.get(vk.id)}
-                            spendIsLoading={spendQuery.isLoading}
-                            spendIsError={spendQuery.isError}
-                            budget={budgetByKeyId.get(vk.id)}
-                            traceHref={traceHrefByKeyId.get(vk.id)}
-                            canUpdate={canUpdate}
-                            canRotate={canRotate}
-                            canRevoke={canRevoke}
-                            onNavigate={(href) => router.push(href)}
-                            onEdit={() => setEditing(vk)}
-                            onRotate={() => setRotating({ id: vk.id, name: vk.name })}
-                            onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
-                          />
-                        ))}
-                      </Table.Body>
-                    </ListTable>
-                  </Card.Body>
-                </Card.Root>
+                <ListTable variant="card" scroll="x" scrollLabel="Virtual keys table">
+                  <ListTable.Header>
+                    <ListTable.Row>
+                      <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Prefix</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Scopes</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Routing</ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>
+                        <Tooltip content="Spend this calendar month, from the same cost data the Usage tab shows. Click a value to open Usage filtered to that key.">
+                          <Text as="span">Spent this month</Text>
+                        </Tooltip>
+                      </ListTable.ColumnHeader>
+                      <ListTable.ColumnHeader>Last used</ListTable.ColumnHeader>
+                      <ListTable.ActionHeader />
+                    </ListTable.Row>
+                  </ListTable.Header>
+                  <ListTable.Body>
+                    {rows.map((vk) => (
+                      <VirtualKeyTableRow
+                        key={vk.id}
+                        vk={vk}
+                        scopes={scopeEntriesWithNames(vk.scopes)}
+                        policyNameById={policyNameById}
+                        spend={spendByKeyId.get(vk.id)}
+                        spendIsLoading={spendQuery.isLoading}
+                        spendIsError={spendQuery.isError}
+                        budget={budgetByKeyId.get(vk.id)}
+                        traceHref={traceHrefByKeyId.get(vk.id)}
+                        canUpdate={canUpdate}
+                        canRotate={canRotate}
+                        canRevoke={canRevoke}
+                        onNavigate={(href) => router.push(href)}
+                        onEdit={() => setEditing(vk)}
+                        onRotate={() => setRotating({ id: vk.id, name: vk.name })}
+                        onRevoke={() => setRevoking({ id: vk.id, name: vk.name })}
+                      />
+                    ))}
+                  </ListTable.Body>
+                </ListTable>
               )}
             </VStack>
           )}
@@ -458,17 +427,16 @@ function VirtualKeyTableRow({
   onRevoke: () => void;
 }) {
   return (
-    <Table.Row
-      cursor="pointer"
-      _hover={{ bg: "bg.subtle" }}
-      onClick={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}
-    >
-      <Table.Cell>
+    <ListTable.Row onActivate={() => onNavigate(`/gateway/virtual-keys/${vk.id}`)}>
+      <ListTable.Cell>
         <VStack align="start" gap={1}>
           <HStack gap={2} align="center">
-            <Link href={`/gateway/virtual-keys/${vk.id}`} fontWeight="medium">
+            <ListTable.RowAction
+              href={`/gateway/virtual-keys/${vk.id}`}
+              onNavigate={({ href }) => onNavigate(href)}
+            >
               {vk.name}
-            </Link>
+            </ListTable.RowAction>
           </HStack>
           {vk.description && (
             <Text fontSize="xs" color="fg.muted">
@@ -494,13 +462,13 @@ function VirtualKeyTableRow({
             );
           })()}
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text fontFamily="mono" fontSize="xs">
           {vk.displayPrefix}…
         </Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {(() => {
           const badge = statusBadge(vk);
           return (
@@ -509,8 +477,8 @@ function VirtualKeyTableRow({
             </Badge>
           );
         })()}
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ProviderScopeChips
           scopes={scopes}
           size="xs"
@@ -523,15 +491,15 @@ function VirtualKeyTableRow({
               : undefined
           }
         />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <RoutingPolicyCell
           routingPolicyId={vk.routingPolicyId}
           routingMode={vk.routingMode}
           policyNameById={policyNameById}
         />
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default" minWidth="140px">
+      </ListTable.Cell>
+      <ListTable.Cell stopRowActivation minWidth={140}>
         <VStack align="stretch" gap={1.5} width="full">
           <Link
             className="group"
@@ -568,8 +536,8 @@ function VirtualKeyTableRow({
           </Link>
           <VirtualKeyBudgetBar value={budget} virtualKeyId={vk.id} />
         </VStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {vk.lastUsedAt ? (
           <Tooltip content={readableDate(vk.lastUsedAt).toLocaleString()}>
             <Text fontSize="sm">{formatTimeAgo(toEpochMs(vk.lastUsedAt))}</Text>
@@ -579,8 +547,8 @@ function VirtualKeyTableRow({
             never
           </Text>
         )}
-      </Table.Cell>
-      <Table.Cell onClick={(e) => e.stopPropagation()} cursor="default">
+      </ListTable.Cell>
+      <ListTable.ActionCell>
         {vk.status !== "revoked" && (
           <Menu.Root>
             <Menu.Trigger asChild>
@@ -640,8 +608,8 @@ function VirtualKeyTableRow({
             </Menu.Content>
           </Menu.Root>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.ActionCell>
+    </ListTable.Row>
   );
 }
 
@@ -691,26 +659,14 @@ function traceHrefsByKeyId(input: {
   return map;
 }
 
-function VirtualKeysEmptyState({
-  canCreate,
-  onCreate,
-}: {
-  canCreate: boolean;
-  onCreate: () => void;
-}) {
+function VirtualKeysEmptyState() {
   return (
-    <VStack gap={6} align="center" maxWidth="640px" marginX="auto" paddingY={8}>
+    <VStack gap={6} align="stretch" paddingY={4}>
       <NoDataInfoBlock
         title="No virtual keys yet"
-        description="Mint your first virtual key to route requests through the LangWatch AI Gateway with budgets, guardrails, and per-tenant tracing attached."
+        description="Create your first virtual key to send requests through the LangWatch AI Gateway with budgets, guardrails and tracing attached."
         icon={<KeyRound size={32} />}
-      >
-        {canCreate && (
-          <PageLayout.HeaderButton primary onClick={onCreate} marginTop={4}>
-            <Plus size={14} /> New virtual key
-          </PageLayout.HeaderButton>
-        )}
-      </NoDataInfoBlock>
+      />
       <GatewayCapabilityPreview />
     </VStack>
   );
@@ -748,30 +704,31 @@ function GatewayCapabilityPreview() {
   }[] = [
     {
       icon: <Zap size={14} />,
-      label: "Cache control",
-      defaultValue: "respect",
+      label: "Prompt caching",
+      defaultValue: "automatic",
       detail:
-        "Provider-agnostic passthrough. Anthropic cache_control, OpenAI/Azure automatic, Gemini cachedContent. Switch to disable/force per key.",
+        "Reuse repeated prompts across providers to cut cost and latency. Turn it off or force it on for any key.",
     },
     {
       icon: <Shield size={14} />,
       label: "Guardrails",
       defaultValue: "none",
       detail:
-        "Attach pre/post/stream_chunk monitors. Block-by-default, opt-in fail-open per direction.",
+        "Check requests and responses with your evaluators. Choose whether a failed check blocks the call or lets it through.",
     },
     {
       icon: <Ban size={14} />,
       label: "Blocked patterns",
       defaultValue: "none",
       detail:
-        "RE2 deny/allow for tools, MCP servers, URLs, and models. Enforced pre-provider-dispatch at zero cost.",
+        "Allow or deny specific tools, MCP servers, URLs and models before a request reaches the provider.",
     },
     {
       icon: <Gauge size={14} />,
       label: "Rate limits",
       defaultValue: "unlimited",
-      detail: "Per-VK RPM and RPD. 429 + Retry-After emitted by the gateway when exceeded.",
+      detail:
+        "Cap requests per minute and per day for each key. Callers get a clear retry-after answer when they hit it.",
     },
   ];
   return (
@@ -784,7 +741,7 @@ function GatewayCapabilityPreview() {
           preview
         </Badge>
       </HStack>
-      <Box borderWidth="1px" borderColor="border.subtle" borderRadius="md" padding={3}>
+      <Box>
         <VStack align="stretch" gap={3}>
           {rows.map((row) => (
             <HStack key={row.label} align="start" gap={3}>

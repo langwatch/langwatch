@@ -1,4 +1,6 @@
-import { Box, Button, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { LoadMore } from "@langwatch/design-system/load-more";
+import { Box, HStack, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import { differenceInMinutes, differenceInSeconds, toEpochMs } from "@langwatch/time";
 
 import type { RouterOutputs } from "../../../../behavior/automation-api.ts";
@@ -78,16 +80,11 @@ export function HistorySection({
         isUnconditioned={isUnconditioned}
         isReport={isReport}
       />
-      {historyQuery.hasNextPage ? (
-        <Button
-          size="xs"
-          variant="ghost"
-          loading={historyQuery.isFetchingNextPage}
-          onClick={() => void historyQuery.fetchNextPage()}
-        >
-          Show earlier
-        </Button>
-      ) : null}
+      <LoadMore
+        hasMore={historyQuery.hasNextPage}
+        loading={historyQuery.isFetchingNextPage}
+        onLoadMore={() => void historyQuery.fetchNextPage()}
+      />
     </VStack>
   );
 }
@@ -103,15 +100,7 @@ function Timeline({
   isGraphAlert: boolean;
 }) {
   return (
-    <VStack
-      align="stretch"
-      gap={0}
-      width="full"
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="md"
-      overflow="hidden"
-    >
+    <Card variant="frame" padding="none" bodyLayout="stack">
       {evaluation ? <EvaluationRow evaluation={evaluation} /> : null}
       {fireRows({ fires, isGraphAlert }).map((row) => (
         <TimelineRow
@@ -122,7 +111,7 @@ function Timeline({
           detailColor={row.detailColor}
         />
       ))}
-    </VStack>
+    </Card>
   );
 }
 

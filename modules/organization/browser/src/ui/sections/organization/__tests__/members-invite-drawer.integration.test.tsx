@@ -6,7 +6,7 @@
  * @see specs/settings/add-member-drawer.feature
  */
 import "@testing-library/jest-dom/vitest";
-import { cleanup, screen } from "@testing-library/react";
+import { cleanup, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -131,6 +131,15 @@ describe("the organization members page", () => {
       expect(host.overlays).toEqual([
         { name: "inviteMember", props: { initialEmail: "a@b.test" } },
       ]);
+    });
+
+    it("keeps the inline box and Invite people on one row that never wraps", () => {
+      renderMembers();
+      const row = screen.getByTestId("members-invite-row");
+
+      expect(within(row).getByLabelText("Invite a teammate by email")).toBeInTheDocument();
+      expect(within(row).getByRole("button", { name: /invite people/i })).toBeInTheDocument();
+      expect(getComputedStyle(row).flexWrap).not.toBe("wrap");
     });
   });
 });

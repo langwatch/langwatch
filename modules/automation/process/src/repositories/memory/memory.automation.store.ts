@@ -7,6 +7,7 @@ import type {
 import type { Instant } from "@langwatch/time";
 
 import type { AnalyticsMetricSource } from "../graph-trigger-sent.repository.ts";
+import type { TriggerJsonColumn } from "../trigger.repository.ts";
 
 /** One claimed send: the row `claimSend` writes once per trigger and trace. */
 interface StoredTriggerSend {
@@ -36,10 +37,20 @@ export class MemoryAutomationStore {
   }
 
   readonly triggers = new Map<string, Trigger>();
+  /**
+   * Columns an earlier release stored as JSON text, by trigger id: what Postgres holds as a jsonb
+   * string. The row in `triggers` is what reading it answers; a test seeds the text here.
+   */
+  readonly triggerJsonText = new Map<string, Partial<Record<TriggerJsonColumn, string>>>();
   readonly sends: StoredTriggerSend[] = [];
   readonly fires: (TriggerFire & { projectId: string })[] = [];
   readonly suppressions: EmailSuppression[] = [];
   readonly customGraphs: (CustomGraph & { dashboardId: string | null })[] = [];
+  /**
+   * The boards set to Only me. This store holds no board rows, so a test names the ones whose
+   * graphs automation must not reach.
+   */
+  readonly privateDashboardIds = new Set<string>();
   readonly graphTriggerSent: StoredGraphTriggerSent[] = [];
   /** The project names an unsubscribe page renders, by project id. */
   readonly projectNames = new Map<string, string>();

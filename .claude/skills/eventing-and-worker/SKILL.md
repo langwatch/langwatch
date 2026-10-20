@@ -1,6 +1,6 @@
 ---
 name: eventing-and-worker
-description: "Event-sourced work on a module's pipeline: definePipeline, commands and events, projections (fold/map), subscribers, peer subscribers (withPeerSubscriber), scheduled process managers (.schedule({ everyMs }).onWake), intents and the outbox, background and periodic work, the worker role vs api vs tasks, at-least-once delivery and per-aggregate ordering, fact events, read hints and projection cursors (event id = k-sortable cursor), one-shot tasks, and renaming or reshaping a stored event type with .withUpcasts (read-time upcast, drain, `upcast:<pipeline>:<stored type>` steps). Use when someone says 'rename an event', 'rename the event type', 'rename the aggregate', 'rename the pipeline', 'change the event payload', 'upcast', 'withUpcasts', 'drain', 'add a projection', 'add a subscriber', 'react to another module's event', 'scheduled job', 'cron', 'background job', 'periodic sweep', 'process manager', 'idempotent', 'retry', 'dead letter', 'worker', 'why did the worker not run it', 'tenant purge', 'projection cursor', or opens modules/*/process/src/eventing/."
+description: "Event-sourced work on a module's pipeline: definePipeline, commands and events, projections (fold/map), subscribers, peer subscribers (withPeerSubscriber), scheduled process managers (.schedule({ everyMs }).onWake), intents and the outbox, background and periodic work, the worker role vs api vs tasks, at-least-once delivery and per-aggregate ordering, fact events, read hints and projection cursors (event id = k-sortable cursor), one-shot tasks, and renaming or reshaping a stored event type with .withUpcasts (read-time upcast, drain, `upcast:<pipeline>:<stored type>` steps). Use when someone says 'rename an event', 'rename the event type', 'rename the aggregate', 'rename the pipeline', 'change the event payload', 'upcast', 'withUpcasts', 'drain', 'add a projection', 'add a subscriber', 'react to another module's event', 'tell another module something happened', 'durable subscriber', 'lastAppliedEventId', 'scheduled job', 'cron', 'background job', 'periodic sweep', 'process manager', 'idempotent', 'retry', 'dead letter', 'worker', 'why did the worker not run it', 'tenant purge', 'projection cursor', or opens modules/*/process/src/eventing/."
 user-invocable: true
 ---
 
@@ -27,23 +27,27 @@ hand-wire a consumer into the api role; the types refuse it.
 - Delivery is **at least once**. Ordering is **per aggregate** (group queue). One poisoned aggregate
   retries with backoff and does not block its neighbours.
 - The hand-off from append to reactions is durable (outbox). Nothing is logged and dropped.
+- There is one kind of event. An event an upgrade step records goes to every projection,
+  subscriber and process manager like any other; a `backfilled` field is data a consumer may read,
+  never routing, and the queue carries the volume (Alex, 2026-10-12, §9).
 
 ## The rules that matter
 
 Each rule lives in §9; this table only points at it.
 
-| Rule                                                                                                             | Record      |
-| ---------------------------------------------------------------------------------------------------------------- | ----------- |
-| Idempotent handlers: throw to be retried, never swallow                                                          | §9          |
-| Background work is a scheduled process manager (`.schedule({ everyMs }).onWake`); no jobs, timers or cron routes | §9          |
-| Keyed calendar work is a process manager keyed by the entity (`nextWakeAt`); `ScheduledJob` is retired           | §9, §15     |
-| Fact events, not trigger events: the owner records the fact, no relay module                                     | §9          |
-| React to a peer with `.withPeerSubscriber`; write your own rows                                                  | §9          |
-| A delivery is `requestDelivery`, not a reaction                                                                  | §9, ADR-167 |
-| Cross-module work is commanded by the owners, each touching only its own rows                                    | §9.1        |
-| Nothing slow in a request: a command plus a process manager; a poll reads the fold                               | §9          |
-| No `any` in events, commands or state; a queued payload is `unknown` until parsed once                           | §9          |
-| Eventual consistency: write optimistically or answer "pending"; never a peer cycle                               | §3, §5      |
+| Rule                                                                                                                          | Record      |
+| ----------------------------------------------------------------------------------------------------------------------------- | ----------- |
+| Idempotent handlers: throw to be retried, never swallow                                                                       | §9          |
+| Background work is a scheduled process manager (`.schedule({ everyMs }).onWake`); no jobs, timers or cron routes              | §9          |
+| Keyed calendar work is a process manager keyed by the entity (`nextWakeAt`); `ScheduledJob` is retired                        | §9, §15     |
+| Fact events, not trigger events: the owner records the fact, no relay module                                                  | §9          |
+| React to a peer with `.withPeerSubscriber`; write your own rows                                                               | §9          |
+| A cross-module fact is an event; a durable receiver stores `lastAppliedEventId` on its row (no new `*Api`, no delivery table) | §9, ADR-179 |
+| A delivery goes through its destination kind's owner and the outbox (`requestDelivery` is the intended name; not built yet)   | §9, ADR-167 |
+| Cross-module work is commanded by the owners, each touching only its own rows                                                 | §9.1        |
+| Nothing slow in a request: a command plus a process manager; a poll reads the fold                                            | §9          |
+| No `any` in events, commands or state; a queued payload is `unknown` until parsed once                                        | §9          |
+| Eventual consistency: write optimistically or answer "pending"; never a peer cycle                                            | §3, §5      |
 
 ## Worked example: automation's `automations` pipeline
 
@@ -112,6 +116,23 @@ definePipeline({ name: "analytics", aggregate })
 - Your store is yours; never read the owner's projection tables. Spec:
   `packages/eventing/specs/peer-projection.feature`.
 
+## Durable receivers: the applied event id is the row's version
+
+A cross-module "something happened" is the owner's fact event and your peer subscriber, never a new
+`*Api` call (§9, ADR-179). Decide which kind of subscriber you are:
+
+- **Best-effort** stores nothing (SSE fan-out, read hints, live views). A miss costs a stale screen.
+- **Durable** changes a row you own. Store `lastAppliedEventId` on that row; in the handler, skip when
+  `freshnessOf({ answerId: row.lastAppliedEventId, hintId: ctx.eventId, scope: "aggregate" })` is
+  `"fresh"` (already applied, or a late older event), otherwise write the new state and the id together.
+  Never compare ids as strings. Accumulating rows (counts, sums) dedupe by `idempotencyKey ?? eventId`.
+- The same id is the row's version: a read over it answers it as its cursor, for read hints and the
+  client's cache version. The server still answers in full.
+- Why this is enough: append-then-stage, the hand-off outbox and the command job's stable id make
+  delivery at least once; a crash-replayed command may restage a fact under a new id with the same
+  idempotency key, which a replace-state row absorbs. Nothing replays history: fill a new receiver
+  with a background step. Existing outboxes and intents stay; add no new per-event delivery table.
+
 ## Reads, hints and cursors (the pipeline's side)
 
 - A contract names what makes a read stale: `.query(name, { invalidatedBy: [EVENT_TYPE] })`. One
@@ -131,14 +152,25 @@ definePipeline({ name: "analytics", aggregate })
 | projections, subscribers, process managers, schedules | not built | hosted | not built |
 | transports                                            | yes       | none   | none      |
 
-Consumers register drain-first, so shutdown drains the worker before the api closes. A stack missing the
-worker serves pages and silently processes no jobs.
+Consumers register drain-first, so shutdown drains the worker before the api closes (drain order is not
+start order: the shipped backend starts both halves together). A stack missing the worker serves pages
+and silently processes no jobs. The worker container's boot requires the event-log retention
+classifier, and a pipeline declares each tenant's retention with `.withRetention(resolver)`; an
+aggregate type missing from data-retention's class table fails the worker installation test (§9,
+`packages/eventing/specs/pipeline-retention.feature`). A job that has no handler is handed back
+without spending an attempt, and a group backing off keeps its place without blocking its neighbours.
+
+**Renaming a lane.** `.withLaneAliases([{ from: "<former lane key>", to: { jobType, lane } }])` lets
+the new lane consume jobs the previous release queued under the old key, for as long as an older
+release may still hold them (example: `modules/dataset/process/src/eventing/dataset-normalization.pipeline.ts`;
+spec `packages/eventing/specs/lane-alias.feature`). Without it, queued work under the old key is stranded.
 
 ## One-shot work: steps and tasks
 
 A backfill or data move is a migration step declared with `.withMigrations` (`defineMigrationStep`,
 the `migration-data-step` skill): the ledger records it, the Upgrades page shows it, a rollback
-reopens it. A `Task` (`@langwatch/task`) is for work an operator invokes by name:
+reopens it, and a re-run is Retry on that step in Ops, never a second task. A step that walks a table
+records every event it needs in one pass, in pages with `sendBatch`, and paces by its own queue work. A `Task` (`@langwatch/task`) is for work an operator invokes by name:
 `modules/automation/process/src/tasks/slack-alert.task.ts` (`name`, `description`,
 `run()`), run by the `tasks` app. Recurring work is a scheduled process manager instead.
 
@@ -171,7 +203,7 @@ definePipeline({ name: "entitlement", aggregate: defineAggregate({ type: "entitl
 | Aggregate type renamed with it       | add `aggregateType: old` to `from`                             |
 | Payload reshaped                     | `data`, a pure transform; the current schema parses its result |
 | Schema version pinned                | `version`                                                      |
-| Pipeline renamed (queue keys change) | `drain: { pipeline: old, jobNames? }`, for one release only    |
+| Pipeline renamed (queue keys change) | `drain: { pipeline: old, jobNames? }`, kept like every alias   |
 | A new field with a default           | nothing: give the schema a `.default()`                        |
 
 - **Refused at build**: `to` not in `.withEvents`, `from.type` still declared as current, two upcasts
@@ -179,12 +211,12 @@ definePipeline({ name: "entitlement", aggregate: defineAggregate({ type: "entitl
 - **Ledger**: each entry is an `event-upcast` background step, id `upcast:<pipeline>:<stored type>`,
   pending while stored events still need it, done when none do; ops reads them through
   `EventUpcastReader`. You write no step for it.
-- **Rewrite at the floor**: the optional rewrite copies corrected events into `event_log`; a renamed
-  aggregate's originals are deleted only by a contract step once the floor passes the release that
-  added the upcast. The rewrite step is `@unimplemented` today
+- **Rewrite**: the optional rewrite copies corrected events into `event_log`; a renamed
+  aggregate's originals are deleted only by an operator step an operator confirms in Ops once old
+  writers are gone; nothing deletes automatically (Alex, 2026-10-11). The rewrite step is `@unimplemented` today
   (`packages/eventing/specs/event-upcast.feature`); declare the upcast and leave the log alone.
-- **Drain life**: remove a `drain` one release after it shipped. The lint that names older drains is
-  ruled (round 16) and not landed; check it by hand in review.
+- **Drain life**: a `drain` is kept, like every upcast and alias: no release is a required stop, so an
+  install of any older release may still hold jobs under the former keys (Alex, 2026-10-11).
 - **Test**: `packages/eventing/src/upcast/__tests__/eventUpcast.unit.test.ts` is the pattern: append a
   stored old-type event to the memory store, read it back as the new type, replay it, drain a job.
 

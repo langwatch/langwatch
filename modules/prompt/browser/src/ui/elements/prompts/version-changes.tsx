@@ -38,7 +38,7 @@ function TextChange({ before, after }: { before: string; after: string }) {
       maxHeight="180px"
       overflowY="auto"
       overflowX="hidden"
-      fontSize="12px"
+      textStyle="caption"
       lineHeight="1.6"
       whiteSpace="pre-wrap"
       wordBreak="break-word"
@@ -56,7 +56,7 @@ function TextChange({ before, after }: { before: string; after: string }) {
 /** A single setting, read as before then after. */
 function ValueChange({ before, after }: { before: string; after: string }) {
   return (
-    <HStack gap={2} fontSize="12px" flexWrap="wrap">
+    <HStack gap={2} textStyle="caption" flexWrap="wrap">
       {before && (
         <Text
           color="red.fg"
@@ -91,7 +91,7 @@ function ChangeEntry({ change }: { change: PromptVersionChange }) {
     <VStack align="stretch" gap={1.5} width="full">
       <HStack gap={2}>
         <Text
-          fontSize="10px"
+          textStyle="micro"
           fontWeight={700}
           letterSpacing="0.06em"
           textTransform="uppercase"
@@ -101,7 +101,7 @@ function ChangeEntry({ change }: { change: PromptVersionChange }) {
         </Text>
         {statusLabel && (
           <Text
-            fontSize="10px"
+            textStyle="micro"
             fontWeight={600}
             letterSpacing="0.06em"
             textTransform="uppercase"
@@ -128,7 +128,7 @@ function ChangeEntry({ change }: { change: PromptVersionChange }) {
 export function VersionChanges({ changes }: { changes: PromptVersionChange[] }) {
   if (changes.length === 0) {
     return (
-      <Text fontSize="12px" color="fg.subtle">
+      <Text textStyle="caption" color="fg.subtle">
         Nothing changed from the version before this one.
       </Text>
     );

@@ -160,7 +160,7 @@ func assertNoStaging(t *testing.T, repo string) {
 }
 
 // @scenario "An hmr stack runs Vite as its own ui lane beside the backend"
-func TestHMRStackRunsBundledViteAndRefusesReloadUI(t *testing.T) {
+func TestHMRStackRunsUnbundledViteAndRefusesReloadUI(t *testing.T) {
 	repo := t.TempDir()
 	o := &Orchestrator{cfg: Config{Home: t.TempDir()}, proxy: stubProxy{}, store: &fakeStore{}}
 	st := domain.Stack{Slug: "branch", WorktreeDir: repo, Refresh: domain.RefreshHMR}
@@ -168,8 +168,8 @@ func TestHMRStackRunsBundledViteAndRefusesReloadUI(t *testing.T) {
 	sel.Refresh = domain.RefreshHMR
 	children := o.planChildren(st, PlanOptions{Selection: sel, RepoRoot: repo}, repo)
 	ui, ok := findChild(children, "ui")
-	if !ok || ui.Shell != "pnpm --silent --filter "+UIPackage+" dev" || !slices.Contains(ui.Env, "LANGWATCH_UI_BUNDLED=1") || sel.IsBuiltUI() {
-		t.Fatalf("want the UI's own Vite lane with LANGWATCH_UI_BUNDLED=1, got %+v", ui)
+	if !ok || ui.Shell != "pnpm --silent --filter "+UIPackage+" dev" || slices.Contains(ui.Env, "LANGWATCH_UI_BUNDLED=1") || sel.IsBuiltUI() {
+		t.Fatalf("want the UI's own unbundled Vite lane (bundled dev held 5 GB), got %+v", ui)
 	}
 	api, ok := findChild(children, APILane)
 	if !ok || !strings.HasSuffix(api.Shell, BackendPackage+" dev") || slices.Contains(api.Env, "LANGWATCH_DEV_WATCH=0") {

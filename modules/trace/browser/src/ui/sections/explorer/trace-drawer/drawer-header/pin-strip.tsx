@@ -12,7 +12,7 @@ export interface CategorizedPin {
   pin: PinnedAttribute;
   /** Resolved attribute / resource value at render time. */
   value: string | null;
-  /** Auto-hoisted (purple sparkle) vs user-pinned (blue pin). */
+  /** Auto-hoisted (no icon) vs user-pinned (a pin that unpins). */
   auto: boolean;
   /** Category bucket — controls grouping & order in the strip. */
   category: PinCategory;
@@ -101,7 +101,7 @@ export function renderPinPills(
         icon={LuPin}
         label="Pinned"
         value={`+${overflowCustom.length}`}
-        tone="blue"
+        tone="neutral"
         ariaLabel={`${overflowCustom.length} more pinned attributes`}
         popover={
           <VStack align="stretch" gap={1.5} padding={3} maxHeight="320px" overflowY="auto">

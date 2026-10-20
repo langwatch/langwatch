@@ -108,6 +108,8 @@ export abstract class GatewaySpendEventsRepository {
     cursor?: string | null;
     limit: number;
     filters?: SpendFilters;
+    /** A caller that reads the whole history on purpose; the reason sits above its flag. */
+    SKIP_COLD_SCAN_CHECK?: true;
   }): Promise<{ rows: SpendEventRow[]; nextCursor: string | null }>;
 
   abstract readSpendSummaries(input: {

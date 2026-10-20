@@ -1,6 +1,6 @@
-import type { ZodTypeAny, z } from "zod";
+import type { z } from "zod";
 
-import type { PipelineEventSchema } from "../domain/eventSchemas.ts";
+import type { ParsingSchema, PipelineEventSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
 import type { ProcessEventEnvelope } from "../process-manager/processManager.types.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
@@ -26,7 +26,7 @@ type ErasedEventHandler = EventHandler<unknown, unknown, ErasedIntents>;
 
 /** A pipeline event schema whose `data` a process handler reads (ARCHITECTURE §9). */
 export type HandledEventSchema = PipelineEventSchema & {
-  readonly shape: { readonly data: ZodTypeAny };
+  readonly shape: { readonly data: ParsingSchema };
 };
 
 /** The event type a handled schema's `type` literal names. */
@@ -34,7 +34,7 @@ function handledTypeOf(schema: HandledEventSchema): string {
   return String([...schema.shape.type.values][0]);
 }
 
-function parseWith<Schema extends ZodTypeAny>(schema: Schema, value: unknown): z.output<Schema> {
+function parseWith<Schema extends ParsingSchema>(schema: Schema, value: unknown): z.output<Schema> {
   return schema.parse(value);
 }
 
@@ -44,7 +44,7 @@ function erasedHandler<State, Data, Intents>({
   readData,
   handle,
 }: {
-  stateSchema: z.ZodType<State>;
+  stateSchema: ParsingSchema<State>;
   readData: (data: unknown) => Data;
   handle: EventHandler<State, Data, Intents>;
 }): ErasedEventHandler {
@@ -68,10 +68,10 @@ function presentContext<Intents>(
 /** What every stage past `.state()` shares: the erased accumulator and the state schema. */
 interface StageParts<E extends Event, State> {
   readonly builder: ProcessManagerBuilder<E>;
-  readonly stateSchema: z.ZodType<State>;
+  readonly stateSchema: ParsingSchema<State>;
 }
 
-function addIntent<E extends Event, State, Schema extends ZodTypeAny>(
+function addIntent<E extends Event, State, Schema extends ParsingSchema>(
   parts: StageParts<E, State>,
   { name, schema, run }: { name: string; schema: Schema; run: IntentSpec<Schema>["run"] },
 ): void {
@@ -80,7 +80,7 @@ function addIntent<E extends Event, State, Schema extends ZodTypeAny>(
   );
 }
 
-function addSignal<E extends Event, State, Schema extends ZodTypeAny, Intents>(
+function addSignal<E extends Event, State, Schema extends ParsingSchema, Intents>(
   parts: StageParts<E, State>,
   {
     name,
@@ -111,8 +111,8 @@ function addWake<E extends Event, State, Intents>(
 export class ProcessManagerInitialStage<E extends Event> {
   constructor(private readonly builder: ProcessManagerBuilder<E>) {}
 
-  state<Schema extends ZodTypeAny>(
-    schema: Schema & z.ZodType<z.output<Schema>>,
+  state<Schema extends ParsingSchema>(
+    schema: Schema & ParsingSchema<z.output<Schema>>,
     initial: z.output<Schema>,
   ): ProcessManagerStateStage<E, z.output<Schema>> {
     this.builder.setState(schema, initial);
@@ -126,7 +126,7 @@ export class ProcessManagerInitialStage<E extends Event> {
 export class ProcessManagerStateStage<E extends Event, State> {
   constructor(protected readonly parts: StageParts<E, State>) {}
 
-  intent<Name extends string, Schema extends ZodTypeAny>(
+  intent<Name extends string, Schema extends ParsingSchema>(
     name: Name,
     schema: Schema,
     run: IntentSpec<Schema>["run"],
@@ -178,7 +178,7 @@ export class ProcessManagerStage<E extends Event, State, Intents> {
 
   constructor(private readonly parts: StageParts<E, State>) {}
 
-  intent<Name extends string, Schema extends ZodTypeAny>(
+  intent<Name extends string, Schema extends ParsingSchema>(
     name: Name,
     schema: Schema,
     run: IntentSpec<Schema>["run"],
@@ -187,7 +187,7 @@ export class ProcessManagerStage<E extends Event, State, Intents> {
     return new ProcessManagerStage(this.parts);
   }
 
-  on<S extends HandledEventSchema & z.ZodType<E>>(
+  on<S extends HandledEventSchema & ParsingSchema<E>>(
     schema: S,
     handle: EventHandler<State, z.output<S["shape"]["data"]>, Intents>,
   ): this {
@@ -205,7 +205,7 @@ export class ProcessManagerStage<E extends Event, State, Intents> {
     return this;
   }
 
-  onSignal<Schema extends ZodTypeAny>(
+  onSignal<Schema extends ParsingSchema>(
     name: string,
     schema: Schema,
     handle: SignalHandler<State, z.output<Schema>, Intents>,
@@ -243,7 +243,7 @@ export class ProcessManagerStage<E extends Event, State, Intents> {
    * The content boundary (ADR-052): narrows a committed event to the payload the process may see,
    * persisted verbatim; handlers then read that payload through `schema`, not the event's data.
    */
-  toPayload<Payload extends ZodTypeAny>(
+  toPayload<Payload extends ParsingSchema>(
     schema: Payload,
     map: (event: E) => ProcessEventEnvelope["payload"],
   ): ProcessManagerPayloadStage<E, State, Intents, Payload> {
@@ -257,7 +257,7 @@ export class ProcessManagerPayloadStage<
   E extends Event,
   State,
   Intents,
-  Payload extends ZodTypeAny,
+  Payload extends ParsingSchema,
 > {
   readonly buildable = true;
 
@@ -266,7 +266,7 @@ export class ProcessManagerPayloadStage<
     private readonly payloadSchema: Payload,
   ) {}
 
-  intent<Name extends string, Schema extends ZodTypeAny>(
+  intent<Name extends string, Schema extends ParsingSchema>(
     name: Name,
     schema: Schema,
     run: IntentSpec<Schema>["run"],
@@ -275,7 +275,7 @@ export class ProcessManagerPayloadStage<
     return new ProcessManagerPayloadStage(this.parts, this.payloadSchema);
   }
 
-  on<S extends HandledEventSchema & z.ZodType<E>>(
+  on<S extends HandledEventSchema & ParsingSchema<E>>(
     schema: S,
     handle: EventHandler<State, z.output<Payload>, Intents>,
   ): this {
@@ -291,7 +291,7 @@ export class ProcessManagerPayloadStage<
     return this;
   }
 
-  onSignal<Schema extends ZodTypeAny>(
+  onSignal<Schema extends ParsingSchema>(
     name: string,
     schema: Schema,
     handle: SignalHandler<State, z.output<Schema>, Intents>,
@@ -333,7 +333,7 @@ export interface ProcessManagerBuildableStage {
 
 class ProcessManagerBuilder<E extends Event> {
   private stateValue: unknown;
-  private stateSchema: ZodTypeAny | undefined;
+  private stateSchema: ParsingSchema | undefined;
   private readonly intents: Record<string, IntentSpec> = {};
   private readonly handlers: Record<string, ErasedEventHandler> = {};
   private readonly signals: Record<string, SignalSpec> = {};
@@ -346,12 +346,12 @@ class ProcessManagerBuilder<E extends Event> {
 
   constructor(private readonly name: string) {}
 
-  setState(schema: ZodTypeAny, initial: unknown): void {
+  setState(schema: ParsingSchema, initial: unknown): void {
     this.stateValue = initial;
     this.stateSchema = schema;
   }
 
-  intent(name: string, schema: ZodTypeAny, run: IntentSpec["run"]): this {
+  intent(name: string, schema: ParsingSchema, run: IntentSpec["run"]): this {
     if (this.intents[name]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",
@@ -375,7 +375,7 @@ class ProcessManagerBuilder<E extends Event> {
     return this;
   }
 
-  onSignal(name: string, schema: ZodTypeAny, handle: SignalSpec["handle"]): this {
+  onSignal(name: string, schema: ParsingSchema, handle: SignalSpec["handle"]): this {
     if (this.signals[name]) {
       throw new ConfigurationError(
         "ProcessManagerBuilder",

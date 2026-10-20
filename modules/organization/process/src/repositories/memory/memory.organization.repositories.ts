@@ -1,4 +1,8 @@
+import type { PrivateRouteVariable } from "@langwatch/clickhouse-client";
+
 import type { OrganizationRepositories } from "../organization.repositories.ts";
+import { PrivateClickHouseRoutesRepository } from "../private-clickhouse-routes.repository.ts";
+import { PrivateS3AccountsRepository } from "../private-s3-accounts.repository.ts";
 import { MemoryGroupRepository } from "./memory.group.repository.ts";
 import { MemoryOrganizationInviteRateLimitRepository } from "./memory.organization-invite-rate-limit.repository.ts";
 import { MemoryOrganizationInviteRepository } from "./memory.organization-invite.repository.ts";
@@ -41,5 +45,21 @@ export function memoryOrganizationRepositories({
     invite: MemoryOrganizationInviteRepository.create({ memory }),
     seats: MemoryOrganizationSeatRepository.create({ memory }),
     userDirectory: MemoryOrganizationUserDirectoryRepository.create({ memory }),
+    privateClickHouseRoutes: new MemoryPrivateClickHouseRoutesRepository(),
+    privateS3Accounts: new MemoryPrivateS3AccountsRepository(),
   };
+}
+
+/** A memory process holds no ClickHouse, so no organization is privately routed. */
+class MemoryPrivateClickHouseRoutesRepository extends PrivateClickHouseRoutesRepository {
+  findRouteVariables(): readonly PrivateRouteVariable[] {
+    return [];
+  }
+}
+
+/** The memory object-storage twin names no private S3 account. */
+class MemoryPrivateS3AccountsRepository extends PrivateS3AccountsRepository {
+  findAccountVariables(): readonly PrivateRouteVariable[] {
+    return [];
+  }
 }

@@ -11,6 +11,7 @@ import {
   type SsoDomainVerification,
 } from "../../sso-connection/connection.ts";
 import {
+  grandfatheredSsoConnectionId,
   isConfiguredLegacySsoRoute,
   isSsoConnectionInSetup,
   lapsedDomainsOf,
@@ -144,6 +145,42 @@ describe("qualifying what proved a domain", () => {
     expect(
       qualifySsoDomainOwnership({
         state: stateWith({ ...imported, actorId: "user_operator" }, legacy),
+        domain: DOMAIN,
+      }),
+    ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
+  });
+
+  /** @scenario "A direct replacement counts the domain proof it inherited from the grandfathered connection" */
+  it("accepts the inherited import only on the replacement naming the grandfathered connection", () => {
+    const imported = proof({ method: "legacy-configuration", actorId: null, tokenHash: null });
+    const predecessor = grandfatheredSsoConnectionId({ organizationId: ORGANIZATION_ID });
+
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith(imported, { replacesConnectionId: predecessor }),
+        domain: DOMAIN,
+      }).status,
+    ).toBe("QUALIFIED");
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith(imported, { replacesConnectionId: "ssoc_some_other_connection" }),
+        domain: DOMAIN,
+      }),
+    ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith(imported, {
+          replacesConnectionId: grandfatheredSsoConnectionId({ organizationId: "org_other" }),
+        }),
+        domain: DOMAIN,
+      }),
+    ).toEqual({ status: "UNKNOWN", reason: "incomplete" });
+    expect(
+      qualifySsoDomainOwnership({
+        state: stateWith(
+          { ...imported, actorId: "user_operator" },
+          { replacesConnectionId: predecessor },
+        ),
         domain: DOMAIN,
       }),
     ).toEqual({ status: "UNKNOWN", reason: "incomplete" });

@@ -1,5 +1,5 @@
 import { UpgradeLedgerRepository } from "./ledger.repository.ts";
-import type { UpgradeRun, UpgradeStepKind } from "./ledger.ts";
+import type { InferredStep, UpgradeRun, UpgradeStep, UpgradeStepKind } from "./ledger.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "./ports.ts";
 import {
   gooseSteps,
@@ -38,13 +38,9 @@ export class UpgradeLedgerSeedService {
     await this.ledger.createTables();
     const run = await this.ledger.startRun({ kind: "seed" });
     try {
-      const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres: this.postgres }) });
-      const goose = this.clickhouse
-        ? gooseSteps({ rows: await readGooseVersions({ clickhouse: this.clickhouse }) })
-        : [];
       const written = await this.ledger.writeInferredSteps({
         runId: run.id,
-        steps: [...prisma, ...goose],
+        steps: await this.readHistory(),
       });
       return await this.ledger.finishRun({
         runId: run.id,
@@ -60,6 +56,45 @@ export class UpgradeLedgerSeedService {
       throw error;
     }
   }
+
+  /**
+   * Re-reads the tools' records into every row still inferred, under the seed run that wrote it:
+   * an installation upgraded by an image older than the ledger moves only those records.
+   */
+  async reinfer({ seedRunId }: { seedRunId: string }): Promise<void> {
+    await this.ledger.writeInferredSteps({ runId: seedRunId, steps: await this.readHistory() });
+  }
+
+  /** Prisma's and goose's own history, as inferred steps. */
+  async readHistory(): Promise<InferredStep[]> {
+    const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres: this.postgres }) });
+    const goose = this.clickhouse
+      ? gooseSteps({ rows: await readGooseVersions({ clickhouse: this.clickhouse }) })
+      : [];
+    return [...prisma, ...goose];
+  }
+}
+
+/**
+ * The ledger as a re-inference would leave it: a row still inferred takes the tools' record, and
+ * a step only the tools record joins. Spec: packages/upgrade/specs/ledger-seed.feature.
+ */
+export function withReinferred({
+  steps,
+  history,
+}: {
+  steps: readonly Pick<UpgradeStep, "id" | "status" | "inferred">[];
+  history: readonly InferredStep[];
+}): Pick<UpgradeStep, "id" | "status">[] {
+  const recorded = new Map(history.map((step) => [step.id, step]));
+  const known = new Set(steps.map((step) => step.id));
+  return [
+    ...steps.map((step) => {
+      const fresh = step.inferred ? recorded.get(step.id) : undefined;
+      return fresh ? { id: step.id, status: fresh.status } : { id: step.id, status: step.status };
+    }),
+    ...history.filter((step) => !known.has(step.id)).map(({ id, status }) => ({ id, status })),
+  ];
 }
 
 function countByKind(kinds: readonly UpgradeStepKind[]): Partial<Record<UpgradeStepKind, number>> {

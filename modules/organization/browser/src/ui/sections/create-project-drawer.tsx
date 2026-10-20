@@ -152,32 +152,15 @@ export function CreateProjectDrawer({
   };
 
   return (
-    <Drawer.Root
-      open={open}
-      placement="end"
-      size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) {
-          handleClose();
-        }
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.CloseTrigger onClick={handleClose} />
-          <Drawer.Title>Create New Project</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <ProjectForm
-            onSubmit={handleSubmit}
-            isLoading={createProject.isPending}
-            error={createProject.error}
-            {...(defaultTeamId ? { defaultTeamId } : {})}
-            {...(effectiveOrganizationId ? { organizationId: effectiveOrganizationId } : {})}
-            canCreateAggregate={canCreateAggregate}
-          />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer open={open} onClose={handleClose} title="Create New Project" size="lg">
+      <ProjectForm
+        onSubmit={handleSubmit}
+        isLoading={createProject.isPending}
+        error={createProject.error}
+        {...(defaultTeamId ? { defaultTeamId } : {})}
+        {...(effectiveOrganizationId ? { organizationId: effectiveOrganizationId } : {})}
+        canCreateAggregate={canCreateAggregate}
+      />
+    </Drawer>
   );
 }

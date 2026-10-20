@@ -4,7 +4,6 @@
  * Query cache.
  */
 
-import type { TimeseriesBucket } from "@langwatch/analytics-contract";
 import { createModuleApi, type ContractApiMap, type WireOf } from "@langwatch/api/web";
 import type {
   homeTrpc,
@@ -52,62 +51,6 @@ type BorrowedProcedures = {
       query: {
         input: { organizationId: string };
         output: { free: boolean; type?: string };
-      };
-    };
-  };
-
-  analytics: {
-    /**
-     * Briefing's vanity strip and error line figures. Input is the shared
-     * analytics filter; output is typed for series lookups.
-     */
-    getTimeseries: {
-      query: {
-        input: Record<string, unknown>;
-        output: {
-          previousPeriod?: TimeseriesBucket[];
-          currentPeriod?: TimeseriesBucket[];
-        };
-      };
-    };
-  };
-
-  scenarios: {
-    /**
-     * Simulation sets the briefing rolls up into one pass/fail line.
-     */
-    getExternalSetSummaries: {
-      query: {
-        input: { projectId: string };
-        output: {
-          scenarioSetId: string;
-          passedCount: number;
-          failedCount: number;
-          totalCount: number;
-          lastRunTimestamp?: number | null;
-        }[];
-      };
-    };
-  };
-
-  traces: {
-    /**
-     * Facet value frequencies in a window. Error message shapes compared to
-     * the prior period; `totalDistinct` tells whether we see the whole set.
-     */
-    facetValues: {
-      query: {
-        input: {
-          projectId: string;
-          timeRange: { from: number; to: number };
-          facetKey: string;
-          limit: number;
-          offset: number;
-        };
-        output: {
-          values: { value: string; count: number }[];
-          totalDistinct: number;
-        };
       };
     };
   };

@@ -4,6 +4,7 @@ import {
   DEFAULT_CODE,
   getCodeFromConfig,
 } from "@langwatch/agent-contract/code-config";
+import { ActionRow } from "@langwatch/design-system/action-row";
 import {
   Badge,
   Box,
@@ -12,10 +13,10 @@ import {
   HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { PromptNodeOutput } from "@langwatch/prompt-client";
 import type {
   HttpAuth,
@@ -35,7 +36,7 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
 import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
-import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
+import { OutputsSection, VariablesSection } from "../../../../behavior/lent-prompt.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/studio-host/use-organization-team-project.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../../behavior/workflow-api.ts";
@@ -55,7 +56,7 @@ import {
 import { useRegisterDrawerFooter } from "../../../elements/studio-drawer-footer.tsx";
 import { renderSourceTypeIcon } from "../../../elements/workflow-icons.tsx";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
-import { type Variable, VariablesSection } from "../../prompt/variables/variables-section.tsx";
+import type { WorkflowVariable as Variable } from "../../properties/workflow-properties-panel-props.ts";
 import { CodeEditorModal } from "../code/workflow-code-editor.transport.tsx";
 import { BasePropertiesPanel } from "./base-properties-panel.tsx";
 
@@ -481,11 +482,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
   // immediately (and never the starter template).
   const hasNoSnapshot = !node.data.parameters?.length;
   if (agentQuery.isLoading && hasNoSnapshot) {
-    return (
-      <HStack justify="center" paddingY={8} width="full">
-        <Spinner size="md" />
-      </HStack>
-    );
+    return <SkeletonRows rows={3} />;
   }
 
   const typeBadge = agentTypeBadge({ agentType });
@@ -556,6 +553,7 @@ function DbAgentPanel({ node, agentRef }: { node: Node<AgentComponent>; agentRef
           canAddRemove={true}
           readOnly={false}
           title="Inputs"
+          valueRows={2}
         />
       </Box>
 
@@ -953,26 +951,27 @@ function AgentFooter({
   onApply: () => void;
 }) {
   return (
-    <HStack width="full">
-      {hasLocalChanges && (
-        <Button variant="outline" size="sm" onClick={onDiscard} data-testid="agent-discard-button">
-          Discard
-        </Button>
-      )}
-      <Spacer />
-      <Button
-        variant="outline"
-        size="sm"
-        onClick={onSave}
-        loading={isSaving}
-        data-testid="agent-save-button"
-      >
-        Save
-      </Button>
-      <Button colorPalette="blue" size="sm" onClick={onApply} data-testid="agent-apply-button">
-        Apply
-      </Button>
-    </HStack>
+    <ActionRow
+      note={
+        hasLocalChanges && (
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onDiscard}
+            data-testid="agent-discard-button"
+          >
+            Discard
+          </Button>
+        )
+      }
+      secondaryAction={{
+        label: "Save",
+        onClick: onSave,
+        loading: isSaving,
+        "data-testid": "agent-save-button",
+      }}
+      primaryAction={{ label: "Apply", onClick: onApply, "data-testid": "agent-apply-button" }}
+    />
   );
 }
 

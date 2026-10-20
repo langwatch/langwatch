@@ -24,7 +24,7 @@ export const AnsiText = memo(function AnsiText({ text }: { text: string }) {
     <chakra.pre
       margin={0}
       fontFamily={TERMINAL_FONT_STACK}
-      fontSize="13px"
+      textStyle="bodySm"
       lineHeight="1.55"
       whiteSpace="pre-wrap"
       wordBreak="break-word"

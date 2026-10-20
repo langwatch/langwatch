@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { createUiFeatureApiClient, type UiFeatureApiClientOptions } from "../wire/transport.ts";
+import {
+  createUiFeatureApiClient,
+  UI_BACKGROUND_READ_HEADER,
+  type UiFeatureApiClientOptions,
+} from "../wire/transport.ts";
 
 function requestUrl(input: RequestInfo | URL | undefined): string {
   if (input === undefined) return "";
@@ -128,5 +132,25 @@ describe("when a feature sends an answer on its way out of the document", () => 
     expect(inits[0]?.keepalive).toBe(true);
     expect(urls[0]).not.toContain("batch=1");
     expect(inits[1]?.keepalive).toBeUndefined();
+  });
+});
+
+describe("when a feature polls a read in the background", () => {
+  /** @scenario "A polling read is marked as one" */
+  it("marks only the polling read with the background-read header", async () => {
+    const headers: Headers[] = [];
+    const fetch = (async (_input: RequestInfo | URL, init?: RequestInit) => {
+      headers.push(new Headers(init?.headers));
+      return new Response(JSON.stringify(resultOf("ok")), {
+        status: 200,
+        headers: { "content-type": "application/json" },
+      });
+    }) as typeof globalThis.fetch;
+    const client = createUiFeatureApiClient({ fetch });
+
+    await client.query("analytics.getTimeseries", {}, { context: { background: true } });
+    await client.query("prompts.getAll", { projectId: "p" });
+
+    expect(headers.map((sent) => sent.get(UI_BACKGROUND_READ_HEADER))).toEqual(["1", null]);
   });
 });

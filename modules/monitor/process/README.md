@@ -195,11 +195,11 @@ Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:91`.
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-// Params: monitorRestIdParamsSchema, ../contract/src/monitor-rest.schemas.ts:6
+// Params: monitorRestIdParamsSchema, ../contract/src/monitor-rest.schemas.ts:14
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:22
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
 ```
 
 #### `POST /` · `postApiMonitors`
@@ -211,39 +211,39 @@ Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:113`
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:42
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:22
+type Body = z.infer<typeof monitorRestCreateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:92
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
 ```
 
 #### `PATCH /:id` · `patchApiMonitorsById`
 
 Update a monitor (name, enabled state, settings, etc.)
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:145`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:146`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:6
-type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:55
-type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:22
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
+type Body = z.infer<typeof monitorRestUpdateInputSchema>; // ../contract/src/monitor-rest.schemas.ts:111
+type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/monitor-rest.schemas.ts:73
 ```
 
 #### `POST /:id/toggle` · `postApiMonitorsByIdToggle`
 
 Enable or disable a monitor
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:167`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:169`.
 
 Answers at `/api/monitors/:id/toggle`, `/api/v1/monitors/:id/toggle`; also, undocumented, `/api/monitors/2026-08-07/:id/toggle`, `/api/v1/monitors/2026-08-07/:id/toggle`, `/api/monitors/latest/:id/toggle`, `/api/v1/monitors/latest/:id/toggle`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:6
-// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:69
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
+// Body: monitorRestToggleInputSchema, ../contract/src/monitor-rest.schemas.ts:118
 interface Body {
   enabled: boolean;
 }
-// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:70
+// Response: monitorRestToggledSchema, ../contract/src/monitor-rest.schemas.ts:124
 interface Response {
   id: string;
   enabled: boolean;
@@ -254,13 +254,13 @@ interface Response {
 
 Delete a monitor
 
-Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:184`.
+Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:187`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:6
-// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:71
+type Params = z.infer<typeof monitorRestIdParamsSchema>; // ../contract/src/monitor-rest.schemas.ts:14
+// Response: monitorRestDeletedSchema, ../contract/src/monitor-rest.schemas.ts:130
 interface Response {
   id: string;
   deleted: boolean;
@@ -286,64 +286,64 @@ Contract `../contract/src/monitor.trpc.ts:20`, router `src/transport/monitor.trp
 
 ```typescript
 // monitors.getAllForProject
-// Input: monitorApiProjectInputSchema, ../contract/src/monitor-trpc.schemas.ts:15
+// Input: monitorApiProjectInputSchema, ../contract/src/monitor-trpc.schemas.ts:21
 interface Input {
   projectId: string;
 }
 // Output: monitorWithEvaluatorSchema.array() (inline, ../contract/src/monitor.trpc.ts:23)
 
 // monitors.getById
-// Input: monitorApiMonitorInputSchema, ../contract/src/monitor-trpc.schemas.ts:18
+// Input: monitorApiMonitorInputSchema, ../contract/src/monitor-trpc.schemas.ts:32
 interface Input {
   id: string;
   projectId: string;
 }
-type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:73
+type Output = z.infer<typeof monitorWithEvaluatorSchema>; // ../contract/src/monitor.ts:98
 
 // monitors.isNameAvailable
-// Input: monitorApiNameAvailabilityInputSchema, ../contract/src/monitor-trpc.schemas.ts:37
+// Input: monitorApiNameAvailabilityInputSchema, ../contract/src/monitor-trpc.schemas.ts:67
 interface Input {
   projectId: string;
   checkId?: string;
   name: string;
 }
-// Output: monitorNameAvailabilitySchema, ../contract/src/monitor-trpc.schemas.ts:91
+// Output: monitorNameAvailabilitySchema, ../contract/src/monitor-trpc.schemas.ts:142
 interface Output {
   available: boolean;
 }
 
 // monitors.create
-type Input = z.infer<typeof monitorApiCreateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:50
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:50
+type Input = z.infer<typeof monitorApiCreateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:98
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
 
 // monitors.update
-type Input = z.infer<typeof monitorApiUpdateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:65
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:50
+type Input = z.infer<typeof monitorApiUpdateInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:120
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
 
 // monitors.toggle
-// Input: monitorApiToggleInputSchema, ../contract/src/monitor-trpc.schemas.ts:23
+// Input: monitorApiToggleInputSchema, ../contract/src/monitor-trpc.schemas.ts:43
 interface Input {
   id: string;
   projectId: string;
   enabled: boolean;
 }
-// Output: monitorWriteAcknowledgedSchema, ../contract/src/monitor-trpc.schemas.ts:88
+// Output: monitorWriteAcknowledgedSchema, ../contract/src/monitor-trpc.schemas.ts:134
 interface Output {
   success: true;
 }
 
 // monitors.delete
-type Input = z.infer<typeof monitorApiMonitorInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:18
-type Output = z.infer<typeof monitorWriteAcknowledgedSchema>; // ../contract/src/monitor-trpc.schemas.ts:88
+type Input = z.infer<typeof monitorApiMonitorInputSchema>; // ../contract/src/monitor-trpc.schemas.ts:32
+type Output = z.infer<typeof monitorWriteAcknowledgedSchema>; // ../contract/src/monitor-trpc.schemas.ts:134
 
 // monitors.copy
-// Input: monitorApiCopyInputSchema, ../contract/src/monitor-trpc.schemas.ts:29
+// Input: monitorApiCopyInputSchema, ../contract/src/monitor-trpc.schemas.ts:56
 interface Input {
   monitorId: string;
   projectId: string;
   sourceProjectId: string;
 }
-type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:50
+type Output = z.infer<typeof monitorSchema>; // ../contract/src/monitor.ts:88
 ```
 
 ## Sockets

@@ -104,3 +104,32 @@ func TestDescribeNamesTheDeltas(t *testing.T) {
 		t.Errorf("Describe() = %q, want the exact delta that adds langy", got)
 	}
 }
+
+// @scenario "Selecting Langy also selects the AI gateway it forwards to"
+func TestSelectingLangyAlsoSelectsGateway(t *testing.T) {
+	sel, err := ApplySelectionDeltas(Selection{}, []string{"+langy"})
+	if err != nil {
+		t.Fatalf("+langy was rejected: %v", err)
+	}
+	if !sel.Langy || !sel.Gateway {
+		t.Errorf("+langy must select langy and the gateway, got %+v", sel)
+	}
+}
+
+// @scenario "The ui, api and worker switch off and on as one"
+func TestTheAppIsOneSwitchForTheThreeNodeLanes(t *testing.T) {
+	off, err := ApplySelectionDeltas(DefaultSelection(), []string{"-app"})
+	if err != nil || !off.AppOff || off.IsOn(AppSelection) {
+		t.Fatalf("-app = %+v, %v; want the app off", off, err)
+	}
+	if !strings.Contains(off.Describe(), "ui · api · worker (haven up +app)") {
+		t.Errorf("Describe = %q, want the three lanes named off together", off.Describe())
+	}
+	on, _ := ApplySelectionDeltas(off, []string{"+app"})
+	if on != DefaultSelection() || !on.TurnsOnAny(off) || off.TurnsOnAny(on) {
+		t.Errorf("+app = %+v, want the default back", on)
+	}
+	if _, err := ApplySelectionDeltas(DefaultSelection(), []string{"-api"}); err == nil || !strings.Contains(err.Error(), "-app") {
+		t.Errorf("-api err = %v, want it to point at -app", err)
+	}
+}

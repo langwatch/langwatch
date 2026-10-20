@@ -428,7 +428,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     Scenario: The project catch-up records every existing project's created fact
       Given projects created before the judge existed
       And a project whose created fact failed to write
-      When the project catch-up runs twice
+      When the project:record-created-facts step runs twice
       Then the judge knows each project's organization
       And each project appears once
 
@@ -436,7 +436,7 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
     Scenario: A failed project created fact logs the catch-up that recovers it
       Given recording a new project's created fact fails
       When the failure is logged
-      Then the log names the backfill-project-created catch-up
+      Then the log names the project:record-created-facts step to retry in Ops
 
     @integration
     Scenario: The usage-billing catch-up gives every organization's answer
@@ -542,29 +542,30 @@ Feature: Instant Evals answers an LLM-as-a-judge evaluator as its model
       When the tasks process lists the tasks its installed modules declare
       Then none of them runs the usage-billing or the spend catch-up
 
-  Rule: The picker offers Instant Evals behind the release flag or the organization's opt-in
+  Rule: The picker offers Instant Evals only when the server releases the project
 
     @integration
     Scenario: The judge model picker shows Instant Evals when released
-      Given a project with release_instant_evals on
-      When a member opens the model picker on an LLM judge
-      Then Instant Evals is one of the options
-
-    @integration
-    Scenario: The judge model picker shows Instant Evals to an organization that opted in
-      Given a project with release_instant_evals off, in an organization that opted in to Instant Evals
+      Given a project the server releases Instant Evals for
       When a member opens the model picker on an LLM judge
       Then Instant Evals is one of the options
 
     @integration
     Scenario: The judge model picker hides Instant Evals when not released
-      Given a project with release_instant_evals off, in an organization that has not opted in
+      Given a project the server does not release Instant Evals for
+      When a member opens the model picker on an LLM judge
+      Then Instant Evals is not an option
+
+    @integration
+    Scenario: The release flag alone does not put Instant Evals in the picker
+      Given a project with release_instant_evals on
+      And the server does not release Instant Evals for it, as for a self-hosted install with no license
       When a member opens the model picker on an LLM judge
       Then Instant Evals is not an option
 
     @integration
     Scenario: A project with no model provider can still pick Instant Evals
-      Given a project with release_instant_evals on and no model provider configured
+      Given a project the server releases Instant Evals for, with no model provider configured
       When a member opens the model picker on an LLM judge
       Then Instant Evals is one of the options
 

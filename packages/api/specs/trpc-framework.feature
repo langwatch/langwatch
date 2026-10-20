@@ -91,6 +91,13 @@ Feature: tRPC framework boundary
     Then nothing is logged as an SSE handler error
 
   @unit
+  Scenario: A live subscription refused for access is logged as a warning, not an error
+    Given a subscription the access policy refuses because the subscriber is signed out or not allowed
+    When the stream is being served
+    Then the refusal is logged as a warning
+    And nothing is logged as an error
+
+  @unit
   Scenario: A live subscription whose own signal aborted is the stream closing, not a failure
     Given a subscription whose request signal aborted before its stream rejected with an abort
     When the stream is being served
@@ -182,6 +189,35 @@ Feature: tRPC framework boundary
     Then the frame is plain JSON
     And the subscription input was encoded as plain JSON too
 
+  # A tab left open on the release before plain JSON still wraps its input in
+  # the transformer envelope. It is told it is out of date, never served; it
+  # reloads onto this release through its own stale-chunk recovery.
+  @unit
+  Scenario: A call wrapped in the old transformer envelope is told its page is out of date
+    Given a procedure whose input is a plain object
+    When an old client calls it with the input wrapped as {"json": …, "meta": …}
+    Then the answer is a 400 with the handled code client_outdated
+    And one info line says an outdated client was refused, with nothing at error
+
+  @unit
+  Scenario: A plain JSON call is untouched by the outdated-client check
+    Given a procedure whose input is a plain object
+    When this release's client calls it with plain JSON input
+    Then the procedure runs on that input
+
+  @unit
+  Scenario: A live subscription opened with the old envelope is told its page is out of date
+    Given a live subscription procedure
+    When an old client opens it with its input wrapped as {"json": …}
+    Then the channel answers a 400 with the handled code client_outdated before any session is resolved
+    And one info line says an outdated client was refused, with nothing at error
+
+  @unit
+  Scenario: A live subscription opened with plain JSON input opens as before
+    Given a live subscription procedure
+    When this release's client opens it with plain JSON input
+    Then the stream opens
+
   @unit
   Scenario: A handled error that renders its own body carries it on data.cause
     Given a procedure throws a handled error that renders its own cause body
@@ -246,10 +282,18 @@ Feature: tRPC framework boundary
   Scenario: A procedure asks a platform-tier permission of the operator's grant
     Given a procedure declares a platform-tier permission at the platform (Alex, 2026-10-05, E4)
     When a caller holding that permission at the platform calls it
-    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one
+    Then the platform question is asked before the handler, of the operator behind an impersonated caller where there is one, except ops:manage
     And a caller lacking it is refused FORBIDDEN permission_denied, and a hidden procedure answers NOT_FOUND not_found to a caller lacking it and to an anonymous one
     And a non-platform permission asked at the platform is refused by the compiler and where it is written
     And a process that cannot answer the platform question refuses the call, and the handler never runs
+
+  @unit
+  Scenario: An impersonated caller is never answered ops:manage at the platform
+    Given an operator holding ops:view and ops:manage is impersonating another person (Alex, 2026-10-14)
+    When they call a procedure that asks ops:manage at the platform
+    Then it is refused as a caller lacking the permission, before the platform question is asked
+    And a procedure that asks ops:view is still answered by the operator's own grant
+    And the same operator signed in as themselves is answered as before
 
   @unit
   Scenario: A staff procedure hides from non-staff and refuses staff by name
@@ -267,3 +311,10 @@ Feature: tRPC framework boundary
     And a hook that fails fails the call, so a refusal is never answered unrecorded
     And a caller the door admits never reaches the hook
     And a hook on a procedure whose door refuses nobody is refused where it is written
+
+  @unit
+  Scenario: A strict page input accepts the direction an infinite query adds
+    Given a query declares a strict input schema for one page of a list
+    When the browser asks it for a page through an infinite query, which adds direction "forward" or "backward"
+    Then the door drops that direction before the schema parses the input
+    And any other unknown key is still refused

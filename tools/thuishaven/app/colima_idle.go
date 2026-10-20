@@ -2,6 +2,7 @@ package app
 
 import (
 	"context"
+	"time"
 
 	"go.uber.org/zap"
 
@@ -16,14 +17,24 @@ type idleStoppable interface {
 }
 
 // stopColimaIfIdle stops the VM when haven started it, no stack on the machine
-// needs a container and no container runs on it. A VM the user started is never
-// stopped (the runtime refuses without haven's start record).
+// needs a container (none may with the vm setting off) and no container runs on
+// it. A VM the user started is stopped only with runtime-auto-stop on, after
+// its grace (autoStopRuntime).
 func (o *Orchestrator) stopColimaIfIdle(ctx context.Context) {
-	rt, ok := o.container.(idleStoppable)
-	if !ok || o.container == nil {
+	if o.container == nil {
 		return
 	}
-	if len(o.store.Stacks()) > 0 && len(domain.ContainerNeeds(o.containerNeedInputs())) > 0 {
+	settings := o.machineSettings()
+	if !settings.VMOff && len(o.store.Stacks()) > 0 && len(domain.ContainerNeeds(o.containerNeedInputs())) > 0 {
+		o.runtimeIdleSince = time.Time{}
+		return
+	}
+	if settings.RuntimeAutoStop {
+		o.autoStopRuntime(ctx, settings.RuntimeIdleGrace())
+		return
+	}
+	rt, ok := o.container.(idleStoppable)
+	if !ok {
 		return
 	}
 	stopped, err := rt.StopIfIdle(ctx)

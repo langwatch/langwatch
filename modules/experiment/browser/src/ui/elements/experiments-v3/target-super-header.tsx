@@ -27,13 +27,13 @@ export const TargetSuperHeader = React.memo(function TargetSuperHeader({
     <SuperHeader colSpan={colSpan} colorPalette="green" icon={<LLMIcon />}>
       {isLoading ? (
         <>
-          <Text fontWeight="semibold" fontSize="sm" color="fg">
+          <Text textStyle="cardTitle" color="fg">
             Prompts or Agents
           </Text>
           <Skeleton height="20px" width="150px" />
         </>
       ) : (
-        <Text fontWeight="semibold" fontSize="sm" color="fg">
+        <Text textStyle="cardTitle" color="fg">
           Prompts or Agents
         </Text>
       )}

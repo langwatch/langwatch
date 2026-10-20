@@ -15,7 +15,10 @@ type Alias = Readonly<{
 /** main's flags were opt-in: only `true` switched the signal on. */
 const exporterOf = (value: string) => (value === "true" ? "otlp" : "none");
 
-/** Read until the LTS floor passes the first release carrying the new names (ADR-175 Q7). */
+/** The release the aliases stop being read in: two after 3.21, which renamed them. */
+export const telemetryAliasesRemovedIn = "3.23";
+
+/** Read, with a warning, until `telemetryAliasesRemovedIn` (ADR-175 Q7). */
 export const telemetryAliases: readonly Alias[] = [
   { deprecated: "PINO_LOG_LEVEL", current: "LOG_LEVEL" },
   { deprecated: "_LOG_LEVEL", current: "LOG_LEVEL" },
@@ -120,7 +123,7 @@ function aliasedValue({
     const old = deprecated?.[alias.deprecated];
     if (old === undefined) continue;
     deprecations.push(
-      `${alias.deprecated} is deprecated, use ${current}; it stops being read once the LTS floor passes this release`,
+      `${alias.deprecated} is deprecated, use ${current}; it stops being read in ${telemetryAliasesRemovedIn}`,
     );
     written.set(alias.deprecated, alias.translate ? alias.translate(old) : old);
   }

@@ -88,29 +88,10 @@ export function stripAnsi(input: string): string {
     .join("\n");
 }
 
-/** Convert an xterm-256 colour index (0-255) to an rgb hex string. */
+/** Convert an extended xterm-256 colour index (16-255) to an rgb hex string. */
 export function xterm256ToHex(index: number): string {
-  // 0-15: the 16 system colours. Callers map these to named colours instead
-  // (so they stay theme-aware), but resolve them here too for completeness.
-  const SYSTEM: string[] = [
-    "#000000",
-    "#cd0000",
-    "#00cd00",
-    "#cdcd00",
-    "#0000ee",
-    "#cd00cd",
-    "#00cdcd",
-    "#e5e5e5",
-    "#7f7f7f",
-    "#ff0000",
-    "#00ff00",
-    "#ffff00",
-    "#5c5cff",
-    "#ff00ff",
-    "#00ffff",
-    "#ffffff",
-  ];
-  if (index < 16) return SYSTEM[index] ?? "#000000";
+  // The first 16 indices are named colours, resolved by terminal.* at render time.
+  if (index < 16) throw new RangeError("System colours must be resolved as named ANSI colours");
   // 16-231: 6×6×6 colour cube.
   if (index < 232) {
     const i = index - 16;

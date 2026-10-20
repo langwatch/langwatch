@@ -1,10 +1,11 @@
 import type { UiHostProject } from "@langwatch/browser-host/use-organization-team-project";
 import { downloadCsv } from "@langwatch/csv/download";
+import { Card } from "@langwatch/design-system/card";
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
-  Card,
   Container,
   Heading,
   HStack,
@@ -17,6 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { toEpochMs, readableDate } from "@langwatch/time";
+import { FlaskConical } from "lucide-react";
 import numeral from "numeral";
 import { Download } from "react-feather";
 
@@ -121,53 +123,47 @@ const EvaluationSummaryCard = ({
 }) => {
   const score = averageOf(group, metric);
   return (
-    <Card.Root>
-      <Card.Body>
-        <VStack align="start" justify="center" height="full" gap={2}>
-          <Text color="fg" fontSize="15px" fontWeight="500">
-            {name}
+    <Card padding="lg">
+      <VStack align="start" justify="center" height="full" gap={2}>
+        <Text color="fg" textStyle="body" fontWeight="medium">
+          {name}
+        </Text>
+        <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
+          <Text textStyle="metric">
+            {numeral(score).format(metric === "score" ? "0.00" : "0%")}
           </Text>
-          <HStack align="end" color={score < 0.5 ? "red.fg" : "green.fg"}>
-            <Text fontSize="26px" fontWeight="300">
-              {numeral(score).format(metric === "score" ? "0.00" : "0%")}
+          <Text textStyle="label" marginBottom="1" opacity={0.8}>
+            {metric === "score" ? "avg score" : "pass rate"}
+          </Text>
+        </HStack>
+        <HStack textStyle="eyebrow" color="fg.muted">
+          {group.skipped.length && (
+            <Text>
+              <StatusDot color="yellow.fg" />
+              {group.skipped.length} skipped
             </Text>
-            <Text fontSize="13px" fontWeight="500" marginBottom="4px" opacity={0.8}>
-              {metric === "score" ? "avg score" : "pass rate"}
+          )}
+          {group.error.length && (
+            <Text>
+              <StatusDot color="red.fg" />
+              {group.error.length} error
             </Text>
-          </HStack>
-          <HStack fontSize="11px" textTransform="uppercase" fontWeight="600" color="fg.muted">
-            {group.skipped.length && (
-              <Text>
-                <StatusDot color="yellow.fg" />
-                {group.skipped.length} skipped
-              </Text>
-            )}
-            {group.error.length && (
-              <Text>
-                <StatusDot color="red.fg" />
-                {group.error.length} error
-              </Text>
-            )}
-          </HStack>
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+          )}
+        </HStack>
+      </VStack>
+    </Card>
   );
 };
 
 const StatCard = ({ title, value }: { title: string; value: string }) => (
-  <Card.Root>
-    <Card.Body>
-      <VStack align="start" justify="center" height="full" gap={2}>
-        <Text color="fg" fontSize="15px" fontWeight="500">
-          {title}
-        </Text>
-        <Text fontSize="26px" fontWeight="300">
-          {value}
-        </Text>
-      </VStack>
-    </Card.Body>
-  </Card.Root>
+  <Card padding="lg">
+    <VStack align="start" justify="center" height="full" gap={2}>
+      <Text color="fg" textStyle="body" fontWeight="medium">
+        {title}
+      </Text>
+      <Text textStyle="metric">{value}</Text>
+    </VStack>
+  </Card>
 );
 
 const LoadingTable = () => (
@@ -252,7 +248,7 @@ const EvaluationTable = ({
   const hasDetails = group.all.some((evaluation) => evaluation.details);
   return (
     <VStack align="start" gap={8} paddingTop={12}>
-      <Heading as={"h2"} size="md">
+      <Heading as={"h2"} size="sm">
         {name}
       </Heading>
       <Box>
@@ -363,7 +359,22 @@ export default function BatchEvaluation({
       >
         <VStack align="start" minWidth="0">
           {evaluations.isLoading && <LoadingTable />}
-          {isEmpty && <Text>No data found</Text>}
+          {isEmpty && (
+            <NoDataInfoBlock
+              size="inline"
+              bordered={false}
+              icon={<FlaskConical />}
+              title="No data found"
+              description="Run an evaluation from the studio and its results appear here."
+              next={[
+                {
+                  kind: "docs",
+                  label: "How experiments work",
+                  href: "https://docs.langwatch.ai/evaluations/experiments/overview",
+                },
+              ]}
+            />
+          )}
           {showGroups &&
             groups.map(([name, group]) => (
               <EvaluationTable key={name} name={name} group={group} metric={metricOf(group)} />

@@ -1,4 +1,5 @@
-import { Box, Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Button, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { Pencil } from "lucide-react";
 import type { ReactNode } from "react";
 
@@ -24,7 +25,7 @@ export function ReviewSection({
   children?: ReactNode;
 }) {
   return (
-    <Box padding={3} borderRadius="md" borderWidth="1px" borderColor="border">
+    <Card variant="frame" padding="sm">
       <HStack gap={2} align="start">
         <VStack align="start" gap={0.5} flex="1" minWidth="0">
           <Text textStyle="xs" color="fg.muted" fontWeight="semibold">
@@ -40,6 +41,6 @@ export function ReviewSection({
           <Pencil size={12} aria-hidden="true" /> Edit
         </Button>
       </HStack>
-    </Box>
+    </Card>
   );
 }

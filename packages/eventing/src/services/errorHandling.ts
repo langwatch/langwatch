@@ -224,8 +224,8 @@ export class QueuedPayloadInvalidError extends NonRetryableGroupQueueError {
 
 /**
  * A dequeued event whose type nothing on this worker declares: mid rolling deploy, an older
- * worker took a newer release's event. Retryable, so the queue's retry budget is the drain window
- * in which a worker declaring it takes the job; once spent it exhausts like any job (§9).
+ * worker took a newer release's event. The queue hands it back unspent for a worker declaring it
+ * (Alex, 2026-10-12); past the hand-back window it spends attempts and exhausts like any job (§9).
  */
 export class UndeclaredQueuedEventTypeError extends RecoverableError {
   override readonly name = "UndeclaredQueuedEventTypeError";
@@ -235,11 +235,40 @@ export class UndeclaredQueuedEventTypeError extends RecoverableError {
   constructor({ eventType, declaredBy }: { eventType: string; declaredBy: string }) {
     super(
       `Queued event type "${eventType}" is not declared by ${declaredBy} on this worker; ` +
-        "retrying so a worker that declares it takes the job (rolling-deploy drain)",
+        "handing it back so a worker that declares it takes the job (rolling-deploy drain)",
       { eventType, declaredBy },
     );
     this.eventType = eventType;
     this.declaredBy = declaredBy;
+  }
+}
+
+/**
+ * A dequeued job no registration, drain or alias on this worker routes. The group queue hands it
+ * back without using an attempt so a worker that routes it takes it (Alex, 2026-10-12); handed back
+ * past HAND_BACK_CONFIG.windowMs it spends attempts, then is dead-lettered (Alex, 2026-10-10).
+ */
+export class UnroutableQueuedJobError extends RecoverableError {
+  override readonly name = "UnroutableQueuedJobError";
+  readonly queueName: string;
+  readonly jobPath: string;
+
+  constructor({
+    queueName,
+    jobPath,
+    context,
+  }: {
+    queueName: string;
+    jobPath: string;
+    context: Record<string, unknown>;
+  }) {
+    super(
+      `Queued job "${jobPath}" on ${queueName}: job routing key is not registered in this worker; ` +
+        "handing it back for a worker that routes it, then dead-lettering it if none does",
+      { ...context, queueName, jobPath },
+    );
+    this.queueName = queueName;
+    this.jobPath = jobPath;
   }
 }
 
@@ -623,4 +652,31 @@ function isTransientClickHouseError(error: unknown): boolean {
   }
 
   return false;
+}
+
+const PROJECT_GONE_NAME = "ProjectNotFoundError";
+const PROJECT_GONE_CODE = "project_not_found";
+const MAX_CAUSE_DEPTH = 8;
+
+/**
+ * Whether a failure says its project no longer exists: authorization's and project's
+ * ProjectNotFoundError, read by name or code anywhere in the cause chain, or every member
+ * of an AggregateError. Structural, so no package imports another's error class.
+ */
+export function isProjectGone(error: unknown): boolean {
+  return projectGoneAt({ error, depth: 0 });
+}
+
+function projectGoneAt({ error, depth }: { error: unknown; depth: number }): boolean {
+  if (depth > MAX_CAUSE_DEPTH || error === null || typeof error !== "object") return false;
+  if (error instanceof AggregateError) {
+    const members: unknown[] = error.errors;
+    return (
+      members.length > 0 &&
+      members.every((member) => projectGoneAt({ error: member, depth: depth + 1 }))
+    );
+  }
+  if (Reflect.get(error, "name") === PROJECT_GONE_NAME) return true;
+  if (Reflect.get(error, "code") === PROJECT_GONE_CODE) return true;
+  return projectGoneAt({ error: Reflect.get(error, "cause"), depth: depth + 1 });
 }

@@ -252,6 +252,23 @@ Feature: Member Role Team Restrictions
     And it does not report a team that still has another admin
 
   @integration
+  Scenario: A seat change whose access rows have not landed yet keeps the new seat
+    Given a member holds a shared team role
+    When an organization admin moves them to a Lite Member seat
+    And the grant ledger accepts the corrections but cannot confirm them in time
+    Then the seat change is saved with the Lite Member seat
+    And every correction is still commanded
+    And the organization's cached access is dropped
+
+  @integration
+  Scenario: A seat change whose access rows are refused goes back to the old seat
+    Given a member holds a shared team role
+    When an organization admin moves them to a Lite Member seat
+    And the grant ledger refuses a correction
+    Then the change is refused
+    And the member keeps the seat they held
+
+  @integration
   Scenario: A seat change that names team roles outright still keeps the guard
     Given a member is the only admin of a shared team
     When a caller asks for that team role to be Viewer as part of the seat change

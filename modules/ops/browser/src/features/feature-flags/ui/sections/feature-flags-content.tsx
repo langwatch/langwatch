@@ -1,4 +1,5 @@
-import { Center, Spinner } from "@langwatch/design-system/primitives";
+import { Center } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { HandledErrorAlert } from "@langwatch/error-views";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -29,11 +30,7 @@ export function FeatureFlagsContent() {
   });
 
   if (query.isLoading) {
-    return (
-      <Center paddingY={20}>
-        <Spinner />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   if (query.error) {

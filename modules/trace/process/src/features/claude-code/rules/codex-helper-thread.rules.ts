@@ -5,7 +5,7 @@ import {
   queuedThreadOf,
   REQUEST_QUEUE_SPAN_NAME,
 } from "@langwatch/coding-agent-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { normalizeOtlpId } from "@langwatch/trace-contract/otlp-decoding";
 
 /** The parsed spans of one instrumentation scope entry of an export request. */

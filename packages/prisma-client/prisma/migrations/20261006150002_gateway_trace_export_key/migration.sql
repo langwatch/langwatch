@@ -1,6 +1,6 @@
 -- The ownerless trace-export key a gateway trace project's spans are sent with.
 -- A new table nothing reads yet: the image still serving never names it.
-CREATE TABLE "GatewayTraceExportKey" (
+CREATE TABLE IF NOT EXISTS "GatewayTraceExportKey" (
     "projectId" TEXT NOT NULL,
     "apiKeyId" TEXT NOT NULL,
     "encryptedToken" TEXT NOT NULL,

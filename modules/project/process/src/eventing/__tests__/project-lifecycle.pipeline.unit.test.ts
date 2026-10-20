@@ -208,7 +208,6 @@ describe("given organization records a newly created personal workspace", () => 
       logger: { error: () => void 0 },
       projects: {
         findWithOrgAdmin: async () => null,
-        findIdsByOrganization: async () => [],
         findWithTeam: async () => null,
       },
     });

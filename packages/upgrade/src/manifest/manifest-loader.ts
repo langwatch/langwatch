@@ -2,17 +2,11 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import {
-  compareReleases,
-  ltsFloorSchema,
-  ManifestLoadError,
-  releaseManifestSchema,
-} from "./manifest.ts";
-import type { LtsFloor, ReleaseManifest } from "./manifest.ts";
+import { compareReleases, ManifestLoadError, releaseManifestSchema } from "./manifest.ts";
+import type { ReleaseManifest } from "./manifest.ts";
 
-/** The manifests and the floor ship in the image beside the package's source. */
+/** The manifests ship in the image beside the package's source. */
 export const RELEASES_DIRECTORY = fileURLToPath(new URL("../../releases/", import.meta.url));
-export const LTS_FLOOR_FILE = "lts-floor.json";
 
 function parseJson({ name, text }: { name: string; text: string }): unknown {
   try {
@@ -69,29 +63,14 @@ export function parseManifests({
   return sorted;
 }
 
-export function parseLtsFloor({ text }: { text: string }): LtsFloor {
-  const parsed = ltsFloorSchema.safeParse(parseJson({ name: LTS_FLOOR_FILE, text }));
-  if (!parsed.success) {
-    throw new ManifestLoadError({
-      code: "invalid_floor",
-      message: `${LTS_FLOOR_FILE} is not an LTS floor: ${parsed.error.message}`,
-    });
-  }
-  return parsed.data;
-}
-
-/** Reads every `<release>.json` and `lts-floor.json` from a releases directory. */
+/** Reads every `<release>.json` from a releases directory. */
 export function loadReleases({ directory = RELEASES_DIRECTORY }: { directory?: string } = {}): {
   manifests: ReleaseManifest[];
-  floor: LtsFloor;
 } {
-  const names = readdirSync(directory).filter(
-    (name) => name.endsWith(".json") && name !== LTS_FLOOR_FILE,
-  );
+  const names = readdirSync(directory).filter((name) => name.endsWith(".json"));
   return {
     manifests: parseManifests({
       files: names.map((name) => ({ name, text: readFileSync(join(directory, name), "utf8") })),
     }),
-    floor: parseLtsFloor({ text: readFileSync(join(directory, LTS_FLOOR_FILE), "utf8") }),
   };
 }

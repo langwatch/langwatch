@@ -17,6 +17,7 @@ import {
   defineAggregate,
   definePipeline,
   type FoldProjectionStore,
+  type LaneAlias,
   type Projection,
   type RetentionPolicyResolver,
   type StaticPipelineDefinition,
@@ -92,6 +93,29 @@ export interface EvaluationTraceReactions {
   customEvaluationSync: ReturnType<typeof createTraceCustomEvaluationSync>;
   collectorEvaluation: ReturnType<typeof createTraceCollectorEvaluationReport>;
 }
+
+/**
+ * Main hung the trigger and the SDK-evaluation sync on trace_processing as fold reactors; jobs it
+ * queued there before the cut run on evaluation's lanes. Another trace event type the trigger saw
+ * is acknowledged with a log line, as the trigger only ever acted on these two.
+ */
+export const MAIN_TRACE_REACTION_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "trace_processing:reactor:evaluationTrigger",
+    to: { jobType: "subscriber", lane: "traceEvaluationTrigger" },
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+  },
+  {
+    from: "trace_processing:reactor:evaluationTrigger",
+    to: { jobType: "subscriber", lane: "traceOriginEvaluationTrigger" },
+    eventTypes: [ORIGIN_RESOLVED_EVENT_TYPE],
+  },
+  {
+    from: "trace_processing:reactor:customEvaluationSync",
+    to: { jobType: "subscriber", lane: "traceCustomEvaluationSync" },
+    eventTypes: [SPAN_RECEIVED_EVENT_TYPE],
+  },
+];
 
 /** One quiet window per trace and lane: main's evaluationTrigger dedup, split per event type. */
 function settlePerTrace(lane: string) {
@@ -205,6 +229,9 @@ export class EvaluationProcessingPipelineAdapter {
                     occurredAt: context.occurredAt,
                     spanAttributes: data.span.attributes,
                   },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceOriginEvaluationTrigger", {
@@ -216,6 +243,9 @@ export class EvaluationProcessingPipelineAdapter {
                   tenantId: String(context.tenantId),
                   traceId: String(context.aggregateId),
                   event: { type: ORIGIN_RESOLVED_EVENT_TYPE, occurredAt: context.occurredAt },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceCustomEvaluationSync", {
@@ -247,7 +277,8 @@ export class EvaluationProcessingPipelineAdapter {
               data: traceCollectorEvaluationSchema,
               handle: (data, context) =>
                 traceReactions.collectorEvaluation({ ...data, tenantId: String(context.tenantId) }),
-            });
+            })
+            .withLaneAliases(MAIN_TRACE_REACTION_LANE_ALIASES);
     return (retention === undefined ? reacting : reacting.withRetention(retention)).build();
   }
 }

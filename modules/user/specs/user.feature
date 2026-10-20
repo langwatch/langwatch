@@ -28,13 +28,52 @@ Feature: Canonical user lifecycle
     Then one is deactivated and the other is refused
     And one active operator remains
 
+  # Addresses are stored lower-cased (Alex, 2026-10-13): every lookup is a plain match on the
+  # unique index first; only a miss asks again case aside, for rows not lower-cased yet.
   @unit
-  Scenario: A lookup by address never guesses between case-twins
-    Given accounts whose addresses differ only in case
-    When an account is looked up by address
-    Then the account holding the address exactly is answered
-    And with no exact holder the lookup is refused with code user_email_ambiguous
-    And the address still counts as taken
+  Scenario: Stored addresses are lower-cased
+    When an account is minted, or its address changed, with capitals or spaces in the address
+    Then the account stores the trimmed, lower-cased address
+
+  @unit @integration
+  Scenario: A mixed-case sign-in still finds the account
+    Given an account whose address is stored lower-cased
+    When it is looked up by the address typed with capitals
+    Then that account is answered
+    And the store is asked for the lower-cased address only, matched exactly
+
+  @unit
+  Scenario: An address stored with capitals still signs in
+    Given an account stored with capitals that the address step has not reached, or an older image wrote
+    When it is looked up by its address and no account holds the lower-cased form
+    Then the lookup asks again case aside and answers the oldest such account
+    And the address counts as taken
+
+  @unit @integration
+  Scenario: The address step lower-cases every stored address
+    Given accounts stored with capitals before addresses were lower-cased
+    When the background step "user:lower-case-stored-addresses" runs, as soon as the upgrade starts
+    Then each such address is stored lower-cased, and a mixed-case lookup finds the account
+
+  @unit @integration
+  Scenario: A case-only duplicate is left as it is and reported
+    Given another account already holds an address's lower-cased form
+    When the address step runs
+    Then the account keeps its address as it is, and the step logs it without the address
+    And nothing is merged or removed
+    And the step report on Ops > Upgrades lists the account with its address, for an admin to fix by hand
+
+  @integration
+  Scenario: The address step never overwrites a save made during its pass
+    Given an address that changed after the step read it
+    When the step writes
+    Then the row keeps the newer address
+
+  @unit
+  Scenario: Running the address step twice changes nothing more
+    Given the address step has run
+    When it runs again
+    Then it finds no address to change
 
   @unit
   Scenario: Deactivating the last active platform operator is refused
@@ -120,50 +159,60 @@ Feature: Canonical user lifecycle
     Then each is recorded once on user_lifecycle with the data its write committed
     And a delivery while the bus is down throws, so the outbox retries it
 
+  # One pass over accounts in id order; each page is read once, its history read once, and its
+  # commands sent as batches, created before standing. ARCHITECTURE.md, "Platform operators are a grant".
   @unit
   Scenario: The seed step records a created fact for every existing account
     Given accounts stored before user recorded created facts
     When the background step "user:record-created-facts" runs, or resumes from its checkpoint
     Then each account after the checkpoint is recorded once as created, marked backfilled, at its row's creation time
-    And the step waits until no older image that mints accounts without the fact still serves
+    And the step waits until no older image that mints accounts or changes their standing without the fact still serves
 
   @unit
-  Scenario: The seed step's dry run records nothing
-    When the step runs as a dry run
-    Then it reports how many accounts it would record, records no fact and saves no checkpoint
+  Scenario: The seed step sends each page as batches, every created fact before the page's standing facts
+    Given stored accounts, some deactivated
+    When the step runs
+    Then each page of accounts is read once and sent as one batch of created facts followed by its batches of standing facts
+    And an account's created fact is sent before its own deactivation or reactivation
 
-  # Standing changes an old image made record no fact; ARCHITECTURE.md, "Platform operators are a grant".
   @unit
-  Scenario: The standing step catches up a missed deactivation
+  Scenario: The seed step catches up a missed deactivation
     Given an account an older image deactivated without recording the fact
-    When the background step "user:record-standing-facts" runs
+    When the step runs
     Then the account is recorded deactivated at its stored deactivation time
-    And the step waits until no older image that changes standing without the fact still serves
 
   @unit
-  Scenario: The standing step repairs a missed reactivation
+  Scenario: The seed step repairs a missed reactivation
     Given an active account whose latest fact on user's own log is a deactivation
-    When the standing step runs
+    When the step runs
     Then the account is recorded reactivated at the run's start
     And an active account whose log ends in a reactivation, or holds no deactivation, records nothing
 
   @unit
-  Scenario: Running the standing step twice records once
-    Given the standing step has run
+  Scenario: Running the seed step twice records once
+    Given the step has run
     When it runs again
-    Then no further deactivation or reactivation fact is recorded
+    Then no further created, deactivation or reactivation fact is recorded
+
+  # A retried or restarted attempt resumes from the checkpoint; its report keeps the totals, so an
+  # attempt that resumes at the end of the table reports every account, not none.
+  @unit
+  Scenario: A resumed seed step reports every account its attempts counted
+    Given the seed step's checkpoint counted some accounts before its attempt stopped
+    When the step resumes from that checkpoint
+    Then each checkpoint it saves and the report it finishes with count on from those numbers
 
   @unit
-  Scenario: The standing step's dry run writes nothing
-    When the standing step runs as a dry run
-    Then it reports how many accounts it would re-state, records no fact and saves no checkpoint
-
-  @unit
-  Scenario: The standing step resumes after the saved user id
-    Given the standing step saved a checkpoint after a user id
+  Scenario: The seed step resumes after the saved user id
+    Given the step saved a checkpoint after a user id
     When it resumes
-    Then it re-states only the accounts after that id
+    Then it records only the accounts after that id
     And it saves the last id of each page it finishes
+
+  @unit
+  Scenario: The seed step's dry run records nothing
+    When the step runs as a dry run
+    Then it reports how many accounts it would record or re-state, sends no fact and saves no checkpoint
 
   @unit
   Scenario: Changing an email stores the normalized address
@@ -171,6 +220,13 @@ Feature: Canonical user lifecycle
     Then the profile holds the trimmed, lower-cased address
     And an unknown account is refused with code user_not_found
     And the sessions the old address outlives are auth's to end (modules/auth/specs/account-lifecycle.feature)
+
+  @unit
+  Scenario: Changing an email clears its verification
+    Given a user whose address is verified
+    When the User service changes the user's email to a different address
+    Then the new address is stored as not verified
+    And a change of letter case alone keeps the address verified
 
   @unit
   Scenario: Uploading an avatar uses the personal workspace
@@ -298,10 +354,11 @@ Feature: Canonical user lifecycle
       And no switch is claimed twice
 
     @unit
-    Scenario: A capability switch written a way nothing reads refuses the boot
+    Scenario: A capability switch written another way reads as the previous release read it
       Given a deployment that sets one of the switches to a value outside "on" and "off"
       When user's configuration is parsed
-      Then the boot is refused rather than the surface left quietly off
+      Then the boot goes ahead
+      And two-step enrolment and own passwords read it as off, and passkeys read it as on
 
   # Round 54 (O1-P2): a first visit can act before its personal project arrives; the server
   # answers the retryable "personal_workspace_pending" and the screen waits instead of failing.

@@ -4,6 +4,7 @@
  * The row links via address, not navigation, so a new tab won't lose the mid-edit form.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import {
   Badge,
@@ -308,31 +309,25 @@ export function LLMModelCostMatchingSpans({
   const data = preview.data;
 
   return (
-    <VStack
-      align="stretch"
-      gap={2}
-      marginTop={3}
-      padding={3}
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      bg="bg.subtle"
-      data-testid="matching-spans-preview"
-    >
-      <HStack justify="space-between" gap={2}>
-        <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
-          Matching spans
-        </Text>
-        {data && regexValid && <MatchSummary preview={data} />}
-      </HStack>
+    <Box marginTop={3}>
+      <Card variant="nested" padding="sm" data-testid="matching-spans-preview">
+        <VStack align="stretch" gap={2}>
+          <HStack justify="space-between" gap={2}>
+            <Text textStyle="xs" fontWeight="semibold" color="fg.muted">
+              Matching spans
+            </Text>
+            {data && regexValid && <MatchSummary preview={data} />}
+          </HStack>
 
-      <PreviewBody
-        isLoading={preview.isLoading}
-        onPickModel={onPickModel}
-        preview={data}
-        projectSlug={projectSlug}
-        regexValid={regexValid}
-      />
-    </VStack>
+          <PreviewBody
+            isLoading={preview.isLoading}
+            onPickModel={onPickModel}
+            preview={data}
+            projectSlug={projectSlug}
+            regexValid={regexValid}
+          />
+        </VStack>
+      </Card>
+    </Box>
   );
 }

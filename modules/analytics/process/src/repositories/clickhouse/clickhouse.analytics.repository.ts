@@ -9,14 +9,18 @@ import {
 } from "@langwatch/analytics-contract";
 import { createLogger } from "@langwatch/observability";
 import { toDate } from "@langwatch/time";
+import { z } from "zod";
 
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules.ts";
 import {
   AnalyticsRepository,
+  type AnalyticsFeedbackPageRead,
+  type AnalyticsFeedbackPageReadInput,
   type AnalyticsLegacyReadInput,
   type AnalyticsTimeseriesQuery,
 } from "../analytics.repository.ts";
 import {
+  buildFeedbacksPageQuery,
   buildFeedbacksQuery,
   buildTimeseriesQuery,
   buildTopDocumentsQuery,
@@ -227,6 +231,50 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     }
   }
 
+  async findFeedbackEventsPage(
+    input: AnalyticsFeedbackPageReadInput,
+  ): Promise<AnalyticsFeedbackPageRead> {
+    const client = await this.clientFor(input.projectId);
+    const built = buildFeedbacksPageQuery({
+      projectId: input.projectId,
+      startDate: new Date(input.startDate),
+      endDate: new Date(input.endDate),
+      filters: input.filters,
+      after: input.after,
+      limit: input.limit,
+    });
+    try {
+      const result = await client.query({
+        query: built.sql,
+        query_params: built.params,
+        format: "JSONEachRow",
+        clickhouse_settings: ANALYTICS_CLICKHOUSE_SETTINGS,
+      });
+      const fetched = feedbackPageRowsSchema.parse(await result.json());
+      return {
+        rows: fetched.slice(0, input.limit).map((row) => ({
+          event: toFeedbackEvent(row, input.projectId),
+          position: {
+            startedAt: startedAtOf(row),
+            traceId: row.trace_id,
+            spanId: row.event_id,
+            eventIndex: row.event_index,
+          },
+        })),
+        hasMore: fetched.length > input.limit,
+      };
+    } catch (error) {
+      this.logger.warn(
+        {
+          tenantId: input.projectId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        "Failed to execute feedbacks page query",
+      );
+      throw error;
+    }
+  }
+
   private async clientFor(tenantId: string): Promise<EvaluationAnalyticsClickHouseClient> {
     const client = await this.resolveClient(tenantId);
     if (!client) throw new AnalyticsClientUnavailableError(tenantId);
@@ -234,14 +282,23 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
   }
 }
 
+const feedbackRowSchema = z.object({
+  trace_id: z.string(),
+  event_id: z.string(),
+  started_at: z.union([z.string(), z.number()]),
+  event_type: z.string(),
+  attributes: z.record(z.string(), z.string()),
+});
+const feedbackPageRowsSchema = z.array(
+  z.object({ ...feedbackRowSchema.shape, event_index: z.number() }),
+);
+
+function startedAtOf(row: z.infer<typeof feedbackRowSchema>): number {
+  return typeof row.started_at === "string" ? parseInt(row.started_at, 10) : row.started_at;
+}
+
 function toFeedbackEvent(
-  row: {
-    trace_id: string;
-    event_id: string;
-    started_at: string | number;
-    event_type: string;
-    attributes: Record<string, string>;
-  },
+  row: z.infer<typeof feedbackRowSchema>,
   projectId: string,
 ): AnalyticsFeedbackEvent {
   const metrics: { key: string; value: number }[] = [];
@@ -259,8 +316,7 @@ function toFeedbackEvent(
     if (metricKey) metrics.push({ key: metricKey, value: parseFloat(value) || 0 });
     else eventDetails.push({ key, value });
   }
-  const startedAt =
-    typeof row.started_at === "string" ? parseInt(row.started_at, 10) : row.started_at;
+  const startedAt = startedAtOf(row);
   return {
     event_id: row.event_id,
     event_type: row.event_type,

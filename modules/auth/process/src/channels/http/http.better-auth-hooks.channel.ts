@@ -189,8 +189,10 @@ const announceSsoAutoJoin = ({
   );
 
   announcements.announceSignup({
+    userId: user.id,
     userName: user.name,
     userEmail: user.email,
+    organizationId: org.id,
     organizationName: org.name,
   });
 
@@ -852,25 +854,46 @@ export function createBeforeSessionCreateHook({
       });
     }
     const claims = await mintClaims({ userId: session.userId, path, context, sessionClaims });
-    if (claims.identifierId === null && claims.amr.length === 0) return undefined;
-    return {
-      data: {
-        ...session,
-        amr: [...claims.amr],
-        ...(claims.identifierId === null ? {} : { identifierId: claims.identifierId }),
-      },
-    };
+    // An account that never signed in is minting the session its sign-up started.
+    return mintedSession({ session, claims, startedBySignUp: user?.lastLoginAt === null });
+  };
+}
+
+/** What the hook writes on the session row; nothing when there is nothing to record. */
+function mintedSession<T extends object>({
+  session,
+  claims,
+  startedBySignUp,
+}: {
+  session: T;
+  claims: SessionClaims;
+  startedBySignUp: boolean;
+}) {
+  if (claims.identifierId === null && claims.amr.length === 0 && !startedBySignUp) return undefined;
+  return {
+    data: {
+      ...session,
+      amr: [...claims.amr],
+      ...(claims.identifierId === null ? {} : { identifierId: claims.identifierId }),
+      ...(startedBySignUp ? { startedBySignUp: true } : {}),
+    },
   };
 }
 
 /** What a session records at mint, asked of identity with this request's callback evidence. */
 export type SessionMintClaims = Readonly<{
   identity: Pick<IdentityApi, "claimsForMint">;
-  evidence: Pick<SessionCallbackEvidenceChannel, "findAcceptedAccounts">;
+  evidence: Pick<
+    SessionCallbackEvidenceChannel,
+    "findAcceptedAccounts" | "recordVerifiedCallbackToken" | "recordAuthenticatedCallbackAccount"
+  >;
 }>;
 
 /** Better Auth hands the route pattern (`.../acs/:providerId`); readers need the real path. */
-function toConcretePath(path: string, params: Record<string, string | undefined> = {}): string {
+export function toConcretePath(
+  path: string,
+  params: Record<string, string | undefined> = {},
+): string {
   return path.replace(/:([A-Za-z]+)/g, (whole, name: string) => params[name] ?? whole);
 }
 

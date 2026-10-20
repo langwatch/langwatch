@@ -715,11 +715,11 @@ Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:2
 Answers at `/api/agent-cache/:name`, `/api/v1/agent-cache/:name`.
 
 ```typescript
-// Params: gatewayAgentCacheNameParamsSchema, ../contract/src/gateway-agent-cache.schemas.ts:22
+// Params: gatewayAgentCacheNameParamsSchema, ../contract/src/gateway-agent-cache.schemas.ts:37
 interface Params {
   name: string;
 }
-// Response: gatewayAgentCacheEntrySchema, ../contract/src/gateway-agent-cache.schemas.ts:49
+// Response: gatewayAgentCacheEntrySchema, ../contract/src/gateway-agent-cache.schemas.ts:65
 interface Response {
   name: string;
   value: string;
@@ -735,13 +735,13 @@ Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:3
 Answers at `/api/agent-cache/:name`, `/api/v1/agent-cache/:name`.
 
 ```typescript
-type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:22
-// Body: gatewayAgentCacheWriteSchema, ../contract/src/gateway-agent-cache.schemas.ts:33
+type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:37
+// Body: gatewayAgentCacheWriteSchema, ../contract/src/gateway-agent-cache.schemas.ts:58
 interface Body {
   value: string;
   ttl_seconds?: number;
 }
-// Response: gatewayAgentCacheWrittenSchema, ../contract/src/gateway-agent-cache.schemas.ts:50
+// Response: gatewayAgentCacheWrittenSchema, ../contract/src/gateway-agent-cache.schemas.ts:74
 interface Response {
   name: string;
   ttl_seconds: number;
@@ -752,14 +752,14 @@ interface Response {
 
 Claim an agent cache entry
 
-Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:52`.
+Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:53`.
 
 Answers at `/api/agent-cache/:name/claim`, `/api/v1/agent-cache/:name/claim`.
 
 ```typescript
-type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:22
-type Body = z.infer<typeof gatewayAgentCacheWriteSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:33
-// Response: gatewayAgentCacheClaimedSchema, ../contract/src/gateway-agent-cache.schemas.ts:54
+type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:37
+type Body = z.infer<typeof gatewayAgentCacheWriteSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:58
+// Response: gatewayAgentCacheClaimedSchema, ../contract/src/gateway-agent-cache.schemas.ts:83
 interface Response {
   name: string;
   ttl_seconds: number;
@@ -771,13 +771,13 @@ interface Response {
 
 Delete an agent cache entry
 
-Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:71`.
+Permission `agentCache:manage`. Declared at `src/transport/agent-cache.rest.ts:73`.
 
 Answers at `/api/agent-cache/:name`, `/api/v1/agent-cache/:name`.
 
 ```typescript
-type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:22
-// Response: gatewayAgentCacheDeletedSchema, ../contract/src/gateway-agent-cache.schemas.ts:58
+type Params = z.infer<typeof gatewayAgentCacheNameParamsSchema>; // ../contract/src/gateway-agent-cache.schemas.ts:37
+// Response: gatewayAgentCacheDeletedSchema, ../contract/src/gateway-agent-cache.schemas.ts:92
 interface Response {
   name: string;
   deleted: boolean;
@@ -797,15 +797,15 @@ interface Response {
 
 Public: ElevenLabs delivers this callback publicly; the application verifies the raw bytes against the provider row's stored HMAC secret. Declared at `src/transport/elevenlabs-webhook.rest.ts:27`.
 
-Answers at `/api/elevenlabs/webhook/:modelProviderId`.
+Answers at `/api/elevenlabs/webhook/:modelProviderId`, `/api/v1/elevenlabs/webhook/:modelProviderId`.
 
 ```typescript
-// Params: gatewayElevenLabsWebhookParamsSchema, ../contract/src/gateway-elevenlabs-webhook.schemas.ts:3
+// Params: gatewayElevenLabsWebhookParamsSchema, ../contract/src/gateway-elevenlabs-webhook.schemas.ts:11
 interface Params {
   modelProviderId: string;
 }
-// Rawbody: "text" (inline, src/transport/elevenlabs-webhook.rest.ts:29)
-// Response: inline, src/transport/elevenlabs-webhook.rest.ts:32
+// Rawbody: "text" (inline, src/transport/elevenlabs-webhook.rest.ts:30)
+// Response: inline, src/transport/elevenlabs-webhook.rest.ts:33
 type Response = unknown;
 ```
 
@@ -831,42 +831,42 @@ Authenticated: the Go data plane signs every call with the deployment's own gate
 Answers at `/api/internal/gateway/resolve-key`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:130)
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:131)
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:326
 ```
 
 #### `POST /api/internal/gateway/codex/refresh` · `gatewayInternalCodexRefresh`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:140`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:141`.
 
 Answers at `/api/internal/gateway/codex/refresh`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:141)
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:143)
 ```
 
 #### `GET /api/internal/gateway/config/:vk_id` · `gatewayInternalConfig`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:148`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:150`.
 
 Answers at `/api/internal/gateway/config/:vk_id`.
 
 ```typescript
-// Params: gatewayInternalConfigParamsSchema, ../contract/src/gateway-internal.schemas.ts:25
+// Params: gatewayInternalConfigParamsSchema, ../contract/src/gateway-internal.schemas.ts:43
 interface Params {
   vk_id: string;
 }
-type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:267
+type Headers = z.infer<typeof gatewayInternalHeadersSchema>; // ../contract/src/gateway-internal.schemas.ts:326
 ```
 
 #### `GET /api/internal/gateway/changes` · `gatewayInternalChanges`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:158`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:160`.
 
 Answers at `/api/internal/gateway/changes`.
 
 ```typescript
-// Query: gatewayInternalChangesQuerySchema, ../contract/src/gateway-internal.schemas.ts:271
+// Query: gatewayInternalChangesQuerySchema, ../contract/src/gateway-internal.schemas.ts:336
 interface Query {
   organization_id?: string;
   since?: string;
@@ -876,22 +876,22 @@ interface Query {
 
 #### `POST /api/internal/gateway/guardrail/check` · `gatewayInternalGuardrailCheck`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:165`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:167`.
 
 Answers at `/api/internal/gateway/guardrail/check`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:166)
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:169)
 ```
 
 #### `GET /api/internal/gateway/budget-bucket-spend` · `gatewayInternalBudgetBucketSpend`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:173`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:176`.
 
 Answers at `/api/internal/gateway/budget-bucket-spend`.
 
 ```typescript
-// Query: gatewayInternalBucketQuerySchema, ../contract/src/gateway-internal.schemas.ts:276
+// Query: gatewayInternalBucketQuerySchema, ../contract/src/gateway-internal.schemas.ts:345
 interface Query {
   budget_id?: string;
   end_user_id?: string;
@@ -900,52 +900,52 @@ interface Query {
 
 #### `POST /api/internal/gateway/spend-commands` · `gatewayInternalSpendCommands`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:180`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:183`.
 
 Answers at `/api/internal/gateway/spend-commands`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:181)
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:185)
 ```
 
 #### `POST /api/internal/gateway/realtime-sessions` · `gatewayInternalReserveRealtimeSession`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:189`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:193`.
 
 Answers at `/api/internal/gateway/realtime-sessions`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:190)
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:195)
 ```
 
 #### `PATCH /api/internal/gateway/realtime-sessions/:session_id` · `gatewayInternalPatchRealtimeSession`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:197`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:202`.
 
 Answers at `/api/internal/gateway/realtime-sessions/:session_id`.
 
 ```typescript
-// Params: gatewayInternalSessionParamsSchema, ../contract/src/gateway-internal.schemas.ts:147
+// Params: gatewayInternalSessionParamsSchema, ../contract/src/gateway-internal.schemas.ts:200
 interface Params {
   session_id: string;
 }
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:202)
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:208)
 ```
 
 #### `POST /api/internal/gateway/realtime-sessions/:session_id/usage` · `gatewayInternalReportRealtimeSessionUsage`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:211`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:217`.
 
 Answers at `/api/internal/gateway/realtime-sessions/:session_id/usage`.
 
 ```typescript
-type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:147
-// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:216)
+type Params = z.infer<typeof gatewayInternalSessionParamsSchema>; // ../contract/src/gateway-internal.schemas.ts:200
+// Rawbody: "text" (inline, src/transport/gateway-internal.rest.ts:223)
 ```
 
 #### `GET /api/internal/gateway/bootstrap` · `gatewayInternalBootstrap`
 
-Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:229`.
+Authenticated: the Go data plane signs every call with the deployment's own gateway secret, and GatewayInternalIdentity verifies it under this family's paths before any route runs. Hidden from the OpenAPI document. Declared at `src/transport/gateway-internal.rest.ts:236`.
 
 Answers at `/api/internal/gateway/bootstrap`.
 
@@ -967,7 +967,7 @@ Permission `virtualKeys:view`. Credential `api_key`. Declared at `src/transport/
 Answers at `/api/gateway/v1/virtual-keys`.
 
 ```typescript
-// Query: gatewayVirtualKeyListQuerySchema, ../contract/src/gateway-platform.schemas.ts:180
+// Query: gatewayVirtualKeyListQuerySchema, ../contract/src/gateway-platform.schemas.ts:221
 interface Query {
   cursor?: string;
   limit?: number;
@@ -985,42 +985,42 @@ Permission `virtualKeys:create`. Credential `api_key`. Declared at `src/transpor
 Answers at `/api/gateway/v1/virtual-keys`.
 
 ```typescript
-type Body = z.infer<typeof gatewayCreateVirtualKeySchema>; // ../contract/src/gateway-platform.schemas.ts:231
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string().optional().describ… (inline, src/transport/gateway-platform.rest.ts:289)
+type Body = z.infer<typeof gatewayCreateVirtualKeySchema>; // ../contract/src/gateway-platform.schemas.ts:309
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string().optional().describ… (inline, src/transport/gateway-platform.rest.ts:290)
 ```
 
 #### `GET /virtual-keys/:id` · `getApiGatewayV1VirtualKeysById`
 
 Get virtual key
 
-Permission `virtualKeys:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:348`.
+Permission `virtualKeys:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:349`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id`.
 
 ```typescript
-// Params: gatewayIdParamsSchema, ../contract/src/gateway-platform.schemas.ts:326
+// Params: gatewayIdParamsSchema, ../contract/src/gateway-platform.schemas.ts:422
 interface Params {
   id: string;
 }
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:352)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:353)
 ```
 
 #### `GET /virtual-keys/:id/spend` · `getApiGatewayV1VirtualKeysByIdSpend`
 
 Read a virtual key's spend
 
-Permission `gatewayUsage:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:365`.
+Permission `gatewayUsage:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:366`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/spend`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Query: gatewayVkSpendWindowSchema, ../contract/src/gateway-platform.schemas.ts:200
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Query: gatewayVkSpendWindowSchema, ../contract/src/gateway-platform.schemas.ts:256
 interface Query {
   from?: number;
   to?: number;
 }
-// Response: gatewaySpendSummaryDtoSchema, ../contract/src/gateway-platform.schemas.ts:116
+// Response: gatewaySpendSummaryDtoSchema, ../contract/src/gateway-platform.schemas.ts:137
 interface Response {
   virtual_key_id: string;
   spent_usd: string;
@@ -1036,134 +1036,134 @@ interface Response {
 
 Update virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:403`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:404`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-type Body = z.infer<typeof gatewayUpdateVirtualKeySchema>; // ../contract/src/gateway-platform.schemas.ts:249
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:408)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+type Body = z.infer<typeof gatewayUpdateVirtualKeySchema>; // ../contract/src/gateway-platform.schemas.ts:328
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:410)
 ```
 
 #### `POST /virtual-keys/:id/rotate` · `postApiGatewayV1VirtualKeysByIdRotate`
 
 Rotate virtual key secret
 
-Permission `virtualKeys:rotate`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:447`.
+Permission `virtualKeys:rotate`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:449`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/rotate`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Body: gatewayRotateVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:329
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Body: gatewayRotateVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:430
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }) (inline, src/transport/gateway-platform.rest.ts:452)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema, secret: z.string() }) (inline, src/transport/gateway-platform.rest.ts:455)
 ```
 
 #### `POST /virtual-keys/:id/disable` · `postApiGatewayV1VirtualKeysByIdDisable`
 
 Disable virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:477`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:480`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/disable`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Body: gatewayDisableVkSchema, ../contract/src/gateway-platform.schemas.ts:263
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Body: gatewayDisableVkSchema, ../contract/src/gateway-platform.schemas.ts:334
 interface Body {
   reason?: string;
 }
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:482)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:486)
 ```
 
 #### `POST /virtual-keys/:id/enable` · `postApiGatewayV1VirtualKeysByIdEnable`
 
 Enable virtual key
 
-Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:507`.
+Permission `virtualKeys:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:511`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/enable`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Body: gatewayEnableVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:332
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Body: gatewayEnableVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:438
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:512)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:517)
 ```
 
 #### `POST /virtual-keys/:id/revoke` · `postApiGatewayV1VirtualKeysByIdRevoke`
 
 Revoke virtual key
 
-Permission `virtualKeys:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:531`.
+Permission `virtualKeys:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:536`.
 
 Answers at `/api/gateway/v1/virtual-keys/:id/revoke`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Body: gatewayRevokeVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:335
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Body: gatewayRevokeVirtualKeyBodySchema, ../contract/src/gateway-platform.schemas.ts:446
 type Body = Record<string, unknown>;
-// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:536)
+// Response: z.object({ virtual_key: gatewayVirtualKeyDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:542)
 ```
 
 #### `GET /budgets` · `getApiGatewayV1Budgets`
 
 List budgets
 
-Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:557`.
+Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:563`.
 
 Answers at `/api/gateway/v1/budgets`.
 
 ```typescript
-// Query: gatewayBudgetListQuerySchema, ../contract/src/gateway-platform.schemas.ts:185
+// Query: gatewayBudgetListQuerySchema, ../contract/src/gateway-platform.schemas.ts:237
 interface Query {
   cursor?: string;
   limit?: number;
   scope_type?: string;
   external_id?: string;
 }
-// Response: z.object({ data: z.array(gatewayPlatformBudgetDtoSchema), spend_available: z.boolean(), n… (inline, src/transport/gateway-platform.rest.ts:562)
+// Response: z.object({ data: z.array(gatewayPlatformBudgetDtoSchema), spend_available: z.boolean(), n… (inline, src/transport/gateway-platform.rest.ts:568)
 ```
 
 #### `GET /budgets/:id` · `getApiGatewayV1BudgetsById`
 
 Get budget
 
-Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:601`.
+Permission `gatewayBudgets:view`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:607`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }) (inline, src/transport/gateway-platform.rest.ts:605)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema, spend_available: z.boolean() }) (inline, src/transport/gateway-platform.rest.ts:611)
 ```
 
 #### `POST /budgets` · `postApiGatewayV1Budgets`
 
 Create budget
 
-Permission `gatewayBudgets:create`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:618`.
+Permission `gatewayBudgets:create`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:624`.
 
 Answers at `/api/gateway/v1/budgets`.
 
 ```typescript
-type Body = z.infer<typeof gatewayCreateBudgetSchema>; // ../contract/src/gateway-platform.schemas.ts:271
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:623)
+type Body = z.infer<typeof gatewayCreateBudgetSchema>; // ../contract/src/gateway-platform.schemas.ts:375
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:630)
 ```
 
 #### `PATCH /budgets/:id` · `patchApiGatewayV1BudgetsById`
 
 Update budget
 
-Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:663`.
+Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:670`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Body: gatewayUpdateBudgetSchema, ../contract/src/gateway-platform.schemas.ts:298
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Body: gatewayUpdateBudgetSchema, ../contract/src/gateway-platform.schemas.ts:390
 interface Body {
   name?: string;
   description?: string | null;
@@ -1173,123 +1173,123 @@ interface Body {
   external_id?: string | null;
   metadata?: Record<string, string>;
 }
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:668)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:676)
 ```
 
 #### `DELETE /budgets/:id` · `deleteApiGatewayV1BudgetsById`
 
 Archive budget
 
-Permission `gatewayBudgets:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:694`.
+Permission `gatewayBudgets:delete`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:702`.
 
 Answers at `/api/gateway/v1/budgets/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:698)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:707)
 ```
 
 #### `POST /budgets/:id/reset` · `postApiGatewayV1BudgetsByIdReset`
 
 Reset budget period
 
-Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:712`.
+Permission `gatewayBudgets:update`. Credential `api_key`. Declared at `src/transport/gateway-platform.rest.ts:721`.
 
 Answers at `/api/gateway/v1/budgets/:id/reset`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Query: gatewayResetBudgetQuerySchema, ../contract/src/gateway-platform.schemas.ts:196
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Query: gatewayResetBudgetQuerySchema, ../contract/src/gateway-platform.schemas.ts:246
 interface Query {
   end_user_id?: string;
 }
-// Body: gatewayResetBudgetSchema, ../contract/src/gateway-platform.schemas.ts:267
+// Body: gatewayResetBudgetSchema, ../contract/src/gateway-platform.schemas.ts:343
 interface Body {
   reason?: string;
 }
-// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:718)
+// Response: z.object({ budget: gatewayPlatformBudgetDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:728)
 ```
 
 #### `GET /cache-rules` · `getApiGatewayV1CacheRules`
 
 List cache-control rules
 
-Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:746`.
+Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:756`.
 
 Answers at `/api/gateway/v1/cache-rules`.
 
 ```typescript
-// Query: gatewayPageQuerySchema, ../contract/src/gateway-platform.schemas.ts:169
+// Query: gatewayPageQuerySchema, ../contract/src/gateway-platform.schemas.ts:205
 interface Query {
   cursor?: string;
   limit?: number;
 }
-// Response: z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCurs… (inline, src/transport/gateway-platform.rest.ts:750)
+// Response: z.object({ data: z.array(gatewayPlatformCacheRuleDtoSchema), next_cursor: gatewayNextCurs… (inline, src/transport/gateway-platform.rest.ts:760)
 ```
 
 #### `GET /cache-rules/:id` · `getApiGatewayV1CacheRulesById`
 
 Get a cache rule
 
-Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:778`.
+Permission `gatewayCacheRules:view`. Declared at `src/transport/gateway-platform.rest.ts:788`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:781)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:791)
 ```
 
 #### `POST /cache-rules` · `postApiGatewayV1CacheRules`
 
 Create a cache rule
 
-Permission `gatewayCacheRules:create`. Declared at `src/transport/gateway-platform.rest.ts:793`.
+Permission `gatewayCacheRules:create`. Declared at `src/transport/gateway-platform.rest.ts:803`.
 
 Answers at `/api/gateway/v1/cache-rules`.
 
 ```typescript
-type Body = z.infer<typeof gatewayCreateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:308
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:797)
+type Body = z.infer<typeof gatewayCreateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:404
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:808)
 ```
 
 #### `PATCH /cache-rules/:id` · `patchApiGatewayV1CacheRulesById`
 
 Update a cache rule
 
-Permission `gatewayCacheRules:update`. Declared at `src/transport/gateway-platform.rest.ts:826`.
+Permission `gatewayCacheRules:update`. Declared at `src/transport/gateway-platform.rest.ts:837`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-type Body = z.infer<typeof gatewayUpdateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:317
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:830)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+type Body = z.infer<typeof gatewayUpdateCacheRuleSchema>; // ../contract/src/gateway-platform.schemas.ts:418
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:842)
 ```
 
 #### `DELETE /cache-rules/:id` · `deleteApiGatewayV1CacheRulesById`
 
 Archive a cache rule
 
-Permission `gatewayCacheRules:delete`. Declared at `src/transport/gateway-platform.rest.ts:859`.
+Permission `gatewayCacheRules:delete`. Declared at `src/transport/gateway-platform.rest.ts:871`.
 
 Answers at `/api/gateway/v1/cache-rules/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:862)
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Response: z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }) (inline, src/transport/gateway-platform.rest.ts:875)
 ```
 
 #### `GET /providers` · `getApiGatewayV1Providers`
 
 List provider bindings
 
-Permission `gatewayProviders:view`. Declared at `src/transport/gateway-platform.rest.ts:886`.
+Permission `gatewayProviders:view`. Declared at `src/transport/gateway-platform.rest.ts:899`.
 
 Answers at `/api/gateway/v1/providers`.
 
 ```typescript
-// Response: inline, src/transport/gateway-platform.rest.ts:888
+// Response: inline, src/transport/gateway-platform.rest.ts:901
 type Response = unknown;
 ```
 
@@ -1297,14 +1297,14 @@ type Response = unknown;
 
 Bind a model provider to the gateway
 
-Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:901`.
+Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:914`.
 
 Answers at `/api/gateway/v1/providers`.
 
 ```typescript
-// Body: gatewayRetiredProviderBindingBodySchema, ../contract/src/gateway-platform.schemas.ts:338
+// Body: gatewayRetiredProviderBindingBodySchema, ../contract/src/gateway-platform.schemas.ts:454
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/gateway-platform.rest.ts:904
+// Response: inline, src/transport/gateway-platform.rest.ts:918
 type Response = unknown;
 ```
 
@@ -1312,14 +1312,14 @@ type Response = unknown;
 
 Update provider binding
 
-Permission `gatewayProviders:update`. Declared at `src/transport/gateway-platform.rest.ts:917`.
+Permission `gatewayProviders:update`. Declared at `src/transport/gateway-platform.rest.ts:931`.
 
 Answers at `/api/gateway/v1/providers/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-type Body = z.infer<typeof gatewayRetiredProviderBindingBodySchema>; // ../contract/src/gateway-platform.schemas.ts:338
-// Response: inline, src/transport/gateway-platform.rest.ts:921
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+type Body = z.infer<typeof gatewayRetiredProviderBindingBodySchema>; // ../contract/src/gateway-platform.schemas.ts:454
+// Response: inline, src/transport/gateway-platform.rest.ts:936
 type Response = unknown;
 ```
 
@@ -1327,13 +1327,13 @@ type Response = unknown;
 
 Disable provider binding
 
-Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:933`.
+Permission `gatewayProviders:manage`. Declared at `src/transport/gateway-platform.rest.ts:948`.
 
 Answers at `/api/gateway/v1/providers/:id`.
 
 ```typescript
-type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:326
-// Response: inline, src/transport/gateway-platform.rest.ts:936
+type Params = z.infer<typeof gatewayIdParamsSchema>; // ../contract/src/gateway-platform.schemas.ts:422
+// Response: inline, src/transport/gateway-platform.rest.ts:952
 type Response = unknown;
 ```
 
@@ -1355,8 +1355,8 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/spend-summaries`.
 
 ```typescript
-type Query = z.infer<typeof gatewaySpendSummariesQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:319
-type Response = z.infer<typeof gatewaySpendSummariesPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:360
+type Query = z.infer<typeof gatewaySpendSummariesQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:399
+type Response = z.infer<typeof gatewaySpendSummariesPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:410
 ```
 
 #### `GET /api/gateway/v1/spend-events` · `listGatewaySpendEvents`
@@ -1368,8 +1368,8 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/spend-events`.
 
 ```typescript
-type Query = z.infer<typeof gatewaySpendEventsQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:135
-type Response = z.infer<typeof gatewaySpendEventsPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:367
+type Query = z.infer<typeof gatewaySpendEventsQuerySchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:153
+type Response = z.infer<typeof gatewaySpendEventsPageSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:422
 ```
 
 #### `GET /api/gateway/v1/end-users/:id/spend` · `getGatewayEndUserSpend`
@@ -1381,18 +1381,18 @@ Permission `gatewaySpend:view`. Entitlement `webhook_endpoints`. Declared at `sr
 Answers at `/api/gateway/v1/end-users/:id/spend`.
 
 ```typescript
-// Params: gatewayEndUserSpendParamsSchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:162
+// Params: gatewayEndUserSpendParamsSchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:178
 interface Params {
   id: string;
 }
-// Query: gatewayEndUserSpendQuerySchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:155
+// Query: gatewayEndUserSpendQuerySchema, ../contract/src/features/spend/gateway-spend-rest.schemas.ts:171
 interface Query {
   window?: "day" | "week" | "month";
   from?: number;
   to?: number;
   virtual_key_id?: string;
 }
-type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:373
+type Response = z.infer<typeof gatewayEndUserSpendResponseSchema>; // ../contract/src/features/spend/gateway-spend-rest.schemas.ts:430
 ```
 
 ## tRPC transport
@@ -1415,30 +1415,30 @@ Contract `../contract/src/features/budget/gateway-budget.trpc.ts:25`, router `sr
 
 ```typescript
 // gatewayBudgets.list
-// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/features/budget/gateway.budget.ts:452
+// Input: gatewayBudgetApiOrganizationInputSchema, ../contract/src/features/budget/gateway.budget.ts:483
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:173
+type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:203
 
 // gatewayBudgets.listForProject
-// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/features/budget/gateway.budget.ts:455
+// Input: gatewayBudgetApiProjectInputSchema, ../contract/src/features/budget/gateway.budget.ts:491
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:173
+type Output = z.infer<typeof gatewayBudgetListSchema>; // ../contract/src/gateway.responses.ts:203
 
 // gatewayBudgets.get
-// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/features/budget/gateway.budget.ts:458
+// Input: gatewayBudgetApiBudgetInputSchema, ../contract/src/features/budget/gateway.budget.ts:502
 interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayBudgetDetailSchema>; // ../contract/src/gateway.responses.ts:182
+type Output = z.infer<typeof gatewayBudgetDetailSchema>; // ../contract/src/gateway.responses.ts:229
 
 // gatewayBudgets.groupTargets
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:452
-// Output: gatewayBudgetGroupTargetsSchema, ../contract/src/gateway.responses.ts:203
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:483
+// Output: gatewayBudgetGroupTargetsSchema, ../contract/src/gateway.responses.ts:241
 type Output = {
   id: string;
   name: string;
@@ -1446,15 +1446,15 @@ type Output = {
 }[];
 
 // gatewayBudgets.personalBudget
-type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:452
-type Output = z.infer<typeof gatewayPersonalBudgetSchema>; // ../contract/src/gateway.responses.ts:326
+type Input = z.infer<typeof gatewayBudgetApiOrganizationInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:483
+type Output = z.infer<typeof gatewayPersonalBudgetSchema>; // ../contract/src/gateway.responses.ts:400
 
 // gatewayBudgets.create
-type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:463
-type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
+type Input = z.infer<typeof gatewayBudgetApiCreateInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:538
+type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.update
-// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/features/budget/gateway.budget.ts:494
+// Input: gatewayBudgetApiUpdateInputSchema, ../contract/src/features/budget/gateway.budget.ts:553
 interface Input {
   organizationId: string;
   id: string;
@@ -1464,21 +1464,21 @@ interface Input {
   onBreach?: "BLOCK" | "WARN";
   timezone?: string | null;
 }
-type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
+type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.archive
-type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:458
-type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
+type Input = z.infer<typeof gatewayBudgetApiBudgetInputSchema>; // ../contract/src/features/budget/gateway.budget.ts:502
+type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 
 // gatewayBudgets.reset
-// Input: gatewayBudgetApiResetInputSchema, ../contract/src/features/budget/gateway.budget.ts:504
+// Input: gatewayBudgetApiResetInputSchema, ../contract/src/features/budget/gateway.budget.ts:565
 interface Input {
   organizationId: string;
   id: string;
   endUserId?: string;
   reason?: string;
 }
-type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:209
+type Output = z.infer<typeof gatewayBudgetDtoResponseSchema>; // ../contract/src/gateway.responses.ts:244
 ```
 
 ### `gatewayCacheRules`
@@ -1507,19 +1507,19 @@ interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:109
+type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:147
 
 // gatewayCacheRules.create
 type Input = z.infer<typeof cacheRuleCreateInputSchema>; // ../contract/src/gateway-cache-rule.trpc.ts:19
-type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:109
+type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:147
 
 // gatewayCacheRules.update
 type Input = z.infer<typeof cacheRuleUpdateInputSchema>; // ../contract/src/gateway-cache-rule.trpc.ts:29
-type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:109
+type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:147
 
 // gatewayCacheRules.archive
 type Input = z.infer<typeof cacheRuleIdSchema>; // ../contract/src/gateway-cache-rule.trpc.ts:17
-type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:109
+type Output = z.infer<typeof gatewayCacheRuleDtoSchema>; // ../contract/src/gateway.responses.ts:147
 ```
 
 ### `gatewayGuardrails`
@@ -1560,7 +1560,7 @@ interface Input {
   direction: "PRE" | "POST" | "STREAM_CHUNK";
   failureMode?: "FAIL_OPEN" | "FAIL_CLOSED";
 }
-type Output = z.infer<typeof gatewayGuardrailResourceSchema>; // ../contract/src/gateway-guardrail.ts:23
+type Output = z.infer<typeof gatewayGuardrailResourceSchema>; // ../contract/src/gateway-guardrail.ts:42
 
 // gatewayGuardrails.update
 // Input: guardrailUpdateInputSchema, ../contract/src/gateway-guardrail.trpc.ts:28
@@ -1573,7 +1573,7 @@ interface Input {
   direction?: "PRE" | "POST" | "STREAM_CHUNK";
   failureMode?: "FAIL_OPEN" | "FAIL_CLOSED";
 }
-type Output = z.infer<typeof gatewayGuardrailResourceSchema>; // ../contract/src/gateway-guardrail.ts:23
+type Output = z.infer<typeof gatewayGuardrailResourceSchema>; // ../contract/src/gateway-guardrail.ts:42
 
 // gatewayGuardrails.archive
 type Input = z.infer<typeof guardrailIdSchema>; // ../contract/src/gateway-guardrail.trpc.ts:17
@@ -1594,7 +1594,7 @@ Contract `../contract/src/features/spend/gateway-spend-event.trpc.ts:30`, router
 ```typescript
 // gatewaySpendEvents.list
 type Input = z.infer<typeof listInputSchema>; // ../contract/src/features/spend/gateway-spend-event.trpc.ts:12
-type Output = z.infer<typeof gatewaySpendEventPageSchema>; // ../contract/src/gateway.responses.ts:249
+type Output = z.infer<typeof gatewaySpendEventPageSchema>; // ../contract/src/gateway.responses.ts:304
 ```
 
 ### `gatewayUsage`
@@ -1614,7 +1614,7 @@ interface Input {
   fromDate: string;
   toDate: string;
 }
-type Output = z.infer<typeof gatewayUsageSummarySchema>; // ../contract/src/gateway.responses.ts:270
+type Output = z.infer<typeof gatewayUsageSummarySchema>; // ../contract/src/gateway.responses.ts:340
 
 // gatewayUsage.summaryForVirtualKey
 // Input: usageSummaryForVirtualKeyInputSchema, ../contract/src/gateway-usage.trpc.ts:21
@@ -1625,7 +1625,7 @@ interface Input {
   toDate: string;
   model?: string;
 }
-type Output = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>; // ../contract/src/gateway.responses.ts:294
+type Output = z.infer<typeof gatewayVirtualKeyUsageSummarySchema>; // ../contract/src/gateway.responses.ts:373
 ```
 
 ### `virtualKeys`
@@ -1647,23 +1647,23 @@ Contract `../contract/src/virtual-key.trpc.ts:24`, router `src/transport/virtual
 
 ```typescript
 // virtualKeys.list
-// Input: virtualKeyApiOrganizationInputSchema, ../contract/src/virtual-key.schemas.ts:23
+// Input: virtualKeyApiOrganizationInputSchema, ../contract/src/virtual-key.schemas.ts:34
 interface Input {
   organizationId: string;
 }
 // Output: virtualKeyCamelDtoSchema.array() (inline, ../contract/src/virtual-key.trpc.ts:27)
 
 // virtualKeys.get
-// Input: virtualKeyApiKeyInputSchema, ../contract/src/virtual-key.schemas.ts:26
+// Input: virtualKeyApiKeyInputSchema, ../contract/src/virtual-key.schemas.ts:45
 interface Input {
   organizationId: string;
   id: string;
 }
-type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:18
+type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:53
 
 // virtualKeys.spendThisMonth
-type Input = z.infer<typeof virtualKeyApiOrganizationInputSchema>; // ../contract/src/virtual-key.schemas.ts:23
-// Output: virtualKeySpendThisMonthSchema, ../contract/src/gateway.responses.ts:62
+type Input = z.infer<typeof virtualKeyApiOrganizationInputSchema>; // ../contract/src/virtual-key.schemas.ts:34
+// Output: virtualKeySpendThisMonthSchema, ../contract/src/gateway.responses.ts:92
 type Output = {
   virtualKeyId: string;
   spentUsd: string;
@@ -1678,7 +1678,7 @@ type Output = {
 }[];
 
 // virtualKeys.applicableBudgets
-// Input: virtualKeyApiApplicableBudgetsInputSchema, ../contract/src/virtual-key.schemas.ts:42
+// Input: virtualKeyApiApplicableBudgetsInputSchema, ../contract/src/virtual-key.schemas.ts:74
 interface Input {
   organizationId: string;
   virtualKeyId?: string | null;
@@ -1689,36 +1689,36 @@ interface Input {
   traceProjectId?: string | null;
   principalUserId?: string | null;
 }
-type Output = z.infer<typeof virtualKeyApplicableBudgetsSchema>; // ../contract/src/gateway.responses.ts:83
+type Output = z.infer<typeof virtualKeyApplicableBudgetsSchema>; // ../contract/src/gateway.responses.ts:119
 
 // virtualKeys.create
-type Input = z.infer<typeof virtualKeyApiCreateInputSchema>; // ../contract/src/virtual-key.schemas.ts:74
-type Output = z.infer<typeof virtualKeyMintedSchema>; // ../contract/src/gateway.responses.ts:51
+type Input = z.infer<typeof virtualKeyApiCreateInputSchema>; // ../contract/src/virtual-key.schemas.ts:125
+type Output = z.infer<typeof virtualKeyMintedSchema>; // ../contract/src/gateway.responses.ts:66
 
 // virtualKeys.update
-type Input = z.infer<typeof virtualKeyApiUpdateInputSchema>; // ../contract/src/virtual-key.schemas.ts:92
-type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:18
+type Input = z.infer<typeof virtualKeyApiUpdateInputSchema>; // ../contract/src/virtual-key.schemas.ts:146
+type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:53
 
 // virtualKeys.rotate
-type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:26
-type Output = z.infer<typeof virtualKeyMintedSchema>; // ../contract/src/gateway.responses.ts:51
+type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:45
+type Output = z.infer<typeof virtualKeyMintedSchema>; // ../contract/src/gateway.responses.ts:66
 
 // virtualKeys.revoke
-type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:26
-type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:18
+type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:45
+type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:53
 
 // virtualKeys.disable
-// Input: virtualKeyApiDisableInputSchema, ../contract/src/virtual-key.schemas.ts:32
+// Input: virtualKeyApiDisableInputSchema, ../contract/src/virtual-key.schemas.ts:56
 interface Input {
   organizationId: string;
   id: string;
   reason?: string;
 }
-type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:18
+type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:53
 
 // virtualKeys.enable
-type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:26
-type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:18
+type Input = z.infer<typeof virtualKeyApiKeyInputSchema>; // ../contract/src/virtual-key.schemas.ts:45
+type Output = z.infer<typeof virtualKeyCamelDtoSchema>; // ../contract/src/gateway.responses.ts:53
 ```
 
 ## Sockets
@@ -1804,14 +1804,14 @@ Run by the tasks process, before serve.
 | secret | `internalSecret`              | `LW_GATEWAY_INTERNAL_SECRET`            | `src/app/gateway.app.ts:1151`          |
 | secret | `jwtSecret`                   | `LW_GATEWAY_JWT_SECRET`                 | `src/app/gateway.app.ts:1152`          |
 | secret | `virtualKeyPepper`            | `LW_VIRTUAL_KEY_PEPPER`                 | `src/app/gateway.app.ts:1153`          |
-| config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:26` |
-| config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:28` |
-| config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:30` |
-| config | `publicBaseUrl`               | `BASE_HOST`                             | `../contract/src/gateway.config.ts:32` |
-| config | `baseUrl`                     | `LW_GATEWAY_BASE_URL`                   | `../contract/src/gateway.config.ts:34` |
-| config | `publicUrl`                   | `LW_GATEWAY_PUBLIC_URL`                 | `../contract/src/gateway.config.ts:36` |
-| config | `isSaas`                      | `IS_SAAS`                               | `../contract/src/gateway.config.ts:38` |
-| config | `allowLoopbackVoiceProviders` | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS` | `../contract/src/gateway.config.ts:40` |
-| config | `foldCacheTtlSeconds`         | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`      | `../contract/src/gateway.config.ts:41` |
+| config | `spendSettlementGraceMs`      | `LW_SPEND_SETTLEMENT_GRACE_MS`          | `../contract/src/gateway.config.ts:27` |
+| config | `internalUrl`                 | `LW_GATEWAY_INTERNAL_URL`               | `../contract/src/gateway.config.ts:29` |
+| config | `controlPlaneUrl`             | `GATEWAY_CONTROL_PLANE_URL`             | `../contract/src/gateway.config.ts:31` |
+| config | `publicBaseUrl`               | `BASE_HOST`                             | `../contract/src/gateway.config.ts:33` |
+| config | `baseUrl`                     | `LW_GATEWAY_BASE_URL`                   | `../contract/src/gateway.config.ts:35` |
+| config | `publicUrl`                   | `LW_GATEWAY_PUBLIC_URL`                 | `../contract/src/gateway.config.ts:37` |
+| config | `isSaas`                      | `IS_SAAS`                               | `../contract/src/gateway.config.ts:39` |
+| config | `allowLoopbackVoiceProviders` | `VOICE_UNSAFE_ALLOW_LOOPBACK_PROVIDERS` | `../contract/src/gateway.config.ts:41` |
+| config | `foldCacheTtlSeconds`         | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`      | `../contract/src/gateway.config.ts:42` |
 
 <!-- readme:generated:end -->

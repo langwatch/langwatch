@@ -22,8 +22,6 @@ type TaskRun = (input: TaskInput) => Promise<void>;
 
 // Each task loads its own graph when it runs, so a seed never pays for the migration pass.
 const tasks = new Map<string, () => Promise<TaskRun>>([
-  ["prisma-migrate", async () => (await import("./prisma-migrate.ts")).prismaMigrate],
-  ["clickhouse-migrate", async () => (await import("./clickhouse-migrate.ts")).clickhouseMigrate],
   ["lwql-provision", async () => (await import("./lwql-provision.ts")).lwqlProvision],
   [
     "lwql-render-access-config",
@@ -34,12 +32,22 @@ const tasks = new Map<string, () => Promise<TaskRun>>([
     async () => (await import("./system-migrations-pass.ts")).systemMigrationsPass,
   ],
   ["storage-seed", async () => (await import("./storage-seed/storage-seed.ts")).storageSeed],
+  [
+    "dashboards-demo-seed",
+    async () => (await import("./storage-seed/seed-dashboards-demo.ts")).seedDashboardsDemo,
+  ],
   ["upgrade-ledger-seed", async () => (await import("./upgrade-ledger-seed.ts")).upgradeLedgerSeed],
   ["upgrade", async () => (await import("./upgrade.ts")).upgrade],
 ]);
 
 /** Tasks that take no upgrade lease here: their own leases, or no database at all. */
-const LOCK_FREE_TASKS = new Set(["system-migrations-pass", "lwql-render-access-config", "upgrade"]);
+const LOCK_FREE_TASKS = new Set([
+  "system-migrations-pass",
+  "lwql-render-access-config",
+  "upgrade",
+  // Minutes of HTTP to a running stack; its upserts need no lease against itself.
+  "dashboards-demo-seed",
+]);
 
 /** Unknown names, or `upgrade` beside a leased task, which would wait on its own lease. */
 function refuseUnrunnable(argv: readonly string[]): void {
@@ -104,7 +112,11 @@ async function openConnections({
     url === undefined ? null : openTasksDatabase(url, config),
   );
   const redis = await secrets.into(tasksSecrets.redisUrl, (url) =>
-    url === undefined ? null : new RedisConnectionService().connect({ url }),
+    secrets.into(tasksSecrets.redisClusterEndpoints, (clusterEndpoints) =>
+      url === undefined && clusterEndpoints === undefined
+        ? null
+        : new RedisConnectionService().connect({ url, clusterEndpoints }),
+    ),
   );
 
   resolver.seal();

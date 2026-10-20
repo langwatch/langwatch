@@ -31,6 +31,7 @@ import {
   type InstantEvalClassifierLimits,
   type InstantEvalJudgement,
   type InstantEvalQuestion,
+  isLangWatchJudgeHost,
 } from "@langwatch/instant-eval-judge-contract";
 import { OrganizationApi } from "@langwatch/organization-contract";
 import type { FeatureSetup } from "@langwatch/process";
@@ -59,6 +60,7 @@ import {
 import {
   type InstantEvalJudgeKind,
   instantEvalJudgeKind,
+  isInstantEvalJudgedThroughConnect,
   instantEvalJudgeRoute,
   isInstantEvalJudgeChosenOnFirstCall,
 } from "../rules/instant-eval-judge-choice.rules.ts";
@@ -202,20 +204,20 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     const access = InstantEvalAccessService.create({
       flags: setup.dependencies.featureFlags,
       projects,
-      // Off cloud the judge never holds a key (ADR-174 d. 14): the key-less kind is exact.
-      judgesThroughConnect:
-        !setup.config.isSaas &&
-        instantEvalJudgeKind({
-          classifier: setup.config.classifier,
-          hasCloudKey: false,
-          isProduction: setup.config.nodeEnvironment === "production",
-        }) === "connect",
+      judgesThroughConnect: isInstantEvalJudgedThroughConnect({
+        classifier: setup.config.classifier,
+        isLangWatchHost: isLangWatchJudgeHost(setup.config),
+        isProduction: setup.config.nodeEnvironment === "production",
+      }),
       optIns: {
         isOptedIn: (organizationId) =>
           setup.dependencies.organizations.isInstantEvalsOptedIn({ organizationId }),
       },
       isJudgeConfigured: () => setup.config.classifier !== "null",
       judge,
+      hostedPlans: setup.config.isSaas
+        ? { isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup) }
+        : null,
     });
     const optIns = InstantEvalModule.optInsOf({ setup, access });
     const reads = InstantEvalReadsService.create({
@@ -223,11 +225,15 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
       judgments: repositories.judgments,
     });
     const dispatcher = InstantEvalCommandDispatcherService.create();
-    const rowSource = InstantEvalRowSourceService.create({ analytics });
-    // The extraction half of a judged plan, which is Analytics' own: this
-    // module judges the texts it answers with and never the rows behind them.
+    const rowSource = InstantEvalRowSourceService.create({ analytics, access });
+    // The extraction half of a judged plan, which is Analytics' own: this module judges the
+    // texts it answers with, and states the eval gate Analytics takes from its caller.
     const textSource: InstantEvalTextSource = {
-      texts: (input) => analytics.hydrateLangWatchQLTexts(input),
+      texts: async (input) =>
+        analytics.hydrateLangWatchQLTexts({
+          ...input,
+          isInstantEvalsEnabled: await access.isEnabled({ projectId: input.project.id }),
+        }),
     };
     const cancellations = repositories.cancellations;
     // A hold one process keeps to itself admits the same organization's runs
@@ -373,6 +379,15 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     });
   }
 
+  /** The plan's tier, which on the hosted service decides both the offer and what releases. */
+  private static isEnterprisePlanOf(
+    setup: InstantEvalSetup,
+  ): (organizationId: string) => Promise<boolean> {
+    const { plans } = setup.dependencies;
+    return async (organizationId) =>
+      isEnterpriseTier((await plans.getActivePlan({ organizationId })).type);
+  }
+
   /** The offer and the switch, each peer narrowed to the one question it answers. */
   private static optInsOf({
     setup,
@@ -381,7 +396,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
     setup: InstantEvalSetup;
     access: InstantEvalAccessService;
   }): InstantEvalOptInService {
-    const { plans, organizations, authz } = setup.dependencies;
+    const { organizations, authz } = setup.dependencies;
     const { projects, licensing } = setup.channels;
 
     return InstantEvalOptInService.create({
@@ -398,8 +413,7 @@ export class InstantEvalModule implements InstantEvalApiContract, InstantEvalBro
         },
         licenseStateOf: (organizationId) =>
           licensing.getConnectServiceState({ organizationId, service: "instant_evals" }),
-        isEnterprisePlan: async (organizationId) =>
-          isEnterpriseTier((await plans.getActivePlan({ organizationId })).type),
+        isEnterprisePlan: InstantEvalModule.isEnterprisePlanOf(setup),
         mayManageOrganization: ({ userId, organizationId }) =>
           authz.can({
             principal: { type: "user", id: userId },

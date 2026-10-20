@@ -47,6 +47,20 @@ export function parseQuery(query: Readonly<Record<string, string | undefined>>) 
   return qs.parse(encoded.replaceAll("%2C", ","), URL_QS_PARSE_OPTIONS);
 }
 
+/**
+ * The Explorer's own rule: Langy's turns stay out unless the query names `origin`, except in a
+ * personal project, the one place Langy's traces show.
+ */
+function analyticsHiddenOrigins({
+  query,
+  isPersonalProject,
+}: {
+  query: string | undefined;
+  isPersonalProject: boolean;
+}): string[] {
+  return isPersonalProject ? [] : explorerHiddenOrigins(query);
+}
+
 export function useFilterParams() {
   const host = useAnalyticsHost();
   const project = host.project();
@@ -143,13 +157,16 @@ export function useFilterParams() {
       startDate: startDate.epochMilliseconds,
       endDate: endDate.epochMilliseconds,
       filters,
-      // The Explorer's own rule: Langy's turns stay out unless the query names `origin`.
-      excludeOrigins: explorerHiddenOrigins(query.query),
+      excludeOrigins: analyticsHiddenOrigins({
+        query: query.query,
+        isPersonalProject: project?.isPersonal === true,
+      }),
       ...(typeof queryParams.query === "string" ? { query: queryParams.query } : {}),
       ...(queryParams.negateFilters === "true" ? { negateFilters: true } : {}),
     }),
     [
       project?.id,
+      project?.isPersonal,
       startDate,
       endDate,
       filters,

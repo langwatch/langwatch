@@ -6,7 +6,7 @@
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { renderWithOpsHost } from "../../../testing.tsx";
+import { fakeOpsHost, renderWithOpsHost } from "../../../testing.tsx";
 import { useAdminOne } from "../behavior/use-admin-resource.ts";
 import SsoConnectionsView from "../ui/sections/sso-connections-view.tsx";
 
@@ -323,8 +323,11 @@ describe("the admin single sign-on list", () => {
         target: { value: "   " },
       });
 
-      expect(confirmButton().hasAttribute("disabled")).toBe(true);
+      expect(confirmButton().hasAttribute("disabled")).toBe(false);
       fireEvent.click(confirmButton());
+      expect(
+        await screen.findByText("Explain why this evidence proves domain control."),
+      ).toBeTruthy();
       expect(mutations.attestDomain).not.toHaveBeenCalled();
     });
   });
@@ -486,6 +489,53 @@ describe("the admin single sign-on list", () => {
       expect(domains.queryByText(/user_olive|Olive Admin/)).toBeNull();
     });
 
+    it("tells the operator what to do when nothing has happened and nothing is proved", async () => {
+      byIdState.current = { data: { ...ATTESTED, domainVerifications: [] }, error: null };
+      renderView();
+
+      expect(
+        await screen.findByText(
+          "Nothing has happened to this connection yet. Review the connection details above; future setup and status changes will appear here.",
+        ),
+      ).toBeTruthy();
+      expect(
+        screen.getByText(
+          "No domain has been proved yet. Ask the organization administrator to add and verify a domain in single sign-on setup.",
+        ),
+      ).toBeTruthy();
+    });
+
+    it.each([
+      [
+        { claimedDomains: ["claimed.example"], approvedDomains: [] },
+        "No domain has been proved yet. Review the pending domain claims below before approving them.",
+      ],
+      [
+        { claimedDomains: [], approvedDomains: ["approved.example"] },
+        "No domain has been proved yet. Ask the organization administrator to complete verification for the approved domains.",
+      ],
+      [
+        { claimedDomains: ["claimed.example"], approvedDomains: ["approved.example"] },
+        "No domain has been proved yet. Review the pending domain claims below before approving them. Ask the organization administrator to complete verification for the approved domains.",
+      ],
+    ])("names the next step for claimed and approved domains %#", async (domains, sentence) => {
+      byIdState.current = {
+        data: { ...ATTESTED, ...domains, domainVerifications: [] },
+        error: null,
+      };
+      renderView();
+
+      expect(await screen.findByText(sentence)).toBeTruthy();
+    });
+
+    it("keeps loading and failure apart from the empty history instruction", async () => {
+      historyState.current = { data: [], isLoading: true, error: null };
+      renderView();
+      await screen.findByRole("region", { name: "History" });
+
+      expect(screen.queryByText(/Nothing has happened to this connection yet/)).toBeNull();
+    });
+
     /** @scenario "A failed history read is distinct from an empty history" */
     it("reports a failed history read without claiming the history is empty", async () => {
       historyState.current.error = new Error("History read failed");
@@ -493,7 +543,7 @@ describe("the admin single sign-on list", () => {
       expect(
         await screen.findByText("This connection’s history could not be loaded."),
       ).toBeTruthy();
-      expect(screen.queryByText("Nothing has happened to this connection yet.")).toBeNull();
+      expect(screen.queryByText(/Nothing has happened to this connection yet/)).toBeNull();
     });
 
     it("says who a newcomer signing in becomes, in the customer's own words", async () => {
@@ -560,6 +610,28 @@ describe("the admin single sign-on list", () => {
 
       await waitFor(() => {
         expect(screen.getByText(/No replacement is registered/)).toBeTruthy();
+      });
+    });
+
+    /** @scenario "The back office imports a replacement for a carried-over connection" */
+    it("draws the import sso lends, for that organization and connection", async () => {
+      byIdState.current = {
+        data: { ...ATTESTED, source: "legacy-grandfathered" },
+        error: null,
+      };
+      const LentImport = ({
+        organizationId,
+        replacesConnectionId,
+      }: {
+        organizationId: string;
+        replacesConnectionId: string;
+      }) => <div data-testid="lent-import">{`${organizationId}:${replacesConnectionId}`}</div>;
+      renderWithOpsHost(<SsoConnectionsView />, {
+        host: fakeOpsHost({ ssoReplacementImport: LentImport }),
+      });
+
+      await waitFor(() => {
+        expect(screen.getByTestId("lent-import").textContent).toBe("org_acme:ssoc_1");
       });
     });
   });

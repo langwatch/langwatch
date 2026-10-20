@@ -1,5 +1,6 @@
+import { BrandedCard, BrandedCardPage } from "@langwatch/design-system/branded-card";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Box, Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { Button, Text } from "@langwatch/design-system/primitives";
 import type { JoinOfferProps } from "@langwatch/organization-client";
 import type { ReactNode } from "react";
 
@@ -59,7 +60,7 @@ export function JoinYourTeamTakeover({
         intro="Your colleagues are already here, and this organization lets people on your domain straight in."
         testId="join-team-admitting"
       >
-        <Text fontSize="13px" color="fg.muted" textAlign="center">
+        <Text textStyle="bodySm" color="fg.muted" textAlign="center">
           One moment.
         </Text>
       </Takeover>
@@ -69,7 +70,7 @@ export function JoinYourTeamTakeover({
   if (view.kind === "waiting") {
     return (
       <Takeover title="Waiting for an administrator" testId="join-team-waiting">
-        <Text fontSize="14px" lineHeight="1.65" color="fg.muted" textAlign="center">
+        <Text textStyle="body" color="fg.muted" textAlign="center">
           {view.organizationName === null
             ? "Your request to join is with the administrators."
             : `Your request to join ${view.organizationName} is with their administrators.`}{" "}
@@ -114,7 +115,7 @@ export function JoinYourTeamTakeover({
       >
         {dismissLabel}
       </Button>
-      <Text fontSize="12.5px" color="fg.subtle" textAlign="center">
+      <Text textStyle="bodySm" color="fg.subtle" textAlign="center">
         We will not ask about this domain again.
       </Text>
     </Takeover>
@@ -123,7 +124,8 @@ export function JoinYourTeamTakeover({
 
 /**
  * A cover that a backdrop click cannot dismiss: "not now" is right there, and a
- * stray click is not an answer — treating it as one asks them again tomorrow.
+ * stray click is not an answer. Inside it, the branded page and card every
+ * standalone page uses.
  */
 function Takeover({
   title,
@@ -145,27 +147,18 @@ function Takeover({
       closeOnEscape={false}
       onOpenChange={() => void 0}
     >
-      <Dialog.Content data-testid={testId} borderRadius={0}>
-        <Dialog.Body display="flex" alignItems="center" justifyContent="center" padding={6}>
-          <VStack width="full" maxWidth="420px" align="stretch" gap="18px">
-            <Box>
-              <Dialog.Title
-                fontSize="22px"
-                fontWeight={600}
-                letterSpacing="-0.01em"
-                textAlign="center"
-              >
-                {title}
-              </Dialog.Title>
-              {intro !== undefined && (
-                <Text fontSize="14px" color="fg.muted" textAlign="center" paddingTop="6px">
-                  {intro}
-                </Text>
-              )}
-            </Box>
+      <Dialog.Content
+        data-testid={testId}
+        aria-label={title}
+        borderRadius={0}
+        padding={0}
+        overflowY="auto"
+      >
+        <BrandedCardPage>
+          <BrandedCard title={title} intro={intro}>
             {children}
-          </VStack>
-        </Dialog.Body>
+          </BrandedCard>
+        </BrandedCardPage>
       </Dialog.Content>
     </Dialog.Root>
   );

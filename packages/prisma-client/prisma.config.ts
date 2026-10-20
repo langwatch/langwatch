@@ -1,7 +1,7 @@
 import { defineConfig } from "prisma/config";
 
-// Generation needs no database. Migration callers supply a database URL to
-// PrismaMigrationService instead of making this package read process.env.
+// Generation needs no database. An operator's `prisma migrate resolve` here, as a failed
+// upgrade names it, needs DATABASE_URL: attached only when set, as apps/tasks/prisma.config.ts.
 export default defineConfig({
   schema: "prisma/schema.prisma",
   migrations: {
@@ -10,4 +10,5 @@ export default defineConfig({
     // loads the repository-root .env itself.
     seed: "pnpm --filter @langwatch/tasks task storage-seed",
   },
+  ...(process.env.DATABASE_URL ? { datasource: { url: process.env.DATABASE_URL } } : {}),
 });

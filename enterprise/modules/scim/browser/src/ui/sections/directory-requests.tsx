@@ -1,13 +1,4 @@
-import {
-  Alert,
-  Badge,
-  Button,
-  Heading,
-  HStack,
-  Skeleton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * What the identity provider asked us, and what we answered (ADR-126).
@@ -17,7 +8,16 @@ import {
  * nothing and appears nowhere else, and that refusal is the whole of what
  * somebody who has just pasted a token needs to read.
  */
-import { readableDate } from "@langwatch/time";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
+import {
+  Badge,
+  Button,
+  Heading,
+  HStack,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useState } from "react";
 
@@ -62,7 +62,7 @@ export function DirectoryRequests({
       </Button>
       {open && (
         <>
-          <Heading size="md">Requests from your identity provider</Heading>
+          <Heading size="sm">Requests from your identity provider</Heading>
           {connections.map((connection) => (
             <ConnectionRequests
               key={connection.connectionId}
@@ -107,12 +107,7 @@ function ConnectionRequests({
           empty state below would deny a push to the one reader trying to
           establish whether their provider reached us at all. */}
       {requests.isError && (
-        <Alert.Root status="warning">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Title>We could not read what your identity provider has sent</Alert.Title>
-          </Alert.Content>
-        </Alert.Root>
+        <Banner status="warning">We could not read what your identity provider has sent</Banner>
       )}
 
       {!requests.isLoading && !requests.isError && rows.length === 0 && (
@@ -150,7 +145,7 @@ function RequestRow({ request }: { request: ScimRequestRow }) {
   return (
     <HStack gap={3} align="start" fontSize="xs">
       <Text color="fg.muted" minWidth="14ch">
-        {readableDate(request.occurredAt).toLocaleString()}
+        {<FormattedDate value={request.occurredAt} display="datetime" />}
       </Text>
       <Text minWidth="18ch">
         {request.method} {resourceInWords(request.resource)}

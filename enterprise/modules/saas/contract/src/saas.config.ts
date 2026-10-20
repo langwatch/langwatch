@@ -20,8 +20,6 @@ export const saasConfig = Config.define((c) => ({
   latestRelease: c.env("LANGWATCH_LATEST_RELEASE", releaseName),
   /** The commit that release was built from: a release is one identity only with its commit. */
   latestReleaseCommit: c.env("LANGWATCH_LATEST_RELEASE_COMMIT", commitHash),
-  /** The oldest release an install may run, named in the same answer; unset names none. */
-  releaseFloor: c.env("LANGWATCH_RELEASE_FLOOR", releaseName),
 }));
 
 export type SaasServerConfig = ConfigOf<typeof saasConfig>;

@@ -1,48 +1,60 @@
-import { LANGY_CONVERSATION_EVENT_TYPES } from "@langwatch/langy-contract";
+import {
+  LANGY_CONVERSATION_TURN_STATUS,
+  LangyConversationNotFoundError,
+  type LangyConversationTurnData,
+  type LangyTurnToolCall,
+} from "@langwatch/langy-contract";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const mockGetEventsAfter = vi.fn();
+import { LangyTurnSettlementWaiterService } from "../langy-turn-settlement-waiter.service.ts";
+
+const mockFindTurn = vi.fn();
 const mockDisconnect = vi.fn();
 const mockReadTail = vi.fn();
 const mockFollow = vi.fn();
 
-const { LangyTurnSettlementWaiterService } =
-  await import("../langy-turn-settlement-waiter.service.ts");
 const awaitTurnSettlement: ReturnType<
   typeof LangyTurnSettlementWaiterService.create
 >["awaitTurnSettlement"] = (input) =>
   LangyTurnSettlementWaiterService.create().awaitTurnSettlement(input);
 
-const emptyPage = {
-  events: [],
-  cursor: { acceptedAt: 0, eventId: "" },
-  truncated: false,
-};
+function turn(overrides: Partial<LangyConversationTurnData> = {}): LangyConversationTurnData {
+  return {
+    ConversationId: "conv-1",
+    TurnId: "turn-1",
+    Status: LANGY_CONVERSATION_TURN_STATUS.RUNNING,
+    QuestionParts: [],
+    AnswerParts: [],
+    ToolCalls: [],
+    Plan: null,
+    Error: null,
+    StartedAt: 1,
+    EndedAt: null,
+    CreatedAt: 1,
+    UpdatedAt: 1,
+    LastEventOccurredAt: 1,
+    ...overrides,
+  };
+}
 
-const settledPage = {
-  events: [
-    {
-      id: "evt-1",
-      createdAt: 1,
-      occurredAt: 1,
-      type: LANGY_CONVERSATION_EVENT_TYPES.AGENT_RESPONDED,
-      data: {
-        conversationId: "conv-1",
-        turnId: "turn-1",
-        messageId: "msg-1",
-        role: "assistant",
-        parts: [{ type: "text", text: "from the fold" }],
-        outcome: "completed",
-        error: null,
-      },
-    },
-  ],
-  cursor: { acceptedAt: 1, eventId: "evt-1" },
-  truncated: false,
+const runningTurn = turn();
+const completedTurn = turn({
+  Status: LANGY_CONVERSATION_TURN_STATUS.COMPLETED,
+  AnswerParts: [{ type: "text", text: "from the projection" }],
+  EndedAt: 2,
+});
+
+const settledAnswer = {
+  succeeded: true,
+  outcome: "completed",
+  text: "from the projection",
+  messageId: "langymsg_turn-turn-1",
+  parts: [{ type: "text", text: "from the projection" }],
+  error: null,
 };
 
 const args = {
-  langy: { getEventsAfter: mockGetEventsAfter },
+  langy: { findTurn: mockFindTurn },
   openBuffer: () => ({
     buffer: { readTail: mockReadTail, follow: mockFollow } as never,
     release: mockDisconnect,
@@ -59,8 +71,9 @@ describe("awaitTurnSettlement", () => {
     mockReadTail.mockResolvedValue({ reads: [], lastId: "0" });
   });
 
-  it("uses a buffered terminal only to accelerate the durable fold", async () => {
-    mockGetEventsAfter.mockResolvedValueOnce(emptyPage).mockResolvedValue(settledPage);
+  /** @scenario "A held turn settles from the turn-state projection" */
+  it("settles from the turn projection once it records the reply", async () => {
+    mockFindTurn.mockResolvedValueOnce([runningTurn]).mockResolvedValue([completedTurn]);
     mockFollow.mockImplementation(async function* () {
       yield { id: "1-1", entry: { type: "end" } };
     });
@@ -73,17 +86,37 @@ describe("awaitTurnSettlement", () => {
 
     expect(settlement).toEqual({
       kind: "settled",
-      settlement: { succeeded: true, outcome: "completed", text: "from the fold", error: null },
+      settlement: settledAnswer,
     });
     expect(mockDisconnect).toHaveBeenCalled();
   });
 
-  it("settles from a terminal already in the buffer", async () => {
-    mockReadTail.mockResolvedValue({
-      reads: [{ id: "1-1", entry: { type: "end" } }],
-      lastId: "1-1",
+  /** @scenario "A settled turn answers its message id and parts" */
+  it("hands back the answer's message id and its parts beside its text", async () => {
+    mockFindTurn.mockResolvedValue([completedTurn]);
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
     });
-    mockGetEventsAfter.mockResolvedValue(settledPage);
+
+    expect(settlement).toEqual({
+      kind: "settled",
+      settlement: {
+        succeeded: true,
+        outcome: "completed",
+        text: "from the projection",
+        messageId: "langymsg_turn-turn-1",
+        parts: [{ type: "text", text: "from the projection" }],
+        error: null,
+      },
+    });
+  });
+
+  /** @scenario "A wait is satisfied only by the turn this request started" */
+  it("reads only the turn this request started, keeping waiting until it settles", async () => {
+    mockFindTurn.mockResolvedValueOnce([]).mockResolvedValue([completedTurn]);
 
     const settlement = await awaitTurnSettlement({
       ...args,
@@ -92,10 +125,33 @@ describe("awaitTurnSettlement", () => {
     });
 
     expect(settlement).toMatchObject({ kind: "settled", settlement: { succeeded: true } });
+    expect(mockFindTurn).toHaveBeenCalledWith({
+      projectId: "project-1",
+      conversationId: "conv-1",
+      turnId: "turn-1",
+      userId: "user-1",
+    });
   });
 
-  it("returns null on abort without treating an ended follow as a terminal", async () => {
-    mockGetEventsAfter.mockResolvedValue(emptyPage);
+  it("answers a failed turn with its error", async () => {
+    mockFindTurn.mockResolvedValue([
+      turn({ Status: LANGY_CONVERSATION_TURN_STATUS.FAILED, Error: "agent unreachable" }),
+    ]);
+
+    const settlement = await awaitTurnSettlement({
+      ...args,
+      signal: AbortSignal.timeout(5_000),
+      pollIntervalMs: 5,
+    });
+
+    expect(settlement).toEqual({
+      kind: "settled",
+      settlement: { succeeded: false, outcome: "failed", text: null, error: "agent unreachable" },
+    });
+  });
+
+  it("stops on abort, and an unseen conversation never settles", async () => {
+    mockFindTurn.mockRejectedValue(new LangyConversationNotFoundError("conv-1"));
     mockFollow.mockImplementation(async function* (input: { signal: AbortSignal }) {
       await new Promise((resolve) =>
         input.signal.addEventListener("abort", resolve, { once: true }),
@@ -112,67 +168,39 @@ describe("awaitTurnSettlement", () => {
     expect(settlement).toEqual({ kind: "stopped" });
     expect(mockDisconnect).toHaveBeenCalled();
   });
-
-  /** @scenario "A wait is satisfied only by the turn this request started" */
-  it("keeps waiting past another turn's settlement until its own turn settles", async () => {
-    const otherTurnPage = {
-      ...settledPage,
-      events: [
-        {
-          ...settledPage.events[0],
-          id: "evt-0",
-          data: {
-            ...settledPage.events[0]!.data,
-            turnId: "turn-2",
-            parts: [{ type: "text", text: "not mine" }],
-          },
-        },
-      ],
-    };
-    mockGetEventsAfter.mockResolvedValueOnce(otherTurnPage).mockResolvedValue(settledPage);
-    mockFollow.mockImplementation(async function* () {
-      yield { id: "1-1", entry: { type: "end" } };
-    });
-
-    const settlement = await awaitTurnSettlement({
-      ...args,
-      signal: AbortSignal.timeout(5_000),
-      pollIntervalMs: 5,
-    });
-
-    expect(settlement).toMatchObject({ kind: "settled", settlement: { text: "from the fold" } });
-    expect(mockGetEventsAfter.mock.calls.length).toBeGreaterThan(1);
-  });
 });
 
 describe("awaitTurnSettlement (user wait)", () => {
-  const userWaitEvent = {
-    id: "evt-wait",
-    createdAt: 1,
-    occurredAt: 1,
-    type: LANGY_CONVERSATION_EVENT_TYPES.USER_WAIT_STARTED,
-    data: {
-      conversationId: "conv-1",
-      turnId: "turn-1",
+  const waitingCall: LangyTurnToolCall = {
+    toolCallId: "call-1",
+    toolName: "question",
+    status: "initiated",
+    wait: {
       waitId: "wait-1",
       kind: "question",
+      status: "pending",
       expiresAt: 600_000,
+      callId: null,
+      summary: null,
+      pattern: null,
+      patterns: [],
+      reason: null,
+      timeoutSeconds: null,
+      skipOffered: false,
+      workspaceName: null,
+      hostname: null,
       questions: [
         { question: "What would you like to do?", options: [] },
         { question: "Which project?", options: [] },
       ],
+      decision: null,
+      source: null,
+      answers: null,
+      answeredBy: null,
+      answeredAt: null,
     },
   };
-  const otherTurnWaitEvent = {
-    ...userWaitEvent,
-    id: "evt-wait-other",
-    data: { ...userWaitEvent.data, turnId: "turn-0", waitId: "wait-0" },
-  };
-  const waitingPage = {
-    events: [otherTurnWaitEvent, userWaitEvent],
-    cursor: { acceptedAt: 1, eventId: "evt-wait" },
-    truncated: false,
-  };
+  const waitingTurn = turn({ ToolCalls: [waitingCall] });
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -185,10 +213,10 @@ describe("awaitTurnSettlement (user wait)", () => {
     });
   });
 
-  describe("given a turn whose fold records a question wait and no reply", () => {
+  describe("given a turn whose projection holds a pending question card and no reply", () => {
     /** @scenario "A user wait settles the wait only when the caller opts in" */
     it("settles as awaiting_user carrying the question text when the caller opted in", async () => {
-      mockGetEventsAfter.mockResolvedValue(waitingPage);
+      mockFindTurn.mockResolvedValue([waitingTurn]);
 
       const settlement = await awaitTurnSettlement({
         ...args,
@@ -205,7 +233,7 @@ describe("awaitTurnSettlement (user wait)", () => {
 
     /** @scenario "A user wait keeps a caller that did not opt in waiting" */
     it("keeps a caller that did not opt in waiting until its signal aborts", async () => {
-      mockGetEventsAfter.mockResolvedValue(waitingPage);
+      mockFindTurn.mockResolvedValue([waitingTurn]);
 
       const settlement = await awaitTurnSettlement({
         ...args,
@@ -217,17 +245,10 @@ describe("awaitTurnSettlement (user wait)", () => {
     });
   });
 
-  describe("given a turn whose fold records both a question wait and a completed reply", () => {
+  describe("given a turn whose projection holds both a question card and a completed reply", () => {
     /** @scenario "A reply in the fold wins over a user wait" */
-    it("settles as the completed reply, even when the reply is on a later page", async () => {
-      const laterPageReply = {
-        events: [{ ...settledPage.events[0], id: "evt-2", createdAt: 2 }],
-        cursor: { acceptedAt: 2, eventId: "evt-2" },
-        truncated: false,
-      };
-      mockGetEventsAfter
-        .mockResolvedValueOnce({ ...waitingPage, truncated: true })
-        .mockResolvedValue(laterPageReply);
+    it("settles as the completed reply", async () => {
+      mockFindTurn.mockResolvedValue([{ ...completedTurn, ToolCalls: [waitingCall] }]);
 
       const settlement = await awaitTurnSettlement({
         ...args,
@@ -238,12 +259,8 @@ describe("awaitTurnSettlement (user wait)", () => {
 
       expect(settlement).toEqual({
         kind: "settled",
-        settlement: { succeeded: true, outcome: "completed", text: "from the fold", error: null },
+        settlement: settledAnswer,
       });
-      expect(mockGetEventsAfter).toHaveBeenNthCalledWith(
-        2,
-        expect.objectContaining({ after: waitingPage.cursor }),
-      );
     });
   });
 });

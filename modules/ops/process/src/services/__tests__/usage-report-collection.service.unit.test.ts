@@ -139,6 +139,58 @@ describe("given an install with the report switched fully on", () => {
       });
     });
 
+    /** @scenario "The ClickHouse figures are asked one owner and one window at a time" */
+    it("never has two ClickHouse questions in flight at once", async () => {
+      seedTwoOrganizations();
+      const peers = state.peers();
+      let inFlight = 0;
+      let widest = 0;
+      let asked = 0;
+      const owners = [
+        peers.traces,
+        peers.scenarios,
+        peers.instantEvals,
+        peers.codingAgents,
+        peers.gateway,
+      ];
+      for (const owner of owners) {
+        const original = owner.countUsage.bind(owner);
+        // @ts-expect-error the double wraps each owner's read to watch concurrency
+        owner.countUsage = async (input: never) => {
+          inFlight += 1;
+          asked += 1;
+          widest = Math.max(widest, inFlight);
+          await new Promise((resolve) => setTimeout(resolve, 1));
+          try {
+            return await original(input);
+          } finally {
+            inFlight -= 1;
+          }
+        };
+      }
+
+      await UsageReportCollectionService.create({
+        peers,
+        deployment: () => ({
+          version: "3.17.0",
+          installMethod: "helm",
+          chartVersion: undefined,
+          environment: "production",
+          hostname: "langwatch.acme.test",
+        }),
+      }).collect({
+        organizationIds: ["org-1", "org-2"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: undefined,
+        connected: false,
+        license: LICENSE,
+        now: NOW,
+      });
+
+      expect(asked).toBe(owners.length * 3);
+      expect(widest).toBe(1);
+    });
+
     it("dates each ClickHouse rung from the earliest organization, and null where none reached it", async () => {
       seedTwoOrganizations();
 
@@ -344,6 +396,52 @@ describe("given a process that composes ops health", () => {
 
       expect(payload.ops_health).toBeUndefined();
       expect(payload.version).toBe("3.17.0");
+    });
+  });
+});
+
+describe("given an install whose ClickHouse owners each ask per project", () => {
+  describe("when the report is taken", () => {
+    it("asks the ClickHouse owners one at a time, one window at a time", async () => {
+      seedTwoOrganizations();
+      const peers = state.peers();
+      let inFlight = 0;
+      let mostInFlight = 0;
+      const owners = ["traces", "scenarios", "instantEvals", "codingAgents", "gateway"] as const;
+      for (const owner of owners) {
+        const countUsage = peers[owner].countUsage.bind(peers[owner]);
+        Object.assign(peers[owner], {
+          countUsage: async (input: Parameters<typeof countUsage>[0]) => {
+            inFlight += 1;
+            mostInFlight = Math.max(mostInFlight, inFlight);
+            await Promise.resolve();
+            inFlight -= 1;
+            return countUsage(input);
+          },
+        });
+      }
+      const service = UsageReportCollectionService.create({
+        peers,
+        deployment: () => ({
+          version: "3.17.0",
+          installMethod: "helm",
+          chartVersion: undefined,
+          environment: "production",
+          hostname: "langwatch.acme.test",
+        }),
+      });
+
+      const payload = await service.collect({
+        organizationIds: ["org-1", "org-2"],
+        instanceId: INSTANCE_ID,
+        firstSeenAt: undefined,
+        connected: false,
+        license: LICENSE,
+        now: NOW,
+      });
+
+      expect(mostInFlight).toBe(1);
+      expect(payload).toMatchObject({ totalTraces: 2, gateway_requests: 2 });
     });
   });
 });

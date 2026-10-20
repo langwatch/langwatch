@@ -36,6 +36,7 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
     if (!address) return false;
 
     const legacy = await this.database.user.findFirst({
+      // Found by id, so matching case-insensitively costs nothing and covers unconverted rows.
       where: { id: userId, email: { equals: address, mode: "insensitive" } },
       select: { id: true },
     });
@@ -73,9 +74,10 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
     return rows.map((row) => row.userId);
   }
 
+  /** A plain match on the unique index: user stores addresses lower-cased. */
   async findUsersByEmail({ email }: { email: string }): Promise<SsoResolutionCandidate[]> {
     const rows = await this.database.user.findMany({
-      where: { email: { equals: email, mode: "insensitive" } },
+      where: { email: email.trim().toLowerCase() },
       select: { id: true, emailVerified: true, deactivatedAt: true },
       take: 2,
     });
@@ -134,7 +136,7 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
         userId: { not: userId },
         state: { in: [...LIVE_IDENTIFIER_STATES] },
         OR: [
-          { value: { equals: email, mode: "insensitive" } },
+          { value: normalizeIdentifierValue(email) },
           { issuer: accountKey.issuer, providerAccountId: accountKey.accountId },
         ],
       },
@@ -172,7 +174,7 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
         NOT: {
           userId,
           provider: "email",
-          value: { not: null, equals: email, mode: "insensitive" },
+          value: { not: null, equals: normalizeIdentifierValue(email) },
           state: "ATTACHED",
           verifiedAt: null,
           accountId: null,
@@ -183,7 +185,7 @@ export class PrismaSsoRegistrantReadRepository implements SsoRegistrantReadRepos
         OR: [
           { userId },
           { issuer: accountKey.issuer, providerAccountId: accountKey.accountId },
-          { value: { equals: email, mode: "insensitive" } },
+          { value: normalizeIdentifierValue(email) },
         ],
       },
       select: { id: true },

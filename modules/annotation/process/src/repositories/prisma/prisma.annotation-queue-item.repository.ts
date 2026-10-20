@@ -6,6 +6,7 @@ import {
   type AnnotationQueuePendingCount,
   type AnnotationQueueWithItems,
 } from "@langwatch/annotation-contract";
+import { generate } from "@langwatch/ksuid";
 import { PrismaRepository } from "@langwatch/prisma-client";
 import type { Prisma } from "@langwatch/prisma-client/generated";
 import { toDate, type Instant } from "@langwatch/time";
@@ -148,6 +149,7 @@ export class PrismaAnnotationQueueItemRepository
   async createQueueItems(input: CreateAnnotationQueueItemsInput): Promise<void> {
     const queueItems = input.traceIds.flatMap((traceId) =>
       input.queueIds.map((annotationQueueId) => ({
+        id: generate("annotationqueueitem").toString(),
         annotationQueueId,
         traceId,
         projectId: input.projectId,
@@ -157,6 +159,7 @@ export class PrismaAnnotationQueueItemRepository
 
     const userItems = input.traceIds.flatMap((traceId) =>
       input.userIds.map((userId) => ({
+        id: generate("annotationqueueitem").toString(),
         userId,
         traceId,
         projectId: input.projectId,

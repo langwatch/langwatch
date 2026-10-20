@@ -8,7 +8,8 @@ const meta = {
   parameters: {
     usage: {
       use: "Any money amount: cost, price, balance, spend. The currency's own decimals, the reader's locale, fractions of a cent kept, the exact figure on hover.",
-      avoid: "`toFixed` or a hand-written `$`. A count or ratio: use Formatted number.",
+      avoid:
+        "`toFixed`, `toLocaleString`, `Intl.NumberFormat` with a currency or a hand-written `$` at the call site: Money is the one path. A count or ratio: use Formatted number. No amount: Empty value.",
     },
   },
   component: Money,

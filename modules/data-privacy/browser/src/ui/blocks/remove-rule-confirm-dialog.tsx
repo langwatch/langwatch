@@ -1,6 +1,5 @@
 import type { DataPrivacyRule } from "@langwatch/data-privacy-contract";
-import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Text } from "@langwatch/design-system/primitives";
+import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 
 /** Confirms deleting a privacy rule, since removing one can relax redaction. */
 export function RemoveRuleConfirmDialog({
@@ -15,32 +14,14 @@ export function RemoveRuleConfirmDialog({
   onConfirm: () => void | Promise<void>;
 }) {
   return (
-    <Dialog.Root
+    <ConfirmDialog
       open={!!rule}
-      onOpenChange={({ open }) => {
-        if (!open) onCancel();
-      }}
-    >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Delete privacy rule{rule ? ` for ${rule.name}` : ""}?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text>
-            Deleting this rule may relax how trace content, secrets and PII are redacted at this
-            scope. The next applicable rule, or the platform default, applies from now on.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onCancel} disabled={isRemoving}>
-            Cancel
-          </Button>
-          <Button colorPalette="red" loading={isRemoving} onClick={() => void onConfirm()}>
-            Delete rule
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      onClose={onCancel}
+      onConfirm={() => void onConfirm()}
+      title={`Delete privacy rule${rule ? ` for ${rule.name}` : ""}?`}
+      description="Deleting this rule may relax how trace content, secrets and PII are redacted at this scope. The next applicable rule, or the platform default, applies from now on."
+      confirmLabel="Delete rule"
+      loading={isRemoving}
+    />
   );
 }

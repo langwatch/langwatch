@@ -1,4 +1,5 @@
 import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
   type ParsedLLMError,
@@ -46,6 +47,14 @@ export interface PromptExecution {
 
 const describeError = (error: unknown): string =>
   error instanceof Error ? error.message : String(error);
+
+/** A run that failed outside the stream, keeping the refusal's code when there is one. */
+function failureOf(error: unknown): ParsedLLMError {
+  const handled = readHandledError(error);
+  return handled
+    ? { type: "unknown", message: describeError(error), handled }
+    : { type: "unknown", message: describeError(error) };
+}
 
 /**
  * The conversation as the server wants it: role and text only. A message
@@ -241,17 +250,14 @@ function useRunPrompt({
         // run had failed for an unknown reason. `finally` still settles the
         // turn, so whatever streamed before the stop is kept.
         if (signal.aborted) return;
-        // The stream never opened, or died mid-flight. `parseLLMError` never
-        // ran on this path, so it is unknown and the error registry writes the
-        // sentence. A run that failed before `start` has no turn to attach to,
-        // so one is opened to hold the failure.
+        // The stream never opened, or died mid-flight: unknown to `parseLLMError`,
+        // so the error registry writes the sentence, from the refusal's code when
+        // the server refused the run. A run that failed before `start` has no turn
+        // to attach to, so one is opened to hold the failure.
         if (!assistantId) {
           openReply({ messageId: generate("promptmessage").toString(), traceId: "" });
         }
-        conversation.recordFailure(assistantId!, {
-          type: "unknown",
-          message: describeError(error),
-        });
+        conversation.recordFailure(assistantId!, failureOf(error));
       } finally {
         conversation.settle({ assistantId, content: accumulated });
       }

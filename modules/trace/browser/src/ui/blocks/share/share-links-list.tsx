@@ -1,4 +1,5 @@
-import { HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 
 import type { ShareLinkView } from "../../../model/share/share-link-status.ts";
 import { ShareLinkRow } from "./share-link-row.tsx";
@@ -23,7 +24,7 @@ export function ShareLinksList({
     <VStack gap={0} align="stretch">
       <Text
         fontSize="xs"
-        fontWeight="600"
+        fontWeight="semibold"
         color="fg.muted"
         textTransform="uppercase"
         letterSpacing="wide"
@@ -53,12 +54,7 @@ function ShareLinksBody({
   onRevoke,
 }: Parameters<typeof ShareLinksList>[0]) {
   if (isLoading) {
-    return (
-      <HStack color="fg.muted" fontSize="sm" gap={2} paddingY={3}>
-        <Spinner size="sm" />
-        <Text>Loading…</Text>
-      </HStack>
-    );
+    return <SkeletonRows rows={2} />;
   }
   if (isError) {
     return (

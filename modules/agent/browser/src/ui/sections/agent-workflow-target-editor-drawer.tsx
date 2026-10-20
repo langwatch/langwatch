@@ -1,6 +1,5 @@
-import { Button, Field, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
-import { ArrowLeft } from "lucide-react";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { Field, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
 export interface AgentWorkflowTargetEditorDrawerProps {
@@ -15,65 +14,38 @@ export interface AgentWorkflowTargetEditorDrawerProps {
 
 export function AgentWorkflowTargetEditorDrawer(props: AgentWorkflowTargetEditorDrawerProps) {
   return (
-    <Drawer.Root
+    <Drawer
       open={props.open}
-      onOpenChange={({ open }) => !open && props.onClose()}
+      onClose={props.onClose}
+      onBack={props.onGoBack}
+      backButtonTestId="back-button"
       size="lg"
-      closeOnInteractOutside={false}
-      modal={false}
-      preventScroll={false}
+      title="Workflow Agent"
+      loading={props.isLoading}
+      footer={{
+        primaryAction: {
+          label: "Close",
+          onClick: props.onClose,
+          "data-testid": "close-drawer-button",
+        },
+      }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            {props.onGoBack && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={props.onGoBack}
-                padding={1}
-                minWidth="auto"
-                data-testid="back-button"
-                aria-label="Back"
-              >
-                <ArrowLeft size={20} />
-              </Button>
-            )}
-            <Drawer.Title>Workflow Agent</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          {props.isLoading ? (
-            <HStack justify="center" paddingY={8}>
-              <Spinner size="md" />
-            </HStack>
-          ) : (
-            <VStack gap={4} align="stretch" flex={1} paddingX={6} paddingY={4} overflowY="auto">
-              {props.workflowCard && (
-                <Field.Root>
-                  <Field.Label>Workflow</Field.Label>
-                  {props.workflowCard}
-                </Field.Root>
-              )}
-              {props.hasLookupFailed ? (
-                <Text fontSize="sm" color="fg.error" data-testid="workflow-lookup-error">
-                  Couldn&apos;t load this workflow&apos;s agent or its linked workflow, so its real
-                  input fields aren&apos;t known. Mapping is unavailable until it loads
-                  successfully.
-                </Text>
-              ) : (
-                props.mappings
-              )}
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button onClick={props.onClose} data-testid="close-drawer-button">
-            Close
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <VStack gap={4} align="stretch">
+        {props.workflowCard && (
+          <Field.Root>
+            <Field.Label>Workflow</Field.Label>
+            {props.workflowCard}
+          </Field.Root>
+        )}
+        {props.hasLookupFailed ? (
+          <Text fontSize="sm" color="fg.error" data-testid="workflow-lookup-error">
+            Couldn&apos;t load this workflow&apos;s agent or its linked workflow, so its real input
+            fields aren&apos;t known. Mapping is unavailable until it loads successfully.
+          </Text>
+        ) : (
+          props.mappings
+        )}
+      </VStack>
+    </Drawer>
   );
 }

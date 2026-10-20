@@ -179,7 +179,7 @@ describe("given the Inbox address", () => {
       renderWithAnnotationHost(<AnnotationsScreen view="inbox" />);
 
       expect(screen.getByRole("link", { name: /Inbox/ })).toHaveTextContent("4");
-      expect(screen.getByRole("link", { name: /\(You\)/ })).toHaveTextContent("2");
+      expect(screen.getByRole("link", { name: /Assigned to me/ })).toHaveTextContent("2");
       expect(screen.getByRole("link", { name: /Support reviews/ })).toHaveTextContent("3");
       // A queue with nothing waiting reads as a queue, not as a zero.
       expect(screen.getByRole("link", { name: /Sales reviews/ })).not.toHaveTextContent("0");
@@ -508,7 +508,7 @@ describe("given the queue editor", () => {
     it("writes the address rather than mounting a drawer itself", () => {
       const { host } = renderWithAnnotationHost(<AnnotationsScreen view="inbox" />);
 
-      screen.getByRole("button", { name: "New Queue" }).click();
+      screen.getByRole("button", { name: "New queue" }).click();
 
       expect(host.lastQuery).toMatchObject({ "queue-editor": "new" });
     });
@@ -523,7 +523,7 @@ describe("given the queue editor", () => {
         isLiteMember: true,
       });
 
-      expect(screen.queryByRole("button", { name: "New Queue" })).not.toBeInTheDocument();
+      expect(screen.queryByRole("button", { name: "New queue" })).not.toBeInTheDocument();
 
       expect(
         screen.queryByRole("button", { name: "Actions for queue Support reviews" }),

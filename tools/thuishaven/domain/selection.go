@@ -17,8 +17,12 @@ type Selection struct {
 	// Refresh is what this `haven up` refreshes on a file change (ADR-064
 	// amendment 2026-10-10 b). Never saved: a plain `up` is always still.
 	Refresh RefreshMode `json:"-"`
-	Gateway bool        `json:"gateway"`
-	NLP     bool        `json:"nlp"`
+	// AppOff stops the LangWatch app: the ui, api and worker, which only run
+	// together (`haven up -app`). The zero value runs it, so every selection
+	// written before the switch existed keeps the app on.
+	AppOff  bool `json:"-"`
+	Gateway bool `json:"gateway"`
+	NLP     bool `json:"nlp"`
 	// Langy is off by default: it costs a container image and a hard memory
 	// cap that most worktrees never exercise. The worktrees that need it say
 	// `haven up +langy` once.
@@ -84,11 +88,19 @@ type Selection struct {
 	// names a fleet, so studio runs take the per-project Lambda path through
 	// lambdasim to this stack's nlpgo. `haven up +lambda` once.
 	Lambda bool `json:"lambda"`
+	// Github is the GitHub stand-in (githubsim). Off by default: it names a
+	// GitHub App and points the github module's API and install page at the
+	// sim. `haven up +github` once.
+	Github bool `json:"github"`
+	// Mcp is the MCP client stand-in (mcpsim). Off by default: it signs in as
+	// the seeded admin to approve its own OAuth connects, which nobody should
+	// get by surprise. `haven up +mcp` once.
+	Mcp bool `json:"mcp"`
 }
 
 // RefreshMode is the one stack mode switch: still (the zero value, `haven up`),
 // watch (`--watch`: one-shot UI builds, Node reload, Go rebuild) or hmr
-// (`--hmr`: the same with Vite bundledDev and HMR for the UI).
+// (`--hmr`: the same with the plain Vite dev server and HMR for the UI).
 type RefreshMode string
 
 const (
@@ -120,7 +132,10 @@ func DefaultSelection() Selection {
 }
 
 // SelectableServices are the names ±deltas accept, in display order.
-var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "design-system", "mail-room", "langevals"}
+var SelectableServices = []string{AppSelection, "gateway", "nlp", "langy", "idp", "mail", "storage", "voice", "llm", "analytics", "outbound", "payment", "telemetry", "lambda", "github", "mcp", "design-system", "mail-room", "langevals"}
+
+// AppSelection is the ±name of the LangWatch app: ui, api and worker as one.
+const AppSelection = "app"
 
 // RetiredSelectionServices are ±names that no longer pick what they used to,
 // with the full sentence to say instead. `workers` was the choice between a
@@ -134,10 +149,10 @@ var SelectableServices = []string{"gateway", "nlp", "langy", "idp", "mail", "sto
 // one; see MailService. Refused by name rather than falling into the generic
 // "unknown service" error, which would read as a typo.
 var RetiredSelectionServices = map[string]string{
-	"workers":   "no longer selects anything — the worker runs in the api lane locally and as its own deployment in production — every stack runs the ui and api lanes, so there is nothing to select",
-	"worker":    "no longer selects anything — the worker runs in the api lane, which every stack runs",
-	"api":       "is not selectable — every stack runs the api lane, or it would serve pages and process no jobs",
-	"backend":   "was renamed — the lane is called api now, and it is not selectable: every stack runs it",
+	"workers":   "no longer selects anything — the worker runs in the api lane, with the ui; `haven up -app` stops all three",
+	"worker":    "is not selectable on its own — the ui, api and worker run together; `haven up -app` stops all three",
+	"api":       "is not selectable on its own — the ui, api and worker run together, or the app would serve pages and process no jobs; `haven up -app` stops all three",
+	"backend":   "was renamed — the lane is called api now, and it runs with the ui and worker; `haven up -app` stops all three",
 	"storybook": "was renamed — use +design-system / -design-system",
 }
 
@@ -189,15 +204,36 @@ func refusedSelectionName(name string, layout Layout) string {
 	return RetiredSelectionServices[name]
 }
 
+// IsOn is whether the selection runs the ±name: turning it on changes nothing.
+func (s Selection) IsOn(name string) bool {
+	next, err := applySelectionDelta(s, name, true)
+	return err == nil && next == s
+}
+
+// TurnsOnAny is whether s runs a service that before did not.
+func (s Selection) TurnsOnAny(before Selection) bool {
+	for _, name := range SelectableServices {
+		if s.IsOn(name) && !before.IsOn(name) {
+			return true
+		}
+	}
+	return false
+}
+
 // applySelectionDelta turns one accepted ±name into the selection it makes.
 func applySelectionDelta(sel Selection, name string, on bool) (Selection, error) {
 	switch name {
+	case AppSelection:
+		sel.AppOff = !on
 	case "gateway":
 		sel.Gateway = on
 	case "nlp":
 		sel.NLP = on
 	case "langy":
 		sel.Langy = on
+		if on {
+			sel.Gateway = true
+		}
 	case "idp":
 		sel.IDP = on
 	case "mail":
@@ -224,6 +260,10 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 		sel.Telemetry = on
 	case LambdaService:
 		sel.Lambda = on
+	case GithubService:
+		sel.Github = on
+	case McpService:
+		sel.Mcp = on
 	default:
 		return sel, fmt.Errorf("unknown service %q — services: %s", name, strings.Join(SelectableServices, ", "))
 	}
@@ -233,7 +273,7 @@ func applySelectionDelta(sel Selection, name string, on bool) (Selection, error)
 // SelectionFromStack derives what a running stack actually runs, so a plain
 // `up` can tell "already matches the selection" from "needs a restart".
 func SelectionFromStack(st Stack) Selection {
-	sel := Selection{Refresh: st.Refresh}
+	sel := Selection{Refresh: st.Refresh, AppOff: st.AppOff}
 	for _, svc := range st.Services {
 		local := svc.Port != 0 && !svc.IsFallback
 		switch svc.Name {
@@ -269,6 +309,10 @@ func SelectionFromStack(st Stack) Selection {
 			sel.Telemetry = local
 		case LambdaService:
 			sel.Lambda = local
+		case GithubService:
+			sel.Github = local
+		case McpService:
+			sel.Mcp = local
 		}
 	}
 	return sel
@@ -311,11 +355,15 @@ func (s Selection) Describe() string { return s.DescribeForLayout(LayoutModular)
 // DescribeForLayout is Describe for a known layout: a monolith checkout runs
 // one Node lane, so naming two would describe a stack that is not there.
 func (s Selection) DescribeForLayout(layout Layout) string {
-	on := []string{"ui", "api"}
-	if layout.IsMonolith() {
+	var on, off []string
+	switch {
+	case s.AppOff:
+		off = append(off, "ui · api · worker (haven up +app)")
+	case layout.IsMonolith():
 		on = []string{MonolithAppLane}
+	default:
+		on = []string{"ui", "api"}
 	}
-	var off []string
 	add := func(enabled bool, name string) {
 		if enabled {
 			on = append(on, name)
@@ -336,6 +384,8 @@ func (s Selection) DescribeForLayout(layout Layout) string {
 	add(s.Payment, PaymentService)
 	add(s.Telemetry, TelemetryService)
 	add(s.Lambda, LambdaService)
+	add(s.Github, GithubService)
+	add(s.Mcp, McpService)
 	add(s.DesignSystem, "design-system")
 	add(s.MailRoom, "mail-room")
 	add(s.Langevals, LangevalsService)

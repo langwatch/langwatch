@@ -1,16 +1,10 @@
 import { BackLink } from "@langwatch/design-system/back-link";
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Box,
-  Card,
-  HStack,
-  SimpleGrid,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { getHexColorForString } from "@langwatch/design-system/rotating-colors";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { StatTile, StatTileFigure } from "@langwatch/design-system/stat-tile";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { findLandingProjects } from "@langwatch/project-contract";
@@ -113,15 +107,15 @@ function GovernanceTeamDetailPage() {
               fallbackTitle="Couldn't load this team's activity"
             />
           )}
-          {activityView === "loading" && <Spinner />}
+          {activityView === "loading" && <SkeletonRows rows={3} label="Loading activity" />}
           {activityView === "missing" && (
-            <Card.Root variant="showcase" padding={5}>
+            <Card variant="showcase" padding="lg" bodyLayout="stack">
               <NoDataInfoBlock
                 icon={<Users />}
                 title="No spend data for this team in the last 30 days"
                 description="The team may not have any associated ingestion sources reporting activity yet."
               />
-            </Card.Root>
+            </Card>
           )}
           {activityView === "ready" && team && (
             <>
@@ -135,7 +129,7 @@ function GovernanceTeamDetailPage() {
                 />
               </SimpleGrid>
 
-              <Card.Root variant="showcase" padding={4}>
+              <Card variant="showcase" padding="md" bodyLayout="stack">
                 <Text fontSize="sm" fontWeight="medium" marginBottom={1}>
                   Detail metrics
                 </Text>
@@ -164,7 +158,7 @@ function GovernanceTeamDetailPage() {
                 <Text fontSize="xs" color="fg.subtle" marginTop={1}>
                   The chart's {`'By team'`} view shows this team's spend next to every other team's.
                 </Text>
-              </Card.Root>
+              </Card>
             </>
           )}
         </VStack>

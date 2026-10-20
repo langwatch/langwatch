@@ -6,7 +6,7 @@ import { type PromptConfigFormValues } from "@langwatch/prompt-contract";
 import { act, cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Profiler } from "react";
-import { FormProvider, useForm } from "react-hook-form";
+import { FormProvider, useForm, type UseFormReturn } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { PromptHostProvider } from "../../../../../../model/prompt-host.ts";
@@ -514,9 +514,10 @@ describe("PromptTabbedSection Layout Modes", () => {
     it("does not show border-bottom on tabs in vertical mode", () => {
       renderPromptTabbedSection({ layoutMode: "vertical" });
 
-      // Tabs should not have explicit border-bottom (divider handles it)
-      const tabsList = screen.getByRole("tablist");
-      expect(tabsList).not.toHaveStyle({ borderBottom: "1px solid" });
+      // The strip has no explicit border-bottom (the divider handles it)
+      const strip = screen.getByTestId("prompt-tab-strip");
+      expect(strip).not.toHaveStyle({ borderBottom: "1px solid" });
+      expect(strip.nextElementSibling).toContainElement(screen.getByTestId("resizable-divider"));
     });
   });
 
@@ -528,15 +529,14 @@ describe("PromptTabbedSection Layout Modes", () => {
     });
 
     it("shows border-bottom on tabs in horizontal mode", () => {
-      const { container } = renderPromptTabbedSection({
+      renderPromptTabbedSection({
         layoutMode: "horizontal",
       });
 
       // Tabs should have border-bottom in horizontal mode
-      const tabsList = container.querySelector('[role="tablist"]');
-      expect(tabsList).toBeInTheDocument();
-      // Check the computed style or CSS class
-      expect(tabsList).toHaveStyle({ borderBottomStyle: "solid" });
+      const strip = screen.getByTestId("prompt-tab-strip");
+      expect(strip).toBeInTheDocument();
+      expect(strip).toHaveStyle({ borderBottomStyle: "solid" });
     });
   });
 
@@ -776,5 +776,100 @@ describe("given a deployment that runs no playground chat", () => {
       expect(screen.getByPlaceholderText(/type your message here/i)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /reset chat/i })).toBeInTheDocument();
     });
+  });
+});
+
+describe("given a selected tab that leaves the strip", () => {
+  const withInputs: PromptConfigFormValues["version"]["configData"]["inputs"] = [
+    { identifier: "topic", type: "str" },
+  ];
+  let form: UseFormReturn<PromptConfigFormValues> | undefined;
+  let user: ReturnType<typeof userEvent.setup>;
+
+  function CapturedForm({ children }: { children: React.ReactNode }) {
+    const methods = useForm<PromptConfigFormValues>({
+      defaultValues: {
+        version: {
+          parameters: {},
+          configData: { inputs: withInputs, demonstrations: { inline: { records: {} } } },
+        },
+      },
+    });
+    form = methods;
+    return <FormProvider {...methods}>{children}</FormProvider>;
+  }
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearStoreInstances();
+    getStoreForTesting({ projectId: TEST_PROJECT_ID, capabilities })
+      .getState()
+      .addTab({ data: createTabData() });
+    form = void 0;
+    user = userEvent.setup();
+    renderSection();
+  });
+
+  afterEach(() => {
+    cleanup();
+    clearStoreInstances();
+    localStorage.clear();
+  });
+
+  function renderSection() {
+    renderWithDesignSystem(
+      <PromptHostProvider value={testHost}>
+        <PromptPlaygroundChatProvider>
+          <CapturedForm>
+            <PromptTabbedSection
+              layoutMode="vertical"
+              isPromptExpanded={true}
+              onPositionChange={vi.fn()}
+              onDragEnd={vi.fn()}
+              onToggle={vi.fn()}
+            />
+          </CapturedForm>
+        </PromptPlaygroundChatProvider>
+      </PromptHostProvider>,
+    );
+  }
+
+  it("commits Conversation, keeps focus in the strip and does not reselect on return", async () => {
+    await user.click(screen.getByRole("tab", { name: /variables/i }));
+    expect(screen.getByRole("tab", { name: /variables/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+    expect(screen.getByRole("tab", { name: /variables/i })).toHaveFocus();
+
+    act(() => form?.setValue("version.configData.inputs", []));
+
+    expect(screen.queryByRole("tab", { name: /variables/i })).not.toBeInTheDocument();
+    const conversation = screen.getByRole("tab", { name: /conversation/i });
+    expect(conversation).toHaveAttribute("aria-selected", "true");
+    expect(conversation).toHaveFocus();
+
+    act(() => form?.setValue("version.configData.inputs", withInputs));
+
+    expect(screen.getByRole("tab", { name: /variables/i })).toHaveAttribute(
+      "aria-selected",
+      "false",
+    );
+    expect(screen.getByRole("tab", { name: /conversation/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
+  });
+
+  it("leaves focus alone when the removed tab did not hold it", async () => {
+    await user.click(screen.getByRole("tab", { name: /variables/i }));
+    await user.click(screen.getByRole("tab", { name: /parameters/i }));
+    act(() => form?.setValue("version.configData.inputs", []));
+
+    expect(screen.getByRole("tab", { name: /parameters/i })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: /parameters/i })).toHaveAttribute(
+      "aria-selected",
+      "true",
+    );
   });
 });

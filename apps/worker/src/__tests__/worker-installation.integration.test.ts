@@ -1,7 +1,5 @@
-import { readdirSync } from "node:fs";
-
 import { parseProcessConfig } from "@langwatch/config";
-import { EventSourcing, laneAliasesPastWindow } from "@langwatch/eventing";
+import { EventSourcing } from "@langwatch/eventing";
 import {
   createBlobMaintenancePipeline,
   createProcessManagerMaintenancePipeline,
@@ -378,27 +376,6 @@ describe("the worker process installation", () => {
     }
   });
 
-  /** @scenario "An alias past its release is refused so it gets removed" */
-  it("carries no lane alias past the release that shipped it", async () => {
-    const { runtime, eventing } = await bootWorker();
-
-    try {
-      const newestRelease = readdirSync(
-        new URL("../../../../packages/upgrade/releases/", import.meta.url),
-      )
-        .flatMap((file) => /^(\d+\.\d+\.\d+)\.json$/.exec(file)?.[1] ?? [])
-        .toSorted((a, b) => a.localeCompare(b, undefined, { numeric: true }))
-        .at(-1)!;
-      const declared = eventing.definitions.map((definition) => ({
-        pipeline: definition.metadata.name,
-        aliases: definition.open((opened) => opened.laneAliases ?? []),
-      }));
-      expect(laneAliasesPastWindow({ declared, newestRelease })).toEqual([]);
-    } finally {
-      await runtime.stop();
-    }
-  });
-
   /** @scenario "The worker hosts the gateway's spend settlement sweeper" */
   it("hosts the gateway's settlement sweeper on the spend pipeline", async () => {
     const { runtime, eventing } = await bootWorker();
@@ -493,7 +470,11 @@ describe("the worker process installation", () => {
       );
       expect(
         usage?.open((definition) => definition.globalProjections?.map(({ name }) => name)),
-      ).toEqual(["entitlement.usageTraceMeter", "orgBillableEventsMeter"]);
+      ).toEqual([
+        "entitlement.traceUsageSpan",
+        "entitlement.traceUsageMonthIds",
+        "orgBillableEventsMeter",
+      ]);
     } finally {
       await runtime.stop();
     }

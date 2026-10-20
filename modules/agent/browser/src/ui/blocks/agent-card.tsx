@@ -1,15 +1,8 @@
 import type { Agent, AgentType } from "@langwatch/agent-contract";
 import type { WireOf } from "@langwatch/api/web";
 import { Menu } from "@langwatch/design-system/menu";
-import {
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, Button, HStack } from "@langwatch/design-system/primitives";
+import { ResourceTile } from "@langwatch/design-system/resource-tile";
 import {
   ArrowUp,
   Bot,
@@ -28,7 +21,7 @@ import {
   Trash2,
   Workflow,
 } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
+import type { ReactNode } from "react";
 
 import { agentHasDevTunnel } from "../../model/agent-dev-tunnel.ts";
 import { LocalTunnelBadge } from "../elements/local-tunnel-badge.tsx";
@@ -58,17 +51,18 @@ export const CARD_MENU_CLASS = "js-inner-menu";
 export type AgentCardShellProps = {
   /** The agent the card stands for, so a host can hand the card to an agent. */
   agentId: string;
-  agentName: string;
   /** The mark at the top left: the icon of the kind of agent. */
   leading: ReactNode;
   /** What sits on the top right beside the menu, such as the presence. */
   trailing?: ReactNode;
   /** The three-dot menu at the top right, when the card offers actions. */
   menu?: ReactNode;
-  /** The name line, with whatever sits beside the name. */
-  title: ReactNode;
-  /** The short lines under the name. */
-  info: ReactNode;
+  /** The agent's name, and nothing else. */
+  title: string;
+  /** What sits beside the name below it: the environment, a local tunnel, a scope. */
+  badges?: ReactNode;
+  /** The short line under the name. */
+  meta: ReactNode;
   onClick?: () => void;
   testId: string;
 };
@@ -78,39 +72,28 @@ export function AgentCardShell({
   trailing,
   menu,
   title,
-  info,
+  badges,
+  meta,
   onClick,
   testId,
 }: AgentCardShellProps) {
-  const handleCardClick = (event: MouseEvent) => {
-    if ((event.target as HTMLElement).closest(`.${CARD_MENU_CLASS}`)) return;
-    onClick?.();
-  };
-
   return (
-    <Card.Root
-      variant="elevated"
-      onClick={handleCardClick}
-      cursor="pointer"
-      _hover={{ boxShadow: "lg" }}
-      height="142px"
-      transition="all 0.2s ease-in-out"
-      data-testid={testId}
-    >
-      <Card.Body padding={4}>
-        <VStack align="start" gap={2} height="full" width="full" minWidth={0}>
-          <HStack width="full" gap={2}>
-            {leading}
-            <Spacer />
+    <ResourceTile
+      icon={leading}
+      title={title}
+      meta={meta}
+      badges={badges}
+      menu={
+        (trailing || menu) && (
+          <HStack gap={2}>
             {trailing}
             {menu}
           </HStack>
-          <Spacer />
-          {title}
-          {info}
-        </VStack>
-      </Card.Body>
-    </Card.Root>
+        )
+      }
+      opener={<button type="button" aria-label={title} onClick={onClick} />}
+      data-testid={testId}
+    />
   );
 }
 
@@ -177,7 +160,6 @@ export function AgentCard({
   return (
     <AgentCardShell
       agentId={agent.id}
-      agentName={agent.name}
       testId={`agent-card-${agent.id}`}
       onClick={onClick}
       leading={<AgentCardIcon icon={agentTypeIcons[agent.type] ?? Bot} />}
@@ -185,7 +167,7 @@ export function AgentCard({
         (onEdit || onDelete || onTest || onTalkToIt) && (
           <Menu.Root>
             <AgentCardMenuTrigger agentName={agent.name} />
-            <Menu.Content className={CARD_MENU_CLASS} portalled={false}>
+            <Menu.Content className={CARD_MENU_CLASS}>
               {onEdit && (
                 <Menu.Item value="edit" onClick={onEdit}>
                   <Pencil aria-hidden="true" size={14} /> Edit
@@ -239,24 +221,9 @@ export function AgentCard({
           </Menu.Root>
         )
       }
-      title={
-        <HStack gap={2}>
-          <Text
-            color="fg.muted"
-            fontSize="sm"
-            fontWeight={500}
-            data-testid={`agent-card-name-${agent.name}`}
-          >
-            {agent.name}
-          </Text>
-          {agentHasDevTunnel(agent) && <LocalTunnelBadge />}
-        </HStack>
-      }
-      info={
-        <Text color="fg.subtle" fontSize="12px">
-          {agentTypeLabels[agent.type]} • {updatedAtLabel}
-        </Text>
-      }
+      title={agent.name}
+      badges={agentHasDevTunnel(agent) && <LocalTunnelBadge />}
+      meta={`${agentTypeLabels[agent.type]} • ${updatedAtLabel}`}
     />
   );
 }

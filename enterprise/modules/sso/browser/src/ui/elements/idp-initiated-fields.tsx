@@ -61,7 +61,7 @@ export function IdpInitiatedFields({
         <>
           {value.landingTargets.map((target) => (
             <HStack key={target} gap={2} data-testid="sso-landing-target">
-              <Text fontSize="sm" fontFamily="mono" flex={1}>
+              <Text textStyle="mono" flex={1}>
                 {target}
               </Text>
               <IconButton

@@ -59,6 +59,21 @@ Feature: Private Dataplane S3 Routing
     When object storage places a project of org "org456"
     Then the project's destination is the shared S3 bucket
 
+  # A recorded private organization (specs/private-dataplane/clickhouse-routing.feature)
+  # is refused, never placed on the shared backend, when its S3 variable is gone or broken.
+  @unit
+  Scenario: A recorded private organization whose S3 variable is missing is refused
+    Given org "org123" is recorded with private S3 label "acme"
+    And DATAPLANE_S3__acme__org123 is not set
+    When one of its projects writes an object
+    Then it is refused with private_dataplane_unavailable naming DATAPLANE_S3__acme__org123 as missing
+
+  @unit
+  Scenario: An organization whose S3 variable is malformed is refused
+    Given DATAPLANE_S3__acme__org123 holds JSON missing its credentials
+    When one of its projects writes an object
+    Then it is refused with private_dataplane_unavailable naming DATAPLANE_S3__acme__org123 as malformed
+
   # ---------------------------------------------------------------------------
   # Project-level routing
   # ---------------------------------------------------------------------------

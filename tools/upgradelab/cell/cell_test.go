@@ -61,6 +61,9 @@ func TestEveryProfileRoutesToTheCellsOwnStores(t *testing.T) {
 		if !strings.Contains(env["ADMIN_EMAILS"], "seed+1@snapshot.test") {
 			t.Errorf("%s: the seed account is no platform operator: %q", name, env["ADMIN_EMAILS"])
 		}
+		if env["LOG_LEVEL"] != "info" {
+			t.Errorf("%s: releases log at %q, want info as cloud runs them", name, env["LOG_LEVEL"])
+		}
 	}
 	hybrid, _ := BuildEnv(EnvInput{Profile: Profiles["hybrid"], Stores: stores, APIPort: 7100})
 	if got := hybrid["CLICKHOUSE_URL__snap__snap_hybrid_org_4"]; got != "http://d:p@127.0.0.1:8123/upgradelab_x_p_snap" {
@@ -122,6 +125,44 @@ func TestUpgradeInProgressIsRetriedAfterRetryAfter(t *testing.T) {
 	}
 }
 
+// @scenario "A starting api's 503 is waited out per Retry-After on every deployment"
+func TestStartingAnswerIsWaitedOutOnEveryDeployment(t *testing.T) {
+	for _, stopStart := range []bool{true, false} {
+		var answered atomic.Int32
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			if answered.Add(1) == 1 {
+				w.Header().Set("Retry-After", "1")
+				w.WriteHeader(http.StatusServiceUnavailable)
+				_, _ = w.Write([]byte("langwatch-api is starting"))
+				return
+			}
+			w.WriteHeader(http.StatusOK)
+		}))
+		traffic := &Traffic{Client: Client{URL: server.URL}, Hold: 5 * time.Second, Origin: time.Now(), http: server.Client(), RetryUnanswered: stopStart}
+		call := traffic.one(context.Background(), Kind{Name: "rest-read", Do: restRead}, 0)
+		server.Close()
+		if call.Status != http.StatusOK || call.Gap != 1 || call.NonOK != 0 || call.Retries != 1 {
+			t.Errorf("stopStart=%v: call = %+v, want 200 after waiting out the start, no non-2xx", stopStart, call)
+		}
+	}
+}
+
+// @scenario "The api-early drill holds client requests long enough for the worker delay and the upgrade"
+func TestAPIEarlyDrillRaisesTheClientHold(t *testing.T) {
+	options := Options{Hold: 60 * time.Second, WorkerDelay: 60 * time.Second, FromDir: ".", HeadDir: ".", Release: "r", RunDir: t.TempDir()}
+	got, err := withDrills(options, "", DrillAPIEarly)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Hold != 180*time.Second {
+		t.Errorf("hold = %s, want 3m0s", got.Hold)
+	}
+	got, _ = withDrills(options, "", DrillRetry)
+	if got.Hold != 60*time.Second {
+		t.Errorf("hold = %s without api-early, want 1m0s", got.Hold)
+	}
+}
+
 // @scenario "Traffic is seeded and judged per kind and per api phase"
 func TestQueueKindsGroupWaitingJobs(t *testing.T) {
 	out := "{event-sourcing/jobs}:gq:group:p1/fold/traceSummary/reactor/deferredOriginResolution/trace:a:jobs 1 1000 1000\n" +
@@ -145,18 +186,21 @@ func TestRunSeedGivesEachRunItsOwnIDs(t *testing.T) {
 	}
 }
 
-func TestQueueLeftJudgesOnlyTheJobsPresentAtTheCut(t *testing.T) {
-	gq := "{event-sourcing/jobs}:gq:group:p1/fold/traceSummary/reactor/deferredOriginResolution/trace:a:jobs"
-	cut := map[string]struct{}{gq + " j1": {}, gq + " j2": {}, "q:wait #1x": {}}
-	now := map[string]struct{}{gq + " j2": {}, gq + " fresh": {}, "q:wait #1x": {}}
-	left := QueueLeft(cut, now)
-	if len(left) != 2 {
-		t.Fatalf("left = %v, want j2 and the list job; the fresh job is not the cut's", left)
+func TestInDownWindowLeavesOnlyUnavailableLinesInsideTheWindowToH8(t *testing.T) {
+	origin := time.Date(2026, 10, 11, 18, 44, 32, 0, time.UTC)
+	inside := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"ClickHouseUnavailableError"}}`
+	after := `{"level":"error","time":"2026-10-11T18:47:30.000Z","error":{"type":"ClickHouseUnavailableError"}}`
+	unknown := `{"level":"error","time":"2026-10-11T18:46:47.693Z","error":{"type":"UNKNOWN_TABLE"}}`
+	reopening := `{"level":"error","time":"2026-10-11T18:46:58.300Z","error":{"type":"ClickHouseUnavailableError"}}`
+	if !inDownWindow(inside, 95_000, 146_000, origin) || !inDownWindow(reopening, 95_000, 146_000, origin) {
+		t.Fatal("an unavailable line inside the window, or just as the gate reopens, must go to H8")
 	}
-	if got := LeftByKind(left); got != "fold/traceSummary/reactor/deferredOriginResolution: 1; q:wait: 1" {
-		t.Errorf("by kind = %q", got)
+	if inDownWindow(after, 95_000, 146_000, origin) || inDownWindow(unknown, 95_000, 146_000, origin) || inDownWindow(inside, 0, 0, origin) {
+		t.Fatal("only unavailable lines inside a real window go to H8")
 	}
-	if len(QueueLeft(cut, map[string]struct{}{gq + " fresh": {}})) != 0 {
-		t.Error("only fresh jobs wait, so the cut's jobs are drained")
+	preflight := `{"level":"error","time":"2026-10-11T18:46:47.693Z","phase":"preflight","msg":"Cannot connect to ClickHouse at http://127.0.0.1:1/ after waiting 5s"}`
+	client := `[2026-10-11T18:46:47.788Z][ERROR][@clickhouse/client][Connection] Query: HTTP request error.`
+	if !inDownWindow(preflight, 95_000, 146_000, origin) || !inDownWindow(client, 95_000, 146_000, origin) {
+		t.Fatal("the migration preflight and the client's own line meeting the closed gate go to H8")
 	}
 }

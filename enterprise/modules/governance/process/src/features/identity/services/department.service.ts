@@ -24,20 +24,12 @@ export type DepartmentProjects = Pick<
   "findProjectsWithDepartments" | "assignProjectDepartment"
 >;
 
-/** This module's own department write, fed to the aggregate reconcile (M8487-DEPT-CHANGE). */
-export type MemberDepartmentAssigned = (fact: {
-  organizationId: string;
-  userId: string;
-  occurredAt: number;
-}) => Promise<void>;
-
 export class DepartmentService {
   private constructor(
     private readonly repository: DepartmentRepository,
     private readonly peers: {
       organizations: DepartmentOrganizations;
       projects: DepartmentProjects;
-      onMemberDepartmentAssigned?: MemberDepartmentAssigned;
     },
   ) {}
 
@@ -45,7 +37,6 @@ export class DepartmentService {
     repository: DepartmentRepository;
     organizations: DepartmentOrganizations;
     projects: DepartmentProjects;
-    onMemberDepartmentAssigned?: MemberDepartmentAssigned;
   }): DepartmentService {
     return new DepartmentService(options.repository, options);
   }
@@ -132,11 +123,6 @@ export class DepartmentService {
     }
     const at = nowInstant();
     await this.repository.recordMemberDepartment({ ...input, at });
-    await this.peers.onMemberDepartmentAssigned?.({
-      organizationId: input.organizationId,
-      userId: input.userId,
-      occurredAt: at.epochMilliseconds,
-    });
   }
 
   findOpenUserLinks(input: {

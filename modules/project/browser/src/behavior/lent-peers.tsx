@@ -1,4 +1,4 @@
-/** What analytics, navigation, onboarding, organization and trace lend this module (§10.1). */
+/** What analytics, navigation, onboarding, ops, organization and trace lend this module (§10.1). */
 
 import { CustomGraphToken, type CustomGraphProps } from "@langwatch/analytics-client";
 import { Lent } from "@langwatch/browser-host/lent";
@@ -8,6 +8,7 @@ import {
 } from "@langwatch/navigation-client";
 import { GuidedOnboardingOfferToken } from "@langwatch/onboarding-client";
 import type { GuidedOnboardingOfferProps } from "@langwatch/onboarding-contract";
+import { UpgradeActionNeededToken, type UpgradeActionNeededProps } from "@langwatch/ops-client";
 import {
   PendingJoinRequestsToken,
   ProjectDepartmentFieldToken,
@@ -34,6 +35,11 @@ export function ProjectDepartmentField(props: ProjectDepartmentFieldProps) {
 /** Organization's card of people waiting to join, drawn as organization lends it. */
 export function PendingJoinRequests(props: PendingJoinRequestsProps) {
   return <Lent of={PendingJoinRequestsToken} props={props} />;
+}
+
+/** Ops' "Action needed for updates" card, drawn as ops lends it. */
+export function UpgradeActionNeeded(props: UpgradeActionNeededProps) {
+  return <Lent of={UpgradeActionNeededToken} props={props} />;
 }
 
 /** Analytics' custom graph, drawn as analytics lends it. */

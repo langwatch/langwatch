@@ -251,6 +251,8 @@ export interface OrganizationApi {
   ): Promise<{
     organization: { id: string; name: string };
     team: { id: string; slug: string; name: string };
+    /** False while the founder's grants are still landing; a read hint follows when they do. */
+    grantsConfirmed: boolean;
   }>;
   /**
    * Whether this address may create a new account on the installation
@@ -391,6 +393,8 @@ export interface OrganizationApi {
     team: { id: string; slug: string; name: string };
   }>;
   listProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]>;
+  /** The install's hidden system organization, created with its one team on first ask; no fact. */
+  ensureSystemOrganization(): Promise<{ id: string }>;
   findProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary | null>;
   /** The self-hosted provisioning door's read: one organization's summary, or `not_found`. */
   getProvisioningSummary(organizationId: string): Promise<OrganizationProvisioningSummary>;

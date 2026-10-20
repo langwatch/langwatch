@@ -1,15 +1,8 @@
+import { Card } from "@langwatch/design-system/card";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import {
-  Badge,
-  Box,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, HStack, Spacer, Text } from "@langwatch/design-system/primitives";
 import type { ProcessFleetSummary } from "@langwatch/ops-contract";
 import { Workflow } from "lucide-react";
 
@@ -17,22 +10,22 @@ import { hasFleetTrouble } from "../../model/process-presentation.ts";
 
 function CountCell({ value, color }: { value: number; color?: string }) {
   return (
-    <Table.Cell textAlign="end">
+    <ListTable.Cell align="end">
       <Text
-        textStyle="xs"
-        fontFamily="mono"
+        textStyle="caption"
+        fontVariantNumeric="tabular-nums"
         color={value > 0 ? color : "fg.muted"}
         fontWeight={value > 0 && color ? "medium" : undefined}
       >
         {value}
       </Text>
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
-function fleetRowTint(row: ProcessFleetSummary): string | undefined {
-  if (row.deadMessages > 0) return "red.subtle";
-  if (hasFleetTrouble(row)) return "orange.subtle";
+function fleetRowTone(row: ProcessFleetSummary): "warning" | "danger" | undefined {
+  if (row.deadMessages > 0) return "danger";
+  if (hasFleetTrouble(row)) return "warning";
   return undefined;
 }
 
@@ -44,37 +37,38 @@ function FleetRow({
   onSelect: (processName: string) => void;
 }) {
   return (
-    <Table.Row
-      cursor="pointer"
+    <ListTable.Row
       data-testid={`process-row-${row.processName}`}
-      bg={fleetRowTint(row)}
-      _hover={{ bg: "bg.subtle" }}
-      onClick={() => onSelect(row.processName)}
+      tone={fleetRowTone(row)}
+      onActivate={() => onSelect(row.processName)}
     >
-      <Table.Cell>
+      <ListTable.Cell>
         <HStack gap={1.5}>
-          <Text textStyle="xs" fontFamily="mono" whiteSpace="nowrap" title={row.processName}>
-            {row.processName}
-          </Text>
+          <ListTable.RowAction
+            label={`Open instances of ${row.processName}`}
+            onActivate={() => onSelect(row.processName)}
+          >
+            <InlineCode variant="neutral">{row.processName}</InlineCode>
+          </ListTable.RowAction>
           {row.scheduled && (
             <Badge size="xs" variant="subtle" colorPalette="gray">
               scheduled
             </Badge>
           )}
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted" whiteSpace="nowrap" title={row.pipelineName}>
           {row.pipelineName}
         </Text>
-      </Table.Cell>
+      </ListTable.Cell>
       <CountCell value={row.instances} />
       <CountCell value={row.overdueWakes} color="fg.warning" />
       <CountCell value={row.pendingMessages} />
       <CountCell value={row.overduePending} color="fg.warning" />
       <CountCell value={row.lapsedLeases} color="fg.warning" />
       <CountCell value={row.deadMessages} color="fg.error" />
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -92,57 +86,45 @@ export function ProcessFleetCard({
   onOpenAll?: () => void;
 }) {
   return (
-    <Card.Root borderColor="border.muted" boxShadow="none">
-      <Card.Body padding={0}>
-        <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
-          <Text textStyle="sm" fontWeight="medium">
-            Process managers
-          </Text>
-          <Spacer />
-          {onOpenAll && (
-            <Button size="sm" variant="outline" onClick={onOpenAll}>
-              All instances
-            </Button>
-          )}
-        </HStack>
-        {rows.length === 0 ? (
-          <NoDataInfoBlock
-            icon={<Workflow />}
-            title="No process managers registered."
-            description="Registered processes and their health appear here."
-          />
-        ) : (
-          <Box overflowX="auto">
-            <ListTable
-              density="compact"
-              columnRules={false}
-              containerProps={{ overflowX: "auto" }}
-              size="sm"
-              variant="line"
-              width="full"
-              minWidth="720px"
-            >
-              <Table.Header whiteSpace="nowrap">
-                <Table.Row>
-                  <Table.ColumnHeader>Process</Table.ColumnHeader>
-                  <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Instances</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Overdue wakes</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Pending</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Overdue pending</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Lapsed leases</Table.ColumnHeader>
-                  <Table.ColumnHeader textAlign="end">Dead</Table.ColumnHeader>
-                </Table.Row>
-              </Table.Header>
-              <Table.Body>
-                {rows.map((row) => (
-                  <FleetRow key={row.processName} row={row} onSelect={onSelect} />
-                ))}
-              </Table.Body>
-            </ListTable>
-          </Box>
+    <Card padding="none">
+      <HStack paddingX={4} paddingY={2.5} borderBottom="1px solid" borderBottomColor="border">
+        <Text textStyle="sm" fontWeight="medium">
+          Process managers
+        </Text>
+        <Spacer />
+        {onOpenAll && (
+          <Button size="sm" variant="outline" onClick={onOpenAll}>
+            All instances
+          </Button>
         )}
-      </Card.Body>
-    </Card.Root>
+      </HStack>
+      {rows.length === 0 ? (
+        <NoDataInfoBlock
+          icon={<Workflow />}
+          title="No process managers registered."
+          description="Registered processes and their health appear here."
+        />
+      ) : (
+        <ListTable density="compact" variant="embedded" scroll="x" scrollLabel="Process managers">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Process</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Instances</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Overdue wakes</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Pending</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Overdue pending</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Lapsed leases</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Dead</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {rows.map((row) => (
+              <FleetRow key={row.processName} row={row} onSelect={onSelect} />
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      )}
+    </Card>
   );
 }

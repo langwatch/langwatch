@@ -108,16 +108,16 @@ describe("guardrails page", () => {
       renderPage();
 
       expect(screen.getByText("No guardrails yet")).toBeInTheDocument();
-      expect(screen.getByText(/to bind one of your project/)).toBeInTheDocument();
+      expect(screen.getByText(/run one of your evaluators on requests/)).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /New guardrail/ })).toBeEnabled();
     });
 
-    it("explains the executionMode switch when no evaluator is a guardrail", () => {
+    it("explains how to enable an evaluator when no evaluator is a guardrail", () => {
       state.monitors = [{ ...MONITOR, executionMode: "ON_MESSAGE" }];
       renderPage();
 
       expect(
-        screen.getByText(/No project evaluators are marked as guardrails/),
+        screen.getByText(/None of your evaluators can run as a guardrail yet/),
       ).toBeInTheDocument();
       expect(screen.getByRole("button", { name: /New guardrail/ })).toBeDisabled();
     });

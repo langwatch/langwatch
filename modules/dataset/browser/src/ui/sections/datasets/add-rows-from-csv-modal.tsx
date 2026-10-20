@@ -6,21 +6,17 @@ import {
   type DatasetRecordEntry,
   newDatasetEntriesSchema,
 } from "@langwatch/dataset-contract";
-import {
-  Box,
-  Button,
-  HStack,
-  NativeSelect,
-  Spacer,
-  Text,
-} from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, HStack, NativeSelect, Spacer, Text } from "@langwatch/design-system/primitives";
 import { generate } from "@langwatch/ksuid";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { createLogger } from "@langwatch/observability/browser";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ArrowRight } from "react-feather";
 
 import { convertDatasetRecordsToColumnTypes } from "../../../model/convert-record-values.ts";
 import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
+
+const logger = createLogger("langwatch:dataset:add-rows-from-csv");
 
 /**
  * The app's KSUID resource for a dataset record row (`KSUID_RESOURCES.RECORD`).
@@ -28,6 +24,53 @@ import { CSVReaderComponent } from "./upload-csv-drawer.tsx";
  * the server as-is and persisted, so it belongs with the writer.
  */
 const RECORD_KSUID_RESOURCE = "record";
+
+type UploadStep = "choose-file" | "map-columns" | "upload";
+
+/** Where an Upload attempt stands: no data rows yet, a column left unmapped, or ready. */
+function uploadStepOf({ csvRows, canUpload }: { csvRows: number; canUpload: boolean }): UploadStep {
+  if (csvRows <= 1) return "choose-file";
+  return canUpload ? "upload" : "map-columns";
+}
+
+const STEP_PROBLEMS: Record<UploadStep, string | undefined> = {
+  "choose-file": "Choose a CSV file with at least one row.",
+  "map-columns": "Choose a CSV column for every dataset column.",
+  upload: void 0,
+};
+
+function UploadNotices({
+  problem,
+  hasFormatErrors,
+}: {
+  problem: string | undefined;
+  hasFormatErrors: boolean;
+}) {
+  return (
+    <>
+      {problem && (
+        <Text role="alert" color="red.fg">
+          {problem}
+        </Text>
+      )}
+      {hasFormatErrors && <Text color="red.fg">Please check columns have valid formatting</Text>}
+    </>
+  );
+}
+
+/** Puts focus on the first dataset column that has no CSV column chosen yet. */
+function focusFirstUnmapped({
+  body,
+  columnTypes,
+  mapping,
+}: {
+  body: HTMLElement | null;
+  columnTypes: DatasetColumns;
+  mapping: Record<string, string>;
+}): void {
+  const unmapped = columnTypes.findIndex(({ name }) => !Object.keys(mapping).includes(name));
+  body?.querySelectorAll("select")[unmapped]?.focus();
+}
 
 export function AddRowsFromCSVModal({
   isOpen,
@@ -89,6 +132,10 @@ export function AddRowsFromCSVModal({
   }, [columnTypes, mapping]);
 
   const canUpload = isMappingsComplete();
+  const [attempted, setAttempted] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+  const step = uploadStepOf({ csvRows: csvUploaded.length, canUpload });
+  const problem = attempted ? STEP_PROBLEMS[step] : void 0;
 
   const onSelectChange = (map: string) => (value: string) => {
     const column = value;
@@ -110,7 +157,7 @@ export function AddRowsFromCSVModal({
         entries: convertDatasetRecordsToColumnTypes(recordEntries, columnTypes),
       });
     } catch (error) {
-      console.error(error);
+      logger.error({ error }, "Failed to process CSV");
       toaster.create({
         title: "Error processing CSV",
         type: "error",
@@ -155,6 +202,12 @@ export function AddRowsFromCSVModal({
         },
       },
     );
+  };
+
+  const submitUpload = () => {
+    setAttempted(true);
+    if (step === "map-columns") focusFirstUnmapped({ body: bodyRef.current, columnTypes, mapping });
+    if (step === "upload" && recordEntries.length > 0 && hasErrors.length === 0) uploadCSVData();
   };
 
   const selectMappings = useMemo(() => {
@@ -205,44 +258,34 @@ export function AddRowsFromCSVModal({
       setCSVHeaders([]);
       setCSVUploaded([]);
       setErrors([]);
+      setAttempted(false);
     }
   }, [isOpen]);
 
   return (
-    <Dialog.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Add rows from CSV</Dialog.Title>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body>
-          <CSVReaderComponent
-            onUploadAccepted={({ data }: { data: string[][] }) => {
-              preprocessCSV(data);
-            }}
-          >
-            {renderMapping}
-          </CSVReaderComponent>
-          {hasErrors.length > 0 && (
-            <Text color="red.fg">Please check columns have valid formatting</Text>
-          )}
-        </Dialog.Body>
-
-        <Dialog.Footer>
-          <Button variant="outline" mr={3} onClick={onClose}>
-            Close
-          </Button>
-          <Button
-            colorPalette="orange"
-            disabled={recordEntries.length === 0 || !canUpload || hasErrors.length > 0}
-            onClick={uploadCSVData}
-            loading={uploadRecords.isPending}
-            data-testid="dataset-add-rows-submit"
-          >
-            Upload
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={isOpen}
+      onClose={onClose}
+      title="Add rows from CSV"
+      cancelLabel="Close"
+      busy={uploadRecords.isPending}
+      primaryAction={{
+        label: "Upload",
+        onClick: submitUpload,
+        loading: uploadRecords.isPending,
+        "data-testid": "dataset-add-rows-submit",
+      }}
+    >
+      <Box ref={bodyRef}>
+        <CSVReaderComponent
+          onUploadAccepted={({ data }: { data: string[][] }) => {
+            preprocessCSV(data);
+          }}
+        >
+          {renderMapping}
+        </CSVReaderComponent>
+      </Box>
+      <UploadNotices problem={problem} hasFormatErrors={hasErrors.length > 0} />
+    </Dialog>
   );
 }

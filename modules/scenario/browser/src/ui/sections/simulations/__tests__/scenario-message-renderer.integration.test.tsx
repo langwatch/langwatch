@@ -7,6 +7,7 @@ import type { SimulationMessage } from "@langwatch/scenario-contract";
 import { cleanup, screen } from "@testing-library/react";
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 
+import type { StreamingMessage } from "../../../../behavior/use-simulation-streaming-state.ts";
 import { ScenarioMessageRenderer } from "../scenario-message-renderer.tsx";
 
 vi.mock("../../../../behavior/stored-object/use-stored-object-url.ts", () => ({
@@ -375,6 +376,72 @@ describe("<ScenarioMessageRenderer/>", () => {
       expect(chip).not.toHaveAttribute("target");
       expect(screen.getByText("legacy.pdf")).toBeInTheDocument();
       expect(screen.queryByTestId("media-part-binary-open")).toBeNull();
+    });
+  });
+
+  describe("when a lagging stored row holds part of a completed preview", () => {
+    it("shows the preview's final text", () => {
+      renderWithDesignSystem(
+        <ScenarioMessageRenderer
+          messages={[{ id: "msg_done", role: "assistant", content: "It ships" }]}
+          streamingMessages={[
+            {
+              messageId: "msg_done",
+              role: "assistant",
+              content: "It ships tomorrow",
+              status: "complete",
+            },
+          ]}
+          variant="drawer"
+          projectId={PROJECT_ID}
+        />,
+      );
+
+      expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+      expect(screen.queryByText("It ships")).toBeNull();
+    });
+  });
+
+  describe("when the stored run holds an empty row for a streamed message", () => {
+    const renderStreaming = (streamingMessages: StreamingMessage[]) =>
+      renderWithDesignSystem(
+        <ScenarioMessageRenderer
+          messages={[
+            { id: "msg_user", role: "user", content: "Where is my order?" },
+            { id: "msg_live", role: "assistant", content: "" },
+          ]}
+          streamingMessages={streamingMessages}
+          variant="drawer"
+          projectId={PROJECT_ID}
+        />,
+      );
+
+    it("shows the streamed text in that row's place", () => {
+      renderStreaming([
+        {
+          messageId: "msg_live",
+          role: "assistant",
+          content: "It ships tomorrow",
+          status: "streaming",
+        },
+      ]);
+
+      expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+    });
+
+    describe("when the streamed message has completed before the stored END", () => {
+      it("keeps showing the final text", () => {
+        renderStreaming([
+          {
+            messageId: "msg_live",
+            role: "assistant",
+            content: "It ships tomorrow",
+            status: "complete",
+          },
+        ]);
+
+        expect(screen.getByText("It ships tomorrow")).toBeInTheDocument();
+      });
     });
   });
 

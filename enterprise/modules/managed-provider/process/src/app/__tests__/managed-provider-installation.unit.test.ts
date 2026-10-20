@@ -26,7 +26,7 @@ function secretsFrom(environment: Record<string, string | undefined>): ScopedSec
 
 function install(environment: Record<string, string | undefined>) {
   return ManagedProviderModule.create({
-    config: void 0,
+    config: { stsBase: undefined },
     resources: new ResourceScope(),
     secrets: secretsFrom(environment),
     dependencies: {},

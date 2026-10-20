@@ -45,6 +45,22 @@ Feature: Web Push delivery
       When the person subscribes with it
       Then it is refused and nothing is stored
 
+  Rule: A configured push service stands in for the browsers' own
+
+    # A dev stand-in (outboundsim under haven's +outbound) is the only addition, one origin wide.
+    @unit
+    Scenario: Without a configured push service base only the browsers' push services are accepted
+      Given WEB_PUSH_SERVICE_BASE is not set
+      Then a subscription naming a local push service is refused
+      And a send to a local address is refused at the egress fence, for good
+
+    @unit
+    Scenario: A configured push service base is accepted and reached beside the browsers' own
+      Given WEB_PUSH_SERVICE_BASE names "https://127.0.0.1:5598/push"
+      Then a subscription whose endpoint is below that base is stored
+      And an endpoint on another origin, another path, plain http or with credentials is still refused
+      And a send to that origin passes the egress fence even though it is local
+
   Rule: Every device of the person gets the push, once
 
     @unit

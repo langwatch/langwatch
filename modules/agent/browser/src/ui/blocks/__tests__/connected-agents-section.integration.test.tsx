@@ -225,7 +225,11 @@ describe("<ConnectedAgentsSection />", () => {
       const onOpen = vi.fn();
       renderSection([agent()], { onOpen });
 
-      await userEvent.click(screen.getByTestId("connected-agent-card-agent_1"));
+      await userEvent.click(
+        within(screen.getByTestId("connected-agent-card-agent_1")).getByRole("button", {
+          name: "support-agent",
+        }),
+      );
 
       expect(onOpen).toHaveBeenCalledWith(expect.objectContaining({ id: "agent_1" }));
     });

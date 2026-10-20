@@ -72,7 +72,7 @@ export function UserTurnBubble({
             <Text
               textStyle="2xs"
               color={palette.fg}
-              fontWeight="600"
+              fontWeight="semibold"
               textTransform="uppercase"
               letterSpacing="0.06em"
             >
@@ -116,7 +116,7 @@ export function UserTurnBubble({
         <Text
           textStyle="2xs"
           color={palette.fg}
-          fontWeight="600"
+          fontWeight="semibold"
           textTransform="uppercase"
           letterSpacing="0.06em"
         >

@@ -196,11 +196,25 @@ describe("given the legacy Traces addresses", () => {
 
 describe("given the retired project setup address", () => {
   describe("when an old link to the project setup screen is opened", () => {
-    it("lands on the project home", async () => {
+    /** @scenario "The old setup page sends you to Traces" */
+    it("lands on the project's Traces page", async () => {
       const router = open("/acme/setup");
 
       await waitFor(() => {
-        expect(addressOf(router)).toBe("/acme");
+        expect(addressOf(router)).toBe("/acme/traces");
+      }, LAZY_CHROME);
+    });
+  });
+});
+
+describe("given the retired onboarding project address", () => {
+  describe("when an old link to the project creation screen is opened", () => {
+    /** @scenario "The old onboarding project page sends you home" */
+    it("lands on the home page", async () => {
+      const router = open("/onboarding/acme-team/project");
+
+      await waitFor(() => {
+        expect(addressOf(router)).toBe("/");
       }, LAZY_CHROME);
     });
   });

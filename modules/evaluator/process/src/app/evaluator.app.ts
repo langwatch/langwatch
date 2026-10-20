@@ -151,7 +151,7 @@ export class EvaluatorModule implements EvaluatorApi, EvaluatorBrowserApi {
         auditLog: dependencies.auditLog,
         users: dependencies.users,
       }),
-      codeExecution: EvaluatorCodeExecutionService.withoutNlpRuntime(),
+      codeExecution: EvaluatorCodeExecutionService.create({ workflows: dependencies.workflows }),
       generateId: (kind: string) => generate(kind).toString(),
     });
 

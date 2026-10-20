@@ -4,17 +4,15 @@
  * a membership change cannot half-apply; archiving leaves for the list.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Button,
-  Card,
   Heading,
   HStack,
   Separator,
   Skeleton,
-  Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -122,12 +120,9 @@ export default function TeamDetailScreen() {
 
   if (trpcErrorCode(team.error) === "NOT_FOUND") {
     return (
-      <VStack gap={2} align="start">
-        <Heading as="h1">Team not found</Heading>
-        <Text color="fg.muted">
-          This team does not exist, or it was archived. Pick another from the Teams list.
-        </Text>
-      </VStack>
+      <PageLayout.Header description="This team does not exist, or it was archived. Pick another from the Teams list.">
+        <PageLayout.Heading>Team not found</PageLayout.Heading>
+      </PageLayout.Header>
     );
   }
 
@@ -135,26 +130,24 @@ export default function TeamDetailScreen() {
   if (team.isLoading || !team.data) {
     return (
       <VStack gap={6} width="full" align="start">
-        <HStack gap="8px">
+        <HStack gap="2">
           <Skeleton height="20px" width="60px" />
           <Skeleton height="20px" width="12px" />
           <Skeleton height="20px" width="120px" />
         </HStack>
         <Skeleton height="32px" width="200px" />
-        <Card.Root width="full">
-          <Card.Body paddingY={4}>
-            <VStack gap={4} align="start">
-              <VStack gap={2} align="start" width="full">
-                <Skeleton height="16px" width="80px" />
-                <Skeleton height="40px" width="full" />
-              </VStack>
-              <VStack gap={2} align="start" width="full">
-                <Skeleton height="16px" width="100px" />
-                <Skeleton height="40px" width="full" />
-              </VStack>
+        <Card>
+          <VStack gap={4} align="start">
+            <VStack gap={2} align="start" width="full">
+              <Skeleton height="16px" width="80px" />
+              <Skeleton height="40px" width="full" />
             </VStack>
-          </Card.Body>
-        </Card.Root>
+            <VStack gap={2} align="start" width="full">
+              <Skeleton height="16px" width="100px" />
+              <Skeleton height="40px" width="full" />
+            </VStack>
+          </VStack>
+        </Card>
       </VStack>
     );
   }
@@ -308,9 +301,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
   return (
     <>
       <PageLayout.Header>
-        <PageLayout.Heading>Team Settings</PageLayout.Heading>
-        <Spacer />
-        {updateTeam.isPending && <Spinner />}
+        <PageLayout.Heading>Team settings</PageLayout.Heading>
       </PageLayout.Header>
       <VStack gap={8} align="start" width="full" paddingTop={4}>
         <TeamForm
@@ -322,30 +313,28 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
         />
         <Separator />
         <VStack align="start" gap={3} width="full">
-          <Heading size="sm" color="fg.error">
-            Danger Zone
+          <Heading textStyle="cardTitle" color="fg.error">
+            Danger zone
           </Heading>
-          <Card.Root width="full" borderColor="border.error">
-            <Card.Body>
-              <HStack justify="space-between">
-                <VStack align="start" gap={0}>
-                  <Text fontWeight="medium">Archive this team</Text>
-                  <Text fontSize="sm" color="fg.muted">
-                    Hides the team and all its projects. Contact LangWatch support to restore it.
-                  </Text>
-                </VStack>
-                <Button
-                  colorPalette="red"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => setShowArchiveDialog(true)}
-                  disabled={archiveTeam.isPending}
-                >
-                  Archive team
-                </Button>
-              </HStack>
-            </Card.Body>
-          </Card.Root>
+          <Card variant="nested" tone="red">
+            <HStack justify="space-between">
+              <VStack align="start" gap={0}>
+                <Text fontWeight="medium">Archive this team</Text>
+                <Text fontSize="sm" color="fg.muted">
+                  Hides the team and all its projects. Contact LangWatch support to restore it.
+                </Text>
+              </VStack>
+              <Button
+                colorPalette="red"
+                variant="outline"
+                size="sm"
+                onClick={() => setShowArchiveDialog(true)}
+                disabled={archiveTeam.isPending}
+              >
+                Archive team
+              </Button>
+            </HStack>
+          </Card>
         </VStack>
       </VStack>
       <ConfirmDialog

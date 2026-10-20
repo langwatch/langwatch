@@ -168,6 +168,7 @@
                 ]
               },
               "features/querying-your-data",
+              "features/dashboards",
               "features/automations",
               "features/topic-clustering",
               "features/embedded-analytics"
@@ -537,6 +538,7 @@
               {
                 "group": "Anthropic (Claude)",
                 "pages": [
+                  "integration/anthropic/claude-platform",
                   "integration/python/integrations/anthropic",
                   "integration/go/integrations/anthropic"
                 ]
@@ -1484,6 +1486,8 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
+              "api-reference/projects/list-dashboards-boards",
+              "api-reference/projects/get-a-dashboards-board",
               "api-reference/projects/update-project",
               "api-reference/projects/regenerate-api-key",
               "api-reference/projects/archive-project"
@@ -1736,7 +1740,7 @@
   },
   "redirects": [
     {
-      "source": "/ci/cache/busted/1791401343",
+      "source": "/ci/cache/busted/1792386659",
       "destination": "/introduction"
     },
     {

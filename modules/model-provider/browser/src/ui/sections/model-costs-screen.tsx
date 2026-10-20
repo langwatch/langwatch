@@ -5,24 +5,13 @@
  */
 
 import { formatCurrency } from "@langwatch/design-system/format-currency";
+import { ListPage } from "@langwatch/design-system/list-page";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import {
-  Button,
-  Card,
-  Code,
-  HStack,
-  NativeSelect,
-  Skeleton,
-  Spacer,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
-import { SearchInput } from "@langwatch/design-system/search-input";
+import { Button, Code, NativeSelect, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { ArrowDown, ArrowUp, ArrowUpDown, Coins, MoreVertical, Plus, SearchX } from "lucide-react";
+import { Coins, MoreVertical, Plus } from "lucide-react";
 import { useState } from "react";
 
 import { modelProviderApi } from "../../behavior/model-provider-api.ts";
@@ -45,14 +34,13 @@ import { RegexHighlight } from "../elements/regex-highlight.tsx";
 /** One rate as US dollars per million tokens; the exact per-token figure sits in the tooltip. */
 function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: boolean }) {
   return (
-    <Table.Cell padding={0}>
+    <ListTable.Cell nowrap>
       {rate !== undefined && (
         <Tooltip content={`$${formatRate(rate)} per token`}>
           <Text
             as="span"
             display="inline-block"
             whiteSpace="nowrap"
-            paddingX={3}
             textStyle="sm"
             fontVariantNumeric="tabular-nums"
             color={isCustom ? "green.fg" : undefined}
@@ -65,7 +53,7 @@ function RateCell({ rate, isCustom }: { rate: number | undefined; isCustom: bool
           </Text>
         </Tooltip>
       )}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
@@ -108,9 +96,6 @@ function ModelNameCell(props: { model: string; isCustom: boolean; modelProviderI
 const editorParams = (row: { id?: string; model: string }) =>
   row.id ? { id: row.id } : { cloneModel: row.model };
 
-const SORT_ICONS = { asc: ArrowUp, desc: ArrowDown } as const;
-const ARIA_SORT = { asc: "ascending", desc: "descending" } as const;
-
 function SortHeader(props: {
   label: string;
   sortKey: ModelCostSortKey;
@@ -118,19 +103,15 @@ function SortHeader(props: {
   onSort: (key: ModelCostSortKey) => void;
   minWidth?: string;
 }) {
-  const active = props.sort?.key === props.sortKey ? props.sort.direction : null;
-  const Icon = active ? SORT_ICONS[active] : ArrowUpDown;
+  const active = props.sort?.key === props.sortKey ? props.sort.direction : false;
   return (
-    <Table.ColumnHeader
+    <ListTable.SortHeader
       minWidth={props.minWidth}
-      whiteSpace="nowrap"
-      aria-sort={active ? ARIA_SORT[active] : "none"}
+      sorted={active}
+      onSort={() => props.onSort(props.sortKey)}
     >
-      <Button size="xs" variant="ghost" onClick={() => props.onSort(props.sortKey)}>
-        {props.label}
-        <Icon size={12} />
-      </Button>
-    </Table.ColumnHeader>
+      {props.label}
+    </ListTable.SortHeader>
   );
 }
 
@@ -140,36 +121,23 @@ function countLine(args: { loaded: boolean; isFiltering: boolean; shown: number;
   return `What each of the ${args.total} models costs per token.`;
 }
 
-function FilterBar(props: {
-  search: string;
-  onSearch: (value: string) => void;
-  matchModel: string;
-  onMatchModel: (value: string) => void;
+function pageState(args: { isLoading: boolean; noCosts: boolean; noMatches: boolean }) {
+  if (args.isLoading) return "loading";
+  if (args.noCosts) return "empty";
+  if (args.noMatches) return "no-results";
+  return "ready";
+}
+
+function ProviderFilters(props: {
   provider: string;
   onProvider: (value: string) => void;
   customOnly: boolean;
   onCustomOnly: (value: boolean) => void;
   providerCounts: Map<string, number>;
   total: number;
-  isFiltering: boolean;
-  onClear: () => void;
 }) {
   return (
-    <HStack width="full" gap={3} wrap="wrap">
-      <SearchInput
-        maxWidth="320px"
-        placeholder="Search by model or regex rule"
-        aria-label="Search model costs"
-        value={props.search}
-        onChange={(event) => props.onSearch(event.target.value)}
-      />
-      <SearchInput
-        maxWidth="320px"
-        placeholder="Which rule matches this model?"
-        aria-label="Which rule matches this model?"
-        value={props.matchModel}
-        onChange={(event) => props.onMatchModel(event.target.value)}
-      />
+    <>
       <NativeSelect.Root width="56">
         <NativeSelect.Field
           aria-label="Filter by provider"
@@ -195,14 +163,15 @@ function FilterBar(props: {
       >
         Custom only
       </Button>
-      {props.isFiltering && (
-        <Button size="sm" variant="ghost" onClick={props.onClear}>
-          Clear filters
-        </Button>
-      )}
-    </HStack>
+    </>
   );
 }
+
+const COSTS_DOCS = {
+  kind: "docs",
+  label: "How model costs work",
+  href: "https://langwatch.ai/docs/integration/typescript/tutorials/tracking-llm-costs",
+} as const;
 
 export default function ModelCostsScreen() {
   const host = useModelProviderHost();
@@ -243,156 +212,154 @@ export default function ModelCostsScreen() {
     setCustomOnly(false);
   };
 
-  return (
-    <>
-      <PageLayout.Header>
-        <PageLayout.Heading>Model Costs</PageLayout.Heading>
-        <Spacer />
-        <PageLayout.HeaderButton
-          primary
-          data-testid="add-model-cost"
-          onClick={() => host.openPlatformDrawer({ drawer: "llmModelCost" })}
-          disabled={!host.hasPermission(MODEL_COST_MANAGE_PERMISSION)}
-        >
-          <Plus size={14} />
-          Add New Model
-        </PageLayout.HeaderButton>
-      </PageLayout.Header>
-      <VStack width="full" gap={6} align="start" paddingTop={4}>
-        <Text color="fg.muted">
-          {countLine({
-            loaded: !!llmModelCosts.data,
-            isFiltering,
-            shown: visibleRows.length,
-            total: rows.length,
-          })}
-        </Text>
-        {rows.length > 0 && (
-          <FilterBar
-            search={search}
-            onSearch={setSearch}
-            matchModel={matchModel}
-            onMatchModel={setMatchModel}
-            provider={provider}
-            onProvider={setProvider}
-            customOnly={customOnly}
-            onCustomOnly={setCustomOnly}
-            providerCounts={providerCounts}
-            total={rows.length}
-            isFiltering={isFiltering}
-            onClear={clearFilters}
+  const state = pageState({ isLoading: llmModelCosts.isLoading, noCosts, noMatches });
+  const shared = {
+    title: "Model costs",
+    description: countLine({
+      loaded: !!llmModelCosts.data,
+      isFiltering,
+      shown: visibleRows.length,
+      total: rows.length,
+    }),
+    actions: (
+      <PageLayout.HeaderButton
+        primary
+        data-testid="add-model-cost"
+        onClick={() => host.openPlatformDrawer({ drawer: "llmModelCost" })}
+        disabled={!host.hasPermission(MODEL_COST_MANAGE_PERMISSION)}
+      >
+        <Plus size={14} />
+        Add new model
+      </PageLayout.HeaderButton>
+    ),
+    toolbar:
+      rows.length > 0
+        ? {
+            search: {
+              value: search,
+              onChange: setSearch,
+              placeholder: "Search by model or regex rule",
+              ariaLabel: "Search model costs",
+            },
+            lookup: {
+              value: matchModel,
+              onChange: setMatchModel,
+              placeholder: "Which rule matches this model?",
+              ariaLabel: "Which rule matches this model?",
+            },
+            filters: (
+              <ProviderFilters
+                provider={provider}
+                onProvider={setProvider}
+                customOnly={customOnly}
+                onCustomOnly={setCustomOnly}
+                providerCounts={providerCounts}
+                total={rows.length}
+              />
+            ),
+            onClearFilters: isFiltering ? clearFilters : void 0,
+          }
+        : void 0,
+  } as const;
+  const costsTable = (
+    <ListTable scroll="x" scrollLabel="Model costs">
+      <ListTable.Header>
+        <ListTable.Row>
+          <SortHeader
+            label="Model name"
+            sortKey="model"
+            sort={sort}
+            onSort={onSort}
+            minWidth="160px"
           />
-        )}
-        {noCosts && (
-          <NoDataInfoBlock
-            title="No model costs"
-            description="Add a model to set what it costs per token"
-            icon={<Coins size={24} />}
+          <ListTable.ColumnHeader minWidth="160px">Regex match rule</ListTable.ColumnHeader>
+          <SortHeader label="Input cost" sortKey="inputCostPerToken" sort={sort} onSort={onSort} />
+          <SortHeader
+            label="Output cost"
+            sortKey="outputCostPerToken"
+            sort={sort}
+            onSort={onSort}
           />
-        )}
-        {noMatches && (
-          <NoDataInfoBlock
-            title="No models match"
-            description="Try a different search or provider, or clear the filters."
-            icon={<SearchX size={24} />}
+          <ListTable.ColumnHeader>Cache read</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Cache write (5 min)</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Cache write (1 hour)</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Image input</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Image output</ListTable.ColumnHeader>
+          <ListTable.ActionHeader />
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
+        {visibleRows.map((row) => (
+          <ListTable.Row
+            key={row.model}
+            onActivate={() =>
+              host.openPlatformDrawer({
+                drawer: "llmModelCost",
+                params: editorParams(row),
+              })
+            }
           >
-            <Button size="sm" variant="outline" onClick={clearFilters}>
-              Clear filters
-            </Button>
-          </NoDataInfoBlock>
-        )}
-        {!noCosts && !noMatches && (
-          <Card.Root width="full" overflow="hidden">
-            <Card.Body padding={0} overflowX="auto">
-              <Table.Root variant="line" width="full" maxWidth="100%">
-                <Table.Header width="full">
-                  <Table.Row width="full">
-                    <SortHeader
-                      label="Model name"
-                      sortKey="model"
-                      sort={sort}
-                      onSort={onSort}
-                      minWidth="160px"
-                    />
-                    <Table.ColumnHeader minWidth="160px">Regex match rule</Table.ColumnHeader>
-                    <SortHeader
-                      label="Input cost"
-                      sortKey="inputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <SortHeader
-                      label="Output cost"
-                      sortKey="outputCostPerToken"
-                      sort={sort}
-                      onSort={onSort}
-                    />
-                    <Table.ColumnHeader whiteSpace="nowrap">Cache read</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (5 minutes)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">
-                      Cache write (1 hour)
-                    </Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image input</Table.ColumnHeader>
-                    <Table.ColumnHeader whiteSpace="nowrap">Image output</Table.ColumnHeader>
-                    <Table.ColumnHeader width="64px" padding={1} />
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body width="full">
-                  {llmModelCosts.isLoading &&
-                    Array.from({ length: 3 }).map((_, rowIndex) => (
-                      <Table.Row key={rowIndex}>
-                        {Array.from({ length: 9 }).map((__, cellIndex) => (
-                          <Table.Cell key={cellIndex}>
-                            <Skeleton height="20px" />
-                          </Table.Cell>
-                        ))}
-                        <Table.Cell padding={1} />
-                      </Table.Row>
-                    ))}
-                  {visibleRows.map((row) => (
-                    <Table.Row
-                      key={row.model}
-                      width="full"
-                      cursor="pointer"
-                      _hover={{ bg: "bg.muted" }}
-                      onClick={() =>
-                        host.openPlatformDrawer({
-                          drawer: "llmModelCost",
-                          params: editorParams(row),
-                        })
-                      }
-                    >
-                      <Table.Cell>
-                        <ModelNameCell
-                          model={row.model}
-                          isCustom={!!row.updatedAt}
-                          modelProviderId={providerRows.get(providerOf(row))}
-                        />
-                      </Table.Cell>
-                      <Table.Cell>
-                        <RegexHighlight pattern={row.regex} />
-                      </Table.Cell>
-                      <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
-                      <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
-                      <Table.Cell padding={1} onClick={(event) => event.stopPropagation()}>
-                        <ActionsMenu id={row.id} model={row.model} />
-                      </Table.Cell>
-                    </Table.Row>
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Card.Body>
-          </Card.Root>
-        )}
-      </VStack>
-    </>
+            <ListTable.Cell>
+              <ModelNameCell
+                model={row.model}
+                isCustom={!!row.updatedAt}
+                modelProviderId={providerRows.get(providerOf(row))}
+              />
+            </ListTable.Cell>
+            <ListTable.Cell>
+              <RegexHighlight pattern={row.regex} />
+            </ListTable.Cell>
+            <RateCell rate={row.inputCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.outputCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.cacheReadCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.cacheCreationCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.cacheCreation1hCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.inputImageCostPerToken} isCustom={!!row.id} />
+            <RateCell rate={row.outputImageCostPerToken} isCustom={!!row.id} />
+            <ListTable.ActionCell>
+              <ActionsMenu id={row.id} model={row.model} />
+            </ListTable.ActionCell>
+          </ListTable.Row>
+        ))}
+      </ListTable.Body>
+    </ListTable>
+  );
+
+  if (state === "empty") {
+    return (
+      <ListPage
+        {...shared}
+        state="empty"
+        empty={{
+          title: "No model costs",
+          description: "Add a model to set what it costs per token.",
+          icon: <Coins size={24} />,
+          next: [COSTS_DOCS],
+        }}
+      >
+        {costsTable}
+      </ListPage>
+    );
+  }
+  if (state === "no-results") {
+    return (
+      <ListPage
+        {...shared}
+        state="no-results"
+        noResults={{
+          description: "No models match. Try a different search or provider, or clear the filters.",
+          onClear: clearFilters,
+          next: [COSTS_DOCS],
+        }}
+      >
+        {costsTable}
+      </ListPage>
+    );
+  }
+  return (
+    <ListPage {...shared} state={state}>
+      {costsTable}
+    </ListPage>
   );
 }
 
@@ -449,8 +416,7 @@ function ActionsMenu({ id, model }: { id?: string; model: string }) {
                 {
                   onSuccess: () => {
                     host.succeeded({
-                      title: "Success",
-                      description: "LLM model cost deleted successfully",
+                      title: "Model cost deleted",
                     });
                     void llmModelCosts.refetch();
                   },

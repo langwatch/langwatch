@@ -280,7 +280,7 @@ describe("TerminalView", () => {
         },
       ];
       renderView({ entries: growingEntries });
-      expect(screen.getByText("Context growing: 50.0K tokens")).toBeInTheDocument();
+      expect(screen.getByText("Context growing: 50K tokens")).toBeInTheDocument();
     });
   });
 
@@ -329,9 +329,7 @@ describe("TerminalView", () => {
       ];
       renderView({ entries: rebuildEntries });
       expect(
-        screen.getByText(
-          "Cache rebuilt: 6.0K tokens re-sent instead of reusing 10.0K tokens cached",
-        ),
+        screen.getByText("Cache rebuilt: 6K tokens re-sent instead of reusing 10K tokens cached"),
       ).toBeInTheDocument();
     });
   });
@@ -839,8 +837,8 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(screen.getByText("Context growing: 52.0K tokens")).toBeInTheDocument();
-        expect(screen.queryByText("Context growing: 60.0K tokens")).not.toBeInTheDocument();
+        expect(screen.getByText("Context growing: 52K tokens")).toBeInTheDocument();
+        expect(screen.queryByText("Context growing: 60K tokens")).not.toBeInTheDocument();
       });
     });
 
@@ -880,7 +878,7 @@ describe("TerminalView", () => {
           });
         });
 
-        expect(screen.getByText("Context growing: 60.0K tokens")).toBeInTheDocument();
+        expect(screen.getByText("Context growing: 60K tokens")).toBeInTheDocument();
         expect(offsetUnderTopEdge(view.screenEl, "bump the version")).toBe(before);
         // Two entries and the turn divider arrived above the reader. The note
         // below them is not part of that, and does not move the screen.

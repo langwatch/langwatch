@@ -182,3 +182,11 @@ Feature: Eventing framework boundary and pipeline authoring
     Then a framework document lives under the package that owns the invariant
     And a product document remains with its feature or application
     And every framework decision has one live source of truth
+
+  @unit
+  Scenario: A transient ClickHouse failure storing events is logged at warn
+    Given ClickHouse refuses an event insert with code 202 "Too many simultaneous queries"
+    When the event store's storeEvents fails on it
+    Then it is logged at warn, since the queue retries the batch
+    And the failure is still thrown to the caller
+    But a failure that is not transient is logged at error

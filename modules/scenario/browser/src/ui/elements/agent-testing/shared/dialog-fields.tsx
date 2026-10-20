@@ -6,8 +6,6 @@
 
 import { HStack, Text } from "@langwatch/design-system/primitives";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
-
 /** One label above a field. */
 export function FieldLabel({ children }: { children: React.ReactNode }) {
   return (
@@ -15,9 +13,9 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
       as="span"
       gap={1.5}
       marginBottom={1}
-      fontSize="11.5px"
+      textStyle="caption"
       fontWeight="medium"
-      color={FG_MUTED}
+      color="fg.muted"
     >
       {children}
     </HStack>
@@ -32,7 +30,7 @@ export const DIALOG_FIELD_STYLE = {
   background: "bg.panel",
   paddingX: 3,
   paddingY: 1.5,
-  fontSize: "13px",
+  textStyle: "bodySm",
   height: "auto",
   minHeight: "auto",
 } as const;
@@ -42,7 +40,7 @@ export function FieldError({ message }: { message?: string }) {
   if (!message) return null;
 
   return (
-    <Text marginTop={1} fontSize="11px" color="red.fg">
+    <Text marginTop={1} textStyle="micro" color="red.fg">
       {message}
     </Text>
   );

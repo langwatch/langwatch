@@ -56,7 +56,7 @@ export function AgentTestPanel({
         <Text fontSize="sm" fontWeight="medium">
           Test agent
         </Text>
-        <Text fontSize="11.5px" color="fg.muted">
+        <Text textStyle="caption" color="fg.muted">
           Send one message the way a simulation does and read the answer.
         </Text>
       </VStack>
@@ -72,7 +72,8 @@ export function AgentTestPanel({
           <Box>
             <Button
               size="sm"
-              colorPalette="blue"
+              colorPalette="orange"
+              variant="solid"
               loading={test.isPending}
               disabled={offline || message.trim().length === 0}
               onClick={() =>
@@ -109,14 +110,14 @@ export function AgentTestPanel({
           padding={3}
           data-testid="agent-test-result"
         >
-          <Text fontSize="11.5px" color="fg.muted">
+          <Text textStyle="caption" color="fg.muted">
             {test.data.instance
               ? `${test.data.instance.hostname}${
                   test.data.instance.label ? ` (${test.data.instance.label})` : ""
                 } answered in ${test.data.durationMs} ms`
               : `Answered in ${test.data.durationMs} ms`}
           </Text>
-          <Box as="pre" fontFamily="mono" fontSize="12px" whiteSpace="pre-wrap">
+          <Box as="pre" textStyle="monoSm" whiteSpace="pre-wrap">
             {typeof test.data.output === "string"
               ? test.data.output
               : JSON.stringify(test.data.output, null, 2)}
@@ -216,8 +217,7 @@ function TestError({ error }: { error: unknown }) {
       </Alert.Root>
       {message ? (
         <Text
-          fontSize="12px"
-          fontFamily="mono"
+          textStyle="monoSm"
           whiteSpace="pre-wrap"
           color="fg.muted"
           data-testid="agent-test-error-message"

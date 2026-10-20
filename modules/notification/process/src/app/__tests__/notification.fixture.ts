@@ -25,6 +25,7 @@ export function createNotificationTestApp(
       ses: { enabled: undefined, region: undefined, endpoint: undefined },
       smtp: { host: undefined, port: undefined, user: undefined, secure: undefined },
       publicBaseUrl: undefined,
+      webPushServiceBase: undefined,
       outboundProxy: {
         HTTPS_PROXY: undefined,
         https_proxy: undefined,

@@ -4,7 +4,7 @@
  * Spec: specs/ai-gateway/virtual-key-creation.feature
  */
 import type { Instant } from "@langwatch/time";
-import { cleanup, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -380,7 +380,8 @@ describe("given the new-virtual-key drawer", () => {
       expect(screen.getByTestId("vk-providers-invalid").textContent).toContain(
         "Select at least one provider, or allow all providers.",
       );
-      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -417,8 +418,9 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.click(screen.getByTestId("vk-ownership-organization"));
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
 
+      expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(screen.getByText("Pick the project where traces and costs land.")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -547,9 +549,7 @@ describe("given the new-virtual-key drawer", () => {
       await userEvent.type(screen.getByPlaceholderText("e.g. codex-prod"), "k");
       await userEvent.selectOptions(screen.getByTestId("vk-expiration-preset"), "custom");
 
-      await waitFor(() => {
-        expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
-      });
+      await userEvent.click(screen.getByRole("button", { name: "Create" }));
       expect(createMutateAsync).not.toHaveBeenCalled();
     });
   });
@@ -578,6 +578,185 @@ describe("given the new-virtual-key drawer", () => {
       await waitFor(() => {
         expect(screen.getByText("Pick a date in the future")).toBeTruthy();
       });
+    });
+  });
+});
+
+describe("given a key that is minted while the drawer is open", () => {
+  const SECRET = "vk-lw-secret-marker";
+  const MINTED = {
+    virtualKey: { id: "vk-new", name: "test-key" },
+    secret: SECRET,
+  };
+  const onCreated = vi.fn();
+  const onOpenChange = vi.fn();
+
+  const renderMintingDrawer = () =>
+    renderWithGatewayHost(
+      <VirtualKeyCreateDrawer
+        organizationId={ORG_ID}
+        open
+        onOpenChange={onOpenChange}
+        onCreated={onCreated}
+      />,
+      { host },
+    );
+
+  const nameInput = () => screen.getByPlaceholderText("e.g. codex-prod") as HTMLInputElement;
+
+  const createWithName = async () => {
+    await userEvent.type(nameInput(), "test-key");
+    await submit();
+  };
+
+  const handoffThrowsOnce = () =>
+    onCreated.mockImplementationOnce(() => {
+      throw new Error("could not open");
+    });
+
+  beforeEach(() => {
+    createMutateAsync.mockReset();
+    createMutateAsync.mockResolvedValue(MINTED);
+    onCreated.mockReset();
+    onOpenChange.mockReset();
+    host.recording.failures.length = 0;
+    host.recording.successes.length = 0;
+    applicableBudgetsData.rows = [];
+  });
+
+  afterEach(() => cleanup());
+
+  describe("when the create request is refused", () => {
+    /** @scenario A refused create leaves the form editable and says it failed */
+    it("keeps the form editable, raises the failure and hands nothing over", async () => {
+      createMutateAsync.mockRejectedValueOnce(new Error("socket hang up"));
+      renderMintingDrawer();
+
+      await createWithName();
+
+      await waitFor(() => expect(host.recording.failures).toHaveLength(1));
+      expect(host.recording.failures[0]?.fallbackTitle).toBe("Failed to create virtual key");
+      expect(nameInput().value).toBe("test-key");
+      expect(screen.getByRole("button", { name: "Create" })).toBeEnabled();
+      expect(onCreated).not.toHaveBeenCalled();
+      expect(screen.queryByTestId("gateway-virtual-key-handoff-failed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when handing the minted key over throws", () => {
+    /** @scenario A minted key whose handoff throws offers Show key, never another create */
+    it("says the key was created, locks the form and disables Create", async () => {
+      handoffThrowsOnce();
+      renderMintingDrawer();
+
+      await createWithName();
+
+      const banner = await screen.findByTestId("gateway-virtual-key-handoff-failed");
+      expect(banner.textContent).toContain(
+        "Virtual key created, but we couldn't finish opening it.",
+      );
+      expect(banner.textContent).toContain("You don't need to create another one.");
+      expect(screen.getByRole("button", { name: "Show key" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+      expect(nameInput().closest("[inert]")).not.toBeNull();
+      expect(host.recording.failures).toHaveLength(0);
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario Show key hands the same minted key over again */
+    it("hands the same key over when Show key is pressed, then closes once", async () => {
+      handoffThrowsOnce();
+      renderMintingDrawer();
+      await createWithName();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Show key" }));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(2));
+      expect(onCreated.mock.calls[1]?.[0]).toEqual(onCreated.mock.calls[0]?.[0]);
+      expect(onCreated.mock.calls[1]?.[0]).toEqual(
+        expect.objectContaining({ id: "vk-new", name: "test-key", secret: SECRET }),
+      );
+      expect(onOpenChange).toHaveBeenCalledTimes(1);
+      expect(onOpenChange).toHaveBeenCalledWith(false);
+      expect(screen.queryByTestId("gateway-virtual-key-handoff-failed")).not.toBeInTheDocument();
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario A second handoff failure keeps the recovery open */
+    it("keeps offering Show key when the handoff throws again", async () => {
+      handoffThrowsOnce();
+      handoffThrowsOnce();
+      renderMintingDrawer();
+      await createWithName();
+
+      await userEvent.click(await screen.findByRole("button", { name: "Show key" }));
+
+      await waitFor(() => expect(onCreated).toHaveBeenCalledTimes(2));
+      expect(screen.getByTestId("gateway-virtual-key-handoff-failed")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Show key" })).toBeInTheDocument();
+      expect(onOpenChange).not.toHaveBeenCalled();
+    });
+
+    /** @scenario Escape and Cancel do not discard a key that is still to be shown */
+    it("does not close on Escape, and Cancel cannot be pressed", async () => {
+      handoffThrowsOnce();
+      renderMintingDrawer();
+      await createWithName();
+      await screen.findByTestId("gateway-virtual-key-handoff-failed");
+
+      await userEvent.keyboard("{Escape}");
+      fireEvent.keyDown(document.body, { key: "Escape" });
+
+      expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+      expect(onOpenChange).not.toHaveBeenCalled();
+      expect(screen.getByTestId("gateway-virtual-key-handoff-failed")).toBeInTheDocument();
+    });
+
+    /** @scenario Recovery feedback never carries the secret */
+    it("puts the secret in no notice and in no text of the drawer", async () => {
+      handoffThrowsOnce();
+      renderMintingDrawer();
+      await createWithName();
+      await screen.findByTestId("gateway-virtual-key-handoff-failed");
+
+      expect(JSON.stringify(host.recording)).not.toContain(SECRET);
+      expect(document.body.textContent).not.toContain(SECRET);
+    });
+  });
+
+  describe("when the form will not close after the handoff", () => {
+    /** @scenario A form that will not close after the handoff does not hand the key over again */
+    it("offers Close only and never hands the key over a second time", async () => {
+      onOpenChange.mockImplementationOnce(() => {
+        throw new Error("could not close");
+      });
+      renderMintingDrawer();
+      await createWithName();
+
+      const banner = await screen.findByTestId("gateway-virtual-key-close-failed");
+      expect(banner.textContent).toContain("Virtual key created, but we couldn't close this form.");
+      expect(onCreated).toHaveBeenCalledTimes(1);
+      expect(screen.getByRole("button", { name: "Create" })).toBeDisabled();
+
+      await userEvent.click(within(banner).getByRole("button", { name: "Close" }));
+
+      await waitFor(() => expect(onOpenChange).toHaveBeenCalledTimes(2));
+      expect(onCreated).toHaveBeenCalledTimes(1);
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
+      expect(screen.queryByTestId("gateway-virtual-key-close-failed")).not.toBeInTheDocument();
+    });
+  });
+
+  describe("when Create is pressed twice before the first answer", () => {
+    /** @scenario A second submit while one is unfinished mints once */
+    it("makes the create request once", async () => {
+      createMutateAsync.mockReturnValue(new Promise(() => undefined));
+      renderMintingDrawer();
+      await userEvent.type(nameInput(), "test-key");
+
+      await userEvent.dblClick(screen.getByRole("button", { name: "Create" }));
+
+      expect(createMutateAsync).toHaveBeenCalledTimes(1);
     });
   });
 });

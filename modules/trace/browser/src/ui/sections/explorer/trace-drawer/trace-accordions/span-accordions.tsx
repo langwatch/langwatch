@@ -26,6 +26,7 @@ import {
 } from "../../../../blocks/explorer/trace-drawer/trace-accordions/empty-states.tsx";
 import { ScopeBlock } from "../../../../elements/explorer/trace-drawer/scope-chip.tsx";
 import { SectionFocusGlow } from "../../../../elements/explorer/trace-drawer/trace-accordions/section-focus-glow.tsx";
+import { TruncatedAttributesNotice } from "../../../../elements/explorer/trace-drawer/trace-accordions/truncated-attributes-notice.tsx";
 import { UnmappedCostSuggestion } from "../../../../elements/explorer/trace-drawer/trace-accordions/unmapped-cost-suggestion.tsx";
 import { ContentPrivacyMarkers, PiiIncompleteNotice } from "../../../content-privacy-markers.tsx";
 import { RedactedField } from "../../../redacted-field.tsx";
@@ -375,6 +376,7 @@ function ioSection(ctx: SpanSectionContext): ReactNode {
             framed
           />
           <PiiIncompleteNotice incomplete={ctx.piiIncomplete} />
+          <TruncatedAttributesNotice attributes={ctx.detail?.truncatedAttributes} />
           <RedactedField
             field="input"
             redacted={ctx.detail?.inputRedacted ?? false}
@@ -548,7 +550,12 @@ function exceptionsSection(ctx: SpanSectionContext): ReactNode {
           <Alert.Root status="error" size="sm">
             <Alert.Indicator />
             <Alert.Content>
-              <Alert.Title whiteSpace="pre-wrap">{ctx.detail.error.message}</Alert.Title>
+              <Alert.Title whiteSpace="pre-wrap">
+                {
+                  ctx.detail.error
+                    .message /* no-raw-error-toast-ok: the span's own recorded exception */
+                }
+              </Alert.Title>
             </Alert.Content>
           </Alert.Root>
           {ctx.detail.error.stacktrace.length > 0 && (
@@ -643,7 +650,10 @@ function spanSectionFlags({
     hasEvents: !!detail?.events && detail.events.length > 0,
     hasIO,
     hasLogs: spanLogs.length > 0,
-    hasPrivacyMarkers: piiIncomplete || hasHiddenCategory(contentPrivacy),
+    hasPrivacyMarkers:
+      piiIncomplete ||
+      hasHiddenCategory(contentPrivacy) ||
+      (detail?.truncatedAttributes?.length ?? 0) > 0,
     // Prompt section only when there is actual prompt metadata. The no-prompt
     // case is covered by the "Open in Playground" affordance on the IOViewer
     // header, so an empty Prompt accordion next to it would add nothing.

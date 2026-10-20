@@ -14,7 +14,6 @@ import type {
 } from "@langwatch/authorization";
 import { generate } from "@langwatch/ksuid";
 import { moduleApi } from "@langwatch/module";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import type { Instant } from "@langwatch/time";
 
 import type * as authzGrantEventsModule from "./authz-grant.events.ts";
@@ -72,7 +71,8 @@ export interface AuthzApi {
     scope: Extract<AuthzScopeRef, { type: Tier }>;
     proof?: Readonly<{ actor: Actor; purpose: AuthorizationPurpose }>;
   }): Promise<Authorized<Tier, Permission> & Readonly<{ authorization: Authorization | null }>>;
-  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing. */
+  /** The own-only proof platform code reads its own project with (ADR-177); evaluates nothing.
+   *  A project that no longer exists throws `ProjectNotFoundError`. */
   authorizeInternal(args: {
     actor: Extract<Actor, { type: "internal" | "system" }>;
     projectId: string;
@@ -275,8 +275,6 @@ export interface AuthzApi {
     resourceToken?: string;
     occurredAtMs: number;
   }): string;
-  /** The ORGANIZATION-rooted migrations authz registers (the grant import), as main named it. */
-  registeredMigrations(): readonly SystemMigration[];
 }
 
 export const AuthzApi = moduleApi<AuthzApi>()("authz");

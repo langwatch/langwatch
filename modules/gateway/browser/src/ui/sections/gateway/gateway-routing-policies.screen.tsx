@@ -1,10 +1,11 @@
 import { Banner } from "@langwatch/design-system/banner";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Text, VStack } from "@langwatch/design-system/primitives";
+import { Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { Plus } from "lucide-react";
 import { useState } from "react";
 
 import { api } from "../../../behavior/gateway-api.ts";
@@ -67,9 +68,19 @@ export function RoutingPoliciesPage() {
     });
 
   return (
-    <AiGatewayLayout pageTitle="Routing Policies · AI Gateway · LangWatch">
+    <AiGatewayLayout pageTitle="Routing policies · AI Gateway · LangWatch">
       <PageLayout.Header>
         <PageLayout.Heading>Routing policies</PageLayout.Heading>
+        <Spacer />
+        {canManage && !cannotRead && (
+          <PageLayout.HeaderButton
+            primary
+            data-testid="gateway-routing-policy-new"
+            onClick={() => openNew("organization")}
+          >
+            <Plus size={14} /> New policy
+          </PageLayout.HeaderButton>
+        )}
       </PageLayout.Header>
 
       <PageLayout.Container>

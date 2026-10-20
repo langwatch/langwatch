@@ -2,8 +2,8 @@ Feature: the development badge names the haven stack
   A developer running several haven stacks side by side cannot tell their tabs
   apart when every one of them says "DEV". Haven already knows each stack's
   slug, so it hands the slug to the app, and the development badge in the top
-  bar reads the slug instead. A development build outside haven, and every
-  production build, draw exactly what they drew before.
+  bar reads "DEV" followed by the slug. A development build outside haven, and
+  every production build, draw exactly what they drew before.
 
   @unit
   Scenario: haven names the development badge after its stack
@@ -23,7 +23,8 @@ Feature: the development badge names the haven stack
   Scenario: the development badge shows the stack's slug
     Given a development build whose deployment names the stack "feat-strict-feature-layout-v0"
     When the top bar is drawn
-    Then the development badge reads "feat-strict-feature-layout-v0" instead of "DEV"
+    Then the development badge reads "DEV · feat-strict-feature-layout-v0"
+    And its tooltip says it is a development build running that stack
 
   @integration
   Scenario: a long stack slug truncates with the full name in a tooltip
@@ -37,3 +38,4 @@ Feature: the development badge names the haven stack
     Given a development build whose deployment names no stack
     When the top bar is drawn
     Then the development badge reads "DEV"
+    And its tooltip says it is a development build

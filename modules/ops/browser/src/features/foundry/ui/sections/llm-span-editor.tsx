@@ -1,3 +1,4 @@
+import { Card, type CardTone } from "@langwatch/design-system/card";
 import {
   Box,
   Button,
@@ -13,11 +14,11 @@ import { useTraceStore } from "../../behavior/trace.store.ts";
 import { LLM_MODELS } from "../../model/foundry-models.ts";
 import type { ChatMessage, LLMConfig, SpanConfig } from "../../model/foundry-types.ts";
 
-const ROLE_COLORS: Record<string, string> = {
-  system: "purple.fg",
-  user: "green.fg",
-  assistant: "blue.fg",
-  tool: "yellow.fg",
+const ROLE_TONES: Record<string, CardTone> = {
+  system: "purple",
+  user: "green",
+  assistant: "blue",
+  tool: "yellow",
 };
 
 export function LLMSpanEditor({ span }: { span: SpanConfig }) {
@@ -36,8 +37,8 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
   }
 
   return (
-    <Box rounded="lg" border="1px solid" borderColor="blue.muted" bg="blue.subtle" p={4}>
-      <Text fontSize="sm" fontWeight="semibold" color="blue.fg" mb={3}>
+    <Card variant="nested" tone="blue" padding="md">
+      <Text as="h3" fontSize="sm" fontWeight="semibold" color="blue.fg" mb={3}>
         LLM Configuration
       </Text>
 
@@ -82,55 +83,47 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
       </Text>
       <Flex direction="column" gap={2} mb={2}>
         {messages.map((msg, i) => (
-          <Flex
-            key={i}
-            gap={2}
-            rounded="md"
-            border="1px solid"
-            borderColor="border"
-            borderLeftWidth="2px"
-            borderLeftColor={ROLE_COLORS[msg.role] ?? "gray.fg"}
-            bg="bg.subtle"
-            p={2}
-          >
-            <NativeSelect.Root width="28" flexShrink={0} size="sm">
-              <NativeSelect.Field
-                aria-label={`Message ${i + 1} role`}
-                value={msg.role}
-                onChange={(e) =>
-                  updateMessage(i, {
-                    role: e.target.value as ChatMessage["role"],
-                  })
-                }
+          <Card key={i} variant="accent-row" tone={ROLE_TONES[msg.role] ?? "neutral"}>
+            <Flex gap={2}>
+              <NativeSelect.Root width="28" flexShrink={0} size="sm">
+                <NativeSelect.Field
+                  aria-label={`Message ${i + 1} role`}
+                  value={msg.role}
+                  onChange={(e) =>
+                    updateMessage(i, {
+                      role: e.target.value as ChatMessage["role"],
+                    })
+                  }
+                >
+                  <option value="system">system</option>
+                  <option value="user">user</option>
+                  <option value="assistant">assistant</option>
+                  <option value="tool">tool</option>
+                </NativeSelect.Field>
+                <NativeSelect.Indicator />
+              </NativeSelect.Root>
+              <Textarea
+                flex={1}
+                size="sm"
+                fontSize="xs"
+                value={msg.content}
+                onChange={(e) => updateMessage(i, { content: e.target.value })}
+                rows={2}
+                resize="vertical"
+                placeholder="Message content..."
+              />
+              <Button
+                size="sm"
+                variant="ghost"
+                color="fg.muted"
+                _hover={{ color: "red.fg" }}
+                onClick={() => updateLLM({ messages: messages.filter((_, j) => j !== i) })}
+                alignSelf="flex-start"
               >
-                <option value="system">system</option>
-                <option value="user">user</option>
-                <option value="assistant">assistant</option>
-                <option value="tool">tool</option>
-              </NativeSelect.Field>
-              <NativeSelect.Indicator />
-            </NativeSelect.Root>
-            <Textarea
-              flex={1}
-              size="sm"
-              fontSize="xs"
-              value={msg.content}
-              onChange={(e) => updateMessage(i, { content: e.target.value })}
-              rows={2}
-              resize="vertical"
-              placeholder="Message content..."
-            />
-            <Button
-              size="sm"
-              variant="ghost"
-              color="fg.muted"
-              _hover={{ color: "red.fg" }}
-              onClick={() => updateLLM({ messages: messages.filter((_, j) => j !== i) })}
-              alignSelf="flex-start"
-            >
-              <Trash2 size={12} />
-            </Button>
-          </Flex>
+                <Trash2 size={12} />
+              </Button>
+            </Flex>
+          </Card>
         ))}
         <Button
           size="sm"
@@ -208,6 +201,6 @@ export function LLMSpanEditor({ span }: { span: SpanConfig }) {
           />
         </Box>
       </Flex>
-    </Box>
+    </Card>
   );
 }

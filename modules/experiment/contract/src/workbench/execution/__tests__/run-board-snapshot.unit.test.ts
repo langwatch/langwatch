@@ -48,6 +48,8 @@ const fullBoard = (): Partial<BoardResults> => ({
   errors: {},
 });
 
+const EVALUATORS = [{ id: "exact" }, { id: "tone" }];
+
 const carryOver = ({
   scope,
   results,
@@ -57,6 +59,7 @@ const carryOver = ({
 }) =>
   planBoardCarryOver({
     targets: TARGETS,
+    evaluators: EVALUATORS,
     scope,
     datasetRows: ROWS,
     results,
@@ -196,6 +199,135 @@ describe("given a board with no results at all", () => {
     /** @scenario "A run with no board behind it carries nothing" */
     it("carries nothing", () => {
       expect(carryOver({ scope: { type: "target", targetId: "target-A" } })).toEqual([]);
+    });
+  });
+});
+
+const boardWithTwoEvaluators = (): Partial<BoardResults> => {
+  const board = fullBoard();
+  return {
+    ...board,
+    evaluatorResults: {
+      ...board.evaluatorResults,
+      "target-A": {
+        ...board.evaluatorResults?.["target-A"],
+        tone: [{ status: "processed", label: "kind" }],
+      },
+    },
+  };
+};
+
+describe("given a board scored by two evaluators", () => {
+  describe("when one evaluator is rerun on the first row of one column", () => {
+    const rerun = () =>
+      carryOver({
+        scope: {
+          type: "evaluator",
+          rowIndex: 0,
+          targetId: "target-A",
+          evaluatorId: "exact",
+          targetOutput: "A one",
+          traceId: "trace-a0",
+        },
+        results: boardWithTwoEvaluators(),
+      });
+
+    /** @scenario "Rerunning one cell's evaluator carries that cell's output" */
+    it("carries that cell's output, cost and trace", () => {
+      expect(cellAt(rerun(), { rowIndex: 0, targetId: "target-A" })).toMatchObject({
+        output: "A one",
+        cost: 0.1,
+        traceId: "trace-a0",
+      });
+    });
+
+    /** @scenario "Rerunning one cell's evaluator carries that cell's output" */
+    it("carries the other evaluator's verdict but not the one being rerun", () => {
+      expect(cellAt(rerun(), { rowIndex: 0, targetId: "target-A" })?.evaluatorResults).toEqual([
+        { evaluatorId: "tone", result: { status: "processed", label: "kind" } },
+      ]);
+    });
+
+    /** @scenario "Rerunning one cell's evaluator carries that cell's output" */
+    it("still carries the rerun evaluator's verdicts on the other rows", () => {
+      expect(
+        cellAt(rerun(), { rowIndex: 1, targetId: "target-A" })?.evaluatorResults,
+      ).toContainEqual({
+        evaluatorId: "exact",
+        result: { status: "processed", passed: false, score: 0 },
+      });
+    });
+  });
+
+  describe("when one evaluator is rerun on a cell with no saved output to reuse", () => {
+    const rerun = () =>
+      carryOver({
+        scope: { type: "evaluator", rowIndex: 0, targetId: "target-A", evaluatorId: "exact" },
+        results: boardWithTwoEvaluators(),
+      });
+
+    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
+    it("does not carry that cell", () => {
+      expect(cellAt(rerun(), { rowIndex: 0, targetId: "target-A" })).toBeUndefined();
+    });
+
+    /** @scenario "Rerunning an evaluator without a saved output leaves that cell to the run" */
+    it("still carries the column's other rows", () => {
+      expect(cellAt(rerun(), { rowIndex: 1, targetId: "target-A" })?.output).toBe("A two");
+    });
+  });
+
+  describe("when one evaluator is run on all rows of one column", () => {
+    const runAll = () =>
+      carryOver({
+        scope: {
+          type: "evaluator-all-rows",
+          targetId: "target-A",
+          evaluatorId: "exact",
+          precomputedTargetOutputs: { 0: "A one", 1: "A two" },
+          traceIds: { 0: "trace-a0" },
+        },
+        results: boardWithTwoEvaluators(),
+      });
+
+    /** @scenario "Running an evaluator on all rows carries every row's output" */
+    it("carries every row's output of that column", () => {
+      const carried = runAll();
+      expect(cellAt(carried, { rowIndex: 0, targetId: "target-A" })?.output).toBe("A one");
+      expect(cellAt(carried, { rowIndex: 1, targetId: "target-A" })?.output).toBe("A two");
+    });
+
+    /** @scenario "Running an evaluator on all rows carries every row's output" */
+    it("carries no verdict of that evaluator for that column", () => {
+      const verdicts = runAll()
+        .filter((cell) => cell.targetId === "target-A")
+        .flatMap((cell) => cell.evaluatorResults.map((verdict) => verdict.evaluatorId));
+      expect(verdicts).toEqual(["tone"]);
+    });
+  });
+});
+
+describe("given a board holding a verdict of an evaluator that was removed", () => {
+  describe("when one column is run", () => {
+    /** @scenario "A verdict of an evaluator no longer on the workbench is not carried" */
+    it("does not carry the removed evaluator's verdict", () => {
+      const board = fullBoard();
+      const carried = carryOver({
+        scope: { type: "target", targetId: "target-A" },
+        results: {
+          ...board,
+          evaluatorResults: {
+            "target-B": {
+              ...board.evaluatorResults?.["target-B"],
+              removed: [{ status: "error", details: "Evaluator cannot be reached" }],
+            },
+          },
+        },
+      });
+
+      expect(
+        carried.flatMap((cell) => cell.evaluatorResults.map((verdict) => verdict.evaluatorId)),
+      ).toEqual(["exact", "exact"]);
     });
   });
 });

@@ -7,29 +7,15 @@ import { HandledError } from "@langwatch/handled-error";
 import { LOCAL_CONTROL_PROTOCOL_VERSION, type PlatformFrame } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
-import {
-  type WorkspaceNudge,
-  workspaceNudgeSchema,
-} from "../../../rules/langy-local-call-record.rules.ts";
-import { disconnectMessage } from "../../../rules/langy-local-session-text.rules.ts";
-
-/** A nudge from another pod, or null when it is not one this build understands. */
-function parseWorkspaceNudge(raw: string): WorkspaceNudge | null {
-  try {
-    const parsed = workspaceNudgeSchema.safeParse(JSON.parse(raw));
-
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
-  }
-}
 import type { LangyLocalPresenceRepository } from "../../../repositories/langy-local-presence.repository.ts";
+import type { WorkspaceNudge } from "../../../rules/langy-local-call-record.rules.ts";
 import type {
   ControlBuffer,
   ControlConversations,
   ControlEvents,
   ControlSession,
 } from "../../../rules/langy-local-session-contract.rules.ts";
+import { disconnectMessage } from "../../../rules/langy-local-session-text.rules.ts";
 import type { LocalCallDispatcherService } from "./langy-local-call-dispatcher.service.ts";
 import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 
@@ -169,14 +155,9 @@ export class LocalControlLifecycleService {
 
   async onNudge(
     session: ControlSession,
-    raw: string,
+    parsed: WorkspaceNudge,
     send: (frame: PlatformFrame) => void,
   ): Promise<void> {
-    const parsed = parseWorkspaceNudge(raw);
-    if (!parsed) {
-      return;
-    }
-
     if ("call" in parsed) {
       const lookup = await this.deps.dispatcher.getCall(parsed.call);
       if (lookup.kind === "miss" || lookup.call.conversationId !== session.conversationId) {

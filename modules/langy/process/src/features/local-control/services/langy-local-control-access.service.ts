@@ -2,10 +2,8 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { HandledError } from "@langwatch/handled-error";
 import { LangyLocalRequestInvalidError } from "@langwatch/langy-contract";
 
-import type {
-  ControlRequestService,
-  StoredControlRequest,
-} from "./langy-local-control-request.service.ts";
+import type { StoredControlRequest } from "../../../repositories/langy-local-control-request.repository.ts";
+import type { ControlRequestService } from "./langy-local-control-request.service.ts";
 
 /** The two permissions a control request is read and acted on under. */
 type ControlRequestPermission = "langy:view" | "langy:create";

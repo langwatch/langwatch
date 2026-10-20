@@ -110,7 +110,7 @@ describe("given the unified automations table", () => {
         itemName: /Delete automation Cost spike/,
       });
 
-      const dialog = within(screen.getByRole("dialog"));
+      const dialog = within(screen.getByRole("alertdialog"));
       expect(dialog.getByText("Delete automation")).toBeInTheDocument();
       expect(dialog.getByText(/This permanently deletes "Cost spike"/)).toBeInTheDocument();
       expect(listPagesMocks.deleteMutate).not.toHaveBeenCalled();

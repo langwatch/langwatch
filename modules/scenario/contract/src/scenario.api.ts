@@ -240,9 +240,9 @@ export interface ScenarioUsageCount {
   readonly runs: number;
 }
 
-/** One run of one scenario, as the tRPC `run` input names it, started by `actor`. */
+/** One run of one scenario, as the tRPC `run` input names it, started by `actor` (none: nobody). */
 export type ScenarioLaunchRunInput = z.infer<typeof scenarioTrpcRunSchema> &
-  Readonly<{ actor: RunActor }>;
+  Readonly<{ actor: RunActor | undefined }>;
 
 /** The scenario application: what every scenario door calls, and what peer
  * features such as Suite reach it by. */

@@ -1,6 +1,9 @@
 package diffkit
 
-import "testing"
+import (
+	"net/http"
+	"testing"
+)
 
 func TestOperationsResolvesRefsAndSecurity(t *testing.T) {
 	document := map[string]any{
@@ -33,7 +36,7 @@ func TestOperationsResolvesRefsAndSecurity(t *testing.T) {
 		t.Fatalf("want one operation, got %d", len(operations))
 	}
 	op := operations[0]
-	if op.Method != "POST" || op.Path != "/api/thing/{id}" || op.OperationID != "createThing" {
+	if op.Method != http.MethodPost || op.Path != "/api/thing/{id}" || op.OperationID != "createThing" {
 		t.Fatalf("operation identity wrong: %+v", op)
 	}
 	if !op.BodyRequired || op.BodySchema["type"] != "object" {

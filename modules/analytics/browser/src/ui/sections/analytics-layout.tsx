@@ -1,99 +1,71 @@
 /**
- * The rail and the header every analytics page sits in — chrome (sidebar,
- * top bar, drawer mount) belongs to the route tree, so this drops the
- * outermost wrapper. Which entry is selected ARRIVES AS A PROP, never read.
+ * The header and tabs every analytics page sits in — chrome (sidebar, top bar, drawer mount)
+ * belongs to the route tree, so this drops the outermost wrapper. Which tab is selected
+ * ARRIVES AS A PROP, never read. A dashboard page adds its own title row above the content.
  */
 
+import { PageHeaderSizeProvider } from "@langwatch/design-system/page-layout";
 import { Box } from "@langwatch/design-system/primitives";
-import {
-  SectionNavigationFrame,
-  type SectionNavigationGroup,
-  type SectionNavigationLink,
-} from "@langwatch/design-system/section-navigation-frame";
-import { Gauge, Hash, LayoutDashboard, ListChecks, Users } from "lucide-react";
 import type { PropsWithChildren } from "react";
 
-import { useFilterToggle } from "../../behavior/use-filter-toggle.ts";
 import { useAnalyticsHost } from "../../model/analytics-host.ts";
-import { AnalyticsHeader, type AnalyticsHeaderProps } from "./analytics-header.tsx";
-import { CustomDashboardsSection } from "./custom-dashboards-section.tsx";
+import { AnalyticsHeader } from "./analytics-header.tsx";
+import { AnalyticsTabs } from "./analytics-tabs.tsx";
+import { DashboardTitleRow, type DashboardTitleRowProps } from "./dashboard-title-row.tsx";
 import { SavedViewsScope } from "./saved-views-scope.tsx";
 
-/** Which rail entry the page being rendered is. */
-export type AnalyticsRailEntry =
-  | "overview"
-  | "users"
-  | "topics"
-  | "metrics"
-  | "evaluations"
-  | "reports"
-  | "custom";
+/** Which header tab the page being rendered is; `reports` lights the Dashboards menu tab. */
+export type AnalyticsTab = "overview" | "users" | "topics" | "metrics" | "evaluations" | "reports";
 
 export default function AnalyticsLayout({
   children,
-  title,
-  railEntry,
+  tab,
   activeDashboardId,
-  analyticsHeaderProps,
-  extraHeaderButtons,
+  dashboard,
 }: PropsWithChildren<{
-  title: string;
-  railEntry?: AnalyticsRailEntry;
+  tab?: AnalyticsTab;
   activeDashboardId?: string;
-  analyticsHeaderProps?: Omit<AnalyticsHeaderProps, "title">;
-  extraHeaderButtons?: React.ReactNode;
+  /** A custom dashboard's own title row, under the header. */
+  dashboard?: DashboardTitleRowProps;
 }>) {
   const host = useAnalyticsHost();
   const project = host.project();
-  const { showFilters } = useFilterToggle();
-
-  const base = `/${project?.slug}/analytics`;
-  const link = (label: string, path: string, icon: SectionNavigationLink["icon"]) => ({
-    label,
-    href: `${base}${path}`,
-    icon,
-  });
-  const entries = {
-    overview: link("Overview", "", <LayoutDashboard size={14} />),
-    users: link("Users", "/users", <Users size={14} />),
-    topics: link("Topics", "/topics", <Hash size={14} />),
-    metrics: link("LLM Metrics", "/metrics", <Gauge size={14} />),
-    evaluations: link("Online Evaluations", "/evaluations", <ListChecks size={14} />),
-  };
-  const groups: SectionNavigationGroup[] = [
-    { label: "Engagement", links: [entries.users, entries.topics] },
-    { label: "Observability", links: [entries.metrics, entries.evaluations] },
-    {
-      label: "Custom",
-      links: [],
-      extra: project?.slug ? (
-        <CustomDashboardsSection projectSlug={project.slug} activeDashboardId={activeDashboardId} />
-      ) : null,
-    },
-  ];
-  const activeHref =
-    !railEntry || railEntry === "reports" || railEntry === "custom" ? "" : entries[railEntry].href;
 
   return (
     <SavedViewsScope>
-      <SectionNavigationFrame
-        label="Analytics"
-        header={
+      <PageHeaderSizeProvider size="lg">
+        <Box
+          data-testid="analytics-layout"
+          background="bg.surface"
+          position="relative"
+          flex={1}
+          minWidth={0}
+          minHeight={0}
+          overflowY="auto"
+          overflowX="hidden"
+        >
           <AnalyticsHeader
-            title={title}
-            {...analyticsHeaderProps}
-            extraHeaderButtons={extraHeaderButtons}
+            tabs={
+              project?.slug ? (
+                <AnalyticsTabs
+                  projectSlug={project.slug}
+                  tab={tab}
+                  activeDashboardId={activeDashboardId}
+                />
+              ) : null
+            }
           />
-        }
-        links={[entries.overview]}
-        groups={groups}
-        activeHref={activeHref}
-        onNavigate={(href) => host.navigate(href)}
-      >
-        <Box maxWidth={showFilters ? "1612px" : "1200px"} marginX="auto">
-          {children}
+          <Box
+            data-testid="analytics-content"
+            paddingX={6}
+            paddingTop={dashboard ? 2 : 4}
+            paddingBottom={16}
+          >
+            {dashboard ? <DashboardTitleRow {...dashboard} /> : null}
+            {children}
+          </Box>
         </Box>
-      </SectionNavigationFrame>
+      </PageHeaderSizeProvider>
     </SavedViewsScope>
   );
 }

@@ -10,10 +10,11 @@ Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
 ## Screens
 
-| Page key                | URL         | Within   | Label            | Permission          | Flags |
-| ----------------------- | ----------- | -------- | ---------------- | ------------------- | ----- |
-| `pages/[project]/index` | `/:project` | project  | Home             | –                   | –     |
-| `pages/settings`        | `/settings` | settings | Project Settings | `organization:view` | –     |
+| Page key                 | URL                 | Within   | Label                 | Permission          | Flags |
+| ------------------------ | ------------------- | -------- | --------------------- | ------------------- | ----- |
+| `pages/[project]/index`  | `/:project`         | project  | Home                  | –                   | –     |
+| `pages/settings`         | `/settings`         | settings | Organization settings | `organization:view` | –     |
+| `pages/settings/project` | `/settings/project` | settings | Project settings      | `project:update`    | –     |
 
 A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`; the screen declares no `path`.
 
@@ -23,7 +24,7 @@ None.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/annotation-client`, `@langwatch/dataset-client`, `@langwatch/monitor-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
+- Client packages (package.json): `@langwatch/analytics-client`, `@langwatch/annotation-client`, `@langwatch/dataset-client`, `@langwatch/monitor-client`, `@langwatch/navigation-client`, `@langwatch/onboarding-client`, `@langwatch/ops-client`, `@langwatch/organization-client`, `@langwatch/project-client`, `@langwatch/prompt-client`, `@langwatch/trace-client`, `@langwatch/workflow-client`.
 - Lends: `HeroAskFieldToken`, `ProjectSwitcherToken`.
 - Host APIs it requires: `ProjectHostApi`, `ProjectHomeHost`.
 

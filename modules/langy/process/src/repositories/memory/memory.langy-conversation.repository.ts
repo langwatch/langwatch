@@ -22,6 +22,7 @@ function toRow(projection: Projection): LangyConversationRow {
     userId: state.UserId,
     title: state.Title,
     isShared: state.IsShared,
+    origin: state.Origin,
     status: state.Status,
     currentTurnId: state.CurrentTurnId,
     lastError: state.LastError,

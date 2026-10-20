@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { act, render, screen } from "@testing-library/react";
+import { act, fireEvent, render, screen } from "@testing-library/react";
 import { useState } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -57,20 +57,25 @@ function Harness() {
   const { scrollRef, contentRef, endRef, isPinned, canScroll, jumpToLatest } =
     useLangyStickToBottom();
   const [height, setHeight] = useState(80);
+  const [columnShown, setColumnShown] = useState(true);
 
   return (
     <div>
-      <div data-testid="scroller" ref={scrollRef}>
-        <div data-testid="content" ref={contentRef} style={{ height }}>
-          <div ref={endRef} />
+      {columnShown ? (
+        <div data-testid="scroller" ref={scrollRef}>
+          <div data-testid="content" ref={contentRef} style={{ height }}>
+            <div ref={endRef} />
+          </div>
         </div>
-      </div>
+      ) : null}
       <span data-testid="pinned">{String(isPinned)}</span>
       <span data-testid="can-scroll">{String(canScroll)}</span>
       <button onClick={jumpToLatest}>jump</button>
       {/* Stands in for "a token arrived" / "a card rendered" — content grows
           without anything the old effect's dep list would have noticed. */}
       <button onClick={() => setHeight((h) => h + 200)}>grow</button>
+      {/* Stands in for the recents view taking the panel body and handing it back. */}
+      <button onClick={() => setColumnShown((shown) => !shown)}>toggle column</button>
     </div>
   );
 }
@@ -406,6 +411,64 @@ describe("given the Langy message column follows a stream", () => {
 
       grow({ scroller, to: 800 });
       expect(scroller.scrollTop).toBe(800);
+    });
+  });
+
+  describe("when the column is taken away and shown again", () => {
+    /** Swap the column out and back in, as the recents view does; returns the new scroller. */
+    function rebuildColumn(): HTMLElement {
+      const toggle = screen.getByRole("button", { name: "toggle column" });
+      act(() => {
+        fireEvent.click(toggle);
+      });
+      act(() => {
+        fireEvent.click(toggle);
+      });
+      const scroller = screen.getByTestId("scroller");
+      installScrollIntoView(scroller);
+      return scroller;
+    }
+
+    /** @scenario "A column shown again after the recent chats still answers the reader" */
+    it("hears the reader scroll up in the new column", () => {
+      const { pinned } = setup();
+      const scroller = rebuildColumn();
+      grow({ scroller, to: 500 });
+
+      userScrollTo({ scroller, top: 100 });
+
+      expect(pinned()).toBe("false");
+    });
+
+    /** @scenario "A conversation shown again starts at its live edge and follows" */
+    it("starts the new column pinned, though the reader had scrolled up in the old one", () => {
+      const { scroller: before, pinned } = setup();
+      grow({ scroller: before, to: 500 });
+      userScrollTo({ scroller: before, top: 100 });
+      expect(pinned()).toBe("false");
+
+      const scroller = rebuildColumn();
+      expect(pinned()).toBe("true");
+
+      grow({ scroller, to: 900 });
+      expect(scroller.scrollTop).toBe(900);
+    });
+  });
+
+  describe("when the column shrinks to fit with no scroll to report it", () => {
+    /** @scenario "A new chat follows its first answer" */
+    it("re-pins, so the next answer is followed", () => {
+      const { scroller, pinned } = setup();
+      grow({ scroller, to: 500 });
+      // Read from the very top: a new chat then leaves scrollTop at 0, so no scroll event fires.
+      userScrollTo({ scroller, top: 0 });
+      expect(pinned()).toBe("false");
+
+      grow({ scroller, to: 60 });
+      expect(pinned()).toBe("true");
+
+      grow({ scroller, to: 700 });
+      expect(scroller.scrollTop).toBe(700);
     });
   });
 

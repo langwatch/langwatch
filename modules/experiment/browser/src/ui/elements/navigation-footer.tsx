@@ -1,11 +1,9 @@
 import { useRouter } from "@langwatch/browser-host/use-router";
-import { HStack, IconButton, NativeSelect, Text } from "@langwatch/design-system/primitives";
-import { ChevronLeft, ChevronRight } from "lucide-react"; // Changed from react-feather
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
 // Constants
 const DEFAULT_PAGE_SIZE = 25;
-const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250] as const;
+export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100, 250] as const;
 
 /**
  * Represents cursor pagination information decoded from a scrollId
@@ -174,6 +172,9 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
     [router, buildPaginationQuery],
   );
 
+  /** Open a 1-based page of an offset list, as a page picker names it. */
+  const goToPage = (page: number) => goTo({ pageOffset: Math.max(0, (page - 1) * pageSize) });
+
   /**
    * Navigate to the next page
    * @param currentResponseScrollId - Scroll ID from the current response (for cursor pagination)
@@ -293,161 +294,9 @@ export const useMessagesNavigationFooter = (mode: PaginationMode = "offset") => 
     nextPage,
     prevPage,
     changePageSize,
+    goToPage,
     useUpdateTotalHits,
   };
 };
 
-/**
- * Footer component for messages navigation with pagination controls
- */
-export function MessagesNavigationFooter({
-  mode = "offset",
-  totalHits,
-  pageOffset = 0,
-  pageSize,
-  isPastFirstPage = false,
-  cursorPageNumber = 1,
-  estimatedTotalPages = 1,
-  nextPage,
-  prevPage,
-  changePageSize,
-  scrollId,
-}: {
-  /** See {@link PaginationMode}. Decides which controls mean anything here. */
-  mode?: PaginationMode;
-  totalHits: number;
-  pageOffset?: number;
-  pageSize: number;
-  /**
-   * True once a cursor list has walked past its first page. Offset lists leave
-   * it false and are described by `pageOffset` alone.
-   */
-  isPastFirstPage?: boolean;
-  cursorInfo?: CursorInfo | null;
-  cursorPageNumber?: number;
-  estimatedTotalPages?: number;
-  nextPage: (currentResponseScrollId?: string | null) => void;
-  prevPage: () => void;
-  changePageSize: (size: number) => void;
-  /**
-   * Cursor for the NEXT page, from the current response. Present only for
-   * cursor lists, where its absence is how "nothing follows this" is said.
-   */
-  scrollId?: string | null;
-}) {
-  if (totalHits === 0 && pageOffset === 0 && !isPastFirstPage) return null;
-
-  const isCursorMode = mode === "cursor";
-
-  // A cursor URL can be opened cold — shared, bookmarked, or refreshed — and the
-  // walked-cursor stack only exists in the session that walked it.
-  const isPrevDisabled = isCursorMode ? !isPastFirstPage : pageOffset === 0;
-  // Cold-opened, the counter says 1 while the list shows some later page, so
-  // the position is genuinely unknown rather than known-to-be-one. Saying so is
-  // better than printing a number we would be inventing.
-  const isPositionUnknown = isPastFirstPage && cursorPageNumber <= 1;
-  // A cursor list is out of pages when the response carried no cursor — which
-  // is also true on its first page, so this cannot be keyed on having walked
-  // past page one. An offset list is out when the window reaches the total.
-  const isNextDisabled = isCursorMode ? !scrollId : pageOffset + pageSize >= totalHits;
-
-  const isSinglePage = !isCursorMode && !isPastFirstPage && totalHits <= pageSize;
-  const showPageSize = !isSinglePage || totalHits > PAGE_SIZE_OPTIONS[0];
-
-  return (
-    <HStack paddingX={6} paddingY={3} gap={4} justify="space-between" flexWrap="wrap">
-      {showPageSize ? (
-        <HStack gap={2}>
-          <Text asChild textStyle="sm" color="fg.muted" flexShrink={0}>
-            <label htmlFor="page-size">Items per page</label>
-          </Text>
-          <NativeSelect.Root size="xs" width="auto">
-            <NativeSelect.Field
-              id="page-size"
-              value={pageSize.toString()}
-              onChange={(e) => changePageSize(parseInt(e.target.value, 10))}
-              style={{ fontVariantNumeric: "tabular-nums" }}
-            >
-              {PAGE_SIZE_OPTIONS.map((size) => (
-                <option key={size} value={size.toString()}>
-                  {size}
-                </option>
-              ))}
-            </NativeSelect.Field>
-            <NativeSelect.Indicator />
-          </NativeSelect.Root>
-        </HStack>
-      ) : (
-        <span />
-      )}
-
-      <HStack gap={3}>
-        <Text textStyle="sm" color="fg.muted" flexShrink={0} fontVariantNumeric="tabular-nums">
-          {pageRangeLabel({
-            isCursorPage: isCursorMode && isPastFirstPage,
-            isPositionUnknown,
-            estimatedTotalPages,
-            cursorPageNumber,
-            totalHits,
-            pageOffset,
-            pageSize,
-          })}
-        </Text>
-        {!isSinglePage && (
-          <HStack gap={1}>
-            <IconButton
-              variant="outline"
-              size="xs"
-              onClick={prevPage}
-              disabled={isPrevDisabled}
-              aria-label="Go to previous page"
-              title="Go to previous page"
-            >
-              <ChevronLeft />
-            </IconButton>
-            <IconButton
-              variant="outline"
-              size="xs"
-              disabled={isNextDisabled}
-              onClick={() => nextPage(scrollId)}
-              aria-label="Go to next page"
-              title="Go to next page"
-            >
-              <ChevronRight />
-            </IconButton>
-          </HStack>
-        )}
-      </HStack>
-    </HStack>
-  );
-}
-
-// Backward compatibility exports
-function pageRangeLabel({
-  isCursorPage,
-  isPositionUnknown,
-  estimatedTotalPages,
-  cursorPageNumber,
-  totalHits,
-  pageOffset,
-  pageSize,
-}: {
-  isCursorPage: boolean;
-  isPositionUnknown: boolean;
-  estimatedTotalPages: number;
-  cursorPageNumber: number;
-  totalHits: number;
-  pageOffset: number;
-  pageSize: number;
-}): string {
-  if (!isCursorPage) {
-    return `${pageOffset + 1}-${Math.min(pageOffset + pageSize, totalHits)} of ${totalHits} items`;
-  }
-  if (isPositionUnknown) {
-    return `Resumed from a link, in about ${estimatedTotalPages} pages (${totalHits} total items)`;
-  }
-  return `Page ${cursorPageNumber} of about ${estimatedTotalPages} (${totalHits} total items)`;
-}
-
 export const useNavigationFooter = useMessagesNavigationFooter;
-export const NavigationFooter = MessagesNavigationFooter;

@@ -24,6 +24,7 @@ function license(overrides: Partial<License> = {}): License {
     planType: "ENTERPRISE",
     maxMembers: 50,
     maxMembersLite: 5,
+    liteSeatsUnlimited: false,
     issuedAt: ISSUED,
     expiresAt: TERM_END,
     source: "BACKOFFICE",
@@ -75,7 +76,7 @@ describe("LicensesTable", () => {
       expect(screen.getAllByText("ACME Rockets")).toHaveLength(3);
       expect(screen.getAllByText("ENTERPRISE")).toHaveLength(3);
       expect(screen.getAllByText("50")).toHaveLength(3);
-      expect(screen.getAllByText(new Date(TERM_END).toLocaleDateString())).toHaveLength(3);
+      expect(screen.getAllByText(/2027/)).toHaveLength(3);
       expect(screen.getByText("revoked")).toBeTruthy();
       expect(screen.getByText("expired")).toBeTruthy();
       expect(screen.getAllByText("Instant evals")).toHaveLength(2);

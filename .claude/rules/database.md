@@ -10,7 +10,7 @@ paths:
 
 # Database
 
-Before any migration, load the `migration` skill; it routes to `postgres-migration`, `clickhouse-migration` or `migration-data-step`. Every release from the LTS floor to head must keep running on every later schema (dev/docs/plans/migrations-rethink-2026-10-06.md 6.12): add columns nullable or with `DEFAULT`; drop only what no release at or above the floor reads, with `-- contract: retired in <release>`; never rename in place. No new foreign keys and no new `@relation` (Alex, 2026-10-06); existing ones stay. Never edit a merged migration; write a new one.
+Before any migration, load the `migration` skill; it routes to `postgres-migration`, `clickhouse-migration` or `migration-data-step`. The previous release must keep running on every later schema, and no release is a required stop: any install rolls through every step (Alex, 2026-10-11). Add columns nullable or with `DEFAULT`; nothing is deleted automatically (Alex, 2026-10-11): a migration never drops a table or a column, and a drop is an operator step confirmed in Ops once safe; never rename in place. No new foreign keys and no new `@relation` (Alex, 2026-10-06); existing ones stay. Never edit a merged migration; write a new one.
 
 Read `dev/docs/best_practices/clickhouse-queries.md` before writing or changing a
 ClickHouse query.
@@ -26,5 +26,6 @@ ClickHouse query.
 | One `ALTER TABLE` per goose `StatementBegin`/`StatementEnd` block                           | ClickHouse has no multi-statement queries                                  |
 | ClickHouse down-migrations stay commented out                                               | Note: "To roll back, uncomment and run manually"                           |
 
-Migrations run as tasks (`pnpm prisma:migrate`, `pnpm clickhouse:migrate`),
-before serve, never in the api.
+Migrations are applied by `pnpm task upgrade` (the root `pnpm prisma:migrate` and
+`pnpm clickhouse:migrate` are aliases of it), which a worker runs before it takes jobs; never in the api.
+A backfill walks a table once, in pages with `sendBatch`, as a registered step; a re-run is Retry in Ops.

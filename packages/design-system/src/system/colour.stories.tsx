@@ -48,6 +48,16 @@ const semanticColours = [
   "fg",
   "fg.muted",
   "fg.subtle",
+  "fg.onColor",
+  "avatar.orange",
+  "avatar.blue",
+  "avatar.green",
+  "avatar.yellow",
+  "avatar.purple",
+  "avatar.teal",
+  "avatar.cyan",
+  "avatar.pink",
+  "bg.devBadge",
   "border",
   "border.muted",
   "border.subtle",
@@ -122,7 +132,7 @@ function ColourFoundations() {
   return (
     <Stack gap="10" maxWidth="5xl">
       <Stack gap="1">
-        <Heading size="lg">Colour foundations</Heading>
+        <Heading size="xl">Colour foundations</Heading>
         <Text color="fg.muted">
           Production main’s gray and zinc palette, with #ED8926 brand orange. Semantic tokens select
           the light and dark values; compatibility names alias main’s roles.
@@ -130,7 +140,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Foundations</Heading>
+        <Heading size="sm">Foundations</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {foundationColours.map((token) => (
             <Swatch key={token} token={token} />
@@ -139,7 +149,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Semantic tokens</Heading>
+        <Heading size="sm">Semantic tokens</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {semanticColours.map((token) => (
             <Swatch key={token} token={token} />
@@ -148,7 +158,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Accent (brand orange)</Heading>
+        <Heading size="sm">Accent (brand orange)</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {accentColours.map((token) => (
             <Swatch key={token} token={token} />
@@ -157,7 +167,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Status</Heading>
+        <Heading size="sm">Status</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {statusColours.map((token) => (
             <Swatch key={token} token={token} />
@@ -166,7 +176,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Chart series</Heading>
+        <Heading size="sm">Chart series</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {chartColours.map((token) => (
             <Swatch key={token} token={token} />
@@ -175,7 +185,7 @@ function ColourFoundations() {
       </Stack>
 
       <Stack gap="4">
-        <Heading size="md">Overlay</Heading>
+        <Heading size="sm">Overlay</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {overlayColours.map((token) => (
             <Swatch key={token} token={token} />

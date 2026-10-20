@@ -82,7 +82,8 @@ async function waitForLease({
 
 /**
  * Runs `work` holding the runner lease (rethink 6.7): waits for a live holder up to `waitMs`, then
- * gives up naming it; renews on a heartbeat; aborts `work` when the lease is lost; releases it.
+ * gives up naming it; renews on a heartbeat; aborts `work` when the lease is lost, or when no
+ * renewal has answered for the time to live less one heartbeat (a hung one); releases it.
  */
 export async function holdUpgradeLease<Result>({
   ledger,
@@ -109,35 +110,73 @@ export async function holdUpgradeLease<Result>({
   const onParentAbort = () => held.abort(signal.reason);
   signal.addEventListener("abort", onParentAbort, { once: true });
   let lost = false;
-  let renewedAt = performance.now();
-  const heartbeat = setInterval(() => {
-    void ledger
-      .renewLease({ name, owner: identity.owner, ttlMs: timing.ttlMs })
-      .then((renewed) => {
-        if (renewed) renewedAt = performance.now();
-        else loseLease("another runner holds the upgrade lease");
-      })
-      .catch((error: unknown) => {
-        log.warn("could not renew the upgrade lease", { error: String(error) });
-        if (performance.now() - renewedAt >= timing.ttlMs) loseLease("the upgrade lease expired");
-      });
-  }, timing.heartbeatMs);
   const loseLease = (reason: string) => {
     if (lost) return;
     lost = true;
     log.warn("upgrade lease lost; stopping", { reason });
     held.abort(new Error(reason));
   };
+  const heartbeat = startHeartbeat({ ledger, name, owner: identity.owner, timing, log, loseLease });
 
+  let stolen = false;
   try {
     const result = await work({ signal: held.signal });
-    // A run shorter than the heartbeat never saw the thief; ask once before reporting success.
-    if (!lost && !(await ledger.renewLease({ name, owner: identity.owner, ttlMs: timing.ttlMs })))
-      loseLease("another runner holds the upgrade lease");
+    clearInterval(heartbeat);
+    // Asked once more before release: the result stands as recorded, the thief's lease is kept.
+    const renewed = lost
+      ? null
+      : await ledger
+          .renewLease({ name, owner: identity.owner, ttlMs: timing.ttlMs })
+          .catch(() => null);
+    if (!lost && !renewed) {
+      stolen = true;
+      log.warn("the upgrade lease was not this runner's when its run finished; not releasing it", {
+        phase: "lease",
+      });
+    }
     return { acquired: true, lost, result };
   } finally {
     clearInterval(heartbeat);
     signal.removeEventListener("abort", onParentAbort);
-    if (!lost) await ledger.releaseLease({ name, owner: identity.owner });
+    if (!lost && !stolen) await ledger.releaseLease({ name, owner: identity.owner });
   }
+}
+
+/** Renews every heartbeat; no answer for the time to live less one heartbeat loses the lease. */
+function startHeartbeat({
+  ledger,
+  name,
+  owner,
+  timing,
+  log,
+  loseLease,
+}: {
+  ledger: Pick<UpgradeLedgerRepository, "renewLease">;
+  name: string;
+  owner: string;
+  timing: UpgradeLeaseTiming;
+  log: UpgradeRunnerLog;
+  loseLease: (reason: string) => void;
+}): ReturnType<typeof setInterval> {
+  let renewedAt = performance.now();
+  let renewing = false;
+  return setInterval(() => {
+    if (performance.now() - renewedAt >= timing.ttlMs - timing.heartbeatMs) {
+      loseLease("the upgrade lease was not renewed in time");
+      return;
+    }
+    if (renewing) return;
+    renewing = true;
+    const sentAt = performance.now();
+    void ledger
+      .renewLease({ name, owner, ttlMs: timing.ttlMs })
+      .then((renewed) => {
+        if (renewed) renewedAt = Math.max(renewedAt, sentAt);
+        else loseLease("another runner holds the upgrade lease");
+      })
+      .catch((error: unknown) =>
+        log.warn("could not renew the upgrade lease", { error: String(error) }),
+      )
+      .finally(() => (renewing = false));
+  }, timing.heartbeatMs);
 }

@@ -201,7 +201,7 @@ function olderTables({
 export function lintUpgradeSignInTablesAt({
   root,
   catalogue,
-  released = releasedThrough({ root }),
+  released,
 }: {
   root: string;
   catalogue: readonly FeatureCatalogueEntry[];
@@ -210,6 +210,9 @@ export function lintUpgradeSignInTablesAt({
 }): ArchitectureViolation[] {
   const tables = signInTables({ root, catalogue });
   const created = tableCreations({ root });
+  // Read the tags only once a blocking step needs them: a tree with none has nothing to date.
+  let releasedMigration = released;
+  const releasedNow = () => (releasedMigration ??= releasedThrough({ root }));
 
   return catalogue.flatMap((feature) => {
     const source = join(root, feature.root, "process", "src");
@@ -227,7 +230,9 @@ export function lintUpgradeSignInTablesAt({
         const text = readFileSync(file, "utf8");
         const sql = step.calls.map((name) => methodBody({ source: text, name })).join("\n");
         const touched = ownersTouched({ sql, tables });
-        const older = OPEN_STEPS.has(step.id) ? [] : olderTables({ sql, created, released });
+        const older = OPEN_STEPS.has(step.id)
+          ? []
+          : olderTables({ sql, created, released: releasedNow() });
         const named = [...touched].map(([owner, names]) => `${owner} (${names.join(", ")})`);
 
         return [

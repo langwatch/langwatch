@@ -1,4 +1,3 @@
-import { toaster } from "@langwatch/browser-host/toaster";
 import { createLogger } from "@langwatch/observability/browser";
 import { nowInstant } from "@langwatch/time";
 import { generateOtelTraceId } from "@langwatch/trace-contract";
@@ -100,16 +99,8 @@ export const useComponentExecution = () => {
     });
   }, [triggerTimeout, node, setComponentExecutionState, alertOnComponent]);
 
-  const socketAvailable = useCallback(() => {
-    if (socketStatus !== "connected") {
-      toaster.create({
-        title: "Studio is not connected yet",
-        type: "error",
-      });
-      return false;
-    }
-    return true;
-  }, [socketStatus]);
+  // Run controls are disabled while disconnected; the header status line says why.
+  const socketAvailable = useCallback(() => socketStatus === "connected", [socketStatus]);
 
   const startComponentExecution = useCallback(
     ({ node, inputs }: { node: Node<Component>; inputs?: Record<string, string> }) => {

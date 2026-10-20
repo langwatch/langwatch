@@ -743,6 +743,32 @@ describe("csvExport", () => {
       expect(rows[0]).toContain("0.85");
     });
 
+    it("names a workbench evaluator's columns by its name, not its id", () => {
+      const transformed = transformBatchEvaluationData(
+        createESData({
+          targets: [{ id: "target_1", name: "aaa", type: "prompt" }],
+          dataset: [
+            { index: 0, targetId: "target_1", entry: { input: "Q1" }, predicted: { output: "A" } },
+          ],
+          evaluations: [
+            {
+              evaluator: "evaluator_1791821822986",
+              name: "Exact Match Evaluator",
+              targetId: "target_1",
+              index: 0,
+              status: "processed",
+              passed: true,
+            },
+          ],
+        }),
+      );
+
+      const { headers } = buildCsvData(transformed);
+
+      expect(headers).toContain("aaa_exact_match_evaluator_passed");
+      expect(headers.some((header) => header.includes("evaluator_1791821822986"))).toBe(false);
+    });
+
     it("exports multiple rows with multiple targets each", () => {
       const esData = createESData({
         targets: [

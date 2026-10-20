@@ -55,6 +55,8 @@ import type { BuiltMember } from "./datastore-members.ts";
 /** The event log a draining role reads. */
 export interface EventingEventLogMembers {
   readonly clickhouse: ClickHouseQueryClient;
+  /** The organisation the routed member places a tenant in; appends fold per organisation. */
+  readonly organizationOf?: (tenantId: string) => Promise<string | null>;
 }
 
 /**
@@ -276,6 +278,7 @@ function eventingEventStore(options: {
     repository: EventingClickHouseEventRepository.create({
       resolveClient: eventingClickHouseResolver(eventLog.clickhouse),
       retention,
+      ...(eventLog.organizationOf === undefined ? {} : { organizationOf: eventLog.organizationOf }),
     }),
     retention,
     retentionPolicyFor: options.retentionPolicyFor,
@@ -312,6 +315,8 @@ function eventingClickHouseResolver(
                 tenantId,
                 sql: request.query,
                 ...(request.query_params === undefined ? {} : { params: request.query_params }),
+                ...(request.SKIP_COLD_SCAN_CHECK === true ? { SKIP_COLD_SCAN_CHECK: true } : {}),
+                ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
               })
               .then((result) => result.rows),
         }),
@@ -321,6 +326,7 @@ function eventingClickHouseResolver(
           table: request.table,
           rows: request.values,
           settings: request.clickhouse_settings,
+          ...(request.tenantIds === undefined ? {} : { tenantIds: request.tenantIds }),
         }),
     });
 }
@@ -341,6 +347,7 @@ function eventingQueueFactory(options: {
   return createEventingGroupQueueFactory({
     dependencies,
     consumersEnabled: options.consumersEnabled,
+    listedConsumer: true,
   });
 }
 
@@ -364,6 +371,7 @@ class ProcessQueueContext implements GroupQueueContext {
       organizationId: metadata.organizationId,
       projectId: metadata.projectId,
       userId: metadata.userId,
+      queueDispatchScopeKey: metadata.queueDispatchScopeKey,
     };
   }
 

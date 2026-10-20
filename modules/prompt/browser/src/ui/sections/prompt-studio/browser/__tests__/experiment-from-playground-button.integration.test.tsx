@@ -237,7 +237,7 @@ describe("ExperimentFromPlaygroundButton", () => {
 
       render(<ExperimentFromPlaygroundButton />, { wrapper: Wrapper });
 
-      expect(screen.getByText("Experiment")).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Experiment" })).toBeInTheDocument();
     });
 
     it("is disabled when no tabs are open", () => {

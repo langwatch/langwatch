@@ -25,7 +25,7 @@ import { useEffect, useState } from "react";
 
 import { api, type RouterOutputs } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
-import { useOpsPermission } from "../../../../behavior/ops-session.ts";
+import { useIsSharedInstall, useOpsPermission } from "../../../../behavior/ops-session.ts";
 import { ConfirmDialog } from "../../../../ui/elements/ops-confirm-dialog.tsx";
 import { UpgradeTenantList } from "./upgrade-tenant-list.tsx";
 const STATUS_COLOR: Record<string, string> = {
@@ -85,12 +85,15 @@ type EnrollmentListing = RouterOutputs["ops"]["upgrade"]["listMigrationEnrollmen
 type EnrollmentRecord = EnrollmentListing["enrollments"][number];
 type PickedOrganization = { id: string; name: string };
 
-/** Tenant migrations: per-organization progress, enrolment and actions (was Ops > Migrations). */
+/** Organizations: per-organization step progress, enrolment and actions, on every deployment. */
 export function UpgradeTenantMigrations() {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const { scope } = useOpsPermission();
+  const sharedInstall = useIsSharedInstall();
   const canManage = scope?.kind === "platform";
+  // Enrolment paces cloud's rollout; a self-hosted pass already admits every organization.
+  const canEnroll = canManage && sharedInstall;
 
   const query = api.ops.upgrade.listSystemMigrations.useQuery(undefined, {});
   const enrollmentsQuery = api.ops.upgrade.listMigrationEnrollments.useQuery(undefined, {});
@@ -110,7 +113,7 @@ export function UpgradeTenantMigrations() {
 
   if (query.isLoading) {
     return (
-      <Stack gap={4} aria-label="Loading tenant migrations">
+      <Stack gap={4} aria-label="Loading organization steps">
         <Skeleton height="64px" />
         <Skeleton height="200px" />
       </Stack>
@@ -128,7 +131,6 @@ export function UpgradeTenantMigrations() {
     );
   }
 
-  const isSaaS = enrollmentsQuery.data?.isSaaS ?? false;
   const enrollments = enrollmentsQuery.data?.enrollments ?? [];
   const migrations = query.data ?? [];
 
@@ -140,11 +142,6 @@ export function UpgradeTenantMigrations() {
             Per-organization data migrations, run in order at worker boot. Held organizations failed
             the parity proof and stay on the legacy path; parked ones hit an error and retry.
           </Text>
-          {enrollmentsQuery.data && !isSaaS && (
-            <Text textStyle="sm" color="fg.muted">
-              Released migrations run for every organization here, so nothing needs enrolling.
-            </Text>
-          )}
           {enrollmentsQuery.error && !enrollmentsQuery.data && (
             <Text textStyle="sm" color="fg.muted">
               Enrollment could not be read, so its actions are hidden. Retrying every 30 seconds.
@@ -173,7 +170,7 @@ export function UpgradeTenantMigrations() {
             <Table.ColumnHeader textAlign="end">Finalized</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Held</Table.ColumnHeader>
             <Table.ColumnHeader textAlign="end">Parked</Table.ColumnHeader>
-            {isSaaS && <Table.ColumnHeader textAlign="end">Enrolled</Table.ColumnHeader>}
+            <Table.ColumnHeader textAlign="end">Enrolled</Table.ColumnHeader>
             {canManage && <Table.ColumnHeader>Actions</Table.ColumnHeader>}
           </Table.Row>
         </Table.Header>
@@ -183,8 +180,8 @@ export function UpgradeTenantMigrations() {
               key={migration.name}
               migration={migration}
               previousMigrationTitle={migrations[index - 1]?.title}
-              isSaaS={isSaaS}
               canManage={canManage}
+              canEnroll={canEnroll}
             />
           ))}
         </Table.Body>
@@ -197,8 +194,7 @@ export function UpgradeTenantMigrations() {
           enrollments={enrollments.filter(
             (enrollment) => enrollment.migrationName === migration.name,
           )}
-          isSaaS={isSaaS}
-          canManage={canManage}
+          canEnroll={canEnroll}
         />
       ))}
 
@@ -223,16 +219,25 @@ function CountCell({ count, palette }: { count: number; palette?: string }) {
   );
 }
 
+/** A step that never finalizes by design keeps its users in step; none of them is held. */
+function KeptInStepCell({ count }: { count: number }) {
+  return (
+    <Text as="span" textStyle="sm" color="fg.muted" data-testid="upgrade-kept-in-step">
+      <FormattedNumber value={count} /> kept in step
+    </Text>
+  );
+}
+
 function MigrationRow({
   migration,
   previousMigrationTitle,
-  isSaaS,
   canManage,
+  canEnroll,
 }: {
   migration: MigrationListing;
   previousMigrationTitle?: string;
-  isSaaS: boolean;
   canManage: boolean;
+  canEnroll: boolean;
 }) {
   const requiresConfirmation = migration.requiresOperatorConfirmation;
   const actionable = canManage && migration.availableOnThisInstallation;
@@ -248,7 +253,7 @@ function MigrationRow({
           </Text>
           {!migration.availableOnThisInstallation && (
             <Text textStyle="xs" color="fg.muted">
-              Not yet available for self-hosted installations.
+              Not available on this installation yet.
             </Text>
           )}
         </Stack>
@@ -257,27 +262,29 @@ function MigrationRow({
         <CountCell count={migration.counts.finalized} />
       </Table.Cell>
       <Table.Cell textAlign="end">
-        <CountCell count={migration.counts.migrated} palette="orange" />
+        {migration.migratedIsSteady ? (
+          <KeptInStepCell count={migration.counts.migrated} />
+        ) : (
+          <CountCell count={migration.counts.migrated} palette="orange" />
+        )}
       </Table.Cell>
       <Table.Cell textAlign="end">
         <CountCell count={migration.counts.parked} palette="red" />
       </Table.Cell>
-      {isSaaS && (
-        <Table.Cell textAlign="end">
-          {migration.enrollment ? (
-            <CountCell count={migration.enrollment.enrolledCount} />
-          ) : (
-            <Text as="span" textStyle="sm" color="fg.muted">
-              All
-            </Text>
-          )}
-        </Table.Cell>
-      )}
+      <Table.Cell textAlign="end">
+        {migration.enrollment ? (
+          <CountCell count={migration.enrollment.enrolledCount} />
+        ) : (
+          <Text as="span" textStyle="sm" color="fg.muted">
+            All
+          </Text>
+        )}
+      </Table.Cell>
       {canManage && (
         <Table.Cell>
           {actionable && (
             <Wrap gap={1}>
-              {isSaaS && !migration.enrolledAutomatically && (
+              {canEnroll && !migration.enrolledAutomatically && (
                 <>
                   <EnrollAction
                     migrationName={migration.name}
@@ -306,21 +313,19 @@ function MigrationRow({
   );
 }
 
-/** Enrolments and organizations needing attention for one step; nothing renders when quiet. */
+/** Enrolments (cloud only) and organizations needing attention for one step; quiet is empty. */
 function MigrationDetail({
   migration,
   enrollments,
-  isSaaS,
-  canManage,
+  canEnroll,
 }: {
   migration: MigrationListing;
   enrollments: EnrollmentRecord[];
-  isSaaS: boolean;
-  canManage: boolean;
+  canEnroll: boolean;
 }) {
   // An automatic step admits every organization, so its enrolment rows decide nothing.
   const showEnrollments =
-    isSaaS && migration.availableOnThisInstallation && !migration.enrolledAutomatically;
+    canEnroll && migration.availableOnThisInstallation && !migration.enrolledAutomatically;
   if (!migration.availableOnThisInstallation) return null;
   if (!showEnrollments && migration.attention.length === 0) return null;
   return (
@@ -328,7 +333,7 @@ function MigrationDetail({
       <Heading size="sm" truncate title={migration.title}>
         {migration.title}
       </Heading>
-      {showEnrollments && <EnrollmentTable enrollments={enrollments} canManage={canManage} />}
+      {showEnrollments && <EnrollmentTable enrollments={enrollments} />}
       {migration.attention.length > 0 && (
         <ListTable density="compact" columnRules={false} containerProps={{ overflowX: "auto" }}>
           <Table.Header>
@@ -863,13 +868,7 @@ function RollBackAction({
  *  a count - a cohort of hundreds must not turn the page into a scroll. */
 const ENROLLMENT_PREVIEW_ROWS = 8;
 
-function EnrollmentTable({
-  enrollments,
-  canManage,
-}: {
-  enrollments: EnrollmentRecord[];
-  canManage: boolean;
-}) {
+function EnrollmentTable({ enrollments }: { enrollments: EnrollmentRecord[] }) {
   const [showAll, setShowAll] = useState(false);
   if (enrollments.length === 0) {
     return (
@@ -888,7 +887,7 @@ function EnrollmentTable({
             <Table.ColumnHeader>Enrolled organization</Table.ColumnHeader>
             <Table.ColumnHeader>Enrolled by</Table.ColumnHeader>
             <Table.ColumnHeader>Enrolled at</Table.ColumnHeader>
-            {canManage && <Table.ColumnHeader />}
+            <Table.ColumnHeader />
           </Table.Row>
         </Table.Header>
         <Table.Body>
@@ -896,7 +895,6 @@ function EnrollmentTable({
             <EnrollmentRow
               key={`${enrollment.organizationId}:${enrollment.migrationName}`}
               enrollment={enrollment}
-              canManage={canManage}
             />
           ))}
         </Table.Body>
@@ -915,13 +913,7 @@ function EnrollmentTable({
   );
 }
 
-function EnrollmentRow({
-  enrollment,
-  canManage,
-}: {
-  enrollment: EnrollmentRecord;
-  canManage: boolean;
-}) {
+function EnrollmentRow({ enrollment }: { enrollment: EnrollmentRecord }) {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
   const utils = api.useUtils();
@@ -963,23 +955,21 @@ function EnrollmentRow({
       <Table.Cell>
         <FormattedDate value={enrollment.createdAt} />
       </Table.Cell>
-      {canManage && (
-        <Table.Cell textAlign="right">
-          <Button
-            size="xs"
-            variant="outline"
-            loading={withdraw.isPending}
-            onClick={() =>
-              withdraw.mutate({
-                organizationId: enrollment.organizationId,
-                migrationName: enrollment.migrationName,
-              })
-            }
-          >
-            Withdraw
-          </Button>
-        </Table.Cell>
-      )}
+      <Table.Cell textAlign="right">
+        <Button
+          size="xs"
+          variant="outline"
+          loading={withdraw.isPending}
+          onClick={() =>
+            withdraw.mutate({
+              organizationId: enrollment.organizationId,
+              migrationName: enrollment.migrationName,
+            })
+          }
+        >
+          Withdraw
+        </Button>
+      </Table.Cell>
     </Table.Row>
   );
 }

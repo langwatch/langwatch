@@ -2,7 +2,8 @@ import { formatCost, formatTokens } from "@langwatch/design-system/display-forma
 import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { chakra, HStack, Spinner, Table, Text } from "@langwatch/design-system/primitives";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import { readableDate } from "@langwatch/time";
 import type React from "react";
 
@@ -12,10 +13,18 @@ import { formatShortDate } from "../../model/short-date.ts";
 import { AgentLabel } from "../elements/agent-label.tsx";
 import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
 import { ContributorName } from "../elements/contributor-name.tsx";
-import { EmptySection, Section } from "../elements/detail-section.tsx";
+import { Section } from "../elements/detail-section.tsx";
 
 /** One session as the pull request detail lists it. */
 type DetailSession = DetailPayload["sessions"][number];
+
+const SESSIONS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How sessions are linked to pull requests",
+    href: "https://docs.langwatch.ai/coding-agents/repository-and-pr-attribution",
+  },
+];
 
 /** Sessions on PR (title, start, contributor, agent, tokens, cost); row replays terminal. */
 export const SessionsSection: React.FC<{
@@ -30,20 +39,24 @@ export const SessionsSection: React.FC<{
   return (
     <Section title="Sessions">
       {sessions.length === 0 ? (
-        <EmptySection>No sessions ran on this pull request yet</EmptySection>
+        <NoDataInfoBlock
+          size="line"
+          title="No sessions ran on this pull request yet"
+          next={SESSIONS_NEXT}
+        />
       ) : (
         <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Session</Table.ColumnHeader>
-              <Table.ColumnHeader>Started</Table.ColumnHeader>
-              <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-              <Table.ColumnHeader>Agent</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-              <Table.ColumnHeader textAlign="end">Token cost</Table.ColumnHeader>
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Session</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Started</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Contributor</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Agent</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Tokens</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Token cost</ListTable.ColumnHeader>
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {sessions.map((session) => (
               <SessionRow
                 key={session.sessionId}
@@ -60,7 +73,7 @@ export const SessionsSection: React.FC<{
                 }
               />
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       )}
     </Section>
@@ -73,42 +86,23 @@ const SessionRow: React.FC<{
   onOpenReplay: (() => void) | undefined;
   onPrefetch: (() => void) | undefined;
 }> = ({ session, isOpening, onOpenReplay, onPrefetch }) => (
-  <Table.Row
-    onClick={onOpenReplay}
-    onMouseEnter={onPrefetch}
-    aria-busy={isOpening}
-    cursor={onOpenReplay ? "pointer" : undefined}
-    _hover={onOpenReplay ? { bg: "bg.subtle" } : undefined}
-  >
-    <Table.Cell fontSize="sm">
+  <ListTable.Row onActivate={onOpenReplay} onPrefetch={onPrefetch} aria-busy={isOpening}>
+    <ListTable.Cell>
       <HStack gap={2} minWidth={0}>
-        {/* The whole row opens the replay for a pointer, but a row is not
-            focusable and cannot be activated from a keyboard, so the name
-            carries the same action as a real button. A row with nothing to
+        {/* The whole row opens the replay for a pointer; the name carries the
+            same action as a real button for a keyboard. A row with nothing to
             open renders the name and no control at all. */}
         {onOpenReplay ? (
-          <chakra.button
-            type="button"
-            aria-label={`Open the terminal replay of ${session.title ?? "untitled session"}`}
-            onClick={(event) => {
-              event.stopPropagation();
-              onOpenReplay();
-            }}
-            minWidth={0}
-            textAlign="start"
-            bg="transparent"
-            border="none"
-            padding={0}
-            cursor="pointer"
-            color="inherit"
-            font="inherit"
+          <ListTable.RowAction
+            label={`Open the terminal replay of ${session.title ?? "untitled session"}`}
+            onActivate={onOpenReplay}
           >
             {session.title ?? (
               <Text as="span" color="fg.muted">
                 Untitled session
               </Text>
             )}
-          </chakra.button>
+          </ListTable.RowAction>
         ) : (
           (session.title ?? (
             <Text as="span" color="fg.muted">
@@ -118,8 +112,8 @@ const SessionRow: React.FC<{
         )}
         {isOpening ? <Spinner size="xs" color="fg.muted" flexShrink={0} /> : null}
       </HStack>
-    </Table.Cell>
-    <Table.Cell fontSize="sm" whiteSpace="nowrap">
+    </ListTable.Cell>
+    <ListTable.Cell nowrap>
       <FormattedDate value={session.startedAtMs}>
         {formatShortDate({ timestampMs: session.startedAtMs })}{" "}
         {readableDate(session.startedAtMs).toLocaleTimeString(undefined, {
@@ -127,17 +121,17 @@ const SessionRow: React.FC<{
           minute: "2-digit",
         })}
       </FormattedDate>
-    </Table.Cell>
+    </ListTable.Cell>
     <ContributorName contributor={session} />
-    <Table.Cell fontSize="sm" color="fg.muted">
+    <ListTable.Cell tone="muted">
       {session.agent ? <AgentLabel agent={session.agent} /> : MISSING_VALUE}
-    </Table.Cell>
-    <Table.Cell textAlign="end" fontSize="sm">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       <FormattedNumber value={session.totalTokens} unit="tokens">
         {formatTokens(session.totalTokens)}
       </FormattedNumber>
-    </Table.Cell>
-    <Table.Cell textAlign="end" fontSize="sm">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       {session.costUsd === null ? (
         MISSING_VALUE
       ) : (
@@ -145,6 +139,6 @@ const SessionRow: React.FC<{
           {formatCost(session.costUsd)}
         </FormattedNumber>
       )}
-    </Table.Cell>
-  </Table.Row>
+    </ListTable.Cell>
+  </ListTable.Row>
 );

@@ -108,3 +108,10 @@ Feature: Composing durable coding-agent session processing
     When the same received metric point is delivered twice
     Then each delivery contributes the point to coding-agent unchanged
     And both deliveries share one deduplication identity, apart from any other point
+
+  @unit
+  Scenario: A session's read-window miss widens back to 30 days, then rebuilds from the log
+    Given a session event whose committed row the 7-day read window misses
+    When the session fold retries the read
+    Then it reads windows reaching 21 and then 30 days back, never every partition
+    And a miss at 30 days rebuilds the session from its event history

@@ -37,7 +37,9 @@ import {
   type ContractTerms,
   type IncomingUsageReport,
   type SelfHostedInstanceDetail,
+  type SelfHostedInstanceFilters,
   type SelfHostedInstancePage,
+  type SelfHostedInstanceSummary,
   type SelfHostedSignal,
   type IssueLicenseInput,
   type IssuedLicenseView,
@@ -50,6 +52,7 @@ import {
   licensingSecrets,
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
+  type IssuedLicenseFilters,
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
@@ -62,6 +65,7 @@ import {
   type GenerateLicenseOutput,
   detectLicenseInputForm,
 } from "@langwatch/enterprise-licensing-contract";
+import type { SsoSignInProviderRecordedEventData } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementGrant, ResolvePlanInput } from "@langwatch/entitlement-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
@@ -85,6 +89,7 @@ import type { IssuedLicenseRepository } from "../repositories/issued-license.rep
 import type { LicensingRepositories } from "../repositories/licensing.repositories.ts";
 import type { MemberSeatRepository } from "../repositories/member-seat.repository.ts";
 import type { SelfHostedInstanceRepository } from "../repositories/self-hosted-instance.repository.ts";
+import type { SignInProviderMountRepository } from "../repositories/sign-in-provider-mount.repository.ts";
 import { ACTIVATION_ATTEMPTS_LIMIT } from "../rules/activation-code.rules.ts";
 import { LICENSE_SYNCS_LIMIT } from "../rules/issued-license.rules.ts";
 import { licenseVerifyingKeyOf } from "../rules/license-verifying-key.rules.ts";
@@ -114,6 +119,7 @@ import { LicensingInfrastructureService } from "../services/licensing-infrastruc
 import { SelfHostedCrmService } from "../services/self-hosted-crm.service.ts";
 import type { SelfHostedLeadsInfrastructure } from "../services/self-hosted-crm.service.ts";
 import { SelfHostedInstanceService } from "../services/self-hosted-instance.service.ts";
+import { SsoGateStatusService } from "../services/sso-gate-status.service.ts";
 
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
@@ -130,21 +136,9 @@ function seatCountsOver(
 /** What the process composes this feature's application from. */
 export type LicensingInfrastructure = Readonly<{
   repository: LicenseStorage;
-  /**
-   * The provider name the deployment is CONFIGURED with, before the license
-   * gate and the mount inspector have their say. `null` or `"email"` means
-   * nobody asked for federation.
-   */
-  configuredAuthProvider: () => string | null | undefined;
-  /** Whether the license permits platform single sign-on. */
-  platformSsoAllowed: () => Promise<boolean>;
-  /** Whether the configured provider actually mounted. */
-  authProviderIsMounted: () => boolean;
   /** Records a signing failure; the customer never sees the diagnostic. */
   reportSigningFailure: (entry: Readonly<{ organizationId: string; error: Error }>) => void;
 }>;
-
-type LicensingRuntime = Readonly<Omit<LicensingInfrastructure, "repository">>;
 
 const logger = createLogger("langwatch:licensing");
 
@@ -169,7 +163,6 @@ export class LicensingModule implements LicensingApiContract {
 
   readonly #service: LicenseService;
   readonly #entitlements: LicensingEntitlementSourceService;
-  readonly #runtime: LicensingRuntime;
   readonly #registry: LicenseRegistryService;
   readonly #generation: LicenseGenerationService;
   readonly #credentials: ConnectCredentialService;
@@ -185,6 +178,7 @@ export class LicensingModule implements LicensingApiContract {
   readonly #isSaas: boolean;
   readonly #signingKey: string | undefined;
   readonly #domainClaims: DomainClaimAuthorityService;
+  readonly #ssoGate: SsoGateStatusService;
   #configuredActivation: ConfiguredActivationService | undefined;
 
   /** The licensing_customer pipeline, whose facts organization applies (R42). */
@@ -206,7 +200,6 @@ export class LicensingModule implements LicensingApiContract {
 
   private constructor({
     service,
-    runtime,
     entitlements,
     registry,
     install,
@@ -215,12 +208,13 @@ export class LicensingModule implements LicensingApiContract {
     signingKey,
     domainClaims,
     customerFacts,
+    signInProviderMounts,
   }: {
+    signInProviderMounts: SignInProviderMountRepository;
     customerFacts: LicensingCustomerFactsService;
     generation: LicenseGenerationService;
     domainClaims: DomainClaimAuthorityService;
     service: LicenseService;
-    runtime: LicensingRuntime;
     entitlements: LicensingEntitlementSourceService;
     registry: LicenseRegistryParts;
     install: ConnectInstallParts;
@@ -232,7 +226,6 @@ export class LicensingModule implements LicensingApiContract {
     this.#domainClaims = domainClaims;
     this.#service = service;
     this.#entitlements = entitlements;
-    this.#runtime = runtime;
     this.#registry = registry.registry;
     this.#generation = generation;
     this.#credentials = registry.credentials;
@@ -245,6 +238,10 @@ export class LicensingModule implements LicensingApiContract {
     this.#identity = install.identity;
     this.#customerFacts = customerFacts;
     this.#refresh = install.refresh;
+    this.#ssoGate = SsoGateStatusService.create({
+      mounts: signInProviderMounts,
+      isPlatformSsoLicensed: () => this.isPlatformSsoLicensed(),
+    });
   }
 
   static async create(setup: LicensingSetup): Promise<LicensingModule> {
@@ -284,7 +281,7 @@ export class LicensingModule implements LicensingApiContract {
     const customerFacts = LicensingCustomerFactsService.create();
     // The licence rows are this module's own; the seat counts are organization's
     // own membership classification (a peer, not owned here).
-    const { repository, ...runtime } = LicensingInfrastructureService.create({ role }).withStorage({
+    const { repository } = LicensingInfrastructureService.create({ role }).withStorage({
       licenses: repositories.organizationLicenses,
       facts: customerFacts,
       ...seatCountsOver(repositories.memberSeats),
@@ -317,7 +314,6 @@ export class LicensingModule implements LicensingApiContract {
       customerFacts,
       generation: LicenseGenerationService.create(cryptography),
       service,
-      runtime,
       entitlements: LicensingEntitlementSourceService.create({
         licensing: service,
         mode: config.isSaas ? "cloud" : "self-hosted",
@@ -340,6 +336,7 @@ export class LicensingModule implements LicensingApiContract {
         licenses: service,
         organizations: repositories.connectOrganizations,
       }),
+      signInProviderMounts: repositories.signInProviderMounts,
     });
     if (!config.isSaas && configured.form === "activation_code") {
       app.#configuredActivation = ConfiguredActivationService.create({
@@ -384,17 +381,15 @@ export class LicensingModule implements LicensingApiContract {
   /**
    * Why a deployment configured for single sign-on is not using it.
    */
-  async getSsoGateStatus(): Promise<SsoGateStatus> {
-    const configuredProvider = this.#runtime.configuredAuthProvider();
-    if (!configuredProvider || configuredProvider === "email") {
-      return { configuredProvider: null, licensed: true, mounted: true };
-    }
+  getSsoGateStatus(): Promise<SsoGateStatus> {
+    return this.#ssoGate.getStatus();
+  }
 
-    return {
-      configuredProvider,
-      licensed: await this.#runtime.platformSsoAllowed(),
-      mounted: this.#runtime.authProviderIsMounted(),
-    };
+  /** sso's sign-in provider fact, applied by license_sync's peer subscriber (ADR-179). */
+  applySignInProvider(
+    input: SsoSignInProviderRecordedEventData & { eventId: string },
+  ): Promise<void> {
+    return this.#ssoGate.applySignInProvider(input);
   }
 
   isPlatformSsoLicensed(): Promise<boolean> {
@@ -554,11 +549,13 @@ export class LicensingModule implements LicensingApiContract {
     return this.#registry.getById(input);
   }
 
-  listIssuedLicenses(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<IssuedLicensePage> {
+  listIssuedLicenses(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & IssuedLicenseFilters,
+  ): Promise<IssuedLicensePage> {
     return this.#registry.list(input);
   }
 
@@ -745,16 +742,22 @@ export class LicensingModule implements LicensingApiContract {
     return this.#instances.recordReport(input);
   }
 
-  listSelfHostedInstances(input: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage> {
+  listSelfHostedInstances(
+    input: {
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage> {
     return this.#instances.list(input);
   }
 
   getSelfHostedInstance(input: { id: string }): Promise<SelfHostedInstanceDetail> {
     return this.#instances.getById(input);
+  }
+
+  summarizeSelfHostedInstances(): Promise<SelfHostedInstanceSummary> {
+    return this.#instances.summarize();
   }
 }
 

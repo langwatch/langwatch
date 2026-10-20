@@ -49,8 +49,9 @@ export class PrismaSignUpVerificationTokenRepository
     now: Instant;
     keepSpentUntil: Instant;
   }): Promise<TokenClaim> {
-    const row = await this.prisma.verificationToken.findUnique({
+    const row = await this.prisma.verificationToken.findFirst({
       where: { token },
+      orderBy: { expires: "desc" },
       select: { identifier: true, expires: true },
     });
     if (!row || Temporal.Instant.compare(fromDate(row.expires), now) <= 0) return UNCLAIMED;
@@ -71,8 +72,9 @@ export class PrismaSignUpVerificationTokenRepository
     token: string;
     now: Instant;
   }): Promise<{ identifier: string } | null> {
-    const row = await this.prisma.verificationToken.findUnique({
+    const row = await this.prisma.verificationToken.findFirst({
       where: { token },
+      orderBy: { expires: "desc" },
       select: { identifier: true, expires: true },
     });
     if (!row || Temporal.Instant.compare(fromDate(row.expires), now) <= 0) return null;

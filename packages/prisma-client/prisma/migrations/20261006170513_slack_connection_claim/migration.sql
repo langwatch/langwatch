@@ -6,7 +6,7 @@
 -- projectId is the claimant's project; organizationId the tenancy anchor.
 
 -- CreateTable
-CREATE TABLE "slack_connection_claim" (
+CREATE TABLE IF NOT EXISTS "slack_connection_claim" (
     "connectionId" TEXT NOT NULL,
     "claimantId" TEXT NOT NULL,
     "claimantLabel" TEXT NOT NULL,
@@ -19,4 +19,4 @@ CREATE TABLE "slack_connection_claim" (
 );
 
 -- CreateIndex
-CREATE INDEX "slack_connection_claim_organizationId_idx" ON "slack_connection_claim"("organizationId");
+CREATE INDEX IF NOT EXISTS "slack_connection_claim_organizationId_idx" ON "slack_connection_claim"("organizationId");

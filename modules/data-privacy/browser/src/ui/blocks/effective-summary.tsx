@@ -3,7 +3,8 @@ import {
   type DataPrivacySnapshot,
   type ResolvedDataPrivacy,
 } from "@langwatch/data-privacy-contract";
-import { Card, Table } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { ListTable } from "@langwatch/design-system/list-table";
 import { SettingsSection } from "@langwatch/design-system/settings-section";
 
 import {
@@ -100,30 +101,18 @@ export function EffectiveSummary({
       title={`Effective for ${scopeLabel}`}
       hint="What is actually applied, after the rules above cascade down."
     >
-      <Card.Root width="full">
-        <Card.Body paddingY={0}>
-          <Table.Root
-            variant="line"
-            size="sm"
-            width="full"
-            // The card draws the outer edge; the last row's rule would double it.
-            css={{ "& tr:last-of-type td": { borderBottomWidth: 0 } }}
-          >
-            <Table.Body>
-              {effectiveRows.map(({ term, value }) => (
-                <Table.Row key={term}>
-                  <Table.Cell color="fg.muted" paddingX={0}>
-                    {term}
-                  </Table.Cell>
-                  <Table.Cell textAlign="end" paddingX={0}>
-                    {value}
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </Table.Root>
-        </Card.Body>
-      </Card.Root>
+      <Card padding="none">
+        <ListTable variant="embedded" density="compact" aria-label="Effective privacy settings">
+          <ListTable.Body>
+            {effectiveRows.map(({ term, value }) => (
+              <ListTable.Row key={term}>
+                <ListTable.Cell tone="muted">{term}</ListTable.Cell>
+                <ListTable.Cell align="end">{value}</ListTable.Cell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      </Card>
     </SettingsSection>
   );
 }

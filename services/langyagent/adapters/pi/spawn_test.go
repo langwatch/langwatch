@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/langwatch/langwatch/services/langyagent/adapters/github"
 	"github.com/langwatch/langwatch/services/langyagent/app"
 	"github.com/langwatch/langwatch/services/langyagent/domain"
 )
@@ -448,5 +449,24 @@ func TestBuildWorkerEnv_CarriesConversationID(t *testing.T) {
 
 	if env["LANGY_CONVERSATION_ID"] != "conv-ui" {
 		t.Errorf("LANGY_CONVERSATION_ID = %q, want conv-ui", env["LANGY_CONVERSATION_ID"])
+	}
+}
+
+// A capability's NO_PROXY joins the worker's loopback list instead of replacing it.
+//
+// @scenario "Langy's worker reaches githubsim when the stack names it as the GitHub host"
+func TestBuildWorkerEnv_CapabilityNoProxyJoinsTheList(t *testing.T) {
+	env := envMap(t, buildWorkerEnv(SpawnInput{
+		Home:         "/h",
+		Creds:        testCreds(),
+		Capabilities: []app.Capability{github.New("ghs_sim", "alice", "s").WithHost("github.dev.localhost:1355")},
+	}))
+	for _, key := range []string{"NO_PROXY", "no_proxy"} {
+		if !strings.Contains(env[key], "127.0.0.1") || !strings.HasSuffix(env[key], ",github.dev.localhost") {
+			t.Errorf("%s = %q, want loopback plus github.dev.localhost", key, env[key])
+		}
+	}
+	if env["GH_HOST"] != "github.dev.localhost:1355" {
+		t.Errorf("GH_HOST = %q", env["GH_HOST"])
 	}
 }

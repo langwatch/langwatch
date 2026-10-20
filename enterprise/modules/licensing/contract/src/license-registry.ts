@@ -1,11 +1,22 @@
 import type { Named } from "@langwatch/module";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What an operator sends the license registry (ADR-156), as main's back office accepted it. */
+import { statedLiteSeatsSchema } from "@langwatch/plans";
 import { z } from "zod";
 
 import { licenseCustomerSchema, licenseTermsInputSchema } from "./issued-license.ts";
 
+/** Absent keeps every row: the console asks for active customer licenses by default. */
+const issuedLicenseFiltersSchemaDefinition = z.object({
+  /** Active, or the rest: revoked, superseded or expired. */
+  status: z.enum(["active", "inactive"]).optional(),
+  /** Customers', or internal: issued to our own domains or a name reserved for testing. */
+  audience: z.enum(["customer", "internal"]).optional(),
+});
+export type IssuedLicenseFilters = z.infer<typeof issuedLicenseFiltersSchemaDefinition>;
+
 const listIssuedLicensesInputSchemaDefinition = z.object({
+  ...issuedLicenseFiltersSchemaDefinition.shape,
   page: z.number().int().min(0).default(0),
   pageSize: z.number().int().min(1).max(100).default(25),
   search: z.string().max(200).optional(),
@@ -26,7 +37,7 @@ const issueLicenseInputSchemaDefinition = z.object({
   email: z.string().min(1),
   planType: z.string().min(1),
   maxMembers: z.number().int().min(1),
-  maxMembersLite: z.number().int().min(0).optional(),
+  maxMembersLite: statedLiteSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the term ends. */
   expiresAt: z.string().min(1),
@@ -59,7 +70,7 @@ export const revokeIssuedLicenseInputSchema: RevokeIssuedLicenseInputSchema =
 const reissueLicenseInputSchemaDefinition = z.object({
   id: z.string().min(1),
   maxMembers: z.number().int().min(1).optional(),
-  maxMembersLite: z.number().int().min(0).optional(),
+  maxMembersLite: statedLiteSeatsSchema.optional(),
   maxMessagesPerMonth: z.number().int().positive().optional(),
   /** ISO 8601. The instant the new term ends. */
   expiresAt: z.string().min(1),

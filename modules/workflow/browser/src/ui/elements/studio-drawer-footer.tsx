@@ -13,6 +13,7 @@ export function useInsideDrawer(): boolean {
   return useContext(InsideDrawerContext);
 }
 
+/** Registers the open drawer's footer row; pass a `<Drawer.Actions bare … />`. */
 export function useRegisterDrawerFooter(footer: ReactNode): void {
   const register = useStudioDrawerFooterSlice((state) => state.register);
   useEffect(() => {

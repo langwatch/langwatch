@@ -4,9 +4,8 @@
  * @see specs/traces-v2/instant-eval-search.feature
  */
 
-import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-
-import { Dialog } from "../dialog.tsx";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { HStack, Text, VStack } from "@langwatch/design-system/primitives";
 
 export interface InstantEvalConfirmation {
   /** The question as the judge will read it. */
@@ -43,90 +42,78 @@ export function InstantEvalConfirmDialog({
   onClose,
 }: InstantEvalConfirmDialogProps) {
   return (
-    <Dialog.Root
+    <Dialog
       open={confirmation !== null}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      title="Judge each result?"
       size="sm"
+      cancelLabel={null}
+      secondaryAction={{ label: "Search the words instead", onClick: onSearchWords }}
+      primaryAction={{ label: "Run", onClick: onRun, loading: isStarting }}
     >
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Judge each result?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          {confirmation && (
-            <VStack align="stretch" gap={3}>
-              <VStack align="stretch" gap={1}>
+      {confirmation && (
+        <VStack align="stretch" gap={3}>
+          <VStack align="stretch" gap={1}>
+            <Text textStyle="xs" color="fg.muted">
+              The question, as the judge reads it
+            </Text>
+            <Text textStyle="sm" fontWeight="medium">
+              {confirmation.question}
+            </Text>
+            {confirmation.criteria && (
+              // Shown as the classifier wrote them: whole sentences as
+              // often as fragments, so never folded into one of our own.
+              <VStack align="stretch" gap={0.5}>
                 <Text textStyle="xs" color="fg.muted">
-                  The question, as the judge reads it
+                  <Text as="span" fontWeight="medium">
+                    Yes:
+                  </Text>{" "}
+                  {confirmation.criteria[0]}
                 </Text>
-                <Text textStyle="sm" fontWeight="medium">
-                  {confirmation.question}
+                <Text textStyle="xs" color="fg.muted">
+                  <Text as="span" fontWeight="medium">
+                    No:
+                  </Text>{" "}
+                  {confirmation.criteria[1]}
                 </Text>
-                {confirmation.criteria && (
-                  // Shown as the classifier wrote them: whole sentences as
-                  // often as fragments, so never folded into one of our own.
-                  <VStack align="stretch" gap={0.5}>
-                    <Text textStyle="xs" color="fg.muted">
-                      <Text as="span" fontWeight="medium">
-                        Yes:
-                      </Text>{" "}
-                      {confirmation.criteria[0]}
-                    </Text>
-                    <Text textStyle="xs" color="fg.muted">
-                      <Text as="span" fontWeight="medium">
-                        No:
-                      </Text>{" "}
-                      {confirmation.criteria[1]}
-                    </Text>
-                  </VStack>
-                )}
               </VStack>
-              <HStack gap={6}>
-                <VStack align="start" gap={0}>
-                  <Text textStyle="xs" color="fg.muted">
-                    Rows to judge
-                  </Text>
-                  <Text
-                    textStyle="sm"
-                    fontVariantNumeric="tabular-nums"
-                    data-testid="instant-eval-rows"
-                  >
-                    {confirmation.rows.toLocaleString()}
-                    {confirmation.isRowsCapped ? " (the run's limit)" : ""}
-                  </Text>
-                </VStack>
-                <VStack align="start" gap={0}>
-                  <Text textStyle="xs" color="fg.muted">
-                    Estimated cost
-                  </Text>
-                  <Text
-                    textStyle="sm"
-                    fontVariantNumeric="tabular-nums"
-                    data-testid="instant-eval-price"
-                  >
-                    {formatUsd(confirmation.priceUsd)}
-                  </Text>
-                </VStack>
-              </HStack>
-              {confirmation.freeBudgetRemainingUsd !== undefined && (
-                <Text textStyle="xs" color="fg.muted">
-                  {formatUsd(confirmation.freeBudgetRemainingUsd)} of the free Instant Evals budget
-                  is left.
-                </Text>
-              )}
+            )}
+          </VStack>
+          <HStack gap={6}>
+            <VStack align="start" gap={0}>
+              <Text textStyle="xs" color="fg.muted">
+                Rows to judge
+              </Text>
+              <Text
+                textStyle="sm"
+                fontVariantNumeric="tabular-nums"
+                data-testid="instant-eval-rows"
+              >
+                {confirmation.rows.toLocaleString()}
+                {confirmation.isRowsCapped ? " (the run's limit)" : ""}
+              </Text>
             </VStack>
+            <VStack align="start" gap={0}>
+              <Text textStyle="xs" color="fg.muted">
+                Estimated cost
+              </Text>
+              <Text
+                textStyle="sm"
+                fontVariantNumeric="tabular-nums"
+                data-testid="instant-eval-price"
+              >
+                {formatUsd(confirmation.priceUsd)}
+              </Text>
+            </VStack>
+          </HStack>
+          {confirmation.freeBudgetRemainingUsd !== undefined && (
+            <Text textStyle="xs" color="fg.muted">
+              {formatUsd(confirmation.freeBudgetRemainingUsd)} of the free Instant Evals budget is
+              left.
+            </Text>
           )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" size="sm" onClick={onSearchWords}>
-            Search the words instead
-          </Button>
-          <Button colorPalette="orange" size="sm" onClick={onRun} loading={isStarting}>
-            Run
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+        </VStack>
+      )}
+    </Dialog>
   );
 }

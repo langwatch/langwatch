@@ -176,8 +176,7 @@ describe("ops migration enrollment procedures", () => {
     });
 
     it("refuses a confirmed cutover run from an impersonated session", async () => {
-      // The audit trail names the impersonated account, which is the wrong
-      // posture for a flip of this size.
+      // The door answers no ops:manage while impersonating (ADR-092), before the app's own check.
       service.enroll.mockResolvedValue(undefined);
       const impersonated = callerFor(IMPERSONATING);
 
@@ -189,7 +188,7 @@ describe("ops migration enrollment procedures", () => {
             confirm: "ENROLL",
           }),
         ),
-      ).resolves.toBe("ops_impersonated_operator_refused");
+      ).resolves.toBe("permission_denied");
       expect(service.enroll).not.toHaveBeenCalled();
     });
   });
@@ -361,7 +360,7 @@ describe("ops migration enrollment procedures", () => {
 
   describe("when the page lists enrollments", () => {
     it("answers with the service's listing untouched", async () => {
-      const listing = { isSaaS: true, enrollments: [] };
+      const listing = { enrollments: [] };
       service.getEnrollments.mockResolvedValue(listing);
       const caller = buildCaller();
 

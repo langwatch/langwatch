@@ -1,13 +1,26 @@
 /**
- * Adoption numbers for the workshop, read from the import sites at build time:
- * which files import each entry point (and each name from it), plus the debt
- * the Consistency pages count. `node .storybook/adoption.ts` prints the inventory.
+ * Adoption numbers for the workshop: who imports each entry point, the debt and the shape
+ * census. `--report <path>` writes the census; `--check --paths <globs...>` is the wave gate,
+ * with `--min-adopted <n>` and `--require-owned-closed` (specs/shape-census.feature).
  */
 import { execFileSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 
 import { PACKAGE_ROOT, publishedEntries, storyExists, storyFor } from "./catalogue.ts";
+import {
+  type Census,
+  collectCensus,
+  evaluateCheck,
+  exitCodeOf,
+  gateRefusal,
+  loadEscapes,
+  openOwners,
+  renderCensusMarkdown,
+  revisionOf,
+  targetApi,
+} from "./census.ts";
+import { collectRawColours } from "./raw-colours.ts";
 
 const ROOT = path.resolve(PACKAGE_ROOT, "../..");
 const CONSUMER_DIRS = ["apps", "modules", "enterprise", "packages"];
@@ -40,7 +53,11 @@ export type Adoption = {
     rawColour: Debt;
     paletteStep: Debt;
     handRolledTable: Debt;
+    shapeDrift: Debt;
+    pixelSpacing: Debt;
+    literalFontSize: Debt;
   };
+  census: Census;
 };
 
 /** `git grep` over the consumer tree; tracked and untracked files alike. */
@@ -146,6 +163,12 @@ export function collectAdoption(): Adoption {
   }
 
   const listTableFiles = new Set(filesBySubpath.get("./list-table") ?? []);
+  const { census, sites, literals } = collectCensus();
+  const drift = sites.filter(
+    (site) => site.disposition !== "adopted" && site.disposition !== "clean",
+  );
+  const literalLines = ({ kind }: { kind: string }) =>
+    literals.filter((literal) => literal.kind === kind).map(({ file, line }) => `${file}:${line}`);
 
   return {
     entries,
@@ -157,7 +180,7 @@ export function collectAdoption(): Adoption {
         }),
       }),
       rawColour: debtFrom({
-        lines: grep({ pattern: "[\"'`](#[0-9a-fA-F]{3,8}|rgba?\\()", paths: BROWSER_SOURCES }),
+        lines: collectRawColours(),
       }),
       paletteStep: debtFrom({
         lines: grep({
@@ -171,10 +194,89 @@ export function collectAdoption(): Adoption {
           (line) => !listTableFiles.has(fileOf(line)),
         ),
       }),
+      shapeDrift: debtFrom({ lines: drift.map(({ file, line }) => `${file}:${line}`) }),
+      pixelSpacing: debtFrom({ lines: literalLines({ kind: "pixelSpacing" }) }),
+      literalFontSize: debtFrom({ lines: literalLines({ kind: "fontSize" }) }),
     },
+    census,
   };
 }
 
-if (import.meta.main) {
-  process.stdout.write(`${JSON.stringify(collectAdoption(), null, 2)}\n`);
+/** The values after a flag, up to the next flag. */
+function valuesAfter({ flag }: { flag: string }): string[] {
+  const start = process.argv.indexOf(flag);
+  if (start === -1) return [];
+  const rest = process.argv.slice(start + 1);
+  const end = rest.findIndex((arg) => arg.startsWith("--"));
+  return end === -1 ? rest : rest.slice(0, end);
+}
+
+function valueAfter({ flag }: { flag: string }): string | undefined {
+  return valuesAfter({ flag })[0];
+}
+
+/** The wave gate: 1 on an unsuppressed violation, 2 on an unclassified candidate or unknown. */
+function runCheck() {
+  const paths = valuesAfter({ flag: "--paths" });
+  if (!paths.length) {
+    process.stderr.write("--check needs --paths <globs...>\n");
+    process.exitCode = 3;
+    return;
+  }
+  const { sites, sources } = collectCensus({ paths });
+  const result = evaluateCheck({ sites, escapes: loadEscapes() });
+  const minimum = Number(valueAfter({ flag: "--min-adopted" }) ?? 0);
+  const refused = gateRefusal({
+    paths,
+    files: [...sources.keys()],
+    adopted: result.adoptedRoots.length,
+    minimum,
+  });
+  if (refused) {
+    process.stderr.write(`${refused}\n`);
+    process.exitCode = 3;
+    return;
+  }
+  const ownedOpen = openOwners({ result });
+  const requireClosed = process.argv.includes("--require-owned-closed");
+  const code = exitCodeOf({ result }) || (requireClosed && ownedOpen.length ? 1 : 0);
+  const report = {
+    revision: revisionOf({ sources }),
+    scope: paths,
+    violations: result.violations,
+    approvedEscapes: result.approvedEscapes,
+    unclassifiedCandidates: result.unclassifiedCandidates,
+    adoptedRoots: result.adoptedRoots,
+    unknown: result.unknown,
+    classifiedCandidates: result.classifiedCandidates,
+    counts: {
+      violationParts: result.violations.length,
+      violationRoots: new Set(result.violations.map((found) => found.root)).size,
+      approvedEscapes: result.approvedEscapes.length,
+      unclassifiedCandidates: result.unclassifiedCandidates.length,
+      unknown: result.unknown.length,
+      adoptedRoots: result.adoptedRoots.length,
+    },
+    ownedElsewhere: result.ownedElsewhere,
+    ownedElsewhereOpen: ownedOpen,
+    targetApi: targetApi(),
+  };
+  process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
+  process.stderr.write(
+    `census check: ${result.violations.length} violations, ${result.unclassifiedCandidates.length} unclassified candidates, ${result.unknown.length} unknown, ${result.adoptedRoots.length} adopted roots in ${sources.size} files; owned elsewhere still open: ${ownedOpen.join(", ") || "none"}\n`,
+  );
+  process.exitCode = code;
+}
+
+if (import.meta.main && process.argv.includes("--check")) {
+  runCheck();
+} else if (import.meta.main) {
+  const adoption = collectAdoption();
+  const report = process.argv.indexOf("--report");
+  const target = report === -1 ? undefined : process.argv[report + 1];
+  if (target) {
+    mkdirSync(path.dirname(path.resolve(target)), { recursive: true });
+    writeFileSync(target, renderCensusMarkdown({ census: adoption.census }));
+  }
+  process.stdout.write(`${JSON.stringify(adoption, null, 2)}\n`);
 }

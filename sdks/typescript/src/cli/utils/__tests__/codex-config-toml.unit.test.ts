@@ -54,7 +54,7 @@ describe("buildCodexOtelBlock", () => {
     // The prompt-content knob stays unset: codex then redacts prompt text
     // and still reports its length.
     expect(out).not.toContain("log_user_prompt");
-    expect(out).toContain(`protocol = "json"`);
+    expect(out).toContain(`protocol = "binary"`);
   });
 
   it("does NOT persist the Authorization header in the toml file", () => {

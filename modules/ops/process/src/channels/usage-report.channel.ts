@@ -1,6 +1,9 @@
-/** How a posted report came back: the status is what an operator acts on; the body is unread. */
+import type { CloudLatestRelease } from "../repositories/cloud-latest-release.repository.ts";
+
+/** How a posted report came back: its status, and the newest release the reply named, if any. */
 export interface UsageReportPostAnswer {
   readonly status: number;
+  readonly latestRelease: CloudLatestRelease | null;
 }
 
 /**

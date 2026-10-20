@@ -1,5 +1,4 @@
 import { moduleApi } from "@langwatch/module";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import type { BetterAuthOptions } from "better-auth";
 import type { AdapterFactory, DBAdapter } from "better-auth/adapters";
 import type { z } from "zod";
@@ -566,6 +565,12 @@ export interface SsoAssertionApi {
   /** Which existing person an assertion `decide` admitted signs in as, asked
    *  after it and never instead of it (specs/identity/scim-sso-signin.feature). */
   resolveUser(args: SsoUserResolutionInput): Promise<SsoUserResolution>;
+  /** Whether the organization that proved the address's domain pins the upstream connection
+   *  this broker subject came through; only then is a brokered SAML address verified (ADR-096). */
+  isBrokeredAddressProved(args: {
+    subject: string;
+    email: string | null | undefined;
+  }): Promise<boolean>;
 }
 
 /**
@@ -812,10 +817,6 @@ export interface IdentityApi {
   ceremonies(): IdentityCeremoniesApi;
   /** better-auth's whole `database:` entry: the identity storage adapter (ADR-116 §1). */
   createStorageAdapter(input: IdentityStorageAdapterInput): AdapterFactory<BetterAuthOptions>;
-  /** The USER-rooted migration registry (ADR-101 §6), in main's order. */
-  userMigrations(): readonly SystemMigration[];
-  /** The ORGANIZATION-rooted migrations identity registers (D04), main's `registeredMigrations`. */
-  registeredMigrations(): readonly SystemMigration[];
   joinRequestGuards(): JoinRequestGuardsApi;
   ssoConnections(): SsoConnectionApi;
   ssoConnectionGuards(): SsoConnectionGuardsApi;

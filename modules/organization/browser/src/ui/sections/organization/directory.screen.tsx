@@ -1,11 +1,11 @@
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 /**
  * /settings/directory: who is here, how they got here, and which system says so.
  * Members, Teams and Groups are its tabs; their old addresses forward onto them.
  * Spec: specs/identity/directory-administration.feature
  */
-import { Tabs, Text, VStack } from "@langwatch/design-system/primitives";
-import { TabCount } from "@langwatch/design-system/tab-count";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 import { Suspense } from "react";
 
@@ -63,14 +63,10 @@ function Directory({
 
   return (
     <>
-      <PageLayout.Header>
+      <PageLayout.Header description="Who is in this organization, how they got here, and which system says so.">
         <PageLayout.Heading>Directory</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
-        <Text color="fg.muted">
-          Who is in this organization, how they got here, and which system says so.
-        </Text>
-
+      <VStack gap={3} width="full" align="stretch">
         {/* The status band reads what the directory has been doing: sso:view. */}
         {Summary && host.hasOrganizationPermission("sso:view") && (
           <Suspense fallback={null}>
@@ -105,37 +101,58 @@ function DirectoryTabs({
   const counts = useDirectoryTabCounts({ organizationId, enabled: true });
 
   return (
-    <Tabs.Root
+    <ContentTabs
+      label="Directory"
       value={tab}
-      onValueChange={(event) => onSelectTab(event.value)}
-      colorPalette="orange"
-      width="full"
-    >
-      <Tabs.List marginBottom={6}>
-        <Tabs.Trigger value="people" gap={2}>
-          People <TabCount value={counts.people} />
-        </Tabs.Trigger>
-        <Tabs.Trigger value="teams" gap={2}>
-          Teams &amp; projects <TabCount value={counts.teams} />
-        </Tabs.Trigger>
-        <Tabs.Trigger value="groups" gap={2}>
-          Groups <TabCount value={counts.groups} />
-        </Tabs.Trigger>
-        {departmentCount !== void 0 && (
-          <Tabs.Trigger value="departments" gap={2}>
-            Departments <TabCount value={departmentCount} />
-          </Tabs.Trigger>
-        )}
-      </Tabs.List>
-
-      <Tabs.Content value="people">{tab === "people" && <MembersScreen />}</Tabs.Content>
-      <Tabs.Content value="teams">{tab === "teams" && <TeamsScreen />}</Tabs.Content>
-      <Tabs.Content value="groups">{tab === "groups" && <GroupsScreen />}</Tabs.Content>
-      {departmentCount !== void 0 && (
-        <Tabs.Content value="departments">
-          {tab === "departments" && <DepartmentsScreen organizationId={organizationId} />}
-        </Tabs.Content>
-      )}
-    </Tabs.Root>
+      onValueChange={({ value }) => onSelectTab(value)}
+      mount="active"
+      body="flush"
+      items={[
+        {
+          value: "people",
+          label: "People",
+          count: counts.people,
+          content: (
+            <Box paddingTop={3}>
+              <MembersScreen />
+            </Box>
+          ),
+        },
+        {
+          value: "teams",
+          label: "Teams & projects",
+          count: counts.teams,
+          content: (
+            <Box paddingTop={3}>
+              <TeamsScreen />
+            </Box>
+          ),
+        },
+        {
+          value: "groups",
+          label: "Groups",
+          count: counts.groups,
+          content: (
+            <Box paddingTop={3}>
+              <GroupsScreen />
+            </Box>
+          ),
+        },
+        ...(departmentCount === void 0
+          ? []
+          : [
+              {
+                value: "departments",
+                label: "Departments",
+                count: departmentCount,
+                content: (
+                  <Box paddingTop={3}>
+                    <DepartmentsScreen organizationId={organizationId} />
+                  </Box>
+                ),
+              },
+            ]),
+      ]}
+    />
   );
 }

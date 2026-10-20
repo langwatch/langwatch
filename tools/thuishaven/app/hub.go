@@ -22,6 +22,11 @@ const (
 	processDeathPoll = 50 * time.Millisecond
 )
 
+// destroyDeathWait is DestroyStack's longer bound: it flushes the stack's Redis
+// DB next, and a lane still running after the flush writes into it again. A
+// launcher still shutting down after 5s under load was seen on 2026-10-12.
+const destroyDeathWait = 30 * time.Second
+
 // DownStack stops a registered stack by slug, from anywhere: it terminates the
 // launcher (the supervised children die with their process group), removes the
 // stack's routes, and drops its registry entry. Databases are deliberately
@@ -51,9 +56,9 @@ func (o *Orchestrator) DownStack(ctx context.Context, slug string) error {
 // DestroyStack is DownStack plus the data: it stops the stack named by slug
 // and drops the ClickHouse + Postgres databases haven created for it. The
 // worktree is left alone - a stack is not a checkout, and a tool that boots a
-// throwaway stack inside a checkout it does not own (apidiff, one stack per
-// instance under its own run-scoped slug) must be able to take its own stack
-// and its own data away without touching the directory it borrowed.
+// throwaway stack inside a checkout it does not own, under its own slug, must
+// be able to take its own stack and its own data away without touching the
+// directory it borrowed.
 //
 // Naming the slug is the whole safety story: nothing here is derived from a
 // directory, so a run can only ever destroy the slugs it started. The shared
@@ -71,6 +76,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	}
 	var downed []int
 	var worktreeDir string
+	rdb := o.redisDBFor(slug)
 	if st, ok := o.stackBySlug(slug); ok {
 		worktreeDir = st.WorktreeDir
 		if st.LauncherPID != 0 {
@@ -82,9 +88,10 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	}
 	// Same ordering rule as stopAndDropForDir: the launcher's children must be
 	// gone before the databases they hold connections to are dropped.
-	o.waitForProcessesDead(downed)
+	o.waitForProcessesDeadWithin(downed, destroyDeathWait)
 	o.stopNxDaemon(ctx, worktreeDir)
 	o.dropWorktreeDatabases(ctx, slug)
+	o.flushStackRedis(ctx, slug, rdb)
 	// Logs are haven's own state, same as the databases above: remove this
 	// slug's share of them, not the checkout (ruling 2026-09-29). Best-effort —
 	// a slug with no registered stack has no worktree to resolve one from.
@@ -96,6 +103,7 @@ func (o *Orchestrator) DestroyStack(ctx context.Context, slug string) error {
 	o.removeStackHome(slug)
 	o.removeNxPrivateDir(slug)
 	o.removeStackCredentials(slug)
+	o.ClearSeedStatus(slug)
 	fmt.Printf("stack %q destroyed (database %s dropped)\n", slug, db)
 	return nil
 }
@@ -272,16 +280,39 @@ func (o *Orchestrator) dropWorktreeDatabases(ctx context.Context, slug string) {
 	}
 }
 
+// flushStackRedis empties the destroyed stack's Redis DB so the next stack given
+// that index does not inherit its queued jobs. A DB another registered stack
+// still uses is left alone.
+func (o *Orchestrator) flushStackRedis(ctx context.Context, slug string, rdb int) {
+	if o.rds == nil || !o.cfg.ShouldManageRedis {
+		return
+	}
+	for _, st := range o.store.Stacks() {
+		if st.Slug != slug && st.RedisDB == rdb {
+			o.log.Warn("destroy: redis db shared with another stack, not flushed", zap.Int("db", rdb), zap.String("with", st.Slug))
+			return
+		}
+	}
+	if err := o.rds.FlushDB(ctx, rdb); err != nil {
+		o.log.Warn("destroy: redis flush failed", zapErr(err))
+	}
+}
+
 // waitForProcessesDead blocks until every pid has exited or a bounded deadline
 // passes, whichever comes first. A launcher that refuses to die within the
 // window is left to the OS and the caller proceeds, rather than hanging the hub
 // forever. Uses the wall clock deliberately: this is a real wait on OS
 // processes, not domain time.
 func (o *Orchestrator) waitForProcessesDead(pids []int) {
+	o.waitForProcessesDeadWithin(pids, processDeathWait)
+}
+
+// waitForProcessesDeadWithin is waitForProcessesDead with the caller's bound.
+func (o *Orchestrator) waitForProcessesDeadWithin(pids []int, bound time.Duration) {
 	if len(pids) == 0 {
 		return
 	}
-	deadline := time.Now().Add(processDeathWait)
+	deadline := time.Now().Add(bound)
 	for {
 		if !o.anyAlive(pids) {
 			return
@@ -349,6 +380,9 @@ func launcherAge(samples []ProcessSample, row HubStack) time.Duration {
 type HubWorktree struct {
 	Dir, Branch, Slug    string
 	IsPrimary, IsCurrent bool
+	// IdleFor is how long since HEAD's last commit (0 when unknown); past
+	// domain.StaleWorktreeAge the hub marks the row stale.
+	IdleFor time.Duration
 }
 
 // HubFootprint is the machine's memory picture as the hub header shows it:
@@ -498,6 +532,7 @@ func (o *Orchestrator) hubWorktrees(gitDir, selfDir string, stacks []domain.Stac
 		worktrees = append(worktrees, HubWorktree{
 			Dir: r.Dir, Branch: r.Branch, Slug: r.Slug,
 			IsPrimary: r.IsPrimary, IsCurrent: r.IsCurrent,
+			IdleFor: o.worktreeIdle(r.Dir),
 		})
 	}
 	return worktrees
@@ -550,4 +585,35 @@ func isKnownWorktree(worktrees []Worktree, dir string) bool {
 		}
 	}
 	return false
+}
+
+// worktreeIdleTTL is how long a worktree's idle reading is reused: the hub
+// refreshes every 2 s, and a `git log` per worktree per refresh is waste.
+const worktreeIdleTTL = 10 * time.Minute
+
+type idleReading struct {
+	lastActivity time.Time
+	readAt       time.Time
+}
+
+// worktreeIdle is how long since dir's HEAD last moved, cached per worktree.
+func (o *Orchestrator) worktreeIdle(dir string) time.Duration {
+	now := o.sys.Now()
+	o.idleMu.Lock()
+	cached, ok := o.idleReadings[dir]
+	o.idleMu.Unlock()
+	if !ok || now.Sub(cached.readAt) >= worktreeIdleTTL {
+		at, known := o.hyg.LastActivity(dir)
+		if !known {
+			return 0
+		}
+		cached = idleReading{lastActivity: at, readAt: now}
+		o.idleMu.Lock()
+		if o.idleReadings == nil {
+			o.idleReadings = map[string]idleReading{}
+		}
+		o.idleReadings[dir] = cached
+		o.idleMu.Unlock()
+	}
+	return max(now.Sub(cached.lastActivity), 0)
 }

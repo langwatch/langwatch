@@ -74,12 +74,37 @@ type Orchestrator struct {
 	// know that half has finished.
 	isGoverning atomic.Bool
 	governance  sync.WaitGroup
+	// clickHouseFocus is the slug whose workload last got the focused weight.
+	// Daemon tick only.
+	clickHouseFocus string
+	// clickHouseWeighted is whether clickHouseFocus has been written at all.
+	clickHouseWeighted bool
 
 	// procActivity is the process watch's cross-tick idle clock (ADR-095),
 	// touched only from the daemon's monitor loop. procTel ships the watch's
 	// observations to the local observability stack; nil means unobserved.
 	procActivity map[int]tsgoSeen
-	procTel      ProcTelemetry
+	// browserActivity is the headless browser governor's cross-tick CPU clock.
+	browserActivity map[int]browserSeen
+	procTel         ProcTelemetry
+	// orphanTermed is every pid the orphan sweep has SIGTERMed and when, so a
+	// later sweep SIGKILLs the ones that ignored it; orphanSweptAt paces it.
+	orphanTermed  map[int]orphanTerm
+	orphanSweptAt time.Time
+	// cycleSamples is the one `ps` a monitor tick shares between its sweeps;
+	// nil outside a tick (see processSamples).
+	cycleSamples atomic.Pointer[func() []ProcessSample]
+	// orphanWorktrees is the repository's worktree list, re-read at most every
+	// worktreeIdleTTL: sibling checkouts sit outside the main root.
+	orphanWorktrees   []string
+	orphanWorktreesAt time.Time
+	// idleReadings caches each worktree's last-commit clock for the hub, which
+	// the TUI and the web dashboard read concurrently.
+	idleMu       sync.Mutex
+	idleReadings map[string]idleReading
+	// runtimeIdleSince is when the VM was first seen unused with auto-stop on;
+	// zero while something uses it. Daemon tick only.
+	runtimeIdleSince time.Time
 }
 
 // Deps is the injected object graph. A struct rather than a positional
@@ -186,7 +211,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		return domain.Stack{}, nil, err
 	}
 	nSvc := len(domain.PerWorktreeServices)
-	ports, err := o.sys.FreePorts(nSvc + 5)
+	ports, err := o.sys.FreePorts(nSvc + 6)
 	if err != nil {
 		return domain.Stack{}, nil, err
 	}
@@ -199,7 +224,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	// ports[nSvc+1] the worker metrics endpoint, ports[nSvc+2] the IdP
 	// simulator's verification nameserver, and ports[nSvc+3] the mail sink's SMTP
 	// listener — both reached by address rather than by hostname, so neither can
-	// go through the proxy. ports[nSvc+4] is the worker's voice socket.
+	// go through the proxy. ports[nSvc+4] is the worker's voice socket, ports[nSvc+5] outboundsim's https.
 	redisDB, exclusive := o.allocateRedisDB(slug)
 	if !exclusive {
 		fmt.Printf(
@@ -216,7 +241,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		// one-shot jobs, the lanes status reports and the names restart accepts.
 		Layout:      detectLayout(p.WorktreeDir),
 		LauncherPID: o.sys.Getpid(), LauncherStart: o.sys.ProcessStart(o.sys.Getpid()), RedisDB: redisDB,
-		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
+		APIPort: ports[nSvc], WorkerMetricsPort: ports[nSvc+1], VoiceSocketPort: ports[nSvc+4], OutboundTLSPort: ports[nSvc+5], LocalAPIKey: o.cfg.LocalAPIKey, IsBaseline: p.IsBaseline,
 		PublicURL:            o.cfg.PublicURL,
 		LangyTier:            opts.LangyTier,
 		Mode:                 opts.DeploymentMode.Name,
@@ -224,6 +249,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 		ModeOverriddenBy:     opts.ModeOverriddenBy,
 		EffectiveMode:        domain.EffectiveMode(opts.DeploymentMode.Name, opts.ModeOverriddenBy),
 		Refresh:              opts.Selection.Refresh,
+		AppOff:               opts.Selection.AppOff,
 		LangyImage:           opts.langyImageTag,
 		DisableGoogleDLP:     o.cfg.ShouldDisableGoogleDLP,
 		MockInstantEvalJudge: o.cfg.ShouldMockInstantEvalJudge,
@@ -326,6 +352,7 @@ func (o *Orchestrator) provision(ctx context.Context, p UpParams, opts PlanOptio
 	if err := o.store.SaveStack(st); err != nil {
 		return domain.Stack{}, nil, err
 	}
+	_ = o.store.WriteFocus(slug)
 	cleanup := func() {
 		if !o.cfg.PortlessDisabled {
 			var removals []func()
@@ -367,11 +394,13 @@ func (o *Orchestrator) heartbeat(ctx context.Context, st domain.Stack) {
 		case <-t.C:
 			// A record removed (down, a failed hand-over) or taken by another
 			// launcher is never written back: that resurrected a stack with no routes.
-			if cur, ok := o.stackBySlug(st.Slug); !ok || cur.LauncherPID != st.LauncherPID {
+			cur, ok := o.stackBySlug(st.Slug)
+			if !ok || cur.LauncherPID != st.LauncherPID {
 				return
 			}
-			st.UpdatedAt = o.sys.Now()
-			_ = o.store.SaveStack(st)
+			// The record as it is now: a live ±service rewrites its services.
+			cur.UpdatedAt = o.sys.Now()
+			_ = o.store.SaveStack(cur)
 		}
 	}
 }
@@ -543,6 +572,10 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		}
 	}
 	defer endRegistration()
+	// Only services differ and the keeper replans: start and stop those lanes alone.
+	if err := o.applySelectionLive(ctx, p, opts); !errors.Is(err, errNotLive) {
+		return err
+	}
 	proceed, err := o.reconcileRunningStack(p, opts)
 	if err != nil {
 		return err
@@ -575,6 +608,7 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 	o.EnsureGateHookForUp(p.WorktreeDir)
 	opts.langyDockerHost = o.langyContainerHost(ctx, st, &opts)
 	o.ensureLangyWorkerBinary(ctx, st, &opts)
+	o.ensureLangyCLI(ctx, st, &opts)
 	isLangyDropped := !opts.Selection.Langy && dropLocalLangyAgent(&st)
 	children := o.planChildren(st, opts, p.WorktreeDir)
 	retireStaleSimsCapture(children)
@@ -583,7 +617,9 @@ func (o *Orchestrator) Up(ctx context.Context, p UpParams, opts PlanOptions) err
 		_ = o.store.SaveStack(st)
 	}
 	plan := o.keeperPlan(children, opts.IsForegroundClient)
-	plan.Seed = seed
+	if !opts.Selection.AppOff {
+		plan.Seed = seed // with the app off nothing would ever report ready to seed
+	}
 	sayPhase(p.StartedAt, "services starting")
 	if err := o.handOver(ctx, st, plan); err != nil {
 		return err
@@ -607,6 +643,12 @@ func (o *Orchestrator) resolveLangyTier(ctx context.Context, opts *PlanOptions) 
 	req.ContainerRuntimeAvailable = o.container != nil && o.container.Available(ctx)
 	tier, notice := domain.ResolveLangyTier(req)
 	opts.LangyTier = tier
+	if refusal := o.machineSettings().RefuseVM("sandboxed Langy"); refusal != nil && tier.RunsInContainer() && opts.Selection.Langy {
+		// Refused, never dropped to the unsandboxed host tier.
+		fmt.Printf("  langyagent: %v\n", refusal)
+		opts.Selection.Langy = false
+		return
+	}
 	// Said only when this stack actually runs langy: a worktree that opted out
 	// has no isolation posture to be surprised by.
 	if notice == "" || !opts.Selection.Langy {
@@ -1033,8 +1075,28 @@ func (o *Orchestrator) Down(ctx context.Context, p UpParams, force bool) error {
 	}
 	removeKeeperPlan(p.WorktreeDir, slug)
 	fmt.Printf("stack %q torn down (databases kept — `haven db reset` for fresh ones)\n", slug)
+	o.keepProxyForOtherStacks()
 	o.stopColimaIfIdle(ctx)
 	return nil
+}
+
+// keepProxyForOtherStacks restarts the machine-wide portless proxy if it is
+// down while a stack is still registered. Down never stops the proxy (only
+// `down --all` does); this is the net for a proxy that went away with a
+// process group, and what reload and daemon restart run once they are done.
+func (o *Orchestrator) keepProxyForOtherStacks() {
+	if o.cfg.PortlessDisabled || o.proxy.Running() {
+		return
+	}
+	for _, st := range o.store.Stacks() {
+		if st.PortlessDisabled {
+			continue
+		}
+		if err := o.proxy.EnsureReady(); err != nil {
+			o.log.Warn("down: could not restart the shared portless proxy", zap.Error(err))
+		}
+		return
+	}
 }
 
 // ensureClickHouse starts the shared managed clickhouse-server (if not already
@@ -1059,6 +1121,7 @@ func (o *Orchestrator) ensureClickHouse(ctx context.Context, st *domain.Stack) {
 	st.ClickHouseHTTPPort = port
 	st.ClickHouseDatabase = db
 	st.ClickHousePostgresHost = o.cfg.ClickHousePostgresHost
+	o.ensureClickHouseStackAccess(ctx, st)
 	proxyScheme, proxyPort := o.proxy.Endpoint()
 	scheme, epPort := o.serviceEndpoint(proxyScheme, proxyPort, port)
 	st.Services = append(st.Services, domain.Service{
@@ -1270,6 +1333,10 @@ func runsLocally(name string, opts PlanOptions) bool {
 		return opts.Selection.Telemetry
 	case domain.LambdaService:
 		return opts.Selection.Lambda
+	case domain.GithubService:
+		return opts.Selection.Github
+	case domain.McpService:
+		return opts.Selection.Mcp
 	default:
 		return true
 	}

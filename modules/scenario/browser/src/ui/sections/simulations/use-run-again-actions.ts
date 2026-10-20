@@ -3,6 +3,7 @@
  * against the remembered target, or through the modal when there is none.
  */
 
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useState } from "react";
 
 import {
@@ -12,6 +13,8 @@ import {
 import type { TargetValue } from "../../../model/scenario-target.ts";
 import { useRunScenario } from "../use-run-scenario.ts";
 import { useScenarioTarget } from "../use-scenario-target.ts";
+
+const logger = createLogger("langwatch:scenario:run-again");
 
 export function useRunAgainActions({
   scenarioId,
@@ -49,7 +52,7 @@ export function useRunAgainActions({
       try {
         await runScenario({ scenarioId, target });
       } catch (error) {
-        console.error("Failed to run scenario:", error);
+        logger.error({ error }, "Failed to run scenario");
       }
       setRunModalOpen(false);
     },

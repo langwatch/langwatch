@@ -3,6 +3,7 @@
  */
 
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { useEffect, useEffectEvent, useMemo, useRef, useState } from "react";
 import {
   Bar,
@@ -694,7 +695,7 @@ function MetricBarChart({
           />
           <XAxis
             dataKey="name"
-            style={{ fontSize: "11px" }}
+            style={{ fontSize: TYPE_SCALE_PX.micro }}
             axisLine={false}
             tickLine={false}
             angle={axis.angle}
@@ -703,7 +704,7 @@ function MetricBarChart({
             tickFormatter={formatAxisTick}
           />
           <YAxis
-            style={{ fontSize: "11px" }}
+            style={{ fontSize: TYPE_SCALE_PX.micro }}
             width={yAxisWidth}
             {...(yDomain ? { domain: yDomain } : {})}
             {...(formatValue ? { tickFormatter: (value: number) => formatValue(value) } : {})}

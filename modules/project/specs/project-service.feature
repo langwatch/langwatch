@@ -130,8 +130,9 @@ Feature: Shared project service
   @unit
   Scenario: Existing projects are recorded as created by the backfill, idempotently
     Given an organization with two projects that existed before project recorded its creations
-    When the backfill-project-created task runs twice
+    When the project:record-created-facts step runs twice
     Then each run records both projects as created, marked backfilled, with the organization's admin
+    And each created fact is dated at its project's stored creation time
     And the second run records the same facts as the first, keyed alike, so peers treat it as a repeat
 
   @unit
@@ -189,7 +190,7 @@ Feature: Shared project service
   @unit
   Scenario: Existing projects' presence settings are recorded by the backfill, idempotently
     Given an organization with two projects whose presence settings were stored before project recorded them
-    When the backfill-project-presence-setting task runs twice
+    When the project:record-created-facts step runs twice
     Then each run records each project's stored presence setting once, marked backfilled, with no changer
     And each project's fact is keyed alike on both runs, so the second run records nothing new
 
@@ -215,41 +216,59 @@ Feature: Shared project service
   @unit
   Scenario: Existing projects' departments and teams are recorded by the backfill, idempotently
     Given an organization with two projects stored before project recorded their departments
-    When the backfill-project-department-assigned task runs twice
+    When the project:record-created-facts step runs twice
     Then each run records each project's department, team and personal flag once, marked backfilled
     And each project's fact is keyed alike on both runs, so the second run records nothing new
 
   @unit
-  Scenario: A project fact step records every organization's projects a page at a time
-    Given three organizations, served two to a page
-    When a project fact upgrade step runs
-    Then each organization's projects are recorded once
-    And the step saves its checkpoint after each page, naming the page's last organization
+  Scenario: The project facts step walks the projects table once, a page at a time
+    Given three projects, served two to a page
+    When the project:record-created-facts step runs
+    Then each page's created facts, department assignments and presence settings are each sent to the queue as one batch, in that order
+    And the step saves its checkpoint after each page, naming the page's last project
 
   @unit
-  Scenario: A project fact step resumes after the last page of organizations it saved
-    Given a project fact upgrade step whose checkpoint names the second organization
+  Scenario: The project facts step records an archived project as created only
+    Given an archived project and a live project
+    When the project:record-created-facts step runs
+    Then both projects are recorded as created
+    And only the live project has its department and presence setting recorded
+
+  @unit
+  Scenario: The project facts step resumes after the last page it saved
+    Given the project:record-created-facts step's checkpoint names the second project and its counts
     When the step runs again
-    Then only the organizations after the second are recorded
+    Then only the projects after the second are recorded
+    And the report adds the new counts to the saved ones
 
   @unit
-  Scenario: A dry run of a project fact step records nothing and saves no checkpoint
-    Given three organizations with projects
-    When a project fact upgrade step runs as a dry run
+  Scenario: A dry run of the project facts step records nothing and saves no checkpoint
+    Given three projects, one of them archived
+    When the project:record-created-facts step runs as a dry run
     Then no fact is recorded and no checkpoint is saved
-    And the report counts the projects it would record where the fact can preview them
+    And the report counts the facts it would record
+
+  @unit @regression
+  Scenario: The project facts step skips a project whose team or organization is gone
+    Given a stored project whose team was deleted, one whose organization was deleted, and a live project
+    When the project:record-created-facts step runs
+    Then the step completes and records the live project's facts
+    And nothing is recorded for the two orphaned projects
+    And the report counts the two as skipped orphans and names their ids
+    And the saved checkpoint moves past them, so a resumed run does not read them again
 
   @unit
-  Scenario: A project fact step stops between organizations when the worker stops it
-    Given a project fact upgrade step whose run has been aborted
+  Scenario: The project facts step stops between pages when the worker stops it
+    Given a project:record-created-facts step whose run has been aborted
     When the step runs
-    Then no organization is recorded and no checkpoint is saved
+    Then no project is recorded and no checkpoint is saved
 
   @integration
-  Scenario: The project fact steps are background steps that wait for old writers to go
+  Scenario: The project facts step is a background step that waits for old writers to go
     When the worker's installed modules list their upgrade steps
-    Then project:record-created-facts, project:record-department-assignments and project:record-presence-settings are background data steps
-    And each runs only once no older image serves
+    Then project:record-created-facts is a background data step
+    And it runs only once no older image serves
+    And a rerun is a retry of that step in Ops, not a separate task
 
   @integration
   Scenario: The project created step runs after the judge spend catch-up
@@ -263,3 +282,10 @@ Feature: Shared project service
     Then the live and the archived project are listed
     And the governance project is not listed
     And a read that does not ask for archived projects still leaves the archived one out
+
+  @unit
+  Scenario: A member's landing projects come from their grants
+    Given a member whose grants name one team and one project in an organization
+    When the oldest shared project they belong to is looked up
+    Then only projects under that team or with that id are considered
+    And a member with no team or project grant is offered none

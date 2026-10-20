@@ -15,7 +15,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -40,6 +40,8 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/stored-object-contract": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",
     "@tanstack/react-query": "catalog:",
     "@tanstack/react-table": "catalog:",

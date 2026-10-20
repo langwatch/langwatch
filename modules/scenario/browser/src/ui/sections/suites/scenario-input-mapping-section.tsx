@@ -74,7 +74,7 @@ function invertMappings(stored: Record<string, FieldMapping>): Record<string, Fi
 function buildAgentInputSource(inputs: Variable[]): AvailableSource {
   return {
     id: "agent_input",
-    name: "Agent Inputs",
+    name: "Agent inputs",
     type: "evaluator",
     fields: inputs.map((inp) => ({
       name: inp.identifier,
@@ -87,7 +87,7 @@ function buildAgentInputSource(inputs: Variable[]): AvailableSource {
 function buildAgentOutputSource(outputs: Variable[]): AvailableSource {
   return {
     id: "agent_output",
-    name: "Agent Outputs",
+    name: "Agent outputs",
     type: "evaluator",
     fields: outputs.map((out) => ({
       name: out.identifier,
@@ -195,7 +195,7 @@ export function ScenarioInputMappingSection({
       {/* Section header */}
       <VStack align="start" gap={1}>
         <Text fontSize="sm" fontWeight="medium">
-          Scenario Mappings
+          Scenario mappings
         </Text>
         <Text fontSize="xs" color="fg.muted">
           Configure how this agent connects to the scenario framework. When run as a scenario

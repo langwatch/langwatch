@@ -442,9 +442,50 @@ export class DatabaseBusyError extends HandledError {
  */
 const SCHEMA_BEHIND_CODES: readonly unknown[] = ["P2021", "P2022", "42P01", "42703"];
 
-/** Whether the query named a table or column the schema does not have yet. */
+/** The driver adapter's kinds for 42P01 and 42703 (`@prisma/adapter-pg`). */
+const SCHEMA_BEHIND_KINDS: readonly unknown[] = ["TableDoesNotExist", "ColumnNotFound"];
+
+/** ClickHouse's UNKNOWN_TABLE (60) and NO_SUCH_COLUMN_IN_TABLE (16): its tables migrate too. */
+const CLICKHOUSE_SCHEMA_BEHIND_TYPES: readonly unknown[] = [
+  "UNKNOWN_TABLE",
+  "NO_SUCH_COLUMN_IN_TABLE",
+];
+const CLICKHOUSE_SCHEMA_BEHIND_CODES: readonly unknown[] = ["60", "16"];
+
+/** How many wrappers deep a schema-behind failure is still recognised; also stops a cycle. */
+const CAUSE_DEPTH = 6;
+
+/**
+ * Whether the query named a table or column the schema lacks. Prisma 7 raises raw SQL failures
+ * as P2010, the SQLSTATE only on `meta.driverAdapterError.cause`, so the chain is walked.
+ * 22P02 and 42704 stay unmapped: bad input and unknown settings share them.
+ */
 export function isSchemaBehind(error: unknown): boolean {
-  return error instanceof Error && "code" in error && SCHEMA_BEHIND_CODES.includes(error.code);
+  if (!(error instanceof Error)) return false;
+  let node: unknown = error;
+  for (let depth = 0; depth < CAUSE_DEPTH; depth++) {
+    if (typeof node !== "object" || node === null) return false;
+    if (namesMissingSchema(node)) return true;
+    node = causeOf(node);
+  }
+  return false;
+}
+
+function namesMissingSchema(node: object): boolean {
+  if ("code" in node && SCHEMA_BEHIND_CODES.includes(node.code)) return true;
+  if ("originalCode" in node && SCHEMA_BEHIND_CODES.includes(node.originalCode)) return true;
+  if ("type" in node && CLICKHOUSE_SCHEMA_BEHIND_TYPES.includes(node.type)) return true;
+  if ("code" in node && CLICKHOUSE_SCHEMA_BEHIND_CODES.includes(node.code)) return true;
+  return "kind" in node && SCHEMA_BEHIND_KINDS.includes(node.kind);
+}
+
+/** Prisma's driver error when the node carries one, otherwise the standard `cause`. */
+function causeOf(node: object): unknown {
+  const meta = "meta" in node ? node.meta : undefined;
+  if (typeof meta === "object" && meta !== null && "driverAdapterError" in meta) {
+    return meta.driverAdapterError;
+  }
+  return "cause" in node ? node.cause : undefined;
 }
 
 /** The code is ahead of the Postgres schema while the worker upgrades it (NO-HOLDS); retry soon. */
@@ -460,6 +501,20 @@ export class UpgradeInProgressError extends HandledError {
     });
 
     this.name = "UpgradeInProgressError";
+  }
+}
+
+/** A tab still running the release before plain JSON; its page must reload onto this one. */
+export class ClientOutdatedError extends HandledError {
+  declare readonly code: "client_outdated";
+
+  constructor() {
+    super("client_outdated", "This page is from an earlier release; reload it.", {
+      httpStatus: 400,
+      fault: "customer",
+    });
+
+    this.name = "ClientOutdatedError";
   }
 }
 
@@ -479,17 +534,48 @@ export function setLedgerCurrent({ current }: { current: boolean }): void {
   ledgerCurrent = current;
 }
 
+/** Private ClickHouse targets still applying their migrations, by organisation (T7-F18). */
+let organizationsCatchingUp: ReadonlySet<string> = new Set();
+
+/** The worker's shared list, read from Redis by the upgrade gate; empty when it cannot be read. */
+export function setOrganizationsCatchingUp({
+  organizationIds,
+}: {
+  organizationIds: Iterable<string>;
+}): void {
+  organizationsCatchingUp = new Set(organizationIds);
+}
+
+/** Whether the failure came from a private target that is still catching up its migrations. */
+function isFromTargetCatchingUp(error: unknown): boolean {
+  let node: unknown = error;
+  for (let depth = 0; depth < CAUSE_DEPTH; depth++) {
+    if (typeof node !== "object" || node === null) return false;
+    if ("privateTarget" in node && typeof node.privateTarget === "string") {
+      return organizationsCatchingUp.has(node.privateTarget);
+    }
+    node = causeOf(node);
+  }
+  return false;
+}
+
 /**
  * The one mapping of a store failure every boundary answers: busy pool, schema behind. Schema
- * behind is `upgrade_in_progress` only before the gate admits; after, the ledger and the schema
- * disagree, an unhandled 500 whose log names the table or column (STUCK-STATES).
+ * behind is `upgrade_in_progress` before the gate admits, or from a private ClickHouse target still
+ * catching up; otherwise the ledger and the schema disagree, a 500 naming the table (STUCK-STATES).
  */
 export function promoteStoreFailure<T>(raised: T): T | Error {
   if (isDatabaseBusy(raised)) return new DatabaseBusyError();
   if (!isSchemaBehind(raised)) return raised;
-  if (!ledgerCurrent) return new UpgradeInProgressError();
+  if (!ledgerCurrent || isFromTargetCatchingUp(raised)) return new UpgradeInProgressError();
   const detail = raised instanceof Error ? raised.message : String(raised);
   return new Error(`schema and ledger disagree: ${detail}`, { cause: raised });
+}
+
+/** A read ahead of the schema while the worker upgrades: expected, so logged below error. */
+export function isUpgradeInProgress(raised: unknown): boolean {
+  const promoted = promoteStoreFailure(raised);
+  return HandledError.isHandled(promoted) && promoted.code === "upgrade_in_progress";
 }
 
 // ---------------------------------------------------------------------------

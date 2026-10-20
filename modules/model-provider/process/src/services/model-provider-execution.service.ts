@@ -154,9 +154,10 @@ export class ModelProviderExecutionService {
       parameters.api_key = apiKey;
     }
 
-    const endpoint = definition?.endpointKey
-      ? this.executionValue(provider, definition.endpointKey)
-      : null;
+    // The generic `base_url` key is the gateway wire's own fallback (gateway-config-wire.rules.ts).
+    const endpoint =
+      (definition?.endpointKey ? this.executionValue(provider, definition.endpointKey) : null) ??
+      this.storedExecutionValue(provider, "base_url");
     if (!endpoint) {
       return;
     }
@@ -173,7 +174,13 @@ export class ModelProviderExecutionService {
       return;
     }
 
-    parameters.vertex_credentials = this.executionValue(provider, "VERTEXAI_API_KEY") ?? "invalid";
+    // The service account JSON is stored under the registry's apiKey,
+    // GOOGLE_APPLICATION_CREDENTIALS, not a Vertex-specific key.
+    const definition = this.options.catalog.pickExecutionDefinition({
+      provider: provider.provider,
+    });
+    parameters.vertex_credentials =
+      (definition ? this.executionValue(provider, definition.apiKey) : null) ?? "invalid";
     parameters.vertex_project = this.executionValue(provider, "VERTEXAI_PROJECT") ?? "invalid";
     parameters.vertex_location = this.executionValue(provider, "VERTEXAI_LOCATION") ?? "invalid";
   }

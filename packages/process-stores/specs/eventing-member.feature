@@ -25,3 +25,9 @@ Feature: The eventing member holds one process store in every role
     Given the consuming role built with the worker's event-log retention classifier
     When it appends a control-plane fact and a trace event
     Then the fact is stamped to keep forever and the trace event ages with the retention default
+
+  @unit
+  Scenario: An event-log read declared a full scan reaches the ClickHouse member declared
+    Given the consuming role over the routed ClickHouse member
+    When eventing reads a long-lived aggregate's whole history with no time bound
+    Then the member receives the read declared as a full scan, so it logs no cold-scan warning

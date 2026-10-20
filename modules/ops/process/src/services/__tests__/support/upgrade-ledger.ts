@@ -38,8 +38,6 @@ export function statusOf(overrides: Partial<UpgradeStatus> = {}): UpgradeStatus 
     installed: "3.21.0",
     origin: "recorded",
     image: "3.21.0",
-    floor: "3.20.1",
-    ledgerFloor: "3.20.1",
     lease: null,
     lastRun: null,
     counts: {},

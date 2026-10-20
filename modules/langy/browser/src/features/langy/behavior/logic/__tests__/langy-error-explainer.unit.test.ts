@@ -52,6 +52,11 @@ describe("KNOWN_LANGY_ERROR_KINDS", () => {
       // the browser as coded TRPCErrors from the create/continue mutations.
       "langy_model_not_configured",
       "langy_model_not_allowed",
+      // Refusals that answer the same way every time: no retry action.
+      "langy_agent_not_configured",
+      "langy_not_enabled",
+      "langy_skill_not_available",
+      "langy_dispatch_rejected",
       "langy_egress_misconfigured",
       "langy_insufficient_scope",
       "langy_turn_in_progress",
@@ -320,6 +325,84 @@ describe("explainLangyError", () => {
         expect(presentation.description).toBe(
           "The model provider refused the request as invalid, and it refuses the same request every time. Pick a different model, or share the trace with support.",
         );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A request the provider refuses with a plain 400 offers no retry */
+      it.each([[[{ kind: "invalid_request_error" }]], [[{ kind: "upstream_bad_request" }]]])(
+        "reads %j as an invalid request, and offers the settings",
+        (reasons) => {
+          // The chain every Anthropic turn on a Claude 5.5 model recorded while
+          // the worker sent a thinking shape those models refuse.
+          const presentation = explainLangyError(
+            domain({
+              code: "langy_agent_errored",
+              reasons: [
+                {
+                  kind: "llm_upstream_error",
+                  meta: { http_status: 400, provider: "anthropic", body_kind: "json" },
+                  reasons,
+                },
+              ],
+            }),
+          );
+
+          expect(presentation.kind).toBe("llm_upstream_error");
+          expect(presentation.action).toEqual({
+            label: "Configure model",
+            kind: "configure-model",
+          });
+        },
+      );
+
+      /** @scenario A spent provider balance reads as the account to top up, with no retry */
+      it("reads a spent balance as the account to top up, and offers the settings", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, provider: "anthropic", body_kind: "json" },
+                reasons: [
+                  { kind: "invalid_request_error" },
+                  { kind: "llm_provider_out_of_credit" },
+                ],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.kind).toBe("llm_upstream_error");
+        expect(presentation.title).toBe("This provider account is out of credit");
+        expect(presentation.description).toBe(
+          "Your account with this model provider has no allowance left. Check its billing or usage limits, or pick a model from a different provider.",
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      });
+
+      /** @scenario A key the provider refuses on a 400 reads as a credential to check */
+      it("reads the proxy's refused-key reason as the provider refusing the key", () => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [
+              {
+                kind: "llm_upstream_error",
+                meta: { http_status: 400, provider: "gemini", body_kind: "json" },
+                reasons: [{ kind: "INVALID_ARGUMENT" }, { kind: "llm_provider_key_rejected" }],
+              },
+            ],
+          }),
+        );
+
+        expect(presentation.title).toBe("This provider rejected the API key");
         expect(presentation.action).toEqual({
           label: "Configure model",
           kind: "configure-model",
@@ -1022,6 +1105,30 @@ describe("resolveLiveTurnError", () => {
       });
     });
 
+    describe("when the live message is only the code the durable record explains", () => {
+      /** @scenario "A bare failure code still reads the reasons on the durable record" */
+      it("reads the durable record's reasons", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("langy_agent_errored"),
+          durableLastError: typedStreamError,
+        });
+
+        expect(explainLangyError(domain).kind).toBe("langy_codex_plan_limit");
+      });
+    });
+
+    describe("when a turn-start refusal arrives over an older durable failure", () => {
+      /** @scenario "A bare failure code still reads the reasons on the durable record" */
+      it("keeps the live refusal", () => {
+        const domain = resolveLiveTurnError({
+          error: new Error("langy_agent_not_configured"),
+          durableLastError: typedStreamError,
+        });
+
+        expect(domain.code).toBe("langy_agent_not_configured");
+      });
+    });
+
     describe("when the durable record is empty too", () => {
       it("falls back to unknown", () => {
         const domain = resolveLiveTurnError({
@@ -1099,4 +1206,35 @@ describe("isLangyConversationPending", () => {
   it("waits twenty seconds before a missing conversation stops reading as lagging", () => {
     expect(LANGY_CONVERSATION_PENDING_GRACE_MS).toBe(20_000);
   });
+});
+
+describe("refusals no retry can change", () => {
+  /** @scenario A deployment with no Langy agent says so instead of an unexpected error */
+  it("names a deployment without a Langy agent and offers no retry", () => {
+    const card = explainLangyError(domain({ code: "langy_agent_not_configured", httpStatus: 503 }));
+    expect(card.title).toBe("Langy isn't set up on this deployment");
+    expect(card.description).toContain("haven up +langy");
+    expect(card.render).toBe("card");
+    expect(card.action).toBeUndefined();
+  });
+
+  /** @scenario A deployment with no Langy agent says so instead of an unexpected error */
+  it("reads the code off a refusal whose tRPC envelope was dropped", () => {
+    const resolved = resolveLiveTurnError({
+      error: new Error("langy_agent_not_configured"),
+      durableLastError: null,
+    });
+    expect(resolved.code).toBe("langy_agent_not_configured");
+  });
+
+  /** @scenario Refusals that answer the same way every time offer no retry */
+  it.each(["langy_not_enabled", "langy_skill_not_available", "langy_dispatch_rejected"])(
+    "offers no retry for %s",
+    (code) => {
+      const card = explainLangyError(domain({ code }));
+      expect(card.render).toBe("card");
+      expect(card.action).toBeUndefined();
+      expect(card.title).not.toBe("Langy couldn't finish that");
+    },
+  );
 });

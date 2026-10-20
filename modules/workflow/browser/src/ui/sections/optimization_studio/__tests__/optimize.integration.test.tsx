@@ -1,9 +1,9 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 /**
  * @vitest-environment jsdom
  * Characterizes starting an optimization: the entry limits, the version it runs on, and failures.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { type UseFormReturn, useForm } from "react-hook-form";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -36,6 +36,7 @@ vi.mock("../../../../behavior/use-workflow-store.ts", () => ({
   useWorkflowStore: (selector: (store: unknown) => unknown) =>
     selector({
       workflow_id: "wf-1",
+      socketStatus: "connected",
       getWorkflow: () => WORKFLOW,
       nodes: WORKFLOW.nodes,
       state: { optimization: undefined },

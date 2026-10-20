@@ -1,111 +1,137 @@
-import {
-  Alert,
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Skeleton,
-  Spacer,
-  Stack,
-  Table,
-} from "@chakra-ui/react";
+import { ColumnTypeIcon } from "@langwatch/design-system/column-type-icon";
+import { FilterChips } from "@langwatch/design-system/filter-chips";
+import { ListPage, type ListPageState } from "@langwatch/design-system/list-page";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Menu } from "@langwatch/design-system/menu";
+import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Badge, Button } from "@langwatch/design-system/primitives";
+import { ProductScope } from "@langwatch/design-system/product-scope";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { FileText } from "lucide-react";
-import type { ReactNode } from "react";
-
-import { SearchInput } from "../components/forms/search-input.tsx";
-import { FilterChips } from "../components/layout/filter-chips.tsx";
-import { ListTable } from "../components/layout/list-table.tsx";
-import { PageLayout } from "../components/layout/page-layout.tsx";
-import { Pagination } from "../components/layout/pagination.tsx";
-import { Menu } from "../components/overlays/menu.tsx";
-import { NoDataInfoBlock } from "../components/states/no-data-info-block.tsx";
+import { useState } from "react";
 
 const PROMPTS = [
-  { name: "Support triage", model: "gpt-5-mini", version: 14, status: "Published" },
-  { name: "Refund policy answerer", model: "claude-sonnet-4-5", version: 3, status: "Draft" },
+  { id: "support-triage", name: "Support triage", model: "gpt-5-mini", version: 14, draft: false },
   {
+    id: "refund-policy",
+    name: "Refund policy answerer",
+    model: "claude-sonnet-4-5",
+    version: 3,
+    draft: true,
+  },
+  {
+    id: "handover-note",
     name: "Summarise a conversation for the handover note",
     model: "gemini-2.5-flash",
     version: 27,
-    status: "Published",
+    draft: false,
   },
 ];
 
-function Frame({ children }: { children: ReactNode }) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border.muted"
-      borderRadius="md"
-      overflow="hidden"
-      bg="bg.page"
-    >
-      <PageLayout.Header>
-        <PageLayout.Heading>Prompts</PageLayout.Heading>
-        <Spacer />
-        <PageLayout.HeaderButton primary>New prompt</PageLayout.HeaderButton>
-      </PageLayout.Header>
-      <PageLayout.Container sidebarWidth={0}>
-        <PageLayout.Content>
-          <Stack gap={4}>
-            <HStack gap={3}>
-              <FilterChips
-                value="all"
-                onChange={() => undefined}
-                groupLabel="Filter prompts"
-                items={[
-                  { value: "all", label: "All", count: 3 },
-                  { value: "draft", label: "Drafts", count: 1 },
-                ]}
-              />
-              <Spacer />
-              <Box width="16rem">
-                <SearchInput placeholder="Search prompts" size="sm" />
-              </Box>
-            </HStack>
-            {children}
-          </Stack>
-        </PageLayout.Content>
-      </PageLayout.Container>
-    </Box>
-  );
-}
+const AGENT_PROMPT =
+  'Create a LangWatch prompt called "Support triage" that sorts incoming support messages into billing, delivery and refunds.';
 
-function Rows({ loading = false }: { loading?: boolean }) {
+/** A prompts list built from the current shapes; each story forces one of the page's states. */
+function PromptList({ forced }: { forced?: ListPageState | "failed" }) {
+  const [query, setQuery] = useState(forced === "no-results" ? "Escalations" : "");
+  const [filter, setFilter] = useState("all");
+
+  const rows = PROMPTS.filter(
+    (prompt) =>
+      prompt.name.toLowerCase().includes(query.trim().toLowerCase()) &&
+      (filter === "all" || prompt.draft),
+  );
+  const state: ListPageState =
+    forced === "failed"
+      ? "error"
+      : (forced ?? (rows.length === 0 && query !== "" ? "no-results" : "ready"));
+
   return (
-    <ListTable>
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Prompt</Table.ColumnHeader>
-          <Table.ColumnHeader>Model</Table.ColumnHeader>
-          <Table.ColumnHeader>Version</Table.ColumnHeader>
-          <Table.ColumnHeader>Status</Table.ColumnHeader>
-          <Table.ColumnHeader width={12} />
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {PROMPTS.map((prompt) => (
-          <Table.Row key={prompt.name}>
-            {loading ? (
-              <Table.Cell colSpan={5}>
-                <Skeleton height={4} />
-              </Table.Cell>
-            ) : (
-              <>
-                <Table.Cell>{prompt.name}</Table.Cell>
-                <Table.Cell>{prompt.model}</Table.Cell>
-                <Table.Cell>v{prompt.version}</Table.Cell>
-                <Table.Cell>
-                  <Badge colorPalette={prompt.status === "Draft" ? "gray" : "green"}>
-                    {prompt.status}
+    <ProductScope product="llm-ops">
+      <ListPage
+        title="Prompts"
+        description="Instructions your agents send, with every version kept."
+        actions={<PageLayout.HeaderButton primary>New prompt</PageLayout.HeaderButton>}
+        state={state}
+        toolbar={{
+          search: {
+            value: query,
+            onChange: setQuery,
+            placeholder: "Search prompts",
+            ariaLabel: "Search prompts",
+          },
+          filters: (
+            <FilterChips
+              value={filter}
+              onChange={setFilter}
+              groupLabel="Filter prompts"
+              items={[
+                { value: "all", label: "All", count: PROMPTS.length },
+                { value: "draft", label: "Drafts", count: 1 },
+              ]}
+            />
+          ),
+        }}
+        error={{
+          title: "Could not load the prompts",
+          description: "We have been notified. Try again in a moment.",
+          onRetry: () => undefined,
+          next: [
+            { kind: "docs", label: "Prompt troubleshooting", href: "https://docs.langwatch.ai" },
+          ],
+        }}
+        empty={{
+          title: "No prompts yet",
+          description: "Prompts hold the instructions your agents send, with every version kept.",
+          icon: <ColumnTypeIcon type="chat_messages" size={24} />,
+          next: [
+            { kind: "docs", label: "Read about prompts", href: "https://docs.langwatch.ai" },
+            { kind: "agent-prompt", prompt: AGENT_PROMPT },
+          ],
+        }}
+        noResults={{
+          description: `No prompt is called "${query}".`,
+          onClear: () => setQuery(""),
+          next: [{ kind: "agent-prompt", prompt: AGENT_PROMPT }],
+        }}
+        pagination={{
+          page: 1,
+          pageSize: 25,
+          totalCount: rows.length,
+          unitLabel: "prompts",
+          onPageChange: () => undefined,
+          onPageSizeChange: () => undefined,
+        }}
+      >
+        <ListTable aria-label="Prompts">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Prompt</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader align="end">Version</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ActionHeader />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {rows.map((prompt) => (
+              <ListTable.Row key={prompt.id} onActivate={() => undefined}>
+                <ListTable.Cell>
+                  <ListTable.RowAction onActivate={() => undefined}>
+                    {prompt.name}
+                  </ListTable.RowAction>
+                </ListTable.Cell>
+                <ListTable.Cell tone="muted">{prompt.model}</ListTable.Cell>
+                <ListTable.Cell numeric>v{prompt.version}</ListTable.Cell>
+                <ListTable.Cell>
+                  <Badge colorPalette={prompt.draft ? "gray" : "green"}>
+                    {prompt.draft ? "Draft" : "Published"}
                   </Badge>
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.ActionCell>
                   <Menu.Root>
                     <Menu.Trigger asChild>
                       <Button size="xs" variant="ghost" aria-label={`Actions for ${prompt.name}`}>
-                        ⋯
+                        <span aria-hidden>⋮</span>
                       </Button>
                     </Menu.Trigger>
                     <Menu.Content>
@@ -115,13 +141,13 @@ function Rows({ loading = false }: { loading?: boolean }) {
                       </Menu.Item>
                     </Menu.Content>
                   </Menu.Root>
-                </Table.Cell>
-              </>
-            )}
-          </Table.Row>
-        ))}
-      </Table.Body>
-    </ListTable>
+                </ListTable.ActionCell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      </ListPage>
+    </ProductScope>
   );
 }
 
@@ -130,9 +156,15 @@ const meta = {
   parameters: {
     layout: "fullscreen",
     usage: {
-      use: "Any page that lists one kind of thing: Page layout header with the primary action, filter chips and search above, a List table with an overflow menu per row, Pagination below. Empty, loading and error take the table's place.",
+      use: "Any page that lists one kind of thing: a ListPage with the primary action in the header, search and filters in its toolbar, a ListTable with one native opener and an overflow menu per row, and Pagination. Loading, empty, no-results and error take the table's place, and the last three carry a next step.",
       avoid:
-        "A page heading drawn by hand, a bare Table.Root, or row actions as a row of buttons (row-actions-overflow-menu.md).",
+        "A page heading drawn by hand, a bare Table.Root, row actions as a row of buttons, or an empty state with nowhere to go. To add, change and remove rows from the list, see Create, edit and delete.",
+    },
+    docs: {
+      description: {
+        component:
+          "The list on its own. The full flow with a form, a confirmation and Undo is [Create, edit and delete](?path=/docs/patterns-create-edit-and-delete--docs).",
+      },
     },
   },
   tags: ["autodocs"],
@@ -141,56 +173,15 @@ const meta = {
 export default meta;
 type Story = StoryObj<typeof meta>;
 
-export const Default: Story = {
-  render: () => (
-    <Frame>
-      <Stack gap={0}>
-        <Rows />
-        <Pagination
-          page={1}
-          pageSize={25}
-          totalCount={3}
-          unitLabel="prompts"
-          onPageChange={() => undefined}
-          onPageSizeChange={() => undefined}
-        />
-      </Stack>
-    </Frame>
-  ),
-};
+export const Default: Story = { render: () => <PromptList /> };
 
-export const Loading: Story = {
-  render: () => (
-    <Frame>
-      <Rows loading />
-    </Frame>
-  ),
-};
+export const Loading: Story = { render: () => <PromptList forced="loading" /> };
 
-export const Empty: Story = {
-  render: () => (
-    <Frame>
-      <NoDataInfoBlock
-        title="No prompts yet"
-        description="Prompts hold the instructions your agents send, with every version kept."
-        icon={<FileText />}
-      >
-        <Button size="sm">New prompt</Button>
-      </NoDataInfoBlock>
-    </Frame>
-  ),
-};
+/** No prompts: a docs page and a prompt for a coding agent, never a dead end. */
+export const Empty: Story = { render: () => <PromptList forced="empty" /> };
 
-export const Failed: Story = {
-  render: () => (
-    <Frame>
-      <Alert.Root status="error">
-        <Alert.Indicator />
-        <Alert.Content>
-          <Alert.Title>Could not load the prompts</Alert.Title>
-          <Alert.Description>We have been notified. Try again in a moment.</Alert.Description>
-        </Alert.Content>
-      </Alert.Root>
-    </Frame>
-  ),
-};
+/** The search matched nothing: clear it, or hand the job to a coding agent. */
+export const NoResults: Story = { render: () => <PromptList forced="no-results" /> };
+
+/** The read failed: try again, or follow the troubleshooting page. */
+export const Failed: Story = { render: () => <PromptList forced="failed" /> };

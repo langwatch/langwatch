@@ -9,9 +9,11 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { HandledError } from "@langwatch/handled-error";
 import { generate } from "@langwatch/ksuid";
 import {
+  CALL_ENVELOPE_SLACK_MS,
   CALL_OFFLINE_WAIT_MS,
   CALL_POLL_HOLD_MS,
-  LIVE_STREAM_KEEPALIVE_MS,
+  CALL_RESULT_TTL_MS,
+  PERMISSION_WAIT_BUDGET_MS,
   POLL_INTERVAL_MS,
   LangyLocalRecordUnreadableError,
   LangyLocalWorkspaceOfflineError,
@@ -24,27 +26,17 @@ import {
   type ResultFrame,
 } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { nowInstant } from "@langwatch/time";
 
+import type { LangyLocalWorkspaceChannel } from "../../../channels/langy-local-workspace.channel.ts";
 import { LANGY_ID_RESOURCES } from "../../../eventing/langy-conversation-process.schemas.ts";
+import type { LangyLocalCallRepository } from "../../../repositories/langy-local-call.repository.ts";
 import type { LangyLocalPresenceRepository } from "../../../repositories/langy-local-presence.repository.ts";
-import { callActivityLine } from "../../../rules/langy-local-call-activity.rules.ts";
-import {
-  storedLocalCallSchema,
-  type LocalCallBuffer,
-  type LocalCallDispatcherOptions,
-  type StoredLocalCall,
-  type WorkspaceNudge,
+import type {
+  LocalCallBuffer,
+  StoredLocalCall,
 } from "../../../rules/langy-local-call-record.rules.ts";
-import {
-  callKeepaliveKey,
-  callKey,
-  pendingCallsKey,
-  workspaceChannel,
-} from "../../../rules/langy-local-control-keys.rules.ts";
-import { LANGY_LIVENESS } from "../../../rules/langy-streaming-constants.rules.ts";
-import { LocalCallStoreService } from "./langy-local-call-store.service.ts";
+import { LocalCallKeepaliveService } from "./langy-local-call-keepalive.service.ts";
 
 const logger = createLogger("langwatch:langy:local-control:dispatcher");
 
@@ -52,13 +44,25 @@ const logger = createLogger("langwatch:langy:local-control:dispatcher");
 type LocalCallPoll = { outcome: "polled"; answer: PollCallResponse } | { outcome: "gone" };
 export type LocalCallLookup = { kind: "hit"; call: StoredLocalCall } | { kind: "miss" };
 
+interface LocalCallDispatcherOptions {
+  calls: LangyLocalCallRepository;
+  workspace: LangyLocalWorkspaceChannel;
+  presence: LangyLocalPresenceRepository;
+  buffer?: LocalCallBuffer;
+  now?: () => number;
+  /** Test knob: how long a first call waits for the folder to appear. */
+  offlineWaitMs?: number;
+  pollIntervalMs?: number;
+}
+
 export class LocalCallDispatcherService {
-  private readonly store: SessionStateStore;
+  private readonly calls: LangyLocalCallRepository;
+  private readonly workspace: LangyLocalWorkspaceChannel;
   private readonly presence: LangyLocalPresenceRepository;
   private readonly buffer: LocalCallBuffer | null;
   private readonly offlineWaitMs: number;
   private readonly pollIntervalMs: number;
-  private readonly records: LocalCallStoreService;
+  private readonly keepalive: LocalCallKeepaliveService;
   readonly now: () => number;
 
   static create(options: LocalCallDispatcherOptions): LocalCallDispatcherService {
@@ -66,13 +70,19 @@ export class LocalCallDispatcherService {
   }
 
   private constructor(options: LocalCallDispatcherOptions) {
-    this.store = options.store;
+    this.calls = options.calls;
+    this.workspace = options.workspace;
     this.presence = options.presence;
     this.buffer = options.buffer ?? null;
     this.now = options.now ?? (() => nowInstant().epochMilliseconds);
     this.offlineWaitMs = options.offlineWaitMs ?? CALL_OFFLINE_WAIT_MS;
     this.pollIntervalMs = options.pollIntervalMs ?? POLL_INTERVAL_MS;
-    this.records = LocalCallStoreService.create({ store: this.store, now: this.now });
+    this.keepalive = LocalCallKeepaliveService.create({
+      calls: this.calls,
+      presence: this.presence,
+      buffer: this.buffer,
+      now: this.now,
+    });
   }
 
   /**
@@ -114,12 +124,9 @@ export class LocalCallDispatcherService {
       ...call,
     } as StoredLocalCall;
 
-    await this.records.write(stored);
-    await this.records.track(stored);
-    await this.store.publish(
-      workspaceChannel(conversationId),
-      JSON.stringify({ call: stored.callId } satisfies WorkspaceNudge),
-    );
+    await this.write(stored);
+    await this.track(stored);
+    await this.workspace.nudge({ conversationId, nudge: { call: stored.callId } });
 
     return stored;
   }
@@ -139,7 +146,7 @@ export class LocalCallDispatcherService {
     signal?: AbortSignal;
   }): Promise<LocalCallPoll> {
     const until = this.now() + holdMs;
-    const beat = this.beater();
+    const beat = this.keepalive.beater();
     const look = async (): Promise<LocalCallLookup> => {
       const lookup = await this.getCall(callId);
       if (lookup.kind === "hit" && lookup.call.state !== "done") await beat(lookup.call);
@@ -162,72 +169,6 @@ export class LocalCallDispatcherService {
       : { outcome: "gone" };
   }
 
-  /**
-   * The keepalive gate of one poll request: it refreshes on the first pass,
-   * then once per heartbeat interval for as long as the request holds.
-   */
-  private beater(): (call: StoredLocalCall) => Promise<void> {
-    let lastBeatAt: number | null = null;
-
-    return async (call) => {
-      const now = this.now();
-      const due = lastBeatAt === null || now - lastBeatAt >= LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS;
-      if (!due) {
-        return;
-      }
-
-      lastBeatAt = now;
-      await this.keepTurnAlive(call);
-    };
-  }
-
-  /**
-   * Holds the turn open, and says on the panel what the machine is doing, at
-   * most once per window. Gated on its own key, not the call record — two
-   * replicas polling one call must not each write a line.
-   */
-  private async keepTurnAlive(call: StoredLocalCall): Promise<void> {
-    const buffer = this.buffer;
-    if (!buffer) {
-      return;
-    }
-
-    await buffer.heartbeat({
-      conversationId: call.conversationId,
-      turnId: call.turnId,
-      now: this.now(),
-    });
-    if (this.now() - call.createdAt < LANGY_LIVENESS.HEARTBEAT_INTERVAL_MS) {
-      return;
-    }
-
-    const firstOfWindow = await this.store.setIfAbsent(
-      callKeepaliveKey(call.callId),
-      String(this.now()),
-      Math.ceil(LIVE_STREAM_KEEPALIVE_MS / 1000),
-    );
-    if (!firstOfWindow) {
-      return;
-    }
-
-    const workspace = await this.presence
-      .getByConversationId(call.conversationId)
-      .catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.code === "langy_local_workspace_offline") {
-          return null;
-        }
-        throw error;
-      });
-    await buffer.appendStatus({
-      conversationId: call.conversationId,
-      turnId: call.turnId,
-      status: callActivityLine({
-        call,
-        machine: workspace?.hostname ?? "your machine",
-      }),
-    });
-  }
-
   /** The command line started the call. */
   async ack(callId: string): Promise<void> {
     const lookup = await this.getCall(callId);
@@ -236,7 +177,7 @@ export class LocalCallDispatcherService {
     }
     const { call } = lookup;
 
-    await this.records.write({ ...call, state: "running" });
+    await this.write({ ...call, state: "running" });
   }
 
   /**
@@ -256,8 +197,8 @@ export class LocalCallDispatcherService {
       state: "awaiting_permission",
       waitId,
     };
-    await this.records.write(next);
-    await this.records.track(next);
+    await this.write(next);
+    await this.track(next);
   }
 
   /** Sends the developer's answer to the command line holding the call. */
@@ -281,16 +222,11 @@ export class LocalCallDispatcherService {
         state: "running",
         deadlineAt: this.now() + (call.timeoutMs ?? call.deadlineAt - call.createdAt),
       };
-      await this.records.write(released);
-      await this.records.track(released);
+      await this.write(released);
+      await this.track(released);
     }
 
-    await this.store.publish(
-      workspaceChannel(conversationId),
-      JSON.stringify({
-        permission: { callId, decision },
-      } satisfies WorkspaceNudge),
-    );
+    await this.workspace.nudge({ conversationId, nudge: { permission: { callId, decision } } });
   }
 
   /** The command line answered. First terminal wins. */
@@ -307,7 +243,7 @@ export class LocalCallDispatcherService {
     }
     const { call } = lookup;
 
-    await this.records.settle({
+    await this.settle({
       ...call,
       ok: frame.ok,
       ...(frame.text !== undefined ? { text: frame.text } : {}),
@@ -336,12 +272,9 @@ export class LocalCallDispatcherService {
     }
     const { call } = lookup;
 
-    await this.store.publish(
-      workspaceChannel(call.conversationId),
-      JSON.stringify({ cancel: callId } satisfies WorkspaceNudge),
-    );
+    await this.workspace.nudge({ conversationId: call.conversationId, nudge: { cancel: callId } });
 
-    await this.records.settle({ ...call, ok: false, error: { code, message } });
+    await this.settle({ ...call, ok: false, error: { code, message } });
   }
 
   /** Every call still in flight on one turn, for the Stop path. */
@@ -359,7 +292,7 @@ export class LocalCallDispatcherService {
 
   /** Every call still in flight on one folder, for the disconnect path. */
   async listPendingForConversation(conversationId: string): Promise<StoredLocalCall[]> {
-    const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), 0);
+    const ids = await this.calls.findPendingIds({ conversationId, from: 0 });
     const calls: StoredLocalCall[] = [];
     for (const id of ids) {
       const lookup = await this.readSkippingUnreadable(id);
@@ -378,8 +311,8 @@ export class LocalCallDispatcherService {
    */
   async pendingEnvelopes(conversationId: string): Promise<CallEnvelope[]> {
     const now = this.now();
-    await this.store.zremrangebyscore(pendingCallsKey(conversationId), now);
-    const ids = await this.store.zrangebyscore(pendingCallsKey(conversationId), now);
+    await this.calls.dropLapsedPending({ conversationId, lapsedAt: now });
+    const ids = await this.calls.findPendingIds({ conversationId, from: now });
     const envelopes: CallEnvelope[] = [];
     for (const id of ids) {
       const lookup = await this.readSkippingUnreadable(id);
@@ -398,23 +331,59 @@ export class LocalCallDispatcherService {
    * that tells the person at the command line to ask for the change again.
    */
   async getCall(callId: string): Promise<LocalCallLookup> {
-    const raw = await this.store.tryGet(callKey(callId));
-    if (!raw) {
-      return { kind: "miss" };
+    const lookup = await this.calls.find(callId);
+    if (lookup.kind === "unreadable") {
+      throw new LangyLocalRecordUnreadableError({ reasons: lookup.reasons });
     }
 
-    try {
-      return { kind: "hit", call: storedLocalCallSchema.parse(JSON.parse(raw)) };
-    } catch (error) {
-      throw new LangyLocalRecordUnreadableError({
-        reasons: error instanceof Error ? [error] : [],
-      });
-    }
+    return lookup.kind === "hit" ? { kind: "hit", call: lookup.value } : { kind: "miss" };
   }
 
   /** The call as the command line receives it. */
   envelopeOf(call: StoredLocalCall): CallEnvelope {
     return toEnvelope(call);
+  }
+
+  /** Marks the call done, kept long enough for its answer to be read, and off the pending set. */
+  private async settle(call: StoredLocalCall): Promise<StoredLocalCall> {
+    const done: StoredLocalCall = { ...call, state: "done" };
+    await this.calls.save({ call: done, ttlSeconds: Math.ceil(CALL_RESULT_TTL_MS / 1000) });
+    await this.calls.untrackPending({ conversationId: done.conversationId, callId: done.callId });
+
+    return done;
+  }
+
+  private async write(call: StoredLocalCall): Promise<void> {
+    await this.calls.save({ call, ttlSeconds: this.envelopeTtlSeconds(call) });
+  }
+
+  /** Keeps the conversation's pending set in step with the call's own expiry. */
+  private async track(call: StoredLocalCall): Promise<void> {
+    await this.calls.trackPending({
+      conversationId: call.conversationId,
+      callId: call.callId,
+      expiresAt: this.expiresAt(call),
+      ttlSeconds: this.envelopeTtlSeconds(call),
+    });
+  }
+
+  /**
+   * When the envelope stops being worth keeping. A call waiting on a card
+   * lives for the card's whole budget: the developer has that long to answer,
+   * and the call has to be there when they do.
+   */
+  private expiresAt(call: StoredLocalCall): number {
+    if (call.state !== "awaiting_permission") {
+      return call.deadlineAt;
+    }
+
+    return Math.max(call.deadlineAt, this.now() + PERMISSION_WAIT_BUDGET_MS);
+  }
+
+  private envelopeTtlSeconds(call: StoredLocalCall): number {
+    const remaining = this.expiresAt(call) - this.now() + CALL_ENVELOPE_SLACK_MS;
+
+    return Math.max(1, Math.ceil(remaining / 1000));
   }
 
   /**

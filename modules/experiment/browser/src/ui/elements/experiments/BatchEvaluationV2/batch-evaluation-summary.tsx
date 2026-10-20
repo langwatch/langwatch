@@ -219,10 +219,10 @@ export function BatchEvaluationV2EvaluationSummary({
               onClick={onStop}
               minHeight="28px"
               minWidth="0"
-              paddingY="6px"
-              marginLeft="8px"
+              paddingY="1.5"
+              marginLeft="2"
             >
-              <Box paddingX="6px">Stop</Box>
+              <Box paddingX="1.5">Stop</Box>
             </Button>
           )}
         </HStack>

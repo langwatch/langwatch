@@ -1,7 +1,6 @@
 /** Sends selected traces to reviewers or queues. */
 
 import { Dialog } from "@langwatch/design-system/dialog";
-import { VStack } from "@langwatch/design-system/primitives";
 import { useState } from "react";
 
 import { annotationApi } from "../../behavior/annotation-api.ts";
@@ -156,41 +155,34 @@ export function SendToQueueDialog({
   });
 
   return (
-    <Dialog.Root open onOpenChange={(details) => !details.open && onClose()}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header paddingBottom={0}>
-          <VStack align="start" gap={1}>
-            <Dialog.Title>
-              {intent === "move" ? "Move to queue" : "Add to annotation queue"}
-            </Dialog.Title>
-            <Dialog.Description color="fg.muted" fontSize="sm">
-              {intent === "move"
-                ? "Change which people or queues these traces are queued for"
-                : "Send the selected traces to people or queues for annotation"}
-            </Dialog.Description>
-          </VStack>
-        </Dialog.Header>
-        <Dialog.Body paddingTop={5} paddingBottom={6}>
-          <QueueParticipants
-            annotators={annotators}
-            setAnnotators={setAnnotators}
-            queues={queues.data ?? []}
-            members={organization.data?.members ?? []}
-            onCreateQueue={onCreateQueue}
-            isSending={send.isPending}
-            onSend={() => {
-              if (!projectId) return;
+    <Dialog
+      open
+      onClose={onClose}
+      cancelLabel={null}
+      title={intent === "move" ? "Move to queue" : "Add to annotation queue"}
+      description={
+        intent === "move"
+          ? "Change which people or queues these traces are queued for"
+          : "Send the selected traces to people or queues for annotation"
+      }
+    >
+      <QueueParticipants
+        annotators={annotators}
+        setAnnotators={setAnnotators}
+        queues={queues.data ?? []}
+        members={organization.data?.members ?? []}
+        onCreateQueue={onCreateQueue}
+        isSending={send.isPending}
+        onSend={() => {
+          if (!projectId) return;
 
-              send.mutate({
-                projectId,
-                traceIds,
-                annotators: annotators.map((annotator) => annotator.id),
-              });
-            }}
-          />
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+          send.mutate({
+            projectId,
+            traceIds,
+            annotators: annotators.map((annotator) => annotator.id),
+          });
+        }}
+      />
+    </Dialog>
   );
 }

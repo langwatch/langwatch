@@ -19,6 +19,7 @@ import {
   type PricingModel,
   type SignInSecurityPolicy,
   type OrganizationCurrency,
+  ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, toDate, type Instant } from "@langwatch/time";
 
@@ -29,6 +30,7 @@ import {
   type EnsuredPersonalTeam,
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
+  type OrganizationPresenceSettingRow,
 } from "../organization.repository.ts";
 import type {
   MemoryOrganizationDatabase,
@@ -57,12 +59,29 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
   }
 
   async listAllIds({ after, limit }: OrganizationIdPageInput = {}): Promise<OrganizationIdPage> {
-    const ids = [...this.memory.organizations.keys()]
+    const ids = [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM)
+      .map((row) => row.id)
       .filter((id) => after === undefined || id > after)
       .toSorted();
     if (limit === undefined || ids.length <= limit) return { ids, next: null };
     const page = ids.slice(0, limit);
     return { ids: page, next: page[page.length - 1] ?? null };
+  }
+
+  async findPresenceSettingPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationPresenceSettingRow[]> {
+    return [...this.memory.organizations.values()]
+      .filter((row) => row.kind !== ORGANIZATION_KIND.SYSTEM)
+      .filter((row) => afterId === null || row.id > afterId)
+      .toSorted((a, b) => (a.id < b.id ? -1 : 1))
+      .slice(0, limit)
+      .map((row) => ({ id: row.id, presenceEnabled: row.presenceEnabled }));
   }
 
   /** The memory rows carry no legacy single sign-on column, so no provider is named here. */
@@ -222,6 +241,17 @@ export class MemoryOrganizationRepository extends OrganizationRepository {
 
   async isInstantEvalsOptedIn({ organizationId }: { organizationId: string }): Promise<boolean> {
     return !!this.memory.organizations.get(organizationId)?.instantEvalsEnabledAt;
+  }
+
+  async recordPrivateDataplaneSeen(input: {
+    organizationId: string;
+    clickhouseLabel: string | null;
+    s3Label: string | null;
+  }): Promise<void> {
+    const organization = this.memory.organizations.get(input.organizationId);
+    if (!organization) return;
+    organization.privateClickHouseLabel ??= input.clickhouseLabel;
+    organization.privateS3Label ??= input.s3Label;
   }
 
   async recordInstantEvalsOptIn(input: {

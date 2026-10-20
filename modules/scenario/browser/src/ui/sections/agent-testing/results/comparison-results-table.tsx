@@ -4,10 +4,10 @@
  * @see specs/features/agent-testing/comparison-mode.feature
  */
 
-import { Box, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box } from "@langwatch/design-system/primitives";
 import type { ScenarioRunData } from "@langwatch/scenario-contract";
 
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import { TargetLegend } from "../../../elements/agent-testing/shared/target-dot.tsx";
 import { RunMetricsSummary } from "../../../elements/suite/runs/run-metrics-summary.tsx";
 import { comparisonColumns } from "./comparison-columns.ts";
@@ -49,11 +49,9 @@ function TargetColumnHeader({
       flexDirection="column"
       alignItems="flex-start"
       gap={1.5}
-      textTransform="none"
-      letterSpacing="normal"
       data-testid={`comparison-column-${target.key}`}
     >
-      <TargetLegend color={target.color} label={target.label} fontSize="11.5px" isWrapped />
+      <TargetLegend color={target.color} label={target.label} textStyle="caption" isWrapped />
       <RunMetricsSummary summary={summary} size="sm" />
     </Box>
   );
@@ -61,70 +59,56 @@ function TargetColumnHeader({
 
 /** The line above the matrix: "Scenario", then one header per target. */
 function MatrixHeader({
-  columns,
   targets,
   scenarioRuns,
 }: {
-  columns: string;
   targets: BatchTarget[];
   scenarioRuns: ScenarioRunData[];
 }) {
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="flex-start"
-      paddingX={4}
-      paddingY={2.5}
-      background={TABLE_HEADER_BG}
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      fontSize="10.5px"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color={FG_MUTED}
-    >
-      <Text as="span" paddingTop="2px">
-        Scenario
-      </Text>
-      {targets.map((target) => (
-        <TargetColumnHeader key={target.key} target={target} scenarioRuns={scenarioRuns} />
-      ))}
-    </Box>
+    <ListTable.Header>
+      <ListTable.Row>
+        <ListTable.ColumnHeader>
+          <Box paddingTop="0.5">Scenario</Box>
+        </ListTable.ColumnHeader>
+        {targets.map((target) => (
+          <ListTable.ColumnHeader key={target.key}>
+            <TargetColumnHeader target={target} scenarioRuns={scenarioRuns} />
+          </ListTable.ColumnHeader>
+        ))}
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
 export function ComparisonResultsTable(props: ComparisonResultsTableProps) {
   const { scenarioRuns, targets } = props;
   const scenarios = scenariosOf(scenarioRuns);
-  const { template: columns, minWidth } = comparisonColumns(targets);
+  const { scenarioWidth, targetWidth, minWidth } = comparisonColumns(targets);
 
   return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      overflowX="auto"
+    <ListTable
+      tableLayout="fixed"
+      headerLayout="content"
+      minWidth={minWidth}
+      scroll="x"
+      scrollLabel="Comparison results"
       data-testid="comparison-results-table"
     >
-      <Box minWidth={minWidth}>
-        <MatrixHeader columns={columns} targets={targets} scenarioRuns={scenarioRuns} />
+      <ListTable.ColumnGroup>
+        <ListTable.Column width={scenarioWidth} data-column="scenario" />
+        {targets.map((target) => (
+          <ListTable.Column key={target.key} width={targetWidth} data-column={target.key} />
+        ))}
+      </ListTable.ColumnGroup>
 
-        <Box
-          css={{
-            "& > * + *": {
-              borderTopWidth: "1px",
-              borderTopColor: "var(--chakra-colors-border-muted)",
-            },
-          }}
-        >
-          {scenarios.map((scenario) => (
-            <MatrixRow key={scenario.scenarioId} scenario={scenario} columns={columns} {...props} />
-          ))}
-        </Box>
-      </Box>
-    </Box>
+      <MatrixHeader targets={targets} scenarioRuns={scenarioRuns} />
+
+      <ListTable.Body>
+        {scenarios.map((scenario) => (
+          <MatrixRow key={scenario.scenarioId} scenario={scenario} {...props} />
+        ))}
+      </ListTable.Body>
+    </ListTable>
   );
 }

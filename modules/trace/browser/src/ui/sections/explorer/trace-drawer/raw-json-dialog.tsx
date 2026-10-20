@@ -1,14 +1,15 @@
 import { useColorMode } from "@langwatch/design-system/color-mode";
+import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
   Button,
   HStack,
   Icon,
   Input,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { TraceHeader } from "@langwatch/trace-contract";
 import { useEffect, useMemo, useState } from "react";
@@ -17,7 +18,6 @@ import { LuCheck, LuCopy, LuMinus, LuSearch, LuWrapText, LuX } from "react-icons
 import { useSpansFull } from "../../../../features/span/behavior/use-spans-full.ts";
 import { ShikiCodeBlock, useCopyToClipboard } from "../../../../index.ts";
 import { SegmentedToggle } from "../../../elements/explorer/trace-drawer/segmented-toggle.tsx";
-import { Dialog } from "../../dialog.tsx";
 
 type RawTab = "trace" | "spans";
 
@@ -88,150 +88,146 @@ export function RawJsonDialog({ open, onClose, trace }: RawJsonDialogProps) {
   const noSearchMatch = search !== "" && visiblePayload === "";
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) onClose();
-      }}
+      onClose={onClose}
+      title="Raw JSON"
       size="xl"
       placement="center"
-    >
-      <Dialog.Content maxHeight="85vh" display="flex" flexDirection="column">
-        <Dialog.Header borderBottomWidth="1px" borderColor="border">
-          <VStack align="stretch" gap={2}>
-            <HStack gap={3} align="center">
-              <Dialog.Title>
-                <Text textStyle="md" fontWeight="semibold">
-                  Raw JSON
-                </Text>
-              </Dialog.Title>
-              <SegmentedToggle
-                value={tab}
-                onChange={(t) => setTab(t as RawTab)}
-                options={["trace", "spans"]}
+      headerAppearance="divided"
+      heightLimit="reading"
+      body="flush"
+      bodyScroll="content"
+      cancelLabel={null}
+      trapFocus={false}
+      preventScroll={false}
+      headerContent={
+        <VStack align="stretch" gap={2}>
+          <HStack gap={3} align="center">
+            <Text textStyle="md" fontWeight="semibold">
+              Raw JSON
+            </Text>
+            <SegmentedToggle
+              value={tab}
+              onChange={(t) => setTab(t as RawTab)}
+              options={["trace", "spans"]}
+            />
+            <SizeBadge chars={charCount} lines={lineCount} />
+            <Box flex={1} />
+            <ToggleButton
+              active={pretty}
+              onClick={() => setPretty((v) => !v)}
+              icon={LuMinus}
+              tooltip={pretty ? "Minify" : "Pretty-print"}
+              label={pretty ? "Pretty" : "Minified"}
+            />
+            <ToggleButton
+              active={wrap}
+              onClick={() => setWrap((v) => !v)}
+              icon={LuWrapText}
+              tooltip={wrap ? "Disable line wrap" : "Wrap long lines"}
+              label="Wrap"
+            />
+            <CopyButton payload={fullPayload} disabled={!fullPayload} />
+          </HStack>
+          <HStack gap={2} align="center">
+            <Box position="relative" flex={1}>
+              <Icon
+                as={LuSearch}
+                boxSize={3}
+                position="absolute"
+                left={2}
+                top="50%"
+                transform="translateY(-50%)"
+                color="fg.subtle"
+                pointerEvents="none"
               />
-              <SizeBadge chars={charCount} lines={lineCount} />
-              <Box flex={1} />
-              <ToggleButton
-                active={pretty}
-                onClick={() => setPretty((v) => !v)}
-                icon={LuMinus}
-                tooltip={pretty ? "Minify" : "Pretty-print"}
-                label={pretty ? "Pretty" : "Minified"}
+              <Input
+                size="xs"
+                paddingLeft={7}
+                paddingRight={search ? 7 : 2}
+                placeholder="Filter lines (case-insensitive)…"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
               />
-              <ToggleButton
-                active={wrap}
-                onClick={() => setWrap((v) => !v)}
-                icon={LuWrapText}
-                tooltip={wrap ? "Disable line wrap" : "Wrap long lines"}
-                label="Wrap"
-              />
-              <CopyButton payload={fullPayload} disabled={!fullPayload} />
-            </HStack>
-            <HStack gap={2} align="center">
-              <Box position="relative" flex={1}>
-                <Icon
-                  as={LuSearch}
-                  boxSize={3}
+              {search && (
+                <Box
+                  as="button"
                   position="absolute"
-                  left={2}
+                  right={2}
                   top="50%"
                   transform="translateY(-50%)"
                   color="fg.subtle"
-                  pointerEvents="none"
-                />
-                <Input
-                  size="xs"
-                  paddingLeft={7}
-                  paddingRight={search ? 7 : 2}
-                  placeholder="Filter lines (case-insensitive)…"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
-                />
-                {search && (
-                  <Box
-                    as="button"
-                    position="absolute"
-                    right={2}
-                    top="50%"
-                    transform="translateY(-50%)"
-                    color="fg.subtle"
-                    cursor="pointer"
-                    onClick={() => setSearch("")}
-                    aria-label="Clear search"
-                    _hover={{ color: "fg" }}
-                  >
-                    <Icon as={LuX} boxSize={3} />
-                  </Box>
-                )}
-              </Box>
-              {search && (
-                <Text textStyle="2xs" color="fg.muted" whiteSpace="nowrap">
-                  {matchedLines ?? 0}/{lineCount} line
-                  {lineCount === 1 ? "" : "s"}
-                </Text>
+                  cursor="pointer"
+                  onClick={() => setSearch("")}
+                  aria-label="Clear search"
+                  _hover={{ color: "fg" }}
+                >
+                  <Icon as={LuX} boxSize={3} />
+                </Box>
               )}
-            </HStack>
-          </VStack>
-          <Dialog.CloseTrigger />
-        </Dialog.Header>
-        <Dialog.Body padding={0} overflow="hidden" display="flex" flexDirection="column" flex={1}>
-          {spansLoading && (
-            <VStack gap={2} paddingY={8} flex={1} justify="center">
-              <Spinner size="sm" color="blue.fg" />
-              <Text textStyle="xs" color="fg.muted">
-                Loading spans…
-              </Text>
-            </VStack>
-          )}
-          {!spansLoading && spansFailed && (
-            <VStack gap={2} paddingY={8} flex={1} justify="center">
-              <Text textStyle="xs" color="fg.muted">
-                Failed to load spans
-              </Text>
-              <Button size="xs" variant="outline" onClick={() => void spansQuery.refetch()}>
-                Retry
-              </Button>
-            </VStack>
-          )}
-          {!spansLoading && !spansFailed && noSearchMatch && (
-            <VStack gap={2} paddingY={8} flex={1} justify="center">
-              <Text textStyle="xs" color="fg.muted">
-                No lines match "{search}"
-              </Text>
-              <Button size="xs" variant="ghost" onClick={() => setSearch("")}>
-                Clear search
-              </Button>
-            </VStack>
-          )}
-          {!spansLoading && !spansFailed && !noSearchMatch && (
-            <Box
-              flex={1}
-              overflow="auto"
-              // Wrap toggle: when on, allow long lines to wrap (good for
-              // chat payloads); when off, horizontal scroll preserves
-              // the JSON shape (good for diffing nested structures).
-              css={
-                wrap
-                  ? {
-                      "& pre, & code": {
-                        whiteSpace: "pre-wrap !important",
-                        wordBreak: "break-word !important",
-                      },
-                    }
-                  : {
-                      "& pre, & code": {
-                        whiteSpace: "pre !important",
-                      },
-                    }
-              }
-            >
-              <ShikiCodeBlock code={visiblePayload} language="json" colorMode={colorMode} flush />
             </Box>
-          )}
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+            {search && (
+              <Text textStyle="2xs" color="fg.muted" whiteSpace="nowrap">
+                {matchedLines ?? 0}/{lineCount} line
+                {lineCount === 1 ? "" : "s"}
+              </Text>
+            )}
+          </HStack>
+        </VStack>
+      }
+    >
+      {spansLoading && (
+        <Box flex={1} paddingY={4}>
+          <SkeletonRows rows={6} />
+        </Box>
+      )}
+      {!spansLoading && spansFailed && (
+        <VStack gap={2} paddingY={8} flex={1} justify="center">
+          <Text textStyle="xs" color="fg.muted">
+            Failed to load spans
+          </Text>
+          <Button size="xs" variant="outline" onClick={() => void spansQuery.refetch()}>
+            Retry
+          </Button>
+        </VStack>
+      )}
+      {!spansLoading && !spansFailed && noSearchMatch && (
+        <VStack gap={2} paddingY={8} flex={1} justify="center">
+          <Text textStyle="xs" color="fg.muted">
+            No lines match "{search}"
+          </Text>
+          <Button size="xs" variant="ghost" onClick={() => setSearch("")}>
+            Clear search
+          </Button>
+        </VStack>
+      )}
+      {!spansLoading && !spansFailed && !noSearchMatch && (
+        <Box
+          flex={1}
+          overflow="auto"
+          // Wrap toggle: when on, allow long lines to wrap (good for
+          // chat payloads); when off, horizontal scroll preserves
+          // the JSON shape (good for diffing nested structures).
+          css={
+            wrap
+              ? {
+                  "& pre, & code": {
+                    whiteSpace: "pre-wrap !important",
+                    wordBreak: "break-word !important",
+                  },
+                }
+              : {
+                  "& pre, & code": {
+                    whiteSpace: "pre !important",
+                  },
+                }
+          }
+        >
+          <ShikiCodeBlock code={visiblePayload} language="json" colorMode={colorMode} flush />
+        </Box>
+      )}
+    </Dialog>
   );
 }
 

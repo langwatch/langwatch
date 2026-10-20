@@ -103,6 +103,20 @@ function clientWith() {
 describe("AuthorizedClickHouse", () => {
   describe("given a proof with own grant on the aggregate and shared grants on members A and B", () => {
     describe("when a repository queries through the client with that proof", () => {
+      /** @scenario "A fenced read declared a full scan reaches the client declared" */
+      it("carries a full-scan declaration through to the routed client", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          SKIP_COLD_SCAN_CHECK: true,
+        });
+
+        expect(sent().SKIP_COLD_SCAN_CHECK).toBe(true);
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();

@@ -19,7 +19,7 @@ function codeText(children: React.ReactNode): string {
 export function buildMarkdownComponents(colorMode: string) {
   return {
     h1: ({ children }: { children?: React.ReactNode }) => (
-      <Heading as="h1" size="md" marginTop={3} marginBottom={2}>
+      <Heading as="h1" size="sm" marginTop={3} marginBottom={2}>
         {children}
       </Heading>
     ),
@@ -138,7 +138,7 @@ export function buildMarkdownComponents(colorMode: string) {
             fontFamily="mono"
             // Flat 10 px — operator minimum, matches the bumped
             // ShikiCodeBlock / JsonHighlight code-block sizing.
-            fontSize="0.625rem"
+            textStyle="micro"
             paddingX={1}
             paddingY="1px"
             borderRadius="xs"

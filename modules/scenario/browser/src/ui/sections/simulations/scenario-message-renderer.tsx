@@ -36,7 +36,7 @@ export function ScenarioMessageRenderer({
   isHumanCaller = false,
 }: ScenarioMessageRendererProps) {
   const parts = useMemo(
-    () => flattenMessages({ messages, streaming: streamingMessages }),
+    () => flattenMessages(overlayPreviews(messages, streamingMessages ?? [])),
     [messages, streamingMessages],
   );
 
@@ -62,6 +62,34 @@ export function ScenarioMessageRenderer({
       ) : null}
     </>
   );
+}
+
+/**
+ * A preview stays until the stored row matches it, so a live preview takes its
+ * stored row's place; previews with no stored row yet trail the thread. A
+ * completed preview with no text (a tool-only reply) leaves its row as stored.
+ */
+function overlayPreviews(
+  messages: SimulationMessage[],
+  streamingMessages: StreamingMessage[],
+): { messages: SimulationMessage[]; streaming: StreamingMessage[] } {
+  const previews = new Map(
+    streamingMessages
+      .filter((preview) => preview.status === "streaming" || preview.content)
+      .map((preview) => [preview.messageId, preview]),
+  );
+  const storedIds = new Set(messages.map((message) => message.id));
+
+  const overlaid = messages.map((message) => {
+    const preview = message.id ? previews.get(message.id) : void 0;
+    if (!preview) return message;
+    return { id: preview.messageId, role: preview.role, content: preview.content || "…" };
+  });
+
+  return {
+    messages: overlaid,
+    streaming: streamingMessages.filter((preview) => !storedIds.has(preview.messageId)),
+  };
 }
 
 /**

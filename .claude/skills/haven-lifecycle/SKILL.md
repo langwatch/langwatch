@@ -12,9 +12,9 @@ Run from the workspace root. `make haven <sub>` forwards to the CLI (`dev/haven.
 ```bash
 haven up --agent -d               # start; bare `haven up` without a TTY never returns and dies with your shell
 haven status --agent              # every stack, service health, shared servers, RAM (--json, --reveal)
-haven down                        # stop this stack, keep databases
+haven down                        # stop this stack, keep databases; never stops the shared portless proxy (only --all does); up starts a missing one
 haven down --all                  # every stack, shared servers, daemon and proxy; --force kills hard
-haven restart sims                # bounce one lane; nothing else restarts (--rebuild for an image)
+haven restart api                 # bounce one lane; nothing else restarts (--rebuild for an image)
 haven reload                      # apply changes to a held stack; waits for "reload finished"
 haven down --destroy --stack <slug> --yes        # stop a stack and DROP its databases (ask first, see haven-db)
 ```
@@ -25,6 +25,7 @@ Check `haven status`, then the URL; `haven up` returning is not health.
 
 ```bash
 haven up +langy -mail             # add or drop a service; sticky
+haven service off mail             # switch one service in place, keeping the mode; app = ui+api+worker
 haven up +langevals               # evaluators (monitors, evaluations)
 haven up +llm                     # zero-cost model answers (llmsim)
 haven up +design-system +mail-room  # the Storybook and the mail studio
@@ -48,7 +49,8 @@ worker are one process: see `dev-runtime`. The `go` lane also hosts the simulato
 `sims` lane runs; `LANGWATCH_DEV_ONE_PROCESS=0` splits both, Go and sims only (`LANGWATCH_GO_ONE_PROCESS` is a
 deprecated alias). The Go lane rebuilds and swaps its child on a Go change
 only under `--watch` or `--hmr`, and `LANGWATCH_GO_WATCH=0` keeps it off; `haven logs <sim>` still reads
-each one. Langy stays its own lane.
+each one. Langy stays its own lane. On the host tier its `langwatch`/`lw` run this checkout's built CLI
+(the SDK's built CLI, shims in `.bin/langwatch-cli`), built on `haven up` when missing.
 
 ```bash
 haven restart api                 # restart the whole lane
@@ -62,7 +64,7 @@ haven restart ui                  # same on a still or --watch stack (no backend
 ```bash
 haven up                          # still: built UI served by the api, no Vite, nothing reloads
 haven up --watch                  # UI one-shot builds (open pages reload once idle), Node reload, Go rebuild
-haven up --hmr                    # as --watch, but the UI is Vite 8 bundled dev with HMR
+haven up --hmr                    # as --watch, but the UI is the plain Vite dev server with HMR
 ```
 
 `haven status` names the mode (`refresh still|watch|hmr`, `"refresh"` in `--json`).
@@ -70,19 +72,29 @@ Still builds the bundle once at `up` (cached by Nx) and never again until `haven
 open pages never reload. `--watch` adds a `ui` lane, `haven ui-watch`: one build per settled burst
 of edits, swapped in whole (`haven logs ui` shows each; a failed build keeps the last good
 bundle). An open page then reloads once nobody has touched it for 60 s, or at once when hidden.
-Old chunks stay loadable for 24 h after a swap. `pnpm dev` runs the Vite dev server outside haven. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
+Old chunks stay loadable for 24 h after a swap. Outside haven, `pnpm dev` builds the UI once and serves it like a still stack; `pnpm dev:hmr` is the one that runs Vite. Numbers for each mode: `dev/docs/LOCAL_STACK.md`.
 
-|             | dev (`pnpm dev`) | built (still, --watch)        |
-| ----------- | ---------------- | ----------------------------- |
-| Role        | almost never     | testing without changing code |
-| Page memory | 708 MB           | 396 MB                        |
-| JS heap     | 242 MB           | 69 MB                         |
-| Requests    | 2289             | 563                           |
+|             | Vite (`--hmr`, `pnpm dev:hmr`) | built (still, --watch, `pnpm dev`) |
+| ----------- | ------------------------------ | ---------------------------------- |
+| Role        | almost never                   | testing without changing code      |
+| Page memory | 708 MB                         | 396 MB                             |
+| JS heap     | 242 MB                         | 69 MB                              |
+| Requests    | 2289                           | 563                                |
 
 - The app's own process sheds the UI's Vite server too.
-- There is no orb (so no `haven orb feedback`) and no HMR, and the app runs its production code paths.
-- Old assets pile up in `apps/ui/dist/client/assets`; `rm -rf apps/ui/dist` clears them.
+- The orb is there on any haven stack, built or Vite (`haven orb feedback`, see `haven-orb`); a built page has no HMR and runs its production code paths.
+- Old assets pile up in the UI build folder; `rm -rf apps/ui/dist` clears them.
 - A build peaks at about 4.8 GB.
+
+## focus
+
+One stack is the focused one: under memory pressure the others are slowed and it gets the larger ClickHouse share. It changes only on `haven up`, `haven switch` into a worktree with a stack, and `haven focus <slug>`; heartbeats never move it. If it goes down there is no focus until one of those runs again.
+
+```bash
+haven focus              # prints "focus: <slug>" or "focus: none"
+haven focus <slug>       # make a registered stack the focus (a unique prefix works)
+haven status             # shows the same "focus:" line
+```
 
 ## install, setup, switch, clean
 
@@ -107,6 +119,8 @@ prometheus loki` and the pinned ClickHouse, Tempo and Alloy downloads). macOS ne
 - haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or
   observability, sandboxed Langy, `haven pr --throwaway`), records that in `colima-<profile>.json`, and stops it
   once nothing needs it (`haven status` adds "stopped by haven"). A VM you started is never stopped.
+- `haven machine settings set vm off` keeps haven off the VM entirely: ClickHouse and observability run
+  natively, sandboxed Langy and `haven pr --throwaway` refuse naming the setting, and a VM haven started stops.
 - `machine clean` flags: `--stale-days <n>`, `--include-recent` (agent jobs finished within 48h).
   Only agents that were asked may run `haven machine clean` or `haven down --destroy`.
 
@@ -114,3 +128,5 @@ Internal commands (hidden from help, spawned by haven, not for agents): `haven k
 keeper), `haven go-watch`, `haven simulator`, `haven static <lane> <dir> <port>` (serves a built bundle
 for `+design-system` and `+mail-room`). `haven hmr`, `haven git` and `haven play-launch` are deleted (ADR-064).
 See also: `haven-env` (`machine limits`), `haven-logs`, `troubleshooting.md` in `haven`.
+
+`haven reload` and `haven daemon restart` finish by ensuring the shared portless proxy is up; every portless command runs in its own session.

@@ -9,6 +9,7 @@ import { setTimeout as sleep } from "node:timers/promises";
 import { Pool } from "pg";
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { assertCurrent } from "../../gate/serving-gate.ts";
 import { createLedgerTables } from "../../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../../ledger.repository.ts";
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
@@ -60,7 +61,6 @@ const MANIFESTS: ReleaseManifest[] = [
     steps: [step("trace:reindex", "data", "background")],
   },
 ];
-const FLOOR = { release: "3.20.1", namedAt: "2026-10-06" };
 
 let sequence = 0;
 let scratch: { name: string; postgres: Pool; admin: Pool };
@@ -104,15 +104,17 @@ function fakeApplier({
   failOn?: string[];
   failOnce?: boolean;
   during?: () => Promise<void>;
-}): UpgradeSchemaApplier & { calls: (string | null)[]; order: string[] } {
+}): UpgradeSchemaApplier & { calls: (string | null)[]; order: string[]; asked: string[] } {
   const goose = new Map(targets.map((target) => [target, new Set<string>()]));
   let pendingFailure = failOnce;
   const order: string[] = [];
   const calls: (string | null)[] = [];
+  const asked: string[] = [];
   return {
     calls,
     order,
-    async apply({ release }) {
+    asked,
+    async apply({ release, skipTargets }) {
       calls.push(release);
       order.push("schema");
       await during?.();
@@ -132,6 +134,8 @@ function fakeApplier({
         { engine: "postgres", target: "postgres", ok: true, error: null },
       ];
       for (const [target, applied] of goose) {
+        if (skipTargets?.has(target)) continue;
+        asked.push(target);
         const failing = failOn.includes(target);
         if (!failing)
           for (const s of steps.filter((s) => s.id.startsWith("clickhouse:"))) applied.add(s.id);
@@ -156,7 +160,7 @@ function runnerFor({
   return createUpgradeRunner({
     postgres: scratch.postgres,
     image: { release, steps: shippedUpTo(release) },
-    releases: { manifests: MANIFESTS, floor: FLOOR },
+    releases: { manifests: MANIFESTS },
     applier,
     identity: { image: release, host: "pod-b" },
     log: { info: () => {}, warn: () => {} },
@@ -171,6 +175,29 @@ const run = (runner: ReturnType<typeof createUpgradeRunner>) =>
 const ledger = () => UpgradeLedgerRepository.create({ postgres: scratch.postgres });
 const statusOf = async (id: string) =>
   (await ledger().findSteps()).find((s) => s.id === id)?.status;
+
+const INDEX_SQL = `CREATE UNIQUE INDEX IF NOT EXISTS "Widget_key_key" ON "Widget" ("key");`;
+const indexDefinition = async () =>
+  (
+    await scratch.postgres.query<{ definition: string }>(
+      `SELECT indexdef AS definition FROM pg_indexes
+        WHERE schemaname = current_schema() AND indexname = 'Widget_key_key'`,
+    )
+  ).rows[0]?.definition;
+
+/** A "Widget" table with the operator's index, then a run whose pending folder makes INDEX_SQL. */
+async function runOverPrebuilt({ index }: { index: string }) {
+  await scratch.postgres.query(
+    `CREATE TABLE "Widget" ("key" TEXT, "createdAt" TIMESTAMPTZ DEFAULT now())`,
+  );
+  await scratch.postgres.query(index);
+  const before = await indexDefinition();
+  const applier = fakeApplier({ release: "3.21.0" });
+  const prismaSql = ({ folder }: { folder: string }) =>
+    folder === "20261002000000_add" ? INDEX_SQL : null;
+  const outcome = await run(runnerFor({ release: "3.21.0", applier, prismaSql }));
+  return { outcome, applier, before, after: await indexDefinition() };
+}
 
 const ARCHIVE_DROP = "prisma:20261003000000_drop_old";
 const ARCHIVE_MANIFESTS: ReleaseManifest[] = [
@@ -319,34 +346,48 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         },
       });
       expect(applier.calls).toEqual([]);
+      expect(outcome.message).toContain("in packages/prisma-client with DATABASE_URL set");
+      expect(outcome.message).toContain("runs the upgrade again by itself");
     });
   });
 
-  describe("when a private ClickHouse target fails", () => {
-    /** @scenario "A failing private ClickHouse target fails the run and is recorded per target" */
-    it("records each target, fails the step and the run", async () => {
-      const applier = fakeApplier({
-        release: "3.20.1",
-        targets: ["shared", "private:org_1"],
-        failOn: ["private:org_1"],
+  describe("when a pending migration creates an index another index already holds the name of", () => {
+    /** @scenario "A pre-built index that differs from a pending migration's stops the upgrade by name" */
+    it("exits 1 naming the index, what it should be and what it is, and leaves it in place", async () => {
+      const { outcome, applier, before, after } = await runOverPrebuilt({
+        index: `CREATE INDEX "Widget_key_key" ON "Widget" ("createdAt")`,
       });
-      const outcome = await run(runnerFor({ release: "3.20.1", applier }));
-      expect(outcome).toMatchObject({ exitCode: 1, code: "schema_failed" });
-      const targets = await ledger().findTargets({ stepId: "clickhouse:00001" });
-      expect(
-        targets.map(({ target, status, lastError }) => ({ target, status, lastError })),
-      ).toEqual([
-        { target: "private:org_1", status: "failed", lastError: "Code: 210. Connection refused" },
-        { target: "shared", status: "done", lastError: null },
-      ]);
-      expect(await statusOf("clickhouse:00001")).toBe("failed");
-      expect((await ledger().findRuns()).at(-1)?.outcome).toBe("failed");
+      expect(outcome).toMatchObject({
+        exitCode: 1,
+        code: "prebuilt_index_differs",
+        detail: {
+          indexes: [
+            expect.objectContaining({
+              migration: "20261002000000_add",
+              name: "Widget_key_key",
+              table: "Widget",
+              should: INDEX_SQL.slice(0, -1),
+              is: expect.stringContaining('USING btree ("createdAt")'),
+            }),
+          ],
+        },
+      });
+      expect(applier.calls).toEqual([]);
+      expect(after).toBe(before);
+    });
+
+    /** @scenario "A pre-built index that matches a pending migration's passes" */
+    it("exits 0 when the pre-built index has the migration's definition", async () => {
+      const { outcome } = await runOverPrebuilt({
+        index: `CREATE UNIQUE INDEX "Widget_key_key" ON "Widget" ("key")`,
+      });
+      expect(outcome.code).toBe("done");
     });
   });
 
-  describe("when the installation is below the LTS floor", () => {
-    /** @scenario "An installation below the LTS floor is refused before any schema change" */
-    it("exits 2 naming the LTS to stop at, and never calls the applier", async () => {
+  describe("when the installation is on a release older than every manifest", () => {
+    /** @scenario "An installation on any older release rolls through every step to the image" */
+    it("exits 0 and applies every shipped release up to the image", async () => {
       await createLedgerTables({ postgres: scratch.postgres });
       const old = await ledger().startRun({ kind: "upgrade" });
       await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).recordRunPlan({
@@ -357,12 +398,8 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
       const applier = fakeApplier({ release: "3.21.0" });
       const outcome = await run(runnerFor({ release: "3.21.0", applier }));
-      expect(outcome).toMatchObject({
-        exitCode: 2,
-        code: "refused_below_floor",
-        detail: { stopAt: "3.20.1" },
-      });
-      expect(applier.calls).toEqual([]);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(applier.calls).toContain("3.21.0");
     });
   });
 
@@ -386,7 +423,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect((await ledger().findRuns()).at(-1)).toMatchObject({
         outcome: "succeeded",
         release: "3.21.0",
-        floor: "3.20.1",
       });
     });
   });
@@ -537,7 +573,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
           release: "3.22.0",
           applier,
           image: { release: "3.22.0", steps: manifests.flatMap((m) => m.steps) },
-          releases: { manifests, floor: FLOOR },
+          releases: { manifests },
           codeSteps: [blocking("dataset:copy-keys"), blocking("trace:rekey")],
         }),
       );
@@ -734,6 +770,22 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       }
     });
 
+    /** @scenario "A schema step recorded done carries the start and finish of its schema phase" */
+    it("stamps each schema step row with its schema phase's start and finish", async () => {
+      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
+      const phases = await phasesOf();
+      const rows = new Map((await ledger().findSteps()).map((row) => [row.id, row]));
+      const timingOf = (name: string) => {
+        const phase = phases.find((each) => each.name === name);
+        return {
+          startedAt: new Date(phase?.startedAt ?? 0),
+          finishedAt: new Date(phase?.finishedAt ?? 0),
+        };
+      };
+      expect(rows.get("prisma:20261001000000_base")).toMatchObject(timingOf("postgres-schema"));
+      expect(rows.get("clickhouse:00001")).toMatchObject(timingOf("clickhouse-schema"));
+    });
+
     /** @scenario "A run whose schema fails records the failed phase and no later one" */
     it("ends with a failed ClickHouse schema phase and records no reconcile", async () => {
       const applier = fakeApplier({ release: "3.20.1", failOn: ["shared"] });
@@ -742,24 +794,6 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       expect(phases.at(-1)).toMatchObject({ name: "clickhouse-schema", outcome: "failed" });
       expect(phases.find((phase) => phase.name === "postgres-schema")?.outcome).toBe("succeeded");
       expect(phases.some((phase) => phase.name === "reconcile")).toBe(false);
-    });
-
-    /** @scenario "A refused upgrade is recorded as a failed run whose report names the refusal" */
-    it("records the refusal as a failed run with one failed preflight", async () => {
-      await createLedgerTables({ postgres: scratch.postgres });
-      const old = await ledger().startRun({ kind: "upgrade" });
-      const runner = UpgradeRunnerRepository.create({ postgres: scratch.postgres });
-      await runner.recordRunPlan({ runId: old.id, release: "3.16.0", plan: {} });
-      await ledger().finishRun({ runId: old.id, outcome: "succeeded", report: {} });
-      await run(runnerFor({ release: "3.21.0", applier: fakeApplier({ release: "3.21.0" }) }));
-      const refused = (await ledger().findRuns()).at(-1);
-      expect(refused).toMatchObject({
-        outcome: "failed",
-        report: { refused: "below_lts_floor" },
-      });
-      expect((await phasesOf()).map(({ name, outcome }) => ({ name, outcome }))).toEqual([
-        { name: "preflight", outcome: "failed" },
-      ]);
     });
 
     /** @scenario "A read hint is published at each phase change and at the finish" */
@@ -806,14 +840,18 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
     });
   });
 
-  describe("when a later release drops what an earlier release's background step reads", () => {
+  describe("when a jump crosses a release with a background step and an operator step", () => {
     const manifests: ReleaseManifest[] = [
-      ...MANIFESTS.slice(0, 2),
+      MANIFESTS[0]!,
+      {
+        ...MANIFESTS[1]!,
+        steps: [...MANIFESTS[1]!.steps, step("identity:drop-legacy-key", "data", "operator")],
+      },
       {
         release: "3.22.0",
         previous: "3.21.0",
         cutAt: "2026-10-04T09:00:00+02:00",
-        steps: [step("prisma:20261003000000_drop_old", "postgres-schema")],
+        steps: [step("prisma:20261003000000_add_more", "postgres-schema")],
       },
     ];
     const upTo = (release: string | null) =>
@@ -837,17 +875,13 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
         ];
       },
     });
-    const upgradeTo = ({ release, order }: { release: string; order: string[] }) =>
+    const upgradeTo = ({ order }: { order: string[] }) =>
       run(
         runnerFor({
-          release,
+          release: "3.22.0",
           applier: recording(order),
-          image: {
-            release,
-            steps: manifests.filter((m) => m.release <= release).flatMap((m) => m.steps),
-          },
-          releases: { manifests, floor: FLOOR },
-          contracts: new Map([["prisma:20261003000000_drop_old", []]]),
+          image: { release: "3.22.0", steps: manifests.flatMap((m) => m.steps) },
+          releases: { manifests },
           codeSteps: [
             defineMigrationStep({
               id: "dataset:copy-keys",
@@ -867,33 +901,41 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
                 return {};
               },
             }),
+            defineMigrationStep({
+              id: "identity:drop-legacy-key",
+              kind: "data",
+              mode: "operator",
+              description: "drops the legacy key once an operator confirms it is safe",
+              run: async () => {
+                order.push("step identity:drop-legacy-key");
+                return {};
+              },
+            }),
           ],
         }),
       );
 
-    /** @scenario "A jump runs the earlier release's unfinished background step before the contract release's schema" */
-    it("runs the background step between the two releases' schema", async () => {
+    let order: string[];
+    let outcome: Awaited<ReturnType<typeof upgradeTo>>;
+
+    beforeEach(async () => {
       await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
-      const order: string[] = [];
-      const outcome = await upgradeTo({ release: "3.22.0", order });
-      expect(outcome.code).toBe("done");
-      expect(order).toEqual(["schema 3.21.0", "step identity:backfill", "schema 3.22.0"]);
-      expect(await statusOf("identity:backfill")).toBe("done");
+      order = [];
+      outcome = await upgradeTo({ order });
     });
 
-    /** @scenario "A background step the worker finished is not run again before the contract release's schema" */
-    it("does not run the step the worker already finished", async () => {
-      await run(runnerFor({ release: "3.20.1", applier: fakeApplier({ release: "3.20.1" }) }));
-      await upgradeTo({ release: "3.21.0", order: [] });
-      await UpgradeRunnerRepository.create({ postgres: scratch.postgres }).setStatus({
-        ids: ["identity:backfill"],
-        status: "done",
-        runId: "background:worker-1",
-      });
-      const order: string[] = [];
-      const outcome = await upgradeTo({ release: "3.22.0", order });
+    /** @scenario "An upgrade never runs a background step, even before a later release's schema" */
+    it("applies both releases' schema and leaves the background step to the worker", async () => {
       expect(outcome.code).toBe("done");
-      expect(order).toEqual(["schema 3.22.0"]);
+      expect(order).toEqual(["schema 3.21.0", "schema 3.22.0"]);
+      expect(await statusOf("identity:backfill")).toBe("pending");
+    });
+
+    /** @scenario "An operator step is registered pending and the upgrade never runs it" */
+    it("records the operator step pending and never runs it", async () => {
+      expect(outcome.code).toBe("done");
+      expect(order).not.toContain("step identity:drop-legacy-key");
+      expect(await statusOf("identity:drop-legacy-key")).toBe("pending");
     });
   });
 
@@ -934,8 +976,7 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
           release: "3.22.0",
           applier: dropping(order),
           image: { release: "3.22.0", steps: ARCHIVE_MANIFESTS.flatMap((m) => m.steps) },
-          releases: { manifests: ARCHIVE_MANIFESTS, floor: FLOOR },
-          contracts: new Map([[ARCHIVE_DROP, []]]),
+          releases: { manifests: ARCHIVE_MANIFESTS },
           archives: new Map([[ARCHIVE_DROP, [table]]]),
         }),
       );
@@ -1002,11 +1043,140 @@ describe.skipIf(!DB_URL)("the upgrade runner", () => {
       await run(runnerFor({ release: "3.22.0", applier, clickhouse: unreachable })).catch(
         () => null,
       );
-      const outcome = await run(runnerFor({ release: "3.22.0", applier, clickhouse: gooseAt }));
+      const copyKeys: MigrationStep = defineMigrationStep({
+        id: "dataset:copy-keys",
+        kind: "data",
+        mode: "blocking",
+        description: "copies the keys",
+        run: async () => ({ copied: 0 }),
+      });
+      const outcome = await run(
+        runnerFor({ release: "3.22.0", applier, clickhouse: gooseAt, codeSteps: [copyKeys] }),
+      );
       expect(outcome.code).toBe("done");
       expect(await statusOf("dataset:copy-keys")).not.toBe("not-needed");
       const base = (await ledger().findSteps()).find((s) => s.id === "prisma:20261001000000_base");
       expect(base).toMatchObject({ status: "done", inferred: true });
+    });
+  });
+});
+
+describe.skipIf(!DB_URL)("the upgrade runner on an unfinished or stale ledger", () => {
+  describe("when the schema apply reports success but leaves an open schema step not done", () => {
+    /** @scenario "A run whose schema apply left an open schema step not done fails with schema_failed naming it" */
+    it("fails with schema_failed naming the step and records no succeeded run", async () => {
+      const applier = fakeApplier({ release: "3.21.0", targets: [] });
+      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      expect(outcome).toMatchObject({ code: "schema_failed", exitCode: 1 });
+      expect(outcome.message).toContain("clickhouse:00001");
+      expect(outcome.message).toContain("no ClickHouse target was configured");
+      expect(await statusOf("prisma:20261001000000_base")).toBe("done");
+      expect(await statusOf("clickhouse:00001")).not.toBe("done");
+      const upgrades = (await ledger().findRuns()).filter((r) => r.kind === "upgrade");
+      expect(upgrades.map((r) => r.outcome)).toEqual(["failed"]);
+    });
+  });
+});
+
+describe.skipIf(!DB_URL)("the upgrade runner over a private ClickHouse target", () => {
+  describe("when a private ClickHouse target fails", () => {
+    const rowsOf = async (stepId: string) =>
+      (await ledger().findTargets({ stepId })).map(({ target, status, lastError }) => ({
+        target,
+        status,
+        lastError,
+      }));
+
+    /** @scenario "A failing private ClickHouse target is held while the release goes on" */
+    it("finishes the shared target and the release, and holds only the private target", async () => {
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn: ["private:org_1"],
+      });
+      const runner = runnerFor({
+        release: "3.21.0",
+        applier,
+        retry: { attempts: 3, backoffMs: 1 },
+      });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(await statusOf("clickhouse:00001")).toBe("done");
+      expect(await statusOf("clickhouse:00002")).toBe("done");
+      expect(await rowsOf("clickhouse:00001")).toEqual([
+        { target: "private:org_1", status: "failed", lastError: "Code: 210. Connection refused" },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(await rowsOf("clickhouse:00002")).toEqual([
+        { target: "private:org_1", status: "pending", lastError: null },
+        { target: "shared", status: "done", lastError: null },
+      ]);
+      expect(applier.asked.filter((target) => target === "private:org_1")).toHaveLength(1);
+      const blockingSteps = shippedUpTo("3.21.0")
+        .filter((each) => each.mode === "blocking")
+        .map((each) => each.id);
+      const verdict = assertCurrent({
+        ledger: { steps: await ledger().findSteps() },
+        image: { release: "3.21.0", blockingSteps },
+      });
+      expect(verdict).toEqual({ admitted: true, outcome: "current" });
+      expect(await runner.status()).toMatchObject({
+        state: "needs-attention",
+        reason: "failed-target",
+        failedTargets: 1,
+      });
+    });
+
+    /** @scenario "A held private ClickHouse target catches up on the next pass" */
+    it("applies the private target's backlog once it answers, and the attention clears", async () => {
+      const failOn = ["private:org_1"];
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn,
+      });
+      await run(runnerFor({ release: "3.21.0", applier }));
+      failOn.length = 0;
+      const runner = runnerFor({ release: "3.21.0", applier });
+      const outcome = await run(runner);
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      for (const id of ["clickhouse:00001", "clickhouse:00002"]) {
+        expect(await rowsOf(id)).toEqual([
+          { target: "private:org_1", status: "done", lastError: null },
+          { target: "shared", status: "done", lastError: null },
+        ]);
+      }
+      expect(await ledger().findTargetsBehind()).toEqual([]);
+      expect((await runner.status()).failedTargets).toBe(0);
+    });
+
+    /** @scenario "A held private ClickHouse target still down stays held and the pass succeeds" */
+    it("leaves the rows held and the run succeeded", async () => {
+      const applier = fakeApplier({
+        release: "3.21.0",
+        targets: ["shared", "private:org_1"],
+        failOn: ["private:org_1"],
+      });
+      await run(runnerFor({ release: "3.21.0", applier }));
+      const outcome = await run(runnerFor({ release: "3.21.0", applier }));
+      expect(outcome).toMatchObject({ exitCode: 0, code: "done" });
+      expect(applier.calls).toEqual(["3.21.0", null]);
+      expect((await rowsOf("clickhouse:00001"))[0]).toMatchObject({ status: "failed" });
+    });
+  });
+
+  describe("when the shared ClickHouse target fails beside a private one", () => {
+    /** @scenario "A failing shared ClickHouse target fails the run" */
+    it("fails the step and the run, holding nothing", async () => {
+      const applier = fakeApplier({
+        release: "3.20.1",
+        targets: ["shared", "private:org_1"],
+        failOn: ["shared"],
+      });
+      const outcome = await run(runnerFor({ release: "3.20.1", applier }));
+      expect(outcome).toMatchObject({ exitCode: 1, code: "schema_failed" });
+      expect(await statusOf("clickhouse:00001")).toBe("failed");
+      expect((await ledger().findRuns()).at(-1)?.outcome).toBe("failed");
     });
   });
 });

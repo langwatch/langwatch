@@ -184,12 +184,13 @@ import { HttpAnomalyAlertChannel } from "../channels/http/http.anomaly-alert.cha
 import { ClaudeComplianceReferencePullerAdapter } from "../channels/http/http.claude-compliance.channel.ts";
 import { HttpCopilotStudioDataverseChannel } from "../channels/http/http.copilot-studio-dataverse.channel.ts";
 import { HttpCopilotStudioChannel } from "../channels/http/http.copilot-studio.channel.ts";
-import { ssrfSafeFetch } from "../channels/http/http.governance-http.channel.ts";
+import {
+  createSsrfSafeFetch,
+  type GovernanceEgressPolicy,
+} from "../channels/http/http.governance-http.channel.ts";
 import { HttpOttlTransformChannel } from "../channels/http/http.ottl-transform.channel.ts";
 import { HttpPollingPullerAdapter } from "../channels/http/http.polling.channel.ts";
 import { HttpProviderAccountChannel } from "../channels/http/http.provider-account.channel.ts";
-import { OutboxAggregateReconcile } from "../eventing/aggregate-reconcile.intent.ts";
-import { enqueueMemberAggregates } from "../eventing/aggregate-reconcile.subscriber.ts";
 import {
   OutboxAnomalyAlertDelivery,
   requestAnomalyAlertDelivery,
@@ -238,10 +239,7 @@ import { GovernanceCostBreakdownService } from "../features/cost/services/govern
 import { GovernanceCostNoticesService } from "../features/cost/services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../features/cost/services/governance-cost-summary.service.ts";
 import { DatabricksGeniePullerService } from "../features/databricks-genie/services/databricks-genie-puller.service.ts";
-import {
-  DepartmentService,
-  type MemberDepartmentAssigned,
-} from "../features/identity/services/department.service.ts";
+import { DepartmentService } from "../features/identity/services/department.service.ts";
 import { DirectoryDepartmentSyncService } from "../features/identity/services/directory-department-sync.service.ts";
 import { ErasureSuppressionService } from "../features/identity/services/erasure-suppression.service.ts";
 import { GovernancePeopleScreenService } from "../features/identity/services/governance-people-screen.service.ts";
@@ -294,6 +292,7 @@ import { DefaultGovernancePersonalUsageService } from "../features/personal/serv
 import type { GovernanceRepositories } from "../repositories/governance.repositories.ts";
 import { governanceOperatorReads } from "../repositories/prisma/prisma.suppression-snapshot.repository.ts";
 import { anomalyRuleConfigComplaint } from "../rules/anomaly-rule-config-error.rules.ts";
+import { exemptOriginsOf, vendorBasesOf, type VendorBases } from "../rules/vendor-bases.rules.ts";
 import { DefaultGovernanceAdminWorkspaceViewAuditService } from "../services/admin-workspace-view-audit.service.ts";
 import { AggregateReconcilerService } from "../services/aggregate-reconciler.service.ts";
 import { DefaultGovernanceAiToolCatalogService } from "../services/ai-tool-catalog.service.ts";
@@ -350,7 +349,6 @@ interface GovernanceAppDependencies {
     | "findIdentity"
     | "findAggregate"
     | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
     | "findPersonalProjectIds"
     | "findReadableProjectIds"
   >;
@@ -567,6 +565,12 @@ export class GovernanceModule implements GovernanceRestApi {
       gatewayBaseUrl: governanceGatewayBaseUrl({ config }),
       publicBaseUrl: config?.publicBaseUrl,
       ingestRateLimitDisabled: config?.ingestRateLimitDisabled ?? false,
+      // Main's default: local addresses allowed unless BLOCK_LOCAL_HTTP_CALLS says otherwise.
+      pullEgress: {
+        blockLocal: config?.blockLocalHttpCalls ?? false,
+        allowedHosts: config?.allowedProxyHosts ?? [],
+      },
+      vendorBases: vendorBasesOf({ config }),
     });
   }
 
@@ -579,6 +583,8 @@ export class GovernanceModule implements GovernanceRestApi {
     gatewayBaseUrl,
     publicBaseUrl,
     ingestRateLimitDisabled,
+    pullEgress,
+    vendorBases,
   }: {
     ottl: GovernanceOttlGateway;
     ingestionSecrets: IngestionSecretService;
@@ -588,8 +594,11 @@ export class GovernanceModule implements GovernanceRestApi {
     gatewayBaseUrl: string;
     publicBaseUrl: string | undefined;
     ingestRateLimitDisabled: boolean;
+    pullEgress: GovernanceEgressPolicy;
+    vendorBases: VendorBases;
   }) {
     this.dependencies = dependencies;
+    this.vendorBases = vendorBases;
     this.repositories = repositories;
     const tenantHistory = GovernanceTenantHistoryService.create({
       projects: dependencies.projects,
@@ -630,6 +639,10 @@ export class GovernanceModule implements GovernanceRestApi {
           occurredAt,
           ...data,
         }),
+      recordMany: (commands) =>
+        this.codingAssistantBillingSender("recordCodingAssistantBilling").sendBatch(
+          commands.map(({ tenantId, occurredAt, data }) => ({ tenantId, occurredAt, ...data })),
+        ),
     });
     this.sessionPolicy = OrganizationSessionPolicyService.create({
       organizations: dependencies.organizations,
@@ -643,9 +656,6 @@ export class GovernanceModule implements GovernanceRestApi {
       repository: repositories.departments,
       organizations: dependencies.organizations,
       projects: dependencies.projects,
-      // ponytail: no outbox in this process -> organization's member_department_changed fact and the sweep reconcile.
-      onMemberDepartmentAssigned: (fact) =>
-        this.#memberAggregateReconcile?.(fact) ?? Promise.resolve(),
     });
     this.erasureSuppression = erasureSuppression;
     // One instance: the erasure refreshes the very snapshot the cost fold reads (ADR-128 §9 step 5).
@@ -817,8 +827,10 @@ export class GovernanceModule implements GovernanceRestApi {
       },
       lifecycle: { sync: (source) => this.pullLifecycle.sync(toPullLifecycleSource(source)) },
       secrets: ingestionSecrets,
-      destinations: PullDestinationService.create(),
-      providerAccounts: HttpProviderAccountChannel.create(),
+      destinations: PullDestinationService.create({
+        configuredBase: vendorBases.databricksWorkspace,
+      }),
+      providerAccounts: HttpProviderAccountChannel.create({ vendorBases }),
       diagnostics: { warn: (message, context) => logger.warn(context, message) },
       ottl,
     });
@@ -832,24 +844,28 @@ export class GovernanceModule implements GovernanceRestApi {
     const sourceCredentials = SourceCredentialAccessService.create({
       sources: repositories.ingestionSources,
     });
-    const http: GovernanceHttpClient = { fetch: ssrfSafeFetch };
+    const http: GovernanceHttpClient = {
+      fetch: createSsrfSafeFetch(pullEgress, {
+        exemptOrigins: exemptOriginsOf({ bases: vendorBases }),
+      }),
+    };
     this.http = http;
     const channels = governanceListingChannels.live;
-    const signIn = channels.providerSignIn.create({ http });
+    const signIn = channels.providerSignIn.create({ http, vendorBases });
     this.agentDiscovery = AgentDiscoveryService.create({
       agents: repositories.discoveredAgents,
       sourceCredentials,
       signIn,
       genieSpaces: channels.genieSpaces.create({ http }),
-      copilotBots: channels.copilotBots.create({ http }),
+      copilotBots: channels.copilotBots.create({ http, vendorBases }),
     });
     this.personListing = PersonListingService.create({
       sourceCredentials,
       suppression: erasureSuppression,
       discovery: PersonDiscoveryService.create({ people: repositories.discoveredPeople }),
       signIn,
-      adminApiUsers: channels.adminApiUsers.create({ http }),
-      microsoftDirectory: channels.microsoftDirectory.create({ http }),
+      adminApiUsers: channels.adminApiUsers.create({ http, vendorBases }),
+      microsoftDirectory: channels.microsoftDirectory.create({ http, vendorBases }),
       databricksScimUsers: channels.databricksScimUsers.create({ http }),
     });
 
@@ -990,6 +1006,7 @@ export class GovernanceModule implements GovernanceRestApi {
   private readonly identityMatchSuggestions: IdentityMatchSuggestionService;
   private readonly repositories: GovernanceRepositories;
   private readonly http: GovernanceHttpClient;
+  private readonly vendorBases: VendorBases;
   private ingestionPullCommands: EventingSenders | undefined;
   private pulledUsageCommands: EventingSenders | undefined;
   private codingAssistantBillingCommands: EventingSenders | undefined;
@@ -1057,21 +1074,6 @@ export class GovernanceModule implements GovernanceRestApi {
   /** Main's `spendSpikeAnomalyWorker` tick: every active spend_spike rule against `governance_kpis`. */
   evaluateSpendSpikes(): Promise<SpendSpikeEvaluationSummary> {
     return this.spendSpikes.evaluateAll();
-  }
-
-  #memberAggregateReconcile: MemberDepartmentAssigned | undefined;
-
-  /** A built pipeline means an outbox: this module's own department writes enqueue reconciles. */
-  connectAggregateReconcileOutbox({
-    processStore,
-  }: {
-    processStore: Pick<ProcessStore, "appendIntents">;
-  }): void {
-    this.#memberAggregateReconcile = enqueueMemberAggregates({
-      reconciler: this.aggregateReconciler,
-      outbox: OutboxAggregateReconcile.create(processStore),
-      trigger: "department-write",
-    });
   }
 
   #anomalyAlertOutbox: OutboxAnomalyAlertDelivery | undefined;
@@ -1205,12 +1207,18 @@ export class GovernanceModule implements GovernanceRestApi {
     const pullers = PullerRegistryService.create();
     pullers.register(HttpPollingPullerAdapter.create({ http, diagnostics }));
     pullers.register(S3PollingPullerService.create({ objects, diagnostics }));
-    pullers.register(HttpCopilotStudioChannel.create({ http }));
-    pullers.register(HttpCopilotStudioDataverseChannel.create(http));
+    pullers.register(HttpCopilotStudioChannel.create({ http, vendorBases: this.vendorBases }));
+    pullers.register(HttpCopilotStudioDataverseChannel.create(http, this.vendorBases));
     pullers.register(OpenAiComplianceReferencePullerService.create({ objects, diagnostics }));
-    pullers.register(OpenAiAdminPullerService.create(http));
-    pullers.register(ClaudeComplianceReferencePullerAdapter.create({ http, diagnostics }));
-    pullers.register(AnthropicAdminPullerService.create(http));
+    pullers.register(OpenAiAdminPullerService.create(http, this.vendorBases));
+    pullers.register(
+      ClaudeComplianceReferencePullerAdapter.create({
+        http,
+        diagnostics,
+        vendorBases: this.vendorBases,
+      }),
+    );
+    pullers.register(AnthropicAdminPullerService.create(http, this.vendorBases));
     pullers.register(DatabricksGeniePullerService.create(http));
     const worker = IngestionPullWorkerService.create({
       sources: repositories.ingestionSources,

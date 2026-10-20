@@ -1,3 +1,4 @@
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { DeadLetterAttempt } from "../../model/dead-letter-types.ts";
@@ -35,9 +36,7 @@ export function DeadLetterAttemptHistory({
             >
               {row.attempt}
             </Badge>
-            <Text textStyle="xs" fontFamily="mono" color="red.fg">
-              {row.errorType}
-            </Text>
+            <InlineCode variant="neutral">{row.errorType}</InlineCode>
             <Text textStyle="xs" color="fg.muted">
               {row.errorMessage}
             </Text>

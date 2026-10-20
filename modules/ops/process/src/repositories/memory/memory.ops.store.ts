@@ -9,6 +9,7 @@ import {
   type ReplayStatus,
 } from "@langwatch/ops-contract";
 
+import type { CloudLatestRelease } from "../cloud-latest-release.repository.ts";
 import type { ImpersonationTarget } from "../impersonation.repository.ts";
 import type { StorageStatsReading } from "../storage-stats-readings.repository.ts";
 
@@ -71,6 +72,7 @@ export class MemoryOpsStore {
   readonly tenantRateMinutes = new Map<string, Map<number, number>>();
   readonly rateBaselines = new Map<string, number>();
   /** Per ClickHouse endpoint, the last storage reading and the last backup it saw. */
+  readonly cloudLatestRelease: CloudLatestRelease[] = [];
   readonly storageReadings = new Map<string, Omit<StorageStatsReading, "lastBackup">>();
   readonly storageLastBackups = new Map<string, NonNullable<StorageStatsReading["lastBackup"]>>();
   /** The published snapshots and the writer lease over them; a lease here never lapses. */

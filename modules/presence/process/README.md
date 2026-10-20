@@ -121,22 +121,22 @@ Contract `../contract/src/presence.trpc.ts:26`, router `src/transport/presence.t
 
 ```typescript
 // presence.update
-type Input = z.infer<typeof presenceUpdateRequestSchema>; // ../contract/src/presence.ts:119
-// Output: presenceAcknowledgedSchema, ../contract/src/presence.ts:179
+type Input = z.infer<typeof presenceUpdateRequestSchema>; // ../contract/src/presence.ts:159
+// Output: presenceAcknowledgedSchema, ../contract/src/presence.ts:243
 interface Output {
   ok: true;
 }
 
 // presence.leave
-// Input: presenceLeaveRequestSchema, ../contract/src/presence.ts:128
+// Input: presenceLeaveRequestSchema, ../contract/src/presence.ts:172
 interface Input {
   projectId: string;
   sessionId: string;
 }
-type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:179
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:243
 
 // presence.cursor
-// Input: presenceCursorRequestSchema, ../contract/src/presence.ts:159
+// Input: presenceCursorRequestSchema, ../contract/src/presence.ts:219
 interface Input {
   projectId: string;
   sessionId: string;
@@ -146,46 +146,46 @@ interface Input {
     y: number;
   };
 }
-type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:179
+type Output = z.infer<typeof presenceAcknowledgedSchema>; // ../contract/src/presence.ts:243
 
 // presence.onPresenceUpdate
-// Input: presenceProjectInputSchema, ../contract/src/presence.ts:101
+// Input: presenceProjectInputSchema, ../contract/src/presence.ts:125
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof presenceEventSchema>; // ../contract/src/presence.ts:70
+type Output = z.infer<typeof presenceEventSchema>; // ../contract/src/presence.ts:84
 
 // presence.onPresenceCursor
-// Input: presenceCursorSubscriptionSchema, ../contract/src/presence.ts:169
+// Input: presenceCursorSubscriptionSchema, ../contract/src/presence.ts:234
 interface Input {
   projectId: string;
   anchor: string;
   sessionId: string;
 }
-type Output = z.infer<typeof presenceCursorEventSchema>; // ../contract/src/presence.ts:93
+type Output = z.infer<typeof presenceCursorEventSchema>; // ../contract/src/presence.ts:117
 
 // presence.onOrganizationReadHints
-// Input: organizationReadHintsInputSchema, ../contract/src/read-hints.ts:16
+// Input: organizationReadHintsInputSchema, ../contract/src/read-hints.ts:26
 interface Input {
   organizationId: string;
 }
-// Output: readHintSchema, ../contract/src/read-hints.ts:12
+// Output: readHintSchema, ../contract/src/read-hints.ts:15
 interface Output {
   path: string;
 }
 
 // presence.onProjectReadHints
-// Input: projectReadHintsInputSchema, ../contract/src/read-hints.ts:22
+// Input: projectReadHintsInputSchema, ../contract/src/read-hints.ts:38
 interface Input {
   organizationId: string;
   projectId: string;
 }
-type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:12
+type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:15
 
 // presence.onUpgradeReadHints
 // Input: inline, ../contract/src/presence.trpc.ts:64
 type Input = unknown;
-type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:12
+type Output = z.infer<typeof readHintSchema>; // ../contract/src/read-hints.ts:15
 ```
 
 ## Sockets

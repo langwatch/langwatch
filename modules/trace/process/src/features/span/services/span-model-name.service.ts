@@ -1,4 +1,4 @@
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 
 /** Model name extraction in caller-given priority order. Token estimation and
  * cost enrichment disagree on priority; shared as service to avoid drift. */

@@ -1,5 +1,5 @@
 import type { ModelCost } from "@langwatch/model-provider-contract";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 import { describe, expect, it, vi } from "vitest";
 
 import type { TraceModelCostCatalog } from "../span-cost-enrichment.service.ts";

@@ -197,7 +197,7 @@ export function IfElsePropertiesPanel({
               }))}
               viewStateKey={`if-else-condition:${node.id}`}
             />
-            <Text fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               Python over the inputs, must return True or False. The not-taken branch is skipped.
             </Text>
           </>
@@ -209,7 +209,7 @@ export function IfElsePropertiesPanel({
               placeholder={'e.g. context != ""'}
               availableVariables={(node.data.inputs ?? []).map((i) => i.identifier)}
             />
-            <Text fontSize="12px" color="fg.muted">
+            <Text textStyle="caption" color="fg.muted">
               <Link
                 href={LIQUID_OPERATORS_DOCS}
                 target="_blank"

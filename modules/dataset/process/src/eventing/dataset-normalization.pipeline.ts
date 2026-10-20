@@ -46,7 +46,6 @@ export function buildDatasetNormalizationPipeline(deps: {
         {
           from: "trace_processing:job:datasetNormalize",
           to: { jobType: "command", lane: "datasetNormalize" },
-          removeAfter: "3.21.0",
         },
       ])
       .build()

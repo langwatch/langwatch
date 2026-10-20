@@ -143,4 +143,32 @@ describe("ProjectionRouter registration guard", () => {
       });
     });
   });
+
+  describe("given a fold that bounds its read-window fallback with lookback steps", () => {
+    const boundedFold = (name: string, refoldOnStoreMiss: boolean) =>
+      createMockFoldProjectionDefinition(name, {
+        options: {
+          refoldOnStoreMiss,
+          readWindow: { ...READ_WINDOW, fallbackLookbackStepsMs: [30 * 24 * 60 * 60 * 1000] },
+        },
+      });
+
+    describe("when it does not refold on a store miss", () => {
+      /** @scenario a bounded fallback is declared only by a fold that rebuilds on a miss */
+      it("refuses the registration, naming the fold", () => {
+        expect(() =>
+          createRouter().registerFoldProjection(boundedFold("bounded-no-refold", false)),
+        ).toThrow(/bounded-no-refold.*does not refold on a store miss/);
+      });
+    });
+
+    describe("when it refolds on a store miss", () => {
+      /** @scenario a bounded fallback is declared only by a fold that rebuilds on a miss */
+      it("registers the fold", () => {
+        expect(() =>
+          createRouter().registerFoldProjection(boundedFold("bounded-refolds", true)),
+        ).not.toThrow();
+      });
+    });
+  });
 });

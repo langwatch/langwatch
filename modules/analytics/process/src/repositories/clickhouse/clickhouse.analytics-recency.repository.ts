@@ -17,6 +17,7 @@ const AGGREGATE_ID_COLUMN_BY_SOURCE: Record<AnalyticsMetricSource, string> = {
 /**
  * Reads the newest `OccurredAt` of the deduped slim table (ADR-034 §6), bounded
  * on the partition column, with the IN-tuple dedup over `ReplacingMergeTree(UpdatedAt)`.
+ * Origins are left out of the newest versions only: origin is stamped late.
  */
 export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyRepository {
   private constructor(private readonly clickhouse: ClickHouseQueryClient) {
@@ -31,9 +32,13 @@ export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyReposi
     projectId: string;
     source: AnalyticsMetricSource;
     since: Instant;
+    excludeOrigins?: readonly string[];
   }): Promise<Instant[]> {
     const table = SLIM_TABLE_BY_SOURCE[input.source];
     const idColumn = AGGREGATE_ID_COLUMN_BY_SOURCE[input.source];
+    const excludeOrigins = input.source === "trace" ? (input.excludeOrigins ?? []) : [];
+    const byOrigin =
+      excludeOrigins.length > 0 ? "AND Origin NOT IN ({excludeOrigins:Array(String)})" : "";
     const { rows } = await this.clickhouse.query<{ lastMs: string | number | null }>({
       tenantId: input.projectId,
       table,
@@ -51,9 +56,14 @@ export class ClickHouseAnalyticsRecencyRepository extends AnalyticsRecencyReposi
                 AND OccurredAt >= toDateTime64({startMs:UInt64} / 1000.0, 3)
               GROUP BY TenantId, ${idColumn}
             )
+            ${byOrigin}
         )
       `,
-      params: { tenantId: input.projectId, startMs: input.since.epochMilliseconds },
+      params: {
+        tenantId: input.projectId,
+        startMs: input.since.epochMilliseconds,
+        ...(excludeOrigins.length > 0 ? { excludeOrigins } : {}),
+      },
     });
 
     const lastMs = rows[0]?.lastMs;

@@ -8,6 +8,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { lazy, Suspense, useMemo, useRef } from "react";
@@ -37,6 +38,7 @@ import {
   usePresenceStore,
 } from "../../../../behavior/presence/presence-store.ts";
 import { useTraceDrawer } from "../../../../behavior/trace-drawer.ts";
+import { drawerShortcut } from "../../../../features/trace-drawer/behavior/trace-drawer-shortcut-table.ts";
 import type { VizTab } from "../../../../model/trace-drawer-params.ts";
 import { SequenceSkeleton } from "../../../blocks/sequence/sequence-skeleton.tsx";
 import { TopologySkeleton } from "../../../blocks/sequence/topology-skeleton.tsx";
@@ -110,7 +112,7 @@ function VizTabContent({ tab, traceId }: { tab: VizTabDef; traceId: string | nul
       <Text textStyle="xs" lineHeight={1}>
         {tab.label}
       </Text>
-      <Kbd>{tab.shortcut}</Kbd>
+      <Kbd interaction="static">{tab.shortcut}</Kbd>
       {traceId ? <VizTabPresenceDot traceId={traceId} panel={tab.value} /> : null}
     </>
   );
@@ -236,6 +238,7 @@ function VizTabButton({
       <Flex
         as="button"
         data-overflow-id={tab.value}
+        aria-keyshortcuts={shortcutAriaKeys(drawerShortcut(tab.value))}
         align="center"
         gap={1.5}
         paddingX={2}

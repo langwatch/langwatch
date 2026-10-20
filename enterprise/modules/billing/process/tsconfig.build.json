@@ -24,97 +24,99 @@
   ],
   "references": [
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../connect/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/eventing/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/instant-eval-judge/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/internal-slack/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/ksuid/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/mail/tsconfig.declarations.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/notification/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/observability/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/onboarding/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/ops/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/organization/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/plans/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/prisma-client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/process/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/scenario/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/task/tsconfig.build.json"
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../../../modules/trace/contract/tsconfig.build.json"
+      "path": "../../../../packages/task/tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/upgrade/tsconfig.build.json"
+      "path": "../../../../packages/secrets/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/process/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/prisma-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/plans/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/organization/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/observability/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/notification/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/module/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/mail/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/ksuid/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/internal-slack/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/instant-eval-judge/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../connect/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/clickhouse-client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/api/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/evaluation-contract",
+        "@langwatch/instant-eval-judge-process",
+        "@langwatch/onboarding-contract",
+        "@langwatch/scenario-contract",
+        "@langwatch/test-harness",
+        "@langwatch/trace-contract",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

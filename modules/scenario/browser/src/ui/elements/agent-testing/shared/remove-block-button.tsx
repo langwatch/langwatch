@@ -7,8 +7,6 @@
 import { chakra } from "@langwatch/design-system/primitives";
 import { X } from "lucide-react";
 
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
-
 export function RemoveBlockButton({
   label,
   onClick,
@@ -24,8 +22,8 @@ export function RemoveBlockButton({
       display="flex"
       alignItems="center"
       cursor="pointer"
-      color={FG_MUTED}
-      boxShadow={QUIET_BUTTON_SHADOW}
+      color="fg.muted"
+      boxShadow="none"
       _hover={{ color: "red.fg" }}
       title="Remove"
       aria-label={label}

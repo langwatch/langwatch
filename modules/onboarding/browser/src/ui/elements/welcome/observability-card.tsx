@@ -15,7 +15,7 @@ interface Guide {
 
 const guides: Guide[] = [
   {
-    icon: <FaPython size={16} color="#4584b6" />,
+    icon: <FaPython size={16} color="var(--chakra-colors-illustration-python)" />,
     label: "Get started using our Python SDK",
     href: "https://docs.langwatch.ai/integration/python/guide",
     event: "integration_guide_click",
@@ -23,7 +23,7 @@ const guides: Guide[] = [
     bg: "blue.subtle",
   },
   {
-    icon: <FaJs size={16} color="#2563eb" />,
+    icon: <FaJs size={16} color="var(--chakra-colors-illustration-typescript)" />,
     label: "Follow the TypeScript guide",
     href: "https://docs.langwatch.ai/integration/typescript/guide",
     event: "integration_guide_click",
@@ -31,7 +31,7 @@ const guides: Guide[] = [
     bg: "cyan.subtle",
   },
   {
-    icon: <FaGolang size={16} color="#00ADD8" />,
+    icon: <FaGolang size={16} color="var(--chakra-colors-illustration-go)" />,
     label: "Get going with our Golang SDK",
     href: "https://github.com/langwatch/langwatch/tree/main/sdks/go",
     event: "integration_guide_click",

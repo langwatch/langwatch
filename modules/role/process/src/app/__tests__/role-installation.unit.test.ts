@@ -1,7 +1,8 @@
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import { createApp } from "@langwatch/process";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 import { RoleApi } from "@langwatch/role-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
@@ -29,15 +30,21 @@ function process(role: "api" | "worker") {
     getActivePlan: async () => testPlan(),
   });
 
-  return createApp({ role })
-    .withModules([roleProcessModule])
-    .withStores(memoryStores())
-    .provide({ authz, entitlement });
+  return bootInstalledProcess({
+    role,
+    modules: [roleProcessModule],
+    config: {},
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AuthzApi, instance: authz }),
+      testPeer({ token: EntitlementApi, instance: entitlement }),
+    ],
+  });
 }
 
 describe("role app installation", () => {
   it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-    const runtime = await process(role).boot();
+    const runtime = await process(role);
 
     try {
       const app = runtime.service(RoleApi);
@@ -52,7 +59,7 @@ describe("role app installation", () => {
   });
 
   it("publishes the permission catalog every custom role is written from", async () => {
-    const runtime = await process("api").boot();
+    const runtime = await process("api");
 
     try {
       const catalog = await runtime.service(RoleApi).getPermissionCatalog();

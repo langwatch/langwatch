@@ -67,8 +67,9 @@ echo "GATEWAY_PORT=\${GATEWAY_PORT:-}"
 }
 
 /**
- * Runs the launcher with a `pnpm` that reports rather than runs. What comes
- * back is exactly what the lanes would have been started with.
+ * Runs the launcher with a `pnpm` that reports what the lanes would start
+ * with. It runs with --hmr: without Vite the api lane takes PORT itself, and
+ * PORT + 1000 is the api's port only when the browser application owns PORT.
  */
 function launchWithStubbedPnpm({ extraEnv = {} }: { extraEnv?: Record<string, string> } = {}): {
   argv: string[];
@@ -110,7 +111,7 @@ function launchWithStubbedPnpm({ extraEnv = {} }: { extraEnv?: Record<string, st
     delete inherited[key];
   }
 
-  const stdout = execFileSync("bash", [DEV_STACK], {
+  const stdout = execFileSync("bash", [DEV_STACK, "--hmr"], {
     encoding: "utf8",
     cwd: REPO_ROOT,
     env: {

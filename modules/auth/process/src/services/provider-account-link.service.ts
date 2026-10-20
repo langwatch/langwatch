@@ -21,7 +21,8 @@ interface ProviderAccountLinkServiceDeps {
 
 /**
  * How a confirmed link proposal becomes a sign-in method. It writes through Better Auth
- * and nowhere else, so no second path can claim an account row.
+ * and nowhere else, so no second path can claim an account row. A connection's proposal
+ * keys the row by the connection, as that connection's own sign-ins do.
  */
 export class ProviderAccountLinkService {
   static create(deps: ProviderAccountLinkServiceDeps): ProviderAccountLinkService {
@@ -48,7 +49,7 @@ export class ProviderAccountLinkService {
 
     await this.deps.accounts.createAccount({
       userId,
-      providerId: provider,
+      providerId: connectionId ?? provider,
       issuer: providerAccountIssuer({ connectionIssuer, provider }),
       accountId: subject,
     });

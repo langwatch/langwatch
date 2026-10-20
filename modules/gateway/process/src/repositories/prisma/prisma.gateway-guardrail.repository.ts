@@ -7,6 +7,7 @@ import {
   type UpdateGatewayGuardrailInput,
 } from "@langwatch/gateway-contract";
 import { type GatewayGuardrail, type PrismaClient } from "@langwatch/prisma-client/generated";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import {
   GatewayGuardrailRepository,
@@ -115,7 +116,7 @@ export class PrismaGatewayGuardrailRepository extends GatewayGuardrailRepository
   async archive(input: ArchiveGatewayGuardrailInput): Promise<void> {
     await this.database.gatewayGuardrail.update({
       where: { id: input.id, projectId: input.projectId },
-      data: { archivedAt: new Date(), updatedById: input.actorUserId },
+      data: { archivedAt: toDate(nowInstant()), updatedById: input.actorUserId },
     });
   }
 }

@@ -52,16 +52,21 @@ function holder(userId: string): PlatformOperator {
   };
 }
 
+const SELF_HOSTED = { cloud: false, isLocalDevelopment: false };
+const HOSTED_CLOUD = { cloud: true, isLocalDevelopment: false };
+
 function world({
   holders = [],
   users = [],
   organizations = [],
   administrators = [],
+  deployment = SELF_HOSTED,
 }: {
   holders?: PlatformOperator[];
   users?: UserProfile[];
   organizations?: string[];
   administrators?: string[];
+  deployment?: { cloud: boolean; isLocalDevelopment: boolean };
 } = {}) {
   const granted: AuthzGrantPlatformOperatorInput[] = [];
   const authz: Pick<
@@ -103,6 +108,7 @@ function world({
     authz,
     users: directory,
     organizations: organizationDirectory,
+    deployment,
   });
   return { service, granted, authz };
 }
@@ -336,18 +342,6 @@ describe("PlatformOperatorsService", () => {
     });
   });
 
-  describe("when boot reads ADMIN_EMAILS", () => {
-    /** @scenario "A set ADMIN_EMAILS only warns at boot" */
-    it("warns that a set list grants nothing and names the page and the task", () => {
-      const [warning] = PlatformOperatorsService.bootWarnings({ adminEmails: ["ana@acme.com"] });
-
-      expect(warning).toMatch(/grants nothing/);
-      expect(warning).toMatch(/\/ops\/operators/);
-      expect(warning).toMatch(/grant-platform-operator/);
-      expect(PlatformOperatorsService.bootWarnings({ adminEmails: [] })).toEqual([]);
-    });
-  });
-
   describe("when the task grants as the system", () => {
     /** @scenario "The recovery task grants the role as the system" */
     it("grants the account behind the address as the system", async () => {
@@ -374,6 +368,23 @@ describe("PlatformOperatorsService", () => {
       await expect(service.grantAsSystem({ email: "gone@acme.com" })).rejects.toMatchObject({
         code: "platform_operator_user_not_found",
       });
+    });
+
+    /** @scenario "The recovery task refuses an account whose address was never verified" */
+    it.each([
+      ["a self-hosted install", SELF_HOSTED],
+      ["the hosted cloud", HOSTED_CLOUD],
+    ])("refuses an unverified account on %s and grants nobody", async (_label, deployment) => {
+      const { service, granted } = world({
+        users: [user("squatter", { emailVerified: false })],
+        deployment,
+      });
+
+      await expect(service.grantAsSystem({ email: "squatter@acme.com" })).rejects.toMatchObject({
+        code: "platform_operator_user_not_found",
+        meta: { userId: "squatter" },
+      });
+      expect(granted).toEqual([]);
     });
   });
 
@@ -421,7 +432,7 @@ describe("PlatformOperatorsService", () => {
     });
 
     /** @scenario "The page refuses an account whose address was never verified" */
-    it("refuses an unverified account on the page, while the task still grants it", async () => {
+    it("refuses an unverified account on the page and grants nobody", async () => {
       const { service, granted } = world({
         users: [user("ana"), user("squatter", { emailVerified: false })],
       });
@@ -430,8 +441,6 @@ describe("PlatformOperatorsService", () => {
         code: "platform_operator_user_not_found",
       });
       expect(granted).toEqual([]);
-      await service.grantAsSystem({ email: "squatter@acme.com" });
-      expect(granted.map(({ principal }) => principal.id)).toEqual(["squatter"]);
     });
 
     /** @scenario "A refused grant never carries the address" */
@@ -463,6 +472,110 @@ describe("PlatformOperatorsService", () => {
       ).rejects.toMatchObject({ code: "ops_impersonated_operator_refused" });
       expect(granted).toEqual([]);
       expect(authz.revokePlatformOperator).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("PlatformOperatorsService staff-only grants", () => {
+  const operator = { id: "ana", email: "ana@langwatch.ai", impersonator: null };
+  const ana = user("ana", { email: "ana@langwatch.ai" });
+
+  /** Both ways in, the page and the recovery task, for one address. */
+  function grantBothWays({
+    email,
+    users,
+    deployment,
+  }: {
+    email: string;
+    users: UserProfile[];
+    deployment: { cloud: boolean; isLocalDevelopment: boolean };
+  }) {
+    const { service, granted } = world({ users: [ana, ...users], deployment });
+    return {
+      granted,
+      page: () => service.grant({ email, operator }),
+      task: () => service.grantAsSystem({ email }),
+    };
+  }
+
+  describe("given the hosted cloud", () => {
+    /** @scenario "On the hosted cloud the page and the task grant a verified staff account" */
+    it("grants a verified account on langwatch.ai on the page and through the task", async () => {
+      const bo = user("bo", { email: "bo@langwatch.ai" });
+      const { page, task, granted } = grantBothWays({
+        email: "bo@langwatch.ai",
+        users: [bo],
+        deployment: HOSTED_CLOUD,
+      });
+
+      await expect(page()).resolves.toMatchObject({ userId: "bo" });
+      await expect(task()).resolves.toMatchObject({ userId: "bo" });
+      expect(granted.map(({ principal }) => principal.id)).toEqual(["bo", "bo"]);
+    });
+
+    /** @scenario "On the hosted cloud an account outside the staff domain is refused" */
+    it.each([
+      ["another domain", "bo@acme.com"],
+      ["a subdomain", "bo@eu.langwatch.ai"],
+      ["a lookalike suffix", "bo@langwatch.ai.acme.com"],
+      ["a lookalike prefix", "bo@notlangwatch.ai"],
+      ["a trailing dot", "bo@langwatch.ai."],
+    ])("refuses a verified address on %s and grants nobody", async (_label, email) => {
+      const { page, task, granted } = grantBothWays({
+        email,
+        users: [user("bo", { email })],
+        deployment: HOSTED_CLOUD,
+      });
+
+      await expect(page()).rejects.toMatchObject({
+        code: "platform_operator_user_not_found",
+        meta: { userId: "bo" },
+      });
+      await expect(task()).rejects.toMatchObject({ code: "platform_operator_user_not_found" });
+      expect(granted).toEqual([]);
+    });
+
+    /** @scenario "On the hosted cloud an unverified staff address is refused" */
+    it("refuses an unverified address on langwatch.ai and grants nobody", async () => {
+      const { page, task, granted } = grantBothWays({
+        email: "bo@langwatch.ai",
+        users: [user("bo", { email: "bo@langwatch.ai", emailVerified: false })],
+        deployment: HOSTED_CLOUD,
+      });
+
+      await expect(page()).rejects.toMatchObject({ code: "platform_operator_user_not_found" });
+      await expect(task()).rejects.toMatchObject({ code: "platform_operator_user_not_found" });
+      expect(granted).toEqual([]);
+    });
+  });
+
+  describe("given a self-hosted install", () => {
+    /** @scenario "A self-hosted install grants any verified active account" */
+    it("grants a verified account on the install's own domain both ways", async () => {
+      const { page, task, granted } = grantBothWays({
+        email: "bo@acme.com",
+        users: [user("bo")],
+        deployment: SELF_HOSTED,
+      });
+
+      await page();
+      await task();
+      expect(granted.map(({ principal }) => principal.id)).toEqual(["bo", "bo"]);
+    });
+  });
+
+  describe("given a local development stack running as the hosted cloud", () => {
+    /** @scenario "A developer's local stack grants its own seeded admin" */
+    it("grants the seeded admin through the task", async () => {
+      const admin = user("admin", { email: "admin@mail.langwatch.localhost" });
+      const { task, granted } = grantBothWays({
+        email: "admin@mail.langwatch.localhost",
+        users: [admin],
+        deployment: { cloud: true, isLocalDevelopment: true },
+      });
+
+      await expect(task()).resolves.toMatchObject({ userId: "admin" });
+      expect(granted.map(({ principal }) => principal.id)).toEqual(["admin"]);
     });
   });
 });
@@ -513,6 +626,132 @@ describe("PlatformOperatorsService.seedFromAdminEmails", () => {
 
       await expect(service.seedFromAdminEmails({ settings: step, dryRun: false })).resolves.toBe(0);
       expect(granted).toEqual([]);
+    });
+  });
+});
+
+describe("PlatformOperatorsService.grantFirstUser", () => {
+  const selfHosted = { adminEmails: ["someone-else@acme.com"], cloud: false };
+
+  function signingUp(options: Parameters<typeof world>[0]) {
+    const seeded = world(options);
+    const record = vi.fn(async () => undefined);
+    seeded.service.connectSeedRecorder({ record });
+    return { ...seeded, record };
+  }
+
+  describe("given a self-hosted install nobody operates and its only user was created", () => {
+    /** @scenario "The first user of a self-hosted install becomes a platform operator" */
+    it("records that user as the seed's decision, whatever ADMIN_EMAILS names", async () => {
+      const { service, record, granted } = signingUp({ users: [user("ana")] });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(true);
+
+      expect(record).toHaveBeenCalledExactlyOnceWith({ via: "first-user", userIds: ["ana"] });
+      expect(granted).toEqual([]);
+    });
+
+    /** @scenario "The first user of a self-hosted install becomes a platform operator" */
+    it("grants the recorded first user as the system, as every seeded grant is", async () => {
+      const { service, granted } = world({ users: [user("ana")] });
+
+      await service.grantSeeded({ via: "first-user", userIds: ["ana"] });
+
+      expect(granted).toEqual([
+        expect.objectContaining({
+          principal: { type: "user", id: "ana" },
+          caller: { type: "system" },
+          actor: PLATFORM_OPERATOR_SEED_ACTOR,
+        }),
+      ]);
+    });
+  });
+
+  describe("given another user already exists", () => {
+    /** @scenario "A second user never becomes an operator by signing up" */
+    it("records nothing for the second user", async () => {
+      const { service, record } = signingUp({ users: [user("ana"), user("bo")] });
+
+      await expect(
+        service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Two users signing up at once never both become operators" */
+    it("records nothing for either of two users whose facts both find two users", async () => {
+      const { service, record } = signingUp({ users: [user("ana"), user("bo")] });
+
+      await Promise.all([
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+        service.grantFirstUser({ userId: "bo", backfilled: false, settings: selfHosted }),
+      ]);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the hosted service", () => {
+    /** @scenario "The hosted service never makes its first user an operator" */
+    it("records nothing", async () => {
+      const { service, record } = signingUp({ users: [user("ana")] });
+
+      await expect(
+        service.grantFirstUser({
+          userId: "ana",
+          backfilled: false,
+          settings: { ...selfHosted, cloud: true },
+        }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given somebody already holds the grant", () => {
+    /** @scenario "An existing operator means no first-user grant" */
+    it("records nothing and grants nobody", async () => {
+      const { service, record, granted, authz } = signingUp({
+        users: [user("ana")],
+        holders: [holder("carol")],
+      });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+      expect(granted).toEqual([]);
+      expect(authz.revokePlatformOperator).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given a backfilled fact for the install's only user", () => {
+    /** @scenario "A backfilled or stale creation fact grants nobody" */
+    it("records nothing", async () => {
+      const { service, record } = signingUp({ users: [user("ana")] });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: true, settings: selfHosted }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("given the fact names a user who is gone or deactivated", () => {
+    /** @scenario "A backfilled or stale creation fact grants nobody" */
+    it.each([
+      { case: "erased", users: [user("bo")] },
+      {
+        case: "deactivated",
+        users: [user("ana", { deactivatedAt: new Date("2025-02-01T00:00:00Z") })],
+      },
+    ])("records nothing when the user was $case", async ({ users }) => {
+      const { service, record } = signingUp({ users });
+
+      await expect(
+        service.grantFirstUser({ userId: "ana", backfilled: false, settings: selfHosted }),
+      ).resolves.toBe(false);
+      expect(record).not.toHaveBeenCalled();
     });
   });
 });

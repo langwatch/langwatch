@@ -84,4 +84,33 @@ describe.skipIf(!DB_URL)("the per-tenant migration state on Postgres", () => {
       });
     });
   });
+
+  describe("given tenant rows in two steps", () => {
+    const OTHER = `state-list-${ns}`;
+
+    afterAll(async () => {
+      await prisma.systemMigrationTenantState.deleteMany({
+        where: { migrationName: OTHER, tenantId: TENANT },
+      });
+    });
+
+    describe("when an operator lists tenants without choosing a step", () => {
+      /** @scenario "The unfiltered tenant list reads every step's rows within the tenant guard" */
+      it("lists both steps' rows instead of refusing the read", async () => {
+        const repository = PrismaSystemMigrationStateRepository.create({ prisma });
+        for (const migrationName of [MIGRATION, OTHER]) {
+          await prisma.systemMigrationTenantState.upsert({
+            where: { migrationName_tenantId: { migrationName, tenantId: TENANT } },
+            create: { migrationName, tenantId: TENANT, status: "parked", report: {} },
+            update: { status: "parked" },
+          });
+        }
+
+        const rows = await repository.findRecordsByStatus({ statuses: ["parked"], limit: 500 });
+
+        const mine = rows.filter((row) => row.tenantId === TENANT).map((row) => row.migrationName);
+        expect(mine.toSorted()).toEqual([MIGRATION, OTHER].toSorted());
+      });
+    });
+  });
 });

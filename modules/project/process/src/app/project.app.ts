@@ -55,6 +55,11 @@ import {
   type ProjectLifecycleSenders,
 } from "../services/project-created-notice.service.ts";
 import { ProjectCredentialsService } from "../services/project-credentials.service.ts";
+import {
+  ProjectFactsBackfillService,
+  type ProjectFactsBackfillReport,
+  type ProjectFactsBackfillRun,
+} from "../services/project-facts-backfill.service.ts";
 import { ProjectOperationsService } from "../services/project-operations.service.ts";
 import { ProjectRequestService } from "../services/project-request.service.ts";
 import { ProjectService as ProjectApplicationService } from "../services/project.service.ts";
@@ -115,6 +120,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
   readonly #projectService: ProjectApplicationService;
   readonly #operations: ProjectOperationsService;
   readonly #lifecycle: ProjectCreatedNoticeService;
+  readonly #factsBackfill: ProjectFactsBackfillService;
   readonly #authorization: AuthzApi;
   readonly #dataPrivacy: DataPrivacyApi;
   readonly #organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -130,6 +136,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     projectService,
     operations,
     lifecycle,
+    factsBackfill,
     authorization,
     dataPrivacy,
     organizations,
@@ -140,6 +147,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     projectService: ProjectApplicationService;
     operations: ProjectOperationsService;
     lifecycle: ProjectCreatedNoticeService;
+    factsBackfill: ProjectFactsBackfillService;
     authorization: AuthzApi;
     dataPrivacy: DataPrivacyApi;
     organizations: Pick<OrganizationApi, "isMember" | "getMember">;
@@ -150,6 +158,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     this.#projectService = projectService;
     this.#operations = operations;
     this.#lifecycle = lifecycle;
+    this.#factsBackfill = factsBackfill;
     this.#authorization = authorization;
     this.#dataPrivacy = dataPrivacy;
     this.#organizations = organizations;
@@ -186,6 +195,11 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       projectService: projects,
       operations,
       lifecycle,
+      factsBackfill: ProjectFactsBackfillService.create({
+        projects: repositories.projects,
+        lifecycle,
+        logger: createLogger("langwatch:project:facts-backfill"),
+      }),
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,
       organizations: dependencies.organizations,
@@ -229,23 +243,9 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
     return this.#personalProjects;
   }
 
-  /** Records one organization's existing projects as created, for the backfill task. */
-  recordExistingProjectsCreated(
-    input: Readonly<{ organizationId: string; isDryRun?: boolean }>,
-  ): Promise<number> {
-    return this.#lifecycle.recordExisting(input);
-  }
-
-  /** Records one organization's projects' stored departments and teams, for the backfill task. */
-  recordExistingDepartmentAssignments(
-    input: Readonly<{ organizationId: string }>,
-  ): Promise<number> {
-    return this.#lifecycle.recordExistingDepartmentAssignments(input);
-  }
-
-  /** Records one organization's projects' stored presence settings, for the backfill task. */
-  recordExistingPresenceSettings(input: Readonly<{ organizationId: string }>): Promise<number> {
-    return this.#lifecycle.recordExistingPresenceSettings(input);
+  /** The `project:record-created-facts` step's body: every project's facts, one pass. */
+  recordExistingFacts(input: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
+    return this.#factsBackfill.recordExisting(input);
   }
 
   /**
@@ -394,6 +394,10 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
 
   getOrganizationId(projectId: string): Promise<string> {
     return this.#projectService.getOrganizationId(projectId);
+  }
+
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean> {
+    return this.#projectService.isTeamMember(input);
   }
 
   getWithTeam(id: string): Promise<ProjectWithTeam> {

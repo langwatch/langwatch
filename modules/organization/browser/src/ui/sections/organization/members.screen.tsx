@@ -139,8 +139,7 @@ function usePeopleListState({
   );
 
   const { openDrawer } = useDrawer();
-  const joinRequestsEnabled = host.isFeatureEnabled(FrontendFlags.join_requests);
-  const { cut: addressCut, selectCut } = useCutFromAddress();
+  const { cut, selectCut } = useCutFromAddress();
 
   const invitesFlow = useInviteFlow({ organization, activePlan });
   const removal = useMemberRemoval(organization.id);
@@ -150,13 +149,9 @@ function usePeopleListState({
     userId: session?.user?.id,
     pendingInvites: invitesFlow.pendingInvites,
   });
-  // Requests an SSO "ask" arrival queued exist whatever the flag says, so their cut does too.
-  const waitingShown = joinRequestsEnabled || reads.joinRequests.requests.length > 0;
-  const cut = !waitingShown && addressCut === "waiting" ? "all" : addressCut;
 
   return {
     canManage,
-    joinRequestsEnabled,
     department,
     showDepartment,
     departmentNameById,
@@ -192,7 +187,6 @@ function PeopleList({
           memberCount={people.sortedMembers.length}
           openInviteCount={people.openInvites.length}
           requestCount={people.joinRequests.requests.length}
-          joinRequestsEnabled={people.joinRequestsEnabled}
           onInvite={people.openDrawer}
         />
 
@@ -353,7 +347,10 @@ function MemberRowActions({
   );
 }
 
-/** Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700). */
+/**
+ * Holds a whole address; Enter opens the invite drawer carrying it (WEB-8700).
+ * A set width: a percentage one fills the row and pushes the button under it.
+ */
 function InlineInviteBox({
   value,
   onChange,
@@ -367,7 +364,7 @@ function InlineInviteBox({
     <Input
       value={value}
       size="sm"
-      maxWidth="240px"
+      width={{ base: "180px", sm: "240px" }}
       placeholder="Invite by email…"
       aria-label="Invite a teammate by email"
       onChange={(event) => onChange(event.target.value)}
@@ -516,7 +513,6 @@ function PeopleHeader({
   memberCount,
   openInviteCount,
   requestCount,
-  joinRequestsEnabled,
   onInvite,
 }: {
   organizationId: string;
@@ -527,7 +523,6 @@ function PeopleHeader({
   memberCount: number;
   openInviteCount: number;
   requestCount: number;
-  joinRequestsEnabled: boolean;
   onInvite: ReturnType<typeof useDrawer>["openDrawer"];
 }) {
   const [draft, setDraft] = useState("");
@@ -543,11 +538,12 @@ function PeopleHeader({
         hint="Everybody in this organization, and everybody on their way in."
         right={
           canManage ? (
-            <HStack gap={2}>
+            <HStack gap={2} data-testid="members-invite-row">
               <InlineInviteBox value={draft} onChange={setDraft} onSubmit={openInvite} />
               <Button
                 size="sm"
                 colorPalette="orange"
+                flexShrink={0}
                 onClick={openInvite}
                 data-testid="members-invite-open"
               >
@@ -567,7 +563,7 @@ function PeopleHeader({
         groupLabel="Filter people by how they got here"
         countNoun={{ singular: "person", plural: "people" }}
         testId="people-cuts"
-        items={peopleCutItems({ memberCount, openInviteCount, requestCount, joinRequestsEnabled })}
+        items={peopleCutItems({ memberCount, openInviteCount, requestCount })}
       />
     </>
   );
@@ -584,36 +580,24 @@ function InviteLinkDialog({
   onClose: () => void;
 }) {
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => (open ? undefined : onClose())}>
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title textStyle="xl" fontWeight="semibold">
-            Invite Link
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body paddingBottom={6}>
-          <VStack align="start" gap={4}>
-            <Text>
-              Send the link below to the users you want to invite to join the organization.
-            </Text>
+    <Dialog open={open} onClose={onClose} title="Invite Link" cancelLabel="Close">
+      <VStack align="start" gap={4}>
+        <Text>Send the link below to the users you want to invite to join the organization.</Text>
 
-            <VStack align="start" gap={4} width="full">
-              {invites.map((invite) => (
-                <VStack key={invite.inviteCode} align="start" gap={6} width="full">
-                  <Text fontWeight="600">{invite.email}</Text>
-                  <CopyInput
-                    value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
-                    label="Invite Link"
-                    marginTop={0}
-                  />
-                </VStack>
-              ))}
+        <VStack align="start" gap={4} width="full">
+          {invites.map((invite) => (
+            <VStack key={invite.inviteCode} align="start" gap={6} width="full">
+              <Text fontWeight="600">{invite.email}</Text>
+              <CopyInput
+                value={`${window.location.origin}/invite/accept?inviteCode=${invite.inviteCode}`}
+                label="Invite Link"
+                marginTop={0}
+              />
             </VStack>
-          </VStack>
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+          ))}
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }
 

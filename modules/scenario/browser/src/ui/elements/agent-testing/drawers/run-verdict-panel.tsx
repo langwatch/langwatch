@@ -4,6 +4,7 @@
  * criteria count or duration: the chip strip at the top of the drawer already reads all four.
  */
 
+import { Card } from "@langwatch/design-system/card";
 import { formatScore } from "@langwatch/design-system/metric-value-formatters";
 import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import {
@@ -31,7 +32,6 @@ import {
   failedRequiredEvaluatorName,
   type RunEvaluation,
 } from "../../../../model/agent-testing/results/evaluation-summaries.ts";
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 import { SCENARIO_RUN_STATUS_CONFIG } from "../../../../model/scenario-run-status-config.ts";
 import { PASS_RATE_AMBER_COLOR } from "../shared/pass-rate-color.ts";
 
@@ -91,7 +91,7 @@ const SPACE_BETWEEN_SECTIONS = 4;
 function PanelHeading({
   children,
   icon,
-  color = FG_MUTED,
+  color = "fg.muted",
 }: {
   children: React.ReactNode;
   icon?: React.ReactNode;
@@ -101,7 +101,7 @@ function PanelHeading({
     <HStack
       gap={1.5}
       alignItems="center"
-      fontSize="10.5px"
+      textStyle="micro"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
@@ -116,7 +116,7 @@ function PanelHeading({
           height={HEADING_LINE_HEIGHT}
           lineHeight={0}
           flexShrink={0}
-          marginTop="-2px"
+          marginTop="-0.5"
         >
           {icon}
         </Box>
@@ -151,11 +151,11 @@ function VerdictStatusLine({
       marginBottom={SPACE_BELOW_VERDICT}
       data-testid="run-verdict-status-line"
     >
-      <Text fontSize="12px" color={FG_MUTED}>
+      <Text textStyle="caption" color="fg.muted">
         Verdict:
       </Text>
       <Text
-        fontSize="13px"
+        textStyle="bodySm"
         fontWeight="bold"
         letterSpacing="0.03em"
         color={color}
@@ -216,12 +216,12 @@ function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
         <CriterionIcon tone={tone} />
       </Box>
       <VStack align="stretch" gap={0.5} minWidth={0}>
-        <Text fontSize="12px" fontWeight="medium">
+        <Text textStyle="caption" fontWeight="medium">
           {result.criterion}
         </Text>
         {showsRequirement ? (
           <Text
-            fontSize="11px"
+            textStyle="micro"
             color="fg.subtle"
             lineHeight="short"
             data-testid="run-verdict-criterion-requirement"
@@ -231,8 +231,8 @@ function CriterionRow({ result }: { result: ScenarioCriterionResult }) {
         ) : null}
         {reasoning ? (
           <Text
-            fontSize="11.5px"
-            color={FG_MUTED}
+            textStyle="caption"
+            color="fg.muted"
             lineHeight="short"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
@@ -268,7 +268,7 @@ function CriteriaSection({
     <VStack align="stretch" gap={2} data-testid={testId}>
       <PanelHeading color={headingColor}>{heading}</PanelHeading>
       {description ? (
-        <Text fontSize="11.5px" color={FG_MUTED} lineHeight="short" marginTop={-1}>
+        <Text textStyle="caption" color="fg.muted" lineHeight="short" marginTop={-1}>
           {description}
         </Text>
       ) : null}
@@ -313,8 +313,8 @@ function EvaluationInputs({
         size="xs"
         height="auto"
         paddingX={0}
-        fontSize="11px"
-        color={FG_MUTED}
+        textStyle="micro"
+        color="fg.muted"
         onClick={() => setOpen((isOpen) => !isOpen)}
         data-testid={`evaluation-inputs-toggle-${evaluatorId}`}
       >
@@ -325,42 +325,40 @@ function EvaluationInputs({
         </Text>
       </Button>
       {open ? (
-        <VStack
-          align="stretch"
-          gap={1.5}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="md"
-          background="bg.subtle"
-          padding={2}
+        <Card
+          variant="nested"
+          padding="xs"
+          borderTone="muted"
           data-testid={`evaluation-inputs-${evaluatorId}`}
         >
-          {entries.map(([name, value]) => (
-            <Box key={name} minWidth={0}>
-              <Text
-                fontSize="9.5px"
-                fontWeight="semibold"
-                textTransform="uppercase"
-                letterSpacing="0.025em"
-                color={FG_MUTED}
-              >
-                {name}
-              </Text>
-              <Text
-                as="pre"
-                fontFamily="mono"
-                fontSize="10.5px"
-                lineHeight="short"
-                color={FG_MUTED}
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-                title={value}
-              >
-                {previewOf(value)}
-              </Text>
-            </Box>
-          ))}
-        </VStack>
+          <VStack align="stretch" gap={1.5}>
+            {entries.map(([name, value]) => (
+              <Box key={name} minWidth={0}>
+                <Text
+                  textStyle="micro"
+                  fontWeight="semibold"
+                  textTransform="uppercase"
+                  letterSpacing="0.025em"
+                  color="fg.muted"
+                >
+                  {name}
+                </Text>
+                <Text
+                  as="pre"
+                  fontFamily="mono"
+                  textStyle="micro"
+                  lineHeight="short"
+                  color="fg.muted"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                  title={value}
+                >
+                  {previewOf(value)}
+                </Text>
+              </Box>
+            ))}
+          </VStack>
+        </Card>
       ) : null}
     </VStack>
   );
@@ -389,7 +387,7 @@ function EvaluationMarker({ evaluation }: { evaluation: RunEvaluation }) {
           borderRadius="sm"
           background="bg.muted"
           fontFamily="mono"
-          fontSize="10px"
+          textStyle="micro"
           fontWeight="semibold"
           fontVariantNumeric="tabular-nums"
           lineHeight="16px"
@@ -423,7 +421,7 @@ function evaluationVerdict(evaluation: RunEvaluation): { word: string; color: st
     case "error":
       return { word: "Error", color: PASS_RATE_AMBER_COLOR };
     case "skipped":
-      return { word: "Skipped", color: FG_MUTED };
+      return { word: "Skipped", color: "fg.muted" };
     case "scored":
       return null;
   }
@@ -451,7 +449,7 @@ function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
       </Box>
       <Box minWidth={0} flex={1}>
         <HStack gap={1.5} alignItems="baseline" flexWrap="wrap">
-          <Text fontSize="12px" fontWeight="medium" color={isSkipped ? FG_MUTED : "fg"}>
+          <Text textStyle="caption" fontWeight="medium" color={isSkipped ? "fg.muted" : "fg"}>
             {evaluation.name}
           </Text>
           {evaluation.required ? (
@@ -460,11 +458,11 @@ function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
               paddingX={1}
               borderRadius="sm"
               background="bg.muted"
-              fontSize="9px"
+              textStyle="micro"
               fontWeight="semibold"
               textTransform="uppercase"
               letterSpacing="0.025em"
-              color={FG_MUTED}
+              color="fg.muted"
               title="A failing required evaluator fails the scenario"
               data-testid="evaluation-required-mark"
             >
@@ -474,7 +472,7 @@ function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
         </HStack>
         {verdict ? (
           <Text
-            fontSize="11.5px"
+            textStyle="caption"
             fontWeight="medium"
             color={verdict.color}
             marginTop="1px"
@@ -485,8 +483,8 @@ function EvaluationRow({ evaluation }: { evaluation: RunEvaluation }) {
         ) : null}
         {evaluation.details ? (
           <Text
-            fontSize="11.5px"
-            color={FG_MUTED}
+            textStyle="caption"
+            color="fg.muted"
             lineHeight="short"
             whiteSpace="pre-wrap"
             wordBreak="break-word"
@@ -572,7 +570,7 @@ function RunFailurePanel({ raw }: { raw: string }) {
         {scenarioErrorTitle(handled.code)}
       </PanelHeading>
       <Text
-        fontSize="12px"
+        textStyle="caption"
         fontFamily="mono"
         color="red.fg"
         lineHeight="short"
@@ -583,8 +581,8 @@ function RunFailurePanel({ raw }: { raw: string }) {
       </Text>
       {handled.hint ? (
         <Text
-          fontSize="11.5px"
-          color={FG_MUTED}
+          textStyle="caption"
+          color="fg.muted"
           lineHeight="short"
           wordBreak="break-word"
           data-testid="run-verdict-error-hint"
@@ -600,8 +598,8 @@ function RunFailurePanel({ raw }: { raw: string }) {
             size="xs"
             height="auto"
             paddingX={0}
-            fontSize="11px"
-            color={FG_MUTED}
+            textStyle="micro"
+            color="fg.muted"
             onClick={() => setDetailOpen((open) => !open)}
             data-testid="run-verdict-error-toggle"
           >
@@ -609,27 +607,20 @@ function RunFailurePanel({ raw }: { raw: string }) {
             {detailOpen ? "Hide details" : "More info"}
           </Button>
           {detailOpen ? (
-            <Box
-              borderWidth="1px"
-              borderColor="border.muted"
-              borderRadius="md"
-              background="bg.subtle"
-              padding={2}
-              maxHeight="260px"
-              overflow="auto"
-              data-testid="run-verdict-error-detail"
-            >
-              <Text
-                as="pre"
-                fontFamily="mono"
-                fontSize="10.5px"
-                lineHeight="short"
-                color={FG_MUTED}
-                whiteSpace="pre-wrap"
-                wordBreak="break-word"
-              >
-                {detail}
-              </Text>
+            <Box maxHeight="260px" overflow="auto" data-testid="run-verdict-error-detail">
+              <Card variant="nested" padding="xs" borderTone="muted">
+                <Text
+                  as="pre"
+                  fontFamily="mono"
+                  textStyle="micro"
+                  lineHeight="short"
+                  color="fg.muted"
+                  whiteSpace="pre-wrap"
+                  wordBreak="break-word"
+                >
+                  {detail}
+                </Text>
+              </Card>
             </Box>
           ) : null}
         </VStack>
@@ -727,7 +718,7 @@ export function RunVerdictPanel({
           testId="run-verdict-passed-criteria"
         />
         {!hasAnyCriteria && !error ? (
-          <Text fontSize="12px" color={FG_MUTED}>
+          <Text textStyle="caption" color="fg.muted">
             The judge scored no criteria for this run.
           </Text>
         ) : null}
@@ -742,8 +733,8 @@ export function RunVerdictPanel({
         <VStack align="stretch" gap={2} marginTop={SPACE_BELOW_CRITERIA}>
           <PanelHeading>Judge reasoning</PanelHeading>
           <Text
-            fontSize="11.5px"
-            color={FG_MUTED}
+            textStyle="caption"
+            color="fg.muted"
             lineHeight="short"
             whiteSpace="pre-wrap"
             wordBreak="break-word"

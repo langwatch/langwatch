@@ -16,6 +16,7 @@ import type { UIMessage } from "ai";
 import { Fragment, memo, type ReactNode, useMemo } from "react";
 
 import { useLangyStore } from "../../../../behavior/langy.store.ts";
+import { LentAnswerActions } from "../../../../behavior/lent-answer-actions.tsx";
 import { useOrganizationTeamProject } from "../../../../behavior/use-organization-team-project.ts";
 import {
   isSubstantiveLangyAnswer,
@@ -47,6 +48,7 @@ import { LangyCodeAccessCard } from "../../../tools/ui/sections/langy-code-acces
 import { LangySecretSnippetCard } from "../../../tools/ui/sections/langy-secret-snippet-card.tsx";
 import {
   hasLangyBlockParts,
+  langyAnswerInsightsCard,
   type LangyAnswerSegment,
   langyAnswerSegments,
   langyAnswerSegmentsFromText,
@@ -266,6 +268,18 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
   const feedbackDirective = parseLangyFeedbackDirective(messageText(message));
   const showsActivity = hasLangyActivity(message);
   const hasActivity = showsActivity || Boolean(plan);
+  // The findings an answer action may keep, as typed data: never read back out of the prose.
+  const insights = useMemo(
+    () =>
+      isStreaming
+        ? undefined
+        : langyAnswerInsightsCard({
+            parts,
+            text: messageText(message),
+            isRecorded: isRecordedMessage(message),
+          }),
+    [isStreaming, parts, message],
+  );
   // Thinking headlines fold into the receipt on a settled turn, never loose paragraphs above it.
   const reasoningFold = isStreaming
     ? { titles: [], text: feedbackDirective.cleanedText }
@@ -290,6 +304,7 @@ function useAnswerReading({ message, isStreaming }: { message: UIMessage; isStre
     prs: githubPrsFromToolParts(parts),
     proposals: extractProposals(message),
     hasBlocks: hasLangyBlockParts(parts),
+    insights,
   };
 }
 
@@ -355,7 +370,7 @@ function MutedAnswerLine({ children }: { children: string }) {
     <Text
       fontSize="langyAnswer"
       lineHeight="1.5"
-      paddingX="2px"
+      paddingX="0.5"
       fontStyle="italic"
       color="fg.muted"
     >
@@ -425,6 +440,15 @@ function AssistantMessage(props: MessageContentProps) {
         <AnswerCards props={props} />
         {/* The reply the user cut short says so, whatever it managed to say first. */}
         {interrupted && !isStreaming ? <MutedAnswerLine>Interrupted</MutedAnswerLine> : null}
+        {!isStreaming && (reading.displayText || reading.insights?.findings.length) && project ? (
+          <LentAnswerActions
+            projectId={project.id}
+            conversationId={conversationId ?? null}
+            messageId={message.id}
+            answerText={reading.displayText}
+            {...(reading.insights ? { insights: reading.insights } : {})}
+          />
+        ) : null}
         {showsFeedbackPrompt({ props, reading }) ? (
           <LangyFeedback
             conversationId={conversationId ?? undefined}
@@ -680,7 +704,7 @@ function AnswerRun({
   // (ADR-060 §7). Fence-less streams take the plain path inside, unchanged.
   if (isStreaming) {
     return (
-      <Box paddingX="2px">
+      <Box paddingX="0.5">
         <StreamingAnswerWithCards text={display} projectSlug={context.projectSlug} />
       </Box>
     );
@@ -690,7 +714,7 @@ function AnswerRun({
       // The cards around it have a border plus their own inner padding, so a
       // flush-left paragraph sat a hair OUTSIDE their text edge. Two pixels
       // tucks the prose onto the same optical column.
-      paddingX="2px"
+      paddingX="0.5"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },
@@ -821,7 +845,7 @@ function ProseSegment({
     <Box
       // Same 2px optical alignment as the joined path: prose lines up with
       // the inner text of the bordered cards above it.
-      paddingX="2px"
+      paddingX="0.5"
       css={{
         "& > div > :first-child": { marginTop: 0 },
         "& > div > :last-child": { marginBottom: 0 },
@@ -900,7 +924,7 @@ function SayRun({ parts }: { parts: readonly unknown[] }) {
   return (
     <Box
       data-langy-say
-      paddingX="2px"
+      paddingX="0.5"
       display="flex"
       flexDirection="column"
       gap={2}

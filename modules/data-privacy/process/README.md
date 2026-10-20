@@ -138,7 +138,7 @@ None: this module declares no REST family.
 
 ### `dataPrivacy`
 
-Contract `../contract/src/data-privacy.trpc.ts:32`, router `src/transport/data-privacy.trpc.ts:36`.
+Contract `../contract/src/data-privacy.trpc.ts:47`, router `src/transport/data-privacy.trpc.ts:36`.
 
 | Procedure                    | Kind     | Gate                                                                                                                                                                                                                                                          | Input                               | Output                      |
 | ---------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------- | --------------------------- |
@@ -148,18 +148,18 @@ Contract `../contract/src/data-privacy.trpc.ts:32`, router `src/transport/data-p
 
 ```typescript
 // dataPrivacy.getSnapshot
-// Input: dataPrivacyProjectScopeSchema, ../contract/src/data-privacy.trpc.ts:18
+// Input: dataPrivacyProjectScopeSchema, ../contract/src/data-privacy.trpc.ts:23
 interface Input {
   projectId: string;
 }
-type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:57
+type Output = z.infer<typeof dataPrivacySnapshotSchema>; // ../contract/src/data-privacy.snapshot.ts:98
 
 // dataPrivacy.setForScope
-// Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:49)
-type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:187
+// Input: z.object({ ...dataPrivacyScopeTargetInputSchema.shape, config: dataPrivacyConfigSchema }) (inline, ../contract/src/data-privacy.trpc.ts:64)
+type Output = z.infer<typeof dataPrivacyPolicySchema>; // ../contract/src/data-privacy.ts:226
 
 // dataPrivacy.removeForScope
-// Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:26
+// Input: dataPrivacyScopeTargetInputSchema, ../contract/src/data-privacy.trpc.ts:45
 interface Input {
   projectId: string;
   scope: {
@@ -182,7 +182,7 @@ None: data-privacy declares no pipeline, process manager, subscriber or task.
 
 | Kind   | Leaf                           | Environment variable                 | Declared at                                 |
 | ------ | ------------------------------ | ------------------------------------ | ------------------------------------------- |
-| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:103`           |
+| secret | `googleApplicationCredentials` | `GOOGLE_APPLICATION_CREDENTIALS`     | `src/app/data-privacy.app.ts:104`           |
 | config | `googleDlpDisabled`            | `LANGWATCH_DISABLE_GOOGLE_DLP`       | `../contract/src/data-privacy.config.ts:11` |
 | config | `enforcement`                  | `LANGWATCH_DATA_PRIVACY_ENFORCEMENT` | `../contract/src/data-privacy.config.ts:16` |
 | config | `nodeEnvironment`              | `NODE_ENV`                           | `../contract/src/data-privacy.config.ts:18` |

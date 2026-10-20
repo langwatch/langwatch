@@ -115,15 +115,16 @@ remaining diagnostics exactly. Don't call a blocked check green.
 pnpm install                        # root only; one lockfile. Narrow: --filter "<pkg>..."
 pnpm start:prepare:files            # generated files (Prisma client, etc.); fixes "Cannot find module"
 pnpm generate:modules               # after editing modules/catalogue.json
-pnpm sync:references                # after adding/removing a workspace package
+pnpm sync:references                # nx sync: project references, after a dependency change
 pnpm test:affected                  # Nx: only packages this change reached, cached
 pnpm typecheck                      # one root tsc -b; incremental, rechecks only what changed
+pnpm typecheck:src                  # same, without the test programs: the local default; CI runs the full one
 pnpm start:prepare:db                # upgrade + system-migrations pass; the api refuses until it ran
 make go-lint-changed                # Go: lints your uncommitted edits (never raw golangci-lint)
 ```
 
-Nx (ADR-150) sits beside the root scripts, not in front of them: prefer the
-`pnpm` scripts above; the Nx plugin's skills cover `nx` itself.
+The root `test`, `typecheck` and `lint` scripts run through Nx (ADR-150): use
+the `pnpm` scripts above rather than `nx` directly; the Nx plugin's skills cover `nx` itself.
 
 ## Dev stack
 
@@ -145,6 +146,9 @@ them. Module code never reads `process.env`.
   before committing. Don't push or open a PR unless asked.
 - British English in prose; no em dashes; no attribution lines or agent names in
   commits, PRs or specs. Never name a customer: the repo is public.
+- Every PR description fills `## Architecture` honestly: tick the box only after reading the
+  sections of `dev/docs/ARCHITECTURE.md` the change touches, and list anything unusual under
+  "Needs a human look" rather than leaving it for the reviewer to find.
 - Commit messages are Conventional Commits (`feat(scope): …`, `fix: …`).
 - Branches: `issue123/slug` for issues, `feat/slug` for features.
 - Worktrees go in `.worktrees/<branch-with-slash-as-hyphen>` via

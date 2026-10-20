@@ -15,11 +15,12 @@ export type {
   GroupQueueHandlerContext,
   GroupQueuePayloadSchema,
   GroupQueuePolicy,
+  ListedRun,
   QueueSendOptions,
 } from "./contracts.ts";
 export { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "./deadLetter.ts";
 export { defineGroupQueue } from "./definition.ts";
-export { GroupQueueProcessor } from "./groupQueue.ts";
+export { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "./groupQueue.ts";
 export {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependenciesAdapterOptions,
@@ -29,7 +30,9 @@ export {
 export {
   GroupQueueConfigurationError,
   GroupQueueError,
+  HandBackGroupQueueError,
   NonRetryableGroupQueueError,
+  refusesRetry,
 } from "./errors.ts";
 export type { MintStorageUri, ObjectStore } from "./storage.ts";
 export { resolveGroupQueuePolicyFromEnv, type GroupQueuePolicyEnvInputs } from "./policy-env.ts";

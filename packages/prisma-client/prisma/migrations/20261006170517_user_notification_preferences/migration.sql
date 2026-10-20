@@ -14,4 +14,4 @@
 -- The data part does not: dropping the column makes Langy offer
 -- notifications to every person again.
 
-ALTER TABLE "User" ADD COLUMN "notificationPreferences" JSONB NOT NULL DEFAULT '{}';
+ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "notificationPreferences" JSONB NOT NULL DEFAULT '{}';

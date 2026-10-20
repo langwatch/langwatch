@@ -296,18 +296,20 @@ export class WorkflowService {
       workflow_id: command.workflowId,
       state: {},
     });
+    const autoSaved = versions.find((version) => version.autoSaved);
+    // An autosave rewrites the one autosaved row, so it keeps that row's number.
+    const autoSavedNumber = autoSaved?.version ?? String(major + 1);
     const persist: PersistWorkflowVersionInput = {
       id: this.id(WORKFLOW_VERSION_KSUID_RESOURCE),
       workflowId: command.workflowId,
       projectId: command.projectId,
       parentId: workflow.currentVersionId,
-      version: command.autoSaved ? String(major + 1) : String(command.dsl.version),
+      version: command.autoSaved ? autoSavedNumber : String(command.dsl.version),
       autoSaved: command.autoSaved,
       commitMessage: command.commitMessage,
       authorId: command.authorId,
       dsl,
     };
-    const autoSaved = versions.find((version) => version.autoSaved);
     const version = autoSaved
       ? await this.options.repository.updateAutoSavedVersion({
           ...persist,

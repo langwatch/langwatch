@@ -41,10 +41,14 @@ const logger = createLogger("langwatch:export");
  * response while updating progress.
  */
 type OwnReadAuthorizer = (input: { projectId: string }) => Promise<Authorization>;
+type FilterCompiler = (input: {
+  request: ExportRequest;
+  protections: Protections;
+}) => ExportFilter | Promise<ExportFilter>;
 
 export class TraceExportService {
   private readonly traceService: TraceLegacyRead;
-  private readonly compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+  private readonly compileFilter: FilterCompiler;
   private readonly authorizeOwnRead: OwnReadAuthorizer;
 
   private constructor({
@@ -53,7 +57,7 @@ export class TraceExportService {
     authorizeOwnRead,
   }: {
     traceService: TraceLegacyRead;
-    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    compileFilter: FilterCompiler;
     authorizeOwnRead: OwnReadAuthorizer;
   }) {
     this.traceService = traceService;
@@ -69,7 +73,7 @@ export class TraceExportService {
   }: {
     traceService: TraceLegacyRead;
     /** The Explorer's compiled filter for the request's query. */
-    compileFilter: (input: { request: ExportRequest }) => ExportFilter;
+    compileFilter: FilterCompiler;
     /** Mints the own-only proof the span and evaluation reads go through (TRACE-PROOF-SHARE). */
     authorizeOwnRead: OwnReadAuthorizer;
   }): TraceExportService {
@@ -103,7 +107,7 @@ export class TraceExportService {
         downloadMode: false,
         includeSpans: false,
         scrollId: null,
-        filterWhere: this.compileFilter({ request }),
+        filterWhere: await this.compileFilter({ request, protections }),
         authorization,
         ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },
@@ -217,7 +221,7 @@ export class TraceExportService {
         includeSpans: request.mode === "full",
         resolveBlobs: true,
         scrollId: scrollId ?? null,
-        filterWhere: this.compileFilter({ request }),
+        filterWhere: await this.compileFilter({ request, protections }),
         authorization,
         ownRead: await this.authorizeOwnRead({ projectId: request.projectId }),
       },

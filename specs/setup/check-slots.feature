@@ -56,8 +56,8 @@ Feature: Machine-wide slots for whole-repo checks
     Then it repeats its position and how long it has waited
     And it names the runs holding the slots and how long they have held them
 
-  # Gap: main served waiters strictly first-in first-out; the Go slot polls flocks every 100 ms with whole-minute ageing, so same-class waiters race.
-  @unit @unimplemented
+  # Arrivals inside one 100 ms poll tick still race; anything later waits its turn.
+  @unit
   Scenario: Waiters are served in arrival order
     Given the limit is 1, one run holding the slot and two queued behind it
     When the holder finishes
@@ -212,12 +212,116 @@ Feature: Machine-wide slots for whole-repo checks
     And an operator's explicit GOMEMLIMIT still reaches it unchanged
 
   @unit
-  Scenario: Memory pressure halves the compiler's parallelism
-    Given the machine reports amber or red memory pressure
-    When a check runs through the queue
-    Then its GOMAXPROCS is half the cores, never below two
-    And a green machine sets no GOMAXPROCS at all
-    And an operator's explicit GOMAXPROCS still wins
+  Scenario: A run's parallelism is the units it holds, on every machine
+    When a check runs through the queue, at any pressure level
+    Then its GOMAXPROCS is the number of units it holds
+    And a green machine caps it too, because a run counted as two cores must not take ten
+
+  # Measured 2026-10-11 at load 33 (2,298-file typecheck, five alternating
+  # rounds): utility medians 0.78 s against 0.70 s plain; background (-b) was
+  # eight to thirty times slower in the plan's own rounds, so it is never used.
+  @unit
+  Scenario: An agent's run on macOS runs in the utility band
+    Given a run started from an agent shell on macOS, with CLAUDECODE or HAVEN_AGENT_ID set
+    When it runs through the queue
+    Then it runs under taskpolicy -c utility, never in the background band
+    And HAVEN_AGENT_QOS=off keeps the default band
+    And a person's shell, or any other operating system, is never clamped
+
+  # --- Slot classes: one budget in core units (dev/docs/plans/haven-exec-policy.md) ---
+
+  @unit
+  Scenario: The budget is counted in core units and narrows with pressure
+    Given CHECK_SLOTS is not set on a machine with 10 cores and 64 GiB
+    When the unit budget is resolved
+    Then it is 8 units when green, 4 when amber and 2 when red
+    And an explicit CHECK_SLOTS of N is N checks of two units each
+
+  @unit
+  Scenario: Each class takes its weight in units
+    When "haven machine slot run --class <class>" starts a run
+    Then typecheck, lint and build take two units
+    And test takes its Vitest worker count, two by default and at most four
+    And a run with no --class takes two units, as one check always has
+
+  @unit
+  Scenario: A test run is told its worker count
+    When "haven machine slot run --class test" starts a run holding two units
+    Then its VITEST_MAX_WORKERS is 2 and its GOMAXPROCS is 2
+
+  @unit
+  Scenario: An operator's explicit parallelism wins, up to the units held
+    Given GOMAXPROCS or VITEST_MAX_WORKERS is set in the caller's environment
+    When a run starts through the queue
+    Then the child sees the operator's GOMAXPROCS unchanged
+    And its VITEST_MAX_WORKERS is the operator's value, capped at the units the run holds
+
+  @unit
+  Scenario: The gate and haven machine typecheck take two units of the same budget
+    Given slot runs hold part of the unit budget
+    When the hook gate or "haven machine typecheck" admits a run
+    Then it takes two units of the same budget, all or none, and names itself as a holder
+
+  @unit
+  Scenario: A run takes all of its units or none
+    Given 3 of 4 units are held
+    When a run needing 2 units tries for them
+    Then it takes none and waits, holding nothing
+
+  @unit
+  Scenario: A big run at the head of the queue is not starved by small ones
+    Given a 4-unit test run queued first and 2-unit typechecks arriving after it
+    When units free up
+    Then the typechecks let the test run go first
+
+  @unit
+  Scenario: A run inside a slot takes no second slot
+    Given a run started inside "haven machine slot run"
+    When it runs "haven machine slot run --class typecheck" itself
+    Then it runs at once without touching the budget
+
+  # Ruling 2026-10-11: a run rush's gate owns (a shim in rush's gate/bin folder
+  # and a runnable rush) queues in rush, never in haven's slots as well.
+  @unit
+  Scenario: A launcher hands a run rush's gate owns to rush
+    Given rush's gate holds a shim for the program and rush is runnable
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it runs under "rush gate run --name <program> --dir <cwd>"
+    And its environment carries GOMAXPROCS 2, GOMEMLIMIT 3GiB or VITEST_MAX_WORKERS 2 unless set
+    And it takes no haven slot
+
+  @unit
+  Scenario: A run rush already admitted takes no haven slot
+    Given RUSH_GATE_HELD is set in the environment
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it runs directly under haven's caps, asking neither rush nor haven
+
+  @unit
+  Scenario: Without rush, haven queues as before
+    Given rush's gate holds no shim for the program, or the shim's rush is not runnable
+    When tsc, vitest, oxlint or with-build-slot.sh starts a run
+    Then it takes its haven slot through "haven machine slot run" as before
+
+  # Ruling 2026-10-11: the stack's UI rebuild is the developer waiting on
+  # their own page, so it skips both queues and keeps the build caps.
+  @unit
+  Scenario: haven's own UI rebuild never waits behind agent runs
+    Given rush's gate owns vite, or haven's slots are full of agent runs
+    When haven rebuilds a stack's UI through build:local
+    Then with-build-slot.sh runs vite at once, capped at GOMAXPROCS 2 and GOMEMLIMIT 3GiB
+    And it asks neither rush nor haven for a slot
+
+  @unit
+  Scenario: haven status names rush's gate as the queue for what it owns
+    Given rush's gate holds shims for some programs
+    When "haven status" prints the slots block
+    Then one line reads "queue: rush gate (<programs>)" listing them
+
+  @unit
+  Scenario: slot explain names who holds the units
+    Given runs hold units of the budget
+    When "haven machine slot explain" runs
+    Then each holder is listed with its class, units, worktree and pid
 
   @unit
   Scenario: A forced pressure level overrides the measurement
@@ -225,6 +329,20 @@ Feature: Machine-wide slots for whole-repo checks
     When the level is resolved
     Then the forced level is used instead of measuring the machine
     And a misspelled level falls back to the measurement, like a CHECK_SLOTS typo
+
+  @unit
+  Scenario: A slot reads the published memory pressure instead of measuring it
+    Given the haven daemon published a pressure level within the last 90 seconds
+    When a slot run or slot explain resolves the level
+    Then it uses the published level
+    And it does not probe the machine's memory itself
+
+  @unit
+  Scenario: A slot measures the pressure when no fresh level is published
+    Given the published pressure record is missing, unreadable, of an unknown version or older than 90 seconds
+    When a slot run or slot explain resolves the level
+    Then it measures the machine's memory pressure itself
+    And a missing daemon never reads as a green machine
 
   # CI already runs one check per job on a machine of its own, which is why it
   # gets no queue. The same reasoning retires the pressure policy there: nobody
@@ -436,3 +554,22 @@ Feature: Machine-wide slots for whole-repo checks
     When it decides whether to yield this poll tick
     Then it never yields
     And it behaves exactly as the queue did before priority scheduling existed
+
+  @unit
+  Scenario: A quiet machine grows the check budget and run widths
+    Given the 1-minute load is at most 0.35 of the cores and a quarter of RAM is available
+    When a typecheck is admitted
+    Then the budget is every core and the run takes twice its usual units, up to the idle cores
+
+  @unit
+  Scenario: The capacity tier does not flap
+    Given the machine is quiet
+    When the load rises to half the cores
+    Then it stays quiet until the load reaches 0.6 of the cores or available RAM falls under 15%
+
+  @unit
+  Scenario: A check gives way to a boot someone is waiting on
+    Given a haven wait --for ready is blocked on a stack boot
+    When an agent's check is admitted
+    Then it takes at most half the budget, runs under taskpolicy -b, and its queued line says a boot is ahead of it
+    And once the stack answers, new checks get the full budget and utility again

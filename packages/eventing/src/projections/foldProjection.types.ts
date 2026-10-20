@@ -89,7 +89,9 @@ export interface FoldProjectionOptions {
   coalesceMaxBatch?: number;
   // Bound store read-back to a time window around folded event's business
   // time; unwindowed retry is the correctness net. Omit for non-partitioned reads.
-  readWindow?: { widthMs: number };
+  // `fallbackLookbackStepsMs`: on a miss, re-read reaching each step back from the event,
+  // narrowest first, instead of one unbounded read; a miss at the widest is final.
+  readWindow?: { widthMs: number; fallbackLookbackStepsMs?: readonly number[] };
   // Re-fold from event log on store miss; transitional only for rows predating
   // read-back columns. See ADR-066; requires eventLoaderUpTo and RedisCachedFoldStore.
   refoldOnStoreMiss?: boolean;

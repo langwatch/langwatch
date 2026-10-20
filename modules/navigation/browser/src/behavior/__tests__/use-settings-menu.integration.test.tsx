@@ -39,13 +39,15 @@ describe("given an Enterprise plan that has answered", () => {
 });
 
 describe("given a plan that answered as not Enterprise", () => {
-  /** @scenario "A still-loading plan hides the enterprise entries" */
-  it("hides the enterprise entries", () => {
+  /** @scenario "A plan without Enterprise sees its entries locked" */
+  it("offers the enterprise entries locked", () => {
     const { result } = renderHook(() => useSettingsMenu(), {
       wrapper: wrapperWithPlan({ isLoading: false, isEnterprise: false }),
     });
 
-    const hrefs = result.current.flatMap((group) => group.items.map((item) => item.href));
-    expect(hrefs).not.toContain("/settings/roles");
+    const roles = result.current
+      .flatMap((group) => group.items)
+      .find((item) => item.href === "/settings/roles");
+    expect(roles?.isLocked).toBe(true);
   });
 });

@@ -47,14 +47,21 @@ class RecordingLog {
   }
 }
 
-function requestsWith({ allowed = true }: { allowed?: boolean } = {}) {
+function requestsWith({
+  allowed = true,
+  allowInsecureLocal = false,
+}: { allowed?: boolean; allowInsecureLocal?: boolean } = {}) {
   const limiter = new CountingCaps(allowed);
   const log = new RecordingLog();
   const egress = WebhookEgressService.create({
     caps: WebhookDispatchCapService.create({ caps: limiter }),
     http: { send: mockedSend },
   });
-  return { limiter, log, requests: WebhookRequestService.create({ egress, deliveries: log }) };
+  return {
+    limiter,
+    log,
+    requests: WebhookRequestService.create({ egress, deliveries: log, allowInsecureLocal }),
+  };
 }
 
 const request = (url = "https://hooks.acme.test/in"): WebhookSendRequest => ({
@@ -221,6 +228,33 @@ describe("WebhookRequestService", () => {
       expect(log.attempts).toEqual([
         expect.objectContaining({ outcome: "terminal", responseStatus: null }),
       ]);
+    });
+  });
+
+  describe("given the local-URL dev switch", () => {
+    /** @scenario "A webhook request honours the local-URL dev switch the endpoints read" */
+    it("sends to a plain-http loopback receiver", async () => {
+      mockedSend.mockResolvedValue({ status: 200, body: "", responseHeaders: {} });
+      const { requests } = requestsWith({ allowInsecureLocal: true });
+
+      await expect(requests.send(request("http://127.0.0.1:52249/hooks/x"))).resolves.toMatchObject(
+        {
+          status: 200,
+        },
+      );
+      expect(mockedSend).toHaveBeenCalledTimes(1);
+    });
+
+    it("still refuses a cloud metadata destination, naming why for the author", async () => {
+      const { requests } = requestsWith({ allowInsecureLocal: true });
+
+      await expect(
+        requests.send(request("http://169.254.169.254/latest/meta-data")),
+      ).rejects.toMatchObject({
+        retryable: false,
+        customerMessage: expect.stringMatching(/^The destination .* metadata endpoint/),
+      });
+      expect(mockedSend).not.toHaveBeenCalled();
     });
   });
 

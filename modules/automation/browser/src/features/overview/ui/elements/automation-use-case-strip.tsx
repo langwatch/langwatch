@@ -1,4 +1,5 @@
 import { TriggerAction } from "@langwatch/automation-contract";
+import { Card } from "@langwatch/design-system/card";
 import { SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle, Database, DollarSign, Edit3, Flag, TrendingDown } from "lucide-react";
 
@@ -96,28 +97,16 @@ function UseCaseCard({
   const Icon = useCase.icon;
 
   return (
-    <VStack
-      as="button"
-      align="start"
-      gap={1}
-      padding={3}
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="lg"
-      bg="bg.panel"
-      cursor="pointer"
-      textAlign="left"
-      _hover={{ bg: "bg.muted", borderColor: "border.emphasized" }}
-      onClick={() => onOpen(useCase.prefill)}
-    >
-      <Text textStyle="sm" fontWeight="semibold" display="inline-flex" alignItems="center" gap={2}>
-        <Icon size={14} />
-        {useCase.title}
-      </Text>
-      <Text textStyle="sm" color="fg.muted">
-        {useCase.description}
-      </Text>
-    </VStack>
+    <Card
+      padding="sm"
+      icon={<Icon size={14} />}
+      title={useCase.title}
+      titleLevel={3}
+      description={useCase.description}
+      opener={
+        <button type="button" aria-label={useCase.title} onClick={() => onOpen(useCase.prefill)} />
+      }
+    />
   );
 }
 

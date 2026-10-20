@@ -66,6 +66,24 @@ describe("IssueActivationCodeDrawer", () => {
       });
     });
 
+    describe("when the operator issues a code without naming the customer", () => {
+      /** @scenario "A code names the hosted services the license may call" */
+      it("names every missing field, focuses the first and issues nothing", async () => {
+        mutate.mockClear();
+        renderDrawer();
+
+        const issue = await screen.findByRole("button", { name: "Issue code" });
+        expect(issue).toBeEnabled();
+        fireEvent.click(issue);
+
+        expect(await screen.findByText("Enter the customer organization id.")).toBeTruthy();
+        expect(screen.getByText("Enter the customer name.")).toBeTruthy();
+        expect(screen.getByText("Enter a contact email.")).toBeTruthy();
+        expect(screen.getByRole("textbox", { name: "Customer organization id" })).toHaveFocus();
+        expect(mutate).not.toHaveBeenCalled();
+      });
+    });
+
     describe("when the operator leaves lite seats empty, or types a number", () => {
       /** @scenario "The activation code form offers lite seats with the plan default" */
       it("sends no lite seats when empty, and the typed number otherwise", async () => {

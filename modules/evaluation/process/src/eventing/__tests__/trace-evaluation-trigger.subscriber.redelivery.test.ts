@@ -2,13 +2,12 @@ import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contrac
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
+import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   SPAN_RECEIVED_EVENT_TYPE,
   isSpanReceivedEvent,
   SPAN_RECEIVED_EVENT_VERSION_LATEST,
-  type OtlpKeyValue,
-  type OtlpSpan,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";

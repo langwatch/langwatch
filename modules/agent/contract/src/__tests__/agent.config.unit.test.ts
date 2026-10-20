@@ -14,6 +14,15 @@ describe("agent server configuration", () => {
     });
   });
 
+  describe("given the replica count and payload cap exported blank", () => {
+    /** @scenario "A setting written the way the previous release read it keeps that meaning" */
+    it("reads them as unset rather than refusing the boot", () => {
+      expect(
+        read({ LANGWATCH_APP_REPLICAS: "", LANGWATCH_AGENT_RELAY_MAX_PAYLOAD_MB: "" }),
+      ).toEqual({ replicaCount: 1, relayMaxPayloadMb: undefined });
+    });
+  });
+
   describe("given a replica count that is not a positive whole number", () => {
     /** @scenario "An unreadable switch is refused instead of read as off" */
     it("refuses the boot", () => {

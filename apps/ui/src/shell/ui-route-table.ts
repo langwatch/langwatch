@@ -238,7 +238,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
   { path: "/onboarding", page: "pages/onboarding" },
   {
     path: "/onboarding/:team/project",
-    page: "pages/onboarding/[team]/project",
+    redirect: { from: "/onboarding/:team/project", to: "/" },
   },
   {
     path: "/onboarding/product",
@@ -297,6 +297,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "layouts/project-langy",
         children: [
           { path: "/settings", page: "pages/settings" },
+          { path: "/settings/project", page: "pages/settings/project" },
           {
             // Role Bindings became the Roles page's assignments tab.
             path: "/settings/role-bindings",
@@ -763,7 +764,7 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           },
           {
             path: "/:project/setup",
-            redirect: { from: "/:project/setup", to: "/:project" },
+            redirect: { from: "/:project/setup", to: "/:project/traces" },
           },
           {
             path: "/:project/workflows",
@@ -802,6 +803,24 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
           {
             path: "/:project/analytics/custom/:id",
             page: "pages/[project]/analytics/custom/[id]",
+          },
+
+          // Dashboards v1 (behind release_dashboards; the screens gate themselves)
+          {
+            path: "/:project/dashboards",
+            page: "pages/[project]/dashboards/index",
+          },
+          {
+            path: "/:project/dashboards/templates",
+            page: "pages/[project]/dashboards/templates",
+          },
+          {
+            path: "/:project/dashboards/curated/:templateId",
+            page: "pages/[project]/dashboards/curated/[templateId]",
+          },
+          {
+            path: "/:project/dashboards/:dashboardId",
+            page: "pages/[project]/dashboards/[dashboardId]",
           },
 
           // Experiments
@@ -894,17 +913,15 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
       {
-        // Tenant migrations are a tab of the Upgrades page now.
+        // Organization steps are the Organizations tab of the Upgrades page.
         path: "/ops/migrations",
-        redirect: { from: "/ops/migrations", to: "/ops/upgrades", pinParams: { tab: "tenants" } },
+        redirect: {
+          from: "/ops/migrations",
+          to: "/ops/upgrades",
+          pinParams: { tab: "organizations" },
+        },
       },
       { path: "/ops/upgrades", page: "pages/ops/upgrades" },
-      { path: "/ops/upgrades/preview", page: "pages/ops/upgrades/preview" },
-      {
-        path: "/ops/upgrades/releases/:release",
-        page: "pages/ops/upgrades/releases/[release]",
-      },
-      { path: "/ops/upgrades/runs/:runId", page: "pages/ops/upgrades/runs/[runId]" },
       {
         // Projection replay is a drawer on the event-sourcing page now, so the
         // old address has to open the drawer as well as land on the page. Per-run

@@ -8,7 +8,6 @@ import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Folder } from "lucide-react";
 
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { FieldLabel } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { PICKER_UNFILED_GROUP_NAME } from "../../../elements/suite/pickers/scenario-picker.tsx";
 import { TagPill } from "../../../elements/tag-pill.tsx";
@@ -84,7 +83,7 @@ function TestSuiteChoices({
 }) {
   if (testSuites.length === 0) {
     return (
-      <Text fontSize="11.5px" color={FG_MUTED}>
+      <Text textStyle="caption" color="fg.muted">
         No test suite yet. Make one in the rail on the left.
       </Text>
     );
@@ -100,7 +99,7 @@ function TestSuiteChoices({
           onCheckedChange={() => onToggle(testSuite.id)}
           data-testid={`run-scope-test-suite-${testSuite.id}`}
         >
-          <Text fontSize="12px">{testSuite.name}</Text>
+          <Text textStyle="caption">{testSuite.name}</Text>
         </Checkbox>
       ))}
     </HStack>
@@ -119,8 +118,8 @@ function LabelChoices({
 }) {
   if (labels.length === 0) {
     return (
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        No label on any scenario yet.
+      <Text textStyle="caption" color="fg.muted">
+        No label on any scenario yet. Add one when you edit a scenario.
       </Text>
     );
   }
@@ -135,7 +134,7 @@ function LabelChoices({
             type="button"
             cursor="pointer"
             borderRadius="full"
-            boxShadow={QUIET_BUTTON_SHADOW}
+            boxShadow="none"
             _hover={{ opacity: isChosen ? 1 : 0.85 }}
             aria-pressed={isChosen}
             onClick={() => onToggle(label)}
@@ -179,8 +178,8 @@ function CaseChoices({
 
   if (groups.length === 0) {
     return (
-      <Text fontSize="11.5px" color={FG_MUTED}>
-        No scenario yet.
+      <Text textStyle="caption" color="fg.muted">
+        No scenario yet. Create one in the scenario library, then run it from here.
       </Text>
     );
   }
@@ -199,7 +198,7 @@ function CaseChoices({
     >
       {groups.map((group) => (
         <Box key={group.id}>
-          <HStack gap={1.5} fontSize="11px" fontWeight="semibold" color={FG_MUTED}>
+          <HStack gap={1.5} textStyle="micro" fontWeight="semibold" color="fg.muted">
             <Folder size={11} />
             <Text>{group.name}</Text>
           </HStack>
@@ -212,7 +211,7 @@ function CaseChoices({
                 onCheckedChange={() => onToggle(scenario.id)}
                 data-testid={`run-scope-case-${scenario.id}`}
               >
-                <Text fontSize="12px" truncate>
+                <Text textStyle="caption" truncate>
                   {scenario.name}
                 </Text>
               </Checkbox>
@@ -309,7 +308,7 @@ export function RunScopeSection({
               display="flex"
               alignItems="center"
               gap={2}
-              fontSize="12.5px"
+              textStyle="bodySm"
               cursor="pointer"
             >
               <chakra.input
@@ -335,7 +334,7 @@ export function RunScopeSection({
             )}
           </Box>
         ))}
-        <Text paddingTop={1} fontSize="11px" color={FG_MUTED}>
+        <Text paddingTop={1} textStyle="micro" color="fg.muted">
           {count === 1 ? "1 scenario will run." : `${count} scenarios will run.`}
         </Text>
       </VStack>

@@ -9,6 +9,8 @@ export interface BackfillUserRow {
   userHashKey: string | null;
   /** Null for an account never signed into: with `emailVerified`, the unproven test. */
   lastLoginAtMs: number | null;
+  /** A passkey sign-up started on this address and not yet finished. */
+  passkeySignupPending: boolean;
 }
 
 /** A legacy `Account` row: one sign-in method the user already holds. */
@@ -31,5 +33,11 @@ export abstract class IdentityBackfillRepository {
   /** `UserNotFoundError` when the user has vanished. */
   abstract getUser(args: { userId: string }): Promise<BackfillUserRow>;
   abstract findAccountRows(args: { userId: string }): Promise<BackfillAccountRow[]>;
+  /** The legacy `Passkey` rows this user holds, counted. */
+  abstract countPasskeys(args: { userId: string }): Promise<number>;
+  /** Every `User` whose address matches this one, case-insensitively, the asker included. */
+  abstract findAddressSharers(args: { normalizedValue: string }): Promise<BackfillUserRow[]>;
+  /** Who holds the address lock on this value: none or one user id. */
+  abstract findAddressLockHolders(args: { normalizedValue: string }): Promise<string[]>;
   abstract findIdentifierRows(args: { userId: string }): Promise<BackfillIdentifierRow[]>;
 }

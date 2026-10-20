@@ -20,6 +20,9 @@ import {
 } from "../instant-eval-row-source.service.ts";
 import type { AcceptedInstantEvalStatement } from "../instant-eval-statement.service.ts";
 
+/** Instant Evals released for every project: the gate a pass states, open. */
+const OPEN_GATE = { isEnabled: () => Promise.resolve(true) };
+
 const CALLER = { id: "project-1", lwqlKey: "lwql-secret" };
 const PROTECTIONS = { catalogue: { permissions: [] } };
 
@@ -78,7 +81,10 @@ class ScriptedTexts implements InstantEvalTextSource {
 function harness({ total, bytesPerText = 400 }: { total: number; bytesPerText?: number }) {
   const textSource = new ScriptedTexts(bytesPerText);
   const estimates = InstantEvalEstimateService.create({
-    rowSource: InstantEvalRowSourceService.create({ analytics: new ScriptedRunner(total) }),
+    rowSource: InstantEvalRowSourceService.create({
+      analytics: new ScriptedRunner(total),
+      access: OPEN_GATE,
+    }),
     textSource,
     judge: { limits: INSTANT_EVAL_CLASSIFIER_LIMITS, pricing: INSTANT_EVAL_PRICING },
   });
@@ -160,6 +166,7 @@ describe("given a statement a run was accepted for", () => {
           analytics: {
             executeLangWatchQLPass: () => Promise.reject(new Error("clickhouse is down")),
           },
+          access: OPEN_GATE,
         }),
         textSource: new ScriptedTexts(10),
         judge: { limits: INSTANT_EVAL_CLASSIFIER_LIMITS, pricing: INSTANT_EVAL_PRICING },

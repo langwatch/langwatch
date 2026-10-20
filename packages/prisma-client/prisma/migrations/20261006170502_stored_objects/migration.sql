@@ -1,6 +1,6 @@
 -- One Stored Objects operational table. The legacy ClickHouse table remains
 -- authoritative until the system migration finalizes a tenant.
-CREATE TABLE "StoredObject" (
+CREATE TABLE IF NOT EXISTS "StoredObject" (
     "tenantId" TEXT NOT NULL,
     "id" TEXT NOT NULL,
     "status" TEXT NOT NULL,
@@ -27,6 +27,6 @@ CREATE TABLE "StoredObject" (
     CONSTRAINT "StoredObject_pkey" PRIMARY KEY ("tenantId", "id")
 );
 
-CREATE INDEX "StoredObject_tenantId_status_id_idx" ON "StoredObject"("tenantId", "status", "id");
-CREATE INDEX "StoredObject_ownerKind_ownerId_status_idx" ON "StoredObject"("ownerKind", "ownerId", "status");
-CREATE INDEX "StoredObject_status_expiresAt_idx" ON "StoredObject"("status", "expiresAt");
+CREATE INDEX IF NOT EXISTS "StoredObject_tenantId_status_id_idx" ON "StoredObject"("tenantId", "status", "id");
+CREATE INDEX IF NOT EXISTS "StoredObject_ownerKind_ownerId_status_idx" ON "StoredObject"("ownerKind", "ownerId", "status");
+CREATE INDEX IF NOT EXISTS "StoredObject_status_expiresAt_idx" ON "StoredObject"("status", "expiresAt");

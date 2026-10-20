@@ -1,7 +1,7 @@
 import { Drawer } from "@langwatch/design-system/drawer";
 import type { UiCreateTeamDrawerProps } from "@langwatch/organization-contract";
 import type React from "react";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { type SubmitHandler, useForm } from "react-hook-form";
 
 import { applyHandledErrorToForm } from "../../behavior/handled-error-form.tsx";
@@ -21,6 +21,7 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
   const { data: session } = useRequiredSession();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
+  const formId = useId();
 
   const form = useForm<TeamFormData>({
     defaultValues: {
@@ -80,30 +81,30 @@ export function CreateTeamDrawer({ open = true }: UiCreateTeamDrawerProps): Reac
   );
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      placement="end"
+      onClose={closeDrawer}
+      title="Create New Team"
       size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
+      footer={{
+        primaryAction: {
+          label: "Create",
+          type: "submit",
+          form: formId,
+          loading: createTeam.isPending,
+          "data-testid": "team-form-submit",
+        },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Create New Team</Drawer.Title>
-          <Drawer.CloseTrigger onClick={closeDrawer} />
-        </Drawer.Header>
-        <Drawer.Body>
-          {organization && (
-            <TeamForm
-              organizationId={organization.id}
-              form={form}
-              onSubmit={onSubmit}
-              isLoading={createTeam.isPending}
-            />
-          )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      {organization && (
+        <TeamForm
+          organizationId={organization.id}
+          form={form}
+          formId={formId}
+          onSubmit={onSubmit}
+          isLoading={createTeam.isPending}
+        />
+      )}
+    </Drawer>
   );
 }

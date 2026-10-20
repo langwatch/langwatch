@@ -40,7 +40,6 @@ describe("given a ClickHouse database the migrations have run against", () => {
         await ClickHouseMigrateTask.createFromConfig({
           config: {
             buildTime: false,
-            skipped: false,
             sharedUrl: provisioned.url,
             privateEndpoints: [],
           },

@@ -51,6 +51,7 @@ export function FrontDoorValuePanel({
           <FullLogo width={176} height={43.2} />
         </Box>
         <Heading
+          size="sm"
           as="h2"
           fontSize="clamp(30px, 3.1vw, 48px)"
           fontFamily={HEADING_FONT}
@@ -78,10 +79,8 @@ export function FrontDoorValuePanel({
           // and the least inviting thing on a page whose whole job is to
           // invite. It keeps a trace of the old treatment in its tracking.
           <Text
+            textStyle="body"
             display={{ base: "none", md: "block" }}
-            fontSize="16px"
-            lineHeight="1.6"
-            letterSpacing="0.01em"
             maxWidth="42ch"
             color="fg.muted"
             data-testid="front-door-tagline"

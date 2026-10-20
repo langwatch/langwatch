@@ -21,6 +21,18 @@ class OverloadRefusal extends HandledError {
   }
 }
 
+/** The stores' refusal for a read whose ClickHouse connection dropped (process-stores' twin). */
+class UnavailableRefusal extends HandledError {
+  constructor(cause: Error) {
+    super("clickhouse_unavailable", "Database temporarily unavailable", {
+      httpStatus: 503,
+      fault: "platform",
+      reasons: [cause],
+    });
+    this.name = "UnavailableRefusal";
+  }
+}
+
 class PoolDrainedError extends HandledError {
   constructor() {
     super("pool_drained", "Replica pool drained on host db-7", {
@@ -70,6 +82,46 @@ describe("a transient 503 refusal over REST", () => {
       const response = await answerFor(new OverloadRefusal());
 
       expect(await response.text()).not.toContain("10.0.0.9");
+    });
+  });
+
+  describe("when a read finds its ClickHouse connection dropped", () => {
+    const dropped = () =>
+      new UnavailableRefusal(
+        Object.assign(
+          new Error("read ECONNRESET http://ch-private-7.internal:8123/?query_id=abc"),
+          {
+            code: "ECONNRESET",
+          },
+        ),
+      );
+
+    /** @scenario "A dropped ClickHouse connection answers 503 clickhouse_unavailable over REST without its raw reason" */
+    it("answers 503 with its own code and message", async () => {
+      const response = await answerFor(dropped());
+
+      expect(response.status).toBe(503);
+      expect(await response.json()).toMatchObject({
+        code: "clickhouse_unavailable",
+        message: "Database temporarily unavailable",
+      });
+    });
+
+    /** @scenario "A dropped ClickHouse connection answers 503 clickhouse_unavailable over REST without its raw reason" */
+    it("names no ECONNRESET, host or URL in the body", async () => {
+      const text = await (await answerFor(dropped())).text();
+
+      expect(text).toContain("clickhouse_unavailable");
+      for (const leak of ["ECONNRESET", "ch-private-7", "http://", ":8123"]) {
+        expect(text).not.toContain(leak);
+      }
+    });
+
+    /** @scenario "A dropped ClickHouse connection answers 503 clickhouse_unavailable over REST without its raw reason" */
+    it("keeps the raw connection error as the refusal's reason, for the log", () => {
+      expect(dropped().reasons.map((reason) => reason.message)).toEqual([
+        "read ECONNRESET http://ch-private-7.internal:8123/?query_id=abc",
+      ]);
     });
   });
 

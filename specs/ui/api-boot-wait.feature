@@ -29,6 +29,15 @@ Feature: The browser waits for an API that is still starting
     And the screen the reader asked for is rendered
     And no failure is reported to the reader
 
+  @unit
+  Scenario: A page whose reads could not reach the API carries on when it answers
+    Given a read on the page failed because nothing answered on the API's address
+    When the API's health endpoint is polled, easing off from 2 seconds to at most 15
+    And the health endpoint answers
+    Then the failed read is run again without the reader reloading or clicking
+    And the page draws the answer
+    And polling stops once no read is still waiting on the API
+
   @integration
   Scenario: A genuine refusal still goes to sign in
     Given the session endpoint answers that the reader is not authenticated

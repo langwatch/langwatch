@@ -138,13 +138,6 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // this root, every scenario describing what the published plugin does could
   // only be @unimplemented.
   "plugins",
-  // The capture half of visualdiff (@langwatch/visual-diff-runner): the settle
-  // and per-step recording scenarios are proved by its vitest suite, which
-  // lives beside it under tools/ rather than in packages/.
-  "tools/visualdiff/runner/src",
-  // The fuzz browser runner (@langwatch/fuzz-runner): its vision judge's
-  // scenarios are proved by its vitest suite and by nothing else.
-  "tools/fuzz/runner/src",
   // The seed runner's tests bind specs/setup/seedgen-runner.feature.
   "tools/seedgen/runner/src",
   // The contributor-only backend launcher (tools/dev-runtime): the API and the
@@ -165,6 +158,8 @@ const DEFAULT_TEST_ROOTS: string[] = [
   // scans this directory for `.bats` files; this is the `.test.mjs`
   // counterpart. Without it, dev-tooling scenarios could only ever be @unimplemented.
   "dev/scripts/__tests__",
+  // dev/nx plugins' own logic is tested with `node --test` beside them.
+  "dev/nx/__tests__",
   "dev/scripts/upgrade-rehearsal/__tests__",
 ];
 
@@ -229,24 +224,26 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // The IdP simulator. Its scenarios (OIDC/SAML/SCIM/domain verification,
   // specs/setup/idp-simulator.feature) are satisfied by Go tests and by
   // nothing else.
-  "services/idpsim",
+  "services/sims/idpsim",
   // The mail sink. Its service-side scenarios (SMTP intake, the message API,
   // security headers, the browser inbox — specs/setup/mail-sink.feature) are
   // satisfied by Go tests and by nothing else.
-  "services/mailsim",
+  "services/sims/mailsim",
   // The other simulators haven runs (LLM, storage, analytics, voice, outbound,
-  // telemetry) and the diff and fuzz suites: their specs/setup scenarios bind
+  // telemetry) and the fuzz and worker suites: their specs/setup scenarios bind
   // only from Go tests.
-  "services/llmsim",
-  "services/storagesim",
-  "services/analyticssim",
-  "services/voicesim",
-  "services/outboundsim",
-  "services/paymentsim",
-  "services/telemetrysim",
-  "services/lambdasim",
-  "tools/diffsuite",
-  "tools/fuzz",
+  "services/sims/llmsim",
+  "services/sims/storagesim",
+  "services/sims/analyticssim",
+  "services/sims/voicesim",
+  "services/sims/outboundsim",
+  "services/sims/paymentsim",
+  "services/sims/telemetrysim",
+  "services/sims/lambdasim",
+  "services/sims/githubsim",
+  "services/sims/mcpsim",
+  // The Go scenario runner: its child-contract and fence scenarios bind only from Go tests.
+  "services/scenariorunner",
   "tools/workerrun",
   "tools/seedgen",
   // The Go SDK. Its span-attribute scenarios (typed input/output envelopes,
@@ -275,21 +272,12 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // identity each keeps and which address variable each binds are asserted
   // here and nowhere else.
   "cmd/service",
-  // visualdiff: the boot, classification and teardown rules in
-  // specs/tooling/visual-diff.feature are asserted by these Go tests and by
-  // nothing else. Its Playwright half binds from the TS roots below.
-  "tools/visualdiff",
-  // apidiff: how it boots its two instances - one haven stack per instance
-  // under its own run-scoped slug, and a teardown that can only reach the
-  // slugs it started (specs/tooling/apidiff-on-haven.feature) - is asserted by
-  // these Go tests and by nothing else.
-  "tools/apidiff",
   // upgradelab: snapshot format, restore guards, scrub and generation (specs/upgrade/*.feature)
   // are asserted by these Go tests only.
   "tools/upgradelab",
   // telemetrysim: presets, rates, fuzz replay and its control API
   // (specs/setup/haven-telemetrysim.feature) are asserted by these Go tests only.
-  "services/telemetrysim",
+  "services/sims/telemetrysim",
   // ClickHouse serverless chart configuration rendering. Scenarios describing
   // keeper-backed replicated access storage binding through unit tests in
   // internal/render/render_test.go that verify the XML config is generated
@@ -346,6 +334,9 @@ const LEGACY_UNBOUND: string[] = [
  * spot.
  */
 const LEGACY_INERT: string[] = [
+  // 2026-10-12: the id index (dev/docs/plans/id-index-2026-10-10.md) is planned,
+  // not built; every scenario is @unimplemented. Remove with its first binding.
+  "specs/clickhouse/id-index-reads.feature",
   // 2026-09-30 port of #7532: design-only specs for ADRs 161-163, every
   // scenario @unimplemented until the ADR is accepted and built.
   "modules/authz/specs/access-reviews.feature",
@@ -355,7 +346,6 @@ const LEGACY_INERT: string[] = [
   // would bind them (packages/architecture-enforcer's unspecced-core report),
   // every scenario @unimplemented on purpose. Remove each entry with its
   // first real binding.
-  "modules/scenario/specs/simulation-run.feature",
   "specs/agents/create-workflow-agent.feature",
   "specs/agents/workflow-agent-editor.feature",
   "specs/ai-gateway/budgets-principal-cascade.feature",
@@ -521,7 +511,6 @@ const LEGACY_INERT: string[] = [
   "specs/langy/langy-context-awareness.feature",
   "specs/langy/langy-empty-state-suggestions.feature",
   "specs/langy/langy-panel-fold-motion.feature",
-  "specs/langy/langy-peek-dock.feature",
   "specs/langy/langy-selfhost-install.feature",
   "specs/langy/langy-session-key-lifecycle.feature",
   "specs/langy/langy-shutdown-handoff.feature",
@@ -551,8 +540,6 @@ const LEGACY_INERT: string[] = [
   "specs/monitors/monitor-execution-backend.feature",
   "specs/monitors/monitor-trace-mappings.feature",
   "specs/monitors/new-evaluation-menu.feature",
-  "specs/monitors/online-evaluation-drawer-flow.feature",
-  "specs/monitors/pending-mappings-validation.feature",
   "specs/monitors/replicate-monitor-to-project.feature",
   "specs/monitors/workflow-evaluator-checktype.feature",
   "specs/monitors/workflow-evaluator-mappings.feature",
@@ -561,7 +548,6 @@ const LEGACY_INERT: string[] = [
   "specs/nlp-go/proxy.feature",
   "specs/nlp-go/python-removal.feature",
   "specs/nlp-go/remove-execute-evaluation.feature",
-  "specs/nlp-go/topic-clustering.feature",
   "specs/nlp-go/tracing-parity.feature",
   "specs/npx-installer/01-bootstrap.feature",
   "specs/npx-installer/02-predeps.feature",
@@ -634,7 +620,6 @@ const LEGACY_INERT: string[] = [
   "specs/traces-v2/editable-trace-name-alignment.feature",
   "specs/traces-v2/facet-perspectives.feature",
   "modules/trace/specs/flame-graph.feature",
-  "specs/traces-v2/grouping-engine.feature",
   "specs/traces-v2/io-pretty-markdown.feature",
   "specs/traces-v2/lens-preset-groups.feature",
   "specs/traces-v2/light-mode-contrast.feature",
@@ -680,6 +665,12 @@ const LEGACY_INERT: string[] = [
 
 /** Feature files with mixed tagged/untagged scenarios (legacy tolerance; new files fail) */
 const LEGACY_PARTIAL: string[] = [
+  // Reason: left LEGACY_INERT when the launcher's place beside an open drawer
+  // was bound (#8588). The peek scenarios are still planned and stay untagged.
+  "specs/langy/langy-peek-dock.feature",
+  // Reason: left LEGACY_INERT when the grouping relabel scenario was bound.
+  // The other grouping scenarios describe the engine and stay untagged.
+  "specs/traces-v2/grouping-engine.feature",
   // Reason: left LEGACY_INERT when sub-cent costs stopped reading as zero;
   // the "Cost formatting" rule is enforced. The pills, duration, token and
   // span tab rules are described here and stay untagged.

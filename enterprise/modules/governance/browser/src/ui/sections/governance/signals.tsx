@@ -1,6 +1,7 @@
+import { Card } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Badge, Card, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, HStack, Spacer, Text, VStack } from "@langwatch/design-system/primitives";
 import { BellPlus, Plus } from "lucide-react";
 
 import {
@@ -50,14 +51,14 @@ function SignalsPage() {
                 listed in the <Link href="/governance/insights">Insights inbox</Link>.
               </Text>
             </HStack>
-            <Card.Root variant="showcase">
+            <Card variant="showcase" padding="none" bodyLayout="stack">
               <NoDataInfoBlock
                 testId="signals-empty-registry"
                 icon={<BellPlus />}
                 title="No rules here yet. Creating one is coming."
                 description="This preview will hold the conditions you watch and the actions they trigger. Nothing is being watched yet."
               />
-            </Card.Root>
+            </Card>
           </VStack>
 
           <Text fontSize="sm" color="fg.muted">

@@ -5,7 +5,7 @@ import type { ObjectStorageAzureConfig } from "../config.ts";
 import { openStores } from "../open-stores.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
 
-/** Never dialled: the tenant directory the storage member takes opens no connection until asked. */
+/** Never dialled: destinations are asked for PLATFORM_TENANT_ID, answered with no read. */
 const UNREACHED_DATABASE = "postgresql://nobody:nothing@127.0.0.1:9/unreached";
 
 export type ObjectStorageSettings = StoresConfig["objectStorage"];
@@ -41,6 +41,9 @@ export async function openObjectStorage(options: {
   const config: StoresConfig = {
     defaultRetentionDays: 30,
     shutdownDrainTimeoutMs: undefined,
+    queueConcurrency: undefined,
+    queueTenantCap: undefined,
+    queueGlobalBudget: undefined,
     clickhouseStatementLaneReserveShare: undefined,
     clickhousePool: {
       override: undefined,
@@ -78,3 +81,6 @@ export function azureBlock(
 ): ObjectStorageAzureConfig {
   return { accountName: "lwacct", container: "lw-container", ...overrides };
 }
+
+/** The tenant the directory places without a database read: these suites open no connection. */
+export const PLATFORM_TENANT_ID = "platform";

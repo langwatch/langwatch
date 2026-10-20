@@ -5,7 +5,7 @@
  * @see specs/features/agents/voice-agents-v1.feature
  */
 
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen } from "@testing-library/react";
 import type { ReactNode } from "react";

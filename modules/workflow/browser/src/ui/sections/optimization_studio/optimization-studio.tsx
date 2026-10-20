@@ -8,20 +8,18 @@ import {
   useColorRawValue,
 } from "@langwatch/design-system/color-mode";
 import { LogoIcon } from "@langwatch/design-system/logo-icon";
+import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Box,
   Button,
   Center,
   Flex,
   HStack,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 
 import "@xyflow/react/dist/style.css";
-import { titleCase } from "@langwatch/design-system/string-casing";
-import { Tooltip } from "@langwatch/design-system/tooltip";
 import { DEFAULT_MODEL } from "@langwatch/model-provider-contract";
 import { PromptListDrawerToken } from "@langwatch/prompt-client";
 import {
@@ -71,12 +69,13 @@ import {
 } from "../../../behavior/use-workflow-prompt-picker-flow.ts";
 import { useWorkflowStore } from "../../../behavior/use-workflow-store.ts";
 import { workflowApi } from "../../../behavior/workflow-api.ts";
-import type { SocketStatus, WorkflowStore } from "../../../behavior/workflow-store.ts";
+import type { WorkflowStore } from "../../../behavior/workflow-store.ts";
 import { isConnectionAllowed } from "../../../model/control-flow.ts";
 import { publishedComponentsSchema } from "../../../model/published-workflow.ts";
 import { DatasetImagePreviewTable } from "../../blocks/dataset/dataset-image-preview-table.tsx";
 import Head from "../../elements/compat/next-head.tsx";
 import { EvaluationProgressBar } from "../../elements/experiment/BatchEvaluationV2/evaluation-progress-bar.tsx";
+import { StudioConnectionStatus } from "../../elements/studio-connection-status.tsx";
 import { WorkflowCanvasControls } from "../../elements/workflow-canvas-controls.tsx";
 import { ComponentIcon } from "../../elements/workflow-icons.tsx";
 import { WorkflowNodeHostProvider } from "../../elements/workflow-node.host.tsx";
@@ -84,10 +83,7 @@ import { HoverableBigText } from "../hoverable-big-text.tsx";
 import { WorkflowAutosave } from "../workflow-autosave.tsx";
 import { WorkflowDragPreview } from "../workflow-drag-preview.tsx";
 import { WorkflowEdge } from "../workflow-edge.tsx";
-import {
-  type WorkflowEmojiPickerRenderProps,
-  WorkflowNamePopover,
-} from "../workflow-name-popover.tsx";
+import { WorkflowNamePopover } from "../workflow-name-popover.tsx";
 import {
   WorkflowNodeSelectionPanel,
   WorkflowNodeSelectionPanelButton,
@@ -104,7 +100,6 @@ import { StudioNodeDrawer } from "./drawers/studio-node-drawer.tsx";
 import { Evaluate } from "./evaluate.tsx";
 import { History } from "./history.tsx";
 import { Optimize } from "./optimize.tsx";
-import { EmojiPickerModal } from "./properties/modals/emoji-picker-modal.tsx";
 import { Publish } from "./publish.tsx";
 import { ResultsPanel } from "./results-panel.tsx";
 import { useComponentExecution } from "./use-component-execution.ts";
@@ -248,21 +243,16 @@ export default function OptimizationStudio() {
     <WorkflowNodeHostProvider value={studioNodeHost}>
       <div style={{ width: "100vw", height: "100vh" }}>
         <Head>
-          <title>LangWatch - Optimization Studio - {name}</title>
+          <title>LangWatch - Workflow studio - {name}</title>
         </Head>
         <ReactFlowProvider>
           <DndProvider backend={HTML5Backend}>
             <PostEventProvider>
               <WorkflowDragPreview />
               <VStack width="full" height="full" gap={0}>
-                <HStack
-                  width="full"
-                  background="bg"
-                  padding={2}
-                  borderBottom="1px solid"
-                  borderColor="border.emphasized"
-                >
-                  <HStack width="full">
+                <PageLayout.Header size="sm" background="bg" borderColor="border.emphasized">
+                  {/* The header wraps its children; full-width thirds would each take a row. */}
+                  <HStack flex="1 1 0" minWidth={0}>
                     <Link href={`/${project?.slug}/workflows`}>
                       <LogoIcon height={24} forceColorMode="light" />
                     </Link>
@@ -271,14 +261,11 @@ export default function OptimizationStudio() {
                       <StudioWorkflowAutosave />
                     )}
                   </HStack>
-                  <HStack width="full" justify="center">
+                  <HStack flex="1 1 0" minWidth={0} justify="center">
                     <StudioWorkflowNamePopover />
-                    <StatusCircle
-                      status={socketStatus}
-                      tooltip={<SocketStatusTooltip socketStatus={socketStatus} />}
-                    />
+                    <StudioConnectionStatus isConnected={socketStatus === "connected"} />
                   </HStack>
-                  <HStack width="full" justify="end">
+                  <HStack flex="1 1 0" minWidth={0} justify="end">
                     <StudioWorkflowUndoRedo />
                     <History />
                     <Box />
@@ -287,7 +274,7 @@ export default function OptimizationStudio() {
                     <Optimize />
                     <Publish isDisabled={socketStatus !== "connected"} />
                   </HStack>
-                </HStack>
+                </PageLayout.Header>
                 <Box width="full" height="full" position="relative">
                   <Flex width="full" height="full">
                     <StudioWorkflowNodeSelectionPanel
@@ -442,35 +429,6 @@ function controlsMarginLeft({
 }): string {
   if (nodeSelectionPanelIsOpen) return isResultsPanelCollapsed ? "122px" : "16px";
   return isResultsPanelCollapsed ? "262px" : "180px";
-}
-
-function statusCircleColor({ status }: { status: string }): string {
-  if (status === "connected") return "green.fg";
-  if (status === "disconnected") return "red.fg";
-  return "yellow.fg";
-}
-
-function StatusCircle({ status, tooltip }: { status: string; tooltip?: string | React.ReactNode }) {
-  return (
-    <Tooltip content={tooltip}>
-      <HStack>
-        <Box
-          minWidth="12px"
-          maxWidth="12px"
-          minHeight="12px"
-          maxHeight="12px"
-          background={statusCircleColor({ status })}
-          borderRadius="full"
-        />
-        {status !== "connected" && status !== "disconnected" && (
-          <HStack>
-            <Text>Connecting...</Text>
-            <Spinner size="sm" />
-          </HStack>
-        )}
-      </HStack>
-    </Tooltip>
-  );
 }
 
 export function OptimizationStudioCanvas({
@@ -699,7 +657,7 @@ function StudioWorkflowUndoRedo() {
 }
 
 function StudioWorkflowNamePopover() {
-  return <WorkflowNamePopover renderEmojiPicker={renderWorkflowEmojiPicker} />;
+  return <WorkflowNamePopover />;
 }
 
 function StudioWorkflowProgressToast() {
@@ -716,10 +674,6 @@ function StudioWorkflowProgressToast() {
 }
 
 const StudioWorkflowNodeSelectionPanelButton = WorkflowNodeSelectionPanelButton;
-
-function renderWorkflowEmojiPicker(props: WorkflowEmojiPickerRenderProps) {
-  return <EmojiPickerModal {...props} />;
-}
 
 function normalizePaletteFields(fields: unknown[] | undefined) {
   return (fields ?? []).flatMap((field) => {
@@ -767,20 +721,4 @@ function applyResultsPanelRequest({
   if (request === "closed" && !isCollapsed) {
     panelRef.current?.collapse();
   }
-}
-
-function SocketStatusTooltip({ socketStatus }: { socketStatus: SocketStatus }) {
-  if (socketStatus !== "connecting-python") return <>{titleCase(socketStatus)}</>;
-  return (
-    <VStack align="start" gap={1} padding={2}>
-      <HStack>
-        <StatusCircle status="connected" />
-        <Text>Socket Connection</Text>
-      </HStack>
-      <HStack>
-        <StatusCircle status="connecting" />
-        <Text>Python Runtime</Text>
-      </HStack>
-    </VStack>
-  );
 }

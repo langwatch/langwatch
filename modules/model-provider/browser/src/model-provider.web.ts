@@ -31,13 +31,13 @@ export const modelProviderWeb = defineBrowserModule("model-provider")
     "pages/settings/model-providers": {
       path: "/settings/model-providers",
       within: "settings",
-      label: "Model Providers",
+      label: "Model providers",
       load: () => import("./ui/sections/model-providers-screen.tsx"),
     },
     "pages/settings/model-costs": {
       path: "/settings/model-costs",
       within: "settings",
-      label: "Model Costs",
+      label: "Model costs",
       load: () => import("./ui/sections/model-costs-screen.tsx"),
     },
   })

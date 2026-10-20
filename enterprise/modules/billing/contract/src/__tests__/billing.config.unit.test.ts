@@ -34,4 +34,25 @@ describe("billing server configuration", () => {
       );
     });
   });
+  describe("given STRIPE_API_BASE exported blank", () => {
+    /** @scenario "A blank Stripe API base reads as unset and the api still boots" */
+    it("reads as unset, so Stripe itself is reached", () => {
+      const config = parseProcessConfig({
+        owners: [{ name: "billing", config: billingConfig }],
+        environment: { STRIPE_API_BASE: "  " },
+      });
+
+      expect(config.billing.stripeApiBase).toBeUndefined();
+    });
+
+    /** @scenario "A blank Stripe API base reads as unset and the api still boots" */
+    it("still refuses a value that is set but is not a URL", () => {
+      expect(() =>
+        parseProcessConfig({
+          owners: [{ name: "billing", config: billingConfig }],
+          environment: { STRIPE_API_BASE: "not a url" },
+        }),
+      ).toThrow(/STRIPE_API_BASE/);
+    });
+  });
 });

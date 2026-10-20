@@ -5,6 +5,7 @@
  */
 import {
   emptySsoConnection,
+  SsoConnectionNotFoundError,
   type BreakGlassBinding,
   type SsoConnectionState,
   type SsoDomainVerification,
@@ -75,6 +76,7 @@ function scenario(
     providerAccountId?: string | null;
   }[] = [],
   entitled = true,
+  legacySsoDomain?: string,
 ) {
   const store = MemoryIdentityStore.create();
   for (const record of authentications) {
@@ -93,6 +95,12 @@ function scenario(
     breakGlass: repositories.ssoBreakGlass,
     activity: repositories.ssoMigrationEvidence,
     entitled: async () => entitled,
+    legacy: {
+      getLegacySso: async () => {
+        if (!legacySsoDomain) throw new SsoConnectionNotFoundError(`${ORG} carries no legacy SSO`);
+        return { ssoDomain: legacySsoDomain, ssoProvider: "okta" };
+      },
+    },
     migrations: SsoMigrationProgressService.create({
       connections: repositories.ssoConnections,
       evidence: repositories.ssoMigrationEvidence,
@@ -114,6 +122,7 @@ describe("given an organization that has registered nothing", () => {
       record: null,
       goLive: null,
       legacyRoute: null,
+      legacyDomainsToMove: [],
       enterpriseRequired: false,
       migration: null,
     });
@@ -374,5 +383,31 @@ describe("given a connection nobody can carry further", () => {
 
     expect(view.connection).toBeNull();
     expect(view.goLive).toBeNull();
+  });
+});
+
+describe("given legacy settings beside the organization's own connection", () => {
+  const legacyOn = (rows: SsoConnectionState[]) =>
+    scenario(rows, [], [], true, "Acme.com").getSetup({ organizationId: ORG });
+
+  /** @scenario "The legacy domain beside an organization's own connection is the one still to move" */
+  it("names the legacy domain until its connection verifies it, or none is live", async () => {
+    expect((await legacyOn([connection()])).legacyDomainsToMove).toEqual(["acme.com"]);
+
+    const moved = connection({ verifiedDomains: ["acme.com"] });
+    expect((await legacyOn([moved])).legacyDomainsToMove).toEqual([]);
+
+    const gone = connection({ state: "DISCARDED" });
+    expect((await legacyOn([gone])).legacyDomainsToMove).toEqual([]);
+  });
+
+  it("names nothing while a grandfathered connection carries the legacy domain", async () => {
+    const grandfathered = connection({
+      connectionId: "ssoc_gf_org_acme",
+      source: "legacy-grandfathered",
+      state: "ACTIVE",
+    });
+
+    expect((await legacyOn([grandfathered, connection()])).legacyDomainsToMove).toEqual([]);
   });
 });

@@ -2,29 +2,38 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  UPGRADE_COMMAND,
   groupStepsByRelease,
+  heldOrganizationCount,
   orderReleasesNewestFirst,
+  releaseGroupName,
   remainingCount,
+  runKindLabel,
   runOutcomeLabel,
   statusTone,
   summariseError,
-  upgradeCommandFor,
+  versionLine,
 } from "../model/upgrade-labels.ts";
 
-describe("upgradeCommandFor()", () => {
-  describe("when the reader says the image is newer than the installed release", () => {
-    /** @scenario "An image newer than the ledger is described as behind with the command to run" */
-    it("names the release upgrade command", () => {
-      expect(upgradeCommandFor({ reason: "image-newer" })).toBe("pnpm task upgrade");
-      expect(UPGRADE_COMMAND).toBe("pnpm task upgrade");
+describe("versionLine()", () => {
+  describe("when the build is not a release", () => {
+    /** @scenario "A development build reads as the release it contains and its short commit" */
+    it("names the release it contains and its short commit, and a release reads Running", () => {
+      expect(
+        versionLine({ kind: "development", containsRelease: "3.20.1", commit: "abc1234def" }),
+      ).toBe("Development build 3.20.1+abc1234");
+      expect(versionLine({ kind: "development", containsRelease: null, commit: null })).toBe(
+        "Development build",
+      );
+      expect(versionLine({ kind: "release", release: "3.21.0" })).toBe("Running 3.21.0");
     });
   });
+});
 
-  describe("when the installation is current", () => {
-    it("names no command", () => {
-      expect(upgradeCommandFor({ reason: "current" })).toBeNull();
-    });
+describe("runKindLabel()", () => {
+  it("reads the seed run as imported history and an unknown kind raw", () => {
+    expect(runKindLabel("seed")).toBe("Imported history");
+    expect(runKindLabel("upgrade")).toBe("Upgrade");
+    expect(runKindLabel("rehearsal")).toBe("rehearsal");
   });
 });
 
@@ -45,9 +54,9 @@ describe("statusTone() and runOutcomeLabel()", () => {
 });
 
 describe("orderReleasesNewestFirst()", () => {
-  describe("when the reader lists releases oldest first with the unreleased steps last", () => {
-    /** @scenario "The releases list puts unreleased first, then the newest release, and calls out what is left" */
-    it("puts unreleased first, then the newest release", () => {
+  describe("when the reader lists releases oldest first with the development build last", () => {
+    /** @scenario "The Steps tab groups by version, the development build first, then the newest release" */
+    it("puts the development build first, then the newest release, the oldest as and earlier", () => {
       const ordered = orderReleasesNewestFirst([
         { release: "3.19.0" },
         { release: "3.19.4" },
@@ -63,6 +72,9 @@ describe("orderReleasesNewestFirst()", () => {
         "3.19.0",
         "3.9.10",
       ]);
+      expect(releaseGroupName({ release: null, oldest: false })).toBe("Development build");
+      expect(releaseGroupName({ release: "3.18.1", oldest: true })).toBe("3.18.1 and earlier");
+      expect(releaseGroupName({ release: "3.20.1", oldest: false })).toBe("3.20.1");
     });
   });
 });
@@ -96,7 +108,7 @@ describe("summariseError()", () => {
 
 describe("groupStepsByRelease()", () => {
   describe("when steps span two releases and one has none", () => {
-    it("keeps the reader's release order and puts the unreleased steps last", () => {
+    it("keeps the reader's release order and puts the development build last", () => {
       const groups = groupStepsByRelease([
         { id: "x", release: null },
         { id: "a", release: "3.22.0" },
@@ -109,6 +121,58 @@ describe("groupStepsByRelease()", () => {
         ["3.23.0", ["b"]],
         [null, ["x"]],
       ]);
+    });
+  });
+});
+
+describe("heldOrganizationCount()", () => {
+  const held = (tenantId: string) => ({ tenantId, status: "migrated" });
+
+  describe("when one organization is held by two steps and another is parked", () => {
+    /** @scenario "Held organizations are counted once however many steps hold them" */
+    it("counts each organization once", () => {
+      expect(
+        heldOrganizationCount([
+          {
+            tenant: "organization",
+            migratedIsSteady: false,
+            attention: [held("org-a"), { tenantId: "org-b", status: "parked" }],
+          },
+          { tenant: "organization", migratedIsSteady: false, attention: [held("org-a")] },
+          { tenant: "organization", migratedIsSteady: false, attention: [] },
+        ]),
+      ).toBe(2);
+    });
+  });
+
+  describe("when a user-rooted step holds users", () => {
+    /** @scenario "Users a user-rooted step holds are not counted as held organizations" */
+    it("counts only organization-rooted holds", () => {
+      expect(
+        heldOrganizationCount([
+          { tenant: "organization", migratedIsSteady: false, attention: [held("org-a")] },
+          {
+            tenant: "user",
+            migratedIsSteady: false,
+            attention: [held("user-1"), held("user-2")],
+          },
+        ]),
+      ).toBe(1);
+    });
+  });
+
+  describe("when a step's migrated is its steady state", () => {
+    /** @scenario "A step that never finalizes by design keeps its users in step, not held" */
+    it("counts none of its migrated tenants as held, and still counts a parked one", () => {
+      expect(
+        heldOrganizationCount([
+          {
+            tenant: "organization",
+            migratedIsSteady: true,
+            attention: [held("org-a"), { tenantId: "org-b", status: "parked" }],
+          },
+        ]),
+      ).toBe(1);
     });
   });
 });

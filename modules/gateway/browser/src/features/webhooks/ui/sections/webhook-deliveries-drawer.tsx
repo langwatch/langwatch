@@ -1,14 +1,8 @@
 import { Drawer } from "@langwatch/design-system/drawer";
-import {
-  Badge,
-  Box,
-  Button,
-  HStack,
-  Spinner,
-  Table,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { LoadMore } from "@langwatch/design-system/load-more";
+import { Badge, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { type TimeInput, readableDate } from "@langwatch/time";
 import { useEffect, useMemo, useState } from "react";
 
@@ -139,23 +133,19 @@ function WebhookHealthStrip({
 /** One attempt as the receiver answered it. */
 function DeliveryRow({ delivery }: { delivery: DeliveryView }) {
   return (
-    <Table.Row>
-      <Table.Cell whiteSpace="nowrap">{formatWhen(delivery.firedAt)}</Table.Cell>
-      <Table.Cell>{delivery.attempt}</Table.Cell>
-      <Table.Cell>{delivery.eventCount}</Table.Cell>
-      <Table.Cell>{outcomeBadge(delivery.outcome)}</Table.Cell>
-      <Table.Cell>{delivery.responseStatus ?? ""}</Table.Cell>
-      <Table.Cell>{delivery.latencyMs !== null ? `${delivery.latencyMs}ms` : ""}</Table.Cell>
-      <Table.Cell
-        maxWidth="240px"
-        overflow="hidden"
-        textOverflow="ellipsis"
-        whiteSpace="nowrap"
-        title={delivery.error ?? undefined}
-      >
+    <ListTable.Row>
+      <ListTable.Cell nowrap>{formatWhen(delivery.firedAt)}</ListTable.Cell>
+      <ListTable.Cell>{delivery.attempt}</ListTable.Cell>
+      <ListTable.Cell>{delivery.eventCount}</ListTable.Cell>
+      <ListTable.Cell>{outcomeBadge(delivery.outcome)}</ListTable.Cell>
+      <ListTable.Cell>{delivery.responseStatus ?? ""}</ListTable.Cell>
+      <ListTable.Cell>
+        {delivery.latencyMs !== null ? `${delivery.latencyMs}ms` : ""}
+      </ListTable.Cell>
+      <ListTable.Cell maxWidth="240px" truncate title={delivery.error ?? undefined}>
         {delivery.error ?? ""}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -172,38 +162,32 @@ function DeliveriesTable({
   onLoadMore: () => void;
 }) {
   return (
-    <Box width="full" overflowX="auto">
-      <Table.Root size="sm">
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Fired</Table.ColumnHeader>
-            <Table.ColumnHeader>Attempt</Table.ColumnHeader>
-            <Table.ColumnHeader>Events</Table.ColumnHeader>
-            <Table.ColumnHeader>Outcome</Table.ColumnHeader>
-            <Table.ColumnHeader>Status</Table.ColumnHeader>
-            <Table.ColumnHeader>Latency</Table.ColumnHeader>
-            <Table.ColumnHeader>Error</Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+    <VStack align="stretch" gap={2} width="full">
+      <ListTable variant="embedded" scroll="x" scrollLabel="Deliveries table">
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Fired</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Attempt</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Events</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Outcome</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Latency</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Error</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {rows.map((d) => (
             <DeliveryRow key={d.id} delivery={d} />
           ))}
-        </Table.Body>
-      </Table.Root>
-      {hasMore && (
-        <Button
-          size="xs"
-          variant="outline"
-          marginTop={2}
-          loading={isFetching}
-          onClick={onLoadMore}
-          data-testid="webhook-deliveries-load-more"
-        >
-          Load more
-        </Button>
-      )}
-    </Box>
+        </ListTable.Body>
+      </ListTable>
+      <LoadMore
+        hasMore={hasMore}
+        loading={isFetching}
+        onLoadMore={onLoadMore}
+        data-testid="webhook-deliveries-load-more"
+      />
+    </VStack>
   );
 }
 
@@ -289,40 +273,25 @@ export function WebhookDeliveriesDrawer({
   );
 
   return (
-    <Drawer.Root
-      placement="end"
-      size="lg"
-      open={endpoint !== null}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.Title>Deliveries</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="start" gap={4} width="full">
-            {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
+    <Drawer open={endpoint !== null} onClose={onClose} size="lg" title="Deliveries">
+      <VStack align="start" gap={4} width="full">
+        {endpoint && <WebhookHealthStrip endpoint={endpoint} health={health.data} />}
 
-            {deliveries.isLoading && <Spinner size="sm" />}
-            {deliveries.data && rows.length === 0 && isFirstPage && (
-              <Text fontSize="sm" color="fg.muted">
-                No deliveries recorded in the last 30 days.
-              </Text>
-            )}
-            {rows.length > 0 && (
-              <DeliveriesTable
-                rows={rows}
-                hasMore={hasMore}
-                isFetching={deliveries.isFetching}
-                onLoadMore={loadMore}
-              />
-            )}
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        {deliveries.isLoading && <SkeletonRows rows={4} />}
+        {deliveries.data && rows.length === 0 && isFirstPage && (
+          <Text fontSize="sm" color="fg.muted">
+            No deliveries recorded in the last 30 days.
+          </Text>
+        )}
+        {rows.length > 0 && (
+          <DeliveriesTable
+            rows={rows}
+            hasMore={hasMore}
+            isFetching={deliveries.isFetching}
+            onLoadMore={loadMore}
+          />
+        )}
+      </VStack>
+    </Drawer>
   );
 }

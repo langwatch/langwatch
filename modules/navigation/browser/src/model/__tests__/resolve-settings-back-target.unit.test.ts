@@ -34,6 +34,19 @@ describe("resolveSettingsBackTarget", () => {
       ).toEqual({ label: "Back to LLM Ops", href: "/acme-app/traces?span=abc" });
     });
 
+    it("names Dashboards when Settings was entered from a board", () => {
+      captureSettingsReturnPath({ organizationId: "org_1", pathname: "/acme-app/dashboards/b_1" });
+
+      expect(
+        resolveSettingsBackTarget({
+          organizationId: "org_1",
+          rememberedProduct: null,
+          reachableProducts: ["llm-ops", "dashboards"],
+          projectSlug: "acme-app",
+        }),
+      ).toEqual({ label: "Back to Dashboards", href: "/acme-app/dashboards/b_1" });
+    });
+
     /** @scenario The back entry drops a page from another organization */
     it("drops it after an organization switch, so it never returns somewhere else", () => {
       captureSettingsReturnPath({ organizationId: "org_1", pathname: "/acme-app/traces" });

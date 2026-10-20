@@ -11,7 +11,7 @@ import {
   parseEvaluatorAttachments,
   parseSuiteFieldDefinitions,
 } from "@langwatch/scenario-contract";
-import { useCallback, useMemo } from "react";
+import { useMemo } from "react";
 
 import { type Scenario } from "../../../../behavior/scenario-api.ts";
 import { useTestSuites } from "../../../../behavior/suites/use-test-suites.ts";
@@ -70,19 +70,15 @@ export function AgentTestingCaseEditorDrawer(_props: UiAgentTestingCaseEditorDra
 
   const suites = useEditorSuites(projectId);
 
-  const callbacks = getFlowCallbacks(CASE_EDITOR_DRAWER);
-
-  const onSaved = useCallback(
-    (saved: Scenario, options: { shouldRunAfterSave: boolean }) => {
-      toaster.create({
-        title: scenarioId ? "Scenario updated" : "Scenario created",
-        type: "success",
-      });
-      closeDrawer();
-      callbacks?.onSaved?.(saved, options);
-    },
-    [callbacks, closeDrawer, scenarioId],
-  );
+  // Read when the save lands: the opener registers its callback after this renders.
+  const onSaved = (saved: Scenario, options: { shouldRunAfterSave: boolean }) => {
+    toaster.create({
+      title: scenarioId ? "Scenario updated" : "Scenario created",
+      type: "success",
+    });
+    closeDrawer();
+    getFlowCallbacks(CASE_EDITOR_DRAWER)?.onSaved?.(saved, options);
+  };
 
   const editor = useCaseEditor({
     open: isOpen,

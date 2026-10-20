@@ -33,6 +33,19 @@ class InMemoryStateRepository implements SystemMigrationStateRepository {
     return record;
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    return tenantIds.flatMap((tenantId) => {
+      const record = this.rows.get(`${migrationName}:${tenantId}`);
+      return record ? [record] : [];
+    });
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     this.rows.set(`${record.migrationName}:${record.tenantId}`, record);
   }
@@ -174,6 +187,23 @@ describe("the migration pass under its cohort rules", () => {
         }),
       ).rejects.toBeInstanceOf(SystemMigrationRecordNotFoundError);
       expect(summary?.finalized).toBe(2);
+    });
+  });
+
+  describe("given a self-hosted installation that enrolled no organization", () => {
+    /** @scenario "Enrollment does not apply to self-hosted installations" */
+    it("processes every organization without consulting enrollment", async () => {
+      const migration = migrationOf({ name: "selfhosted", runsAutomaticallyOnSelfHosted: true });
+
+      await passOn({
+        isSaaS: false,
+        tenants: ["acme", "globex"],
+        enrolled: new Map(),
+        migrations: [migration],
+        state: new InMemoryStateRepository(),
+      });
+
+      expect(migration.migrateTenant).toHaveBeenCalledTimes(2);
     });
   });
 

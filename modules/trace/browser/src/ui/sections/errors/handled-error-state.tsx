@@ -52,18 +52,18 @@ export function HandledErrorState({
         {/* `role="alert"` on the text, not the whole box: a screen reader
             should hear what went wrong, not the decoration around it. */}
         <Stack gap={2} role="alert">
-          <Heading size="lg" letterSpacing="-0.01em">
+          <Heading size="xl" letterSpacing="-0.01em">
             {copy.title}
           </Heading>
           {copy.description && (
-            <Text color="fg.muted" fontSize="15px" lineHeight="1.6">
+            <Text color="fg.muted" textStyle="body">
               {copy.description}
             </Text>
           )}
         </Stack>
 
         {copy.tips.length > 0 && (
-          <List.Root gap={1} fontSize="13.5px" color="fg.muted" textAlign="left" paddingLeft={4}>
+          <List.Root gap={1} textStyle="bodySm" color="fg.muted" textAlign="left" paddingLeft={4}>
             {/* Index key: tips are server-supplied prose, so two can be
                 identical and collide as keys. Their order is fixed. */}
             {copy.tips.map((tip, index) => (

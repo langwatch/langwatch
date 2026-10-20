@@ -7,7 +7,6 @@ import {
   Button,
   HStack,
   SimpleGrid,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -19,7 +18,7 @@ import { useDebounce } from "use-debounce";
 import { api } from "../../../../behavior/ops-api.ts";
 import { useOpsToaster } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
-import { EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 const PAGE_SIZE = 25;
 
@@ -104,45 +103,34 @@ function BugReportsTable({
   onOpen: (reportId: string) => void;
 }) {
   return (
-    <ListTable
-      density="compact"
-      columnRules={false}
-      containerProps={{ overflowX: "auto" }}
-      size="sm"
-      variant="line"
-    >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Received</Table.ColumnHeader>
-          <Table.ColumnHeader>Title</Table.ColumnHeader>
-          <Table.ColumnHeader>Kind</Table.ColumnHeader>
-          <Table.ColumnHeader>Agent</Table.ColumnHeader>
-          <Table.ColumnHeader>Source</Table.ColumnHeader>
-          <Table.ColumnHeader>Project</Table.ColumnHeader>
-          <Table.ColumnHeader>Contact</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact" scroll="x" scrollLabel="Bug reports table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Received</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Title</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Kind</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Agent</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Source</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Project</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Contact</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {reports?.length === 0 && (
-          <Table.Row>
-            <Table.Cell colSpan={7}>
-              <NoDataInfoBlock
-                icon={<Inbox />}
-                title="No reports yet"
-                description="Reports arrive when a customer’s coding agent runs langwatch report."
-              />
-            </Table.Cell>
-          </Table.Row>
+          <ListTable.SpanRow columns={7}>
+            <NoDataInfoBlock
+              icon={<Inbox />}
+              title="No reports yet"
+              description="Reports arrive when a customer’s coding agent runs langwatch report."
+            />
+          </ListTable.SpanRow>
         )}
         {reports?.map((report) => (
-          <Table.Row
-            key={report.id}
-            cursor="pointer"
-            _hover={{ backgroundColor: "bg.muted" }}
-            onClick={() => onOpen(report.id)}
-          >
-            <Table.Cell whiteSpace="nowrap">{formatDateTime(report.createdAt)}</Table.Cell>
-            <Table.Cell maxWidth="320px">
+          <ListTable.Row key={report.id} onActivate={() => onOpen(report.id)}>
+            <ListTable.Cell nowrap>
+              <AdminDate value={report.createdAt} display="datetime" />
+            </ListTable.Cell>
+            <ListTable.Cell maxWidth={320}>
               <Button
                 variant="plain"
                 size="sm"
@@ -150,26 +138,23 @@ function BugReportsTable({
                 height="auto"
                 fontWeight="medium"
                 maxWidth="full"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onOpen(report.id);
-                }}
+                onClick={() => onOpen(report.id)}
               >
                 <Text truncate>{report.title}</Text>
               </Button>
-            </Table.Cell>
-            <Table.Cell>
+            </ListTable.Cell>
+            <ListTable.Cell>
               <Badge colorPalette={report.kind === "full_session" ? "purple" : "gray"}>
                 {kindLabel[report.kind] ?? report.kind}
               </Badge>
-            </Table.Cell>
-            <Table.Cell>{report.agent ?? <EmptyCell />}</Table.Cell>
-            <Table.Cell>{report.source}</Table.Cell>
-            <Table.Cell>{report.linkedProjectId ?? <EmptyCell />}</Table.Cell>
-            <Table.Cell>{report.contactEmail ?? <EmptyCell />}</Table.Cell>
-          </Table.Row>
+            </ListTable.Cell>
+            <ListTable.Cell>{report.agent ?? <EmptyCell />}</ListTable.Cell>
+            <ListTable.Cell>{report.source}</ListTable.Cell>
+            <ListTable.Cell>{report.linkedProjectId ?? <EmptyCell />}</ListTable.Cell>
+            <ListTable.Cell>{report.contactEmail ?? <EmptyCell />}</ListTable.Cell>
+          </ListTable.Row>
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
@@ -207,86 +192,77 @@ function BugReportDrawer({ reportId, onClose }: { reportId: string | null; onClo
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!reportId}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
+      title={report.data?.title ?? "Bug report"}
       size="xl"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{report.data?.title ?? "Bug report"}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {report.error && (
-            <Text color="fg.error" fontSize="sm">
-              {report.error.message}
-            </Text>
-          )}
-          {report.data && (
-            <VStack align="stretch" gap={6}>
-              <SimpleGrid columns={2} gap={3}>
-                <Fact label="Received">{formatDateTime(report.data.createdAt)}</Fact>
-                <Fact label="Kind">{kindLabel[report.data.kind] ?? report.data.kind}</Fact>
-                <Fact label="Source">{report.data.source}</Fact>
-                <Fact label="Agent">{report.data.agent ?? "unknown"}</Fact>
-                <Fact label="CLI version">{report.data.cliVersion ?? "unknown"}</Fact>
-                <Fact label="Project">{report.data.linkedProjectId ?? "not linked"}</Fact>
-                <Fact label="Contact">{report.data.contactEmail ?? "none"}</Fact>
-                <Fact label="Transcript">{describeTranscript(report.data)}</Fact>
-              </SimpleGrid>
+      {report.error && (
+        <Text color="fg.error" fontSize="sm">
+          {report.error.message}
+        </Text>
+      )}
+      {report.data && (
+        <VStack align="stretch" gap={6}>
+          <SimpleGrid columns={2} gap={3}>
+            <Fact label="Received">{formatDateTime(report.data.createdAt)}</Fact>
+            <Fact label="Kind">{kindLabel[report.data.kind] ?? report.data.kind}</Fact>
+            <Fact label="Source">{report.data.source}</Fact>
+            <Fact label="Agent">{report.data.agent ?? "unknown"}</Fact>
+            <Fact label="CLI version">{report.data.cliVersion ?? "unknown"}</Fact>
+            <Fact label="Project">{report.data.linkedProjectId ?? "not linked"}</Fact>
+            <Fact label="Contact">{report.data.contactEmail ?? "none"}</Fact>
+            <Fact label="Transcript">{describeTranscript(report.data)}</Fact>
+          </SimpleGrid>
 
-              {report.data.summary && (
-                <Box>
-                  <Text fontWeight="semibold" marginBottom={2}>
-                    Summary
-                  </Text>
-                  <Box
-                    backgroundColor="bg.muted"
-                    borderRadius="md"
-                    padding={3}
-                    fontSize="sm"
-                    whiteSpace="pre-wrap"
-                    fontFamily="mono"
-                  >
-                    {report.data.summary}
-                  </Box>
-                </Box>
-              )}
-
-              {report.data.sessionData && (
-                <Box>
-                  <HStack marginBottom={2}>
-                    <Text fontWeight="semibold">Session transcript</Text>
-                    <Button size="sm" variant="outline" onClick={copyTranscript}>
-                      <Copy size={12} /> Copy
-                    </Button>
-                    <Button size="sm" variant="outline" onClick={downloadTranscript}>
-                      <Download size={12} /> Download .jsonl
-                    </Button>
-                  </HStack>
-                  <Box
-                    backgroundColor="bg.muted"
-                    borderRadius="md"
-                    padding={3}
-                    fontSize="xs"
-                    fontFamily="mono"
-                    whiteSpace="pre-wrap"
-                    wordBreak="break-all"
-                    maxHeight="480px"
-                    overflowY="auto"
-                  >
-                    {report.data.sessionData}
-                  </Box>
-                </Box>
-              )}
-            </VStack>
+          {report.data.summary && (
+            <Box>
+              <Text fontWeight="semibold" marginBottom={2}>
+                Summary
+              </Text>
+              <Box
+                backgroundColor="bg.muted"
+                borderRadius="md"
+                padding={3}
+                fontSize="sm"
+                whiteSpace="pre-wrap"
+                fontFamily="mono"
+              >
+                {report.data.summary}
+              </Box>
+            </Box>
           )}
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+
+          {report.data.sessionData && (
+            <Box>
+              <HStack marginBottom={2}>
+                <Text fontWeight="semibold">Session transcript</Text>
+                <Button size="sm" variant="outline" onClick={copyTranscript}>
+                  <Copy size={12} /> Copy
+                </Button>
+                <Button size="sm" variant="outline" onClick={downloadTranscript}>
+                  <Download size={12} /> Download .jsonl
+                </Button>
+              </HStack>
+              <Box
+                backgroundColor="bg.muted"
+                borderRadius="md"
+                padding={3}
+                fontSize="xs"
+                fontFamily="mono"
+                whiteSpace="pre-wrap"
+                wordBreak="break-all"
+                maxHeight="480px"
+                overflowY="auto"
+              >
+                {report.data.sessionData}
+              </Box>
+            </Box>
+          )}
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 

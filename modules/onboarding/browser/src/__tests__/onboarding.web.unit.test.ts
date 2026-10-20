@@ -75,13 +75,6 @@ describe("given a browser that installs onboarding", () => {
 
       expect(loaded).toHaveProperty("default");
     });
-
-    it("answers with the Project component", async () => {
-      const screen = onboardingWeb.installation.screens["pages/onboarding/[team]/project"];
-      const loaded = await screen?.load?.();
-
-      expect(loaded).toHaveProperty("default");
-    });
   });
 
   describe("when the shell reads first-touch attribution", () => {

@@ -2,12 +2,13 @@
  * The plotted answer.
  */
 
-import { useChart } from "@langwatch/design-system/charts";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { useChart } from "@langwatch/design-system/charts";
 import { RawMenu as Menu } from "@langwatch/design-system/menu";
 import { Box, Button, HStack, Portal, Text, VStack } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { ArrowUpRight, LayoutDashboard, TrendingDown, TrendingUp } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
@@ -215,14 +216,14 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
               dataKey={chart.key("t")}
               tickLine={false}
               axisLine={false}
-              tick={{ fill: chart.color("fg.subtle"), fontSize: 10 }}
+              tick={{ fill: chart.color("fg.subtle"), fontSize: TYPE_SCALE_PX.micro }}
               minTickGap={24}
             />
             <YAxis
               tickLine={false}
               axisLine={false}
               width={52}
-              tick={{ fill: chart.color("fg.subtle"), fontSize: 10 }}
+              tick={{ fill: chart.color("fg.subtle"), fontSize: TYPE_SCALE_PX.micro }}
               tickFormatter={format}
             />
             <Tooltip
@@ -235,7 +236,7 @@ export function TimeseriesPlot({ payload }: { payload: TimeseriesPayload }) {
                 background: chart.color("bg.panel"),
                 border: `1px solid ${chart.color("border.muted")}`,
                 borderRadius: 8,
-                fontSize: 11,
+                fontSize: TYPE_SCALE_PX.micro,
               }}
             />
             {peak ? (
@@ -329,11 +330,13 @@ function ComparisonHeadline({
 }
 
 /**
- * Save the plot onto a dashboard — an existing one, or a new one named after it.
+ * Save the plot onto an Analytics Reports board: an existing one, or a new one named after it.
  */
 function SaveToDashboard({ graph, title }: { graph: unknown; title?: string }) {
   const { project } = useOrganizationTeamProject();
   const [saving, setSaving] = useState(false);
+  // `dashboards.getAll` lists the Reports boards alone: a builder chart has no place on a
+  // Dashboards board (AC199c).
   const dashboards = api.dashboards.getAll.useQuery(
     { projectId: project?.id ?? "" },
     { enabled: !!project?.id && !!graph },

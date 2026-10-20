@@ -489,4 +489,64 @@ describe("the modelProvider tRPC namespace", () => {
       });
     });
   });
+
+  describe("given a Codex row that is re-authenticated from its own drawer", () => {
+    const SCOPES = [{ scopeType: "PROJECT" as const, scopeId: PROJECT_A }];
+    const poll = (modelProviderId?: string) => ({
+      projectId: PROJECT_A,
+      deviceAuthId: "auth-1",
+      userCode: "ABCD-EFGH",
+      scopes: SCOPES,
+      ...(modelProviderId ? { modelProviderId } : {}),
+    });
+
+    describe("when the approved sign-in names that row", () => {
+      it("updates the row instead of saving a second one", async () => {
+        const { caller, repositories } = mount({
+          codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
+        });
+        const first = await caller.codexSignInPoll(poll());
+        if (first.status !== "complete") throw new Error("expected the first sign-in to complete");
+
+        const again = await caller.codexSignInPoll(poll(first.providerId));
+
+        const rows = await repositories.providers.findForProject(SCOPES);
+        expect(rows.map((row) => row.id)).toEqual([first.providerId]);
+        expect(again).toMatchObject({ status: "complete", providerId: first.providerId });
+      });
+    });
+
+    describe("when the named row is not a Codex row", () => {
+      it("refuses it as not found and rewrites nothing", async () => {
+        const { caller, repositories } = mount({
+          codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
+        });
+        const first = await caller.codexSignInPoll(poll());
+        if (first.status !== "complete") throw new Error("expected the first sign-in to complete");
+        const [row] = await repositories.providers.findForProject(SCOPES);
+        if (!row) throw new Error("expected the saved row");
+        await repositories.providers.update({ ...row, provider: "openai" });
+
+        await expect(caller.codexSignInPoll(poll(first.providerId))).rejects.toMatchObject({
+          code: "NOT_FOUND",
+          cause: { code: "model_provider_not_found" },
+        });
+        const [after] = await repositories.providers.findForProject(SCOPES);
+        expect(after?.provider).toBe("openai");
+      });
+    });
+
+    describe("when the named row lives outside the caller's project", () => {
+      it("refuses it as not found", async () => {
+        const { caller } = mount({
+          codexAccounts: StubCodexAccounts.create({ status: "complete", keys: CODEX_KEYS }),
+        });
+
+        await expect(caller.codexSignInPoll(poll("provider_elsewhere"))).rejects.toMatchObject({
+          code: "NOT_FOUND",
+          cause: { code: "model_provider_not_found" },
+        });
+      });
+    });
+  });
 });

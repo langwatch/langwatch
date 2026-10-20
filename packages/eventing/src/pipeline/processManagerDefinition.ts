@@ -1,5 +1,6 @@
-import type { ZodTypeAny, z } from "zod";
+import type { z } from "zod";
 
+import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
 import { ensureJsonSafe } from "../process-manager/json.ts";
 import type {
@@ -55,7 +56,7 @@ export type SubscriberSpec<E extends Event = Event, State = unknown> = TriggerSp
   };
 
 /** The schema an intent declares, read off its spec: what `IntentSpecs` checks `run` against. */
-export type SchemaOf<Spec> = Spec extends { schema: infer Schema extends ZodTypeAny }
+export type SchemaOf<Spec> = Spec extends { schema: infer Schema extends ParsingSchema }
   ? Schema
   : never;
 
@@ -82,7 +83,7 @@ export interface IntentContext {
 
 export type IntentExecutor<Payload> = (payload: Payload, context: IntentContext) => Promise<void>;
 
-export interface IntentSpec<Schema extends ZodTypeAny = ZodTypeAny> {
+export interface IntentSpec<Schema extends ParsingSchema = ParsingSchema> {
   schema: Schema;
   run: IntentExecutor<z.output<Schema>>;
 }
@@ -129,7 +130,7 @@ export type SignalHandler<State, Data, Intents> = (
 ) => ProcessEvolution<State>;
 
 export interface SignalSpec<
-  Schema extends ZodTypeAny = ZodTypeAny,
+  Schema extends ParsingSchema = ParsingSchema,
   State = unknown,
   Intents = Record<string, IntentSpec>,
 > {
@@ -141,7 +142,7 @@ export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
   name: string;
   state: State;
   /** Parses the state the store hands back before any handler reads it (ARCHITECTURE §9). */
-  stateSchema: z.ZodType<State>;
+  stateSchema: ParsingSchema<State>;
   handlers: Record<string, EventHandler<State, unknown, Intents>>;
   eventTypes: readonly string[];
   /**
@@ -151,7 +152,7 @@ export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
    */
   keyBy?: (event: E) => string;
   /** Named, schema-validated synchronous signals accepted by this process. */
-  signals?: Record<string, SignalSpec<ZodTypeAny, State, Intents>>;
+  signals?: Record<string, SignalSpec<ParsingSchema, State, Intents>>;
   onWake?: WakeHandler<State, Intents>;
   /** Narrows event to payload the process sees; required for events carrying customer content. */
   toPayload?: (event: E) => ProcessEventEnvelope["payload"];
@@ -161,6 +162,8 @@ export interface ProcessManagerConfig<State, Intents, E extends Event = Event> {
   outbox?: {
     maxAttempts?: number;
     leaseDurationMs?: number;
+    /** Silence before a running handler's lease stops renewing. Default 5 minutes. */
+    maxSilenceMs?: number;
     retryDelayMs?: (params: { attempt: number }) => number;
     /** In-flight dispatches per loop. Default 1 (sequential). */
     concurrency?: number;

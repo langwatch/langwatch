@@ -50,7 +50,7 @@ import { EntitlementService } from "../services/entitlement.service.ts";
 import { PlanNextStepService } from "../services/plan-next-step.service.ts";
 import { SelfServePlanCatalogueService } from "../services/self-serve-plan-catalogue.service.ts";
 import { SubscriptionPlanService } from "../services/subscription-plan.service.ts";
-import { TraceMeterAppendService } from "../services/trace-meter-append.service.ts";
+import { TraceUsageService } from "../services/trace-usage.service.ts";
 import { UsageCountingService } from "../services/usage-counting.service.ts";
 import { UsageService, type UsageCounter } from "../services/usage-enforcement.service.ts";
 import { UsageStatsService } from "../services/usage-stats.service.ts";
@@ -227,9 +227,9 @@ export class EntitlementModule implements EntitlementApiContract {
       plans,
       billing: dependencies.billing,
     });
-    // The trace meter is appended everywhere (round 22); the billable-events meter on Cloud only.
-    const traceMeter = TraceMeterAppendService.create({
-      meter: repositories.traces,
+    // Trace usage is written everywhere (round 22); the billable-events meter on Cloud only.
+    const traceUsage = TraceUsageService.create({
+      counts: repositories.traces,
       projects: repositories.tenancy,
     });
     const billableEventsMeter = config.isSaas
@@ -247,7 +247,7 @@ export class EntitlementModule implements EntitlementApiContract {
       usagePipeline: (send) =>
         buildUsagePipeline({
           countMonth: CountMonthCommand.create({ counting }),
-          traceMeter,
+          traceUsage,
           billableEventsMeter,
           projects: repositories.tenancy,
           send,

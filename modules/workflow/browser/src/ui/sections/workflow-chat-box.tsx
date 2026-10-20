@@ -162,7 +162,7 @@ export function WorkflowChatBox({
                       {optimization.isPending ? (
                         <HStack>
                           <Spinner size="xs" />
-                          <Text fontSize="13px">Running...</Text>
+                          <Text textStyle="bodySm">Running...</Text>
                         </HStack>
                       ) : (
                         output

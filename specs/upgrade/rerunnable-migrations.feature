@@ -14,7 +14,7 @@ Feature: Re-runnable migrations are resolved and retried by the upgrade
   So that a busy table costs a retry, not a manual `prisma migrate resolve`, and never a double apply
 
   Background:
-    Given a scratch Postgres database at the LTS floor
+    Given a scratch Postgres database at an older release
 
   @integration
   Scenario: A re-runnable migration cancelled by lock_timeout mid-way is resolved and completes
@@ -72,3 +72,56 @@ Feature: Re-runnable migrations are resolved and retried by the upgrade
     Then it is marked rolled back and retried twice, each logged with its attempt and wait
     And it exits with code 1 and code "rerunnable_migration_failed" naming the migration and its error
     And the message says the next upgrade marks it rolled back and retries it without a resolve command
+
+  # Fail forward if safe, otherwise stop safely; never leave a half state; never need a shell
+  # (Alex, 2026-10-11). The marker is the last folder of the last release, 3.20.1.
+
+  @unit
+  Scenario: Main's single-statement folders after the marker count as re-runnable
+    Given main's three unguarded folders after the marker that each hold one statement
+    Then each is re-runnable, since one statement either committed or did not
+    And main's two unguarded two-statement folders are not
+
+  @integration
+  Scenario: A first install retries a failed migration whatever the marker
+    Given an empty database that no upgrade run ever finished
+    And the image ships a migration older than the marker that fails on its first attempt
+    When the upgrade runs
+    Then the failed migration is marked rolled back and retried under the backoff
+    And the upgrade exits with code 0 and the ledger records the migration done
+    And no schema was reset
+
+  @integration
+  Scenario: A first install re-runs a failed folder the image contains but no release file names
+    Given an empty database that no upgrade run ever finished
+    And the image contains a "0_init" folder that no release file and no image step names
+    And a type planted beforehand makes "0_init" fail on every attempt
+    When the upgrade runs
+    Then it stops without the message "This image does not ship it"
+    When the operator drops the planted type and the upgrade runs again
+    Then "0_init" is marked rolled back, applied, and the upgrade exits with code 0
+    And nothing was dropped but the planted type the operator removed
+
+  @integration
+  Scenario: Retry on Ops Upgrades is the operator's consent to re-run a failed migration
+    Given a migration older than the marker failed and the run stopped with "failed_prisma_migration"
+    When the operator presses Retry on its step
+    Then the step row records the operator's retry
+    And the next upgrade marks the migration rolled back, applies it and exits with code 0
+    And the step row no longer carries the retry
+
+  @integration
+  Scenario: A consented re-run that fails again needs a new Retry
+    Given the operator pressed Retry on a failed migration older than the marker
+    And the migration fails on every attempt of the next upgrade
+    When the upgrade after that runs
+    Then it stops with "failed_prisma_migration" before the schema applier is called
+
+  @integration
+  Scenario: A two-statement main folder that may be half applied stops with the SQL to run
+    Given _prisma_migrations holds a failed row for "20261001120001_organization_instant_evals_opt_in"
+    And the operator pressed Retry on its step
+    When the upgrade runs
+    Then it exits with code 1 and code "failed_prisma_migration" before the schema applier is called
+    And its message gives guarded SQL that completes the folder whatever it left behind
+    And the SQL that records the folder applied in _prisma_migrations

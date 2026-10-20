@@ -46,6 +46,30 @@ Feature: A pipeline's own event store
       Then the append is refused, naming the pipeline and the refused aggregate type
       And nothing is written to the event log
 
+  Rule: A pipeline reads many of its own aggregates in one read
+
+    @unit
+    Scenario: One read answers many of a pipeline's own aggregates, each oldest first
+      Given a pipeline's own aggregates under two tenants, each holding events
+      And one asked aggregate that holds none
+      When it reads all of them in one read
+      Then the event log is read once
+      And each aggregate answers its own accepted events, oldest first, in the order asked
+      And the aggregate that holds none answers no events
+
+    @unit
+    Scenario: A read of many aggregates answers no stream it was not asked for
+      Given another aggregate type, and another tenant, each hold a stream under an asked aggregate id
+      When the pipeline reads its asked aggregates in one read
+      Then none of those other streams' events are answered
+
+    @unit
+    Scenario: A read of many aggregates asks the event log by tenant set first
+      Given the event log is ClickHouse
+      When many aggregates are read in one read
+      Then the one query filters TenantId by the asked tenant set first, then the aggregate type and ids
+      And it declares that tenant set, so the server holding them answers it
+
   Rule: The store refuses by name rather than pretending
 
     @unit

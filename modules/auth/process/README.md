@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 Everything the auth module does for a caller: the signed-in browser session, and the signed-out front door that stands before they have one — one interface because it is one module, meeting at the same person.
 
-Peers call these through the token, declared at `../contract/src/auth.api.ts:105`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/auth.api.ts:104`; nothing else in this package is public.
 
 #### `offersPasskeys`
 
@@ -98,10 +98,10 @@ verifyBrowserSession(input: { headers: Headers }): Promise<BrowserSessionVerific
 
 #### `resolveBrowserSession`
 
-A missing, revoked, expired, or unusable session resolves as anonymous.
+A missing, revoked, expired, or unusable session resolves as anonymous. `background`: the browser's own polling read, judged against the idle window but never counted as use.
 
 ```typescript
-resolveBrowserSession(input: { verified: VerifiedBrowserSession; }): Promise<BrowserSessionResolution>;
+resolveBrowserSession(input: { verified: VerifiedBrowserSession; background?: boolean; }): Promise<BrowserSessionResolution>;
 ```
 
 #### `getCliAccessSession`
@@ -212,7 +212,7 @@ changeUserEmail(input: UpdateUserEmailInput): Promise<UserProfile>;
 
 #### `setOwnFirstPassword`
 
-Fills an empty credential slot through user, then ends every other session (D-A1U-4).
+Fills an empty credential slot, then ends every other session (D-A1U-4).
 
 ```typescript
 setOwnFirstPassword(input: SetOwnFirstPasswordInput): Promise<void>;
@@ -224,6 +224,14 @@ Verifies the current password and replaces it, then ends every other session.
 
 ```typescript
 changeOwnPassword(input: ChangeOwnPasswordInput): Promise<void>;
+```
+
+#### `unlinkOwnAccount`
+
+Removes one of the caller's own sign-in methods, never the last (ported from `user.*`).
+
+```typescript
+unlinkOwnAccount(input: UnlinkUserAccountInput): Promise<void>;
 ```
 
 #### `registerCredentialAccount`
@@ -410,14 +418,6 @@ Which identity providers this person holds an account through, each named once. 
 findFederatedAccountProviders(input: { userId: string }): Promise<string[]>;
 ```
 
-#### `changeFederatedPassword`
-
-Changes the password the Auth0 tenant holds for this person's database identity: the current one is proven first. Main's `changeFederatedPassword`; whether a tenant is configured is decided on each call.
-
-```typescript
-changeFederatedPassword(input: AuthFederatedPasswordChange): Promise<AuthFederatedPasswordOutcome>;
-```
-
 #### `getSsoSetupStatus`
 
 Whether this person still owes the single sign-on their address's organization pins, asked of the accounts they hold now: live, never stored.
@@ -484,98 +484,98 @@ Public: the device flow authenticates the caller inside its own handlers (the CL
 Answers at `/api/auth/cli/device-code`, `/api/v1/auth/cli/device-code`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:94)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:97
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:95)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:98
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/exchange` · `exchangeCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:102`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:103`.
 
 Answers at `/api/auth/cli/exchange`, `/api/v1/auth/cli/exchange`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:103)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:106
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:105)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:108
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/refresh` · `refreshCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:111`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:113`.
 
 Answers at `/api/auth/cli/refresh`, `/api/v1/auth/cli/refresh`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:112)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:115
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:115)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:118
 type Response = unknown;
 ```
 
 #### `GET /api/auth/cli/lookup` · `lookupCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:125`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:128`.
 
 Answers at `/api/auth/cli/lookup`, `/api/v1/auth/cli/lookup`.
 
 ```typescript
-// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:61
+// Query: lookupQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:78
 interface Query {
   user_code?: string;
 }
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:128
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:131
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/approve` · `approveCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:133`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:136`.
 
 Answers at `/api/auth/cli/approve`, `/api/v1/auth/cli/approve`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:134)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:137
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:138)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:141
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/deny` · `denyCliDeviceCode`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:142`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:146`.
 
 Answers at `/api/auth/cli/deny`, `/api/v1/auth/cli/deny`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:143)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:146
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:148)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:151
 type Response = unknown;
 ```
 
 #### `POST /api/auth/cli/logout` · `endCliDeviceSession`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:156`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:161`.
 
 Answers at `/api/auth/cli/logout`, `/api/v1/auth/cli/logout`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:157)
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:160
+// Rawbody: "text" (inline, src/transport/auth-cli-device-flow.rest.ts:163)
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:166
 type Response = unknown;
 ```
 
 #### `GET /api/auth/cli/device-approval` · `watchCliDeviceApproval`
 
-Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:170`.
+Public: the device flow authenticates the caller inside its own handlers (the CLI half by device code and refresh token, the browser half by the session cookie the process resolves) and answers its own 401, 403 and RFC 8628 refusals. Declared at `src/transport/auth-cli-device-flow.rest.ts:176`.
 
 Answers at `/api/auth/cli/device-approval`, `/api/v1/auth/cli/device-approval`.
 
 ```typescript
-// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:64
+// Query: deviceApprovalQuerySchema, ../contract/src/auth-cli-device-flow.schemas.ts:86
 interface Query {
   device_code: string;
 }
-// Response: inline, src/transport/auth-cli-device-flow.rest.ts:173
+// Response: inline, src/transport/auth-cli-device-flow.rest.ts:179
 type Response = unknown;
 ```
 
@@ -596,7 +596,7 @@ Answers at `/api/auth/validate`.
 
 ```typescript
 type Headers = z.infer<typeof VALIDATE_HEADERS>; // src/transport/auth.rest.ts:65
-// Response: inline, src/transport/auth.rest.ts:99
+// Response: inline, src/transport/auth.rest.ts:100
 interface Response {
   projectSlug: string;
 }
@@ -604,46 +604,46 @@ interface Response {
 
 #### `GET /api/auth/session` · `readBrowserAuthSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:107`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:108`.
 
 Answers at `/api/auth/session`.
 
 ```typescript
 type Headers = z.infer<typeof COOKIE_HEADERS>; // src/transport/auth.rest.ts:70
-// Response: inline, src/transport/auth.rest.ts:110
+// Response: inline, src/transport/auth.rest.ts:111
 type Response = unknown;
 ```
 
 #### `GET /api/auth/logout` · `endBrowserSessionAndRedirect`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:115`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:116`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:117
+// Response: inline, src/transport/auth.rest.ts:118
 type Response = unknown;
 ```
 
 #### `POST /api/auth/logout` · `endBrowserSession`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:120`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:121`.
 
 Answers at `/api/auth/logout`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:122
+// Response: inline, src/transport/auth.rest.ts:124
 type Response = unknown;
 ```
 
 #### `ALL /api/auth/*` · `betterAuthHandshake`
 
-Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:130`.
+Public: the Better Auth session and OAuth handshake; the framework manages its own session, and the session poll, the logout and the legacy token check each answer their own refusal. Declared at `src/transport/auth.rest.ts:132`.
 
 Answers at `/api/auth/*`.
 
 ```typescript
-// Response: inline, src/transport/auth.rest.ts:132
+// Response: inline, src/transport/auth.rest.ts:134
 type Response = unknown;
 ```
 
@@ -651,7 +651,7 @@ type Response = unknown;
 
 ### `auth`
 
-Contract `../contract/src/auth.trpc.ts:40`, router `src/transport/auth.trpc.ts:89`.
+Contract `../contract/src/auth.trpc.ts:41`, router `src/transport/auth.trpc.ts:89`.
 
 | Procedure                        | Kind     | Gate                                                                                                                                                                                                                | Input                              | Output                            |
 | -------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------- | --------------------------------- |
@@ -668,32 +668,33 @@ Contract `../contract/src/auth.trpc.ts:40`, router `src/transport/auth.trpc.ts:8
 | `auth.endBrowserSession`         | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `endBrowserSessionInputSchema`     | `browserSessionsEndedSchema`      |
 | `auth.setPassword`               | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiSetPasswordInputSchema`    | `userApiSuccessSchema`            |
 | `auth.changePassword`            | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiChangePasswordInputSchema` | `userApiSuccessSchema`            |
+| `auth.unlinkAccount`             | mutation | No permission: operates on the session user's own account, so no tenant scope applies                                                                                                                               | `userApiUnlinkAccountInputSchema`  | `userApiSuccessSchema`            |
 | `auth.register`                  | mutation | Public: the signup form's own backend: it mints the account a caller would otherwise need to already hold                                                                                                           | `userApiRegisterInputSchema`       | `createdUserSchema`               |
 
 ```typescript
 // auth.signUpEnrollment
-// Input: signUpEnrollmentInputSchema, ../contract/src/front-door.schemas.ts:49
+// Input: signUpEnrollmentInputSchema, ../contract/src/front-door.schemas.ts:88
 interface Input {
   email: string;
   addressProof: string;
 }
-type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:73
+type Output = z.infer<typeof signUpEnrollmentSchema>; // ../contract/src/front-door.responses.ts:106
 
 // auth.route
-// Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:14
+// Input: frontDoorRouteInputSchema, ../contract/src/front-door.schemas.ts:24
 interface Input {
   identifier: string | null;
   breakGlass?: boolean;
 }
-type Output = z.infer<typeof routingDecisionSchema>; // ../../identity/contract/src/features/signin/signin-routing.ts:141
+type Output = z.infer<typeof routingDecisionSchema>; // ../../identity/contract/src/features/signin/signin-routing.ts:155
 
 // auth.requestSignUpVerification
-// Input: signUpVerificationInputSchema, ../contract/src/front-door.schemas.ts:26
+// Input: signUpVerificationInputSchema, ../contract/src/front-door.schemas.ts:45
 interface Input {
   email: string;
   callbackUrl?: string;
 }
-// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:12
+// Output: signUpVerificationRequestSchema, ../contract/src/front-door.responses.ts:21
 type Output =
   | {
       sent: true;
@@ -704,11 +705,11 @@ type Output =
     };
 
 // auth.inviteLanding
-// Input: frontDoorInviteCodeInputSchema, ../contract/src/front-door.schemas.ts:45
+// Input: frontDoorInviteCodeInputSchema, ../contract/src/front-door.schemas.ts:76
 interface Input {
   inviteCode: string;
 }
-// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:92
+// Output: inviteLandingSchema, ../../organization/contract/src/organization.responses.ts:143
 interface Output {
   organizationName: string;
   inviterName: string | null;
@@ -716,16 +717,16 @@ interface Output {
 }
 
 // auth.requestFreshInvite
-type Input = z.infer<typeof frontDoorInviteCodeInputSchema>; // ../contract/src/front-door.schemas.ts:45
-// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:25
+type Input = z.infer<typeof frontDoorInviteCodeInputSchema>; // ../contract/src/front-door.schemas.ts:76
+// Output: frontDoorAskedSchema, ../contract/src/front-door.responses.ts:38
 interface Output {
   asked: boolean;
 }
 
 // auth.myAddressConfirmation
-// Input: inline, ../contract/src/auth.trpc.ts:68
+// Input: inline, ../contract/src/auth.trpc.ts:69
 type Input = unknown;
-// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:48
+// Output: addressConfirmationSchema, ../contract/src/front-door.responses.ts:77
 interface Output {
   email: string | null;
   confirmed: boolean;
@@ -733,20 +734,20 @@ interface Output {
 }
 
 // auth.sendMyAddressConfirmation
-// Input: frontDoorOwnAddressInputSchema, ../contract/src/front-door.schemas.ts:35
+// Input: frontDoorOwnAddressInputSchema, ../contract/src/front-door.schemas.ts:58
 interface Input {
   codeChallenge: string;
 }
-// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:19
+// Output: frontDoorOwnAddressSentSchema, ../contract/src/front-door.responses.ts:32
 interface Output {
   sent: true;
   identifierId: string;
 }
 
 // auth.priorSession
-// Input: inline, ../contract/src/auth.trpc.ts:77
+// Input: inline, ../contract/src/auth.trpc.ts:78
 type Input = unknown;
-// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:58
+// Output: priorSessionSchema, ../contract/src/front-door.responses.ts:86
 type Output =
   | {
       kind: "expired";
@@ -757,66 +758,61 @@ type Output =
     };
 
 // auth.deactivate
-// Input: userApiUserInputSchema, ../../user/contract/src/user.schemas.ts:58
+// Input: userApiUserInputSchema, ../../user/contract/src/user.schemas.ts:100
 interface Input {
   userId: string;
 }
-// Output: userApiSuccessSchema, ../../user/contract/src/user.responses.ts:9
+// Output: userApiSuccessSchema, ../../user/contract/src/user.responses.ts:12
 interface Output {
   success: true;
 }
 
 // auth.browserSessions
-// Input: inline, ../contract/src/auth.trpc.ts:90
+// Input: inline, ../contract/src/auth.trpc.ts:91
 type Input = Record<string, unknown>;
-// Output: inline, ../contract/src/auth.trpc.ts:91
-type Output = {
-  sessionId: string;
-  identifierId: string | null;
-  method: string;
-  secondFactorProven: boolean;
-  ipAddress: string | null;
-  userAgent: string | null;
-  signedInAt: string;
-  lastActiveAt: string;
-  expiresAt: string;
-  current: boolean;
-}[];
+// Output: browserSessionInventoryEntrySchema.array() (inline, ../contract/src/auth.trpc.ts:92)
 
 // auth.endBrowserSession
-// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:106
+// Input: endBrowserSessionInputSchema, ../contract/src/browser-session.ts:126
 interface Input {
   sessionId: string;
 }
-// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:109
+// Output: browserSessionsEndedSchema, ../contract/src/browser-session.ts:136
 interface Output {
   ended: number;
 }
 
 // auth.setPassword
-// Input: userApiSetPasswordInputSchema, ../../user/contract/src/user.schemas.ts:46
+// Input: userApiSetPasswordInputSchema, ../../user/contract/src/user.schemas.ts:81
 interface Input {
   password: string;
 }
-type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:9
+type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:12
 
 // auth.changePassword
-// Input: userApiChangePasswordInputSchema, ../../user/contract/src/user.schemas.ts:48
+// Input: userApiChangePasswordInputSchema, ../../user/contract/src/user.schemas.ts:95
 interface Input {
   currentPassword: string;
   newPassword: string;
 }
-type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:9
+type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:12
+
+// auth.unlinkAccount
+// Input: userApiUnlinkAccountInputSchema, ../../user/contract/src/user.schemas.ts:74
+interface Input {
+  accountId: string;
+}
+type Output = z.infer<typeof userApiSuccessSchema>; // ../../user/contract/src/user.responses.ts:12
 
 // auth.register
-// Input: userApiRegisterInputSchema, ../../user/contract/src/user.schemas.ts:29
+// Input: userApiRegisterInputSchema, ../../user/contract/src/user.schemas.ts:67
 interface Input {
   name?: string;
   email: string;
   password: string;
   addressProof: string;
 }
-// Output: createdUserSchema, ../../user/contract/src/user.ts:82
+// Output: createdUserSchema, ../../user/contract/src/user.ts:115
 interface Output {
   id: string;
 }
@@ -834,11 +830,11 @@ Contract `../contract/src/sign-in-security.trpc.ts:16`, router `src/transport/si
 
 ```typescript
 // signInSecurity.get
-// Input: signInSecurityOrganizationInputSchema, ../contract/src/sign-in-security.ts:16
+// Input: signInSecurityOrganizationInputSchema, ../contract/src/sign-in-security.ts:24
 interface Input {
   organizationId: string;
 }
-// Output: signInSecuritySettingsSchema, ../contract/src/sign-in-security.ts:13
+// Output: signInSecuritySettingsSchema, ../contract/src/sign-in-security.ts:14
 interface Output {
   lockoutAfterFailedAttempts: number;
   lockoutMinutes: number;
@@ -847,7 +843,7 @@ interface Output {
 }
 
 // signInSecurity.save
-// Input: saveSignInSecurityInputSchema, ../contract/src/sign-in-security.ts:20
+// Input: saveSignInSecurityInputSchema, ../contract/src/sign-in-security.ts:34
 interface Input {
   lockoutAfterFailedAttempts: number;
   lockoutMinutes: number;
@@ -855,19 +851,19 @@ interface Input {
   sessionMaxLifetimeMinutes: number;
   organizationId: string;
 }
-// Output: saveSignInSecurityResultSchema, ../contract/src/sign-in-security.ts:26
+// Output: saveSignInSecurityResultSchema, ../contract/src/sign-in-security.ts:46
 interface Output {
   ok: true;
   sweptSessions: number;
 }
 
 // signInSecurity.release
-// Input: releaseHeldAccountInputSchema, ../contract/src/sign-in-security.ts:33
+// Input: releaseHeldAccountInputSchema, ../contract/src/sign-in-security.ts:57
 interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: releaseHeldAccountResultSchema, ../contract/src/sign-in-security.ts:38
+// Output: releaseHeldAccountResultSchema, ../contract/src/sign-in-security.ts:64
 interface Output {
   released: boolean;
 }
@@ -909,7 +905,7 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                                          |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------------------- |
-| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:274`                            |
+| secret | `session`                     | `NEXTAUTH_SECRET`                         | `src/app/auth.app.ts:269`                            |
 | secret | `googleClientSecret`          | `GOOGLE_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:52` |
 | secret | `githubClientSecret`          | `GITHUB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:53` |
 | secret | `gitlabClientSecret`          | `GITLAB_CLIENT_SECRET`                    | `../../../packages/secrets/src/shared-secrets.ts:54` |
@@ -919,21 +915,20 @@ Run by the tasks process, before serve.
 | secret | `cognitoClientSecret`         | `COGNITO_CLIENT_SECRET`                   | `../../../packages/secrets/src/shared-secrets.ts:58` |
 | secret | `oneLoginClientSecret`        | `ONELOGIN_CLIENT_SECRET`                  | `../../../packages/secrets/src/shared-secrets.ts:59` |
 | secret | `oidcClientSecret`            | `OIDC_CLIENT_SECRET`                      | `../../../packages/secrets/src/shared-secrets.ts:60` |
-| secret | `auth0ManagementSecret`       | `AUTH0_MGMT_CLIENT_SECRET`                | `src/app/auth.app.ts:277`                            |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:279`                            |
-| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:20`                  |
-| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:22`                  |
-| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:23`                  |
-| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:25`                  |
-| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:27`                  |
-| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:28`                  |
-| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:30`                  |
-| config | `auth0ManagementClientId`     | `AUTH0_MGMT_CLIENT_ID`                    | `../contract/src/auth.config.ts:35`                  |
-| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:37`                  |
-| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:39`                  |
-| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:41`                  |
-| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:43`                  |
-| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:44`                  |
-| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:49`                  |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`                   | `src/app/auth.app.ts:272`                            |
+| config | `sessionUrl`                  | `NEXTAUTH_URL`                            | `../contract/src/auth.config.ts:40`                  |
+| config | `mfaEnrollmentOpen`           | `MFA_ENROLLMENT_OPEN`                     | `../contract/src/auth.config.ts:42`                  |
+| config | `passkeysEnabled`             | `PASSKEYS_ENABLED`                        | `../contract/src/auth.config.ts:43`                  |
+| config | `passkeyHandleSecret`         | `PASSKEY_HANDLE_SECRET`                   | `../contract/src/auth.config.ts:45`                  |
+| config | `trustedIdpOrigins`           | `SSO_TRUSTED_IDP_ORIGINS`                 | `../contract/src/auth.config.ts:47`                  |
+| config | `idpSimulatorUrl`             | `LANGWATCH_IDPSIM_URL`                    | `../contract/src/auth.config.ts:48`                  |
+| config | `localPasswords`              | `LOCAL_PASSWORDS_ENABLED`                 | `../contract/src/auth.config.ts:50`                  |
+| config | `signInProviders`             | `AUTH_PROVIDER`                           | `../contract/src/auth.config.ts:52`                  |
+| config | `socialProviderBases`         | `GOOGLE_SIGN_IN_BASE`                     | `../contract/src/auth.config.ts:53`                  |
+| config | `isSaas`                      | `IS_SAAS`                                 | `../contract/src/auth.config.ts:55`                  |
+| config | `signUpMode`                  | `SIGN_UP_MODE`                            | `../contract/src/auth.config.ts:57`                  |
+| config | `publicBaseUrl`               | `BASE_HOST`                               | `../contract/src/auth.config.ts:59`                  |
+| config | `nodeEnvironment`             | `NODE_ENV`                                | `../contract/src/auth.config.ts:60`                  |
+| config | `cliRefreshTokenTtlSeconds`   | `LANGWATCH_CLI_REFRESH_TOKEN_TTL_SECONDS` | `../contract/src/auth.config.ts:65`                  |
 
 <!-- readme:generated:end -->

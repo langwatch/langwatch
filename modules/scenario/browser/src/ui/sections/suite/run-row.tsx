@@ -6,7 +6,7 @@
 
 import { formatTimeAgoCompact } from "@langwatch/browser-host/format-time-ago";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Box, Button, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { Box, chakra, HStack, Spinner, Text } from "@langwatch/design-system/primitives";
 import type { SimulationRunData as ScenarioRunData } from "@langwatch/scenario-contract";
 import { ChevronDown, ChevronRight, Square } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -93,7 +93,7 @@ function RunRowLoading({ suiteName }: { suiteName?: string }) {
           <Box flex={1} />
           {/* Invisible spacer matching RunMetricsSummary pill height */}
           <Box paddingY={1} paddingX={2} borderRadius="lg" border="1px solid transparent">
-            <Text fontSize="12px" visibility="hidden">
+            <Text textStyle="caption" visibility="hidden">
               &nbsp;
             </Text>
           </Box>
@@ -271,39 +271,27 @@ function RunRowData({
 
       {/* Confirmation dialog for cancelling all remaining jobs */}
       {onCancelAll && (
-        <Dialog.Root
+        <Dialog
           open={isCancelAllDialogOpen}
-          onOpenChange={({ open }) => setIsCancelAllDialogOpen(open)}
+          onClose={() => setIsCancelAllDialogOpen(false)}
+          title="Cancel remaining jobs?"
+          role="alertdialog"
+          cancelLabel="Keep running"
+          primaryAction={{
+            label: `Cancel ${cancellableCount} ${cancellableCount === 1 ? "job" : "jobs"}`,
+            danger: true,
+            onClick: () => {
+              setIsCancelAllDialogOpen(false);
+              onCancelAll();
+            },
+            "data-testid": "confirm-cancel-all-button",
+          }}
         >
-          <Dialog.Content maxWidth="sm">
-            <Dialog.CloseTrigger />
-            <Dialog.Header>
-              <Dialog.Title>Cancel remaining jobs?</Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body>
-              <Text fontSize="sm" color="fg.muted">
-                This will cancel {cancellableCount} remaining{" "}
-                {cancellableCount === 1 ? "job" : "jobs"} in this batch run. This action cannot be
-                undone.
-              </Text>
-            </Dialog.Body>
-            <Dialog.Footer>
-              <Button variant="outline" onClick={() => setIsCancelAllDialogOpen(false)}>
-                Keep running
-              </Button>
-              <Button
-                colorPalette="red"
-                onClick={() => {
-                  setIsCancelAllDialogOpen(false);
-                  onCancelAll();
-                }}
-                data-testid="confirm-cancel-all-button"
-              >
-                Cancel {cancellableCount} {cancellableCount === 1 ? "job" : "jobs"}
-              </Button>
-            </Dialog.Footer>
-          </Dialog.Content>
-        </Dialog.Root>
+          <Text fontSize="sm" color="fg.muted">
+            This will cancel {cancellableCount} remaining {cancellableCount === 1 ? "job" : "jobs"}{" "}
+            in this batch run. This action cannot be undone.
+          </Text>
+        </Dialog>
       )}
     </Box>
   );

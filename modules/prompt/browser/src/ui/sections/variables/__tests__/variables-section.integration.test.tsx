@@ -3,7 +3,7 @@
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import type { AvailableSource, FieldMapping } from "@langwatch/workflow-contract";
-import { cleanup, fireEvent, screen } from "@testing-library/react";
+import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -653,5 +653,62 @@ describe("VariablesSection", () => {
       const equalSigns = screen.getAllByText("=");
       expect(equalSigns).toHaveLength(1);
     });
+  });
+});
+
+describe("VariablesSection keyboard and focus", () => {
+  afterEach(() => {
+    cleanup();
+  });
+
+  const three: Variable[] = [
+    { identifier: "a", type: "str" },
+    { identifier: "b", type: "str" },
+    { identifier: "c", type: "str" },
+  ];
+
+  /** @scenario "Name edit keys do not submit or close the containing drawer" */
+  it("commits once on Enter and cancels on Escape without submitting the form", async () => {
+    const user = userEvent.setup();
+    const onSubmit = vi.fn((event: { preventDefault: () => void }) => event.preventDefault());
+    const onChange = vi.fn();
+    renderWithDesignSystem(
+      <form onSubmit={onSubmit}>
+        <VariablesSection variables={[{ identifier: "a", type: "str" }]} onChange={onChange} />
+      </form>,
+    );
+
+    await user.click(screen.getByTestId("variable-name-a"));
+    const input = screen.getByTestId("variable-name-input-a");
+    await user.clear(input);
+    await user.type(input, "z{Enter}");
+    expect(onChange).toHaveBeenCalledTimes(1);
+
+    await user.click(screen.getByTestId("variable-name-a"));
+    await user.type(screen.getByTestId("variable-name-input-a"), "q{Escape}");
+    expect(onChange).toHaveBeenCalledTimes(1);
+    expect(onSubmit).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByTestId("variable-name-a")).toHaveFocus());
+  });
+
+  /** @scenario "Deleting a variable keeps keyboard focus in the section" */
+  it("moves focus to the next name, then to Add when the list empties", async () => {
+    const user = userEvent.setup();
+    const onMappingChange = vi.fn();
+    const view = renderWithDesignSystem(
+      <VariablesSection variables={three} onChange={vi.fn()} onMappingChange={onMappingChange} />,
+    );
+
+    await user.click(screen.getByTestId("remove-variable-b"));
+    await waitFor(() => expect(screen.getByTestId("variable-name-c")).toHaveFocus());
+    expect(onMappingChange).toHaveBeenCalledTimes(1);
+    expect(onMappingChange).toHaveBeenCalledWith("b", undefined);
+
+    view.rerender(
+      <VariablesSection variables={[{ identifier: "a", type: "str" }]} onChange={vi.fn()} />,
+    );
+    await user.click(screen.getByTestId("remove-variable-a"));
+    view.rerender(<VariablesSection variables={[]} onChange={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("add-variable-button")).toHaveFocus());
   });
 });

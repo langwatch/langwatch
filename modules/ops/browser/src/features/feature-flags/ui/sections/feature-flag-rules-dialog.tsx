@@ -19,8 +19,10 @@ import {
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
+  Box,
   Button,
   createListCollection,
   Field,
@@ -151,85 +153,65 @@ export function FeatureFlagRulesDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(details: { open: boolean }) => onOpenChange(details.open)}
+      onClose={() => onOpenChange(false)}
       size="lg"
+      title="Targeting rules"
+      description="Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its handle to change that order. When no rule matches, the row toggle decides."
+      primaryAction={{ label: "Save rules", onClick: () => void save(), loading: saving }}
+      busy={saving}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Targeting rules</Dialog.Title>
-          <Dialog.Description>
-            Rules are evaluated top-to-bottom; the first match wins, and you can drag a rule by its
-            handle to change that order. When no rule matches, the row toggle decides.
-          </Dialog.Description>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={3}>
-            <Text fontFamily="mono" fontSize="xs" color="fg.muted">
-              {flagKey}
-            </Text>
-            <DndContext
-              sensors={sensors}
-              collisionDetection={closestCenter}
-              onDragEnd={(event: DragEndEvent) => {
-                const { active, over } = event;
-                if (!over || active.id === over.id) return;
-                setDraft((current) =>
-                  withRuleMoved(current, { fromId: String(active.id), toId: String(over.id) }),
-                );
-              }}
-            >
-              <SortableContext
-                items={draft.map((rule) => rule.id)}
-                strategy={verticalListSortingStrategy}
-              >
-                <VStack align="stretch" gap={2}>
-                  {draft.map((rule) => (
-                    <RuleEditorRow
-                      key={rule.id}
-                      rule={rule}
-                      onChange={(patch) =>
-                        setDraft((current) =>
-                          current.map((candidate) =>
-                            candidate.id === rule.id ? { ...candidate, ...patch } : candidate,
-                          ),
-                        )
-                      }
-                      onRemove={() =>
-                        setDraft((current) =>
-                          current.filter((candidate) => candidate.id !== rule.id),
-                        )
-                      }
-                    />
-                  ))}
-                </VStack>
-              </SortableContext>
-            </DndContext>
-            {validationError && <Text color="fg.error">{validationError}</Text>}
-            <Button
-              variant="ghost"
-              size="sm"
-              alignSelf="flex-start"
-              onClick={() => setDraft((current) => withRuleAdded(current, newRule()))}
-            >
-              <Plus size={14} /> Add rule
-            </Button>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Dialog.ActionTrigger asChild>
-            <Button variant="outline" disabled={saving}>
-              Cancel
-            </Button>
-          </Dialog.ActionTrigger>
-          <Button colorPalette="orange" loading={saving} onClick={() => void save()}>
-            Save rules
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack align="stretch" gap={3}>
+        <Text fontFamily="mono" fontSize="xs" color="fg.muted">
+          {flagKey}
+        </Text>
+        <DndContext
+          sensors={sensors}
+          collisionDetection={closestCenter}
+          onDragEnd={(event: DragEndEvent) => {
+            const { active, over } = event;
+            if (!over || active.id === over.id) return;
+            setDraft((current) =>
+              withRuleMoved(current, { fromId: String(active.id), toId: String(over.id) }),
+            );
+          }}
+        >
+          <SortableContext
+            items={draft.map((rule) => rule.id)}
+            strategy={verticalListSortingStrategy}
+          >
+            <VStack align="stretch" gap={2}>
+              {draft.map((rule) => (
+                <RuleEditorRow
+                  key={rule.id}
+                  rule={rule}
+                  onChange={(patch) =>
+                    setDraft((current) =>
+                      current.map((candidate) =>
+                        candidate.id === rule.id ? { ...candidate, ...patch } : candidate,
+                      ),
+                    )
+                  }
+                  onRemove={() =>
+                    setDraft((current) => current.filter((candidate) => candidate.id !== rule.id))
+                  }
+                />
+              ))}
+            </VStack>
+          </SortableContext>
+        </DndContext>
+        {validationError && <Text color="fg.error">{validationError}</Text>}
+        <Button
+          variant="ghost"
+          size="sm"
+          alignSelf="flex-start"
+          onClick={() => setDraft((current) => withRuleAdded(current, newRule()))}
+        >
+          <Plus size={14} /> Add rule
+        </Button>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -247,79 +229,76 @@ function RuleEditorRow({
   });
 
   return (
-    <HStack
+    <Box
       ref={setNodeRef}
       style={{
         transform: CSS.Translate.toString(transform),
         transition,
         opacity: isDragging ? 0.6 : 1,
       }}
-      align="flex-end"
-      gap={2}
-      padding={2}
-      borderWidth="1px"
-      borderRadius="md"
-      borderColor="border.muted"
-      background="bg.panel"
       zIndex={isDragging ? 1 : void 0}
     >
-      <IconButton
-        aria-label="Reorder rule"
-        size="sm"
-        variant="ghost"
-        color="fg.subtle"
-        cursor="grab"
-        {...attributes}
-        {...listeners}
-      >
-        <GripVertical size={14} />
-      </IconButton>
-      <Field.Root flexBasis="180px" flexShrink={0}>
-        <Field.Label fontSize="xs">Scope</Field.Label>
-        <Select.Root
-          collection={SCOPE_COLLECTION}
-          value={[rule.scopeKind]}
-          onValueChange={(details: { value: string[] }) => {
-            const next = details.value[0] as ScopeKind | undefined;
-            if (!next) return;
-            onChange({
-              scopeKind: next,
-              // The field beside the picker means something different per
-              // scope — an id, a date, nothing — so a leftover value from the
-              // previous scope would be a rule that cannot match.
-              target: next === rule.scopeKind ? rule.target : "",
-            });
-          }}
-          size="sm"
-        >
-          <Select.Trigger>
-            <Select.ValueText placeholder="Pick scope" />
-          </Select.Trigger>
-          <Select.Content>
-            {SCOPE_COLLECTION.items.map((item) => (
-              <Select.Item key={item.value} item={item}>
-                {item.label}
-              </Select.Item>
-            ))}
-          </Select.Content>
-        </Select.Root>
-      </Field.Root>
-      <RuleTargetField rule={rule} onChange={onChange} />
-      <Field.Root flexBasis="120px" flexShrink={0}>
-        <Field.Label fontSize="xs">Enabled</Field.Label>
-        <HStack height="32px" alignItems="center">
-          <Switch
-            colorPalette="accent"
-            checked={rule.enabled}
-            onCheckedChange={(details) => onChange({ enabled: details.checked })}
-          />
-          <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
+      <Card variant="nested" padding="sm">
+        <HStack align="flex-end" gap={2}>
+          <IconButton
+            aria-label="Reorder rule"
+            size="sm"
+            variant="ghost"
+            color="fg.subtle"
+            cursor="grab"
+            {...attributes}
+            {...listeners}
+          >
+            <GripVertical size={14} />
+          </IconButton>
+          <Field.Root flexBasis="180px" flexShrink={0}>
+            <Field.Label fontSize="xs">Scope</Field.Label>
+            <Select.Root
+              collection={SCOPE_COLLECTION}
+              value={[rule.scopeKind]}
+              onValueChange={(details: { value: string[] }) => {
+                const next = details.value[0] as ScopeKind | undefined;
+                if (!next) return;
+                onChange({
+                  scopeKind: next,
+                  // The field beside the picker means something different per
+                  // scope — an id, a date, nothing — so a leftover value from the
+                  // previous scope would be a rule that cannot match.
+                  target: next === rule.scopeKind ? rule.target : "",
+                });
+              }}
+              size="sm"
+            >
+              <Select.Trigger>
+                <Select.ValueText placeholder="Pick scope" />
+              </Select.Trigger>
+              <Select.Content>
+                {SCOPE_COLLECTION.items.map((item) => (
+                  <Select.Item key={item.value} item={item}>
+                    {item.label}
+                  </Select.Item>
+                ))}
+              </Select.Content>
+            </Select.Root>
+          </Field.Root>
+          <RuleTargetField rule={rule} onChange={onChange} />
+          <Field.Root flexBasis="120px" flexShrink={0}>
+            <Field.Label fontSize="xs">Enabled</Field.Label>
+            <HStack height="32px" alignItems="center">
+              <Switch
+                colorPalette="accent"
+                checked={rule.enabled}
+                onCheckedChange={(details) => onChange({ enabled: details.checked })}
+              />
+              <Text fontSize="xs">{rule.enabled ? "on" : "off"}</Text>
+            </HStack>
+          </Field.Root>
+          <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
+            <Trash2 size={14} />
+          </IconButton>
         </HStack>
-      </Field.Root>
-      <IconButton aria-label="Remove rule" size="sm" variant="ghost" onClick={onRemove}>
-        <Trash2 size={14} />
-      </IconButton>
-    </HStack>
+      </Card>
+    </Box>
   );
 }
 

@@ -19,7 +19,7 @@ export default function ProfileScreen() {
       <PageLayout.Header>
         <PageLayout.Heading>Profile</PageLayout.Heading>
       </PageLayout.Header>
-      <Box paddingTop={4} width="full" maxWidth="820px">
+      <Box paddingTop={4} width="full">
         <Text color="fg.muted" paddingBottom={SETTINGS_BAND_PADDING_Y}>
           Who you are here, how you get in, and where you are signed in.
         </Text>

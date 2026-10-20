@@ -13,14 +13,20 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
     organization admin, and is never offered a button the server would refuse;
   - an enterprise organization is offered a word with us instead, and is never switched on by a
     click;
-  - a self-hosted install that judges through LangWatch is released by its license: the customer
-    signed a license that names Instant Evals, which is the same agreement, and an organization
-    admin can still switch hosted judging off in Settings, Connect;
+  - a self-hosted install that judges through LangWatch is released by its license alone: the
+    customer signed a license that names Instant Evals, which is the same agreement, and an
+    organization admin can still switch hosted judging off in Settings, Connect; the operator's
+    release flag never releases it, so no install judges without a license that names them;
   - a self-hosted install that is not released is told why in its own terms: its license does
     not include Instant Evals, an admin switched them off, it is not connected to LangWatch, or it
     has judging turned off, since judging runs on LangWatch Cloud only, and its operator decides;
-  - the operator's release flag stays as it was, and the flag, the license or the switch makes a
-    project judgeable.
+  - on the hosted service the plan decides what releases a project: a self-serve organization is
+    released by its own switch alone, whatever the operator's release flag says, so no organization
+    sends its text to the judge without having agreed to it; an enterprise organization is released
+    by the flag alone, which is how one that asked gets them, and a switch thrown before it was on
+    an enterprise plan no longer counts;
+  - an install that does not judge through LangWatch, which has judging turned off or is a
+    development checkout with its own key, is released by the operator's release flag.
 
   Rule: The offer depends on the plan, the deployment, and whether the member may throw the switch
 
@@ -46,7 +52,7 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When the popover asks what to offer
       Then it is offered a word with us, whatever the member may do
 
-  Rule: A self-hosted install is released by its license, and told why when it is not
+  Rule: A self-hosted install is released by its license alone, and told why when it is not
 
     @unit
     Scenario: A license that names Instant Evals releases them without the flag
@@ -63,10 +69,18 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then it may not
 
     @unit
-    Scenario: An install with judging turned off still waits for the release flag
-      Given a self-hosted install with judging turned off, with the release flag off
+    Scenario: The release flag does not release a self-hosted install without a license
+      Given a self-hosted install that judges through LangWatch, with the release flag on
+      And the organization's license does not name Instant Evals
       When the project asks whether it may judge
-      Then the license is not what releases it
+      Then it may not, and neither the flag nor the organization's own switch is read
+
+    @unit
+    Scenario: A development checkout waits for the release flag
+      Given a development checkout that does not judge through LangWatch
+      When the project asks whether it may judge
+      Then it may when the release flag is on and may not when it is off
+      And the license is not read
 
     @unit
     Scenario: A self-hosted install is told why from its judge and its license, and the plan is not read
@@ -133,12 +147,42 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       Then the registry's words are shown as a warning
       And no estimate is requested and the popover stays open
 
-    @unit
+  Rule: On the hosted service the plan decides whether the switch or the release flag releases a project
+
+    @unit @integration
     Scenario: An organization that switched itself on is judged without the flag
-      Given the release flag is off for the project and its organization switched Instant Evals on
+      Given a self-serve organization on the hosted service that switched Instant Evals on
+      And the release flag is off for the project
       When the project asks whether it may judge
       Then it may, from the organization's switch
-      And a project the flag is on for never reads the switch
+
+    @unit @integration
+    Scenario: The release flag does not release a self-serve organization that never switched itself on
+      Given a self-serve organization on the hosted service that has not switched Instant Evals on
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may not, and the flag is not read
+      And the popover still offers the switch
+
+    @unit @integration
+    Scenario: The release flag releases an enterprise organization
+      Given an enterprise organization on the hosted service
+      And the release flag is on for the project
+      When the project asks whether it may judge
+      Then it may, and the organization's switch is not read
+
+    @integration
+    Scenario: The search bar takes release from the server, never from its own read of the flag
+      Given the release flag reads on in the browser but the server says the project is not released
+      When the search bar asks whether Instant Evals are available
+      Then they are not, and the offer is the server's
+
+    @unit
+    Scenario: A switch thrown before an organization moved to an enterprise plan no longer counts
+      Given an enterprise organization on the hosted service whose switch was thrown earlier
+      And the release flag is off for the project
+      When the project asks whether it may judge
+      Then it may not
 
   Rule: An enterprise organization is never switched on by a click
 
@@ -156,3 +200,15 @@ Feature: An organization switches Instant Evals on itself, once it has read wher
       When a request tries to throw the switch anyway
       Then it is refused as not offered, and nothing is recorded
       And the refusal says what turns Instant Evals on instead: the plan, or on a self-hosted install its license, or whoever runs it when it has judging turned off
+
+  Rule: Instant Evals decide whether a run's statement may call an eval function, and Analytics takes that answer
+
+    @unit
+    Scenario: Every read a run makes carries Instant Evals' own answer to whether eval functions may run
+      Given a project whose statement calls an eval function
+      When a run reads its rows through Analytics
+      Then each read states whether the project is released, by the flag, the license or the organization's switch
+      And a connected install whose license names Instant Evals is allowed without the flag
+      And an organization on the hosted service that switched them on is allowed without the flag
+      And an install whose license does not name them, with the flag off and no switch, is refused "lwql_not_permitted"
+      And Analytics never reads the release flag for that read itself

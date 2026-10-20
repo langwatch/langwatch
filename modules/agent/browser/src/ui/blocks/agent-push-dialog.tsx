@@ -1,7 +1,9 @@
 import type { AgentCopy } from "@langwatch/agent-contract";
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Text, VStack } from "@langwatch/design-system/primitives";
+import { useState } from "react";
 
 /** The caller resolves failures and reports the outcome after pushing replicas. */
 
@@ -20,38 +22,42 @@ export type AgentPushDialogProps = {
 };
 
 export function AgentPushDialog(props: AgentPushDialogProps) {
-  const { open, agentName, isLoading, selectedCopyIds, isPushing, onClose, onPush } = props;
+  const { open, agentName, copies, isLoading, selectedCopyIds, isPushing, onClose, onPush } = props;
+  const [attempted, setAttempted] = useState(false);
+  const nothingSelected = selectedCopyIds.size === 0;
+  let unavailable: string | undefined;
+  if (isLoading) unavailable = "Replicas are still loading";
+  else if (copies.length === 0) unavailable = "There are no replicas to push to";
+  const push = () => {
+    if (isPushing) return;
+    if (nothingSelected) return setAttempted(true);
+    void onPush();
+  };
   return (
-    <Dialog.Root open={open} onOpenChange={(event) => !event.open && onClose()}>
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Push to Replicas</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="start">
-            <Text fontSize="sm" color="fg.muted">
-              {`Select which replicas to push "${agentName}" to:`}
-            </Text>
-            <ReplicaSelection {...props} />
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={() => void onPush()}
-            loading={isPushing}
-            disabled={selectedCopyIds.size === 0 || isLoading}
-          >
-            Push to {selectedCopyIds.size} replica
-            {selectedCopyIds.size === 1 ? "" : "s"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Push to Replicas"
+      busy={isPushing}
+      primaryAction={{
+        label: `Push to ${selectedCopyIds.size} replica${selectedCopyIds.size === 1 ? "" : "s"}`,
+        onClick: push,
+        loading: isPushing,
+        disabledReason: unavailable,
+      }}
+    >
+      <VStack gap={4} align="start">
+        <Text fontSize="sm" color="fg.muted">
+          {`Select which replicas to push "${agentName}" to:`}
+        </Text>
+        <ReplicaSelection {...props} />
+        {attempted && nothingSelected && copies.length > 0 && (
+          <Text role="alert" color="red.fg" textStyle="sm">
+            Select at least one replica to push to.
+          </Text>
+        )}
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -69,7 +75,14 @@ function ReplicaSelection({
         {errorMessage}
       </Text>
     );
-  if (copies.length === 0) return <Text color="fg.muted">No replicas found.</Text>;
+  if (copies.length === 0) {
+    return (
+      <NoDataInfoBlock
+        size="line"
+        title="No replicas found. Use Replicate to another project on this agent's menu to create one."
+      />
+    );
+  }
 
   return (
     <VStack gap={2} align="start" width="full">

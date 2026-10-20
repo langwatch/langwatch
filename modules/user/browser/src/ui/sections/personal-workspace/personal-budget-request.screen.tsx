@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Alert,
@@ -165,13 +166,7 @@ export function PersonalBudgetRequestScreen() {
           {!noOrg && submitState !== "sent" && (
             <>
               {hasContext ? (
-                <Box
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="md"
-                  padding={4}
-                  backgroundColor="bg.subtle"
-                >
+                <Card variant="nested">
                   <Text
                     fontSize="xs"
                     color="fg.muted"
@@ -187,7 +182,7 @@ export function PersonalBudgetRequestScreen() {
                     <ContextRow label="Spent so far" value={fmtUsd(spentUsd ?? 0)} tone="red" />
                     <ContextRow label="Current limit" value={fmtUsd(limitUsd ?? 0)} />
                   </VStack>
-                </Box>
+                </Card>
               ) : (
                 <Alert.Root status="warning">
                   <Alert.Indicator>
@@ -203,7 +198,7 @@ export function PersonalBudgetRequestScreen() {
                 </Alert.Root>
               )}
 
-              <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4}>
+              <Card>
                 <HStack marginBottom={2} fontSize="sm" color="fg.muted">
                   <Mail size={14} />
                   <Text>
@@ -220,7 +215,7 @@ export function PersonalBudgetRequestScreen() {
                   minHeight="100px"
                   resize="vertical"
                 />
-              </Box>
+              </Card>
 
               <HStack>
                 <Spacer />

@@ -139,6 +139,9 @@ local totalDropped = pendingCount
 
 redis.call("DEL", jobsKey)
 redis.call("DEL", dataKey)
+-- A claimed record (":active" is 7 chars) would put a dead worker's jobs back into the
+-- emptied group on the next claim; draining throws them away with the rest.
+redis.call("DEL", string.sub(activeKey, 1, #activeKey - 7) .. ":claimed")
 redis.call("DEL", activeKey)
 redis.call("DEL", errorKey)
 -- Draining empties the group for a fresh start, so EVERY counter that decides
@@ -465,6 +468,23 @@ export class QueueRedisRepository extends QueueRepository {
     } while (cursor !== "0");
 
     return Array.from(names);
+  }
+
+  /** Each queue's total-pending counter, floored by its ready groups, as the drain audit reads. */
+  async countWaitingJobs(): Promise<number> {
+    const queueNames = await this.discoverQueueNames();
+    const counts = await Promise.all(
+      queueNames.map(async (queueName) => {
+        const prefix = `${queueName}:gq:`;
+        const [totalPending, ready] = await Promise.all([
+          this.redis.get(`${prefix}stats:total-pending`),
+          this.redis.zcard(`${prefix}ready`),
+        ]);
+        const total = Number(totalPending);
+        return Number.isFinite(total) ? Math.max(total, ready) : ready;
+      }),
+    );
+    return counts.reduce((sum, count) => sum + count, 0);
   }
 
   async scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]> {

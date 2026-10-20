@@ -12,7 +12,7 @@ import { createApp } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import { isMigrationStep } from "@langwatch/upgrade/step";
+import { isDeclaredMigrationStep, isMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -37,6 +37,7 @@ async function bootIdentity() {
         passkeysEnabled: false,
         mfaEnrollmentOpen: false,
         localPasswords: false,
+        identifierBackfillMaxQueuedJobs: 5000,
       },
     })
     .withEventing(new EventSourcing({ enabled: false, processManagerMode: "producer-only" }))
@@ -62,7 +63,10 @@ const STEP = "identity:reopen-unproven-accounts-after-rollout";
 
 async function stepOnFreshIdentity() {
   const runtime = await bootIdentity();
-  const step = runtime.migrationSteps(isMigrationStep).find((candidate) => candidate.id === STEP);
+  const step = runtime
+    .migrationSteps(isDeclaredMigrationStep)
+    .filter(isMigrationStep)
+    .find((candidate) => candidate.id === STEP);
   if (!step) throw new Error(`step ${STEP} is not declared`);
   return { runtime, step };
 }

@@ -5,8 +5,9 @@
  */
 
 import { useDrawer } from "@langwatch/browser-host/drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, VStack } from "@langwatch/design-system/primitives";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import type { ReactNode } from "react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
 import { RunDrawerContent } from "./run-drawer-content.tsx";
@@ -16,8 +17,24 @@ import {
   type RunDrawerState,
   useRunDrawerState,
   useRunDrawerStop,
-  WIDE_DRAWER_MAX_WIDTH,
 } from "./use-run-drawer-state.ts";
+
+/** The run's own ground, under the transcript and the results. */
+function RunSurface({ children }: { children: ReactNode }) {
+  return (
+    <Box
+      display="flex"
+      flexDirection="column"
+      flex={1}
+      minHeight={0}
+      width="full"
+      overflow="hidden"
+      bg="bg.card"
+    >
+      {children}
+    </Box>
+  );
+}
 
 /**
  * What the run drawer reads when the run behind the address cannot be read.
@@ -25,14 +42,13 @@ import {
  */
 function RunDrawerErrorBody({ error }: { error: unknown }) {
   return (
-    <Drawer.Body bg={"bg.card"}>
-      <VStack gap={3} align="start" w="100%" pt={4}>
-        <Drawer.CloseTrigger />
+    <RunSurface>
+      <VStack gap={3} align="start" w="100%" pt={4} paddingX={4}>
         <Box width="100%">
           <HandledErrorAlert error={error} fallbackTitle="Failed to load run" />
         </Box>
       </VStack>
-    </Drawer.Body>
+    </RunSurface>
   );
 }
 
@@ -41,36 +57,35 @@ function RunDrawerErrorBody({ error }: { error: unknown }) {
  * layout does not appear piece by piece while the reader waits: only a read
  * that is still on its way, or one that failed, draws something else.
  */
-function RunDrawerBody({
+function RunDrawerBody({ state }: { state: RunDrawerState }) {
+  // While the read is on its way the drawer must not say "Queued": that is a
+  // status of the run, not a report on our own request.
+  if (state.isReadingRun) return <RunDrawerLoadingBody />;
+  if (state.readFailed) return <RunDrawerErrorBody error={state.detail.runStateError} />;
+  return (
+    <RunSurface>
+      <RunDrawerContent detail={state.detail} isSideBySide={state.isSideBySide} />
+    </RunSurface>
+  );
+}
+
+/** The header band, on the run's ground; the frame's 3rem for the X is painted through. */
+function RunDrawerHeader({
   state,
   stop,
 }: {
   state: RunDrawerState;
   stop: ReturnType<typeof useRunDrawerStop>;
 }) {
-  const { detail } = state;
-
-  // While the read is on its way the drawer must not say "Queued": that is a
-  // status of the run, not a report on our own request.
-  if (state.isReadingRun) return <RunDrawerLoadingBody />;
-  if (state.readFailed) {
-    return <RunDrawerErrorBody error={detail.runStateError} />;
-  }
-
+  if (state.isReadingRun || state.readFailed) return null;
   return (
-    <Drawer.Body
-      paddingY={0}
-      paddingX={0}
-      display="flex"
-      flexDirection="column"
-      width="full"
-      height="full"
-      overflow="hidden"
-      bg={"bg.card"}
-    >
-      <RunDrawerHeaderBand detail={detail} scenarioVersion={state.scenarioVersion} stop={stop} />
-      <RunDrawerContent detail={detail} isSideBySide={state.isSideBySide} />
-    </Drawer.Body>
+    <Box bg="bg.card" borderTopRadius="lg" width="calc(100% + 3rem)">
+      <RunDrawerHeaderBand
+        detail={state.detail}
+        scenarioVersion={state.scenarioVersion}
+        stop={stop}
+      />
+    </Box>
   );
 }
 
@@ -87,27 +102,18 @@ export function AgentTestingRunDrawer({ open }: { open?: boolean }) {
   });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!open}
-      // Only a close is a close. The handler is called on every change of the
-      // open state, so one that reads nothing closes the drawer the moment it
-      // is asked to open, and the run that opened it lands on a bare page.
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
-      }}
-      placement="end"
-      size="lg"
+      // Only a close is a close: asking to open must not close the drawer, and
+      // the run that opened it would land on a bare page.
+      onClose={closeDrawer}
+      size="wide"
+      title="Run details"
+      chrome="content"
+      headerContent={<RunDrawerHeader state={state} stop={stop} />}
+      data-testid="agent-testing-run-drawer"
     >
-      <Drawer.Content
-        bg="transparent"
-        paddingX={0}
-        maxWidth={WIDE_DRAWER_MAX_WIDTH}
-        overflow="hidden"
-        borderRadius="lg"
-        data-testid="agent-testing-run-drawer"
-      >
-        <RunDrawerBody state={state} stop={stop} />
-      </Drawer.Content>
-    </Drawer.Root>
+      <RunDrawerBody state={state} />
+    </Drawer>
   );
 }

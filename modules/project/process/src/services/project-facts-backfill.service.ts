@@ -1,84 +1,119 @@
 /**
- * The project fact steps' backfill: each organization's existing projects recorded as one fact
- * (created, department or presence), a page of organizations at a time, resuming after the last
- * page saved. Spec: modules/project/specs/project-service.feature
+ * The project facts step: one pass over the projects table, a page at a time in id order, each
+ * page's created facts, then department assignments, then presence settings sent as one batch
+ * each. Spec: modules/project/specs/project-service.feature
  */
-import { ORGANIZATION_ID_PAGE_LIMIT, type OrganizationApi } from "@langwatch/organization-contract";
+import { nowInstant } from "@langwatch/time";
 
-type ProjectFactsBackfillPeers = Readonly<{
-  organizations: Pick<OrganizationApi, "listAllIds">;
-  /** Records one organization's projects' fact; answers how many projects it recorded. */
-  record: (input: { organizationId: string }) => Promise<number>;
-  /** Counts what `record` would record, writing nothing; absent, a dry run counts no projects. */
-  preview?: (input: { organizationId: string }) => Promise<number>;
-}>;
+import type {
+  ProjectBackfillEntry,
+  ProjectBackfillRow,
+  ProjectRepository,
+} from "../repositories/project.repository.ts";
+import type { ProjectCreatedNoticeService } from "./project-created-notice.service.ts";
 
-type ProjectFactsBackfillReport = {
-  afterOrganizationId: string | null;
-  organizations: number;
+const PAGE_SIZE = 2000;
+
+/** How many skipped project ids the report names; the count covers the rest. */
+const ORPHAN_IDS_REPORTED = 20;
+
+export type ProjectFactsBackfillReport = {
   projects: number;
+  departmentAssignments: number;
+  presenceSettings: number;
+  /** Projects whose team or organization is gone, so the step records nothing for them. */
+  skippedOrphans: number;
+  orphanProjectIds: string[];
 };
 
+export type ProjectFactsBackfillRun = Readonly<{
+  dryRun: boolean;
+  signal: AbortSignal;
+  afterProjectId: string | null;
+  /** What the run this one resumes had counted, so the report totals every attempt. */
+  countedBefore: ProjectFactsBackfillReport;
+  onPageDone: (input: {
+    afterProjectId: string;
+    report: ProjectFactsBackfillReport;
+  }) => Promise<void>;
+}>;
+
+type Dependencies = Readonly<{
+  projects: Pick<ProjectRepository, "findBackfillPage">;
+  lifecycle: Pick<ProjectCreatedNoticeService, "recordBackfillPage">;
+  logger: Readonly<{ warn(payload: Readonly<Record<string, unknown>>, message: string): void }>;
+}>;
+
+/**
+ * Every project is recorded as created, archived ones included; a live project also has its
+ * department and presence setting recorded. Keyed per project, so a rerun adds nothing new.
+ * A project left without a team or organization is skipped and counted, never retried.
+ */
 export class ProjectFactsBackfillService {
-  private constructor(private readonly peers: ProjectFactsBackfillPeers) {}
+  private constructor(private readonly deps: Dependencies) {}
 
-  static create({ peers }: { peers: ProjectFactsBackfillPeers }): ProjectFactsBackfillService {
-    return new ProjectFactsBackfillService(peers);
+  static create(deps: Dependencies): ProjectFactsBackfillService {
+    return new ProjectFactsBackfillService(deps);
   }
 
-  /**
-   * Each organization after `after`, a page at a time; `onPage` hears the last organization of
-   * each completed page, never on a dry run. Stops between organizations on abort.
-   */
-  async backfill({
-    after,
+  async recordExisting({
     dryRun,
     signal,
-    onPage,
-  }: {
-    after: string | undefined;
-    dryRun: boolean;
-    signal: AbortSignal;
-    onPage: (page: { afterOrganizationId: string }) => Promise<void>;
-  }): Promise<ProjectFactsBackfillReport> {
-    const totals = { organizations: 0, projects: 0 };
-    let cursor = after;
-    let hasMore = true;
-    while (hasMore && !signal.aborted) {
-      const page = await this.peers.organizations.listAllIds({
-        after: cursor,
-        limit: ORGANIZATION_ID_PAGE_LIMIT,
-      });
-      const completed = await this.recordPage({ ids: page.ids, dryRun, signal, totals });
-      const last = page.ids.at(-1);
-      if (completed && last !== undefined) {
-        cursor = last;
-        if (!dryRun) await onPage({ afterOrganizationId: last });
+    afterProjectId,
+    countedBefore,
+    onPageDone,
+  }: ProjectFactsBackfillRun): Promise<ProjectFactsBackfillReport> {
+    const report: ProjectFactsBackfillReport = {
+      ...countedBefore,
+      orphanProjectIds: [...countedBefore.orphanProjectIds],
+    };
+    let cursor = afterProjectId;
+    while (!signal.aborted) {
+      // Taken before the read, so a change saved meanwhile is the newer fact.
+      const occurredAt = nowInstant().epochMilliseconds;
+      const page = await this.deps.projects.findBackfillPage({ afterId: cursor, limit: PAGE_SIZE });
+      const last = page.at(-1);
+      if (!last) break;
+      const { projects, orphanIds } = splitEntries(page);
+      const live: ProjectBackfillRow[] = projects.filter((project) => !project.isArchived);
+      if (!dryRun && projects.length > 0) {
+        await this.deps.lifecycle.recordBackfillPage({ created: projects, live, occurredAt });
       }
-      hasMore = completed && page.next !== null;
+      this.warnSkipped(orphanIds);
+      report.projects += projects.length;
+      report.departmentAssignments += live.length;
+      report.presenceSettings += live.length;
+      report.skippedOrphans += orphanIds.length;
+      report.orphanProjectIds = [...report.orphanProjectIds, ...orphanIds].slice(
+        0,
+        ORPHAN_IDS_REPORTED,
+      );
+      cursor = last.kind === "whole" ? last.project.id : last.id;
+      if (!dryRun) await onPageDone({ afterProjectId: cursor, report: { ...report } });
     }
-    return { afterOrganizationId: cursor ?? null, ...totals };
+    return report;
   }
 
-  /** One page's organizations; false when the signal stopped it part way. */
-  private async recordPage({
-    ids,
-    dryRun,
-    signal,
-    totals,
-  }: {
-    ids: readonly string[];
-    dryRun: boolean;
-    signal: AbortSignal;
-    totals: { organizations: number; projects: number };
-  }): Promise<boolean> {
-    for (const organizationId of ids) {
-      if (signal.aborted) return false;
-      totals.projects += dryRun
-        ? ((await this.peers.preview?.({ organizationId })) ?? 0)
-        : await this.peers.record({ organizationId });
-      totals.organizations += 1;
+  private warnSkipped(orphanIds: readonly string[]): void {
+    for (const projectId of orphanIds) {
+      this.deps.logger.warn(
+        { projectId },
+        "the project facts step skipped a project whose team or organization no longer exists",
+      );
     }
-    return true;
   }
+}
+
+/** A page's whole projects and the ids of its orphans, each in id order. */
+function splitEntries(page: readonly ProjectBackfillEntry[]): {
+  projects: ProjectBackfillRow[];
+  orphanIds: string[];
+} {
+  const projects: ProjectBackfillRow[] = [];
+  const orphanIds: string[] = [];
+  for (const entry of page) {
+    if (entry.kind === "whole") projects.push(entry.project);
+    else orphanIds.push(entry.id);
+  }
+  return { projects, orphanIds };
 }

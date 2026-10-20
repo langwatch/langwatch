@@ -228,6 +228,7 @@ async function harness({
   };
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: async () => {} },
     identity,
   });
   const keyedContext = [

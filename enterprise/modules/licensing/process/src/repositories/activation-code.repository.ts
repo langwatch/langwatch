@@ -14,7 +14,9 @@ export interface ActivationCodeRecord {
   email: string;
   planType: string;
   maxMembers: number;
-  maxMembersLite: number;
+  /** Null when `liteSeatsUnlimited`. */
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   licenseTermDays: number;
   services: string[];
   expiresAt: Instant;
@@ -35,8 +37,8 @@ export type ActivationCodeDraft = Readonly<{
   email: string;
   planType: string;
   maxMembers: number;
-  /** Undefined is the column's own default of none. */
-  maxMembersLite: number | undefined;
+  maxMembersLite: number | null;
+  liteSeatsUnlimited: boolean;
   licenseTermDays: number;
   services: string[];
   expiresAt: Instant;

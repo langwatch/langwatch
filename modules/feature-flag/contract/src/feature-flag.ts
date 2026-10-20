@@ -151,7 +151,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. A self-serve organization on the hosted service switches them on itself from the search bar, and that opt-in counts whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals, whatever this says; one that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
+      "The operator's switch for Instant Evals and the LangWatchQL eval functions, the judged columns that classify a conversation, a trace or any text a query projects. Off by default; enable per project or organization via a targeting rule, which is how an enterprise organization that asked gets them. On the hosted service this releases an enterprise organization only: a self-serve one is released by switching them on itself from the search bar, whatever this says. A self-hosted install that judges through Connect is released by a license that names Instant Evals alone, and this never releases it; only a development checkout that judges with its own key still needs this. A deployment with no classifier configured keeps them unavailable either way.",
   },
   {
     key: "release_lwql_workbench",
@@ -176,6 +176,13 @@ export const FEATURE_FLAGS = [
       "Offers the trained annotations evaluator in evaluator selection. Off by default; operators can enable it per project or organization.",
   },
   {
+    key: "release_scenario_go_runner_enabled",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
+  },
+  {
     key: "release_voice_agents_enabled",
     scope: "PRODUCT",
     defaultValue: false,
@@ -189,7 +196,7 @@ export const FEATURE_FLAGS = [
     scope: "PRODUCT",
     defaultValue: true,
     description:
-      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline, where the 256 KB per-value cap applies. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline and the same 256 KB cap applies.",
+      "Routes over-threshold OTLP spans through a transient S3 spool at the ingestion edge so oversized attribute values reach the trace intact (ADR-022). On by default; switch it off fleet-wide or per project to keep spans inline. Deployments with no reachable object storage keep ingesting either way: the edge falls back inline. Both routes keep attribute values up to 8 MiB whole.",
   },
   // Externalizes inline media to stored-objects store at ingestion edge;
   // currently opt-in (ADR pending).
@@ -273,20 +280,18 @@ export const FEATURE_FLAGS = [
       "Lets the agent drive the open page through typed UI actions (spec: specs/langy/langy-ui-actions.feature): `langwatch ui call` dispatches a manifest-validated action over the turn's live stream, the attached page claims and executes it, and the result returns to the agent in the same call. Off = the dispatch surface 404s like it was never deployed and the panel ignores `ui` stream entries; the rollback position loses live page control and nothing else. Managed only from the internal flag store (/ops/feature-flags).",
   },
   {
-    key: "release_custom_chart_playground",
-    scope: "SYSTEM",
-    defaultValue: false,
-    envOverridable: false,
-    family: "Custom Chart Playground",
-    description:
-      "Opens the custom-chart-playground page, its playground-widget REST routes, and the Langy skill that drives them, outside local development — otherwise all three are dev-only unconditionally. Default off, so the surface stays dev-only until someone is explicitly opted in. Managed only from the internal flag store: toggle it, or add per-project/per-org targeting rules, via /ops/feature-flags. For local dev use FEATURE_FLAG_FORCE_ENABLE=release_custom_chart_playground.",
-  },
-  {
-    key: "release_ui_home_signal_focused_enabled",
+    key: "release_dashboards",
     scope: "PRODUCT",
     defaultValue: false,
     description:
-      "Switches the project home to the signal-focused composition — the briefing sheet leads, the chrome grid and recent work follow (spec: modules/project/specs/signal-focused-home-rollout.feature). Deliberately decoupled from release_langy_enabled: this flag alone decides the home's composition, while Langy access only decides whether the sheet's hand-to-Langy affordances render. Default off = classic home. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_ui_home_signal_focused_enabled.",
+      "Opens the Dashboards area (/[project]/dashboards): the Agent Flight Deck and the member's own boards, as a product in the product switcher and saved-dashboards list (spec: modules/dashboard/specs/dashboards-v1.feature). With release_lwql_workbench also on, members build and edit widgets on boards. While it is on, Langy offers its dashboard-widgets skill instead of lwql-charts. Default off; while off the area answers not-found and the sidebar shows no entry. Legacy analytics is untouched either way. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_dashboards.",
+  },
+  {
+    key: "release_insights",
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Opens the Insights inbox (/[project]/insights): each person's own saved insights for the project, which only they read, in Inbox, Stale and Archived folders, the sidebar entry with its unread count, the topbar bell, and 'Save as insight' under a Langy answer (spec: modules/insight/specs/insight-inbox.feature). Default off; while off the page answers not-found, the chrome shows nothing and every insights procedure refuses with insights_not_enabled. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=release_insights.",
   },
   {
     key: "release_ui_comparison_leaderboard_enabled",
@@ -310,17 +315,8 @@ export const FEATURE_FLAGS = [
     description:
       "Unlocks Agent Testing, the v2 interface for simulations (specs under specs/features/agent-testing/): one page with the scenarios and the results in tabs, test suites as folders of scenarios, run notes, scenario versions, and a wider run drawer that puts the results beside the conversation. Flag off leaves the Simulations pages and menu group exactly as they were; the flag only decides which interface renders, and the backend additions it uses are unflagged. Default on, so a self-hosted installation reads Agent Testing with no rule; a rule keeps a project or an organization on the Simulations pages. Every simulations address redirects to Agent Testing while the flag is on.",
   },
-  {
-    // D12 (ADR-117). Named `join_requests` rather than the usual
-    // `release_...` prefix so its auto-derived env override is exactly
-    // `JOIN_REQUESTS`, which is the operator lever the epic names and the
-    // one thing rollback consists of.
-    key: "join_requests",
-    scope: "PRODUCT",
-    defaultValue: false,
-    description:
-      "Lets somebody with a verified company address find the organization their colleagues are already in and ask to join it, and lets an administrator turn that into automatic joining for a domain they name (spec: specs/identity/join-requests.feature, join-matching-and-privacy.feature, domain-auto-join.feature, join-before-create.feature). Off = the sign-up interstitial never renders, the members area shows no requests section, the lookup answers nothing to everyone, and no join command is ever dispatched. This is the whole of the rollback. Force-enable in dev via FEATURE_FLAG_FORCE_ENABLE=join_requests, or set JOIN_REQUESTS=1 on a deployment.",
-  },
+  // `join_requests` (D12, ADR-117) was here and is retired, as on main: the
+  // lookup's own rules and the Access page setting are the only gates.
   {
     // D05 tier 3 (ADR-117). Named so its env override is exactly `SELF_SERVE_SSO`,
     // the per-organization lever whose rollback is the whole of tier 3's.

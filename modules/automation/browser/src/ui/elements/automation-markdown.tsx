@@ -5,6 +5,7 @@
  */
 
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import Markdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 
@@ -14,7 +15,7 @@ export function AutomationMarkdown({ children, ...props }: BoxProps & { children
       css={{
         "& p": { marginBottom: "0.5rem" },
         "& p:last-child": { marginBottom: 0 },
-        "& code": { fontSize: "0.85em" },
+        "& code": { fontSize: `${TYPE_SCALE_PX.caption}px` },
         "& ul, & ol": { paddingLeft: "1.25rem" },
       }}
       {...props}

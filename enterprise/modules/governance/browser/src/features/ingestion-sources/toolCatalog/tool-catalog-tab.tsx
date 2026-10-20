@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { HStack, Spinner, Text } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { AiToolEntry } from "@langwatch/enterprise-governance-contract";
 import { HandledErrorAlert } from "@langwatch/error-views";
 import { Boxes } from "lucide-react";
@@ -97,14 +97,7 @@ export function ToolCatalogTab({
   // its failure is the reader's problem while it is on — the banner above has
   // already said nothing on screen is real.
   if (!sampleActive && isLoading) {
-    return (
-      <HStack padding={6} justifyContent="center" gap={2}>
-        <Spinner size="sm" />
-        <Text fontSize="sm" color="fg.muted">
-          Loading the catalog…
-        </Text>
-      </HStack>
-    );
+    return <SkeletonRows rows={5} leading label="Loading the catalog" />;
   }
 
   if (!sampleActive && error) {

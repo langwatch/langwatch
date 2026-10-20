@@ -1,9 +1,11 @@
 import type { FilterField } from "@langwatch/analytics-filters";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Menu } from "@langwatch/design-system/menu";
 import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import qs from "qs";
 import { X } from "react-feather";
+import { LuCheck, LuEllipsis } from "react-icons/lu";
 
 import { URL_QS_PARSE_OPTIONS } from "../../../../model/analytics/qs-parse-options.ts";
 import { type FilterParam, useFilterParams } from "../use-filter-params.ts";
@@ -134,21 +136,26 @@ export function FilterToggleButton({
           </Button>
         </Tooltip>
       )}
-      {setNegateFilters && (
-        <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
-          <Button
-            variant="plain"
-            width="fit-content"
-            minWidth={0}
-            backgroundColor={negateFiltersToggled ? "bg.muted" : undefined}
-            onClick={(e) => {
-              e.stopPropagation();
-              setNegateFilters(!negateFiltersToggled);
-            }}
-          >
-            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span> Negate Filters
-          </Button>
-        </Tooltip>
+      {hasAnyFilters && setNegateFilters && (
+        <Menu.Root>
+          <Menu.Trigger asChild>
+            <Button size="sm" variant="ghost" aria-label="More filter actions">
+              <LuEllipsis aria-hidden="true" />
+            </Button>
+          </Menu.Trigger>
+          <Menu.Content>
+            <Menu.Item
+              value="negate-filters"
+              onClick={() => setNegateFilters(!negateFiltersToggled)}
+            >
+              <LuCheck
+                aria-hidden="true"
+                visibility={negateFiltersToggled ? "visible" : "hidden"}
+              />{" "}
+              Negate filters
+            </Menu.Item>
+          </Menu.Content>
+        </Menu.Root>
       )}
     </HStack>
   );

@@ -91,3 +91,9 @@ Feature: The worker runs the operational loops nobody else can
       Given two configured endpoints, one of which refuses the read
       When the collection ticks
       Then the reachable endpoint is still reported
+
+    @unit
+    Scenario: An overloaded ClickHouse refusing the read is a warning, not an error
+      Given an endpoint that refuses the read because ClickHouse is overloaded
+      When the collection ticks
+      Then the failed read is logged as a warning, and the next tick reads it again

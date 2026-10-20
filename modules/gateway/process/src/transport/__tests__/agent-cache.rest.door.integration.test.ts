@@ -64,6 +64,7 @@ function mount({ grants }: { grants: readonly string[] }) {
   };
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate, identify },
   });
   const hono = runtime.mount(agentCacheRest.router(), {

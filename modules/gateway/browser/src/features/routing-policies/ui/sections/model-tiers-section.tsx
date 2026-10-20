@@ -1,6 +1,6 @@
+import { Card } from "@langwatch/design-system/card";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
-  Box,
   Code,
   Field,
   HStack,
@@ -83,22 +83,11 @@ export function ModelTiersSection({
         </Field.HelperText>
       </Field.Root>
 
-      <Box
-        borderWidth="1px"
-        borderColor="border.muted"
-        borderRadius="md"
-        backgroundColor="bg.subtle"
-        padding={3}
-      >
-        <VStack align="start" gap={1}>
-          <Text fontSize="xs" fontWeight="semibold">
-            What a client sends
-          </Text>
-          <Code fontSize="xs" whiteSpace="pre" padding={2} width="full">
-            {modelTierRequestSnippet(MODEL_TIERS[0])}
-          </Code>
-        </VStack>
-      </Box>
+      <Card variant="nested" padding="sm" titleLevel={3} title="What a client sends">
+        <Code fontSize="xs" whiteSpace="pre" padding={2} width="full">
+          {modelTierRequestSnippet(MODEL_TIERS[0])}
+        </Code>
+      </Card>
     </VStack>
   );
 }
@@ -131,7 +120,7 @@ function TierRow({
   const isKnownOption = options.some((option) => option.modelId === value);
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={3}>
+    <Card variant="frame" padding="sm">
       <VStack align="stretch" gap={2}>
         <HStack gap={2} alignItems="baseline" flexWrap="wrap">
           <Code fontSize="xs">{tier}</Code>
@@ -166,6 +155,6 @@ function TierRow({
           </Text>
         )}
       </VStack>
-    </Box>
+    </Card>
   );
 }

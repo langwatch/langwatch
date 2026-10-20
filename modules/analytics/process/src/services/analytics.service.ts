@@ -1,6 +1,13 @@
+import { createHash } from "node:crypto";
+
 import {
+  analyticsFeedbacksPageParamsSchema,
   analyticsMetricAggregations,
   analyticsTimeseriesInputSchema,
+  ANALYTICS_FEEDBACKS_PAGE_DEFAULT_LIMIT,
+  type AnalyticsFeedbacksCursor,
+  type AnalyticsFeedbacksPageParams,
+  type AnalyticsFeedbacksPageResult,
   type AnalyticsFeedbacksResult,
   type AnalyticsReadInput,
   type AnalyticsTopDocumentsResult,
@@ -24,6 +31,7 @@ import {
   type Instant,
 } from "@langwatch/time";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
+import { z } from "zod";
 
 import type { AnalyticsEvaluationRepository } from "../repositories/analytics-persistence.repository.ts";
 import type {
@@ -145,6 +153,33 @@ function refuseDisallowedSeriesAggregations(input: AnalyticsTimeseriesInput): vo
       );
     }
   }
+}
+
+function sortedObjectKeys(_key: string, value: unknown): unknown {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return value;
+  return Object.fromEntries(Object.entries(value).toSorted(([a], [b]) => a.localeCompare(b)));
+}
+
+/**
+ * What a feedbacks cursor is tied to: the project and the filters that pick the rows. The
+ * window is left out, so a "last 7 days" page request that moved its end still continues.
+ */
+function feedbacksCursorScope(input: AnalyticsReadInput): string {
+  return createHash("sha256")
+    .update(JSON.stringify([input.projectId, input.filters ?? {}], sortedObjectKeys))
+    .digest("hex");
+}
+
+function refuseInvalidFeedbacksPage(error: z.ZodError): never {
+  throw new ValidationError("Invalid feedbacks page request", {
+    meta: { fieldErrors: z.flattenError(error).fieldErrors },
+  });
+}
+
+function refuseForeignFeedbacksCursor(): never {
+  throw new ValidationError("This cursor belongs to a different project or filter set", {
+    meta: { fieldErrors: { cursor: ["Start again from the first page."] } },
+  });
 }
 
 export class AnalyticsService {
@@ -294,6 +329,50 @@ export class AnalyticsService {
         span.setAttribute("event.count", result.events.length);
 
         return result;
+      } catch (error) {
+        span.recordException(error instanceof Error ? error : String(error));
+        span.setStatus({ code: SpanStatusCode.ERROR });
+
+        throw error;
+      } finally {
+        span.end();
+      }
+    });
+  }
+
+  async getFeedbacksPage(
+    input: AnalyticsReadInput & AnalyticsFeedbacksPageParams,
+  ): Promise<AnalyticsFeedbacksPageResult> {
+    const page = analyticsFeedbacksPageParamsSchema.safeParse({
+      cursor: input.cursor,
+      limit: input.limit,
+    });
+    if (!page.success) refuseInvalidFeedbacksPage(page.error);
+    const scope = feedbacksCursorScope(input);
+    if (page.data.cursor && page.data.cursor.scope !== scope) refuseForeignFeedbacksCursor();
+    const limit = page.data.limit ?? ANALYTICS_FEEDBACKS_PAGE_DEFAULT_LIMIT;
+
+    const span = this.tracer.startSpan("AnalyticsService.getFeedbacksPage", {
+      attributes: { "tenant.id": input.projectId },
+    });
+    const activeContext = trace.setSpan(context.active(), span);
+
+    return context.with(activeContext, async (): Promise<AnalyticsFeedbacksPageResult> => {
+      try {
+        const read = await this.repository.findFeedbackEventsPage({
+          projectId: input.projectId,
+          startDate: input.startDate,
+          endDate: input.endDate,
+          filters: input.filters,
+          after: page.data.cursor?.after,
+          limit,
+        });
+        span.setAttribute("event.count", read.rows.length);
+        const events = read.rows.map((row) => row.event);
+        const last = read.rows.at(-1);
+        if (!read.hasMore || !last) return { hasMore: false, events };
+        const nextCursor: AnalyticsFeedbacksCursor = { scope, after: last.position };
+        return { hasMore: true, events, nextCursor };
       } catch (error) {
         span.recordException(error instanceof Error ? error : String(error));
         span.setStatus({ code: SpanStatusCode.ERROR });

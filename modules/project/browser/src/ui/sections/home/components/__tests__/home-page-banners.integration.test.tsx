@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import type React from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -17,8 +17,6 @@ vi.mock("../../../../../behavior/langy/langy.store.ts", () => ({
 }));
 
 vi.mock("@langwatch/design-system/langy-mark", () => ({ LangyMark: () => null }));
-
-vi.mock("../../../../../model/langy/asaplangy-tokens.ts", () => ({ SERIF: "serif" }));
 
 import {
   ProjectHomeHostProvider,
@@ -38,9 +36,11 @@ const routerPush = vi.fn();
 const hostState: {
   project: ProjectHomeProject | undefined;
   reducedMotion: boolean;
+  langy: boolean;
 } = {
   project: { id: "project-1", name: "My Project", slug: "my-project" },
   reducedMotion: false,
+  langy: false,
 };
 
 class StubProjectHomeHost extends ProjectHomeHost {
@@ -60,7 +60,7 @@ class StubProjectHomeHost extends ProjectHomeHost {
     return false;
   }
   langyVisibility(): ProjectHomeLangyVisibility {
-    return { show: false, isResolving: false };
+    return { show: hostState.langy, isResolving: false };
   }
   canAskLangy(): boolean {
     return false;
@@ -78,9 +78,6 @@ class StubProjectHomeHost extends ProjectHomeHost {
 
 const VOICE_KEY = "langwatch:voice-agents-home-banner-dismissed:v1:project-1";
 const AUTOMATIONS_KEY = "langwatch:automations-home-banner-dismissed:v1:project-1";
-
-/** The pill row next to a slide's heading — where the "New" badge lives. */
-const headingRow = (name: string) => within(screen.getByRole("heading", { name }).parentElement!);
 
 function renderWithProviders(ui: React.ReactElement) {
   return render(
@@ -114,6 +111,7 @@ describe("<HomePageBanners />", () => {
     askLangy.mockClear();
     hostState.project = { id: "project-1", name: "My Project", slug: "my-project" };
     hostState.reducedMotion = false;
+    hostState.langy = false;
   });
 
   afterEach(() => {
@@ -122,27 +120,20 @@ describe("<HomePageBanners />", () => {
     localStorage.clear();
   });
 
-  it("leads with the automations banner, with dots, when all are eligible", () => {
+  it("leads with the automations announcement, with a segment per announcement", () => {
     renderWithProviders(<HomePageBanners />);
-    expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
-    // Two eligible banners → two navigation dots.
+    expect(screen.getByText("React the moment it matters")).toBeDefined();
     expect(screen.getByRole("button", { name: "Show announcement 1 of 2" })).toBeDefined();
     expect(screen.getByRole("button", { name: "Show announcement 2 of 2" })).toBeDefined();
   });
 
-  it("keeps the full-colour banner for users outside the Langy rollout", () => {
-    const { container } = renderWithProviders(<HomePageBanners variant="legacy" />);
-
-    expect(container.querySelector('[data-banner-variant="legacy"]')).not.toBeNull();
-    expect(screen.queryByRole("button", { name: "Previous announcement" })).toBeNull();
-  });
-
-  it("carries every announcement, with dots to move between them", () => {
-    // Every slide in the rotation shows, always — an announcement stands until
-    // it is taken out in code, so there is no state that can reduce the set.
-    renderWithProviders(<HomePageBanners />);
-    expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
-    expect(screen.getAllByRole("button", { name: /Show announcement/ }).length).toBeGreaterThan(1);
+  it("lays what it is given over the same ground", () => {
+    renderWithProviders(
+      <HomePageBanners>
+        <div data-testid="hero" />
+      </HomePageBanners>,
+    );
+    expect(screen.getByTestId("hero")).toBeDefined();
   });
 
   it("renders nothing before the project id resolves", () => {
@@ -150,12 +141,8 @@ describe("<HomePageBanners />", () => {
     // would push /undefined/automations.
     hostState.project = undefined;
     renderWithProviders(<HomePageBanners />);
-    expect(screen.queryByRole("heading", { name: "React the moment it matters" })).toBeNull();
-    expect(
-      screen.queryByRole("heading", {
-        name: "Voice agent simulations are here",
-      }),
-    ).toBeNull();
+    expect(screen.queryByText("React the moment it matters")).toBeNull();
+    expect(screen.queryByText("Voice agent simulations are here")).toBeNull();
   });
 
   it("shows an announcement a reader had previously hidden", () => {
@@ -164,7 +151,7 @@ describe("<HomePageBanners />", () => {
     localStorage.setItem(AUTOMATIONS_KEY, String(Date.now() + 60_000));
     localStorage.setItem(VOICE_KEY, String(Date.now() + 60_000));
     renderWithProviders(<HomePageBanners />);
-    expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
+    expect(screen.getByText("React the moment it matters")).toBeDefined();
   });
 
   describe("when a banner's link is followed", () => {
@@ -182,7 +169,7 @@ describe("<HomePageBanners />", () => {
       fireEvent.click(screen.getByRole("button", { name: /Explore automations/ }));
 
       // Still on screen: following a link is interest, not "seen it, thanks".
-      expect(screen.getByRole("heading", { name: "React the moment it matters" })).toBeDefined();
+      expect(screen.getByText("React the moment it matters")).toBeDefined();
       expect(localStorage.getItem(AUTOMATIONS_KEY)).toBeNull();
     });
 
@@ -193,21 +180,18 @@ describe("<HomePageBanners />", () => {
     });
   });
 
-  describe("when the Langy home carries the announcements", () => {
+  describe("when the reader has Langy", () => {
     /** @scenario The Langy home carries an announcement about Langy */
-    /** @scenario That announcement is not shown to readers without Langy */
-    it("adds the Langy announcement only for the lantern", () => {
-      renderWithProviders(<HomePageBanners variant="lantern" />);
-      expect(screen.getByText("Langy can ship the fix, not just find it")).toBeDefined();
-
-      cleanup();
+    it("adds the Langy announcement", () => {
+      hostState.langy = true;
       renderWithProviders(<HomePageBanners />);
-      expect(screen.queryByText("Langy can ship the fix, not just find it")).toBeNull();
+      expect(screen.getByText("Langy can ship the fix, not just find it")).toBeDefined();
     });
 
     /** @scenario The Langy home carries an announcement about Langy */
     it("starts the conversation in place instead of navigating", () => {
-      renderWithProviders(<HomePageBanners variant="lantern" />);
+      hostState.langy = true;
+      renderWithProviders(<HomePageBanners />);
 
       fireEvent.click(screen.getByRole("button", { name: /Ask Langy to investigate/ }));
 
@@ -216,10 +200,19 @@ describe("<HomePageBanners />", () => {
     });
   });
 
+  describe("when the reader does not have Langy", () => {
+    /** @scenario That announcement is not shown to readers without Langy */
+    it("carries no announcement about Langy", () => {
+      renderWithProviders(<HomePageBanners />);
+      expect(screen.queryByText("Langy can ship the fix, not just find it")).toBeNull();
+      expect(screen.getAllByRole("button", { name: /Show announcement/ })).toHaveLength(2);
+    });
+  });
+
   it("does not reintroduce a Langy promo into the announcement carousel", () => {
+    hostState.langy = true;
     renderWithProviders(<HomePageBanners />);
-    expect(screen.queryByRole("heading", { name: "Meet Langy" })).toBeNull();
-    expect(screen.queryByRole("heading", { name: "Langy is on its way" })).toBeNull();
-    expect(headingRow("Voice agent simulations are here").getByText("New")).toBeDefined();
+    expect(screen.queryByText("Meet Langy")).toBeNull();
+    expect(screen.queryByText("Langy is on its way")).toBeNull();
   });
 });

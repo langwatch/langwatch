@@ -10,8 +10,7 @@ const PILL_STYLES = {
     paddingLeft: 4,
     paddingY: "5px",
     boxShadow: "xs",
-    fontSize: "13px",
-    fontWeight: "medium",
+    textStyle: "label",
     color: "orange.fg",
     _hover: { borderColor: "orange.solid", background: "orange.muted" },
   },
@@ -21,8 +20,7 @@ const PILL_STYLES = {
     paddingLeft: 3,
     paddingY: "3px",
     boxShadow: "2xs",
-    fontSize: "12px",
-    fontWeight: undefined,
+    textStyle: "caption",
     color: "fg",
     _hover: { borderColor: "border.emphasized", background: "bg.emphasized" },
   },
@@ -75,7 +73,7 @@ export function HeroLeadPill({
       transition="border-color 130ms ease, background 130ms ease"
       _hover={style._hover}
     >
-      <chakra.span fontSize={style.fontSize} fontWeight={style.fontWeight} color={style.color}>
+      <chakra.span textStyle={style.textStyle} color={style.color}>
         {label}
       </chakra.span>
       <HStack gap="3px">

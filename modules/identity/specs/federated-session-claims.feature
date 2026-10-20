@@ -26,6 +26,13 @@ Feature: A federated callback's session claims come only from verified evidence
     Then the new session records "oidc pwd otp"
     And the unsupported assertion is omitted
 
+  @unit
+  Scenario: A deployment Okta or Auth0 callback carries its verified token's factors to the session
+    Given the deployment signs in through Okta or Auth0, whose ID tokens are verified
+    When the callback writes or refreshes "sam"'s account and the verified token asserts "pwd mfa"
+    Then the evidence the session is minted from carries "pwd mfa" for that account
+    But a token whose subject is not the accepted account, or a callback path of another provider, earns nothing
+
   # The identity provider can be down, or not yet resolvable, while the app
   # starts. That must cost single sign-on only, never the whole application.
   @integration

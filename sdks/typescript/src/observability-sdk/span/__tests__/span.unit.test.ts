@@ -1,5 +1,4 @@
 import { SpanStatusCode } from "@opentelemetry/api";
-import * as semconv from "@opentelemetry/semantic-conventions/incubating";
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
@@ -9,6 +8,7 @@ import {
   performanceUtils,
 } from "../../__tests__/test-utils";
 import * as intSemconv from "../../semconv";
+import * as otelSemconv from "../../semconv/otel";
 import { type SpanType } from "../../span/types";
 
 describe("span.ts", () => {
@@ -168,7 +168,7 @@ describe("span.ts", () => {
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
-        semconv.ATTR_GEN_AI_REQUEST_MODEL,
+        otelSemconv.ATTR_GEN_AI_REQUEST_MODEL,
         "gpt-4",
       );
     });
@@ -179,7 +179,7 @@ describe("span.ts", () => {
 
       expect(result).toBe(langwatchSpan);
       expect(mockSpan.setAttribute).toHaveBeenCalledWith(
-        semconv.ATTR_GEN_AI_RESPONSE_MODEL,
+        otelSemconv.ATTR_GEN_AI_RESPONSE_MODEL,
         "gpt-5-mini",
       );
     });

@@ -27,13 +27,17 @@ import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from
 import WebSocket from "ws";
 
 import { testRedisUrl } from "../../__tests__/support/test-redis-url.ts";
+import { RedisLangyLocalWorkspaceChannel } from "../../channels/redis/redis.langy-local-workspace.channel.ts";
 import type { LocalCallLookup } from "../../features/local-control/services/langy-local-call-dispatcher.service.ts";
 import { LocalControlConnectionService } from "../../features/local-control/services/langy-local-control-connection.service.ts";
 import { LocalControlLongPollService } from "../../features/local-control/services/langy-local-control-long-poll.service.ts";
 import type { LocalControlRuntime } from "../../features/local-control/services/langy-local-control-runtime.service.ts";
 import { LangyLocalControlRuntimeService } from "../../features/local-control/services/langy-local-control-runtime.service.ts";
 import { LocalControlSessionCoreService } from "../../features/local-control/services/langy-local-session.service.ts";
+import { LangyLocalCallRedisRepository } from "../../repositories/redis/redis.langy-local-call.repository.ts";
+import { LangyLocalControlRequestRedisRepository } from "../../repositories/redis/redis.langy-local-control-request.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "../../repositories/redis/redis.langy-local-presence.repository.ts";
+import { LangyLocalUserWaitRedisRepository } from "../../repositories/redis/redis.langy-local-user-wait.repository.ts";
 import { presenceKey } from "../../rules/langy-local-control-keys.rules.ts";
 import { localControlSessionKeyDoor } from "../langy-local-control-connect.rest.ts";
 import {
@@ -141,10 +145,19 @@ const apiKeys = createApiFixture<ApiKeyApi>({
   },
 });
 
-function testPorts(store: SessionStateStore) {
+function testPorts({
+  store,
+  workspace,
+}: {
+  store: SessionStateStore;
+  workspace: RedisLangyLocalWorkspaceChannel;
+}) {
   const runtime = LangyLocalControlRuntimeService.create({
-    store,
+    calls: LangyLocalCallRedisRepository.create({ store }),
+    userWaits: LangyLocalUserWaitRedisRepository.create({ store }),
+    controlRequests: LangyLocalControlRequestRedisRepository.create({ store }),
     presence: LangyLocalPresenceRedisRepository.create({ store }),
+    workspace,
     projects: {
       getOrganizationId: async () => organizationId,
       getSlug: async () => "acme-shop",
@@ -204,7 +217,7 @@ function testPorts(store: SessionStateStore) {
       },
     },
     baseHost: "https://app.langwatch.ai",
-    store,
+    workspace: runtime.workspace,
     presence: runtime.presence,
     dispatcher: runtime.dispatcher,
     waits: runtime.waits,
@@ -250,7 +263,10 @@ function testPorts(store: SessionStateStore) {
 }
 
 async function startPod(): Promise<Pod> {
-  const { runtime, core } = testPorts(SessionStateStoreFactory.redis(connection));
+  const { runtime, core } = testPorts({
+    store: SessionStateStoreFactory.redis(connection),
+    workspace: RedisLangyLocalWorkspaceChannel.create(connection),
+  });
   const server = createServer((_request, response) => {
     response.statusCode = 404;
     response.end();
@@ -299,7 +315,7 @@ async function stopPod(pod: Pod): Promise<void> {
   await pod.gateway.close();
   await pod.sockets.close();
   await pod.longPoll.close();
-  await pod.runtime.store.close();
+  await pod.runtime.workspace.close();
   await new Promise<void>((resolve) => pod.server.close(() => resolve()));
 }
 

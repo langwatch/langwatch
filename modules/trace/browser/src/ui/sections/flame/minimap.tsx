@@ -299,7 +299,7 @@ export function Minimap({
 
 function HandleGrip() {
   return (
-    <Flex direction="column" gap="2px" pointerEvents="none">
+    <Flex direction="column" gap="0.5" pointerEvents="none">
       {[0, 1, 2].map((i) => (
         <Box
           key={i}

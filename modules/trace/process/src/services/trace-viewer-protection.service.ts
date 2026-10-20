@@ -1,3 +1,4 @@
+import { isUpgradeInProgress } from "@langwatch/api";
 import type { Authorization, PrincipalRef } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
@@ -56,7 +57,7 @@ export class TraceViewerProtectionService {
       }
       return await this.window.getVisibilityWindow({ organizationId });
     } catch (error) {
-      this.logger.error(
+      this.logger[isUpgradeInProgress(error) ? "info" : "error"](
         { projectId, error },
         "visibility window failing closed: plan resolution failed",
       );

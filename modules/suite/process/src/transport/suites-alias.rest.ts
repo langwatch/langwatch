@@ -1,10 +1,3 @@
-/**
- * The deprecated `/api/suites` family: one address for both nouns, from before
- * run plans and test suites were published separately. Every answer names its
- * successors, and the family is addressed exactly as it always was.
- */
-import { randomUUID } from "node:crypto";
-
 import {
   badRequestSchema,
   defineRestRouter,
@@ -15,6 +8,12 @@ import {
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
+/**
+ * The deprecated `/api/suites` family: one address for both nouns, from before
+ * run plans and test suites were published separately. Every answer names its
+ * successors, and the family is addressed exactly as it always was.
+ */
+import { generate } from "@langwatch/ksuid";
 import { createLogger } from "@langwatch/observability";
 import { type ScenarioTestSuite, deriveRunActor } from "@langwatch/scenario-contract";
 import {
@@ -307,7 +306,7 @@ async function runSuite(params: {
     surfaceHeader: params.surface,
     apiKeyId: params.callerKey,
   });
-  const idempotencyKey = input.idempotencyKey ?? `api-${randomUUID()}`;
+  const idempotencyKey = input.idempotencyKey ?? `api-${generate("suite").toString()}`;
 
   return scheduleRun({ app, input, projectId, idempotencyKey, actor }).catch((error: unknown) =>
     refuseRun(error),

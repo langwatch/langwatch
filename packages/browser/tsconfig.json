@@ -11,35 +11,22 @@
 
     "rootDir": ".",
 
-    "outDir": "dist"
+    "outDir": "dist",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts", "src/**/*.tsx"],
-  "exclude": ["tests/**/*.ts", "**/__tests__/**"],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../api/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     },
     {
-      "path": "../browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../config/tsconfig.build.json"
-    },
-    {
-      "path": "../design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../error-views/tsconfig.build.json"
-    },
-    {
-      "path": "../module/tsconfig.build.json"
-    },
-    {
-      "path": "../vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.type-tests.json"
     }
   ]
 }

@@ -67,15 +67,15 @@ hostname through the portless proxy:
     nlp.portless.langwatch.localhost         NLP engine (Go)
     clickhouse.portless.langwatch.localhost  ClickHouse (this stack's own DB, HTTP)
 
-The ten simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
-idp, storage, payment and telemetry run by default; llm, voice, analytics, outbound and lambda come with
-"haven up +llm +voice +analytics +outbound +lambda". Billing uses paymentsim unless .env sets a Stripe
+The eleven simulators each have a console at <name>.<slug>.langwatch.localhost: mail,
+idp, storage, payment and telemetry run by default; llm, voice, analytics, outbound, lambda and github come with
+"haven up +llm +voice +analytics +outbound +lambda +github". Billing uses paymentsim unless .env sets a Stripe
 key; "haven up" prints which. "haven sim --json" lists every one: running
 here or not, its console, its verbs and its skill. Read one's output with "haven logs
-<name>". Drive one from a terminal with "haven sim mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry|lambda
+<name>". Drive one from a terminal with "haven sim mail|idp|llm|analytics|outbound|payment|storage|voice|telemetry|lambda|github
 <verb>" (--json on every read).
 
-    mail|idp|storage|llm|voice|analytics|outbound|telemetry|lambda.portless.langwatch.localhost
+    mail|idp|storage|llm|voice|analytics|outbound|telemetry|lambda|github.portless.langwatch.localhost
 
 Two more only when the worktree asked for them ("haven up +design-system +mail-room"):
 
@@ -159,6 +159,10 @@ var envHelpText = `Environment variables.
                                  repository scripts run directly. A live queue
                                  owner is recognized through CHECK_QUEUE_HELD
                                  so descendants do not take another slot.
+                                 "slot run" counts core units: cores less two
+                                 (8 of 10) when green, half amber, a quarter red;
+                                 N here is N checks of two units. --class test
+                                 weighs VITEST_MAX_WORKERS (2, at most 4), others 2.
     CHECK_PRESSURE=green|amber|red
                                  Override the measured machine pressure when
                                  resolving the shared queue's capacity.
@@ -240,6 +244,10 @@ var envHelpText = `Environment variables.
     HAVEN_COLIMA_CPUS            CPUs of a colima VM haven creates (never resizes one).
     HAVEN_COLIMA_MEMORY_GIB      Memory of a colima VM haven creates, in GiB.
     HAVEN_TEST_WORKERS=N         Machine-wide cap on unit test workers.
+    HAVEN_UI_MAX_RSS_MB=2048     Vite ui lane's memory ceiling; over it the lane is killed
+                                 and restarted. 0 disables.
+    HAVEN_API_MAX_RSS_MB=2560    api and worker ceilings; they share the --hmr api lane,
+    HAVEN_WORKER_MAX_RSS_MB=2560 capped at their sum. 0 on either disables.
     HAVEN_INSTANT_EVAL_MOCK_JUDGE=1  Judge Instant Evals with the app's deterministic
                                  memory judge (INSTANT_EVAL_CLASSIFIER=memory); modular
                                  checkouts only, from the next haven up. Default 0.

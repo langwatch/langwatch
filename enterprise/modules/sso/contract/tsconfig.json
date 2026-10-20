@@ -8,28 +8,19 @@
     "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
     "noImplicitReturns": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
 
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/secrets/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

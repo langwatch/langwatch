@@ -1,13 +1,12 @@
+import { Banner } from "@langwatch/design-system/banner";
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
-  Alert,
   Box,
   Button,
   HStack,
   Image,
   Input,
   NativeSelect,
-  Spacer,
   Text,
   Textarea,
   VStack,
@@ -479,91 +478,78 @@ export function AiToolEntryDrawer({ organizationId, state, onClose }: Props) {
   if (!state) return null;
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      open
+      onClose={onClose}
       size="md"
-      onOpenChange={(e) => {
-        if (!e.open) onClose();
+      title={isEdit ? "Edit tool" : "Add tool"}
+      busy={isPending}
+      footer={{
+        primaryAction: {
+          label: saveToolLabel({ isPending, isEdit }),
+          onClick: onSave,
+          loading: isPending,
+          disabledReason: canSave ? void 0 : "Fill in the required fields",
+        },
       }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          {/* "Tool", not "tile". A tile is how this row is drawn on the
-              personal portal; what the reader is adding is a tool the
-              organization runs, and the Inventory catalog that now opens this
-              same drawer calls it that. */}
-          <Drawer.Title>{isEdit ? "Edit tool" : "Add tool"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <TypeSection
-              isEdit={isEdit}
-              type={form.type}
-              onSelect={(type) => {
-                const next = blankForm(type);
-                setForm(next);
-                setIconAsset(deriveDefaultIconAsset(next));
-              }}
-            />
+      <VStack align="stretch" gap={4}>
+        <TypeSection
+          isEdit={isEdit}
+          type={form.type}
+          onSelect={(type) => {
+            const next = blankForm(type);
+            setForm(next);
+            setIconAsset(deriveDefaultIconAsset(next));
+          }}
+        />
 
-            <FormSection label="Visible to" hint={visibilityHint(departmentIds.length)}>
-              <ScopeChipPicker
-                value={scopes}
-                onChange={setScopes}
-                organizationId={organizationId}
-                organizationName={organization?.name ?? "Whole organization"}
-                availableDepartments={departments}
-                allowedScopeTypes={["ORGANIZATION", "DEPARTMENT"]}
-                label=""
-                showSummary={false}
-              />
-              {departments.length === 0 && (
-                <Text fontSize="xs" color="fg.muted">
-                  No departments yet. The tool stays visible to every member. Create departments
-                  under{" "}
-                  <Link href="/governance/people" color="blue.fg">
-                    Governance → People
-                  </Link>{" "}
-                  to scope tools to a group of people.
-                </Text>
-              )}
-            </FormSection>
+        <FormSection label="Visible to" hint={visibilityHint(departmentIds.length)}>
+          <ScopeChipPicker
+            value={scopes}
+            onChange={setScopes}
+            organizationId={organizationId}
+            organizationName={organization?.name ?? "Whole organization"}
+            availableDepartments={departments}
+            allowedScopeTypes={["ORGANIZATION", "DEPARTMENT"]}
+            label=""
+            showSummary={false}
+          />
+          {departments.length === 0 && (
+            <Text fontSize="xs" color="fg.muted">
+              No departments yet. The tool stays visible to every member. Create departments under{" "}
+              <Link href="/governance/people" color="blue.fg">
+                Governance → People
+              </Link>{" "}
+              to scope tools to a group of people.
+            </Text>
+          )}
+        </FormSection>
 
-            <FormSection label="Display name">
-              <Input
-                size="sm"
-                placeholder="e.g. Claude Code"
-                value={form.displayName}
-                onChange={(e) => setForm({ ...form, displayName: e.target.value })}
-              />
-            </FormSection>
+        <FormSection label="Display name">
+          <Input
+            size="sm"
+            placeholder="e.g. Claude Code"
+            value={form.displayName}
+            onChange={(e) => setForm({ ...form, displayName: e.target.value })}
+          />
+        </FormSection>
 
-            <ToolTypeFields
-              form={form}
-              setForm={setForm}
-              onAssistantKindChange={onAssistantKindChange}
-              iconAsset={iconAsset}
-              onIconAssetChange={setIconAsset}
-              modelProviderOptions={{
-                providerOptions: providerOptionsQuery.data,
-                providerOptionsLoading: providerOptionsQuery.isLoading,
-                routingPolicyOptions: routingPolicyOptionsQuery.data,
-                routingPolicyOptionsLoading: routingPolicyOptionsQuery.isLoading,
-              }}
-            />
-
-            <HStack gap={2} marginTop={4}>
-              <Spacer />
-              <Button size="sm" onClick={onSave} disabled={!canSave || isPending}>
-                {saveToolLabel({ isPending, isEdit })}
-              </Button>
-            </HStack>
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+        <ToolTypeFields
+          form={form}
+          setForm={setForm}
+          onAssistantKindChange={onAssistantKindChange}
+          iconAsset={iconAsset}
+          onIconAssetChange={setIconAsset}
+          modelProviderOptions={{
+            providerOptions: providerOptionsQuery.data,
+            providerOptionsLoading: providerOptionsQuery.isLoading,
+            routingPolicyOptions: routingPolicyOptionsQuery.data,
+            routingPolicyOptionsLoading: routingPolicyOptionsQuery.isLoading,
+          }}
+        />
+      </VStack>
+    </Drawer>
   );
 }
 
@@ -925,20 +911,14 @@ function ModelProviderFields({
           <NativeSelect.Indicator />
         </NativeSelect.Root>
         {selectedProvider && !selectedProvider.configured && (
-          <Alert.Root status="warning" variant="surface" size="sm" marginTop={2}>
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Title>Provider not configured</Alert.Title>
-              <Alert.Description>
-                This provider has no enabled credential yet. Tiles will publish but VK issuance will
-                502 until you{" "}
-                <Link href="/settings/model-providers" color="orange.fg">
-                  configure it
-                </Link>
-                .
-              </Alert.Description>
-            </Alert.Content>
-          </Alert.Root>
+          <Banner status="warning" title="Provider not configured">
+            This provider has no credential yet. The tool will publish, but requests through it will
+            fail until you{" "}
+            <Link href="/settings/model-providers" color="orange.fg">
+              configure it
+            </Link>
+            .
+          </Banner>
         )}
       </FormSection>
       <FormSection label="Default label suggestion (optional)">

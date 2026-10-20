@@ -19,7 +19,7 @@ export const MessageExpandToggle: React.FC<{
     gap={0.5}
     marginTop={1}
     textStyle="2xs"
-    fontWeight="600"
+    fontWeight="semibold"
     color="fg.muted"
     cursor="pointer"
     _hover={{ color: "fg" }}

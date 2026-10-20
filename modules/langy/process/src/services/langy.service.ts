@@ -1,6 +1,7 @@
 import {
   type LangyConversationDetail as ContractConversationDetail,
   type LangyConversationEventPage,
+  type LangyConversationTurnData,
   type LangyConversationListCursor as ContractConversationListCursor,
   type LangyConversationListPage as ContractConversationListPage,
   type LangyMessageRow as ContractMessageRow,
@@ -136,6 +137,16 @@ export class LangyService {
     return this.conversations.getEventsAfter(input);
   }
 
+  /** One turn's projected state for a caller who may see its conversation. */
+  findTurn(input: {
+    projectId: string;
+    conversationId: string;
+    turnId: string;
+    userId: string;
+  }): Promise<LangyConversationTurnData[]> {
+    return this.conversations.findTurn(input);
+  }
+
   /** Writes one line into the transcript without starting a turn (ADR-129). */
   recordUserMessage(
     input: Parameters<LangyConversationService["recordUserMessage"]>[0],
@@ -208,6 +219,15 @@ export class LangyService {
 
   startConversationTurn(
     input: LangyStartConversationTurnInput,
+  ): Promise<{ conversationId: string; turnId: string }> {
+    return this.turns.startConversationTurn(input);
+  }
+
+  /** A turn for a person who is not at the keyboard: read-only, in a run conversation. */
+  startUnattendedTurn(
+    input: LangyStartConversationTurnInput & {
+      unattended: { title: string; countTurn: () => Promise<void> };
+    },
   ): Promise<{ conversationId: string; turnId: string }> {
     return this.turns.startConversationTurn(input);
   }

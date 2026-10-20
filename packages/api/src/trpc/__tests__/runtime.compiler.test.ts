@@ -35,7 +35,7 @@ describe("binding a server to a contract", () => {
   /** @scenario "A service endpoint that declares no access fails to compile" */
   /** @scenario "Every tRPC procedure declares its access decision or an explicit reason not to" */
   /** @scenario "A hand-rolled procedure middleware cannot claim a permission check" */
-  it("refuses an unknown name, a repeat, an omission, a missing or doubled decision, a hand-rolled check and a wrong answer", () => {
+  it("refuses an unknown name, a repeat, an omission, a missing or doubled decision, a hand-rolled check, a hand-made contract and a wrong answer", () => {
     const directory = mkdtempSync(join(process.cwd(), ".tmp-trpc-router-"));
     const contract = join(process.cwd(), "../module/src/index.ts");
     const router = join(process.cwd(), "src/trpc/runtime.ts");
@@ -56,7 +56,8 @@ defineTrpcRouter(AnnotationApi, contract)
   .procedure("getById").withPermission("annotations:view").handle(async () => ({ wrong: "" }));
 defineTrpcRouter(AnnotationApi, contract).procedure("getById").use(async () => undefined);
 defineTrpcRouter(AnnotationApi, contract)
-  .procedure("getById").withPermission("annotations:view").noPermission({ reason: "both" });`,
+  .procedure("getById").withPermission("annotations:view").noPermission({ reason: "both" });
+defineTrpcRouter(AnnotationApi, { namespace: "annotation", members: contract.members });`,
       ),
     );
 
@@ -70,6 +71,7 @@ defineTrpcRouter(AnnotationApi, contract)
       expect(diagnostics).toMatch(/refusals\.ts\(22,\d+\).*not assignable to type 'ValueResult/);
       expect(diagnostics).toMatch(/refusals\.ts\(23,\d+\).*Property 'use' does not exist/);
       expect(diagnostics).toMatch(/refusals\.ts\(25,\d+\).*Property 'noPermission' does not exist/);
+      expect(diagnostics).toMatch(/refusals\.ts\(26,\d+\).*parameter of type 'BuiltTrpcContract/);
     } finally {
       rmSync(directory, { recursive: true, force: true });
     }

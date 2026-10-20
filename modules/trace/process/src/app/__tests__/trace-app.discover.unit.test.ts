@@ -2,6 +2,7 @@
  * The sidebar's facet read on the real `TraceModule`: no `query` is the tenant's cached
  * discovery; a `query`, empty included, counts every facet under it in the list's window.
  */
+import type { Project, ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi } from "vitest";
 
@@ -28,6 +29,10 @@ function harness() {
   }));
   const getFacets = vi.fn<TracesListReader["getFacets"]>(async () => [FACET]);
   const app = createTraceAppHarness({
+    projects: createApiFixture<ProjectApi>(
+      { findById: async () => ({ id: PROJECT_ID, isPersonal: false }) as Project },
+      "projects",
+    ),
     traces: { list: createApiFixture<TracesListReader>({ getDiscover, getFacets }, "list") },
   });
   return { app, getDiscover, getFacets };

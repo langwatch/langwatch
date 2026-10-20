@@ -12,7 +12,7 @@ import { AggregateProjectAvatar, ProjectAvatar } from "../elements/project-avata
 import { ProjectComboboxPopup } from "./project-switcher-combobox-popup.tsx";
 
 /**
- * Project switch combobox for long lists: searchable, grouped by team,
+ * Project switch combobox: searchable, grouped by team,
  * keyboard navigation. Spec: modules/navigation/specs/product-switcher-navigation.feature
  */
 export function ProjectSwitcherCombobox({
@@ -34,6 +34,7 @@ export function ProjectSwitcherCombobox({
 }) {
   const host = useNavigationHost();
   const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
   const { allItems, collection, visibleGroups } = useProjectPickItems({
     groups,
     query,
@@ -65,8 +66,16 @@ export function ProjectSwitcherCombobox({
         const next = details.value?.[0];
         if (next) pick(next);
       }}
+      inputValue={query}
       onInputValueChange={(details) => setQuery(details.inputValue)}
+      open={open}
       onOpenChange={(details) => {
+        // The first Escape empties the field; the next one closes the menu.
+        if (!details.open && details.reason === "escape-key" && query) {
+          setQuery("");
+          return;
+        }
+        setOpen(details.open);
         if (details.open) setQuery("");
       }}
       positioning={{ placement: "bottom-start", gutter: 4 }}
@@ -80,6 +89,7 @@ export function ProjectSwitcherCombobox({
         visibleGroups={visibleGroups}
         showTeamHeaders={showTeamHeaders}
         currentProjectId={currentProjectId}
+        query={query}
       />
     </Combobox.Root>
   );
@@ -103,7 +113,7 @@ function ProjectComboboxTrigger({
           aria-label="Switch project"
           data-testid="navigation-project-switcher"
           data-tour="project-switcher"
-          fontSize="13px"
+          textStyle="bodySm"
           fontWeight="normal"
           paddingX={2}
           height="32px"

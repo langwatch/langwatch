@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ManifestStep, ReleaseManifest } from "../../manifest/manifest.ts";
-import { inlineBeforeContracts, planUpgrade, type StepOrderError } from "../plan-upgrade.ts";
+import { orderAfter, planUpgrade, type StepOrderError } from "../plan-upgrade.ts";
 
 function step(
   id: string,
@@ -30,17 +30,21 @@ const manifests = [
   manifest("3.23.0", "3.22.0", [step("prisma:20270101000000_drop_legacy_key", "postgres-schema")]),
 ];
 const imageSteps = manifests.flatMap((release) => release.steps);
-const noLedger = { floor: null, steps: [] };
+/** What a succeeded run to `release` leaves: every step through it done. */
+const settledThrough = (release: string) =>
+  manifests
+    .filter((manifest) => manifest.release <= release)
+    .flatMap((manifest) => manifest.steps.map(({ id }) => ({ id, status: "done" as const })));
+const noLedger = { steps: [] };
 
 describe("planUpgrade()", () => {
-  describe("when 3.20.1 upgrades to a 3.23.0 image over a 3.19.0 floor", () => {
+  describe("when 3.20.1 upgrades to a 3.23.0 image", () => {
     /** @scenario "An upgrade across several releases steps release by release" */
     it("plans 3.21.0, 3.22.0 and 3.23.0, each from its own manifest", () => {
       expect(
         planUpgrade({
           installed: "3.20.1",
           image: { release: "3.23.0", steps: imageSteps },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests: manifests.toReversed(),
           ledger: noLedger,
         }),
@@ -84,11 +88,12 @@ describe("planUpgrade()", () => {
       const plan = planUpgrade({
         installed: "3.22.0",
         image: { release: "3.23.0", steps: imageSteps },
-        floor: { release: "3.19.0", namedAt: "2026-10-06" },
         manifests,
         ledger: {
-          floor: "3.19.0",
-          steps: [{ id: "prisma:20270101000000_drop_legacy_key", status: "done" }],
+          steps: [
+            ...settledThrough("3.22.0"),
+            { id: "prisma:20270101000000_drop_legacy_key", status: "done" },
+          ],
         },
       });
 
@@ -105,38 +110,6 @@ describe("planUpgrade()", () => {
     });
   });
 
-  describe("when the installation is below the LTS floor", () => {
-    /** @scenario "An installation below the LTS floor is refused by the name of the LTS to stop at" */
-    it("refuses with below_lts_floor and names 3.20.1 as the stop", () => {
-      const plan = planUpgrade({
-        installed: "3.16.0",
-        image: { release: "3.23.0", steps: imageSteps },
-        floor: { release: "3.20.1", namedAt: "2026-10-06" },
-        manifests,
-        ledger: noLedger,
-      });
-
-      expect(plan).toMatchObject({ outcome: "refused", code: "below_lts_floor", stopAt: "3.20.1" });
-      expect(plan.outcome === "refused" && plan.message).toContain("upgrade to 3.20.1 (LTS) first");
-    });
-  });
-
-  describe("when the image is older than the floor the ledger records", () => {
-    /** @scenario "An image below the ledger's floor is refused" */
-    it("refuses with image_below_ledger_floor, naming both releases", () => {
-      const plan = planUpgrade({
-        installed: "3.22.0",
-        image: { release: "3.21.0", steps: imageSteps },
-        floor: { release: "3.19.0", namedAt: "2026-10-06" },
-        manifests,
-        ledger: { floor: "3.22.0", steps: [] },
-      });
-
-      expect(plan).toMatchObject({ outcome: "refused", code: "image_below_ledger_floor" });
-      expect(plan.outcome === "refused" && plan.message).toMatch(/3\.21\.0.*3\.22\.0/);
-    });
-  });
-
   describe("when the database has no installed release", () => {
     /** @scenario "A fresh install applies all schema at once and needs no data, tenant or procedure step" */
     it("plans one release of every schema id and marks every data and tenant step not needed", () => {
@@ -144,7 +117,6 @@ describe("planUpgrade()", () => {
         planUpgrade({
           installed: null,
           image: { release: "3.23.0", steps: imageSteps },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests,
           ledger: noLedger,
         }),
@@ -187,9 +159,8 @@ describe("planUpgrade()", () => {
         planUpgrade({
           installed: "3.23.0",
           image: { release: null, steps: [...imageSteps, ...unreleased] },
-          floor: { release: "3.19.0", namedAt: "2026-10-06" },
           manifests,
-          ledger: { floor: "3.19.0", steps: [] },
+          ledger: { steps: settledThrough("3.23.0") },
         }),
       ).toEqual({
         outcome: "planned",
@@ -210,157 +181,10 @@ describe("planUpgrade()", () => {
   });
 });
 
-describe("inlineBeforeContracts()", () => {
-  const contracts = new Map([["prisma:20270101000000_drop_legacy_key", []]]);
-  const background = [
-    { id: "dataset:content-to-object-storage", release: "3.21.0" },
-    { id: "identity:identifier-backfill", release: "3.22.0" },
-  ];
-  const planned = () => {
-    const plan = planUpgrade({
-      installed: "3.20.1",
-      image: { release: "3.23.0", steps: imageSteps },
-      floor: { release: "3.19.0", namedAt: "2026-10-06" },
-      manifests,
-      ledger: noLedger,
-    });
-    if (plan.outcome !== "planned") throw new Error(`expected a plan, got ${plan.outcome}`);
-    return plan.releases;
-  };
-
-  describe("when 3.23.0 drops a column and both earlier background steps are unfinished", () => {
-    /** @scenario "An unfinished background step of an earlier release runs inline before a contract release" */
-    it("runs both before 3.23.0's schema and none before 3.21.0's or 3.22.0's", () => {
-      expect(
-        inlineBeforeContracts({ releases: planned(), contracts, background, settled: new Set() }),
-      ).toEqual([[], [], ["dataset:content-to-object-storage", "identity:identifier-backfill"]]);
-    });
-  });
-
-  describe("when the 3.21.0 background step is already done", () => {
-    /** @scenario "A finished background step is not run again before a contract release" */
-    it("runs only the unfinished one", () => {
-      const settled = new Set(["dataset:content-to-object-storage"]);
-      expect(
-        inlineBeforeContracts({ releases: planned(), contracts, background, settled }),
-      ).toEqual([[], [], ["identity:identifier-backfill"]]);
-    });
-  });
-
-  describe("when no planned release holds a contract step", () => {
-    /** @scenario "A release without a contract step waits for no background step" */
-    it("runs nothing inline", () => {
-      expect(
-        inlineBeforeContracts({
-          releases: planned(),
-          contracts: new Map(),
-          background,
-          settled: new Set(),
-        }),
-      ).toEqual([[], [], []]);
-    });
-  });
-
-  describe("when a background step ships with the contract or is not released yet", () => {
-    /** @scenario "A background step runs before a contract only when an earlier release shipped it" */
-    it("runs only the released one, and only before the unreleased contract", () => {
-      expect(
-        inlineBeforeContracts({
-          releases: [
-            { release: "3.21.0", schema: ["prisma:20261101000000_drop_a"] },
-            { release: null, schema: ["prisma:20261201000000_drop_b"] },
-          ],
-          contracts: new Map([
-            ["prisma:20261101000000_drop_a", []],
-            ["prisma:20261201000000_drop_b", []],
-          ]),
-          background: [
-            { id: "dataset:same-release", release: "3.21.0" },
-            { id: "trace:unreleased", release: null },
-          ],
-          settled: new Set(),
-        }),
-      ).toEqual([[], ["dataset:same-release"]]);
-    });
-  });
-
-  describe("when a released background step runs after one not released yet", () => {
-    /** @scenario "A background step runs before a contract after every step it names, released or not" */
-    it("runs the named unreleased step first", () => {
-      expect(
-        inlineBeforeContracts({
-          releases: planned(),
-          contracts,
-          background: [
-            {
-              id: "stored-object:purge-inputs",
-              release: "3.21.0",
-              after: ["evaluation:copy-inputs"],
-            },
-            { id: "evaluation:copy-inputs", release: null },
-          ],
-          settled: new Set(),
-        }),
-      ).toEqual([[], [], ["evaluation:copy-inputs", "stored-object:purge-inputs"]]);
-    });
-  });
-
-  describe("when the named step is already done", () => {
-    /** @scenario "A step named by another that is already done is not run again" */
-    it("runs only the step that names it", () => {
-      expect(
-        inlineBeforeContracts({
-          releases: planned(),
-          contracts,
-          background: [
-            {
-              id: "stored-object:purge-inputs",
-              release: "3.21.0",
-              after: ["evaluation:copy-inputs"],
-            },
-          ],
-          settled: new Set(["evaluation:copy-inputs"]),
-        }),
-      ).toEqual([[], [], ["stored-object:purge-inputs"]]);
-    });
-  });
-
-  describe("when a contract's SQL names a background step not released yet", () => {
-    /** @scenario "A contract step runs after the background step its SQL names, released or not" */
-    it("runs the named step, and each step it runs after, before the contract's schema", () => {
-      expect(
-        inlineBeforeContracts({
-          releases: planned(),
-          contracts: new Map([["prisma:20270101000000_drop_legacy_key", ["instant-eval:copy"]]]),
-          background: [
-            { id: "instant-eval:copy", release: null, after: ["billing:catch-up"] },
-            { id: "billing:catch-up", release: null },
-          ],
-          settled: new Set(),
-        }),
-      ).toEqual([[], [], ["billing:catch-up", "instant-eval:copy"]]);
-    });
-  });
-
-  describe("when a contract's SQL names a step the image does not have", () => {
-    /** @scenario "A contract step naming a step the image does not have is refused at plan time" */
-    it("refuses with step_after_unknown, naming both", () => {
-      const run = () =>
-        inlineBeforeContracts({
-          releases: [],
-          contracts: new Map([["clickhouse:00110", ["instant-eval:copy-judge-spnd"]]]),
-          background: [],
-          settled: new Set(["instant-eval:copy-judge-spnd"]),
-        });
-      expect(run).toThrow(
-        "contract step clickhouse:00110 runs after instant-eval:copy-judge-spnd, which is not a background code step of this image",
-      );
-    });
-  });
-
-  const refusalOf = (background: { id: string; release: null; after?: string[] }[]) => {
+describe("orderAfter()", () => {
+  const refusalOf = (steps: { id: string; after?: string[] }[]) => {
     try {
-      inlineBeforeContracts({ releases: planned(), contracts, background, settled: new Set() });
+      orderAfter({ steps, settled: new Set() });
     } catch (error) {
       return error as StepOrderError;
     }
@@ -371,7 +195,7 @@ describe("inlineBeforeContracts()", () => {
     /** @scenario "A step that runs after an unknown step is refused at plan time" */
     it("refuses with step_after_unknown, naming both", () => {
       const refusal = refusalOf([
-        { id: "stored-object:purge-inputs", release: null, after: ["evaluation:copy-inptus"] },
+        { id: "stored-object:purge-inputs", after: ["evaluation:copy-inptus"] },
       ]);
       expect(refusal.code).toBe("step_after_unknown");
       expect(refusal.message).toContain("evaluation:copy-inptus");
@@ -382,8 +206,8 @@ describe("inlineBeforeContracts()", () => {
     /** @scenario "Steps that run after each other in a cycle are refused at plan time" */
     it("refuses with step_after_cycle, naming the cycle", () => {
       const refusal = refusalOf([
-        { id: "a:one", release: null, after: ["a:two"] },
-        { id: "a:two", release: null, after: ["a:one"] },
+        { id: "a:one", after: ["a:two"] },
+        { id: "a:two", after: ["a:one"] },
       ]);
       expect(refusal.code).toBe("step_after_cycle");
       expect(refusal.message).toContain("a:one -> a:two -> a:one");

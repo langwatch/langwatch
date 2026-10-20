@@ -127,7 +127,7 @@ describe("given no module lends the guided tour", () => {
     world.registered.current = {};
     world.declarations.current = uiDeclarations([]);
     renderPage();
-    expect(screen.getByText("Virtual Keys")).toBeInTheDocument();
+    expect(screen.getByText("Virtual keys")).toBeInTheDocument();
     expect(world.registered.current).toEqual({});
   });
 });

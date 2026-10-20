@@ -7,7 +7,6 @@
 import type { AuthzPermission } from "@langwatch/authorization";
 import { moduleApi } from "@langwatch/module";
 import { Hono } from "hono";
-import { generateSpecs } from "hono-openapi";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -32,6 +31,8 @@ import { documentedResponses, securityForCredentialClass } from "../openapi.ts";
 import { bindMiddlewareContext, defineMiddlewareContext } from "../request.ts";
 import { declined } from "../response.ts";
 import { createRestRuntime, type RestDeprecationLog } from "../runtime.ts";
+import { generateSpecs } from "./generate-specs.ts";
+import { routeFamily } from "./route-family.ts";
 
 /**
  * The runtime's loggers are created at module scope, so spying on `createLogger` calls never
@@ -1369,7 +1370,7 @@ describe("a route that declares the several answers it may give", () => {
   it("records the request as handled rather than as a server fault", async () => {
     await platformHealthApp({ status: "unhealthy" }).app.request("/api/v1/platform-health");
 
-    const rows = logsFor("langwatch:api:platform-health");
+    const rows = logsFor("langwatch:api:hono");
 
     expect(rows).toContainEqual(
       expect.objectContaining({
@@ -1393,7 +1394,7 @@ describe("a route that declares the several answers it may give", () => {
       },
     });
 
-    expect(logsFor("langwatch:api:platform-health")).toContainEqual(
+    expect(logsFor("langwatch:api:hono")).toContainEqual(
       expect.objectContaining({
         fields: expect.objectContaining({
           endpointClass: "api",
@@ -1761,7 +1762,7 @@ function aliasHost(): Hono {
 
   const host = new Hono();
 
-  host.route("/", family);
+  routeFamily({ host, family });
   host.get("/api/v1/aliased/its-own", (context) => context.text("the namespace behind the alias"));
 
   return host;
@@ -1896,14 +1897,14 @@ function runsHost(): Hono {
   const host = new Hono();
 
   for (const family of [runReader, runRunner]) {
-    host.route(
-      "/",
-      runtime.mount(family.router(), {
+    routeFamily({
+      host,
+      family: runtime.mount(family.router(), {
         app: () => runApplication,
         credential: "project",
         onError: createErrorHandler(),
       }),
-    );
+    });
   }
 
   return host;
@@ -2131,7 +2132,7 @@ function evaluationsHost(): Hono {
 
   const host = new Hono();
 
-  host.route("/", family);
+  routeFamily({ host, family });
   host.get("/api/evaluations/anything-else", (c) => c.json({ sibling: true }));
 
   return host;
@@ -3196,16 +3197,17 @@ describe("three families mounted on one host", () => {
       identity: { authenticate: () => ({ actor: null, scope: null }) },
     });
 
-    host = new Hono();
+    const created = new Hono();
+    host = created;
 
     for (const namespace of ["prompts", "datasets", "monitors"]) {
-      host.route(
-        "/",
-        runtime.mount(familyOver(namespace).router(), {
+      routeFamily({
+        host,
+        family: runtime.mount(familyOver(namespace).router(), {
           app: () => ({ getById: async ({ id }) => ({ id }) }),
           onError: createErrorHandler(),
         }),
-      );
+      });
     }
   });
 

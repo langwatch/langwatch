@@ -103,31 +103,66 @@ let _cachedSession: CompatSession | null = null;
 // Dedup in-flight fetches: multiple useSession() hooks mounting at the
 // same time share a single /api/auth/session request instead of each
 // firing their own.
-let _inflight: Promise<CompatSession | null> | null = null;
+let _inflight: Promise<SessionRead> | null = null;
 // Subscribers: all mounted useSession() hooks that need to be notified
 // when the shared fetch resolves.
 const _subscribers = new Set<(session: CompatSession | null) => void>();
 
-async function _fetchSessionShared(): Promise<CompatSession | null> {
+/**
+ * A read that answered nothing (network, 5xx, a proxy's 4xx). Only a 401 or a
+ * reply naming no user signs a reader out; anything else is retried while the
+ * shell's reconnecting screen holds them (specs/auth/session-failure.feature).
+ */
+const UNANSWERED = Symbol("unanswered");
+type SessionRead = CompatSession | null | typeof UNANSWERED;
+// Whether the endpoint has ever answered in this document: after it has, a
+// failed re-read keeps that answer, as `_cachedSession` always did.
+let _answered = false;
+let _retry: ReturnType<typeof setTimeout> | undefined;
+const RETRY_FIRST_MS = 500;
+const RETRY_MAX_MS = 3_000;
+
+async function _fetchSessionShared(): Promise<SessionRead> {
   if (_inflight !== null) return _inflight;
   _inflight = (async () => {
     try {
       const res = await fetch("/api/auth/session", { credentials: "include" });
-      if (!res.ok) return _cachedSession;
-      const json = await res.json();
-      const session = adaptSession(json);
-      _cachedSession = session;
+      if (res.status === 401) return answered(null);
+      if (!res.ok) return _answered ? _cachedSession : UNANSWERED;
+      const session = answered(adaptSession(await res.json()));
       // Every landing passes through here, wherever a provider's callback put the browser, so
       // this is where a parked social method becomes the badge. A no-op when nothing is parked.
       if (session) promotePendingMethod();
       return session;
     } catch {
-      return _cachedSession;
+      return _answered ? _cachedSession : UNANSWERED;
     } finally {
       _inflight = null;
     }
   })();
   return _inflight;
+}
+
+function answered(session: CompatSession | null): CompatSession | null {
+  _answered = true;
+  _cachedSession = session;
+  return session;
+}
+
+function publishSession(session: CompatSession | null): void {
+  for (const sub of _subscribers) sub(session);
+}
+
+/** Reads until the endpoint answers, easing off; stops once nobody is listening. */
+function readSessionUntilAnswered(delay = RETRY_FIRST_MS): void {
+  void _fetchSessionShared().then((session) => {
+    if (session !== UNANSWERED) return publishSession(session);
+    if (_retry !== undefined) return;
+    _retry = setTimeout(() => {
+      _retry = undefined;
+      if (_subscribers.size > 0) readSessionUntilAnswered(Math.min(delay * 2, RETRY_MAX_MS));
+    }, delay);
+  });
 }
 
 export const useSession = (
@@ -153,10 +188,7 @@ export const useSession = (
       setData(_cachedSession);
       setIsPending(false);
     } else {
-      void _fetchSessionShared().then((session) => {
-        // Notify all subscribers (including this one)
-        for (const sub of _subscribers) sub(session);
-      });
+      readSessionUntilAnswered();
     }
 
     return () => {
@@ -178,7 +210,7 @@ export const useSession = (
     // Force a fresh fetch (bypass inflight dedup) and notify all subscribers
     _inflight = null;
     const session = await _fetchSessionShared();
-    for (const sub of _subscribers) sub(session);
+    if (session !== UNANSWERED) publishSession(session);
   }, []);
 
   return {
@@ -450,6 +482,14 @@ const parkAndHandOff = (target: string | undefined): string | undefined => {
 };
 
 /**
+ * The callbackURL for a link started by a signed-in reader: the same-origin
+ * guard, then the same hand-off as a provider sign-in, so better-auth is never
+ * sent an address it refuses with "Invalid callbackURL".
+ */
+export const linkCallbackUrl = (callbackUrl: string | undefined): string =>
+  parkAndHandOff(safeRedirectTarget(callbackUrl)) ?? "/";
+
+/**
  * Reads and clears the target parked by `parkReturnTo`, "/" when there is
  * none. Re-guarded because storage is writable by any script on the origin.
  */
@@ -471,6 +511,7 @@ export const signOut = async (opts?: {
   // Clear module-level session cache so the next useSession mount
   // doesn't serve stale data after logout.
   _cachedSession = null;
+  _answered = false;
   // The reads and preferences persisted to disk were this user's; the next one never sees them.
   clearReaderUiStorage();
   clearSessionUiStorage();
@@ -502,7 +543,7 @@ export const linkAccount = async (
   provider: string,
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+  const callbackURL = linkCallbackUrl(options?.callbackUrl);
   const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
   const res = await fetch("/api/auth/link-social", {

@@ -12,7 +12,6 @@ const lastRun = {
   kind: "upgrade",
   outcome: "succeeded",
   finishedAt: RUN_FINISHED,
-  floor: null,
 } as const;
 
 function installation({ runs = [lastRun] }: { runs?: readonly (typeof lastRun)[] } = {}) {

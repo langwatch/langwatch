@@ -217,94 +217,86 @@ EOF
       : "https://docs.langwatch.ai/evaluations/online-evaluation/overview";
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => !open && onClose()} size="xl">
-      <Dialog.Content maxWidth="800px">
-        <Dialog.Header>
-          <Dialog.Title>Use via API</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body paddingBottom={6}>
-          <VStack align="stretch" gap={4}>
-            {/* Evaluator info */}
-            <Box>
-              <Text fontSize="sm" color="fg.muted">
-                Evaluator: <strong>{evaluator.name}</strong>
-                {evaluator.slug && (
-                  <Text as="span" color="fg.subtle">
-                    {" "}
-                    ({evaluator.slug})
-                  </Text>
-                )}
+    <Dialog open={open} onClose={onClose} title="Use via API" size="xl" cancelLabel="Close">
+      <VStack align="stretch" gap={4}>
+        {/* Evaluator info */}
+        <Box>
+          <Text fontSize="sm" color="fg.muted">
+            Evaluator: <strong>{evaluator.name}</strong>
+            {evaluator.slug && (
+              <Text as="span" color="fg.subtle">
+                {" "}
+                ({evaluator.slug})
               </Text>
-            </Box>
+            )}
+          </Text>
+        </Box>
 
-            {/* Mode and Language Selectors */}
-            <HStack gap={4}>
-              <NativeSelect.Root width="200px">
-                <NativeSelect.Field
-                  value={usageMode}
-                  onChange={(e) => setUsageMode(e.target.value as UsageMode)}
-                  data-testid="usage-mode-select"
-                >
-                  <option value="online">Online Evaluation</option>
-                  <option value="experiment">Experiment (Batch)</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
+        {/* Mode and Language Selectors */}
+        <HStack gap={4}>
+          <NativeSelect.Root width="200px">
+            <NativeSelect.Field
+              value={usageMode}
+              onChange={(e) => setUsageMode(e.target.value as UsageMode)}
+              data-testid="usage-mode-select"
+            >
+              <option value="online">Online Evaluation</option>
+              <option value="experiment">Experiment (Batch)</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
 
-              <NativeSelect.Root width="170px">
-                <NativeSelect.Field
-                  value={language}
-                  onChange={(e) => setLanguage(e.target.value as Language)}
-                  data-testid="language-select"
-                >
-                  <option value="python">Python</option>
-                  <option value="typescript">TypeScript</option>
-                  <option value="bash">cURL</option>
-                </NativeSelect.Field>
-                <NativeSelect.Indicator />
-              </NativeSelect.Root>
-            </HStack>
+          <NativeSelect.Root width="170px">
+            <NativeSelect.Field
+              value={language}
+              onChange={(e) => setLanguage(e.target.value as Language)}
+              data-testid="language-select"
+            >
+              <option value="python">Python</option>
+              <option value="typescript">TypeScript</option>
+              <option value="bash">cURL</option>
+            </NativeSelect.Field>
+            <NativeSelect.Indicator />
+          </NativeSelect.Root>
+        </HStack>
 
-            {/* Code Block */}
-            <Box borderRadius="md" overflow="hidden" width="full">
-              <CodePreview code={getCode()} language={getLanguageForHighlight()} />
-            </Box>
+        {/* Code Block */}
+        <Box borderRadius="md" overflow="hidden" width="full">
+          <CodePreview code={getCode()} language={getLanguageForHighlight()} />
+        </Box>
 
-            {/* Help text */}
-            <VStack align="start" gap={2}>
-              <Text fontSize="sm" color="fg.muted">
-                Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with your
-                API key.{" "}
-                <Link
-                  href={apiKeyLink}
-                  color="blue.fg"
-                  display="inline-flex"
-                  alignItems="center"
-                  gap={1}
-                >
-                  Find your API key <ExternalLink size={12} />
-                </Link>
-              </Text>
-              <Text fontSize="sm" color="fg.muted">
-                Learn more about{" "}
-                {usageMode === "experiment" ? "running experiments" : "online evaluations"} in our{" "}
-                <Link
-                  href={docsLink}
-                  color="blue.fg"
-                  display="inline-flex"
-                  alignItems="center"
-                  gap={1}
-                  target="_blank"
-                >
-                  documentation <ExternalLink size={12} />
-                </Link>
-              </Text>
-            </VStack>
-          </VStack>
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+        {/* Help text */}
+        <VStack align="start" gap={2}>
+          <Text fontSize="sm" color="fg.muted">
+            Set the <InlineCode>LANGWATCH_API_KEY</InlineCode> environment variable with your API
+            key.{" "}
+            <Link
+              href={apiKeyLink}
+              color="blue.fg"
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+            >
+              Find your API key <ExternalLink size={12} />
+            </Link>
+          </Text>
+          <Text fontSize="sm" color="fg.muted">
+            Learn more about{" "}
+            {usageMode === "experiment" ? "running experiments" : "online evaluations"} in our{" "}
+            <Link
+              href={docsLink}
+              color="blue.fg"
+              display="inline-flex"
+              alignItems="center"
+              gap={1}
+              target="_blank"
+            >
+              documentation <ExternalLink size={12} />
+            </Link>
+          </Text>
+        </VStack>
+      </VStack>
+    </Dialog>
   );
 }
 

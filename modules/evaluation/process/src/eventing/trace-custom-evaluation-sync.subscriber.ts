@@ -7,12 +7,11 @@ import crypto from "node:crypto";
 
 import type { ReportEvaluationCommandData } from "@langwatch/evaluation-contract";
 import { createLogger } from "@langwatch/observability";
+import { type OtlpSpan, spanSchema } from "@langwatch/otlp/trace-request";
 import { nowInstant } from "@langwatch/time";
 import {
-  type OtlpSpan,
   type SdkEvaluation,
   sdkEvaluationSchema,
-  spanSchema,
   STALE_TRACE_THRESHOLD_MS,
 } from "@langwatch/trace-contract";
 import { z } from "zod";

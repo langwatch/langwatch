@@ -120,6 +120,13 @@ Feature: Connect on a self-hosted install
     And they are judged through the hosted service only when "Instant Evals" is switched on
 
   @unit
+  Scenario: A development checkout judges with LangWatch's key directly
+    Given a development checkout (NODE_ENV "development") that is not LangWatch Cloud
+    And LangWatch's judge key is set
+    Then eval functions and search routing are judged with that key, as on LangWatch Cloud
+    And nothing is judged through Connect
+
+  @unit
   Scenario: An install with the service off publishes eval functions as unavailable
     Given "Instant Evals" is switched off
     And the install has no judge key of its own

@@ -17,16 +17,38 @@ Feature: Internal ops navigation
     Then there is no Ops section in it
 
   @integration
-  Scenario: The settings menu holds the ops groups at the bottom
+  Scenario: Settings holds no operator groups
     Given I have ops access and I am an admin
     When the settings sidebar renders
-    Then the OPS and BACKOFFICE groups are the last two groups
+    Then it holds no Health, Tools, Instance or Cloud group
+    And no menu group in it leads to an ops page
+
+  @integration
+  Scenario: Settings points operators to the Operations console
+    Given I have ops access
+    When the settings sidebar renders
+    Then an "Ops have moved" link is pinned to the bottom of its menu
+    And it leads to the Operations console
+
+  @integration
+  Scenario: Settings shows no signpost to a reader without ops access
+    Given I have no ops access
+    When the settings sidebar renders
+    Then there is no "Ops have moved" link
+
+  @integration
+  Scenario: The Admin console has its own sidebar
+    Given I have ops access and I am an admin on LangWatch Cloud
+    When I open an ops page
+    Then the sidebar is the Admin console's, grouped Health, Tools, Instance and Cloud
+    And the top bar names Operations rather than Settings
+    And the product switcher and the user menu each offer Operations to an operator
 
   @integration
   Scenario: A reader without ops access sees no ops groups
     Given I do not have ops access
     When the settings sidebar renders
-    Then there is no OPS group and no BACKOFFICE group
+    Then there is no Health, Tools, Instance or Cloud group
 
   # The badge the legacy sidebar drew on its own Ops section: blocked groups
   # plus dead-lettered jobs, the two integers `ops.getBadgeCounts` answers.
@@ -54,7 +76,7 @@ Feature: Internal ops navigation
     Then the counts are not requested
 
   @unit
-  Scenario: The settings menu reaches every internal ops page
+  Scenario: The Admin menu reaches every internal ops page
     Given the route table registers the internal ops pages
     When each registered ops address is matched against the settings menu
     Then every one of them is claimed by a menu entry
@@ -71,10 +93,10 @@ Feature: Internal ops navigation
     And the Event Sourcing entry claims their addresses
 
   @integration
-  Scenario: An ops page renders inside the new settings shell
+  Scenario: An ops page renders inside the Admin console
     When I open an ops page
-    Then it renders in the navigation-v2 settings shell
-    And the matching settings menu entry is marked as active
+    Then it renders in the navigation-v2 shell with the Admin sidebar
+    And the matching Admin entry is marked as active
 
   @unit
   Scenario: An ops page is never remembered as the last product

@@ -9,11 +9,11 @@ user-invocable: true
 Fakes ElevenLabs Conversational AI (the signed-URL mint and the conversation socket) and
 OpenAI's `pcm` speech and transcription. Every answer is canned: tones for audio, four
 scripted agent lines, one fixed caller transcript. Keys are accepted and never checked: a dev
-shim, never expose it. Code: `services/voicesim`, console `apps/voicesim-web`.
+shim, never expose it. Code: `services/sims/voicesim`, console `apps/sims/src/voice`.
 
 ## Run it
 
-- Opt-in: `haven up +voice` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +voice` (sticky). Runs in the `go` lane by default (see `sims`).
 - Already on? `haven sim voice status` answers with the base URLs; the seeded org then has an ElevenLabs provider at voicesim, no clean instance needed.
 - Console: `https://voice.<slug>.langwatch.localhost` (calls, transcripts, events, Clear calls); `haven status` shows the loopback port.
 - Unless `.env` names `ELEVENLABS_BASE_URL`, the overlay sets it to `http://127.0.0.1:<port>`,
@@ -50,13 +50,13 @@ A call id is `conv_voicesim_0001`, `0002`, ... An unfaked provider path answers 
 
 - `VOICESIM_SEED=1` (haven sets it) records one finished two-turn call for agent
   `agent_voicesim_seed`, so the console starts with content.
-- Nothing persists: a restart (`haven restart sims`) empties it.
+- Nothing persists: a restart of the lane that hosts it (`haven restart go`) empties it.
 
 ## Tests and load
 
 - Caps: `VOICESIM_MAX_CALLS` (default 200, oldest dropped) and `VOICESIM_MAX_EVENTS_PER_CALL`
   (default 500, the rest counted as `droppedEvents`).
-- Drive the loopback port directly; `go test ./services/voicesim` covers the protocol.
+- Drive the loopback port directly; `go test ./services/sims/voicesim` covers the protocol.
 - The Twilio phone transport is not faked.
 
 ## From a terminal or agent

@@ -1,7 +1,6 @@
-import path from "node:path";
-
 import type { AgentApi } from "@langwatch/agent-contract";
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
+import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import { DEFAULT_MODEL, type ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -14,10 +13,11 @@ import type { TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { CancellationPublisher, CancellationSubscriber } from "../app/scenario.app.ts";
-import {
-  NodeScenarioChildService,
-  type ScenarioChildProcessConfig,
-} from "../features/child/services/node-scenario-child.service.ts";
+import type {
+  ScenarioChildChannel,
+  ScenarioGoChildChannel,
+} from "../channels/scenario-child.channel.ts";
+import { ScenarioChildChoiceService } from "../features/child/services/scenario-child-choice.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioVoiceTargetService } from "../features/voice/services/scenario-voice-target.service.ts";
 import type { VoiceNonceRegistryService } from "../features/voice/services/voice-nonce-registry.service.ts";
@@ -43,27 +43,21 @@ type ScenarioExecutorPeers = Readonly<{
   modelProviders: ModelProviderApi;
   apiKeys: ApiKeyApi;
   gateway: GatewayApi;
+  featureFlags: FeatureFlagApi;
 }>;
-
-/** The repository root: this file sits five folders below it, in source and in dist alike. */
-const WORKSPACE_ROOT = path.join(import.meta.dirname, "..", "..", "..", "..", "..");
-const CHILD_PACKAGE_ROOT = path.join(WORKSPACE_ROOT, "apps", "scenario-child");
 
 /** The process facts a child is started with, as the module resolved them. */
 type ScenarioExecutorHost = Readonly<{
   /** Acquires the worker's public media origin on the first voice run. */
   voicePublicUrl: () => Promise<VoicePublicUrl>;
   nlpServiceUrl: string | undefined;
-  /** The engine hop's shared credential, as the process resolved it. */
-  nlpInternalSecret: string | undefined;
-  isSaas: boolean;
-  nodeEnvironment: string | undefined;
-  publicBaseUrl: string | undefined;
 }>;
 
 type ScenarioExecutorInput = Readonly<{
   /** The worker's one nonce registry, shared with its media door. */
   voiceNonces: VoiceNonceRegistryService;
+  /** The child channels a run starts on; the choice between them is made per run. */
+  children: Readonly<{ node: ScenarioChildChannel; go: ScenarioGoChildChannel }>;
   peers: ScenarioExecutorPeers;
   scenarios: ScenarioService;
   simulations: SimulationService;
@@ -154,49 +148,20 @@ export class ScenarioExecutorService {
       execution,
       pool,
       cancellations: this.input.cancellationSubscriptions,
-      childProcesses: NodeScenarioChildService.create({
-        config: this.#childConfig(),
-        voicePublicUrl: this.input.host.voicePublicUrl,
-        pool,
-        nonces: this.input.voiceNonces,
-      }),
+      childProcesses: this.#childProcesses(pool),
       metrics: ScenarioProcessorMetricsService.create(),
     });
   }
 
-  #childConfig(): ScenarioChildProcessConfig {
-    return ScenarioExecutorService.childConfig({
-      config: this.input.config,
-      host: this.input.host,
+  #childProcesses(pool: ScenarioExecutionPoolService): ScenarioChildChoiceService {
+    return ScenarioChildChoiceService.create({
+      node: this.input.children.node,
+      go: this.input.children.go,
+      featureFlags: this.input.peers.featureFlags,
+      pool,
+      nonces: this.input.voiceNonces,
+      voicePublicUrl: this.input.host.voicePublicUrl,
     });
-  }
-
-  /** How a scenario child is started here, whether it runs a simulation or one agent-test turn. */
-  static childConfig({
-    config,
-    host,
-  }: {
-    config: ScenarioServerConfig;
-    host: ScenarioExecutorHost;
-  }): ScenarioChildProcessConfig {
-    return {
-      packageRoot: CHILD_PACKAGE_ROOT,
-      sourcePath: path.join(CHILD_PACKAGE_ROOT, "src", "main.ts"),
-      sourceRoots: [
-        path.join(CHILD_PACKAGE_ROOT, "src"),
-        path.join(WORKSPACE_ROOT, "modules", "scenario", "contract", "src"),
-        path.join(WORKSPACE_ROOT, "modules", "scenario", "process", "src", "channels"),
-      ],
-      nodeEnv: host.nodeEnvironment,
-      isSaas: host.isSaas,
-      baseHost: host.publicBaseUrl,
-      egress: {
-        blockLocal: config.blockLocalHttpCalls,
-        allowedHosts: [...config.allowedProxyHosts],
-      },
-      nlpInternalSecret: host.nlpInternalSecret,
-      parentEnvironment: config.childParentEnvironment,
-    };
   }
 
   #withoutExecutor(reason: "no-telemetry-endpoint" | "no-nlp-engine"): void {

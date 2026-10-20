@@ -2,7 +2,6 @@ import { Box, Button, HStack } from "@langwatch/design-system/primitives";
 import type { Instant } from "@langwatch/time";
 import { ChartColumn } from "lucide-react";
 
-import { FG_MUTED } from "../../../../model/agent-testing/shared/design.ts";
 /**
  * The filter row of the Results tab: how the list is grouped, what is cut from it, and
  * the window it all sits in.
@@ -97,9 +96,9 @@ export function ResultsFilterRow({
           size="xs"
           variant="ghost"
           height="32px"
-          fontSize="12.5px"
+          textStyle="bodySm"
           fontWeight="medium"
-          color={FG_MUTED}
+          color="fg.muted"
           onClick={() => onFiltersChange(EMPTY_RESULT_FILTERS)}
         >
           Reset filters

@@ -2,7 +2,6 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { VerifiedBrowserSession } from "@langwatch/auth-contract";
 import { AuthUnavailableError } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { SignInProviderMounts, SsoApi } from "@langwatch/enterprise-sso-contract";
 /**
  * The module composes the deployment's ONE Better Auth instance, and the
@@ -91,7 +90,12 @@ async function appFor(
       trustedIdpOrigins: undefined,
       idpSimulatorUrl: undefined,
       localPasswords: false,
-      auth0ManagementClientId: undefined,
+      socialProviderBases: {
+        google: undefined,
+        github: undefined,
+        gitlab: undefined,
+        microsoft: undefined,
+      },
       cliRefreshTokenTtlSeconds: undefined,
       isSaas: false,
       signInProviders: { ...NO_SIGN_IN_PROVIDERS, ...providers.config },
@@ -110,7 +114,6 @@ async function appFor(
         createApiFixture<IdentityApi>({ createStorageAdapter: ({ legacyEngine }) => legacyEngine }),
       organizations: createApiFixture<OrganizationApi>(),
       entitlements: createApiFixture<EntitlementApi>(),
-      licensing: createApiFixture<LicensingApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>({
         getSignInProviderMounts: async (input) => {

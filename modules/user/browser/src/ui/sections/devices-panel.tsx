@@ -1,9 +1,14 @@
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type {
   CliSessionCard,
   PersonalIngestionKeyListing,
 } from "@langwatch/enterprise-governance-contract";
+import { docsUrl } from "@langwatch/handled-error/docs-url";
+import { Laptop } from "lucide-react";
 import { type ReactNode, useState } from "react";
 
 import { api } from "../../behavior/personal-workspace-api.ts";
@@ -257,45 +262,38 @@ function RevokeAllConfirmation({
   onConfirm: () => void;
 }) {
   return (
-    <HStack
-      gap={2}
-      paddingY={2}
-      paddingX={3}
-      backgroundColor="red.subtle"
-      borderRadius="sm"
-      borderWidth="1px"
-      borderColor="red.emphasized"
+    <Banner
+      status="error"
+      action={
+        <HStack gap={2}>
+          <BannerAction onClick={onCancel} disabled={isRevoking}>
+            Cancel
+          </BannerAction>
+          <Button size="xs" colorPalette="red" onClick={onConfirm} loading={isRevoking}>
+            Confirm revoke all
+          </Button>
+        </HStack>
+      }
     >
-      <Text fontSize="xs" color="red.fg" flex={1}>
-        Revoke every device on your account? Their ingestion keys stop with them, and you'll need to
-        re-run <InlineCode>langwatch login</InlineCode> on each device after this.
-      </Text>
-      <Button size="xs" variant="ghost" onClick={onCancel} disabled={isRevoking}>
-        Cancel
-      </Button>
-      <Button size="xs" colorPalette="red" onClick={onConfirm} loading={isRevoking}>
-        Confirm revoke all
-      </Button>
-    </HStack>
+      Revoke every device on your account? Their ingestion keys stop with them, and you'll need to
+      re-run <InlineCode>langwatch login</InlineCode> on each device after this.
+    </Banner>
   );
 }
 
 /** A failed read is not an empty one: a key that could not be read is still live. */
 function CredentialsUnavailable({ onRetry }: { onRetry: () => void }) {
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={6}>
-      <VStack align="start" gap={2}>
-        <Text fontSize="sm" fontWeight="medium">
-          Could not load your devices and keys
-        </Text>
-        <Text fontSize="sm" color="fg.muted">
-          Anything already signed in keeps working. Try again to see the current list.
-        </Text>
+    <Card
+      titleLevel={3}
+      title="Could not load your devices and keys"
+      description="Anything already signed in keeps working. Try again to see the current list."
+      footer={
         <Button size="xs" variant="outline" onClick={onRetry}>
           Try again
         </Button>
-      </VStack>
-    </Box>
+      }
+    />
   );
 }
 
@@ -303,16 +301,15 @@ function CredentialsUnavailable({ onRetry }: { onRetry: () => void }) {
 function NoDevicesState() {
   return (
     <VStack align="stretch" gap={4}>
-      <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={6}>
-        <VStack align="start" gap={2}>
-          <Text fontSize="sm" fontWeight="medium">
-            No devices signed in
-          </Text>
-          <Text fontSize="sm" color="fg.muted">
-            Sign in from a new device to see it appear here.
-          </Text>
-        </VStack>
-      </Box>
+      <NoDataInfoBlock
+        size="inline"
+        icon={<Laptop />}
+        title="No devices signed in"
+        description="Sign in from a new device to see it appear here."
+        next={[
+          { kind: "docs", label: "CLI install guide", href: docsUrl("/integration/cli#install") },
+        ]}
+      />
       <InstallCliCard
         heading="Sign in from a new device"
         subline="Install the CLI on the device you want to authorize, then run `langwatch login` to start the SSO flow. The device will appear above."

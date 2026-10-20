@@ -36,21 +36,38 @@ type Config struct {
 	// Tsgo bounds what tsgo may take from the machine (ADR-095); the daemon's
 	// tick enforces it over every live tsgo process regardless of who spawned
 	// it. Tsgo.RunMaxRSS == 0 disables the governor.
-	Tsgo           domain.TsgoLimits
-	HeartbeatEvery time.Duration // launcher heartbeat cadence
-	DaemonArgv     []string      // how to (re)launch `haven daemon`
-	SimulatorArgv  []string      // this Haven executable plus its internal simulator command
-	GoWatchArgv    []string      // this Haven executable plus its internal Go watch command
-	UIWatchArgv    []string      // this Haven executable plus its internal UI watch command
+	Tsgo domain.TsgoLimits
+	// Browser bounds LangWatch's Playwright headless shells the same way;
+	// Browser.MaxRSS == 0 disables that governor.
+	Browser domain.BrowserLimits
+	// Orphans bounds the daemon's sweep of unowned dev tooling under the
+	// BrowserOwnerRoots and every stack's worktree; a zero field disables a rule.
+	Orphans domain.OrphanLimits
+	// Duplicates is the sweep of infra running twice (HAVEN_DEDUPE); zero is off.
+	Duplicates domain.DuplicateLimits
+	// BrowserOwnerRoots are the checkout roots whose scripts' headless shells
+	// the browser governor may reap; worktrees sit beneath the main root.
+	BrowserOwnerRoots []string
+	HeartbeatEvery    time.Duration // launcher heartbeat cadence
+	DaemonArgv        []string      // how to (re)launch `haven daemon`
+	SimulatorArgv     []string      // this Haven executable plus its internal simulator command
+	GoWatchArgv       []string      // this Haven executable plus its internal Go watch command
+	UIWatchArgv       []string      // this Haven executable plus its internal UI watch command
 	// UpArgv is this Haven executable plus `up`, resolved once in the composition
 	// root against the TRUSTED checkout — never against the directory a child
 	// will run in. Empty disables starting a stack from the dashboard.
 	UpArgv []string
+	// ServiceArgv is this Haven executable plus `service`, resolved like UpArgv:
+	// how the dashboard switches one service of a running stack.
+	ServiceArgv []string
 	// KeepArgv is this Haven executable plus `keep`: the stack's keeper.
 	KeepArgv                 []string
 	IsAgent                  bool // token-free plain output for AI drivers (no color/TUI)
 	ShouldManageClickHouse   bool // haven provisions a shared ClickHouse container (colima) + per-slug DBs
 	ShouldStopClickHouseIdle bool // daemon stops the managed CH container when the last stack is reaped
+	// ClickHousePressure is the load at which the daemon drops the least recently
+	// used unowned stack database, one per ~2 minute probe (zero disables).
+	ClickHousePressure ClickHousePressure
 	// ClickHousePostgresHost is how the managed ClickHouse reaches host Postgres
 	// (domain.ClickHouseRuntime.PostgresHost), recorded on each stack it serves.
 	ClickHousePostgresHost string
@@ -103,6 +120,9 @@ type Config struct {
 	// stand-in (INSTANT_EVAL_CLASSIFIER=memory). Off by default; resolved from
 	// HAVEN_INSTANT_EVAL_MOCK_JUDGE, which `haven machine limits` and the hub also set.
 	ShouldMockInstantEvalJudge bool
+	// LaneMemory is the Node lanes' memory ceilings (`haven machine limits`);
+	// zero means no ceiling.
+	LaneMemory domain.LaneMemoryCaps
 	// ObservabilityConsoleLevel is the console log floor haven injects (as
 	// LOG_CONSOLE_LEVEL) while the observability stack is up — default "warn", so the
 	// terminal is quiet and the full detail lives in Grafana. "" opts out and leaves

@@ -5,19 +5,19 @@ import type { ParsedEvaluationResult } from "@langwatch/evaluator-contract";
  * the trace list, drawer header, Evals accordion, and evaluator chips.
  */
 export const EVALUATION_STATUS_COLORS = {
-  pending: "fg.subtle",
-  running: "blue.fg",
-  passed: "green.fg",
-  failed: "red.fg",
-  processed: "blue.fg", // Neutral color for score-only evaluators (no pass/fail)
+  pending: "evaluation.pending",
+  running: "evaluation.running",
+  passed: "evaluation.passed",
+  failed: "evaluation.failed",
+  processed: "evaluation.processed", // Neutral color for score-only evaluators (no pass/fail)
   // Errors get one step deeper red than a fail verdict — distinct
   // enough to read as "the evaluator broke" without going so dark it
   // looks like a different colour entirely.
-  error: "red.fg",
+  error: "evaluation.error",
   // Skipped is a setup state, not a verdict — light grey (closer to
   // the muted bg than to fg) keeps it from competing for attention
   // next to real pass/fail rows.
-  skipped: "fg.subtle",
+  skipped: "evaluation.skipped",
 } as const;
 
 /**
@@ -33,7 +33,7 @@ export const EVALUATION_STATUS_TONES = {
   processed: { bg: "blue.subtle", fg: "blue.fg" },
   // Slightly deeper red foreground to match the dot, but a step
   // lighter than red.700 so it still reads as red rather than maroon.
-  error: { bg: "red.subtle", fg: "red.fg" },
+  error: { bg: "red.subtle", fg: "evaluation.error" },
   // Gray-on-gray skipped tone — neutral, low-attention.
   skipped: { bg: "bg.muted", fg: "fg.muted" },
 } as const;

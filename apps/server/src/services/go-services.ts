@@ -91,6 +91,7 @@ async function startCombined({
   const probes = await Promise.all(
     [ctx.ports.nlp, ctx.ports.aigateway].map((port) =>
       pollUntilHealthy({
+        handle,
         check: httpGetCheck(`http://127.0.0.1:${port}/healthz`),
         timeoutMs: 30_000,
       }),

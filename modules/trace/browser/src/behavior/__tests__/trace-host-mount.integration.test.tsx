@@ -1,7 +1,6 @@
 /**
  * @vitest-environment jsdom
  * Presence comes off `getScopeGraph`, the first-trace flag off `getHasFirstMessage`. Specs:
- * specs/features/onboarding/manual-setup-api-key.feature,
  * specs/traces-v2/onboarding-empty-state.feature
  */
 import { cleanup, render, screen } from "@testing-library/react";

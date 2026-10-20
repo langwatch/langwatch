@@ -89,12 +89,12 @@ export function buildCodexOtelBlock(
   const traceExporter = [
     "[otel.trace_exporter.otlp-http]",
     `endpoint = "${tomlStr(codexTraceEndpoint(inputs.baseEndpoint))}"`,
-    `protocol = "json"`,
+    `protocol = "binary"`,
   ];
   const eventsExporter = [
     "[otel.exporter.otlp-http]",
     `endpoint = "${tomlStr(codexLogsEndpoint(inputs.baseEndpoint))}"`,
-    `protocol = "json"`,
+    `protocol = "binary"`,
   ];
   if (includeAuthHeader) {
     traceExporter.push(headerLine);

@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import {
   Box,
   chakra,
@@ -68,27 +69,21 @@ export function FacetSection({
   // Always-open panel (standalone / test path).
   if (!accordion) {
     return (
-      <Box padding={3} borderRadius="md" border="1px solid" borderColor="border">
+      <Card variant="frame" padding="sm">
         <HStack mb={3} gap={2}>
           {titleRow}
           <Spacer />
           {headerRight}
         </HStack>
         {children}
-      </Box>
+      </Card>
     );
   }
 
   const { open, onToggle } = accordion;
 
   return (
-    <Box
-      borderRadius="md"
-      border="1px solid"
-      borderColor="border"
-      bg="bg"
-      _hover={{ borderColor: "border.emphasized" }}
-    >
+    <Card variant="frame" padding="none">
       <HStack gap={2} align="center" padding={3} borderRadius="md">
         <chakra.button
           type="button"
@@ -128,6 +123,6 @@ export function FacetSection({
           {children}
         </Box>
       ) : null}
-    </Box>
+    </Card>
   );
 }

@@ -22,7 +22,7 @@ export function FullWidthFormControl({
         <VStack align="start" gap={1} width="full" minWidth={minWidth}>
           <Field.Label margin={0}>{label}</Field.Label>
           {helper && (
-            <Field.HelperText margin={0} fontSize="13px">
+            <Field.HelperText margin={0} textStyle="bodySm">
               {helper}
             </Field.HelperText>
           )}

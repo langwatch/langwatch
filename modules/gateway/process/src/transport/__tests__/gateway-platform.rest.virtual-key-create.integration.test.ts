@@ -127,6 +127,10 @@ async function mountedCreate(
             archivedAt: null,
             kind: "application",
           })),
+        findTraceDestination: async (id) => {
+          const teamId = PROJECT_TEAMS.get(id);
+          return teamId ? { id, teamId, archivedAt: null, kind: "application" } : null;
+        },
         resolveTraceDestination: async ({ projectScopeIds, traceProjectId }) => {
           const id = traceProjectId ?? (projectScopeIds.length === 1 ? projectScopeIds[0] : null);
           const teamId = id === null || id === undefined ? undefined : PROJECT_TEAMS.get(id);
@@ -183,6 +187,7 @@ async function mountedCreate(
   };
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: door, identify: door } },
     idempotency: passthroughIdempotency,

@@ -15,7 +15,7 @@ import {
 } from "@langwatch/trace-contract";
 
 import type { TraceQueryFieldsService } from "../services/trace-query-fields.service.ts";
-import { latestEvaluationRunsSubquery } from "./trace-query-subquery.rules.ts";
+import { latestEvaluationRunsSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import { translateNumericField, translateStringField } from "./trace-query-translators.rules.ts";
 import { extractStringValue, nextParam, validateValueLength } from "./trace-query-values.rules.ts";
 
@@ -162,7 +162,9 @@ export function translateEvaluationScope({
   const excluded = scope.conditions.filter((c) => c.negated);
   return [
     runsOfX(keptSql),
-    ...excluded.map((c) => `NOT ${runsOfX([conditionSql({ condition: c, ctx, fields })])}`),
+    ...excluded.map((c) =>
+      wrapMembership(runsOfX([conditionSql({ condition: c, ctx, fields })]), true),
+    ),
   ].join(" AND ");
 }
 

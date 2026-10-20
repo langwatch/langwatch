@@ -7,6 +7,7 @@ import type {
 } from "../repositories/retroactive-retention.repository.ts";
 
 const POLL_INTERVAL_MS = 30_000;
+const FIRST_POLL_MS = 1_000;
 const SHARED_TARGET = "shared";
 
 /** What the step saves after each target and returns at the end; dry runs list `wouldStart`. */
@@ -104,7 +105,10 @@ export class EventLogKeepForeverService {
     return true;
   }
 
-  /** Polls the target's newest rewrite until it is done; false when aborted first. */
+  /**
+   * Polls the target's newest rewrite until it is done; false when aborted first. The wait
+   * starts at a second and doubles to the poll interval, so a small store is not held 30 s.
+   */
   private async finished({
     target,
     signal,
@@ -112,11 +116,13 @@ export class EventLogKeepForeverService {
     target: ClickHouseTarget;
     signal: AbortSignal;
   }): Promise<boolean> {
+    let delayMs = Math.min(FIRST_POLL_MS, this.pollIntervalMs);
     while (!signal.aborted) {
       const [latest] = await this.retroactive.findKeepForeverRewrites(target);
       if (latest === undefined || latest.isDone) return true;
       if (latest.latestFailReason) throw failedRewrite({ target, rewrite: latest });
-      await wait(this.pollIntervalMs, undefined, { signal }).catch(() => undefined);
+      await wait(delayMs, undefined, { signal }).catch(() => undefined);
+      delayMs = Math.min(delayMs * 2, this.pollIntervalMs);
     }
     return false;
   }

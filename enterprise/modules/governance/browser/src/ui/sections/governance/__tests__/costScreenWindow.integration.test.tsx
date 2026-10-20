@@ -136,8 +136,8 @@ describe("the cost screen on first open", () => {
     renderScreen();
 
     const chips = screen.getAllByRole("button").map((button) => button.textContent);
-    expect(chips).toContain("Time Frame·Last 12 months");
-    expect(chips).toContain("Time Interval·Quarter");
+    expect(chips).toContain("Time frame·Last 12 months");
+    expect(chips).toContain("Time interval·Quarter");
     expect(chips.some((chip) => /group by/i.test(chip ?? ""))).toBe(false);
     expect(screen.queryByText(/group by/i)).toBeNull();
   });
@@ -174,7 +174,7 @@ describe("given the reader picks a Time Frame of two years", () => {
     harness.summary = summaryOver([{ day: "2026-08-01", billedUsd: 5, gatewayUsd: null }]);
     renderScreen();
 
-    await userEvent.click(screen.getByText("Time Frame").closest("button") as HTMLButtonElement);
+    await userEvent.click(screen.getByText("Time frame").closest("button") as HTMLButtonElement);
     await userEvent.click(await screen.findByRole("menuitem", { name: "Last 2 years" }));
 
     const note = await screen.findByTestId("cost-read-ceiling-note");

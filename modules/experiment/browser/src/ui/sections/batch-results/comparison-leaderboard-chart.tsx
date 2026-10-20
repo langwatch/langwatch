@@ -2,6 +2,7 @@
  * ComparisonLeaderboardChart - compact Bradley-Terry ranking card (#5103).
  */
 import { Box, HStack, IconButton, Text } from "@langwatch/design-system/primitives";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { useMemo } from "react";
 import { LuMaximize2 } from "react-icons/lu";
 import {
@@ -62,7 +63,7 @@ function ScoreValueLabel(props: {
       y={top + barHeight / 2}
       textAnchor="start"
       dominantBaseline="central"
-      style={{ fontSize: 11, fill: "var(--chakra-colors-fg)" }}
+      style={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg)" }}
     >
       {value.toFixed(2)}
     </text>
@@ -196,7 +197,7 @@ function LeaderboardBars({
         <XAxis
           type="number"
           domain={[-yMax, yMax]}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           hide
         />
@@ -204,7 +205,7 @@ function LeaderboardBars({
           type="category"
           dataKey="name"
           width={axis.maxLabelLength * 6 + 10}
-          style={{ fontSize: "11px" }}
+          style={{ fontSize: TYPE_SCALE_PX.micro }}
           tick={{ fill: "var(--chakra-colors-fg-muted)" }}
           axisLine={false}
           tickLine={false}
@@ -215,7 +216,7 @@ function LeaderboardBars({
             background: "var(--chakra-colors-bg-panel)",
             border: "1px solid var(--chakra-colors-border)",
             borderRadius: 6,
-            fontSize: 12,
+            fontSize: TYPE_SCALE_PX.caption,
           }}
           formatter={(value) => [(value as number).toFixed(2), "Score"]}
           labelFormatter={(label, payload) =>

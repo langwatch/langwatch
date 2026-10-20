@@ -27,7 +27,6 @@ export class MemoryProjectDatabase {
   readonly #projects = new Map<string, Project>();
   readonly #teams = new Map<string, Team>();
   readonly #organizations = new Map<string, MemoryOrganizationRow>();
-  readonly #teamMembers = new Map<string, Set<string>>();
 
   private constructor() {}
 
@@ -51,14 +50,6 @@ export class MemoryProjectDatabase {
 
   teams(): Team[] {
     return [...this.#teams.values()];
-  }
-
-  putTeamMember(teamId: string, userId: string): void {
-    this.#teamMembers.set(teamId, new Set([...(this.#teamMembers.get(teamId) ?? []), userId]));
-  }
-
-  isTeamMember(teamId: string, userId: string): boolean {
-    return this.#teamMembers.get(teamId)?.has(userId) ?? false;
   }
 
   findTeam(id: string): Team | undefined {

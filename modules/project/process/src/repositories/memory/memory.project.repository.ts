@@ -16,6 +16,7 @@ import {
   type CreateProjectInput,
   type InternalProject,
   type InternalProjectKind,
+  internalProjectKindSchema,
   type PaginatedProjects,
   type ArchivedProject,
   type Project,
@@ -35,9 +36,10 @@ import {
   type ProjectUsageCount,
   type ProjectKind,
 } from "@langwatch/project-contract";
-import { nowInstant, toDate, type Instant } from "@langwatch/time";
+import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -111,12 +113,18 @@ export class MemoryProjectRepository implements ProjectRepository {
     return true;
   }
 
-  async findInternalByOrganization(organizationId: string): Promise<InternalProject | null> {
+  async findInternalByOrganization({
+    organizationId,
+    kind,
+  }: {
+    organizationId: string;
+    kind: InternalProjectKind;
+  }): Promise<InternalProject | null> {
     const project = this.#database
       .projects()
       .find(
         (row) =>
-          row.kind === PROJECT_KIND.INTERNAL_GOVERNANCE &&
+          row.kind === kind &&
           row.archivedAt === null &&
           this.#database.isInOrganization(row, organizationId),
       );
@@ -133,7 +141,7 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findInternalBySlug(slug: string): Promise<InternalProject | null> {
     const project = this.#database.projects().find((row) => row.slug === slug);
-    if (!project || project.kind !== PROJECT_KIND.INTERNAL_GOVERNANCE) return null;
+    if (!project || !internalProjectKindSchema.validate(project.kind)) return null;
 
     return this.#internal(project);
   }
@@ -144,6 +152,8 @@ export class MemoryProjectRepository implements ProjectRepository {
     slug: string;
     apiKey: string;
     teamId: string;
+    kind: InternalProjectKind;
+    framework: string;
   }): Promise<InternalProject> {
     const winner = this.#database.projects().find((row) => row.slug === input.slug);
     if (winner) return this.#internal(winner);
@@ -157,8 +167,8 @@ export class MemoryProjectRepository implements ProjectRepository {
           apiKey: input.apiKey,
           teamId: input.teamId,
           language: "internal",
-          framework: "governance",
-          kind: PROJECT_KIND.INTERNAL_GOVERNANCE,
+          framework: input.framework,
+          kind: input.kind,
           traceSharingEnabled: false,
         }),
       ),
@@ -191,6 +201,15 @@ export class MemoryProjectRepository implements ProjectRepository {
     return { ...project, team };
   }
 
+  async findLiveWithTeamByIds(ids: readonly string[]): Promise<ProjectWithTeam[]> {
+    const found: ProjectWithTeam[] = [];
+    for (const id of ids) {
+      const project = await this.findWithTeam(id);
+      if (project) found.push(project);
+    }
+    return found;
+  }
+
   async updateMetadata({ id, data }: UpdateProjectMetadataInput): Promise<void> {
     const project = this.#database.findProject(id);
     if (!project) return;
@@ -217,6 +236,38 @@ export class MemoryProjectRepository implements ProjectRepository {
       onboardingVariant: organization?.onboardingVariant ?? null,
       organizationCreatedAt: organization?.createdAt ?? null,
     };
+  }
+
+  async findBackfillPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<ProjectBackfillEntry[]> {
+    const page = this.#database
+      .projects()
+      .filter((project) => afterId === null || project.id > afterId)
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
+      .slice(0, limit);
+    return page.map((project): ProjectBackfillEntry => {
+      const organization = this.#database.findOrganizationOf(project);
+      if (!organization) return { kind: "orphan", id: project.id };
+      return {
+        kind: "whole",
+        project: {
+          id: project.id,
+          createdAt: fromDate(project.createdAt),
+          organizationId: organization.id,
+          teamId: project.teamId,
+          isPersonal: project.isPersonal,
+          departmentId: project.departmentId,
+          presenceEnabled: project.presenceEnabled,
+          isArchived: project.archivedAt !== null,
+          adminUserId: organization.adminUserIds[0] ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
@@ -368,17 +419,21 @@ export class MemoryProjectRepository implements ProjectRepository {
     after,
     limit,
   }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
-    const projects = this.#database
+    const rows = this.#database
       .projects()
       .filter((project) => after === undefined || project.id > after)
-      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .flatMap((project) => {
-        const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
-        return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
-      });
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1));
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    const organizationOf = (teamId: string) => this.#database.findTeam(teamId)?.organizationId;
+    const projects = page.flatMap((project) => {
+      const organizationId = organizationOf(project.teamId);
+      return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
+    });
+    const orphanIds = page
+      .filter((project) => organizationOf(project.teamId) === undefined)
+      .map((project) => project.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({
@@ -420,11 +475,11 @@ export class MemoryProjectRepository implements ProjectRepository {
 
   async findSharedProjectSlugs({
     organizationId,
-    memberUserId,
+    member,
     limit,
   }: {
     organizationId: string;
-    memberUserId?: string;
+    member?: { teamIds: readonly string[]; projectIds: readonly string[] };
     limit: number;
   }): Promise<string[]> {
     return this.#database
@@ -436,7 +491,9 @@ export class MemoryProjectRepository implements ProjectRepository {
           !team.isPersonal &&
           project.archivedAt === null &&
           !NEVER_LANDED_ON_PROJECT_KINDS.includes(project.kind) &&
-          (memberUserId === undefined || this.#database.isTeamMember(team.id, memberUserId))
+          (member === undefined ||
+            member.teamIds.includes(team.id) ||
+            member.projectIds.includes(project.id))
         );
       })
       .toSorted((left, right) => left.createdAt.getTime() - right.createdAt.getTime())

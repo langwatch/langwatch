@@ -17,16 +17,39 @@ const PUSH_SERVICE_HOSTS = [
   "notify.windows.com",
 ] as const;
 
-export function isKnownPushServiceEndpoint(endpoint: string): boolean {
+export function isKnownPushServiceEndpoint(
+  endpoint: string,
+  { configuredBase }: { configuredBase?: string } = {},
+): boolean {
   let url: URL;
   try {
     url = new URL(endpoint);
   } catch {
     return false;
   }
+  if (configuredBase !== undefined && isUnderConfiguredBase(url, configuredBase)) return true;
   if (url.protocol !== "https:" || url.port !== "") return false;
   const host = url.hostname.toLowerCase();
   return PUSH_SERVICE_HOSTS.some((known) => host === known || host.endsWith(`.${known}`));
+}
+
+/** An https endpoint on the configured base's origin, below its path, with no credentials. */
+function isUnderConfiguredBase(url: URL, configuredBase: string): boolean {
+  let base: URL;
+  try {
+    base = new URL(configuredBase);
+  } catch {
+    return false;
+  }
+  const prefix = base.pathname.endsWith("/") ? base.pathname : `${base.pathname}/`;
+  return (
+    url.protocol === "https:" &&
+    url.origin === base.origin &&
+    url.username === "" &&
+    url.password === "" &&
+    url.pathname.startsWith(prefix) &&
+    url.pathname.length > prefix.length
+  );
 }
 
 /**

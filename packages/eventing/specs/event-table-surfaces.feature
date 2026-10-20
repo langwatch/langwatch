@@ -98,6 +98,13 @@ Feature: Eventing's own surfaces over its tables
       When the event explorer searches with a lower time bound
       Then the read filters on the event log's partition time, keeping legacy rows
 
+    @unit
+    Scenario: An aggregate's unbounded history read is a declared full scan
+      Given a long-lived aggregate, which has no time-local window
+      When its history is read whole, up to an event, or a page at a time
+      Then each read is declared a full scan, keyed by the aggregate
+      And a read given a lower bound declares nothing, so the bound prunes
+
   Rule: Eventing publishes its table list with categories
 
     @unit

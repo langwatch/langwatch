@@ -7,12 +7,12 @@ user-invocable: true
 # mailsim
 
 A local SMTP sink plus inbox. It catches every message the stack sends and relays
-nothing, whatever the recipient domain. Code: `services/mailsim`, console
-`apps/mailsim-web`.
+nothing, whatever the recipient domain. Code: `services/sims/mailsim`, console
+`apps/sims/src/mail`.
 
 ## Run it
 
-- On by default in haven (`haven up`; `-mail` turns it off). Hosted in the `sims` lane.
+- On by default in haven (`haven up`; `-mail` turns it off). Runs in the `go` lane by default (see `sims`).
 - URL: `https://mail.<slug>.langwatch.localhost` (console); `haven status` shows the
   loopback HTTP port (`MAILSIM_HTTP_ADDR`) and the SMTP port (`MAILSIM_SMTP_ADDR`).
 - The app's own mail is routed at it (`SMTP_HOST=127.0.0.1`) unless `.env` names a provider.
@@ -45,7 +45,7 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 - Send with any SMTP client to the SMTP port; no auth needed.
 - Bounded: `MAILSIM_MAX_MESSAGES` (default 10000) keeps the newest and evicts the oldest;
   `MAILSIM_MAX_MESSAGE_BYTES` (default 10 MiB) caps one message. Id and recipient lookups
-  are indexed. Benchmark: `go test -bench . -benchmem ./services/mailsim`.
+  are indexed. Benchmark: `go test -bench . -benchmem ./services/sims/mailsim`.
 
 ## From a terminal or agent
 
@@ -53,6 +53,6 @@ and read `links[0]`. Use `after=<newest id>` to ignore older mail.
 
 ```
 haven sim mail address | status | list [--to] [--subject] | get <id> [--html] | links <id>
-haven sim mail fault --error <0|4xx|5xx>         # SMTP sends refused with that reply code (4xx retry, 5xx permanent); 0 clears it
+haven sim mail fault <4xx|5xx|off>               # SMTP sends refused with that reply code (4xx retry, 5xx permanent); off clears it
 haven sim mail wait [--to] [--subject] [--after <id>] [--timeout 30s] | delete <id> | clear
 ```

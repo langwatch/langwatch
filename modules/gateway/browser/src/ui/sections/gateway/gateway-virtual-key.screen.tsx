@@ -2,6 +2,7 @@ import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import {
   Badge,
@@ -17,11 +18,11 @@ import {
   Skeleton,
   SkeletonText,
   Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import type { VirtualKeyCamelDtoResponse } from "@langwatch/gateway-contract";
 import { Temporal, formatDistanceToNow, toEpochMs, readableDate } from "@langwatch/time";
 import { Bird, FileClock, PauseCircle, Pencil, PlayCircle, RotateCw, Trash2 } from "lucide-react";
@@ -218,51 +219,51 @@ function VirtualKeyHeaderActions({
   onRevoke: () => void;
 }) {
   return (
-    <HStack>
+    <>
       {/* Audit history stays available even when revoked —
           operators forensically investigating a revoked VK
           still need its create/update/rotate/revoke trail. */}
-      <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
-        <Button variant="outline" size="sm">
+      <PageLayout.HeaderButton asChild>
+        <Link href={`/settings/audit-log?targetKind=virtual_key&targetId=${vk.id}`}>
           <FileClock size={14} /> Audit history
-        </Button>
-      </Link>
+        </Link>
+      </PageLayout.HeaderButton>
       {/* Traces outlive the key, so this is offered whatever the
           key's status: investigating what a revoked key did is
           exactly when somebody needs it. */}
       {viewTracesHref && (
-        <Link href={viewTracesHref}>
-          <Button variant="outline" size="sm" data-testid="vk-header-view-traces">
+        <PageLayout.HeaderButton asChild data-testid="vk-header-view-traces">
+          <Link href={viewTracesHref}>
             <Bird size={14} /> View traces
-          </Button>
-        </Link>
+          </Link>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onEdit}>
+        <PageLayout.HeaderButton onClick={onEdit}>
           <Pencil size={14} /> Edit
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canRotate && (
-        <Button variant="outline" size="sm" onClick={onRotate}>
+        <PageLayout.HeaderButton onClick={onRotate}>
           <RotateCw size={14} /> Rotate
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "active" && canUpdate && (
-        <Button variant="outline" size="sm" onClick={onDisable}>
+        <PageLayout.HeaderButton onClick={onDisable}>
           <PauseCircle size={14} /> Disable
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status === "disabled" && canUpdate && (
-        <Button variant="outline" size="sm" loading={isEnabling} onClick={onEnable}>
+        <PageLayout.HeaderButton loading={isEnabling} onClick={onEnable}>
           <PlayCircle size={14} /> Enable
-        </Button>
+        </PageLayout.HeaderButton>
       )}
       {vk.status !== "revoked" && canUpdate && (
-        <Button colorPalette="red" variant="outline" size="sm" onClick={onRevoke}>
+        <Button colorPalette="red" variant="outline" size="md" flexShrink={0} onClick={onRevoke}>
           <Trash2 size={14} /> Revoke
         </Button>
       )}
-    </HStack>
+    </>
   );
 }
 
@@ -453,23 +454,31 @@ function VirtualKeyDetailPage() {
   return (
     <AiGatewayLayout>
       <>
-        <PageLayout.Header>
-          <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
-          <Spacer />
-          {vk && (
-            <VirtualKeyHeaderActions
-              vk={vk}
-              viewTracesHref={viewTracesHref}
-              canUpdate={canUpdate}
-              canRotate={canRotate}
-              isEnabling={enableMutation.isPending}
-              onEdit={() => setEditing(true)}
-              onRotate={() => setRotating(true)}
-              onDisable={() => setDisabling(true)}
-              onEnable={() => void confirmEnable()}
-              onRevoke={() => setRevoking(true)}
-            />
-          )}
+        <PageLayout.Header
+          actions={
+            vk && (
+              <VirtualKeyHeaderActions
+                vk={vk}
+                viewTracesHref={viewTracesHref}
+                canUpdate={canUpdate}
+                canRotate={canRotate}
+                isEnabling={enableMutation.isPending}
+                onEdit={() => setEditing(true)}
+                onRotate={() => setRotating(true)}
+                onDisable={() => setDisabling(true)}
+                onEnable={() => void confirmEnable()}
+                onRevoke={() => setRevoking(true)}
+              />
+            )
+          }
+        >
+          <Box
+            flex="1 1 0"
+            minWidth="8rem"
+            css={{ "& h1": { overflow: "hidden", textOverflow: "ellipsis" } }}
+          >
+            <PageLayout.Heading>{vk?.name ?? "Virtual key"}</PageLayout.Heading>
+          </Box>
         </PageLayout.Header>
 
         <PageLayout.Container>
@@ -654,7 +663,7 @@ function Section({
   return (
     <Box>
       <HStack mb={2}>
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         <Spacer />
         {action}
       </HStack>
@@ -762,10 +771,10 @@ function UsageSection({
   if (data.totalRequests === 0) {
     return (
       <Section title="Usage (last 30 days)" action={action}>
-        <Text fontSize="sm" color="fg.muted">
-          No usage in the last 30 days. Send a request through this virtual key and it'll show up
-          here.
-        </Text>
+        <NoDataInfoBlock
+          size="line"
+          title="No usage in the last 30 days. Send a request through this virtual key and it'll show up here."
+        />
       </Section>
     );
   }
@@ -808,12 +817,12 @@ function UsageSection({
                 />
                 <XAxis
                   dataKey="day"
-                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+                  tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(d: string) => d.slice(5)}
                   minTickGap={24}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "var(--chakra-colors-fg-muted)" }}
+                  tick={{ fontSize: TYPE_SCALE_PX.micro, fill: "var(--chakra-colors-fg-muted)" }}
                   tickFormatter={(v: number) => `$${v.toFixed(2)}`}
                   width={56}
                 />
@@ -822,7 +831,7 @@ function UsageSection({
                     name === "spendUsd" ? [`$${Number(value).toFixed(4)}`, "Spend"] : [value, name]
                   }
                   labelFormatter={(label) => String(label ?? "")}
-                  contentStyle={{ fontSize: 12 }}
+                  contentStyle={{ fontSize: TYPE_SCALE_PX.caption }}
                 />
                 <Area
                   type="monotone"
@@ -882,49 +891,45 @@ function UsageSection({
                 No requests on that model in the last 30 days.
               </Text>
             ) : (
-              <ListTable
-                containerProps={{ overflowX: "auto", maxWidth: "full" }}
-                size="sm"
-                variant="line"
-              >
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader>When</Table.ColumnHeader>
-                    <Table.ColumnHeader>Model</Table.ColumnHeader>
-                    <Table.ColumnHeader>Tokens</Table.ColumnHeader>
-                    <Table.ColumnHeader>Amount</Table.ColumnHeader>
-                    <Table.ColumnHeader>Latency</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
+              <ListTable scroll="x" scrollLabel="Recent activity table">
+                <ListTable.Header>
+                  <ListTable.Row>
+                    <ListTable.ColumnHeader>When</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Model</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Tokens</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Amount</ListTable.ColumnHeader>
+                    <ListTable.ColumnHeader>Latency</ListTable.ColumnHeader>
+                  </ListTable.Row>
+                </ListTable.Header>
+                <ListTable.Body>
                   {data.recentDebits.slice(0, 10).map((d) => (
-                    <Table.Row key={d.id}>
-                      <Table.Cell>
+                    <ListTable.Row key={d.id}>
+                      <ListTable.Cell>
                         <Tooltip content={readableDate(d.occurredAt).toLocaleString()}>
                           <Text fontSize="xs" color="fg.muted">
                             {formatTimeAgo(toEpochMs(d.occurredAt))}
                           </Text>
                         </Tooltip>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Code fontSize="xs">{d.model}</Code>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs" color="fg.muted">
                           {d.tokensInput.toLocaleString()} → {d.tokensOutput.toLocaleString()}
                         </Text>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs">{formatVkAmount(d.amountUsd)}</Text>
-                      </Table.Cell>
-                      <Table.Cell>
+                      </ListTable.Cell>
+                      <ListTable.Cell>
                         <Text fontSize="xs" color="fg.muted">
                           {d.durationMs !== null ? `${d.durationMs}ms` : "—"}
                         </Text>
-                      </Table.Cell>
-                    </Table.Row>
+                      </ListTable.Cell>
+                    </ListTable.Row>
                   ))}
-                </Table.Body>
+                </ListTable.Body>
               </ListTable>
             )}
           </VStack>

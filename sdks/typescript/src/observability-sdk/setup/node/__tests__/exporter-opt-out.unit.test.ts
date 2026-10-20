@@ -10,7 +10,7 @@ import { resolve } from "node:path";
 import { context, propagation, trace } from "@opentelemetry/api";
 import { logs } from "@opentelemetry/api-logs";
 import { ExportResultCode, type ExportResult } from "@opentelemetry/core";
-import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-http";
+import { OTLPTraceExporter } from "@opentelemetry/exporter-trace-otlp-proto";
 import {
   BatchSpanProcessor,
   SimpleSpanProcessor,
@@ -112,7 +112,7 @@ describe("given a Node process setting up LangWatch observability", () => {
       const logger = createRecordingLogger();
       start({ langwatch: { apiKey: "test-key" } }, logger);
 
-      // The exporter the default path builds is the OTLP *HTTP* one.
+      // The exporter the default path builds is the OTLP HTTP/protobuf one.
       expect(LangWatchTraceExporter.prototype).toBeInstanceOf(OTLPTraceExporter);
       expect(providerName(getConcreteProvider(trace.getTracerProvider()))).toBe(
         "NodeTracerProvider",

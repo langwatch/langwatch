@@ -1,14 +1,8 @@
+import { Card } from "@langwatch/design-system/card";
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
+import { InlineCode } from "@langwatch/design-system/inline-code";
 import { ListTable } from "@langwatch/design-system/list-table";
-import {
-  Badge,
-  Button,
-  Card,
-  HStack,
-  Spacer,
-  Spinner,
-  Table,
-  Text,
-} from "@langwatch/design-system/primitives";
+import { Badge, Button, Spinner, Text } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -32,12 +26,12 @@ export function AnomaliesCard() {
   if (!hasAny && !hasError) return null;
 
   return (
-    <Card.Root borderColor={hardCount > 0 ? "red.muted" : "border.muted"}>
-      <Card.Body padding={0}>
-        <HStack paddingX={4} paddingY={2.5}>
-          <Text textStyle="sm" fontWeight="medium">
-            Anomalous tenants
-          </Text>
+    <Card
+      padding="none"
+      title="Anomalous tenants"
+      status={hardCount > 0 ? "bad" : void 0}
+      badge={
+        <>
           {hardCount > 0 && (
             <Badge colorPalette="red" variant="solid">
               {hardCount} hard
@@ -46,80 +40,83 @@ export function AnomaliesCard() {
           {hasAny && hardCount === 0 && (
             <Badge colorPalette="yellow">{anomalies.length} surfaced</Badge>
           )}
-          <Spacer />
-          {query.isFetching && <Spinner size="xs" />}
-        </HStack>
-        {hasError && (
-          <Text paddingX={4} paddingBottom={3} color="fg.error" textStyle="xs">
-            Could not load anomalies. Redis may be unavailable. Retrying every 30s. Do NOT interpret
-            this as &ldquo;all clear&rdquo;.
-          </Text>
-        )}
-        {hasAny && (
-          <ListTable
-            density="compact"
-            columnRules={false}
-            containerProps={{ overflow: "visible" }}
-            size="sm"
-            variant="line"
-          >
-            <Table.Header>
-              <Table.Row>
-                <Table.ColumnHeader>Tenant</Table.ColumnHeader>
-                <Table.ColumnHeader>Kind</Table.ColumnHeader>
-                <Table.ColumnHeader>Tier</Table.ColumnHeader>
-                <Table.ColumnHeader>Current</Table.ColumnHeader>
-                <Table.ColumnHeader>Baseline</Table.ColumnHeader>
-                <Table.ColumnHeader>Triggered</Table.ColumnHeader>
-                <Table.ColumnHeader>Reason</Table.ColumnHeader>
-                <Table.ColumnHeader />
-              </Table.Row>
-            </Table.Header>
-            <Table.Body>
-              {anomalies.map((a) => (
-                <Table.Row key={`${a.kind}:${a.tenantId}`}>
-                  <Table.Cell>
-                    <Text fontFamily="mono" textStyle="xs">
-                      {a.tenantId}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>{a.kind.replace("_", " ")}</Table.Cell>
-                  <Table.Cell>
-                    <Badge colorPalette={a.tier === "hard" ? "red" : "yellow"} size="xs">
-                      {a.tier}
-                    </Badge>
-                  </Table.Cell>
-                  <Table.Cell>{a.currentRate.toLocaleString()}/min</Table.Cell>
-                  <Table.Cell>{a.baseline.toLocaleString()}/min</Table.Cell>
-                  <Table.Cell>
-                    <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
-                  </Table.Cell>
-                  <Table.Cell maxW="320px">
-                    <Text textStyle="xs" color="fg.muted" lineClamp={2}>
-                      {a.reason}
-                    </Text>
-                  </Table.Cell>
-                  <Table.Cell>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() =>
-                        dismiss.mutate({
-                          tenantId: a.tenantId,
-                          kind: a.kind,
-                        })
-                      }
-                    >
-                      Dismiss
-                    </Button>
-                  </Table.Cell>
-                </Table.Row>
-              ))}
-            </Table.Body>
-          </ListTable>
-        )}
-      </Card.Body>
-    </Card.Root>
+        </>
+      }
+      actions={query.isFetching ? <Spinner size="xs" /> : void 0}
+    >
+      {hasError && (
+        <Text paddingX={4} paddingBottom={3} color="fg.error" textStyle="xs">
+          Could not load anomalies. Redis may be unavailable. Retrying every 30s. Do NOT interpret
+          this as &ldquo;all clear&rdquo;.
+        </Text>
+      )}
+      {hasAny && (
+        <ListTable
+          density="compact"
+          variant="embedded"
+          scroll="x"
+          scrollLabel="Anomalous tenants table"
+        >
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Tenant</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Kind</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Tier</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Current</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Baseline</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Triggered</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Reason</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
+            {anomalies.map((a) => (
+              <ListTable.Row key={`${a.kind}:${a.tenantId}`}>
+                <ListTable.Cell>
+                  <InlineCode variant="neutral">{a.tenantId}</InlineCode>
+                </ListTable.Cell>
+                <ListTable.Cell>{a.kind.replace("_", " ")}</ListTable.Cell>
+                <ListTable.Cell>
+                  <Badge colorPalette={a.tier === "hard" ? "red" : "yellow"} size="xs">
+                    {a.tier}
+                  </Badge>
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <FormattedNumber value={a.currentRate} />
+                  /min
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <FormattedNumber value={a.baseline} />
+                  /min
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <Text textStyle="xs">{formatAge(a.triggeredAt)}</Text>
+                </ListTable.Cell>
+                <ListTable.Cell maxWidth="320px">
+                  <Text textStyle="xs" color="fg.muted" lineClamp={2}>
+                    {a.reason}
+                  </Text>
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() =>
+                      dismiss.mutate({
+                        tenantId: a.tenantId,
+                        kind: a.kind,
+                      })
+                    }
+                  >
+                    Dismiss
+                  </Button>
+                </ListTable.Cell>
+              </ListTable.Row>
+            ))}
+          </ListTable.Body>
+        </ListTable>
+      )}
+    </Card>
   );
 }
 

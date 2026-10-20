@@ -23,14 +23,14 @@ export function FrontDoorField({
   return (
     <Box width="full">
       <HStack width="full" justify="space-between" marginBottom="7px">
-        <Text asChild fontSize="13px" fontWeight={500} color="fg">
+        <Text textStyle="label" asChild color="fg">
           <label htmlFor={id}>{label}</label>
         </Text>
         {labelEnd ?? null}
       </HStack>
       {children(id)}
       {error?.message ? (
-        <Text fontSize="12.5px" lineHeight="1.5" marginTop="6px" color={"frontDoor.danger"}>
+        <Text textStyle="bodySm" marginTop="1.5" color={"frontDoor.danger"}>
           {error.message}
         </Text>
       ) : null}

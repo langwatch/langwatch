@@ -1,5 +1,10 @@
 # ADR-155: Migrations are never breaking
 
+> **Floor withdrawn (Alex, 2026-10-11).** There is no upgrade floor and no LTS. An install
+> of any version upgrades to the latest image and the worker rolls through every step; every
+> step, alias and upcast is kept. A drop or contract waits for `needsOldWritersGone`. The
+> floor text below is history.
+
 **Date:** 2026-09-23
 
 **Status:** Accepted

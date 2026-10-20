@@ -28,18 +28,19 @@ const postToTwoFactor: UiTwoFactorPost = async (endpoint, body) => {
     body: JSON.stringify(body),
   });
   const answered: unknown = await response.json().catch(() => void 0);
-  if (!response.ok) {
-    return {
-      ok: false,
-      error: signInRefusalOf({
-        status: response.status,
-        statusText: response.statusText,
-        body: answered,
-      }),
-    };
-  }
+  if (!response.ok) return { ok: false, error: refusalOf({ response, answered }) };
   return { ok: true, value: answered };
 };
+
+/** A handled body travels whole, so the registry words its code; anything else is read loosely. */
+function refusalOf({ response, answered }: { response: Response; answered: unknown }): unknown {
+  if (typeof answered === "object" && answered !== null && "code" in answered) return answered;
+  return signInRefusalOf({
+    status: response.status,
+    statusText: response.statusText,
+    body: answered,
+  });
+}
 
 function stringsOf(value: unknown): readonly string[] {
   return Array.isArray(value) ? value.filter((one) => typeof one === "string") : [];

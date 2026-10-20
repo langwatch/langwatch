@@ -17,6 +17,7 @@ import (
 	"fmt"
 	"os/exec"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -215,23 +216,53 @@ func (s *Server) Running() bool {
 }
 
 // Health pings the server and returns a one-line status. The formula named is
-// whatever is actually running (live-detected), not necessarily s.formula —
-// each `haven postgres` invocation is a fresh process, so a formula another
-// invocation started (or that was already running) isn't remembered in s.
+// whatever is actually running: the server's own major version when it answers,
+// and only when it does not, `brew services list` (seconds on a loaded machine)
+// for the hint. One psql call reads the version, the tuning and the databases.
 func (s *Server) Health(ctx context.Context) (bool, string) {
-	formula := s.formula
-	if isRunning, active := runningPostgresFormula(ctx); isRunning {
-		formula = active
-	}
 	if !s.ready(ctx) {
+		formula := s.formula
+		if isRunning, active := runningPostgresFormula(ctx); isRunning {
+			formula = active
+		}
 		return false, fmt.Sprintf("not answering on :%d (brew services info %s)", s.port, formula)
 	}
-	dbs, _ := s.Databases(ctx)
-	detail := fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, formula, len(dbs))
-	if untuned, err := s.queryBool(ctx, "postgres", "SELECT current_setting('synchronous_commit') = 'on'"); err == nil && untuned {
+	out, _ := s.query(ctx, "postgres", healthQuery) // unreadable: reported as up, zero databases
+	h := parseHealth(s.formula, out)
+	detail := fmt.Sprintf("up on :%d (%s), %d stack database(s)", s.port, h.formula, h.databases)
+	if h.untuned {
 		detail += "; untuned for dev, consider in postgresql.conf: " + devTuning
 	}
 	return true, detail
+}
+
+// healthQuery reads in one round trip what Health reports: the server's major
+// version, whether synchronous_commit is still on, and the stack databases.
+const healthQuery = `SELECT current_setting('server_version_num')::int / 10000,
+current_setting('synchronous_commit') = 'on',
+(SELECT count(*) FROM pg_database WHERE datname LIKE 'lw\_%')`
+
+// serverHealth is healthQuery's one row.
+type serverHealth struct {
+	formula   string
+	untuned   bool
+	databases int
+}
+
+// parseHealth reads healthQuery's `major|untuned|count` row; a field it cannot
+// read keeps the fallback formula, tuned, or zero databases.
+func parseHealth(fallback, out string) serverHealth {
+	h := serverHealth{formula: fallback}
+	fields := strings.Split(strings.TrimSpace(out), "|")
+	if len(fields) != 3 {
+		return h
+	}
+	if major, err := strconv.Atoi(fields[0]); err == nil && major > 0 {
+		h.formula = "postgresql@" + fields[0]
+	}
+	h.untuned = fields[1] == "t"
+	h.databases, _ = strconv.Atoi(fields[2])
+	return h
 }
 
 // Stop is deliberately a no-op. A brew-managed Postgres is a machine-wide

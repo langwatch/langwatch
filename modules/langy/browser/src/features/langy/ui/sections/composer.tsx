@@ -85,6 +85,34 @@ const CONTEXT_ICON: Record<LangyContextChip["kind"], LucideIcon> = {
 // stays out of the way of what the person is trying to type.
 const COMPOSER_PLACEHOLDER = "Ask Langy or describe what you want…";
 
+/**
+ * An `askLangy` handoff asks the panel's composer to take focus so the reader can keep
+ * typing. Honored on mount (the panel usually opens WITH the handoff) or on change (panel
+ * already open), then consumed so it fires once.
+ */
+function useComposerFocusHandoff({
+  textareaRef,
+  hero,
+}: {
+  textareaRef: React.RefObject<HTMLTextAreaElement | null>;
+  hero: boolean;
+}) {
+  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
+  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
+  // A panel still opening is hidden and its field refuses focus: the request then waits
+  // for the panel to finish showing, which bumps this count.
+  const panelShownCount = useLangyStore((s) => s.panelShownCount);
+  useEffect(() => {
+    if (!composerFocusRequested || hero) return;
+    const frame = requestAnimationFrame(() => {
+      const field = textareaRef.current;
+      field?.focus();
+      if (field && document.activeElement === field) consumeComposerFocus();
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [composerFocusRequested, hero, consumeComposerFocus, textareaRef, panelShownCount]);
+}
+
 /** While a turn runs and nothing is waiting on the reader. */
 export const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
 
@@ -111,7 +139,114 @@ function turnLock({ turnActive }: { turnActive: boolean }) {
 
 function composerGutter({ hero, floating }: { hero: boolean; floating: boolean }) {
   if (hero) return 0;
-  return floating ? 2 : 3.5;
+  return floating ? 3 : 3.5;
+}
+
+/** The bottom rail: the per-send model picker and the `#` and `/` palette buttons. */
+function ComposerRail({
+  hero,
+  model,
+  modelOptions,
+  langyDefaultModel,
+  onModelChange,
+  locked,
+  turnActive,
+  openPalette,
+}: {
+  hero: boolean;
+  model: string;
+  modelOptions: string[];
+  langyDefaultModel?: string | null;
+  onModelChange: (model: string) => void;
+  /** Disabled, or a turn is in flight: nothing on the rail can change. */
+  locked: boolean;
+  turnActive: boolean;
+  openPalette: (mode: PaletteMode) => void;
+}) {
+  return (
+    <HStack
+      gap={1}
+      // ONE row, centers on one line: the model pill (28px control) and
+      // the sigil buttons share the rail, so the sigils carry the same
+      // control height (see SigilButton) and the row centers explicitly
+      // rather than by luck.
+      align="center"
+      // ...and it STAYS one row.
+      flexWrap="nowrap"
+      minWidth={0}
+      paddingLeft={2.5}
+      paddingRight={2}
+      paddingBottom={2}
+      paddingTop={0}
+      // The hero stays bare: see the note on the context summary in ComposerImpl.
+      display={hero ? "none" : undefined}
+    >
+      <Box flex={1} minWidth={0} />
+      {/* Real buttons that name each shortcut and open it, so the shortcut teaches itself.
+          Kept apart so they don't read as one control at the rail's 4px gap. */}
+      <HStack gap={2} flexShrink={0} align="center">
+        <LangyModelPill
+          model={model}
+          options={modelOptions}
+          langyDefaultModel={langyDefaultModel}
+          onChange={onModelChange}
+          // The model is locked in the moment a turn starts — it rode
+          // with the send and can't change mid-flight — so the picker
+          // greys out until the turn settles rather than offering a
+          // choice that wouldn't take.
+          disabled={locked}
+          disabledReason={turnLock({ turnActive })}
+        />
+        <SigilButton
+          sigil="#"
+          label="Context"
+          hint="Add something from this page. Press #"
+          onClick={() => openPalette("context")}
+          disabled={locked}
+        />
+        <SigilButton
+          sigil="/"
+          label="Skills"
+          hint="Pick what Langy should do. Press /"
+          onClick={() => openPalette("skills")}
+          disabled={locked}
+        />
+      </HStack>
+    </HStack>
+  );
+}
+
+/** The caption under the card: the floating panel's review line and the Cloud data use note. */
+function ComposerCaption({ floating, isSaaS }: { floating: boolean; isSaaS: boolean }) {
+  if (!floating && !isSaaS) return null;
+  return (
+    // One caption line, not two stacked whispers: the floating panel's
+    // "you review and apply" and the Cloud data use note share a row.
+    <Text
+      marginTop={2.5}
+      paddingX={2}
+      textStyle="2xs"
+      color="fg.subtle"
+      textAlign="center"
+      letterSpacing="0.01em"
+      lineHeight="1.4"
+    >
+      {floating ? (
+        <Box
+          as="span"
+          css={{
+            "@media (max-height: 520px)": { display: "none" },
+          }}
+        >
+          {/* House style rules out the em dash anywhere in user-facing copy
+                (dev/docs/best_practices/copywriting.md). */}
+          Langy proposes, you review and apply.
+          {isSaaS ? " " : null}
+        </Box>
+      ) : null}
+      {isSaaS ? <span>{COMPOSER_DATA_USE_NOTICE}</span> : null}
+    </Text>
+  );
 }
 
 /**
@@ -191,19 +326,7 @@ function ComposerImpl({
   const turnPhase = useLangyStore((s) => s.turnPhase);
   const turnActive = turnPhase !== "idle";
 
-  // An `askLangy` handoff asks the panel's composer to take focus so the reader can
-  // keep typing. Honored on mount (the panel usually opens WITH the handoff) or on
-  // change (panel already open), then consumed so it fires once.
-  const composerFocusRequested = useLangyStore((s) => s.composerFocusRequested);
-  const consumeComposerFocus = useLangyStore((s) => s.consumeComposerFocus);
-  useEffect(() => {
-    if (!composerFocusRequested || hero) return;
-    const frame = requestAnimationFrame(() => {
-      textareaRef.current?.focus();
-      consumeComposerFocus();
-    });
-    return () => cancelAnimationFrame(frame);
-  }, [composerFocusRequested, hero, consumeComposerFocus]);
+  useComposerFocusHandoff({ textareaRef, hero });
 
   // The rainbow sheen is an ACTIVITY signal, not an invitation.
 
@@ -261,8 +384,8 @@ function ComposerImpl({
       flexShrink={0}
       css={{
         "@media (max-height: 520px)": {
-          paddingTop: "8px",
-          paddingBottom: "8px",
+          paddingTop: "2",
+          paddingBottom: "2",
         },
       }}
     >
@@ -376,86 +499,19 @@ function ComposerImpl({
               The rail only ever shows what is real — see COMPOSER_RAIL above.
               Page context is NOT here — it already has a better home as the
               chips above the input, where you can see what's attached. */}
-          <HStack
-            gap={1}
-            // ONE row, centers on one line: the model pill (28px control) and
-            // the sigil buttons share the rail, so the sigils carry the same
-            // control height (see SigilButton) and the row centers explicitly
-            // rather than by luck.
-            align="center"
-            // ...and it STAYS one row.
-            flexWrap="nowrap"
-            minWidth={0}
-            paddingLeft={2.5}
-            paddingRight={2}
-            paddingBottom={2}
-            paddingTop={0}
-            // See the note on the context summary above: the hero stays bare.
-            display={hero ? "none" : undefined}
-          >
-            <Box flex={1} minWidth={0} />
-            {/* Real buttons that name each shortcut and open it, so the shortcut teaches itself.
-                Kept apart so they don't read as one control at the rail's 4px gap. */}
-            <HStack gap={2} flexShrink={0} align="center">
-              <LangyModelPill
-                model={model}
-                options={modelOptions}
-                langyDefaultModel={langyDefaultModel}
-                onChange={onModelChange}
-                // The model is locked in the moment a turn starts — it rode
-                // with the send and can't change mid-flight — so the picker
-                // greys out until the turn settles rather than offering a
-                // choice that wouldn't take.
-                disabled={disabled || turnActive}
-                disabledReason={turnLock({ turnActive })}
-              />
-              <SigilButton
-                sigil="#"
-                label="Context"
-                hint="Add something from this page. Press #"
-                onClick={() => openPalette("context")}
-                disabled={disabled || turnActive}
-              />
-              <SigilButton
-                sigil="/"
-                label="Skills"
-                hint="Pick what Langy should do. Press /"
-                onClick={() => openPalette("skills")}
-                disabled={disabled || turnActive}
-              />
-            </HStack>
-          </HStack>
+          <ComposerRail
+            hero={hero}
+            model={model}
+            modelOptions={modelOptions}
+            langyDefaultModel={langyDefaultModel}
+            onModelChange={onModelChange}
+            locked={disabled || turnActive}
+            turnActive={turnActive}
+            openPalette={openPalette}
+          />
         </Box>
       </Box>
-      {floating ? (
-        <Text
-          marginTop={1.5}
-          textStyle="2xs"
-          color="fg.subtle"
-          textAlign="center"
-          letterSpacing="0.01em"
-          lineHeight="1.2"
-          css={{
-            "@media (max-height: 520px)": { display: "none" },
-          }}
-        >
-          {/* House style rules out the em dash anywhere in user-facing copy
-              (dev/docs/best_practices/copywriting.md). */}
-          Langy proposes, you review and apply.
-        </Text>
-      ) : null}
-      {isSaaS ? (
-        <Text
-          marginTop={1.5}
-          textStyle="2xs"
-          color="fg.subtle"
-          textAlign="center"
-          letterSpacing="0.01em"
-          lineHeight="1.2"
-        >
-          {COMPOSER_DATA_USE_NOTICE}
-        </Text>
-      ) : null}
+      <ComposerCaption floating={floating} isSaaS={isSaaS} />
     </Box>
   );
 }
@@ -773,8 +829,8 @@ function SigilButton({
           borderWidth="1px"
           borderStyle="solid"
           borderColor="border.emphasized"
+          textStyle="micro"
           fontFamily="mono"
-          fontSize="10px"
           lineHeight="1"
         >
           {sigil}
@@ -882,7 +938,7 @@ function ContextSummaryMenu({
                   {...spotlight(chip)}
                 >
                   <HStack gap={2.5} width="full" align="start">
-                    <Box color="orange.fg" display="grid" paddingTop="2px">
+                    <Box color="orange.fg" display="grid" paddingTop="0.5">
                       <Icon size={13} />
                     </Box>
                     <Box minWidth={0} flex={1}>

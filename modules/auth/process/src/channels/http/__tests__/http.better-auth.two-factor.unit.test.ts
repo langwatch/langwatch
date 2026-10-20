@@ -2,6 +2,7 @@
  * @see modules/auth/specs/two-step-set-up.feature
  */
 import { createErrorHandler } from "@langwatch/api";
+import { normalizedRequestPathname } from "@langwatch/auth-contract";
 import { betterAuth } from "better-auth";
 import { memoryAdapter } from "better-auth/adapters/memory";
 import { APIError, createAuthEndpoint, createAuthMiddleware } from "better-auth/api";
@@ -12,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { isLockoutCountedPath } from "../../../rules/sign-in-identifier-hash.rules.ts";
 import {
   answerAuthRefusalByRegisteredCode,
+  refuseDirectTwoStepDisable,
   releaseHandledRefusal,
   twoFactorPlugin,
 } from "../http.better-auth.channel.ts";
@@ -58,6 +60,9 @@ function twoStepHarness() {
       },
     ],
     hooks: {
+      before: createAuthMiddleware(async (ctx) => {
+        refuseDirectTwoStepDisable(normalizedRequestPathname(ctx.request?.url ?? ""));
+      }),
       after: createAuthMiddleware(async (ctx) => {
         answerAuthRefusalByRegisteredCode(ctx);
       }),
@@ -99,6 +104,7 @@ function twoStepHarness() {
       );
     },
     post,
+    auth,
   };
 }
 
@@ -140,6 +146,44 @@ describe("setting two-step verification up", () => {
 
     expect(response.status).toBe(400);
     expect(await response.json()).toMatchObject({ code: "identity_mfa_password_invalid" });
+  });
+});
+
+describe("turning two-step verification off", () => {
+  describe("when the browser posts to the plugin's own disable route", () => {
+    /** @scenario "The plugin's raw disable route is sealed; turning it off goes through identity" */
+    it("is answered as a route that does not exist", async () => {
+      const harness = twoStepHarness();
+      const cookie = await harness.passwordSession();
+
+      const response = await harness.post(
+        "/two-factor/disable",
+        { password: "correct-horse-battery" },
+        cookie,
+      );
+
+      expect(response.status).toBe(404);
+    });
+  });
+
+  describe("when identity's disable calls the plugin from the server", () => {
+    /** @scenario "The plugin's raw disable route is sealed; turning it off goes through identity" */
+    it("reaches the plugin, which answers on its own terms", async () => {
+      const harness = twoStepHarness();
+      const cookie = await harness.passwordSession();
+
+      const answer = await harness.auth.api
+        .disableTwoFactor({
+          body: { password: "correct-horse-battery" },
+          headers: new Headers({ cookie }),
+        })
+        .then(
+          () => "disabled",
+          (error: unknown) => (error instanceof APIError ? error.status : "unknown"),
+        );
+
+      expect(answer).not.toBe("NOT_FOUND");
+    });
   });
 });
 

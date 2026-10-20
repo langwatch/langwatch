@@ -85,6 +85,7 @@ function mountKey({
     scope: { tier: "project" as const, id: projectId },
   };
   const runtime = createRestRuntime({
+    audit: { record: () => {} },
     authorization: restTestAuthorization(),
     identity: {
       // A project-tier route asks its permission of the door itself.

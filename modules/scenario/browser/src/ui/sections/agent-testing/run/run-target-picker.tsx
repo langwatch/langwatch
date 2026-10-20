@@ -10,7 +10,6 @@ import { Check, Code, Globe, Mic, Plug, Workflow } from "lucide-react";
 
 import { notRunnableCopy } from "../../../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import { agentHasDevTunnel } from "../../../../model/agent-dev-tunnel.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import type { TargetValue } from "../../../../model/scenario-target.ts";
 
 const AGENT_ICONS = {
@@ -115,7 +114,7 @@ function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
             background={isOnline ? "green.fg" : "fg.subtle"}
             data-testid={`agent-presence-${agent.id}`}
           />
-          <Text fontSize="11px" color={FG_MUTED} truncate>
+          <Text textStyle="micro" color="fg.muted" truncate>
             {isOnline ? "Online" : "Offline"}
           </Text>
         </>
@@ -123,7 +122,7 @@ function AgentReachLine({ agent }: { agent: RunDialogAgent }) {
       {!isConnected && hasDevTunnel && (
         <>
           <Box boxSize="8px" borderRadius="full" flexShrink={0} background="orange.solid" />
-          <Text fontSize="11px" color={FG_MUTED} truncate>
+          <Text textStyle="micro" color="fg.muted" truncate>
             Local tunnel
           </Text>
         </>
@@ -174,15 +173,15 @@ function AgentBlock({
           justify="center"
           boxSize="24px"
           borderRadius="md"
-          background="blue.subtle"
-          color="blue.fg"
+          background={isActive ? "blue.subtle" : "bg.muted"}
+          color={isActive ? "blue.fg" : "fg.muted"}
         >
           <AgentIcon size={13} />
         </HStack>
         {isActive && <Check size={14} color="var(--chakra-colors-blue-fg)" />}
       </HStack>
       <Text
-        fontSize="12.5px"
+        textStyle="bodySm"
         fontWeight="medium"
         truncate
         marginTop={3}
@@ -212,7 +211,7 @@ export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
       <VStack
         as="button"
         cursor="pointer"
-        boxShadow={QUIET_BUTTON_SHADOW}
+        boxShadow="none"
         justify="center"
         gap={1}
         height={AGENT_CARD_HEIGHT}
@@ -227,10 +226,10 @@ export function SetupAgentBox({ onSetup }: { onSetup: () => void }) {
         data-testid="run-dialog-setup-agent"
       >
         <Plug size={16} color="var(--chakra-colors-fg-muted)" />
-        <Text fontSize="12.5px" fontWeight="medium">
-          Setup agent
+        <Text textStyle="bodySm" fontWeight="medium">
+          Set up agent
         </Text>
-        <Text fontSize="11px" color={FG_MUTED} lineHeight="1.25">
+        <Text textStyle="micro" color="fg.muted" lineHeight="1.25">
           Connect the agent you want to test
         </Text>
       </VStack>

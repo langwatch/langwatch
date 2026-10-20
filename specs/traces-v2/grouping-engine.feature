@@ -22,7 +22,8 @@ Rule: Grouping selector dropdown
 
   Scenario: Grouping selector appears in the toolbar
     When the Observe page loads
-    Then a grouping dropdown appears on the right side of the toolbar (Layers icon + chevron)
+    Then a "Group by: None" select (Layers icon, label, chevron) is visible in the toolbar
+    And it keeps only the icon and chevron while the toolbar is too narrow
 
   Scenario: Grouping selector defaults to flat for the All lens
     When the user views the "All" lens
@@ -30,23 +31,32 @@ Rule: Grouping selector dropdown
     And the trigger renders as an outline button (the visual cue for the flat state)
 
   Scenario: Grouping selector lists all grouping options
-    When the user opens the grouping dropdown
-    Then the options are "Flat", "By Conversation", "By Service", "By User", and "By Model"
+    When the user opens the grouping select
+    Then the options are "None", "Conversation", "Service", "User", and "Model"
 
+  @unit
   Scenario: Selecting a grouping transforms the table
-    When the user selects "By Model" from the grouping dropdown
+    When the user selects "Model" from the grouping select
     Then the table renders as grouped sections by model
+    And each group row shows its model and trace count, even when the flat lens's columns were customised
     And the change is recorded as a draft on the active lens (orange dot appears)
+
+  @integration
+  Scenario: Switching between two groupings relabels the group column
+    Given the user has selected "By Model" grouping
+    When the user selects "By Service" from the grouping dropdown
+    Then the group column header reads "Service"
+    And a header sorted afterwards shows its own sort direction
 
   Scenario: Selector trigger reflects the active grouping
     When the user selects a non-flat grouping
     Then the trigger switches to the "subtle" button variant
-    And its `aria-label` reads "Group rows — currently <Label>" (e.g. "By Service")
-    # The trigger does NOT show a "Group: by X" text label — only an icon + chevron.
+    And the trigger reads "Group by: <Label>" (e.g. "Group by: Service")
 
+  @unit
   Scenario: Selecting flat restores the ungrouped table
     Given the user has selected "By Model" grouping
-    When the user selects "Flat" from the grouping dropdown
+    When the user selects "None" from the grouping select
     Then the table renders as a flat list of traces
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -96,7 +106,7 @@ Rule: Grouping is editable on every lens (no lock today)
 
   Scenario: Saving a custom lens with a chosen grouping
     Given the user views the "All" lens
-    When the user selects "By Model" from the grouping dropdown
+    When the user selects "Model" from the grouping select
     And saves the changes as a new custom lens
     Then the new custom lens persists with grouping "by-model"
 

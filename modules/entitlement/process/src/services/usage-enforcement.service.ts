@@ -5,7 +5,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
 import type { TenancyRepository } from "../repositories/tenancy.repository.ts";
-import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
+import type { TraceCountRepository } from "../repositories/trace-count.repository.ts";
 import { buildLimitMessage, type UsageDeployment } from "../rules/usage-limit-message.rules.ts";
 import { resolveUsageMeter } from "../rules/usage-meter-policy.rules.ts";
 
@@ -153,11 +153,11 @@ function meterEventCounter({
   };
 }
 
-/** This UTC month's traces per named project off the trace meter, 0 for a project with none. */
+/** This UTC month's traces per named project off the trace count, 0 for a project with none. */
 function meterTraceCounter({
   meter,
 }: {
-  meter: Pick<TraceMeterRepository, "countByProjects">;
+  meter: Pick<TraceCountRepository, "countByProjects">;
 }): UsageVolumeCounter {
   return {
     async getCountByProjects({ organizationId, projectIds }) {
@@ -231,7 +231,7 @@ export class UsageService {
     peers: EntitlementUsagePeers;
     tenancy: UsageTenancy;
     meter: Pick<BillableEventsMeterRepository, "countByProjects">;
-    traceMeter: Pick<TraceMeterRepository, "countByProjects">;
+    traceMeter: Pick<TraceCountRepository, "countByProjects">;
   }): UsageService {
     const { billing } = input.peers;
     const { tenancy } = input;

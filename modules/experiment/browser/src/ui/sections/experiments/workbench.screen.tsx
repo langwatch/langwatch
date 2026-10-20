@@ -1,8 +1,9 @@
 import { useUiSupportChat } from "@langwatch/browser-host/capabilities";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Banner } from "@langwatch/design-system/banner";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Box, HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Box, VStack } from "@langwatch/design-system/primitives";
 import { useEffect, useMemo, useState } from "react";
 
 import { useAutosaveEvaluationsV3 } from "../../../behavior/experiments-v3/use-autosave-evaluations-v3.ts";
@@ -21,6 +22,7 @@ import {
 } from "../../../behavior/experiments-v3/use-workbench-proposal-handlers.ts";
 import { useWorkbenchUiActionHandlers } from "../../../behavior/experiments-v3/use-workbench-ui-action-handlers.ts";
 import { useWorkbenchUpdateListener } from "../../../behavior/experiments-v3/use-workbench-update-listener.ts";
+import { WORKBENCH_SECTION_BORDER } from "../../../model/dataset/dataset-table-styles.ts";
 import { type ProposalHandlers } from "../../../model/langy/langy-proposal-handlers.ts";
 import { AutosaveStatus } from "../../../ui/elements/experiments-v3/autosave-status.tsx";
 import { EditableHeading } from "../../../ui/elements/experiments-v3/editable-heading.tsx";
@@ -176,14 +178,9 @@ export default function ExperimentsWorkbenchPage() {
     return (
       <Box width="full">
         <PageLayout.Container>
-          <Alert.Root status="warning">
-            <Alert.Indicator />
-            <Alert.Title>Experiment not found</Alert.Title>
-            <Alert.Description>
-              The experiment you&apos;re looking for doesn&apos;t exist or you don&apos;t have
-              access to it.
-            </Alert.Description>
-          </Alert.Root>
+          <Banner status="warning" placement="inline" title="Experiment not found">
+            This experiment doesn&apos;t exist, or you don&apos;t have access to it.
+          </Banner>
         </PageLayout.Container>
       </Box>
     );
@@ -201,14 +198,12 @@ export default function ExperimentsWorkbenchPage() {
   }
 
   return (
-    <Box width="full">
+    <VStack width="full" flex={1} minHeight={0} gap={0} align="stretch">
       <PromptTemplateFieldsProvider>
-        <VStack width="full" height="calc(100vh - 50px)" gap={0} align="stretch" overflow="hidden">
-          {/* Header */}
-          <HStack paddingX={6} paddingTop={5} paddingBottom={3} flexShrink={0}>
-            <EditableHeading value={name} onSave={setName} isLoading={isLoadingExperiment} />
-            <Spacer />
-            <HStack gap={2}>
+        <PageLayout.Header
+          withBorder={false}
+          actions={
+            <>
               {staleWorkbench ? (
                 <WorkbenchStaleStatus
                   actorLabel={staleWorkbench.actorLabel}
@@ -228,36 +223,44 @@ export default function ExperimentsWorkbenchPage() {
               <HistoryButton disabled={isLoadingExperiment} />
               <VersionHistoryButton disabled={isLoadingExperiment} />
               <RunEvaluationButton disabled={isLoadingExperiment || isLoadingDatasets} />
-            </HStack>
-          </HStack>
+            </>
+          }
+        >
+          <EditableHeading
+            value={name}
+            placeholder="Untitled experiment"
+            onSave={setName}
+            isLoading={isLoadingExperiment}
+          />
+        </PageLayout.Header>
 
-          {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
+        {activeRowsCut && <WorkbenchRowsCutBanner cut={activeRowsCut} />}
 
-          {/* Main content - table container with config panel */}
-          <Box
-            flex={1}
-            position="relative"
-            overflow="hidden"
-            marginLeft={4}
-            borderTopLeftRadius="xl"
-            borderLeft="1px solid"
-            borderTop="1px solid"
-            borderColor="border.emphasized"
-            bg="bg.panel"
-          >
-            <Box position="absolute" inset={0} overflow="auto">
-              <EvaluationsV3Table
-                isLoadingExperiment={isLoadingExperiment}
-                isLoadingDatasets={isLoadingDatasets}
-                onOptimizeTarget={optimizeTarget}
-              />
-            </Box>
+        {/* The grid: one framed, scrolling surface inset like every page body. */}
+        <Box
+          flex={1}
+          minHeight={0}
+          position="relative"
+          overflow="hidden"
+          marginX="var(--page-inset)"
+          marginBottom="var(--page-inset)"
+          borderRadius="lg"
+          borderWidth="1px"
+          borderColor={WORKBENCH_SECTION_BORDER}
+          bg="bg.panel"
+        >
+          <Box position="absolute" inset={0} overflow="auto">
+            <EvaluationsV3Table
+              isLoadingExperiment={isLoadingExperiment}
+              isLoadingDatasets={isLoadingDatasets}
+              onOptimizeTarget={optimizeTarget}
+            />
           </Box>
-        </VStack>
+        </Box>
 
         {/* Load saved dataset records - renders nothing, just triggers fetches */}
         <SavedDatasetLoaders datasets={datasets} />
       </PromptTemplateFieldsProvider>
-    </Box>
+    </VStack>
   );
 }

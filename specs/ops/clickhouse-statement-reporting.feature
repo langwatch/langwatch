@@ -17,6 +17,19 @@ Feature: Every ClickHouse statement reports how it ended
     Then a cold-scan warning names the table it walked
 
   @unit
+  Scenario: A read that declares a full-history scan is not warned about
+    Given the routed ClickHouse client reports its statements
+    When a maintenance read sets SKIP_COLD_SCAN_CHECK with a comment giving the reason
+    Then it is counted as a success, with no cold-scan warning
+    And the same read without the declaration is still warned about
+
+  @unit
+  Scenario: A table named only in a string literal is not a cold scan
+    Given the routed ClickHouse client reports its statements
+    When a read of system.mutations filters on the literal 'trace_summaries'
+    Then no cold-scan warning names trace_summaries
+
+  @unit
   Scenario: A statement that fails is reported and still reaches its caller
     Given the routed ClickHouse client reports its statements
     When a read fails after its retries

@@ -10,18 +10,26 @@ argument-hint: "<question or frontend task>"
 Read `dev/docs/ARCHITECTURE.md` first — this skill is a pointer into it, plus
 the procedure. `@langwatch/browser` is the browser runtime **and** the
 browser-half vocabulary: `createUi`, the browser supply, `render`,
-`defineBrowserModule`. `apps/ui` is only `src/{main.tsx, shell/, styles/}` —
-everything else lives in a module's `browser/` package. Full shape: record
-§2, §10.
+`defineBrowserModule`, and the shared shell machinery
+(`packages/browser/src/ui-application-shell.tsx`, `ui-root-layout.tsx`,
+`ui-inner-providers.tsx`). `apps/ui` keeps its entry, styles and a shrinking
+composition input; §10.1's amendment puts shell machinery in `@langwatch/browser`.
+The `apps/ui/src/shell/` files that remain (about two dozen) are residue due to
+move: classify before adding to them. Everything else lives in a module's
+`browser/` package. Full shape: record §2, §10, §10.1.
 
 ## `createUi` and the shell
 
 ```ts
-const ui = await createUi({ mount: "root" })
+// apps/ui/src/main.tsx (startUi), abridged
+const installed = await createUi({ document, mount: "root" })
   .withModules(browserModules) // generated from the catalogue
+  .withTransport(transport)
   .render();
-mountShell(ui); // shell/: providers + router over declarations
+UiRuntime.create({ document, shell: BrowserUiShell.create({ config /* ... */ }) });
 ```
+
+Read `apps/ui/src/main.tsx` for the real composition; `mountShell` is not a function.
 
 `createUi` reads the injected public config from a DOM meta tag by default,
 validated against every installed browser module's declaration **before a
@@ -37,9 +45,15 @@ The React Compiler (Oxc's Rust port, `react({ compiler })` in
 `apps/ui/vite.config.ts`) memoises components and hooks for you. Don't write
 `useMemo`, `useCallback` or `React.memo`; remove them in files you touch. If the
 dev log says the compiler skipped a component (a ref read during render, a
-suppressed hooks rule), fix that cause. Before writing any component, check
-`packages/design-system/src/components/` (the `design-system` skill) and reuse
-it; a component another module would want is built there.
+suppressed hooks rule), fix that cause.
+
+The design system is the source of truth for components. Every banner or
+alert, dialog, drawer, empty state, menu, picker and table comes from
+`@langwatch/design-system` (the `design-system` skill lists which); never
+hand-roll one in a module. A missing need is added to the design system first.
+Drawer, Dialog and Card are callable shapes with closed props: write `<Drawer title
+onClose footer>`, never `Drawer.Root` parts (legacy, being removed); props and scales are in
+the `design-system` skill's `references/component-apis.md`.
 
 ## A module's browser half (record §3.4)
 
@@ -58,8 +72,9 @@ tokens: `useLent`, `openDrawer`, `useFeatureFlag` (§3.4, §10.1; kept and off �
 refused by `createUi` at install, by name, before any component renders. The
 whole half is declared once, with `defineBrowserModule` (screens, drawers,
 publications, host mounts), and the package's
-`exports` map lists that declaration and nothing else — `surfaces/` and
-`screens/` are deleted browser folders (record §15). A module capability the
+`exports` map lists that declaration and nothing else. Every browser package
+today exports `./declaration` only; `surfaces/` and `screens/` are deleted
+folders (record §15). A module capability the
 composition root needs (not a screen) travels through the same declaration's
 `.withCapabilities(...)` entry, never a side-door export. The generated `browserModules`
 list installs the declaration, the same way `processModules` are generated
@@ -67,9 +82,22 @@ for the backend — no hand-written file in `apps/ui` names either list.
 
 The tRPC client is derived from the contract's declarations by
 `createModuleApi` (`@langwatch/api/web`) and lives in the module's
-`<name>-client` package — never hand-written, never `AppRouter` (ADR-130). A procedure another module owns and this package
-still calls is the one hand-written exception, in a `BorrowedProcedures` type
-that says so until that module's own contract declares it.
+`<name>-client` package — never hand-written, never `AppRouter` (ADR-130).
+Clean example: `modules/identity/client/src/identity-client.ts`. A procedure another
+module owns is not called through a handwritten map: add it to the owner's contract and
+client. Existing `BorrowedProcedures` maps (for instance
+`modules/annotation/browser/src/behavior/annotation-api.ts`) are debt being removed, not a
+permission.
+
+State: one global UI store, `defineSlice` / `readSlice` from
+`@langwatch/browser-host/global-store`, names `<module>:<key>`; persist preferences only.
+Host services come two ways: the module's own `*HostApi` mount (above), and a service the
+owner provides with `.provides(Service, { load })` and read with `useHostService`
+(`modules/feature-flag/browser/src/feature-flag.web.ts`). Errors: `readHandledError` flows
+to the presentation registry (`@langwatch/handled-error/presentation`) and the reusable views
+in `@langwatch/error-views` (`FormServerError`, `HandledErrorState`, `HandledErrorAlert`,
+`AggregateReadOnlyGate`); never `error.message`. Browser telemetry (errors, navigation spans,
+session) is `@langwatch/react-rum`, set up by the shell, §10.2.
 
 ## Drawers are routed singletons, not local state
 
@@ -121,8 +149,10 @@ boundaries; a violation there is the finding, not a judgement call.
 
 ## Creating a new browser module, end to end
 
-**Copy `modules/annotation`**'s browser package as the shape reference
-(`modules/annotation/browser/src/annotation.web.ts` is the declaration). This
+**Use `modules/annotation`**'s browser package as the shape reference for the
+declaration and layers (`modules/annotation/browser/src/annotation.web.ts`), but not
+wholesale: it still has a bare-name `.withDrawers` entry and a borrowed-procedures client,
+both debt. Take the client from `modules/identity/client`. This
 assumes the module's **contract** already exists (see the `backend` skill's
 "Creating a new process module" for the shared contract steps — a
 browser-only module still needs a contract package if it owns any config or
@@ -148,8 +178,10 @@ export const <name>Web = defineBrowserModule("<name>")
     },
   })
   .drawer(<Name>DrawerToken, { load: ... })  // if any; the token is the owner's (§10.1)
-  .withHosts({ requires: [...], mounts: [...] })  // *HostApi names read/provided —
-                                // an unmounted one is refused by createUi at install
+  .withHosts({
+    requires: ["<Name>HostApi"],
+    mounts: { <Name>HostApi: { load: () => import("./behavior/<name>-host-mount.tsx") } },
+  })                            // an unmounted one is refused by createUi at install
   .withCapabilities({ ... });   // if the composition root needs an impl this module owns
 ```
 
@@ -166,8 +198,8 @@ this is a test **level** (renders a component, mocks its boundaries), not a
 datastore marker — with `// @vitest-environment jsdom` as the file's first
 docblock line; the package's own `vitest.config.ts` declares no global
 `environment`, so every jsdom file states it itself. Render inside the
-module's `Stub<Name>Host` (from `testing.tsx`) rather than a hand-rolled
-provider tree. Describe blocks nest `given`/`when`; `it` titles are
+module's `Stub<Name>Host` (from `testing.tsx`) and `renderWithDesignSystem`
+(`@langwatch/design-system/testing`) rather than a hand-rolled provider tree. Describe blocks nest `given`/`when`; `it` titles are
 action-based. Bind the covering scenario with
 `/** @scenario "<exact title>" */` immediately before the `it`/`test` call —
 an untagged or unannotated scenario enforces nothing

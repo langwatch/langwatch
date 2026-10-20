@@ -1,3 +1,4 @@
+import { FetchSSERefusedError } from "@langwatch/browser-host/fetch-sse";
 import type { PromptConfigFormValues } from "@langwatch/prompt-contract";
 /**
  * @vitest-environment jsdom
@@ -11,7 +12,10 @@ import { usePromptExecution } from "../use-prompt-execution.ts";
 
 const { fetchSSEMock } = vi.hoisted(() => ({ fetchSSEMock: vi.fn() }));
 
-vi.mock("@langwatch/browser-host/fetch-sse", () => ({ fetchSSE: fetchSSEMock }));
+vi.mock("@langwatch/browser-host/fetch-sse", async (importOriginal) => ({
+  ...(await importOriginal<Record<string, unknown>>()),
+  fetchSSE: fetchSSEMock,
+}));
 
 const formValues: PromptConfigFormValues = {
   handle: null,
@@ -154,6 +158,37 @@ describe("usePromptExecution", () => {
         type: "unknown",
         message: "Model is not set",
       });
+    });
+  });
+
+  describe("when the server refuses the run", () => {
+    /** @scenario "A model refused for the playground is named in the conversation" */
+    it("records the refusal's code against a turn with no reply text", async () => {
+      fetchSSEMock.mockRejectedValue(
+        new FetchSSERefusedError({
+          message: "restricted",
+          httpStatus: 400,
+          body: {
+            type: "bad_request",
+            code: "model_restricted_for_execution",
+            message: "restricted",
+            retryable: false,
+          },
+        }),
+      );
+
+      const { result } = setup();
+      await act(async () => {
+        await result.current.send("hi");
+      });
+
+      const failures = Object.values(result.current.errors);
+      expect(failures).toHaveLength(1);
+      expect(failures[0]?.handled).toMatchObject({
+        code: "model_restricted_for_execution",
+        httpStatus: 400,
+      });
+      expect(result.current.messages.at(-1)).toMatchObject({ role: "assistant", content: "" });
     });
   });
 

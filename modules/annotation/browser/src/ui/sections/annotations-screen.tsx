@@ -132,6 +132,14 @@ function QueueList({ host }: { host: AnnotationHostApi }) {
         title="Annotation queue not found"
         description="It may have been deleted or you may no longer have access to it."
         icon={<Inbox />}
+        next={[
+          {
+            kind: "setting",
+            label: "Back to your inbox",
+            href: `/${project?.slug}/annotations`,
+            onNavigate: ({ href }) => host.navigate(href),
+          },
+        ]}
       />
     );
   }

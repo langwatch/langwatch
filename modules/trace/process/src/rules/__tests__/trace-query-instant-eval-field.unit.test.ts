@@ -70,7 +70,7 @@ describe("given an eval chip with a registered run", () => {
     it("negates the verdict subquery under NOT", () => {
       const result = compile('NOT eval:"the user is annoyed"', [run()]);
       expect(result?.sql).toMatch(
-        /^NOT \(\(\(TenantId, TraceId\) IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
+        /^\(\(TenantId, TraceId\) NOT IN \(SELECT TenantId, TraceId FROM instant_eval_judgments/,
       );
     });
 

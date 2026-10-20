@@ -1,9 +1,8 @@
 /**
- * The dashboard widget procedures the custom-chart playground calls, at main's
+ * The dashboard widget procedures the widget editors call, at main's
  * `dashboardWidgets.*` path with main's inputs and outputs. The REST family is
  * `dashboard-widget-rest.schemas.ts`. Spec: custom-chart-playground-dashboard-placement.feature.
  */
-import { DASHBOARD_SRCDOC_CHART_KIND } from "@langwatch/analytics-contract";
 import {
   chartGridPlacementSchema,
   fitsChartGridWidth,
@@ -11,8 +10,11 @@ import {
 import {
   dashboardWidgetCodeSchema,
   dashboardWidgetDefinitionSchema,
+  dashboardWidgetDescriptionSchema,
   dashboardWidgetNameSchema,
+  dashboardWidgetPromptSchema,
   dashboardWidgetQueriesSchema,
+  dashboardWidgetSourceSchema,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
 import { defineTrpcContract, type Named } from "@langwatch/module";
 import { z } from "zod";
@@ -53,14 +55,12 @@ export interface DashboardWidgetTrpcSchema extends Named<
 export const dashboardWidgetTrpcSchema: DashboardWidgetTrpcSchema =
   dashboardWidgetTrpcSchemaDefinition;
 
-/** A widget as main's `list` answered it: the stored chart row, its definition under `graph`. */
+/** A widget as main's `list` answered it: its definition under `graph`. */
 const dashboardWidgetTrpcRowSchemaDefinition = z.object({
   id: z.string(),
   projectId: z.string(),
   name: z.string(),
   graph: dashboardWidgetDefinitionSchema,
-  filters: z.null(),
-  kind: z.literal(DASHBOARD_SRCDOC_CHART_KIND),
   createdAt: z.date(),
   updatedAt: z.date(),
   ...placementShape,
@@ -79,8 +79,12 @@ export const dashboardWidgetTrpcSuccessSchema: DashboardWidgetTrpcSuccessSchema 
   dashboardWidgetTrpcSuccessSchemaDefinition;
 
 export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
+  /**
+   * The project's widgets, or with `dashboardId` one board's: also an Organization board
+   * another project owns, which stores its widgets there.
+   */
   .query("list")
-  .withInput(projectScopeSchema)
+  .withInput(z.object({ ...projectScopeSchema.shape, dashboardId: z.string().optional() }))
   .withOutput(dashboardWidgetTrpcRowSchema.array())
 
   .mutation("create")
@@ -91,6 +95,9 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema,
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      description: dashboardWidgetDescriptionSchema.optional(),
+      prompt: dashboardWidgetPromptSchema.optional(),
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSchema)
@@ -103,6 +110,8 @@ export const dashboardWidgetTrpc = defineTrpcContract("dashboardWidgets")
       name: dashboardWidgetNameSchema.optional(),
       code: dashboardWidgetCodeSchema,
       queries: dashboardWidgetQueriesSchema,
+      /** Kept as stored when absent. */
+      source: dashboardWidgetSourceSchema.optional(),
     }),
   )
   .withOutput(dashboardWidgetTrpcSuccessSchema)

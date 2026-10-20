@@ -3,10 +3,10 @@ import type { Deprecation } from "@langwatch/upgrade/manifest";
 import type {
   ListRunsInput,
   ListStepsFilter,
-  UpgradePreview,
   UpgradeReleasePage,
   UpgradeRunDetail,
   UpgradeRunPage,
+  UpgradeImageVersion,
   UpgradeStatus,
   UpgradeStepDetail,
   UpgradeStepPage,
@@ -22,6 +22,8 @@ export interface UpgradeLedgerRepository {
   findStatus(): Promise<UpgradeStatus>;
   /** The deprecation register this image ships (ruling D8). */
   findDeprecations(): Deprecation[];
+  /** What this image is: its release, or the newest release it contains and its commit. */
+  findImageVersion(): UpgradeImageVersion;
   findSteps(filter?: ListStepsFilter): Promise<UpgradeStepPage>;
   findReleases(): Promise<UpgradeReleasePage>;
   findRuns(input?: ListRunsInput): Promise<UpgradeRunPage>;
@@ -29,8 +31,6 @@ export interface UpgradeLedgerRepository {
   getStep(input: { id: string }): Promise<UpgradeStepDetail>;
   /** Refuses with `upgrade_not_found` when the ledger holds no such run. */
   getRun(input: { id: string }): Promise<UpgradeRunDetail>;
-  /** Refuses with `upgrade_plan_unavailable` when the reader was built without planning. */
-  findPreview(input: { to: string }): Promise<UpgradePreview>;
   findTargets(): Promise<UpgradeTargetSummary[]>;
   /** Sets a failed step pending in one conditional write; false when it was not failed. */
   reopenFailedStep(input: { id: string }): Promise<boolean>;

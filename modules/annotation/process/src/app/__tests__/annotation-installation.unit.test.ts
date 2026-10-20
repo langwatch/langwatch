@@ -56,12 +56,14 @@ const input = {
 };
 
 describe("annotation app installation", () => {
-  /** @scenario "The annotation module declares its pipeline and no migration step" */
-  it("registers annotation_lifecycle and declares no migration step", async () => {
+  /** @scenario "The annotation module declares its pipeline and its one trace migration step" */
+  it("declares annotation:record-trace-annotations as its only migration step", async () => {
     const runtime = await process("worker").boot();
 
     try {
-      expect(runtime.migrationSteps(isMigrationStep)).toEqual([]);
+      expect(runtime.migrationSteps(isMigrationStep).map((step) => step.id)).toEqual([
+        "annotation:record-trace-annotations",
+      ]);
     } finally {
       await runtime.stop();
     }

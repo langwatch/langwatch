@@ -4,6 +4,7 @@
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
 import type { EventReadSeat } from "@langwatch/eventing";
+import { GROUP_QUEUE_CONFIG } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
@@ -97,6 +98,8 @@ export interface ProcessMemberSource {
    * the first that does not. Spec: specs/server/process-readiness.feature.
    */
   answer?(): Promise<void>;
+  /** Tells every opened client shutdown has begun: a lost Redis stops reconnecting. */
+  beginClose?(): void;
   /** Closes every client this source opened, in reverse construction order. */
   close(): Promise<void>;
   /** The same close, so `await using members = buildProcessStores(...).members` works. */
@@ -204,9 +207,11 @@ function refuseUndefinedMembers(supplied: {
 function eventingMember({
   config,
   read,
+  tenantDirectory,
 }: {
   config: ProcessConfig;
   read: ReadMember;
+  tenantDirectory: () => TenantDirectory;
 }): BuiltMember<StoreClients["eventing"]> {
   const eventing = config.eventing;
   if (!eventing) {
@@ -238,7 +243,12 @@ function eventingMember({
     ...(eventing.groupQueue === undefined ? {} : { redis: read("redis") }),
     ...(eventing.store.kind === "producer-only" && !clickhouseConfigured(config)
       ? {}
-      : { eventLog: { clickhouse: read("clickhouse") } }),
+      : {
+          eventLog: {
+            clickhouse: read("clickhouse"),
+            organizationOf: (tenantId: string) => tenantDirectory().organizationForTenant(tenantId),
+          },
+        }),
   });
 }
 
@@ -289,13 +299,29 @@ export type ProcessStores = Readonly<{
   operatorReads: OperatorReadMint;
 }>;
 
+type OpenedMember = {
+  member: StoreClientName;
+  close: () => Promise<void>;
+  beginClose?: (() => void) | undefined;
+};
+
+/**
+ * Reverse construction order: eventing drains before the Redis its queue sits
+ * on goes away, and a client is never closed under something still holding
+ * it. A lost Redis stops reconnecting first, so that drain ends.
+ */
+async function closeOpened(opened: readonly OpenedMember[]): Promise<void> {
+  for (const entry of opened) entry.beginClose?.();
+  for (const entry of [...opened].reverse()) await entry.close();
+}
+
 export function buildProcessStores(options: BuildProcessStoresOptions): ProcessStores {
   const { config } = options;
   const supplied = options.members ?? {};
   refuseUndefinedMembers(supplied);
 
   const built = new Map<StoreClientName, unknown>();
-  const opened: { member: StoreClientName; close: () => Promise<void> }[] = [];
+  const opened: OpenedMember[] = [];
   const answering: { member: string; answer: () => Promise<void> }[] = [];
 
   const read = <Name extends StoreClientName>(name: Name): StoreClients[Name] => {
@@ -305,7 +331,9 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
 
     const result = builders[name]();
     built.set(name, result.value);
-    if (result.close) opened.push({ member: name, close: result.close });
+    if (result.close) {
+      opened.push({ member: name, close: result.close, beginClose: result.beginClose });
+    }
     if (result.answer) answering.push({ member: name, answer: result.answer });
     return result.value as StoreClients[Name];
   };
@@ -359,7 +387,7 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
       }
       return buildRedis(config.redis);
     },
-    eventing: () => eventingMember({ config, read }),
+    eventing: () => eventingMember({ config, read, tenantDirectory }),
     eventReadSeat: () => eventReadSeatMember({ config, supplied, read }),
 
     // Redis-backed, so each inherits Redis's own refusal rather than repeating
@@ -383,11 +411,11 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
         ),
       );
     },
+    beginClose(): void {
+      for (const entry of opened) entry.beginClose?.();
+    },
     async close(): Promise<void> {
-      // Reverse construction order: eventing drains before the Redis its queue
-      // sits on goes away, and a client is never closed under something still
-      // holding it.
-      for (const entry of [...opened].reverse()) await entry.close();
+      await closeOpened(opened);
       opened.length = 0;
       answering.length = 0;
       built.clear();
@@ -399,11 +427,24 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   return { members: source, operatorReads };
 }
 
-/** Host before the runtime so its stores close after the runtime stops; ready once they answer. */
-export function hostedStores(source: ProcessMemberSource) {
+/** Room above the queue drain for closing Redis, Prisma and ClickHouse once eventing drained. */
+const STORE_CLOSE_MARGIN_MS = 5_000;
+
+/**
+ * Host before the runtime so its stores close after the runtime stops; ready once they answer.
+ * Closing them drains eventing's queues, so the phase gets the queue's drain budget, not the
+ * runner's 10s default. Spec: specs/background/worker-graceful-shutdown.feature
+ */
+export function hostedStores({
+  source,
+  drainTimeoutMs,
+}: Readonly<{ source: ProcessMemberSource; drainTimeoutMs?: number | undefined }>) {
   return {
     name: "process stores",
+    stopping: () => source.beginClose?.(),
     stop: () => source.close(),
+    drain: true,
+    timeoutMs: (drainTimeoutMs ?? GROUP_QUEUE_CONFIG.shutdownTimeoutMs) + STORE_CLOSE_MARGIN_MS,
     ...(source.answer === undefined
       ? {}
       : {

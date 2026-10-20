@@ -185,9 +185,11 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
 | `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
-| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
-| `dashboards` | Rows of the Dashboard table, one row per DashboardId. | None | one row per DashboardId | `CreatedAt` |
+| `dashboard_widgets` | One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable. | `output` | one row per DashboardWidgetId | `CreatedAt` |
+| `dashboards` | One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2. | None | one row per DashboardId | `CreatedAt` |
+| `dashboards_v2` | One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
 | `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |

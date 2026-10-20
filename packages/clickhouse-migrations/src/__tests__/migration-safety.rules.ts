@@ -13,6 +13,9 @@ export const GRACEFUL_RULES: ReadonlySet<string> = new Set([
   "materialized-view-populate",
 ]);
 
+/** Nothing is deleted automatically (Alex, 2026-10-11): refused above the newest release tag. */
+export const NOTHING_DELETED_RULES: ReadonlySet<string> = new Set(["drop-table-or-column"]);
+
 /** One refusal: what is wrong, and what to write instead. */
 export interface MigrationFinding {
   readonly migration: string;
@@ -73,49 +76,6 @@ export function parseRelease(text: string): [number, number, number] | null {
   return match ? [Number(match[1]), Number(match[2]), Number(match[3])] : null;
 }
 
-function releaseAtOrBelow({ release, floor }: { release: string; floor: string }): boolean {
-  const note = parseRelease(release);
-  const bound = parseRelease(floor);
-  if (!note || !bound) return false;
-  for (const [index, part] of note.entries()) {
-    if (part !== bound[index]) return part < bound[index]!;
-  }
-  return true;
-}
-
-/** The finding for a note that names a release the floor has not reached, or none. */
-function noteAboveFloor({
-  sql,
-  offset,
-  what,
-  floor,
-}: {
-  sql: string;
-  offset: number;
-  what: string;
-  floor: string;
-}): Finding[] {
-  const release = [...sql.matchAll(RETIREMENT_MARKER)]
-    .filter((match) => match.index < offset)
-    .at(-1)?.[1];
-  if (release === undefined || releaseAtOrBelow({ release, floor })) return [];
-  const unparsed = parseRelease(release) === null;
-  return [
-    {
-      rule: "retirement-note-above-floor",
-      problem: unparsed
-        ? `${what} under a note naming "${release}", which is not a release`
-        : `${what} under a note naming ${release}, above the LTS floor ${floor}`,
-      fix: unparsed
-        ? "name the release that stopped using it as MAJOR.MINOR.PATCH, for example `-- contract: retired in 3.21.0`."
-        : `an installation on ${floor} still reads it, and the floor is the oldest release the ` +
-          `window promises to serve. Keep it until packages/upgrade/releases/lts-floor.json names ` +
-          `${release} or later; the first release cut after the floor reaches ${release} is the ` +
-          `first one this change may ship in.`,
-    },
-  ];
-}
-
 /** A table or view name with backticks, the database prefix and goose placeholders removed. */
 function bareName(identifier: string): string {
   return identifier.replaceAll("`", "").split(".").at(-1)!.trim().toLowerCase();
@@ -135,20 +95,12 @@ function statementsIn(liveSql: string): string[] {
     .filter((statement) => statement.length > 0);
 }
 
-function dropFindings({
-  up,
-  liveUp,
-  floor,
-}: {
-  up: string;
-  liveUp: string;
-  floor: string;
-}): Finding[] {
+function dropFindings({ up, liveUp }: { up: string; liveUp: string }): Finding[] {
   const pattern = /\bDROP\s+(COLUMN|TABLE|VIEW|DICTIONARY)\s+(?:IF\s+EXISTS\s+)?`?([\w.${}]+)`?/gi;
   return [...liveUp.matchAll(pattern)].flatMap((match): Finding[] => {
     const what = `drops ${match[1]!.toLowerCase()} ${match[2]}`;
     if (retiredBefore(up, match.index)) {
-      return noteAboveFloor({ sql: up, offset: match.index, what, floor });
+      return [];
     }
     return [
       {
@@ -160,15 +112,79 @@ function dropFindings({
   });
 }
 
-function typeChangeFindings({
-  up,
+const NO_DROP_FIX =
+  "nothing is deleted automatically: leave it in place and stop reading and writing it, then " +
+  'declare an operator step (`mode: "operator"`) in the owning module that drops it, which an ' +
+  "operator confirms on Ops > Upgrades once it is safe. Dropping an index, a projection, a plain " +
+  "view or a materialised view writing TO a table holds no data of its own and is fine, and so " +
+  "is dropping a table this file creates.";
+
+const MATERIALIZED_VIEW =
+  /^CREATE\s+MATERIALIZED\s+VIEW\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)([\s\S]*?)\bAS\s+SELECT\b/i;
+
+/** Materialised views created without `TO`: each owns an inner table its drop deletes. */
+export function innerTableViews(sources: readonly MigrationSource[]): Set<string> {
+  return new Set(
+    sources.flatMap(({ sql }) =>
+      statementsIn(maskComments(gooseHalves(sql).up)).flatMap((statement) => {
+        const match = MATERIALIZED_VIEW.exec(statement);
+        return match && !/\bTO\b/i.test(match[2]!) ? [bareName(match[1]!)] : [];
+      }),
+    ),
+  );
+}
+
+/**
+ * A DROP TABLE or DROP COLUMN in the up half, or a DROP VIEW of a materialised view that owns an
+ * inner table: the drops that lose data (Alex, 2026-10-11).
+ */
+function noDropFindings({
   liveUp,
-  floor,
+  innerViews,
 }: {
-  up: string;
   liveUp: string;
-  floor: string;
+  innerViews: ReadonlySet<string>;
 }): Finding[] {
+  const statements = statementsIn(liveUp);
+  const created = new Set(
+    statements.flatMap((statement) => {
+      const match =
+        /^CREATE\s+(?:OR\s+REPLACE\s+)?(?:TEMPORARY\s+)?(?:TABLE|MATERIALIZED\s+VIEW)\s+(?:IF\s+NOT\s+EXISTS\s+)?(\S+)/i.exec(
+          statement,
+        );
+      return match ? [bareName(match[1]!)] : [];
+    }),
+  );
+  return statements.flatMap((statement): Finding[] => {
+    const table = /^DROP\s+(?:TEMPORARY\s+)?TABLE\s+(?:IF\s+EXISTS\s+)?(\S+)/i.exec(statement)?.[1];
+    if (table) {
+      if (created.has(bareName(table))) return [];
+      return [{ rule: "drop-table-or-column", problem: `drops table ${table}`, fix: NO_DROP_FIX }];
+    }
+    const view = /^DROP\s+VIEW\s+(?:IF\s+EXISTS\s+)?(\S+)/i.exec(statement)?.[1];
+    if (view) {
+      const name = bareName(view);
+      if (!innerViews.has(name) || created.has(name)) return [];
+      return [
+        {
+          rule: "drop-table-or-column",
+          problem: `drops materialised view ${view}, whose inner table holds its rows`,
+          fix: NO_DROP_FIX,
+        },
+      ];
+    }
+    const altered = /^ALTER\s+TABLE\s+(\S+)/i.exec(statement)?.[1];
+    if (!altered || created.has(bareName(altered))) return [];
+    const columns = /\bDROP\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?/gi;
+    return [...statement.matchAll(columns)].map((match) => ({
+      rule: "drop-table-or-column",
+      problem: `drops column ${altered}.${match[1]}`,
+      fix: NO_DROP_FIX,
+    }));
+  });
+}
+
+function typeChangeFindings({ up, liveUp }: { up: string; liveUp: string }): Finding[] {
   const pattern = /\bMODIFY\s+COLUMN\s+(?:IF\s+EXISTS\s+)?`?(\w+)`?\s+(\S+)/gi;
   return [...liveUp.matchAll(pattern)]
     .filter(
@@ -177,7 +193,7 @@ function typeChangeFindings({
     .flatMap((match): Finding[] => {
       const what = `changes the type of column ${match[1]} to ${match[2]}`;
       if (retiredBefore(up, match.index)) {
-        return noteAboveFloor({ sql: up, offset: match.index, what, floor });
+        return [];
       }
       return [
         {
@@ -431,21 +447,25 @@ function blockingRewriteFindings(liveUp: string): Finding[] {
 }
 
 /**
- * Every rule the ClickHouse scanner applies to one goose migration file. `floor` is the LTS
- * floor release: a retirement note must name a release at or below it. `steps` are the
+ * Every rule the ClickHouse scanner applies to one goose migration file. `steps` are the
  * code-step ids a `-- background step:` note may name.
  */
 export function scanClickHouseMigration({
   name,
   sql,
-  floor,
   steps = new Set(),
-}: MigrationSource & { floor: string; steps?: ReadonlySet<string> }): MigrationFinding[] {
+  innerViews = new Set(),
+}: MigrationSource & {
+  steps?: ReadonlySet<string>;
+  /** Materialised views that own an inner table, from {@link innerTableViews} over the tree. */
+  innerViews?: ReadonlySet<string>;
+}): MigrationFinding[] {
   const { up, down } = gooseHalves(sql);
   const liveUp = maskComments(up);
   return [
-    ...dropFindings({ up, liveUp, floor }),
-    ...typeChangeFindings({ up, liveUp, floor }),
+    ...noDropFindings({ liveUp, innerViews }),
+    ...dropFindings({ up, liveUp }),
+    ...typeChangeFindings({ up, liveUp }),
     ...variableSizeFindings(liveUp),
     ...blockFindings(up),
     ...downFindings(down),

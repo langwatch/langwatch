@@ -1,7 +1,6 @@
 /** The host address controls the score editor overlay. */
 
 import { Drawer } from "@langwatch/design-system/drawer";
-import { HStack } from "@langwatch/design-system/primitives";
 
 import { useAnnotationScoresHost } from "../../model/annotation-scores-host.ts";
 import { AnnotationScoreForm } from "./annotation-score-form.tsx";
@@ -24,32 +23,12 @@ export const AnnotationScoreDrawer = ({
   };
 
   return (
-    <Drawer.Root
-      open={true}
-      placement="end"
+    <Drawer
+      onClose={handleClose}
       size="lg"
-      onOpenChange={({ open }) => {
-        if (!open) {
-          handleClose();
-        }
-      }}
-      onInteractOutside={handleClose}
+      title={annotationScoreId ? "Edit Score Metric" : "Add Score Metric"}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <HStack>
-            <Drawer.CloseTrigger />
-          </HStack>
-          <HStack>
-            <Drawer.Title>
-              {annotationScoreId ? "Edit Score Metric" : "Add Score Metric"}
-            </Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body>
-          <AnnotationScoreForm onClose={handleClose} annotationScoreId={annotationScoreId} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <AnnotationScoreForm onClose={handleClose} annotationScoreId={annotationScoreId} />
+    </Drawer>
   );
 };

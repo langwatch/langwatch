@@ -45,13 +45,20 @@ export class WebhookRequestService {
       WebhookEndpointRepository,
       "recordRequestAttempt" | "findRequestAttempts"
     >,
+    private readonly allowInsecureLocal: boolean,
   ) {}
 
+  /** `allowInsecureLocal` is the module's dev switch, as endpoint deliveries read it. */
   static create(input: {
     egress: Pick<WebhookEgressService, "send">;
     deliveries: Pick<WebhookEndpointRepository, "recordRequestAttempt" | "findRequestAttempts">;
+    allowInsecureLocal?: boolean;
   }): WebhookRequestService {
-    return new WebhookRequestService(input.egress, input.deliveries);
+    return new WebhookRequestService(
+      input.egress,
+      input.deliveries,
+      input.allowInsecureLocal ?? false,
+    );
   }
 
   async send(request: WebhookSendRequest): Promise<WebhookSendRequestResult> {
@@ -79,6 +86,7 @@ export class WebhookRequestService {
         triggerName: request.source.ref,
         contextLabel: request.label,
         testFire: request.testFire,
+        allowInsecureLocal: this.allowInsecureLocal,
       });
       const verdict = judgeWebhookDelivery({ result, label: request.label });
       if (!verdict.delivered) {

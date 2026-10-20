@@ -7,10 +7,10 @@ import { OrganizationModule } from "./app/organization.app.ts";
 import { organizationChannels } from "./channels/organization-channels.registry.ts";
 import { organizationAuditEventing } from "./eventing/organization-audit.pipeline.ts";
 import { organizationLifecycleEventing } from "./eventing/organization-lifecycle.pipeline.ts";
+import { privateDataplaneRecorderEventing } from "./eventing/organization-private-dataplane.pipeline.ts";
 import { seatLimitEventing } from "./eventing/seat-limit.pipeline.ts";
 import { organizationRepositories } from "./repositories/organization-repositories.registry.ts";
 import { OrganizationPresenceSettingBackfillService } from "./services/organization-presence-setting-backfill.service.ts";
-import { OrganizationPresenceSettingBackfillTask } from "./tasks/organization-presence-setting-backfill.task.ts";
 import { groupsRest } from "./transport/group.rest.ts";
 import { groupTrpcTransport } from "./transport/group.trpc.ts";
 import { inviteTrpcTransport } from "./transport/invite.trpc.ts";
@@ -51,6 +51,7 @@ export const organizationProcessModule: PublishedProcessModule<
   .withEventing(seatLimitEventing)
   .withEventing(organizationLifecycleEventing)
   .withEventing(organizationAuditEventing)
+  .withEventing(privateDataplaneRecorderEventing)
   // Old images record no presence fact: run once none serves (ADR-173 §3).
   .withMigrations(({ app }) => [
     defineMigrationStep({
@@ -62,10 +63,7 @@ export const organizationProcessModule: PublishedProcessModule<
       run: async ({ checkpoint, dryRun, signal }) => {
         const resumed = checkpoint.resumeFrom?.afterOrganizationId;
         const report = await OrganizationPresenceSettingBackfillService.create({
-          peers: {
-            organizations: app,
-            record: ({ organizationId }) => app.recordStoredPresenceSetting({ organizationId }),
-          },
+          peers: { recordPage: (input) => app.recordStoredPresenceSettingPage(input) },
         }).backfill({
           after: typeof resumed === "string" ? resumed : undefined,
           dryRun,
@@ -75,5 +73,4 @@ export const organizationProcessModule: PublishedProcessModule<
         return { ...report, dryRun };
       },
     }),
-  ])
-  .withTasks(({ app }) => [OrganizationPresenceSettingBackfillTask.create({ organizations: app })]);
+  ]);

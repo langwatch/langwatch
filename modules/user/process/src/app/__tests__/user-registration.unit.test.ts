@@ -62,6 +62,9 @@ describe("registering a credential account", () => {
         send: async () => {
           throw new Error("event bus unavailable");
         },
+        sendBatch: async () => {
+          throw new Error("event bus unavailable");
+        },
       };
       const app = createUserTestApp({
         lifecycle: { ...senders, recordUserCreated: down, recordUserRegistered: down },

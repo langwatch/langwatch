@@ -31,3 +31,17 @@ Feature: A tenant step's ledger row follows its tenants' state
   Scenario: A blocking tenant step is refused by name
     When a tenant step is defined with mode blocking
     Then the definition refuses, naming the module and the step
+
+  # Ruled small (Alex, 2026-10-12, SWB-F5 and the queue-pacing ruling): the declaration keeps both.
+  @unit
+  Scenario: A tenant step keeps its declared steadiness and queue bound
+    Given a tenant step declaring migratedIsSteady and pauseWhileQueuedAbove
+    When the declaration is parsed
+    Then both reach the pass unchanged
+
+  # Step 4 of the legacy conversion (Alex, 2026-10-12): Ops' page reads declared steps' state here.
+  @unit
+  Scenario: Ops reads a tenant step's counts and attention rows from the framework's table
+    Given tenant steps with finalized, parked and migrated tenants
+    When Ops reads one step's status counts and the tenants needing attention
+    Then each status is counted and only that step's parked or held tenants are listed

@@ -177,6 +177,51 @@ describe("given the shell apps/ui mounts around every routed page", () => {
     });
   });
 
+  describe("when the composition installs a presentation provider", () => {
+    /** @scenario "The composition's presentation provider wraps the page, the drawer and the footer" */
+    it("wraps the page, the open drawer and the footer in it, below the host services", async () => {
+      const Presented = createContext<string | null>(null);
+      function Presentation({ children }: { children?: ReactNode }) {
+        const user = useUiHostServices().session.currentUser()?.id;
+        return <Presented.Provider value={`presented-for-${user}`}>{children}</Presented.Provider>;
+      }
+      function Reader({ id }: { id: string }) {
+        return <div data-testid={id}>{useContext(Presented) ?? "missing"}</div>;
+      }
+      const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
+        apis: [],
+        capabilities: { session: new StubSession(), scope: new StubScope() },
+        transport: {} as UiFeatureApiTransport,
+        drawers: { probe: () => <Reader id="drawer" /> },
+        footer: () => <Reader id="footer" />,
+        presentation: Presentation,
+      });
+
+      const view = renderShell(shell, <Reader id="page" />, void 0, "/?drawer.open=probe");
+
+      expect(view.getByTestId("page").textContent).toBe("presented-for-user_1");
+      expect(view.getByTestId("footer").textContent).toBe("presented-for-user_1");
+      await waitFor(() =>
+        expect(view.getByTestId("drawer").textContent).toBe("presented-for-user_1"),
+      );
+    });
+
+    /** @scenario "A composition with no presentation provider draws the page as before" */
+    it("draws the page unchanged when none is installed", () => {
+      const shell = createUiFeatureShell({
+        sessionQueryKey: TEST_SESSION_QUERY_KEY,
+        apis: [],
+        capabilities: { session: new StubSession(), scope: new StubScope() },
+        transport: {} as UiFeatureApiTransport,
+      });
+
+      const view = renderShell(shell, <p data-testid="page">plain</p>);
+
+      expect(view.getByTestId("page").textContent).toBe("plain");
+    });
+  });
+
   describe("when the shell renders inside a host that already has a QueryClient", () => {
     it("hands every feature Provider that same client, so one cache serves both halves", () => {
       const mounts: Mount[] = [];

@@ -49,13 +49,46 @@ export class NonRetryableGroupQueueError extends Error {
   }
 }
 
+/**
+ * The worker has no handler for this job (mid rolling deploy, a newer release's kind): the queue
+ * hands it back unspent, no attempt used and no failure counted, so a worker that knows it runs it.
+ */
+export class HandBackGroupQueueError extends Error {
+  constructor(message: string, options: { cause?: unknown } = {}) {
+    super(message, options);
+    this.name = "HandBackGroupQueueError";
+  }
+}
+
+/** Fault kinds a refusal names when its cause may pass on its own (HandledError's vocabulary). */
+const TRANSIENT_FAULTS: ReadonlySet<unknown> = new Set([
+  "platform",
+  "presumed_platform",
+  "provider",
+]);
+
+/**
+ * An error that says `retryable: false` (a HandledError, a DispatchError) fails the same way on
+ * every attempt, unless it names a platform or provider fault or a 429 or unattributed 5xx
+ * status: there `retryable: false` is only HandledError's default, so it still retries (ADR-027).
+ */
+export function refusesRetry(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  if (Reflect.get(error, "retryable") !== false) return false;
+  const fault = Reflect.get(error, "fault");
+  const status = Reflect.get(error, "httpStatus");
+  if (status === 429 || TRANSIENT_FAULTS.has(fault)) return false;
+  return !(fault === undefined && typeof status === "number" && status >= 500);
+}
+
 export function defaultFailureDecision(error: unknown): {
   retryable: boolean;
   retryAfterMs?: number;
 } {
   if (
     error instanceof NonRetryableGroupQueueError ||
-    (error instanceof GroupQueueError && !error.retryable)
+    (error instanceof GroupQueueError && !error.retryable) ||
+    refusesRetry(error)
   ) {
     return { retryable: false };
   }

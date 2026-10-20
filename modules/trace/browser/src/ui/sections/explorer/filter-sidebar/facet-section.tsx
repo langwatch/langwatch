@@ -231,7 +231,7 @@ function AnyOfHint() {
     <Text
       textStyle="2xs"
       color="blue.fg"
-      fontWeight="500"
+      fontWeight="medium"
       textTransform="none"
       letterSpacing="normal"
       flexShrink={0}
@@ -320,7 +320,7 @@ function FacetSearchInput({
       {searchQuery.trim() && !isSearching && hasNoMatch && (
         <Text textStyle="2xs" color="fg.muted" paddingX={1}>
           No match. Press <Kbd>Enter</Kbd> to filter by "
-          <Box as="span" fontWeight="600" color="fg">
+          <Box as="span" fontWeight="semibold" color="fg">
             {searchQuery.trim()}
           </Box>
           " anyway.

@@ -52,9 +52,7 @@ const datasetColumn = (columnHelper: Helper, column: DatasetColumn): ColumnDef<T
     header: () => (
       <HStack gap={1}>
         <ColumnTypeIcon type={column.type} />
-        <Text fontSize="13px" fontWeight="medium">
-          {column.name}
-        </Text>
+        <Text textStyle="label">{column.name}</Text>
       </HStack>
     ),
     cell: (info) => info.getValue(),

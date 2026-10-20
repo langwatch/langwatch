@@ -36,6 +36,7 @@ vi.mock("../../../behavior/sso-api.ts", () => {
           getHistory: { invalidate: () => {} },
           breakGlassBindings: { invalidate: () => {} },
         },
+        ssoConnections: { invalidate: () => {} },
       }),
       ssoSetup: {
         getSetup: {
@@ -44,6 +45,9 @@ vi.mock("../../../behavior/sso-api.ts", () => {
         register: mutation("register"),
         startLegacyMigration: mutation("startLegacyMigration"),
         setArrivals: mutation("setArrivals"),
+      },
+      ssoConnections: {
+        startLegacyMigration: mutation("operatorStartLegacyMigration"),
       },
     },
   };
@@ -85,6 +89,7 @@ function grandfatheredSetup(): SsoSetupPageView {
     record: null,
     goLive: null,
     legacyRoute: null,
+    legacyDomainsToMove: [],
     enterpriseRequired: false,
     migration: null,
     availability: { available: true, proof: "dns-txt" },

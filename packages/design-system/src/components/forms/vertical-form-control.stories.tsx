@@ -8,7 +8,8 @@ const meta = {
   parameters: {
     usage: {
       use: "Forms in drawers, dialogs and narrow columns: the label above the control.",
-      avoid: "Wide settings pages: use Horizontal form control.",
+      avoid:
+        "New forms: use Settings field, which stacks inside a Drawer or Dialog on its own. Never override its padding, border or label inset.",
     },
   },
   component: VerticalFormControl,

@@ -1,7 +1,8 @@
 import { createLogger } from "@langwatch/observability";
-import type { ZodSchema, z } from "zod";
+import type { z } from "zod";
 
 import type { CommandType } from "../domain/commandType.ts";
+import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import { mapValidationIssues } from "../utils/errors.ts";
 
 const logger = createLogger("langwatch:event-sourcing:command-schema");
@@ -33,7 +34,7 @@ export interface CommandSchema<Payload, Type extends CommandType> {
  * @param description - Optional description
  */
 export function defineCommandSchema<
-  Schema extends ZodSchema,
+  Schema extends ParsingSchema,
   Type extends CommandType = CommandType,
 >(type: Type, schema: Schema, description?: string): CommandSchema<z.infer<Schema>, Type> {
   return {

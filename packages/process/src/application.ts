@@ -1,5 +1,5 @@
 import { type BoundMiddlewareBindings, type TransportPeers } from "@langwatch/api";
-import { type EventUpcastReader, type FeatureEventing } from "@langwatch/eventing";
+import { type EventUpcastReader, type FeatureEventing, type ListedWork } from "@langwatch/eventing";
 import {
   type DependencyToken,
   type FeatureApiIdentity,
@@ -20,6 +20,7 @@ import {
   StoreTierUnstatedError,
 } from "./boot-errors.ts";
 import { channelsBind, channelsRequire, type AnyChannelRegistry } from "./channel-registry.ts";
+import { trackedForRole, trackedStoresForRole } from "./delivery-progress.ts";
 /** Declares, constructs and starts the process graph (ARCHITECTURE.md §5). */
 import type {
   FeatureTransportDescriptor,
@@ -196,6 +197,12 @@ export class BootedRuntime<Members, Rest = never, Trpc = never> {
    */
   upcastReader(): EventUpcastReader | undefined {
     return this.eventing?.upcastReader?.();
+  }
+
+  /** Runs work whose queue jobs run ahead of any backlog and waits for them; else just the work. */
+  runListedWork<Result>(input: ListedWork<Result>): Promise<Result> {
+    const eventing = this.eventing;
+    return eventing?.runListedWork ? eventing.runListedWork(input) : input.work();
   }
 
   /**
@@ -513,7 +520,13 @@ export class ApplicationBuilder<
     const selections = new Map<string, RepositorySelection>(
       declarations.map((declaration) => [
         declaration.name,
-        { tier: declaration.tier, members: this.repositoryMembersFor(declaration, members) },
+        {
+          tier: declaration.tier,
+          members: trackedStoresForRole({
+            role,
+            members: this.repositoryMembersFor(declaration, members),
+          }),
+        },
       ]),
     );
     // Belt and braces over the union above: a source that answered a claimed
@@ -546,7 +559,9 @@ export class ApplicationBuilder<
           role,
           replayer,
           declaredMigrationSteps,
-          resolve: (token) => resolveInstallToken({ token, provided, apis }),
+          ...listedWorkOf(eventing),
+          resolve: (token) =>
+            trackedForRole({ role, dependency: resolveInstallToken({ token, provided, apis }) }),
         });
         featureServices.push(...resources.sealServices());
         this.bindProviders({ declaration, state, apis, provided });
@@ -996,4 +1011,11 @@ function unavailable(feature: string, role: ServerRole, contribution: string): (
   return () => {
     throw new RoleContributionError(feature, role, `${contribution} (unavailable)`);
   };
+}
+
+/** The eventing host's listed queue runs, handed to each install; nothing where none runs. */
+function listedWorkOf(
+  eventing: { runListedWork?<Result>(input: ListedWork<Result>): Promise<Result> } | undefined,
+): { runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result> } {
+  return eventing?.runListedWork ? { runListedWork: eventing.runListedWork.bind(eventing) } : {};
 }

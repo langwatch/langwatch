@@ -4,6 +4,8 @@
  * @see specs/features/agent-testing/case-version-history.feature
  */
 
+import { Card } from "@langwatch/design-system/card";
+import type { DrawerFooterProps } from "@langwatch/design-system/drawer";
 import { FieldInfoTooltip } from "@langwatch/design-system/field-info-tooltip";
 import {
   Alert,
@@ -20,7 +22,6 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { SimpleSlider } from "@langwatch/design-system/slider";
-import { Drawer } from "@langwatch/design-system/studio-drawer";
 import { Switch } from "@langwatch/design-system/switch";
 import {
   CALLER_VOICE_EFFECTS,
@@ -32,7 +33,6 @@ import {
 import { Play, X } from "lucide-react";
 
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { FG_MUTED, QUIET_BUTTON_SHADOW } from "../../../../model/agent-testing/shared/design.ts";
 import { CustomizeChips } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import {
   DIALOG_FIELD_STYLE,
@@ -40,7 +40,6 @@ import {
   FieldLabel,
 } from "../../../elements/agent-testing/shared/dialog-fields.tsx";
 import { RemoveBlockButton } from "../../../elements/agent-testing/shared/remove-block-button.tsx";
-import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
 import { UNFILED_OPTION_LABEL } from "../../../elements/scenario-form.tsx";
 import { TagList } from "../../../elements/tag-list.tsx";
 import { EFFECT_LABELS } from "../../scenarios/caller-voice-group.tsx";
@@ -51,9 +50,14 @@ import { parameterPlaceholder } from "../run-parameters/parameter-suggestions.ts
 import { useAgentDeclaredParameters } from "../run-parameters/use-agent-declared-parameters.ts";
 import { CaseRecentRunsButton } from "./case-recent-runs-button.tsx";
 import { CaseVersionHistoryPopover } from "./case-version-history-popover.tsx";
-import { strayFieldValues, type CaseDraft, type CaseEditorState } from "./use-case-editor.ts";
+import {
+  criteriaOf,
+  strayFieldValues,
+  type CaseDraft,
+  type CaseEditorState,
+} from "./use-case-editor.ts";
 
-const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
+export const CASE_MODAL_SUBTITLE = "Test your agent on a critical path or edge case";
 
 /**
  * What a field that grows with its text carries.
@@ -75,42 +79,31 @@ const PARAMETERS_HELP =
   "Parameters reach your agent as arguments of the function you annotated. Use them to run the same scenario as a free or a pro customer, in another locale, or on another model.";
 
 /**
- * The heading: what the dialog is for, the way into a recent run of this
- * scenario, and the way back to its versions.
+ * The way into a recent run of this scenario and the way back to its versions,
+ * which the drawer header carries beside its X.
  */
-export function CaseModalHeader({
-  isEditing,
+export function CaseModalHeaderTools({
   scenarioId,
   version,
   openHistoryOnOpen,
 }: {
-  isEditing: boolean;
-  /** The scenario being edited, or nothing for a new one. */
-  scenarioId: string | null;
+  /** The scenario being edited. */
+  scenarioId: string;
   version: number | null;
   /** True when the dialog was opened from a History entry. */
   openHistoryOnOpen?: boolean;
 }) {
   return (
-    <Drawer.Header>
-      <Drawer.Title>{isEditing ? "Edit scenario" : "New scenario"}</Drawer.Title>
-      <Text fontSize="12px" color={FG_MUTED} marginTop={0.5}>
-        {CASE_MODAL_SUBTITLE}
-      </Text>
-      {isEditing && scenarioId && (
-        <HStack position="absolute" top={2.5} right={11} gap={1.5}>
-          <CaseRecentRunsButton scenarioId={scenarioId} />
-          {version !== null && (
-            <CaseVersionHistoryPopover
-              scenarioId={scenarioId}
-              version={version}
-              initialOpen={openHistoryOnOpen}
-            />
-          )}
-        </HStack>
+    <>
+      <CaseRecentRunsButton scenarioId={scenarioId} />
+      {version !== null && (
+        <CaseVersionHistoryPopover
+          scenarioId={scenarioId}
+          version={version}
+          initialOpen={openHistoryOnOpen}
+        />
       )}
-      <Drawer.CloseTrigger />
-    </Drawer.Header>
+    </>
   );
 }
 
@@ -119,10 +112,12 @@ function TitleAndSuiteRow({
   draft,
   setDraft,
   suites,
+  titleError,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
   suites: TestSuiteEntry[];
+  titleError: string | undefined;
 }) {
   return (
     <Grid templateColumns="1fr 180px" gap={3}>
@@ -130,13 +125,14 @@ function TitleAndSuiteRow({
         <FieldLabel>Title</FieldLabel>
         <Input
           {...DIALOG_FIELD_STYLE}
-
           aria-label="Title"
+          aria-invalid={titleError !== undefined}
           data-testid="case-modal-title-input"
           placeholder="Angry customer threatens a chargeback"
           value={draft.title}
           onChange={(event) => setDraft({ title: event.target.value })}
         />
+        <FieldError message={titleError} />
       </Box>
       <Box>
         <FieldLabel>Test suite</FieldLabel>
@@ -166,9 +162,11 @@ function TitleAndSuiteRow({
 function SituationAndCriteria({
   draft,
   setDraft,
+  criteriaError,
 }: {
   draft: CaseDraft;
   setDraft: (update: Partial<CaseDraft>) => void;
+  criteriaError: string | undefined;
 }) {
   return (
     <>
@@ -197,6 +195,7 @@ function SituationAndCriteria({
           minHeight={CRITERIA_HEIGHT.min}
           maxHeight={CRITERIA_HEIGHT.max}
           aria-label="Criteria"
+          aria-invalid={criteriaError !== undefined}
           data-testid="case-modal-criteria-input"
           placeholder={
             "Keeps a calm tone\nGives the refund status without being asked twice\nDoes not promise compensation we do not offer"
@@ -204,7 +203,8 @@ function SituationAndCriteria({
           value={draft.criteria}
           onChange={(event) => setDraft({ criteria: event.target.value })}
         />
-        <Text marginTop={1} fontSize="11px" color={FG_MUTED}>
+        <FieldError message={criteriaError} />
+        <Text marginTop={1} textStyle="micro" color="fg.muted">
           The judge scores each line as pass or fail on the finished conversation.
         </Text>
       </Box>
@@ -255,7 +255,7 @@ function SuiteFieldControl({
           aria-label={identifier}
           inputProps={{ "data-testid": `${testId}-switch` }}
         />
-        <Text fontSize="12.5px" fontWeight="medium" fontFamily="mono">
+        <Text textStyle="bodySm" fontWeight="medium" fontFamily="mono">
           {identifier}
         </Text>
       </HStack>
@@ -281,7 +281,7 @@ function SuiteFieldControl({
           minHeight={FIELD_HEIGHT.min}
           maxHeight={FIELD_HEIGHT.max}
           fontFamily="mono"
-          fontSize="12px"
+          textStyle="caption"
           aria-label={identifier}
           value={fieldText(value)}
           onChange={(event) => onChange(event.target.value)}
@@ -306,40 +306,34 @@ function StrayFieldsBlock({
   return (
     <Box data-testid="case-stray-fields">
       <FieldLabel>Not in this suite</FieldLabel>
-      <VStack
-        align="stretch"
-        gap={1}
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="lg"
-        paddingX={3}
-        paddingY={2}
-      >
-        {Object.entries(values).map(([identifier, value]) => (
-          <HStack key={identifier} gap={2} fontSize="12px">
-            <Text fontFamily="mono" color={FG_MUTED} flexShrink={0}>
-              {identifier}
-            </Text>
-            <Text flex={1} minWidth={0} truncate color="fg.subtle">
-              {String(value)}
-            </Text>
-            <chakra.button
-              type="button"
-              display="flex"
-              alignItems="center"
-              cursor="pointer"
-              color={FG_MUTED}
-              boxShadow={QUIET_BUTTON_SHADOW}
-              _hover={{ color: "red.fg" }}
-              title="Remove"
-              aria-label={`Remove ${identifier}`}
-              onClick={() => onRemove(identifier)}
-            >
-              <X size={12} />
-            </chakra.button>
-          </HStack>
-        ))}
-      </VStack>
+      <Card variant="nested" padding="sm">
+        <VStack align="stretch" gap={1}>
+          {Object.entries(values).map(([identifier, value]) => (
+            <HStack key={identifier} gap={2} textStyle="caption">
+              <Text fontFamily="mono" color="fg.muted" flexShrink={0}>
+                {identifier}
+              </Text>
+              <Text flex={1} minWidth={0} truncate color="fg.subtle">
+                {String(value)}
+              </Text>
+              <chakra.button
+                type="button"
+                display="flex"
+                alignItems="center"
+                cursor="pointer"
+                color="fg.muted"
+                boxShadow="none"
+                _hover={{ color: "red.fg" }}
+                title="Remove"
+                aria-label={`Remove ${identifier}`}
+                onClick={() => onRemove(identifier)}
+              >
+                <X size={12} />
+              </chakra.button>
+            </HStack>
+          ))}
+        </VStack>
+      </Card>
     </Box>
   );
 }
@@ -429,11 +423,15 @@ function ParametersBlock({
 export function CaseModalFields({
   editor,
   suites,
+  attempted,
 }: {
   editor: CaseEditorState;
   suites: TestSuiteEntry[];
+  /** True once a save was tried, so what it refused is named at the field. */
+  attempted: boolean;
 }) {
   const { draft, setDraft } = editor;
+  const problems = caseDraftProblems({ draft, attempted });
 
   if (editor.isLoading) return <CaseModalSkeleton />;
 
@@ -442,8 +440,13 @@ export function CaseModalFields({
       {editor.staleVersion !== null && (
         <StaleVersionNotice currentVersion={editor.staleVersion} onReload={editor.reloadStale} />
       )}
-      <TitleAndSuiteRow draft={draft} setDraft={setDraft} suites={suites} />
-      <SituationAndCriteria draft={draft} setDraft={setDraft} />
+      <TitleAndSuiteRow
+        draft={draft}
+        setDraft={setDraft}
+        suites={suites}
+        titleError={problems.title}
+      />
+      <SituationAndCriteria draft={draft} setDraft={setDraft} criteriaError={problems.criteria} />
       <SuiteFieldsBlock editor={editor} />
       {/* A block a chip opened reads where the reader was looking when they
           opened it: straight under the criteria, in the order the chips sit
@@ -465,22 +468,32 @@ export function CaseModalFields({
   );
 }
 
+/** What a save would refuse, by field: nothing until a save was tried. */
+export function caseDraftProblems({ draft, attempted }: { draft: CaseDraft; attempted: boolean }): {
+  title: string | undefined;
+  criteria: string | undefined;
+} {
+  if (!attempted) return { title: void 0, criteria: void 0 };
+  return {
+    title: draft.title.trim() ? void 0 : "A scenario needs a title.",
+    criteria: criteriaOf(draft).length === 0 ? "A scenario needs at least one criterion." : void 0,
+  };
+}
+
 /** The labels of the scenario, and the two ways of leaving with it saved. */
-export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
+export function caseModalFooter({
+  editor,
+  onSave,
+}: {
+  editor: CaseEditorState;
+  onSave: (options: { shouldRunAfterSave: boolean }) => void;
+}): DrawerFooterProps {
   const { draft, setDraft } = editor;
 
-  return (
-    <Drawer.Footer
-      borderTopWidth="1px"
-      borderColor="border"
-      paddingX={5}
-      paddingY={3}
-      justifyContent="space-between"
-      gap={5}
-      flexWrap="wrap"
-    >
+  return {
+    note: (
       <HStack gap={1.5} flexWrap="wrap">
-        <Text fontSize="12px" fontWeight="medium" color={FG_MUTED}>
+        <Text textStyle="caption" fontWeight="medium" color="fg.muted">
           Labels
         </Text>
         <TagList
@@ -492,31 +505,21 @@ export function CaseModalFooter({ editor }: { editor: CaseEditorState }) {
           onAdd={(label) => setDraft({ labels: [...draft.labels, label] })}
         />
       </HStack>
-      <HStack gap={2}>
-        <SmallButton
-          loading={editor.isSaving}
-          disabled={!!editor.problem}
-          title={editor.problem ?? undefined}
-          onClick={() => editor.save({ shouldRunAfterSave: false })}
-          data-testid="case-modal-save"
-        >
-          Save
-        </SmallButton>
-        <SmallButton
-          variant="solid"
-          colorPalette="blue"
-          loading={editor.isSaving}
-          disabled={!!editor.problem}
-          title={editor.problem ?? undefined}
-          onClick={() => editor.save({ shouldRunAfterSave: true })}
-          data-testid="case-modal-save-and-run"
-        >
-          <Play size={13} />
-          Save &amp; Run
-        </SmallButton>
-      </HStack>
-    </Drawer.Footer>
-  );
+    ),
+    secondaryAction: {
+      label: "Save",
+      loading: editor.isSaving,
+      onClick: () => onSave({ shouldRunAfterSave: false }),
+      "data-testid": "case-modal-save",
+    },
+    primaryAction: {
+      label: "Save & Run",
+      icon: <Play size={14} />,
+      loading: editor.isSaving,
+      onClick: () => onSave({ shouldRunAfterSave: true }),
+      "data-testid": "case-modal-save-and-run",
+    },
+  };
 }
 
 /** How long the conversation may run, and how early the judge may end it. */
@@ -558,7 +561,7 @@ function TurnsBlock({
           />
         </Box>
       </Grid>
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         Max turns caps the conversation. Min turns keeps the judge from ending the test early.
       </Text>
     </VStack>
@@ -626,7 +629,7 @@ function CallerVoiceBlock({
 
   return (
     <VStack align="stretch" gap={3} data-testid="case-caller-voice-block">
-      <Text fontSize="11px" color={FG_MUTED}>
+      <Text textStyle="micro" color="fg.muted">
         Used when this scenario runs against a voice agent.
       </Text>
       <Box>

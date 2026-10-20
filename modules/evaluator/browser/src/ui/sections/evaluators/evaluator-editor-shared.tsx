@@ -8,6 +8,7 @@ import {
 import { applyHandledErrorToForm, showErrorToast } from "@langwatch/browser-host/errors";
 import { formatTimeAgo } from "@langwatch/browser-host/format-time-ago";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import type { DrawerFooterProps } from "@langwatch/design-system/drawer";
 import {
   Box,
   Field,
@@ -50,6 +51,7 @@ import type { EvaluatorCategoryId } from "../../blocks/evaluator-category-picker
 import {
   EvaluatorEditorActions,
   EvaluatorEditorHeading as EvaluatorEditorHeadingPresentation,
+  REMOVE_EVALUATOR_LABEL,
 } from "../../elements/evaluator-editor-chrome.tsx";
 import { FormServerError } from "../../elements/workflow/studio-host/errors.tsx";
 import { WorkflowCardLink } from "../../elements/workflow/workflow-card.tsx";
@@ -159,6 +161,8 @@ export type EvaluatorEditorController = {
   hasUnsavedChanges: boolean;
   isSaving: boolean;
   isValid: boolean;
+  /** A save was tried while the form was invalid: the body names what is missing. */
+  attempted?: boolean | undefined;
   saveButtonText: string | undefined;
   mappingsConfig: EvaluatorMappingsConfig | undefined;
   onMappingChange: ((identifier: string, mapping: UIFieldMapping | undefined) => void) | undefined;
@@ -440,6 +444,7 @@ export function useEvaluatorEditorController(
   });
 
   const isSaving = createMutation.isPending || updateMutation.isPending;
+  const [attempted, setAttempted] = useState(false);
   // The React Compiler memoises `form.watch()` on the stable form; useWatch subscribes.
   const name = useWatch({ control: form.control, name: "name" });
 
@@ -450,7 +455,7 @@ export function useEvaluatorEditorController(
   const isValid = isEditorValid({ name, evaluatorType, comparison });
 
   const handleSave = useCallback(() => {
-    if (!project?.id || !isValid) return;
+    if (!project?.id || holdAttempt({ held: isSaving, isValid, form, name, setAttempted })) return;
     submitEvaluator({
       projectId: project.id,
       evaluatorId,
@@ -468,6 +473,8 @@ export function useEvaluatorEditorController(
     evaluatorType,
     isPersistedEvaluator,
     isValid,
+    isSaving,
+    name,
     form,
     createMutation,
     updateMutation,
@@ -508,9 +515,12 @@ export function useEvaluatorEditorController(
   // state before we close. Without this, a keystroke within 300ms of Apply
   // is dropped — the drawer closes while the trailing call is still queued.
   const handleApply = useCallback(() => {
+    if (onComparisonChange && holdAttempt({ held: isSaving, isValid, form, name, setAttempted })) {
+      return;
+    }
     debouncedUpdateLocalConfig.flush();
     onClose();
-  }, [debouncedUpdateLocalConfig, onClose]);
+  }, [debouncedUpdateLocalConfig, onClose, onComparisonChange, isSaving, isValid, name, form]);
 
   // Exposed so callers that navigate away without invoking handleClose (e.g.
   // the unified drawer's Back/step transitions) can still ensure pending
@@ -542,6 +552,7 @@ export function useEvaluatorEditorController(
     hasUnsavedChanges,
     isSaving,
     isValid,
+    attempted,
     saveButtonText,
     mappingsConfig,
     onMappingChange,
@@ -626,7 +637,12 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
     gate,
     required,
     onRequiredChange,
+    attempted,
   } = controller;
+  const variantsMissing =
+    attempted &&
+    isComparisonEvaluatorType(evaluatorType) &&
+    comparison.variants.filter(Boolean).length < 2;
 
   // Comparison: render the variants+golden picker instead of the generic
   // mappings UI. Derived from evaluatorType alone so it's correct even when
@@ -670,14 +686,19 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
           control={form.control}
           name="name"
           render={({ field, fieldState }) => (
-            <Field.Root required invalid={!!fieldState.error}>
+            <Field.Root
+              required
+              invalid={!!fieldState.error || (attempted && !field.value?.trim())}
+            >
               <Field.Label>Evaluator Name</Field.Label>
               <Input
                 {...field}
                 placeholder="Enter evaluator name"
                 data-testid="evaluator-name-input"
               />
-              <Field.ErrorText>{fieldState.error?.message}</Field.ErrorText>
+              <Field.ErrorText>
+                {fieldState.error?.message ?? "Enter a name for the evaluator."}
+              </Field.ErrorText>
             </Field.Root>
           )}
         />
@@ -747,6 +768,11 @@ export function EvaluatorEditorBody({ controller }: { controller: EvaluatorEdito
               datasetColumns={comparisonContext.datasetColumns}
               datasetName={comparisonContext.datasetName}
             />
+            {variantsMissing && (
+              <Text role="alert" color="red.fg" fontSize="sm" paddingTop={2}>
+                Choose at least two variants to compare.
+              </Text>
+            )}
           </Box>
         )}
 
@@ -819,6 +845,82 @@ export function EvaluatorEditorFooter({ controller, onCancel }: EvaluatorEditorF
       onRemove={onRemove}
     />
   );
+}
+
+/**
+ * The same actions as {@link EvaluatorEditorFooter}, as the Drawer shape's footer: Save and Apply
+ * stay clickable while the form is invalid and name what is missing; only loading holds them.
+ */
+export function evaluatorEditorFooter({
+  controller,
+  onCancel,
+}: EvaluatorEditorFooterProps): DrawerFooterProps {
+  const {
+    evaluatorId,
+    hasUnsavedChanges,
+    isSaving,
+    saveButtonText,
+    onLocalConfigChange,
+    onRemove,
+    handleSave,
+    handleDiscard,
+    handleApply,
+    handleClose,
+    isLoadingEvaluator,
+  } = controller;
+  const loadingReason = isLoadingEvaluator ? "The evaluator is still loading." : void 0;
+  const unavailable = loadingReason ? { disabledReason: loadingReason } : {};
+  const remove = onRemove
+    ? {
+        destructiveAction: {
+          label: REMOVE_EVALUATOR_LABEL,
+          onClick: onRemove,
+          "data-testid": "evaluator-remove-button",
+        },
+      }
+    : {};
+  if (onLocalConfigChange) {
+    return {
+      ...remove,
+      secondaryActions: [
+        ...(hasUnsavedChanges
+          ? [
+              {
+                label: "Discard",
+                onClick: handleDiscard,
+                "data-testid": "evaluator-discard-button",
+              },
+            ]
+          : []),
+        {
+          label: "Save",
+          tone: "success",
+          onClick: handleSave,
+          loading: isSaving,
+          "data-testid": "evaluator-save-button",
+          ...unavailable,
+        },
+      ],
+      primaryAction: {
+        label: "Apply",
+        onClick: handleApply,
+        "data-testid": "evaluator-apply-button",
+        ...unavailable,
+      },
+    };
+  }
+  return {
+    ...remove,
+    cancel: { onClick: onCancel ?? handleClose },
+    primaryAction: {
+      label: saveButtonText ?? (evaluatorId ? "Save Changes" : "Create Evaluator"),
+      tone: "success",
+      onClick: handleSave,
+      loading: isSaving,
+      "data-testid": "save-evaluator-button",
+      ...unavailable,
+    },
+  };
 }
 
 // ============================================================================
@@ -981,6 +1083,30 @@ function navigateAfterSave({
   } else {
     onClose();
   }
+}
+
+/**
+ * True when an attempt must not go through: a save is in flight, or the form is invalid, in
+ * which case the body names what is missing and the name takes focus.
+ */
+function holdAttempt({
+  held,
+  isValid,
+  form,
+  name,
+  setAttempted,
+}: {
+  held: boolean;
+  isValid: boolean;
+  form: UseFormReturn<EvaluatorFormValues>;
+  name: string | undefined;
+  setAttempted: (attempted: boolean) => void;
+}) {
+  if (held) return true;
+  if (isValid) return false;
+  setAttempted(true);
+  if (!name?.trim()) form.setFocus("name");
+  return true;
 }
 
 /** A comparison with fewer than two variants judges nothing, so it cannot be saved. */

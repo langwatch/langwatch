@@ -47,6 +47,17 @@ function isMarkedCurrent(id: "free" | "growth" | "enterprise") {
 afterEach(() => cleanup());
 
 describe("PlansComparisonPage", () => {
+  describe("given the three plan columns", () => {
+    it("draws each as an emphasized card with the 24px inset and an h2 plan name", () => {
+      renderPlans();
+
+      for (const id of ["free", "growth", "enterprise"] as const) {
+        expect(column(id).dataset).toMatchObject({ cardVariant: "emphasized", cardPadding: "xl" });
+        expect(within(column(id)).getByRole("heading", { level: 2 })).toBeInTheDocument();
+      }
+    });
+  });
+
   describe("given a member without administrative rights", () => {
     describe("when the comparison is opened", () => {
       /** @scenario "Non-admin members can access plans comparison" */

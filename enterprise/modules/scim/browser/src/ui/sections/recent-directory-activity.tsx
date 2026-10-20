@@ -1,3 +1,4 @@
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import {
   Badge,
   Box,
@@ -11,7 +12,6 @@ import {
 import { HandledErrorAlert } from "@langwatch/error-views";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /** What the directory did on one connection, newest first, read only while open (ADR-126). */
-import { readableDate } from "@langwatch/time";
 import { ChevronRight } from "lucide-react";
 
 import { scimApi, type DirectoryActivityRow } from "../../behavior/scim-api.ts";
@@ -114,7 +114,7 @@ function ActivityRow({ entry }: { entry: DirectoryActivityRow }) {
       <VStack align="start" gap={0.5} minWidth={0}>
         <Text fontSize="sm">{entry.summary}</Text>
         <Text as="time" fontSize="xs" color="fg.muted">
-          {readableDate(entry.occurredAtMs).toLocaleString()}
+          {<FormattedDate value={entry.occurredAtMs} display="datetime" />}
         </Text>
       </VStack>
     </HStack>

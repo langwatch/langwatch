@@ -1,14 +1,17 @@
+import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
 /**
  * /settings/authentication, in the settings chrome as on main: how everyone signs in and how
  * accounts arrive (the cards sso and scim declare), then the organization's own policies.
  * Spec: specs/identity/organization-authentication-settings.feature
  */
-import { Heading, SimpleGrid, Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 import {
-  SectionNavigationFrame,
-  type SectionNavigationLink,
-} from "@langwatch/design-system/section-navigation-frame";
-import { KeyRound, Plug, ShieldCheck } from "lucide-react";
+  Box,
+  Heading,
+  SimpleGrid,
+  Skeleton,
+  Text,
+  VStack,
+} from "@langwatch/design-system/primitives";
 import { Suspense } from "react";
 
 import {
@@ -19,15 +22,11 @@ import {
 import { PermissionAlert } from "../../../../ui/elements/permission-alert.tsx";
 import { OrganizationPolicyCard } from "./organization-policy-card.tsx";
 
-/** Main's rail across the three Authentication pages (ARCHITECTURE.md §10). */
-const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
-  { label: "Overview", href: "/settings/authentication", icon: <ShieldCheck size={14} /> },
-  {
-    label: "Identity provider",
-    href: "/settings/authentication/provider",
-    icon: <KeyRound size={14} />,
-  },
-  { label: "Connectors", href: "/settings/authentication/connectors", icon: <Plug size={14} /> },
+/** The three Authentication pages, as header tabs (ARCHITECTURE.md §10). */
+const AUTHENTICATION_TABS: readonly PageTab[] = [
+  { label: "Overview", href: "/settings/authentication" },
+  { label: "Identity provider", href: "/settings/authentication/provider" },
+  { label: "Connectors", href: "/settings/authentication/connectors" },
 ];
 
 export default function AuthenticationSettingsScreen() {
@@ -42,15 +41,18 @@ export default function AuthenticationSettingsScreen() {
 
   return (
     <>
-      <SectionNavigationFrame
-        label="Authentication"
-        pageTitle="Overview"
-        links={AUTHENTICATION_LINKS}
-        activeHref="/settings/authentication"
-        onNavigate={(href) => host.navigate(href)}
-      >
+      <PageLayout.Header>
+        <PageLayout.Heading>Authentication</PageLayout.Heading>
+        <PageLayout.Tabs
+          label="Authentication pages"
+          tabs={AUTHENTICATION_TABS}
+          activeHref="/settings/authentication"
+          onNavigate={(href) => host.navigate(href)}
+        />
+      </PageLayout.Header>
+      <Box paddingTop={4}>
         <AuthenticationSettings host={host} organizationId={organizationId} />
-      </SectionNavigationFrame>
+      </Box>
     </>
   );
 }
@@ -77,7 +79,7 @@ export function AuthenticationSettings({
       {cards.length > 0 && (
         <VStack align="stretch" gap={4} width="full">
           <VStack align="stretch" gap={1}>
-            <Heading size="sm">Sign-in and provisioning</Heading>
+            <Heading textStyle="cardTitle">Sign-in and provisioning</Heading>
             <Text color="fg.muted" fontSize="sm">
               Connect your identity provider for single sign-on and directory sync.
             </Text>
@@ -92,12 +94,10 @@ export function AuthenticationSettings({
         </VStack>
       )}
 
-      <VStack align="stretch" gap={2} maxWidth="2xl" width="full">
-        <VStack align="stretch" gap={0.5}>
-          <Text as="h2" fontSize="sm" fontWeight="semibold">
-            Organization policies
-          </Text>
-          <Text color="fg.muted" fontSize="xs" lineHeight="short">
+      <VStack align="stretch" gap={4} width="full" paddingTop={2}>
+        <VStack align="stretch" gap={1}>
+          <Heading size="sm">Organization policies</Heading>
+          <Text color="fg.muted" fontSize="sm">
             Manage who can join and how accounts stay secure. These policies also apply when your
             organization uses password sign-in.
           </Text>

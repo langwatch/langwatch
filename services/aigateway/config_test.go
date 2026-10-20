@@ -488,6 +488,7 @@ func clearGatewayEnv(t *testing.T) {
 		"LW_GATEWAY_CIRCUIT_COOLDOWN_S",
 		"LOG_LEVEL",
 		"LW_GATEWAY_BASE_URL",
+		"CODEX_API_BASE",
 		"LW_GATEWAY_INTERNAL_SECRET",
 		"LW_GATEWAY_JWT_SECRET",
 		"LW_GATEWAY_JWT_SECRET_PREVIOUS",
@@ -627,4 +628,45 @@ func TestLoadConfig_CORSAllowedOrigins(t *testing.T) {
 			}
 		})
 	}
+}
+
+// Spec: specs/model-providers/codex-account-provider.feature
+// "A Codex base that is unset or blank reaches OpenAI" and
+// "Codex is reached at the bases the deployment configures".
+func TestLoadConfig_CodexAPIBase(t *testing.T) {
+	t.Run("unset leaves the router on OpenAI's own backend", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		if got := codexBackendURL(cfg.CodexAPIBase); got != "" {
+			t.Errorf("codexBackendURL = %q, want empty (the router's default)", got)
+		}
+	})
+	t.Run("a configured base carries the Responses endpoint", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("CODEX_API_BASE", "http://127.0.0.1:6970/backend-api/codex/")
+		cfg, err := LoadConfig(context.Background())
+		if err != nil {
+			t.Fatalf("LoadConfig: %v", err)
+		}
+		want := "http://127.0.0.1:6970/backend-api/codex/responses"
+		if got := codexBackendURL(cfg.CodexAPIBase); got != want {
+			t.Errorf("codexBackendURL = %q, want %q", got, want)
+		}
+	})
+	t.Run("a value that is not a URL is refused at boot", func(t *testing.T) {
+		clearGatewayEnv(t)
+		t.Setenv("LW_GATEWAY_INTERNAL_SECRET", "internal-1")
+		t.Setenv("LW_GATEWAY_JWT_SECRET", "jwt-1")
+		t.Setenv("CODEX_API_BASE", "not a url")
+		if _, err := LoadConfig(context.Background()); err == nil || !strings.Contains(err.Error(), "CODEX_API_BASE") {
+			t.Fatalf("LoadConfig error = %v, want a CODEX_API_BASE refusal", err)
+		}
+	})
 }

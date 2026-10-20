@@ -1,3 +1,4 @@
+import type { ListedWork } from "@langwatch/eventing";
 /**
  * A paused worker runs nothing; a stopped or failing step stays resumable; the lease renews on a
  * timer. Spec: specs/upgrade/background-steps.feature.
@@ -13,6 +14,7 @@ import {
 import {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
+  type BackgroundStepsQueue,
   BackgroundStepsService,
 } from "../background-steps.service.ts";
 
@@ -33,6 +35,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -75,6 +78,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -112,6 +116,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: refuse,
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -158,6 +163,7 @@ describe("BackgroundStepsService", () => {
         renewLease: refuse,
         releaseLease: async ({ name }) => (released.push(name), true),
         markRunning: refuse,
+        reopen: refuse,
         setStatus: refuse,
         saveReport: refuse,
       };
@@ -227,6 +233,11 @@ class MemoryBackgroundLedger implements BackgroundStepsLedger {
   saveReport = async ({ report }: { report: Record<string, unknown> }) => {
     this.row = { ...this.row, report };
   };
+  reopen = async ({ ids, reason }: { ids: readonly string[]; reason: string }) => {
+    if (this.row.status !== "running") return [];
+    this.row = { ...this.row, status: "pending", report: null, lastError: reason };
+    return [...ids];
+  };
 }
 
 function serviceOver({
@@ -234,11 +245,15 @@ function serviceOver({
   run,
   log = () => undefined,
   clock = { now: 0 },
+  queue,
+  queueWaitMs,
 }: {
   ledger: MemoryBackgroundLedger;
   run: MigrationStepRun;
   log?: BackgroundStepsLog;
   clock?: { now: number };
+  queue?: BackgroundStepsQueue;
+  queueWaitMs?: number;
 }) {
   return BackgroundStepsService.create({
     ledger,
@@ -248,6 +263,7 @@ function serviceOver({
         kind: "data",
         mode: "background",
         description: "Reopens accounts that never proved their address.",
+        ...(queueWaitMs === undefined ? {} : { queueWaitMs }),
         run,
       }),
     ],
@@ -258,6 +274,7 @@ function serviceOver({
     renewEveryMs: 1_000,
     retry: { attempts: 3, firstBackoffMs: 60_000, maxBackoffMs: 600_000 },
     now: () => clock.now,
+    ...(queue === undefined ? {} : { queue }),
   });
 }
 
@@ -463,6 +480,7 @@ describe("BackgroundStepsService deadline", () => {
             update(id, { status, lastError: lastError ?? null, ...(report ? { report } : {}) });
         },
         saveReport: async ({ id, report }) => update(id, { report }),
+        reopen: async () => [],
       };
       let lateSave: Promise<string> | undefined;
       const stuck = defineMigrationStep({
@@ -528,77 +546,413 @@ describe("BackgroundStepsService deadline", () => {
   });
 });
 
-describe("BackgroundStepsService.runNow()", () => {
-  const id = "identity:reopen-unproven-accounts";
-  const reopen = (run: MigrationStepRun) =>
-    defineMigrationStep({
-      id,
-      kind: "data",
-      mode: "background",
-      description: "Reopens accounts that never proved their address.",
-      needsOldWritersGone: true,
-      run,
-    });
-
-  describe("given a pending step that waits for old writers, on a process that does not serve", () => {
-    /** @scenario "A background step run before a contract runs even while old writers still serve" */
-    it("runs it and records it done without asking the serving roster", async () => {
-      let runs = 0;
-      let asked = 0;
-      const statuses: string[] = [];
+describe("BackgroundStepsService.sweep() with old writers", () => {
+  describe("given a step that needs old writers gone, live on the first sweep and gone on the next", () => {
+    /** @scenario "A step is stamped started only once old writers are gone" */
+    it("marks it running only on the sweep that finds them gone", async () => {
+      const id = "data-retention:keep-control-plane-events-forever";
+      const marked: number[] = [];
+      let sweepNo = 0;
       const service = BackgroundStepsService.create({
         ledger: {
           findSteps: async () => [{ id, status: "pending", report: null }],
           acquireLease: async () => ({}),
           renewLease: async () => ({}),
           releaseLease: async () => true,
-          markRunning: async () => undefined,
-          setStatus: async ({ status }) => {
-            statuses.push(status);
+          markRunning: async () => {
+            marked.push(sweepNo);
           },
+          setStatus: async () => undefined,
           saveReport: async () => undefined,
+          reopen: async () => [],
         },
-        steps: [reopen(async () => ({ runs: ++runs }))],
-        serving: () => false,
-        oldWritersGoneFor: async () => (asked++, false),
-        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
+        steps: [
+          defineMigrationStep({
+            id,
+            kind: "data",
+            mode: "background",
+            description: "Keeps control-plane events forever.",
+            needsOldWritersGone: true,
+            run: async () => ({}),
+          }),
+        ],
+        serving: () => true,
+        oldWritersGoneFor: async () => sweepNo > 1,
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
         log: () => undefined,
       });
+      const signal = new AbortController().signal;
 
-      const outcome = await service.runNow({ id, signal: new AbortController().signal });
+      sweepNo = 1;
+      expect((await service.sweep({ signal })).waiting).toEqual([id]);
+      sweepNo = 2;
+      expect((await service.sweep({ signal })).ran).toEqual([id]);
+      expect(marked).toEqual([2]);
+    });
+  });
+});
 
-      expect(outcome).toBe("done");
-      expect(runs).toBe(1);
-      expect(asked).toBe(0);
-      expect(statuses).toEqual(["done"]);
+describe("BackgroundStepsService one copy at a time", () => {
+  beforeEach(() => {
+    vi.useFakeTimers();
+  });
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const serviceFor = ({
+    ledger,
+    run,
+    gone = async () => true,
+    clock,
+    deadlineMs,
+    log = () => undefined,
+  }: {
+    ledger: MemoryBackgroundLedger;
+    run: MigrationStepRun;
+    gone?: () => Promise<boolean>;
+    clock?: { now: number };
+    deadlineMs?: number;
+    log?: BackgroundStepsLog;
+  }) =>
+    BackgroundStepsService.create({
+      ledger,
+      steps: [
+        defineMigrationStep({
+          id: STEP,
+          kind: "data",
+          mode: "background",
+          description: "Reopens accounts that never proved their address.",
+          needsOldWritersGone: true,
+          run,
+        }),
+      ],
+      serving: () => true,
+      oldWritersGoneFor: gone,
+      identity: { owner: "worker-1", image: "3.21.0", host: "host" },
+      log,
+      renewEveryMs: 1_000,
+      leaseTtlMs: 3_000,
+      ...(deadlineMs === undefined ? {} : { deadlineMs }),
+      ...(clock ? { now: () => clock.now } : {}),
+    });
+
+  describe("given a step whose run ignores its signal past its deadline", () => {
+    /** @scenario "A step cut at its deadline keeps its lease until its run settles" */
+    it("sets it pending and moves on, renewing its lease until the cut run settles", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      let finish: (report: Record<string, unknown>) => void = () => undefined;
+      const service = serviceFor({
+        ledger,
+        deadlineMs: 5_000,
+        run: () => new Promise((resolve) => (finish = resolve)),
+      });
+
+      const pass = sweepOnce(service);
+      await vi.advanceTimersByTimeAsync(5_000);
+      expect(await pass).toMatchObject({ ran: [], failed: [] });
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        lastError: expect.stringContaining("deadline"),
+      });
+
+      const renewalsAtCut = ledger.renewals;
+      await vi.advanceTimersByTimeAsync(3_000);
+      expect(ledger.renewals).toBeGreaterThan(renewalsAtCut);
+      expect(ledger.leaseOwner).toBe("worker-1");
+      expect(await sweepOnce(service)).toMatchObject({ ran: [] });
+
+      finish({ late: true });
+      await vi.advanceTimersByTimeAsync(0);
+      expect(ledger.leaseOwner).toBeNull();
+      expect(ledger.row.status).toBe("pending");
     });
   });
 
-  describe("given a step a worker already finished", () => {
-    /** @scenario "A background step already done is not run again before a contract" */
-    it("skips it without taking its lease", async () => {
-      let runs = 0;
-      const service = BackgroundStepsService.create({
-        ledger: {
-          findSteps: async () => [{ id, status: "done", report: null }],
-          acquireLease: refuse,
-          renewLease: refuse,
-          releaseLease: refuse,
-          markRunning: refuse,
-          setStatus: refuse,
-          saveReport: refuse,
+  describe("given a checkpoint that moved after the sweep read it", () => {
+    /** @scenario "A step resumes from the checkpoint read after taking its lease" */
+    it("resumes from the checkpoint read after taking the lease", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      ledger.row = { ...ledger.row, report: { cursor: "project_1" } };
+      const acquire = ledger.acquireLease;
+      ledger.acquireLease = async (input) => {
+        ledger.row = { ...ledger.row, report: { cursor: "project_7" } };
+        return acquire(input);
+      };
+      let resumedFrom: unknown = null;
+      const service = serviceFor({
+        ledger,
+        run: async ({ checkpoint }) => {
+          resumedFrom = checkpoint.resumeFrom;
+          return { done: true };
         },
-        steps: [reopen(async () => ({ runs: ++runs }))],
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+      expect(resumedFrom).toEqual({ cursor: "project_7" });
+    });
+  });
+
+  describe("given a running step whose lease renewal never answers", () => {
+    /** @scenario "A background step whose renewal never answers is stopped" */
+    it("aborts it once the time to live less one interval passes, and records it neither done nor failed", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      ledger.renewLease = () => new Promise(() => undefined);
+      const clock = { now: 0 };
+      const warnings: string[] = [];
+      const service = serviceFor({
+        ledger,
+        clock,
+        log: (level, _message, fields) =>
+          void (level === "warn" && warnings.push(String(fields.reason))),
+        run: async ({ signal }) => {
+          for (let tick = 0; tick < 10 && !signal.aborted; tick++) {
+            clock.now += 1_000;
+            await vi.advanceTimersByTimeAsync(1_000);
+          }
+          expect(signal.aborted).toBe(true);
+          expect(clock.now).toBe(2_000);
+          return { stopped: true };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], failed: [], retrying: [] });
+      expect(ledger.row.status).toBe("running");
+      expect(warnings).toContain("the lease was not renewed in time");
+    });
+  });
+
+  describe("given an older image that starts serving while the step runs", () => {
+    /** @scenario "A step that needs old writers gone is reopened when an old writer starts during its run" */
+    it("reopens it with its checkpoint cleared instead of recording it done", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      let gone = true;
+      const service = serviceFor({
+        ledger,
+        gone: async () => gone,
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { cursor: "project_3" } });
+          gone = false;
+          return { done: true };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], waiting: [STEP] });
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        report: null,
+        lastError: expect.stringContaining("older image"),
+      });
+      expect(ledger.leaseOwner).toBeNull();
+    });
+  });
+});
+
+/** The job queue's listed runs: records each run, and answers with the work or a refusal. */
+class ListedRunsDouble implements BackgroundStepsQueue {
+  readonly runs: { name: string; timeoutMs: number }[] = [];
+  refusal: Error | undefined;
+
+  async runListedWork<Result>({
+    name,
+    timeoutMs,
+    work,
+  }: {
+    name: string;
+    timeoutMs: number;
+    work: () => Promise<Result>;
+  }): Promise<Result> {
+    this.runs.push({ name, timeoutMs });
+    const result = await work();
+    if (this.refusal) throw this.refusal;
+    return result;
+  }
+}
+
+describe("BackgroundStepsService queue work", () => {
+  describe("given a step whose queue work all runs", () => {
+    /** @scenario "A background step is done only once the queue work it sent has run" */
+    it("runs the step on a list of its own, waiting 5 minutes by default, and records it done", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      const service = serviceOver({ ledger, queue, run: async () => ({ sent: 2 }) });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(queue.runs).toEqual([
+        { name: expect.stringMatching(`^upgrade-step:${STEP}:`), timeoutMs: 5 * 60_000 },
+      ]);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: 2 } });
+    });
+  });
+
+  describe("given two runs of a step that declares a longer wait", () => {
+    it("waits as long as it declares, on a new list each run", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error("Queue work had not all run within 300000 ms");
+      const clock = { now: 0 };
+      const service = serviceOver({
+        ledger,
+        queue,
+        clock,
+        queueWaitMs: 300_000,
+        run: async () => ({ sent: 1 }),
+      });
+
+      await sweepOnce(service);
+      queue.refusal = undefined;
+      clock.now = 600_000;
+      await sweepOnce(service);
+
+      expect(queue.runs.map((run) => run.timeoutMs)).toEqual([300_000, 300_000]);
+      expect(new Set(queue.runs.map((run) => run.name)).size).toBe(2);
+    });
+  });
+
+  describe("given a step whose queue work failed or did not run in time", () => {
+    /** @scenario "A step whose queue work stops draining fails that attempt and stays resumable" */
+    it("is not recorded done: pending again with the refusal and its checkpoint kept", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new ListedRunsDouble();
+      queue.refusal = new Error(
+        "Queue work of upgrade-step had not all run within 60000 ms (still waiting: t/command/a)",
+      );
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          await checkpoint.save({ report: { sent: 1 } });
+          return { sent: 1 };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [], retrying: [STEP] });
+
+      expect(ledger.row).toMatchObject({
+        status: "pending",
+        report: { sent: 1 },
+        lastError: expect.stringContaining("still waiting: t/command/a"),
+      });
+    });
+  });
+});
+
+/** A queue whose worker runs a step's jobs as the step waits for room, counting the outstanding. */
+class PacedRunsDouble implements BackgroundStepsQueue {
+  outstanding = 0;
+  peak = 0;
+  ran = 0;
+  readonly rooms: number[] = [];
+
+  send(): void {
+    this.outstanding += 1;
+    this.peak = Math.max(this.peak, this.outstanding);
+  }
+
+  private runDownTo(bound: number): void {
+    const running = Math.max(0, this.outstanding - bound);
+    this.outstanding -= running;
+    this.ran += running;
+  }
+
+  async runListedWork<Result>({ work }: ListedWork<Result>): Promise<Result> {
+    const result = await work({
+      waitForRoom: async ({ maxOutstanding }) => {
+        this.rooms.push(maxOutstanding);
+        this.runDownTo(maxOutstanding);
+      },
+    });
+    this.runDownTo(0);
+    return result;
+  }
+}
+
+describe("BackgroundStepsService pacing", () => {
+  describe("given a step over 10,000 rows that sends a job per row, 500 rows a page", () => {
+    /** @scenario "A step over many rows keeps at most a page and a small bound of its own jobs outstanding" */
+    it("saves each page only once at most 1,000 of its jobs are outstanding, and finishes every row", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const queue = new PacedRunsDouble();
+      const rows = 10_000;
+      const page = 500;
+      const service = serviceOver({
+        ledger,
+        queue,
+        run: async ({ checkpoint }) => {
+          let sent = 0;
+          while (sent < rows) {
+            for (let row = 0; row < page; row++) queue.send();
+            sent += page;
+            await checkpoint.save({ report: { sent } });
+          }
+          return { sent };
+        },
+      });
+
+      expect(await sweepOnce(service)).toMatchObject({ ran: [STEP] });
+
+      expect(queue.rooms).toEqual(Array.from({ length: rows / page }, () => 1_000));
+      expect(queue.peak).toBeLessThanOrEqual(1_000 + page);
+      expect(queue.ran).toBe(rows);
+      expect(ledger.row).toMatchObject({ status: "done", report: { sent: rows } });
+    });
+  });
+});
+
+describe("BackgroundStepsService side by side", () => {
+  describe("given five independent pending steps and one that runs after another", () => {
+    /** @scenario "Independent background steps run side by side, a few at a time" */
+    it("runs three at once under their own leases, and the dependent step waits", async () => {
+      const ids = ["a:one", "a:two", "a:three", "a:four", "a:five"];
+      let running = 0;
+      let widest = 0;
+      const leases: string[] = [];
+      const step = (id: string, after?: Parameters<typeof defineMigrationStep>[0]["after"]) =>
+        defineMigrationStep({
+          id,
+          kind: "data",
+          mode: "background",
+          description: `Runs ${id}.`,
+          ...(after ? { after } : {}),
+          run: async () => {
+            running += 1;
+            widest = Math.max(widest, running);
+            await new Promise((resolve) => setTimeout(resolve, 10));
+            running -= 1;
+            return { id };
+          },
+        });
+      const ledger: BackgroundStepsLedger = {
+        findSteps: async () =>
+          [...ids, "a:six"].map((id) => ({ id, status: "pending" as const, report: null })),
+        acquireLease: async ({ name }) => {
+          leases.push(name);
+          return {};
+        },
+        renewLease: async () => ({}),
+        releaseLease: async () => true,
+        markRunning: async () => undefined,
+        reopen: async () => [],
+        setStatus: async () => undefined,
+        saveReport: async () => undefined,
+      };
+      const independent = ids.map((id) => step(id));
+      const service = BackgroundStepsService.create({
+        ledger,
+        steps: [...independent, step("a:six", [independent[0]!])],
         serving: () => true,
         oldWritersGoneFor: async () => true,
-        identity: { owner: "upgrade:run-1", image: "3.21.0", host: "host" },
+        identity: { owner: "worker-1", image: "3.21.0", host: "host" },
         log: () => undefined,
       });
 
-      const outcome = await service.runNow({ id, signal: new AbortController().signal });
+      const sweep = await service.sweep({ signal: new AbortController().signal });
 
-      expect(outcome).toBe("skipped");
-      expect(runs).toBe(0);
+      expect(widest).toBe(3);
+      expect(sweep.ran).toEqual(ids);
+      expect(sweep.waiting).toEqual(["a:six"]);
+      expect(leases.toSorted()).toEqual(ids.map((id) => `background:${id}`).toSorted());
     });
   });
 });

@@ -1,10 +1,3 @@
-/**
- * The `/api/v1/run-plans` REST family: the plans a project runs, and the runs
- * they start. The family carries its generation in its own path, so it is
- * addressed only under `/api/v1`.
- */
-import { randomUUID } from "node:crypto";
-
 import {
   badRequestSchema,
   defineRestRouter,
@@ -14,6 +7,12 @@ import {
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
+/**
+ * The `/api/v1/run-plans` REST family: the plans a project runs, and the runs
+ * they start. The family carries its generation in its own path, so it is
+ * addressed only under `/api/v1`.
+ */
+import { generate } from "@langwatch/ksuid";
 import { deriveRunActor } from "@langwatch/scenario-contract";
 import {
   SuiteApi,
@@ -80,7 +79,7 @@ async function runConfiguration(params: {
     projectId,
     ...(input.name !== undefined && { name: input.name }),
     config: input.config,
-    idempotencyKey: input.idempotencyKey ?? `api-${randomUUID()}`,
+    idempotencyKey: input.idempotencyKey ?? `api-${generate("suite").toString()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),
     ...(input.note !== undefined && { note: input.note }),
     ...(actor !== undefined && { actor }),
@@ -119,7 +118,7 @@ async function rerunStoredPlan(params: {
   const result = await app.run({
     id: plan.id,
     projectId,
-    idempotencyKey: input.idempotencyKey ?? `api-${randomUUID()}`,
+    idempotencyKey: input.idempotencyKey ?? `api-${generate("suite").toString()}`,
     ...(input.parameters !== undefined && { parameters: input.parameters }),
     ...(input.note !== undefined && { note: input.note }),
     ...(actor !== undefined && { actor }),

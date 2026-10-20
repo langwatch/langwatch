@@ -52,43 +52,53 @@ const MailRoomService = "mail-room"
 // holds gigabytes. Routed at langevals.<slug>.langwatch.localhost.
 const LangevalsService = "langevals"
 
-// StorageService is the local S3 stand-in (services/storagesim), routed at
+// StorageService is the local S3 stand-in (services/sims/storagesim), routed at
 // storage.<slug>.langwatch.localhost. On by default, like mail.
 const StorageService = "storage"
 
-// VoiceService is the voice provider stand-in (services/voicesim) a scenario
+// VoiceService is the voice provider stand-in (services/sims/voicesim) a scenario
 // voice call talks to, routed at voice.<slug>.langwatch.localhost. Opt-in:
 // it replaces a real provider endpoint, so nobody lands on it by surprise.
 const VoiceService = "voice"
 
-// LLMService is the LLM provider stand-in (services/llmsim), routed at
+// LLMService is the LLM provider stand-in (services/sims/llmsim), routed at
 // llm.<slug>.langwatch.localhost. Opt-in like voice: it answers every model
 // call the stack makes with seeded Markov text, so nothing costs money.
 const LLMService = "llm"
 
-// AnalyticsService is the product-analytics stand-in (services/analyticssim)
+// AnalyticsService is the product-analytics stand-in (services/sims/analyticssim)
 // that catches PostHog and Customer.io calls, routed at
 // analytics.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const AnalyticsService = "analytics"
 
-// OutboundService is the Slack, webhook and SQS stand-in (services/outboundsim)
+// OutboundService is the Slack, webhook and SQS stand-in (services/sims/outboundsim)
 // that records what the product sends out, routed at
 // outbound.<slug>.langwatch.localhost. Opt-in like analytics.
 const OutboundService = "outbound"
 
-// PaymentService is the Stripe stand-in (services/paymentsim), on by default
+// PaymentService is the Stripe stand-in (services/sims/paymentsim), on by default
 // like storage. It answers billing's Stripe client and signs webhooks to the app.
 const PaymentService = "payment"
 
-// TelemetryService is the OTLP sender (services/telemetrysim) that drives
+// TelemetryService is the OTLP sender (services/sims/telemetrysim) that drives
 // seeded telemetry at the stack's OTLP door, routed at
 // telemetry.<slug>.langwatch.localhost. Opt-in like voice and llm.
 const TelemetryService = "telemetry"
 
-// LambdaService is the NLP Lambda fleet stand-in (services/lambdasim), routed at
+// LambdaService is the NLP Lambda fleet stand-in (services/sims/lambdasim), routed at
 // lambda.<slug>.langwatch.localhost. Opt-in: it moves studio runs onto the
 // per-project Lambda path, which a developer must never get by surprise.
 const LambdaService = "lambda"
+
+// GithubService is the GitHub stand-in (services/sims/githubsim), routed at
+// github.<slug>.langwatch.localhost. Opt-in: it replaces the GitHub App the
+// stack talks to, so a developer must never get it by surprise.
+const GithubService = "github"
+
+// McpService is the MCP client stand-in (services/sims/mcpsim) that drives
+// LangWatch's hosted MCP endpoint the way Claude Desktop, Claude Code and
+// Cursor do, routed at mcp.<slug>.langwatch.localhost. Opt-in like github.
+const McpService = "mcp"
 
 // APIService is the Hono API's own routed hostname
 // (api.<slug>.langwatch.localhost). It is additive, not a replacement: the

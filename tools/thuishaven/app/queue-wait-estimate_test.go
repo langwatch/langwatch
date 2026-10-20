@@ -15,20 +15,20 @@ import (
 func TestQueuedRunSaysRoughlyHowLongTheWaitIs(t *testing.T) {
 	now := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC)
 
-	t.Run("given recent history for typecheck, and a typecheck already holding the only slot", func(t *testing.T) {
+	t.Run("given recent history for lint, and a lint already holding the only slot", func(t *testing.T) {
 		store := &fakeStore{
 			heavyRuns:         1,
-			heavyRunSnapshots: []HeavyRunSnapshot{{Command: "pnpm typecheck", StartedAt: now.Add(-10 * time.Second)}},
+			heavyRunSnapshots: []HeavyRunSnapshot{{Command: "pnpm lint", StartedAt: now.Add(-10 * time.Second)}},
 			runHistory: []domain.RunRecord{
-				{Kind: domain.KindTypecheck, Duration: 30 * time.Second},
-				{Kind: domain.KindTypecheck, Duration: 40 * time.Second},
-				{Kind: domain.KindTypecheck, Duration: 50 * time.Second},
+				{Kind: domain.KindLint, Duration: 30 * time.Second},
+				{Kind: domain.KindLint, Duration: 40 * time.Second},
+				{Kind: domain.KindLint, Duration: 50 * time.Second},
 			},
 		}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: now}
 
-		t.Run("when another typecheck is queued behind it", func(t *testing.T) {
-			reply := ask(t, gateOrch(store, sys), bashPayload("pnpm typecheck"))
+		t.Run("when another lint is queued behind it", func(t *testing.T) {
+			reply := ask(t, gateOrch(store, sys), bashPayload("pnpm lint"))
 
 			t.Run("it reports being queued behind 1 run", func(t *testing.T) {
 				if !strings.Contains(reply.SystemMessage, "queued behind 1 run") {
@@ -55,7 +55,7 @@ func TestWithNoHistoryTheGateDoesNotGuess(t *testing.T) {
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: now}
 
 		t.Run("when a run is queued behind another", func(t *testing.T) {
-			reply := ask(t, gateOrch(store, sys), bashPayload("pnpm typecheck"))
+			reply := ask(t, gateOrch(store, sys), bashPayload("pnpm lint"))
 
 			t.Run("it still reports being queued behind 1 run", func(t *testing.T) {
 				if !strings.Contains(reply.SystemMessage, "queued behind 1 run") {

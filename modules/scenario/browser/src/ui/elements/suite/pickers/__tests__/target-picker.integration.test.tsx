@@ -57,7 +57,7 @@ describe("<TargetPicker/> in the suite form", () => {
       renderWithDesignSystem(<SuiteFormTargets />);
 
       expect(screen.getByText("0 of 5 selected")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: "Select All" })).toBeInTheDocument();
+      expect(screen.getByRole("button", { name: "Select all" })).toBeInTheDocument();
       expect(screen.getByRole("button", { name: "Clear" })).toBeInTheDocument();
     });
   });
@@ -70,7 +70,7 @@ describe("<TargetPicker/> in the suite form", () => {
       expect(checkboxes).toHaveLength(5);
       expect(screen.getByText("0 of 5 selected")).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Select All" }));
+      await userEvent.click(screen.getByRole("button", { name: "Select all" }));
 
       expect(await screen.findByText("5 of 5 selected")).toBeInTheDocument();
       for (const checkbox of screen.getAllByRole("checkbox")) {
@@ -83,7 +83,7 @@ describe("<TargetPicker/> in the suite form", () => {
     /** @scenario "Clicking Clear deselects all targets" */
     it("deselects every target and counts none in the footer", async () => {
       renderWithDesignSystem(<SuiteFormTargets />);
-      await userEvent.click(screen.getByRole("button", { name: "Select All" }));
+      await userEvent.click(screen.getByRole("button", { name: "Select all" }));
       expect(await screen.findByText("5 of 5 selected")).toBeInTheDocument();
 
       await userEvent.click(screen.getByRole("button", { name: "Clear" }));

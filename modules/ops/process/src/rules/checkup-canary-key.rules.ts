@@ -10,3 +10,12 @@ export const CANARY_KEY_PERMISSIONS = {
   scenarios: ["scenarios:view"],
   langy: ["langy:create"],
 } as const satisfies Record<string, readonly string[]>;
+
+/** The trace canaries, which run in the hidden checkup project rather than a customer's. */
+export const CHECKUP_PROJECT_CANARIES: ReadonlySet<string> = new Set(["collector", "processor"]);
+
+/** What the key a trace canary runs with holds, and how long it lives. */
+export const CHECKUP_CANARY_KEY = {
+  permissions: ["traces:create", "traces:view"],
+  ttlMs: 5 * 60_000,
+} as const;

@@ -31,6 +31,25 @@ describe("given an organization that was deleted", () => {
         pricingModel: "SEAT_EVENT",
       });
       const app = await OrganizationModule.create(setup);
+      const accepts = { send: async () => undefined };
+      app.connectLifecycle({
+        recordCreated: accepts,
+        recordSignedUp: accepts,
+        recordMembersInvited: accepts,
+        recordInviteAccepted: accepts,
+        recordIntegrationMethodChosen: accepts,
+        recordPersonalWorkspaceProvisioned: accepts,
+        recordPersonalTeamCreated: accepts,
+        recordPersonalWorkspaceArchived: accepts,
+        recordPersonalWorkspaceRevived: accepts,
+        recordPersonalWorkspaceFeaturesChanged: accepts,
+        recordPresenceSettingChanged: { ...accepts, sendBatch: async () => undefined },
+        recordTraceSharingDisabled: accepts,
+        recordMemberDisabled: accepts,
+        recordMemberEnabled: accepts,
+        recordMemberRemoved: accepts,
+        recordMemberDepartmentChanged: accepts,
+      });
       await app.deleteProvisionedOrganization({ organizationId: ORGANIZATION_ID });
 
       await expect(

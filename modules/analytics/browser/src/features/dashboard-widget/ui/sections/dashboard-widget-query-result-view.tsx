@@ -4,7 +4,10 @@
  * the Queries tab's own standalone Run button (`useDashboardWidgetExecutor`).
  */
 
-import { Box, Table, Text } from "@langwatch/design-system/primitives";
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { Box, Text } from "@langwatch/design-system/primitives";
 
 import { formatNumber } from "../../../../model/format.ts";
 import type { QueryLastRun } from "../../behavior/use-dashboard-widget-executor.ts";
@@ -24,7 +27,7 @@ interface DashboardWidgetQueryResultViewProps {
 export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResultViewProps) {
   if (!run) {
     return (
-      <Text fontSize="12px" color="fg.muted">
+      <Text textStyle="caption" color="fg.muted">
         Not run yet.
       </Text>
     );
@@ -32,16 +35,9 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
 
   if (run.error) {
     return (
-      <Box
-        fontSize="12px"
-        color="red.fg"
-        borderWidth="1px"
-        borderColor="red.subtle"
-        borderRadius="md"
-        padding={2}
-      >
-        {run.error.title} [{run.error.code}]: {run.error.message}
-      </Box>
+      <Banner status="error" placement="inline" title={run.error.title}>
+        [{run.error.code}]: {run.error.message}
+      </Banner>
     );
   }
 
@@ -53,43 +49,45 @@ export function DashboardWidgetQueryResultView({ run }: DashboardWidgetQueryResu
 
   return (
     <Box>
-      <Text fontSize="11px" color="fg.muted" marginBottom={1}>
+      <Text textStyle="micro" color="fg.muted" marginBottom={1}>
         {formatNumber(result.rows.length)} row
         {result.rows.length === 1 ? "" : "s"}
         {elapsedMs !== undefined ? ` · ${elapsedMs}ms` : ""}
-        {result.rows.length > MAX_PREVIEW_ROWS ? ` · showing first ${MAX_PREVIEW_ROWS}` : ""}
+        {result.rows.length > MAX_PREVIEW_ROWS
+          ? ` · showing ${shown.length} of ${formatNumber(result.rows.length)}`
+          : ""}
       </Text>
-      <Box
-        maxHeight="200px"
-        overflow="auto"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-      >
-        <Table.Root size="sm">
-          <Table.Header>
-            <Table.Row>
-              {result.columns.map((column) => (
-                <Table.ColumnHeader key={column.name} fontSize="11px">
-                  {column.name}
-                </Table.ColumnHeader>
-              ))}
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
-            {shown.map((row, rowIndex) => (
-              // result rows carry no id of their own; the list is never reordered
-              <Table.Row key={rowIndex}>
+      <Card variant="frame" padding="none">
+        <Box
+          maxHeight="200px"
+          overflow="auto"
+          as="section"
+          aria-label="Query result rows"
+          tabIndex={0}
+        >
+          <ListTable variant="embedded" density="compact" scroll="external" stickyHeader>
+            <ListTable.Header>
+              <ListTable.Row>
                 {result.columns.map((column) => (
-                  <Table.Cell key={column.name} fontSize="11px">
-                    {String(row[column.name])}
-                  </Table.Cell>
+                  <ListTable.ColumnHeader key={column.name}>{column.name}</ListTable.ColumnHeader>
                 ))}
-              </Table.Row>
-            ))}
-          </Table.Body>
-        </Table.Root>
-      </Box>
+              </ListTable.Row>
+            </ListTable.Header>
+            <ListTable.Body>
+              {shown.map((row, rowIndex) => (
+                // result rows carry no id of their own; the list is never reordered
+                <ListTable.Row key={rowIndex}>
+                  {result.columns.map((column) => (
+                    <ListTable.Cell key={column.name}>
+                      <Text textStyle="micro">{String(row[column.name])}</Text>
+                    </ListTable.Cell>
+                  ))}
+                </ListTable.Row>
+              ))}
+            </ListTable.Body>
+          </ListTable>
+        </Box>
+      </Card>
     </Box>
   );
 }

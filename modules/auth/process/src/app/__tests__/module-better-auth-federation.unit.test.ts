@@ -1,4 +1,4 @@
-import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
@@ -14,7 +14,7 @@ function federationFor({
   return ModuleBetterAuthFederation.create({
     authProvider: "auth0",
     providerMounted,
-    licensing: createApiFixture<LicensingApi>({ isPlatformSsoLicensed: async () => licensed }),
+    sso: createApiFixture<SsoApi>({ platformAllowed: async () => licensed }),
     passkeysEnabled: false,
     isSaas: false,
     localPasswords: false,
@@ -55,6 +55,60 @@ describe("given a self-hosted install that names auth0", () => {
         providerMounted: false,
       }).resolveSignInMethodPolicy();
 
+      expect(policy.defaultMethods.map((method) => method.id)).not.toContain("auth0");
+    });
+  });
+});
+
+describe("given a self-hosted install that names auth0 and mounted it", () => {
+  describe("when the sign-in method policy is resolved and the federation gate is asked", () => {
+    /** @scenario "Every sign-in decision asks enterprise SSO's licence gate" */
+    it("answers both from enterprise SSO's gate", async () => {
+      let asked = 0;
+      const federation = ModuleBetterAuthFederation.create({
+        authProvider: "auth0",
+        providerMounted: true,
+        sso: createApiFixture<SsoApi>({
+          platformAllowed: async () => {
+            asked += 1;
+            return true;
+          },
+        }),
+        passkeysEnabled: false,
+        isSaas: false,
+        localPasswords: false,
+        mountedSocialMethodIds: [],
+      });
+
+      await expect(federation.platformSsoAllowed()).resolves.toBe(true);
+      const before = asked;
+      const policy = await federation.resolveSignInMethodPolicy();
+
+      expect(before).toBe(1);
+      expect(asked).toBeGreaterThan(before);
+      expect(policy.federationLicensed).toBe(true);
+    });
+  });
+
+  describe("when enterprise SSO's gate refused because the licensing store did not answer in time", () => {
+    /** @scenario "A gate that gave up on a silent licensing store leaves sign-in on email" */
+    it("offers no federated method", async () => {
+      const federation = ModuleBetterAuthFederation.create({
+        authProvider: "auth0",
+        providerMounted: true,
+        sso: createApiFixture<SsoApi>({
+          platformAllowed: () =>
+            new Promise<boolean>((resolve) => setTimeout(() => resolve(false), 5)),
+        }),
+        passkeysEnabled: false,
+        isSaas: false,
+        localPasswords: false,
+        mountedSocialMethodIds: [],
+      });
+
+      const policy = await federation.resolveSignInMethodPolicy();
+
+      expect(policy.federationLicensed).toBe(false);
       expect(policy.defaultMethods.map((method) => method.id)).not.toContain("auth0");
     });
   });

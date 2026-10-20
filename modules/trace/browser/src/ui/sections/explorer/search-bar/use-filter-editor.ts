@@ -192,6 +192,8 @@ interface FilterEditorApi {
   endAnchorX: number;
   /** Whether the editor currently holds focus. */
   isFocused: boolean;
+  /** The editor holds typed text that neither the applied query nor the last Enter covers. */
+  hasUnsubmittedText: boolean;
 }
 
 export function useFilterEditor({
@@ -215,12 +217,18 @@ export function useFilterEditor({
   // focus/blur into state so the SearchBar can hide chrome (inline
   // submit hint, …) when the editor isn't actively engaged.
   const [isFocused, setIsFocused] = useState(false);
+  // Typed text Enter has not searched yet: the only time the submit hint shows.
+  const [hasUnsubmittedText, setHasUnsubmittedText] = useState(false);
 
   const editorRef = useRef<Editor | null>(null);
   const isProgrammaticRef = useRef(false);
   const triggerPosRef = useRef<number | null>(null);
   const applyQueryTextRef = useLatestRef(applyQueryText);
-  const submitQueryTextRef = useLatestRef(submitQueryText);
+  const queryTextRef = useLatestRef(queryText);
+  const submitQueryTextRef = useLatestRef((text: string) => {
+    setHasUnsubmittedText(false);
+    submitQueryText(text);
+  });
   const onHasContentChangeRef = useLatestRef(onHasContentChange);
   const suggestionRef = useLatestRef(suggestion);
   const dismissedRef = useLatestRef(dropdownDismissed);
@@ -277,6 +285,13 @@ export function useFilterEditor({
       if (isProgrammaticRef.current) return;
       const text = ed.getText();
       reportHasContent({ hasContent: text.length > 0, lastHasContentRef, onHasContentChangeRef });
+      setHasUnsubmittedText(
+        isUnsubmittedText({
+          editorText: text,
+          queryText: queryTextRef.current,
+          submittedText: submittedTextRef.current,
+        }),
+      );
       refreshSuggestion(ed, text);
     },
     onSelectionUpdate: ({ editor: ed }) => {
@@ -368,6 +383,13 @@ export function useFilterEditor({
       submittedTextRef,
       triggerPosRef,
     });
+    setHasUnsubmittedText(
+      isUnsubmittedText({
+        editorText: editor.getText(),
+        queryText,
+        submittedText: submittedTextRef.current,
+      }),
+    );
   }, [editor, queryText, onHasContentChangeRef, measureEndAnchor]);
 
   const acceptSuggestion = useCallback(
@@ -388,6 +410,7 @@ export function useFilterEditor({
     }
     submittedTextRef.current = null;
     reportHasContent({ hasContent: false, lastHasContentRef, onHasContentChangeRef });
+    setHasUnsubmittedText(false);
     setSuggestion(CLOSED_SUGGESTION);
     setDropdownDismissed(false);
     triggerPosRef.current = null;
@@ -401,6 +424,7 @@ export function useFilterEditor({
     cursorAnchorX,
     endAnchorX,
     isFocused,
+    hasUnsubmittedText,
   };
 }
 
@@ -780,6 +804,25 @@ function externalQueryReplacesEditor({
   const answersSubmit = submittedText !== null && current === normalizeEditorText(submittedText);
   if (isFocused && !answersSubmit) return false;
   return current !== normalizeEditorText(queryText);
+}
+
+/**
+ * Whether the editor holds text Enter has not searched: it is neither the applied
+ * query nor what the last Enter submitted (a sentence routed to Langy stays typed).
+ */
+export function isUnsubmittedText({
+  editorText,
+  queryText,
+  submittedText,
+}: {
+  editorText: string;
+  queryText: string;
+  submittedText: string | null;
+}): boolean {
+  const current = normalizeEditorText(editorText);
+  if (current.length === 0) return false;
+  if (current === normalizeEditorText(queryText)) return false;
+  return submittedText === null || current !== normalizeEditorText(submittedText);
 }
 
 /** Accepts a suggestion the reader clicked, as if they had pressed Enter on it. */

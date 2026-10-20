@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { Card, Box, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Heading, HStack, Spacer } from "@langwatch/design-system/primitives";
 import { type ReactNode } from "react";
 
 import { SampleMark } from "./sample-mark.tsx";
@@ -21,21 +22,20 @@ export function CostPanel({
   children: ReactNode;
 }) {
   return (
-    <Card.Root
+    <Card
       variant="showcase"
       data-testid="cost-panel"
       data-tour={tourId}
-      alignItems="stretch"
-      gap={3}
-      padding={4}
+      padding="md"
+      bodyLayout="spaced"
     >
       <HStack gap={2}>
-        <Heading size="sm">{title}</Heading>
+        <Heading textStyle="cardTitle">{title}</Heading>
         <SampleMark shown={sample} />
         <Spacer />
         {action}
       </HStack>
       <Box>{children}</Box>
-    </Card.Root>
+    </Card>
   );
 }

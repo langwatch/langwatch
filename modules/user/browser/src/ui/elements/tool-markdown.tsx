@@ -14,7 +14,7 @@ const MarkdownRoot = chakra("div", {
     "& ul, & ol": { paddingLeft: "1.25rem", marginBottom: "0.5rem" },
     "& li": { listStyle: "revert" },
     "& a": { textDecoration: "underline" },
-    "& code": { fontFamily: "mono", fontSize: "0.9em" },
+    "& code": { textStyle: "monoSm" },
   },
 });
 

@@ -171,6 +171,7 @@ describe("accumulateSpanTokens", () => {
       state: emptyState,
       span: span({ spanAttributes: llmAttributes }),
       spanCost: 0.5,
+      spanUnpriced: false,
       totalDurationMs: 1000,
     });
     expect(result).toMatchObject({
@@ -193,6 +194,7 @@ describe("accumulateSpanTokens", () => {
           },
         }),
         spanCost: 0.5,
+        spanUnpriced: false,
         totalDurationMs: 1000,
       });
       expect(result.totalCost).toBeNull();

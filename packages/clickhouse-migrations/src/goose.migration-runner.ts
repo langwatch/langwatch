@@ -92,6 +92,8 @@ export interface ClickHouseConfig {
    * column outside the sorting key.
    */
   requiresDimensionCompat?: boolean;
+  /** Set during bootstrap on a cluster: the replicas of a shard that each goose write waits for. */
+  clusterReplicas?: number;
 }
 
 /**
@@ -542,6 +544,112 @@ async function executeBootstrapSQL(
   await client.command({ query: sql });
 }
 
+/**
+ * The settings every write to goose's version table carries. On a cluster it waits for every
+ * replica (insert_quorum), so a read through a round-robin balancer on any replica sees it and
+ * goose never reruns a migration. Single node: none (replicated-migration-versions.feature).
+ */
+export function gooseVersionWriteSettings({
+  config,
+}: {
+  config: Pick<ClickHouseConfig, "clusterName" | "clusterReplicas">;
+}): { insert_quorum?: string } {
+  if (!config.clusterName || config.clusterReplicas === undefined) return {};
+  return { insert_quorum: String(config.clusterReplicas) };
+}
+
+/** goose's connection string; on a cluster it carries the write settings as driver settings. */
+export function gooseConnectionStringFor({ config }: { config: ClickHouseConfig }): string {
+  const settings = Object.entries(gooseVersionWriteSettings({ config }));
+  if (settings.length === 0) return config.gooseConnectionString;
+  const url = new URL(config.gooseConnectionString);
+  for (const [name, value] of settings) url.searchParams.set(name, value);
+  return url.toString();
+}
+
+/**
+ * On a cluster, catches every replica up on goose's version table before goose reads it: rows an
+ * earlier run wrote without a quorum, or whose quorum timed out. ON CLUSTER runs it on each
+ * replica, whichever one the balancer picked; one that cannot catch up fails the run.
+ */
+export function gooseVersionSyncStatement({
+  config,
+}: {
+  config: Pick<ClickHouseConfig, "clusterName" | "database">;
+}): string | null {
+  if (!config.clusterName) return null;
+  return `SYSTEM SYNC REPLICA ON CLUSTER ${config.clusterName} ${config.database}.goose_db_version LIGHTWEIGHT`;
+}
+
+/**
+ * The most replicas any shard of the cluster has. A Replicated database also lists a cluster under
+ * its own name (rows with database_shard_name set), so a same-named one counted each replica twice;
+ * the server's configured rows win, and the database's count only when it is the sole definition.
+ */
+const CLUSTER_REPLICAS_QUERY = `SELECT toUInt32(if(countIf(database_shard_name = '') > 0,
+    countIf(database_shard_name = ''), count())) AS replicas FROM system.clusters
+  WHERE cluster = {cluster:String} GROUP BY shard_num ORDER BY replicas DESC LIMIT 1`;
+
+async function readClusterReplicas({
+  client,
+  clusterName,
+}: {
+  client: ClickHouseClient;
+  clusterName: string;
+}): Promise<number> {
+  const result = await client.query({
+    query: CLUSTER_REPLICAS_QUERY,
+    query_params: { cluster: clusterName },
+    format: "JSONEachRow",
+  });
+  const replicas = Number((await result.json<{ replicas: number | string }>())[0]?.replicas ?? 0);
+  if (replicas < 1) {
+    throw new MigrationError(
+      `CLICKHOUSE_CLUSTER is "${clusterName}", but system.clusters defines no replicas for it.`,
+      "bootstrap",
+    );
+  }
+  return replicas;
+}
+
+/** On a cluster: counts the replicas goose's writes wait for and catches each one up. */
+async function syncClusterVersionTable({
+  client,
+  config,
+  verbose,
+}: {
+  client: ClickHouseClient;
+  config: ClickHouseConfig;
+  verbose: boolean | undefined;
+}): Promise<void> {
+  const sync = gooseVersionSyncStatement({ config });
+  if (!config.clusterName || !sync) return;
+  config.clusterReplicas = await readClusterReplicas({ client, clusterName: config.clusterName });
+  if (verbose) logger.debug({ sql: sync }, "Executing bootstrap SQL");
+  // An ON CLUSTER timeout arrives after the 200; waiting for the end puts it in the status.
+  await client.command({ query: sync, clickhouse_settings: { wait_end_of_query: 1 } });
+}
+
+/**
+ * Inserts the version 0 row when the table is empty (atomic, no TOCTOU race): goose needs one row
+ * to find its starting version, else it reports "no next version found".
+ */
+async function insertInitialVersion({
+  client,
+  config,
+  verbose,
+}: {
+  client: ClickHouseClient;
+  config: ClickHouseConfig;
+  verbose: boolean | undefined;
+}): Promise<void> {
+  const sql = `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
+       SELECT 0, 1
+       WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`;
+  if (verbose) logger.debug({ sql }, "Executing bootstrap SQL");
+  await client.command({ query: sql, clickhouse_settings: gooseVersionWriteSettings({ config }) });
+}
+
 // Must run BEFORE goose so goose_db_version is created with correct engine for replication
 async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): Promise<void> {
   logger.debug(
@@ -601,16 +709,8 @@ async function bootstrapDatabase(config: ClickHouseConfig, verbose?: boolean): P
       verbose,
     );
 
-    // Insert initial version 0 row if table is empty (atomic to avoid TOCTOU race)
-    // Goose requires at least one row to determine the starting version.
-    // Without this, goose reports "no next version found" on an empty table.
-    await executeBootstrapSQL(
-      client,
-      `INSERT INTO ${config.database}.goose_db_version (version_id, is_applied)
-       SELECT 0, 1
-       WHERE NOT EXISTS (SELECT 1 FROM ${config.database}.goose_db_version LIMIT 1)`,
-      verbose,
-    );
+    await syncClusterVersionTable({ client, config, verbose });
+    await insertInitialVersion({ client, config, verbose });
   });
 
   // Check if 'local_primary' storage policy exists on this CH instance.
@@ -762,7 +862,7 @@ async function executeGoose({
     logConfig(config);
     logger.debug({ migrationsDir }, "Goose migrations directory");
     // Log connection string with password masked
-    const maskedConnStr = config.gooseConnectionString.replace(/:([^:@]+)@/, ":***@");
+    const maskedConnStr = gooseConnectionStringFor({ config }).replace(/:([^:@]+)@/, ":***@");
     logger.debug({ connectionString: maskedConnStr }, "Goose connection string");
   }
 
@@ -772,7 +872,7 @@ async function executeGoose({
     "-table",
     `${config.database}.goose_db_version`,
     "clickhouse",
-    config.gooseConnectionString,
+    gooseConnectionStringFor({ config }),
     ...command,
   ];
 

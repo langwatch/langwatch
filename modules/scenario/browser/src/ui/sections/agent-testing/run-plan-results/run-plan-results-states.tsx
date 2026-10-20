@@ -5,19 +5,10 @@
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import {
-  Box,
-  EmptyState,
-  HStack,
-  Skeleton,
-  Spinner,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, HStack, Skeleton, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { RefreshCw } from "lucide-react";
 
 import { HandledErrorAlert } from "../../../../behavior/errors.tsx";
-import { FG_MUTED, TABLE_HEADER_BG } from "../../../../model/agent-testing/shared/design.ts";
 import type { Period, RelativePresetKey } from "../../../../model/analytics/period.ts";
 import { ContentColumn } from "../../../elements/agent-testing/shared/content-column.tsx";
 import { SmallButton } from "../../../elements/agent-testing/shared/small-button.tsx";
@@ -40,16 +31,14 @@ export function nextWiderWindow(period: Period): {
 
 export function RunsLoadError({ error, onRetry }: { error: unknown; onRetry: () => void }) {
   return (
-    <EmptyState.Root paddingY={12}>
-      <EmptyState.Content>
-        <Box maxWidth="420px" width="100%">
-          <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
-        </Box>
-        <SmallButton onClick={onRetry}>
-          <RefreshCw size={13} /> Try again
-        </SmallButton>
-      </EmptyState.Content>
-    </EmptyState.Root>
+    <VStack align="center" gap={4} paddingY={12}>
+      <Box maxWidth="420px" width="100%">
+        <HandledErrorAlert error={error} fallbackTitle="Couldn't load runs" />
+      </Box>
+      <SmallButton onClick={onRetry}>
+        <RefreshCw size={13} /> Try again
+      </SmallButton>
+    </VStack>
   );
 }
 
@@ -65,7 +54,7 @@ export function RunsLoadingSkeleton() {
     >
       <Box
         height="32px"
-        background={TABLE_HEADER_BG}
+        background="bg.muted/50"
         borderBottomWidth="1px"
         borderBottomColor="border"
       />
@@ -77,7 +66,7 @@ export function RunsLoadingSkeleton() {
           columnGap={3}
           alignItems="center"
           paddingX={4}
-          paddingY="10px"
+          paddingY="2.5"
           borderTopWidth={index === 0 ? "0" : "1px"}
           borderTopColor="border"
         >
@@ -105,7 +94,7 @@ export function RunPlanDetailSkeleton({ testId }: { testId?: string }) {
         <Skeleton height="28px" width="88px" marginBottom={1} />
         <RunEntriesSkeleton />
       </VStack>
-      <ContentColumn railWidth={RUNS_SIDEBAR_WIDTH}>
+      <ContentColumn>
         <VStack align="stretch" gap={4}>
           <Skeleton height="24px" width="220px" />
           <RunsLoadingSkeleton />
@@ -123,10 +112,10 @@ export function NoRunInPeriod({
 
   return (
     <VStack align="center" gap={3} paddingY={10}>
-      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+      <Text textStyle="bodySm" fontWeight="medium" textAlign="center">
         No run in this period
       </Text>
-      <Text fontSize="12.5px" color={FG_MUTED} textAlign="center">
+      <Text textStyle="bodySm" color="fg.muted" textAlign="center">
         This run plan has no run inside the selected period.
       </Text>
       <SmallButton onClick={() => setRelativePeriod(wider.key)} data-testid="widen-period-button">
@@ -149,14 +138,14 @@ export function WaitingForFirstRun({
 
   return (
     <VStack align="center" gap={3} paddingY={10} data-testid="waiting-for-first-run">
-      <Spinner size="sm" color={FG_MUTED} />
-      <Text fontSize="12.5px" fontWeight="medium" textAlign="center">
+      <Spinner size="sm" color="fg.muted" />
+      <Text textStyle="bodySm" fontWeight="medium" textAlign="center">
         Waiting for the first result
       </Text>
-      <Text fontSize="12.5px" color={FG_MUTED} textAlign="center" maxWidth="360px">
+      <Text textStyle="bodySm" color="fg.muted" textAlign="center" maxWidth="360px">
         This run has not reported a scenario yet. The results appear here as they arrive.
       </Text>
-      <Text fontSize="11.5px" color={FG_MUTED} textAlign="center">
+      <Text textStyle="caption" color="fg.muted" textAlign="center">
         Looking for an older run instead?
       </Text>
       <SmallButton onClick={() => setRelativePeriod(wider.key)} data-testid="widen-period-button">

@@ -37,7 +37,8 @@ export const organizationWeb = defineBrowserModule("organization")
       path: "/settings/audit-log",
       within: "settings",
       label: "Audit Log",
-      requires: "organization:manage",
+      // The grant the menu entry and the read ask too, so all three agree (Alex, 2026-10-11).
+      requires: "auditLog:view",
       load: () => import("./ui/sections/organization/audit-log.screen.tsx"),
     },
     // Members, Teams and Groups are the Directory's tabs; their old addresses redirect.

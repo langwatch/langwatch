@@ -35,7 +35,7 @@ export function PasswordInput({
       <Input
         id={id}
         type={isRevealed ? "text" : "password"}
-        fontSize={{ base: "16px", md: "14px" }}
+        fontSize={{ base: "md", md: "sm" }}
         minHeight="44px"
         borderRadius={SHAPE.field}
         autoComplete={autoComplete}

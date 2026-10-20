@@ -18,6 +18,7 @@ function makeStub(name: string, durationMs = 1) {
         pid: callLog.length,
         // The runtime never reads .child, only .stop().
         child: null as never,
+        crashed: false,
         stop: vi.fn(async () => {
           callLog.push(`stop:${name}`);
         }),
@@ -255,6 +256,22 @@ describe("services/runtime", () => {
       for (const infra of ["postgres", "redis", "clickhouse", "langyagent"]) {
         expect(callLog).toContain(`stop:${infra}`);
       }
+    });
+  });
+
+  describe("when one infrastructure service dies during boot", () => {
+    /** @scenario "A service that dies during initial boot is not restarted" */
+    it("stops the infrastructure that did start and starts no app tier", async () => {
+      clickhouseStub.fn.mockImplementationOnce(async () => {
+        callLog.push("start:clickhouse");
+        throw new Error("clickhouse did not become ready: exited before healthy");
+      });
+
+      await expect(runtime.startAll(fakeCtx())).rejects.toThrow("clickhouse");
+
+      expect(callLog).toContain("stop:postgres");
+      expect(callLog).toContain("stop:redis");
+      expect(callLog).not.toContain("start:langwatch");
     });
   });
 

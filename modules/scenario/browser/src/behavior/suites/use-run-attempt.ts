@@ -26,7 +26,7 @@ export function useRunAttempt() {
     if (attemptRef.current?.key !== key) {
       attemptRef.current = {
         key,
-        idempotencyKey: crypto.randomUUID(),
+        idempotencyKey: generate("suite").toString(),
         batchRunId: generate(KSUID_RESOURCES.SCENARIO_BATCH).toString(),
       };
     }

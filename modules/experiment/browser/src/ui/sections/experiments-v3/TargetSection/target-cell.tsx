@@ -113,7 +113,7 @@ function CellFailure({
             whiteSpace="pre-wrap"
             wordBreak="break-word"
           >
-            {parseLLMError(failure.title).message}
+            {parseLLMError(failure.title).message /* no-raw-error-toast-ok */}
           </Alert.Title>
           {failure.description && (
             <Alert.Description userSelect="text">{failure.description}</Alert.Description>
@@ -128,7 +128,7 @@ function CellFailure({
               whiteSpace="pre-wrap"
               wordBreak="break-word"
             >
-              {parseLLMError(failure.raw).message}
+              {parseLLMError(failure.raw).message /* no-raw-error-toast-ok */}
             </Alert.Description>
           )}
         </Alert.Content>
@@ -139,10 +139,10 @@ function CellFailure({
 
 function TruncatedText({ text, isTruncated }: { text: string; isTruncated: boolean }) {
   return (
-    <Text fontSize="13px" whiteSpace="pre-wrap" wordBreak="break-word">
+    <Text textStyle="bodySm" whiteSpace="pre-wrap" wordBreak="break-word">
       {text}
       {isTruncated && (
-        <Box as="span" color="fg.subtle" fontSize="11px" marginLeft={1}>
+        <Box as="span" color="fg.subtle" textStyle="micro" marginLeft={1}>
           (truncated)
         </Box>
       )}
@@ -160,7 +160,7 @@ function ExpandedOutput({
 }) {
   return (
     <VStack flex={1} overflowY="auto" minHeight={0} align="start">
-      <Text fontSize="11px" color="fg.muted" fontWeight="700" textTransform="uppercase">
+      <Text textStyle="eyebrow" color="fg.muted">
         Output
       </Text>
       <TruncatedText text={displayOutput} isTruncated={isTruncated} />
@@ -356,7 +356,7 @@ function CellActionButtons({
           openDelay={100}
         >
           <Text
-            fontSize="11px"
+            textStyle="micro"
             color="fg.muted"
             whiteSpace="nowrap"
             px={1}
@@ -554,7 +554,7 @@ export function TargetCellContent({
     }
     if (!displayOutput) {
       return (
-        <Text fontSize="13px" color="fg.subtle">
+        <Text textStyle="bodySm" color="fg.subtle">
           No output yet
         </Text>
       );

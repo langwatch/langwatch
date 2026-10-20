@@ -71,7 +71,7 @@ export const BodyCrashed: Story = {
 export const BodyCrashedInDevelopment: Story = {
   render: (args) => (
     <Dialog.Root {...args}>
-      <Dialog.Content errorScope="Node settings" isDevelopment>
+      <Dialog.Content errorScope="Node settings">
         <Dialog.Header>
           <Dialog.Title>Node settings</Dialog.Title>
         </Dialog.Header>

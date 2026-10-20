@@ -92,4 +92,21 @@ describe("saving a privacy rule at several scopes", () => {
       expect(savedScopes).toEqual(TWO_PROJECT_SCOPES);
     });
   });
+
+  describe("when Save is pressed with every setting still on Inherit", () => {
+    it("stays clickable, says what is missing and does not save", async () => {
+      const onSave = vi.fn();
+      renderDrawer(onSave);
+      const user = userEvent.setup();
+
+      const save = screen.getByRole("button", { name: "Save" });
+      expect(save).toBeEnabled();
+      await user.click(save);
+
+      expect(onSave).not.toHaveBeenCalled();
+      expect(screen.getByRole("alert").textContent).toContain(
+        "Choose at least one setting other than Inherit.",
+      );
+    });
+  });
 });

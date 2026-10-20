@@ -24,8 +24,14 @@ export const billingConfig = Config.define((c) => ({
   hubspotFormId: c.env("HUBSPOT_FORM_ID", z.string().optional()),
   hubspotReachedLimitFormId: c.env("HUBSPOT_REACHED_LIMIT_FORM_ID", z.string().optional()),
   bankDetails: c.env("LANGWATCH_BILLING_BANK_DETAILS", z.string().optional()),
-  /** Where Stripe's API is reached; unset is Stripe itself, haven points it at paymentsim. */
-  stripeApiBase: c.env("STRIPE_API_BASE", z.string().url().optional()),
+  /** Where Stripe's API is reached; unset or blank is Stripe itself, haven names paymentsim. */
+  stripeApiBase: c.env(
+    "STRIPE_API_BASE",
+    z.preprocess(
+      (value) => (typeof value === "string" && value.trim() === "" ? undefined : value),
+      z.string().url().optional(),
+    ),
+  ),
   /** The shared leaf: Cloud bills subscriptions and reports usage; an install runs neither. */
   isSaas,
   /** The shared leaf: the origin the usage links and notices point back at. */

@@ -39,7 +39,7 @@ export const TerminalDiff = memo(function TerminalDiff({
         {filePath && (
           <Text
             fontFamily={TERMINAL_FONT_STACK}
-            fontSize="13px"
+            textStyle="bodySm"
             color={TERMINAL_TOKENS.faint}
             truncate
             minWidth={0}
@@ -49,7 +49,7 @@ export const TerminalDiff = memo(function TerminalDiff({
         )}
         <Text
           fontFamily={TERMINAL_FONT_STACK}
-          fontSize="13px"
+          textStyle="bodySm"
           color={DIFF_TOKENS.addFg}
           flexShrink={0}
         >
@@ -57,7 +57,7 @@ export const TerminalDiff = memo(function TerminalDiff({
         </Text>
         <Text
           fontFamily={TERMINAL_FONT_STACK}
-          fontSize="13px"
+          textStyle="bodySm"
           color={DIFF_TOKENS.removeFg}
           flexShrink={0}
         >
@@ -68,7 +68,7 @@ export const TerminalDiff = memo(function TerminalDiff({
         as="pre"
         margin={0}
         fontFamily={TERMINAL_FONT_STACK}
-        fontSize="13px"
+        textStyle="bodySm"
         lineHeight="1.5"
         userSelect="text"
       >

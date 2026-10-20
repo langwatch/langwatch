@@ -87,6 +87,13 @@ Feature: Core OTLP protection applies Enterprise policy without owning it
     When the backfill runs
     Then every organization holding an enabled coding-assistant config records its billing facts
 
+  @unit
+  Scenario: The billing backfill reads and records a slice of organizations at a time
+    Given a thousand organizations
+    When the backfill runs
+    Then it reads the configs of a hundred organizations in one query
+    And it sends that slice's billing facts in one batch
+
   # Unimplemented: trace folds the fact and builds the policy at ingest, but no receiver test drives a real key through it yet (handoffs/otlp-trace-fold.md).
   @unimplemented @integration
   Scenario: An ingestion-source key reaches every receiver with Governance's policy

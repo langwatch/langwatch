@@ -83,13 +83,15 @@ describe.skipIf(!databaseUrl)("the tenancy guard chain on a composed client", ()
   describe("when raw SQL names no tenancy column", () => {
     /** @scenario "Raw SQL without a tenancy predicate is refused, also inside a transaction" */
     it("refuses it directly and inside an interactive transaction", async () => {
-      await expect(prisma.$queryRaw`SELECT 1 AS probe`).rejects.toThrow(/tenancy predicate/);
+      await expect(prisma.$queryRaw`SELECT 1 AS probe`).rejects.toThrow(
+        /compares no tenant column/,
+      );
 
       // The query extension must see template-literal raw SQL inside
       // interactive transactions too, not only at the top level.
       await expect(
         prisma.$transaction(async (tx) => tx.$queryRaw`SELECT 1 AS probe`),
-      ).rejects.toThrow(/tenancy predicate/);
+      ).rejects.toThrow(/compares no tenant column/);
     });
   });
 

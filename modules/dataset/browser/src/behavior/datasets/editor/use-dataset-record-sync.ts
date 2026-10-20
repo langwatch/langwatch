@@ -1,4 +1,5 @@
 import { datasetClient } from "@langwatch/dataset-client";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useRef } from "react";
 
 /**
@@ -8,6 +9,8 @@ import { useCallback, useEffect, useRef } from "react";
  */
 import type { AutosaveState } from "../../../model/dataset-table-context.tsx";
 import type { PendingSavedChanges } from "../../../model/pending-saved-changes.ts";
+
+const logger = createLogger("langwatch:dataset:record-sync");
 
 export const DATASET_SYNC_DEBOUNCE_MS = 500;
 
@@ -228,7 +231,7 @@ function syncDatasetChanges({
           succeed();
         },
         onError: (error) => {
-          console.error("Failed to delete saved records:", error);
+          logger.error({ error }, "Failed to delete saved records");
           fail(error);
         },
       },
@@ -250,7 +253,7 @@ function syncDatasetChanges({
           succeed();
         },
         onError: (error) => {
-          console.error("Failed to sync saved record:", error);
+          logger.error({ error }, "Failed to sync saved record");
           fail(error);
         },
       },

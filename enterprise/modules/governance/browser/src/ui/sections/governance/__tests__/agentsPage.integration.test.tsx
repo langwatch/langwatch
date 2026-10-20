@@ -162,7 +162,7 @@ describe("the Agents page reading the organization's agents", () => {
       harness.list = { data: undefined, isLoading: true, error: null };
       renderPage();
 
-      expect(screen.getByLabelText("Loading agents")).toBeInTheDocument();
+      expect(screen.getByText("Loading agents")).toBeInTheDocument();
       expect(screen.queryByText("No agents registered yet")).toBeNull();
     });
   });

@@ -21,6 +21,7 @@ export interface LangWatchQLVegaLiteChartProps {
   readonly datasets: Readonly<Record<string, LangWatchQLDataset>>;
   readonly columnsByDataset: Readonly<Record<string, readonly LangWatchQLDatasetColumn[]>>;
   readonly ariaLabel?: string;
+  readonly isResultNoteHidden?: boolean;
 }
 
 export function ThemedLangWatchQLVegaLiteChart(props: LangWatchQLVegaLiteChartProps) {

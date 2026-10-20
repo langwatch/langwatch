@@ -5,6 +5,15 @@ description: "Review or refactor Chakra UI v3 code INSIDE packages/design-system
 
 # Chakra UI Refactor & Review
 
+**Scope: files inside `packages/design-system` only.** In this repository the product is a Vite SPA
+(not Next.js) and the public Drawer, Dialog and Card are callable prop-driven shapes with closed
+props (`packages/design-system/adrs/002-overlay-and-card-shapes.md`; the `design-system` skill's
+`references/component-apis.md`). A review here checks that the public component is the shape,
+not raw `Dialog.Root`/`Drawer.Root`/`Card.Root` composition at a consumer, and does not wait for
+a third copy before extracting across modules. Raw parts are legitimate only inside an
+implementation. Navigation goes through `@langwatch/browser-host/link` or an `onNavigate` prop.
+Next.js notes below are upstream generic advice, not this repository's procedure.
+
 You are reviewing and improving UI code using Chakra UI v3. Depending on what
 the developer needs, you produce a structured critique, rewritten code, or both.
 Read the code and project context fully before producing any output.
@@ -16,7 +25,7 @@ Read the code and project context fully before producing any output.
 Before any output, establish:
 
 - **Chakra UI version** — check `package.json`; use v3 by default
-- **Framework** — Next.js App Router, Pages Router, Vite, plain React
+- **Framework** — Vite SPA here; the Next.js lines in this file are upstream notes
 - **Source type** — existing Chakra, plain HTML/CSS, Tailwind, CSS Modules,
   styled-components
 - **What the user is asking:**
@@ -27,7 +36,7 @@ Before any output, establish:
   - **Both** — "review and fix" → critique first, then the rewritten code
 
 State your reading at the top of the response (e.g. "Reviewing as existing
-Chakra v3 code. Assuming Next.js App Router.").
+Chakra v3 code inside the design system.").
 
 If code isn't shared yet, ask for it. Don't review a description of code.
 
@@ -62,11 +71,12 @@ fix.
 
 - Are v3 prop names used? (`disabled` not `isDisabled`, `colorPalette` not
   `colorScheme`, `gap` not `spacing`, `open` not `isOpen`)
-- Are compound components used correctly? (`Field.Root`/`Field.Label`,
-  `Dialog.Root`/`Dialog.Content`, etc.)
-- Is `"use client"` placed correctly in Next.js App Router?
-- Are there v2 patterns still present? (`extendTheme`, `ColorModeScript`,
-  `useColorModeValue`, `sx` prop)
+- Are compound components used correctly? (`Field.Root`/`Field.Label` and so on.) Overlays
+  and cards are the exception: a consumer uses the callable shape, not the parts.
+- Are there v2 patterns still present? (`extendTheme`, `ColorModeScript`, `sx` prop.)
+  `useColorModeValue` is Chakra v2, but the design system exports its own
+  (`@langwatch/design-system/color-mode`): check the import source, and prefer a semantic token
+  where it removes the conditional colour logic.
 
 **Token and style usage**
 
@@ -107,7 +117,6 @@ users
 - Interactive `Box` with `onClick` but no keyboard access
 - Wrong v3 prop name that silently does nothing (`isDisabled` doesn't disable in
   v3)
-- `"use client"` missing on a component that uses hooks in App Router
 
 **Improvements** — correctness and quality issues that aren't urgent
 
@@ -129,9 +138,9 @@ For each critical issue and significant improvement, show a minimal fix:
 The IconButton for closing the dialog has no accessible label.
 
 // Before
-<IconButton icon={<CloseIcon />} onClick={onClose} />
-// After
-<IconButton aria-label="Close dialog" icon={<CloseIcon />} onClick={onClose} />
+<IconButton onClick={onClose}><CloseIcon /></IconButton>
+// After (v3 has no `icon` prop: the icon is the child)
+<IconButton aria-label="Close dialog" onClick={onClose}><CloseIcon /></IconButton>
 ```
 
 Skip sections with nothing to report. Calibrate length to the code — a 20-line
@@ -158,15 +167,15 @@ Use this when the user wants rewritten code.
 | `<img>`                  | `Image` (preserve `alt`)                    |
 | `<input>`, `<select>`    | `Input`, `NativeSelect` inside `Field.Root` |
 
-| CSS                      | Chakra style prop             |
-| ------------------------ | ----------------------------- |
-| `display: flex`          | `Flex` or `display="flex"`    |
-| `flex-direction: column` | `Stack` or `flexDir="column"` |
-| `gap: 16px`              | `gap={4}` (1 unit = 4px)      |
-| `padding: 16px 24px`     | `py={4} px={6}`               |
-| `border-radius: 8px`     | `rounded="md"`                |
-| `color: #6b7280`         | `color="fg.muted"`            |
-| `background: #f9fafb`    | `bg="bg.subtle"`              |
+| CSS                      | Chakra style prop                                                            |
+| ------------------------ | ---------------------------------------------------------------------------- |
+| `display: flex`          | `Flex` or `display="flex"`                                                   |
+| `flex-direction: column` | `Stack` or `flexDir="column"`                                                |
+| `gap: 16px`              | `gap={4}` (1 unit = 4px)                                                     |
+| `padding: 16px 24px`     | `py={4} px={6}`                                                              |
+| `border-radius: 8px`     | the matching radius token in the active system (md is 0.375rem), not a guess |
+| `color: #6b7280`         | `color="fg.muted"`                                                           |
+| `background: #f9fafb`    | `bg="bg.subtle"`                                                             |
 
 **From Tailwind CSS**
 
@@ -230,13 +239,10 @@ const Card = styled.div`padding: 1rem; &:hover { background: #f3f4f6; }`
   as-is
 - Keep `aria-*` attributes; add missing ones where clearly needed
 - Keep semantic HTML intent (`<nav>` → `Box as="nav"`, not just `Box`)
-- Keep `"use client"` where it exists; add it only when the component genuinely
-  needs it
-- Don't add `"use client"` just because a component uses Chakra UI
 - A partially-converted component that works is better than a fully-converted
   one that doesn't
 
-### `asChild` for Next.js Link and Image
+### `asChild` for Next.js Link and Image (upstream note, not used in this repository)
 
 ```tsx
 import NextLink from "next/link";

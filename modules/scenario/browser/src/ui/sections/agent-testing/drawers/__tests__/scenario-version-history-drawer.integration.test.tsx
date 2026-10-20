@@ -5,7 +5,7 @@
  * @see specs/scenarios/scenario-version-restore.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
-import { cleanup, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,6 +18,9 @@ const mocks = vi.hoisted(() => ({
   mockGetById: vi.fn(),
   mockGetByIdRefetch: vi.fn(async () => ({})),
   mockListVersions: vi.fn(),
+  /** What a live query is: a subscription the data changing re-renders. */
+  versionsListeners: new Set<() => void>(),
+  versionsTick: 0,
   mockListVersionsRefetch: vi.fn(),
   mockGetVersion: vi.fn(),
   mockRestoreVersion: vi.fn(),
@@ -53,71 +56,84 @@ vi.mock("@langwatch/prompt-client", () => ({
   },
 }));
 
-vi.mock("@langwatch/scenario-client", () => ({
-  scenarioClient: {
-    useUtils: () => ({
+vi.mock("@langwatch/scenario-client", async () => {
+  const { useSyncExternalStore } = await import("react");
+  const subscribe = (listener: () => void) => {
+    mocks.versionsListeners.add(listener);
+    return () => mocks.versionsListeners.delete(listener);
+  };
+  const tick = () => mocks.versionsTick;
+  return {
+    scenarioClient: {
+      useUtils: () => ({
+        scenarios: {
+          getAll: { invalidate: vi.fn() },
+          getById: { invalidate: vi.fn(), setData: vi.fn() },
+          getByIdIncludingArchived: { invalidate: vi.fn() },
+          listVersions: { invalidate: vi.fn() },
+        },
+      }),
       scenarios: {
-        getAll: { invalidate: vi.fn() },
-        getById: { invalidate: vi.fn(), setData: vi.fn() },
-        getByIdIncludingArchived: { invalidate: vi.fn() },
-        listVersions: { invalidate: vi.fn() },
-      },
-    }),
-    scenarios: {
-      // The run dialog reads the configurations its scope already ran with.
-      getRunConfigurations: {
-        useQuery: () => ({ data: [], isLoading: false }),
-      },
-      create: {
-        useMutation: () => ({
-          mutateAsync: mocks.mockCreateMutateAsync,
-          isPending: false,
-        }),
-      },
-      update: {
-        useMutation: ({
-          onSuccess,
-          onError,
-        }: {
-          onSuccess?: (data: unknown) => void;
-          onError?: (error: unknown) => void;
-        }) => ({
-          mutateAsync: vi.fn(async (input: unknown) => {
-            try {
-              const result = await mocks.mockUpdateMutateAsync(input);
-              onSuccess?.(result);
-              return result;
-            } catch (error) {
-              onError?.(error);
-              throw error;
-            }
+        // The run dialog reads the configurations its scope already ran with.
+        getRunConfigurations: {
+          useQuery: () => ({ data: [], isLoading: false }),
+        },
+        create: {
+          useMutation: () => ({
+            mutateAsync: mocks.mockCreateMutateAsync,
+            isPending: false,
           }),
-          isPending: false,
-        }),
-      },
-      getById: { useQuery: mocks.mockGetById },
-      listVersions: { useQuery: mocks.mockListVersions },
-      getVersion: { useQuery: mocks.mockGetVersion },
-      restoreVersion: {
-        useMutation: ({
-          onSuccess,
-          onSettled,
-        }: {
-          onSuccess?: (data: unknown, variables: unknown) => void;
-          onSettled?: () => void;
-        }) => ({
-          mutate: (variables: unknown) => {
-            mocks.mockRestoreVersion(variables);
-            onSuccess?.({}, variables);
-            onSettled?.();
+        },
+        update: {
+          useMutation: ({
+            onSuccess,
+            onError,
+          }: {
+            onSuccess?: (data: unknown) => void;
+            onError?: (error: unknown) => void;
+          }) => ({
+            mutateAsync: vi.fn(async (input: unknown) => {
+              try {
+                const result = await mocks.mockUpdateMutateAsync(input);
+                onSuccess?.(result);
+                return result;
+              } catch (error) {
+                onError?.(error);
+                throw error;
+              }
+            }),
+            isPending: false,
+          }),
+        },
+        getById: { useQuery: mocks.mockGetById },
+        listVersions: {
+          useQuery: (...args: unknown[]) => {
+            useSyncExternalStore(subscribe, tick);
+            return mocks.mockListVersions(...args);
           },
-          isPending: false,
-          variables: undefined,
-        }),
+        },
+        getVersion: { useQuery: mocks.mockGetVersion },
+        restoreVersion: {
+          useMutation: ({
+            onSuccess,
+            onSettled,
+          }: {
+            onSuccess?: (data: unknown, variables: unknown) => void;
+            onSettled?: () => void;
+          }) => ({
+            mutate: (variables: unknown) => {
+              mocks.mockRestoreVersion(variables);
+              onSuccess?.({}, variables);
+              onSettled?.();
+            },
+            isPending: false,
+            variables: undefined,
+          }),
+        },
       },
     },
-  },
-}));
+  };
+});
 
 vi.mock("../../../scenarios/save-and-run-menu.tsx", () => ({
   SaveAndRunMenu: () => null,
@@ -468,7 +484,7 @@ describe("the History drawer", () => {
       isError: false,
       refetch: mocks.mockListVersionsRefetch,
     });
-    const view = renderHistory();
+    renderHistory();
 
     await user.click(screen.getByTestId("restore-2"));
     await user.click(screen.getByTestId("confirm-restore-2"));
@@ -497,7 +513,10 @@ describe("the History drawer", () => {
       isError: false,
       refetch: mocks.mockListVersionsRefetch,
     });
-    view.rerender(<ScenarioVersionHistoryDrawer open />);
+    act(() => {
+      mocks.versionsTick += 1;
+      for (const listener of mocks.versionsListeners) listener();
+    });
 
     const rows = screen.getAllByTestId(/^version-row-\d+$/);
     expect(rows[0]!.getAttribute("data-testid")).toBe("version-row-6");

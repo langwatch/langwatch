@@ -8,7 +8,6 @@ import {
   Input,
   type ListCollection,
   Separator,
-  Spacer,
   Text,
   Textarea,
   VStack,
@@ -123,62 +122,41 @@ export function InsightsSetupDrawer({
   });
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      onOpenChange={({ open: next }) => {
-        if (!next) onCancel();
-      }}
-      placement="end"
+      onClose={onCancel}
       size="md"
+      title="Set up Insights"
+      subtitle="Schedule, session and skill"
+      footer={{
+        cancel: { onClick: onCancel },
+        primaryAction: { label: "Save", onClick: () => onSave(draft) },
+      }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <VStack align="start" gap={0.5}>
-            <Drawer.Title>Set up Insights</Drawer.Title>
-            <Text fontSize="sm" color="fg.muted" fontWeight="normal">
-              Schedule, session and skill
-            </Text>
-          </VStack>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={0} separator={<Separator />}>
-            <ScheduleRows draft={draft} patch={patch} />
-            <SettingRow
-              label="Model"
-              hint={
-                draft.model
-                  ? "The model the eternal session runs on"
-                  : "Langy's configured model. Pick another to override it here."
-              }
-            >
-              <ModelSelector
-                model={draft.model ?? langyDefaultModel}
-                options={modelOptions}
-                onChange={(model) => patch({ model })}
-                size="full"
-                mode="chat"
-                showConfigureAction
-                forFeatureLabel="for Insights"
-              />
-            </SettingRow>
-            <SessionRows draft={draft} patch={patch} />
-            <LearnedPreferences />
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onCancel}>
-              Cancel
-            </Button>
-            <Button colorPalette="orange" onClick={() => onSave(draft)}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      <VStack align="stretch" gap={0} separator={<Separator />}>
+        <ScheduleRows draft={draft} patch={patch} />
+        <SettingRow
+          label="Model"
+          hint={
+            draft.model
+              ? "The model the eternal session runs on"
+              : "Langy's configured model. Pick another to override it here."
+          }
+        >
+          <ModelSelector
+            model={draft.model ?? langyDefaultModel}
+            options={modelOptions}
+            onChange={(model) => patch({ model })}
+            size="full"
+            mode="chat"
+            showConfigureAction
+            forFeatureLabel="for Insights"
+          />
+        </SettingRow>
+        <SessionRows draft={draft} patch={patch} />
+        <LearnedPreferences />
+      </VStack>
+    </Drawer>
   );
 }
 

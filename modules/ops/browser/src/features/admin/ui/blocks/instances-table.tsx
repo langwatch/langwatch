@@ -1,16 +1,17 @@
+import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
-import { Badge, Table, Text, VStack } from "@langwatch/design-system/primitives";
+import { Badge, Text, VStack } from "@langwatch/design-system/primitives";
 import { Inbox } from "lucide-react";
 
 import {
   ACTIVITY_COLORS,
   ACTIVITY_LABELS,
+  instanceName,
   reportNumber,
-  sortedDomains,
   type SelfHostedInstance,
 } from "../../model/self-hosted-instance.ts";
-import { EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell } from "../elements/admin-cells.tsx";
 import { ShortId } from "../elements/short-id.tsx";
 
 const COLUMN_COUNT = 8;
@@ -25,26 +26,20 @@ export function InstancesTable({
   onOpen: (id: string) => void;
 }) {
   return (
-    <ListTable
-      density="compact"
-      columnRules={false}
-      containerProps={{ overflowX: "auto" }}
-      variant="line"
-      size="sm"
-    >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Install</Table.ColumnHeader>
-          <Table.ColumnHeader>Release</Table.ColumnHeader>
-          <Table.ColumnHeader>Activity</Table.ColumnHeader>
-          <Table.ColumnHeader>Last report</Table.ColumnHeader>
-          <Table.ColumnHeader>First seen</Table.ColumnHeader>
-          <Table.ColumnHeader>Size</Table.ColumnHeader>
-          <Table.ColumnHeader>Last 28 days</Table.ColumnHeader>
-          <Table.ColumnHeader>License</Table.ColumnHeader>
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
+    <ListTable density="compact" scroll="x" scrollLabel="Self-hosted instances table">
+      <ListTable.Header>
+        <ListTable.Row>
+          <ListTable.ColumnHeader>Install</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Release</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Activity</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last report</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>First seen</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Size</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>Last 28 days</ListTable.ColumnHeader>
+          <ListTable.ColumnHeader>License</ListTable.ColumnHeader>
+        </ListTable.Row>
+      </ListTable.Header>
+      <ListTable.Body>
         {instances.length === 0 && !isLoading ? <EmptyRow /> : null}
         {instances.map((instance) => (
           <InstancesTableRow
@@ -53,22 +48,20 @@ export function InstancesTable({
             onOpen={() => onOpen(instance.id)}
           />
         ))}
-      </Table.Body>
+      </ListTable.Body>
     </ListTable>
   );
 }
 
 function EmptyRow() {
   return (
-    <Table.Row>
-      <Table.Cell colSpan={COLUMN_COUNT}>
-        <NoDataInfoBlock
-          icon={<Inbox />}
-          title="No self-hosted install has reported yet."
-          description="Records will appear here when they are available."
-        />
-      </Table.Cell>
-    </Table.Row>
+    <ListTable.SpanRow columns={COLUMN_COUNT}>
+      <NoDataInfoBlock
+        icon={<Inbox />}
+        title="No self-hosted install has reported yet."
+        description="Records will appear here when they are available."
+      />
+    </ListTable.SpanRow>
   );
 }
 
@@ -80,34 +73,38 @@ function InstancesTableRow({
   onOpen: () => void;
 }) {
   return (
-    <Table.Row cursor="pointer" onClick={onOpen}>
-      <Table.Cell>
-        <WhoCell instance={instance} />
-      </Table.Cell>
-      <Table.Cell>
+    <ListTable.Row onActivate={onOpen}>
+      <ListTable.Cell>
+        <WhoCell instance={instance} onOpen={onOpen} />
+      </ListTable.Cell>
+      <ListTable.Cell>
         <ReleaseCell instance={instance} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Badge colorPalette={ACTIVITY_COLORS[instance.activity]}>
           {ACTIVITY_LABELS[instance.activity]}
         </Badge>
-      </Table.Cell>
-      <Table.Cell>{formatDate(instance.lastSeenAt)}</Table.Cell>
-      <Table.Cell>{formatDate(instance.firstSeenAt)}</Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <AdminDate value={instance.lastSeenAt} display="date" />
+      </ListTable.Cell>
+      <ListTable.Cell>
+        <AdminDate value={instance.firstSeenAt} display="date" />
+      </ListTable.Cell>
+      <ListTable.Cell>
         <SizeCell instance={instance} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <UsageCell instance={instance} />
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         {instance.organizationId ? (
           <Badge colorPalette="purple">licensed</Badge>
         ) : (
           <EmptyCell>open source</EmptyCell>
         )}
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 
@@ -115,13 +112,10 @@ function InstancesTableRow({
  * Who runs this install: the customer when a license named one, the largest
  * email domain when it did not, and the instance id when neither is known.
  */
-function WhoCell({ instance }: { instance: SelfHostedInstance }) {
-  const domains = sortedDomains(instance.userEmailDomains);
-  const leading = domains[0];
-
+function WhoCell({ instance, onOpen }: { instance: SelfHostedInstance; onOpen: () => void }) {
   return (
     <VStack align="start" gap={0}>
-      <Text fontWeight="medium">{instance.organizationName ?? leading?.domain ?? "Unknown"}</Text>
+      <ListTable.RowAction onActivate={onOpen}>{instanceName(instance)}</ListTable.RowAction>
       {instance.hostname ? (
         <Text fontSize="xs" color="fg.muted">
           {instance.hostname}
@@ -174,7 +168,9 @@ function UsageCell({ instance }: { instance: SelfHostedInstance }) {
   if (traces === null && activeUsers === null) return <EmptyCell />;
   return (
     <VStack align="start" gap={0}>
-      <Text>{(traces ?? 0).toLocaleString()} traces</Text>
+      <Text>
+        <FormattedNumber value={traces ?? 0} /> traces
+      </Text>
       <Text fontSize="xs" color="fg.muted">
         {activeUsers ?? 0} active users
       </Text>

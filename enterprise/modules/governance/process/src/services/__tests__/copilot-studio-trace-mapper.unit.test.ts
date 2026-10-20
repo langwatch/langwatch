@@ -18,7 +18,7 @@
  */
 
 import type { NormalizedPullEvent } from "@langwatch/enterprise-governance-contract";
-import { spanSchema } from "@langwatch/trace-contract";
+import { spanSchema } from "@langwatch/otlp/trace-request";
 import { describe, expect, it } from "vitest";
 
 import {

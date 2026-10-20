@@ -13,8 +13,9 @@ import {
   type DispatchAgent,
   type DispatchCall,
 } from "@langwatch/agent-contract";
-import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 
+import type { ConnectedAgentRelayChannel } from "../channels/connected-agent-relay.channel.ts";
+import type { ConnectedAgentStateRepository } from "../repositories/connected-agent-state.repository.ts";
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentConnectionService } from "./connected-agent-connection.service.ts";
 import { LongPollTransportService } from "./connected-agent-long-poll.service.ts";
@@ -24,7 +25,8 @@ import { AgentSessionService } from "./connected-agent-session.service.ts";
 
 type ConnectedAgentOptions = {
   agents: AgentService;
-  sessionState: SessionStateStore;
+  state: ConnectedAgentStateRepository;
+  relay: ConnectedAgentRelayChannel;
   config: AgentServerConfig;
   publicBaseUrl: string;
 };
@@ -41,7 +43,8 @@ export class ConnectedAgentService {
 
   private constructor(options: ConnectedAgentOptions) {
     this.#runtime = ConnectedAgentRuntimeService.create({
-      store: options.sessionState,
+      state: options.state,
+      relay: options.relay,
     });
     const session = AgentSessionService.create({
       runtime: this.#runtime,
@@ -105,7 +108,7 @@ export class ConnectedAgentService {
       () => this.#connections.close(),
       () => this.#polling.close(),
       () => this.#runtime.dispatcher.close(),
-      () => this.#runtime.store.close(),
+      () => this.#runtime.relay.close(),
     ]) {
       try {
         await close();

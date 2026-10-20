@@ -12,6 +12,7 @@ import { BrowserUiFeedback } from "@langwatch/browser-host/feedback";
 import {
   registerChunkReloadListener,
   reloadOnBundleSwap,
+  signalUiMounted,
 } from "@langwatch/browser-host/navigation";
 import { SessionVersionWatch, sessionVersionFetch } from "@langwatch/browser-host/session-version";
 import {
@@ -36,11 +37,12 @@ import {
   type UiFeatureApiBinding,
   type UiFeatureApiTransport,
 } from "@langwatch/browser/transport";
+import { TYPE_SCALE_PX } from "@langwatch/design-system/typography";
 import { saasWeb } from "@langwatch/enterprise-saas-browser/declaration";
 import { applyFeatureFlagOverridesFromSearch } from "@langwatch/feature-flag-client";
 import { configureDocsRuntime } from "@langwatch/handled-error/docs-url";
 import posthog from "posthog-js";
-import type { ReactNode } from "react";
+import { type ReactNode, useEffect } from "react";
 import { ErrorBoundary } from "react-error-boundary";
 import { useLocation } from "react-router";
 
@@ -90,9 +92,13 @@ function UiAttributionCapture({ children }: { children: ReactNode }) {
 
 /** The last resort: plain, for when even the branded error page cannot draw. */
 function UiBootPageError() {
+  // The app answered: the boot recovery must not reload over its message.
+  useEffect(signalUiMounted, []);
   return (
     <div role="alert" style={{ padding: "3rem", textAlign: "center" }}>
-      <h1 style={{ fontSize: "1.25rem", marginBottom: "0.5rem" }}>This page did not load</h1>
+      <h1 style={{ fontSize: `${TYPE_SCALE_PX.pageTitle}px`, marginBottom: "0.5rem" }}>
+        This page did not load
+      </h1>
       <p style={{ opacity: 0.7 }}>Something went wrong on our side. Try again in a moment.</p>
     </div>
   );
@@ -110,14 +116,13 @@ function browserUiHostServicesHook({
 }: UiRootHostServices) {
   return function useBrowserUiHostServices({
     transport,
-    feedback,
   }: {
     transport: UiFeatureApiTransport;
     feedback: UiFeedback;
   }): UiSessionHostServices {
     const { pathname, search } = useLocation();
     const isPublicRoute = organization.isUiPublicRoute(pathname);
-    const sessionReading = auth.useUiSessionReading({ feedback, isPublicRoute });
+    const sessionReading = auth.useUiSessionReading({ isPublicRoute });
     const scopeReading = organization.useUiScopeReading({ transport, session: sessionReading });
     const session = auth.useBrowserUiSession({
       transport,
@@ -195,6 +200,7 @@ class BrowserUiShell extends UiShell {
           session: browserUiHostServicesHook(rootHostServices),
           hostServices,
           footer: UiSaasFooter,
+          presentation: rootHostServices.navigationChrome.ProductAccentScope,
           capabilities: {
             feedback: BrowserUiFeedback.create(),
             deployment,

@@ -13,7 +13,7 @@ import { describe, expect, it } from "vitest";
 import { BillableEventsMeterProjection } from "../../eventing/billable-events-meter.projection.ts";
 import { BillableEventsMeterRepository } from "../../repositories/billable-events-meter.repository.ts";
 import { MemoryBillableEventsMeterRepository } from "../../repositories/memory/memory.billable-events-meter.repository.ts";
-import { MemoryTraceMeterRepository } from "../../repositories/memory/memory.trace-meter.repository.ts";
+import { MemoryTraceCountRepository } from "../../repositories/memory/memory.trace-count.repository.ts";
 import { decideLimit } from "../../rules/usage-limit.rules.ts";
 import { BillableEventsMeterAppendService } from "../billable-events-meter-append.service.ts";
 import { UsageCountingService } from "../usage-counting.service.ts";
@@ -36,8 +36,8 @@ function plan({ allowance }: { allowance: number }): Plan {
   });
 }
 
-/** A trace meter that counts how often it is read, over the memory twin. */
-class ReadCountingTraceMeter extends MemoryTraceMeterRepository {
+/** A trace count that counts how often it is read, over the memory twin. */
+class ReadCountingTraceMeter extends MemoryTraceCountRepository {
   reads = 0;
 
   constructor() {
@@ -83,12 +83,14 @@ function compose({
 }) {
   const traceMeter = new ReadCountingTraceMeter();
   const log = new WarningLog();
-  for (const traceId of ["t1", "t2", "t3"]) {
-    void traceMeter.insert({
-      record: { organizationId: ORGANIZATION, tenantId: "project_a", traceId, month: MONTH },
-      organizationId: ORGANIZATION,
-    });
-  }
+  void traceMeter.insert({
+    organizationId: ORGANIZATION,
+    rows: ["trace_1", "trace_2", "trace_3"].map((traceId) => ({
+      projectId: "project_a",
+      traceId,
+      month: MONTH,
+    })),
+  });
   const counting = UsageCountingService.create({
     meter,
     traceMeter,

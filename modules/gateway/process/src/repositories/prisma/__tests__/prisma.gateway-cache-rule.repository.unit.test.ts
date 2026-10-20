@@ -110,6 +110,25 @@ describe("PrismaGatewayCacheRuleRepository", () => {
     });
   });
 
+  describe("when the Cache Rules page lists an organization's rules", () => {
+    it("takes live rules in the order the gateway checks them, lowest priority number first", async () => {
+      const { database, calls } = recordingDatabase();
+      const ports = recordingPorts();
+      const repository = PrismaGatewayCacheRuleRepository.create({
+        database,
+        changes: ports.changesPort,
+        audit: ports.auditPort,
+      });
+
+      await repository.findAll("org_01");
+
+      expect(calls.findMany![0]!.args).toEqual({
+        where: { organizationId: "org_01", archivedAt: null },
+        orderBy: [{ priority: "asc" }, { createdAt: "asc" }],
+      });
+    });
+  });
+
   describe("when a rule's action changes", () => {
     let calls: ReturnType<typeof recordingDatabase>["calls"];
     let ports: ReturnType<typeof recordingPorts>;

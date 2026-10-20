@@ -1,4 +1,6 @@
 import type { TriggerKind } from "@langwatch/automation-contract";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Badge, Box, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import {
   type Instant,
@@ -8,7 +10,7 @@ import {
   toDate,
   toEpochMs,
 } from "@langwatch/time";
-import { AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
+import { Activity, AlertTriangle, Calendar, CheckCircle, Zap } from "lucide-react";
 import { useMemo } from "react";
 
 export type AutomationActivityFire = {
@@ -163,19 +165,19 @@ export function AutomationHistory({
 
   if (days.length === 0) {
     return (
-      <Box
-        borderWidth="1px"
-        borderStyle="dashed"
-        borderColor="border"
-        borderRadius="lg"
-        padding={8}
-        textAlign="center"
-      >
-        <Text textStyle="sm" color="fg.muted">
-          Nothing has fired yet. When your automations and reports run, you'll see what they did
-          here.
-        </Text>
-      </Box>
+      <NoDataInfoBlock
+        size="inline"
+        icon={<Activity size={20} />}
+        title="Nothing has fired yet"
+        description="When your automations and reports run, you'll see what they did here."
+        next={[
+          {
+            kind: "docs",
+            label: "Read about automations",
+            href: "https://docs.langwatch.ai/features/automations",
+          },
+        ]}
+      />
     );
   }
 
@@ -186,24 +188,18 @@ export function AutomationHistory({
           <Text textStyle="xs" fontWeight="semibold" color="fg.muted" paddingBottom={2}>
             {dayLabelOf(entries[0]!.at)}
           </Text>
-          <VStack
-            align="stretch"
-            gap={0}
-            borderWidth="1px"
-            borderColor="border.emphasized"
-            borderRadius="md"
-            overflow="hidden"
-            separator={<Box height="1px" bg="border.muted" />}
-          >
-            {entries.map((entry) => (
-              <ActivityRow
-                key={entry.id}
-                entry={entry}
-                formatTimeAgo={formatTimeAgo}
-                onOpen={() => onOpenAutomation(entry.triggerId)}
-              />
-            ))}
-          </VStack>
+          <Card variant="frame" padding="none">
+            <VStack align="stretch" gap={0} separator={<Box height="1px" bg="border.muted" />}>
+              {entries.map((entry) => (
+                <ActivityRow
+                  key={entry.id}
+                  entry={entry}
+                  formatTimeAgo={formatTimeAgo}
+                  onOpen={() => onOpenAutomation(entry.triggerId)}
+                />
+              ))}
+            </VStack>
+          </Card>
         </VStack>
       ))}
     </VStack>
@@ -235,10 +231,10 @@ function ActivityRow({
       <Box color={`${meta.palette}.fg`} display="inline-flex" flexShrink={0}>
         <Icon size={14} />
       </Box>
-      <Text textStyle="sm" fontWeight="medium" flexShrink={0}>
+      <Text textStyle="sm" fontWeight="medium" minWidth={0} truncate title={entry.name}>
         {entry.name}
       </Text>
-      <Badge size="sm" colorPalette={meta.palette} variant="subtle">
+      <Badge size="sm" colorPalette={meta.palette} variant="subtle" flexShrink={0}>
         {meta.label}
       </Badge>
       <Box flex="1" />

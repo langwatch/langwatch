@@ -2,8 +2,9 @@
  * query state (overlays open from ?key=). Same shape as gateway-web. */
 
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
+import type { SsoReplacementImportProps } from "@langwatch/enterprise-sso-contract";
 import { render, type RenderResult } from "@testing-library/react";
-import { useMemo, useState, type ReactElement, type ReactNode } from "react";
+import { useMemo, useState, type ComponentType, type ReactElement, type ReactNode } from "react";
 
 import type { OpsToast, OpsToaster } from "./behavior/ops-feedback.ts";
 import {
@@ -50,6 +51,8 @@ export type FakeOpsHostOptions = {
   query?: OpsQuery;
   /** The whole address including the fragment, for Deja View. */
   asPath?: string;
+  /** The replacement import sso lends; absent unless a test hands one in. */
+  ssoReplacementImport?: ComponentType<SsoReplacementImportProps>;
 };
 
 export class FakeOpsHost extends OpsHostApi {
@@ -172,6 +175,10 @@ export class FakeOpsHost extends OpsHostApi {
 
   failed(failure: OpsFailureNotice): void {
     this.recording.failures.push(failure);
+  }
+
+  ssoReplacementImport(): ComponentType<SsoReplacementImportProps> | undefined {
+    return this.options.ssoReplacementImport;
   }
 }
 

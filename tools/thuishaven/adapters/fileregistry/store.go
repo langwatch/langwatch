@@ -117,6 +117,8 @@ type selectionFile struct {
 // than keeping it: every one of those files says `"workers": false`, and a
 // field would read that as "run no background processing at all".
 type selectionFields struct {
+	// App is the LangWatch app (ui, api, worker), stated positively on disk.
+	App     *bool `json:"app"`
 	Gateway *bool `json:"gateway"`
 	NLP     *bool `json:"nlp"`
 	Langy   *bool `json:"langy"`
@@ -139,6 +141,8 @@ type selectionFields struct {
 	Payment   *bool `json:"paymentsim"`
 	Telemetry *bool `json:"telemetry"`
 	Lambda    *bool `json:"lambda"`
+	Github    *bool `json:"github"`
+	Mcp       *bool `json:"mcp"`
 	// LegacyDesignSystem decodes the pre-rename key (`"storybook"`) a
 	// worktree's .haven.json may still carry. applyTo prefers the new key
 	// when both are present; WriteSelection never writes it, so the next
@@ -149,6 +153,9 @@ type selectionFields struct {
 
 // applyTo overlays the services this file actually states onto sel.
 func (f selectionFields) applyTo(sel *domain.Selection) {
+	if f.App != nil {
+		sel.AppOff = !*f.App
+	}
 	for _, field := range []struct{ stated, legacy, target *bool }{
 		{f.Gateway, nil, &sel.Gateway},
 		{f.NLP, nil, &sel.NLP},
@@ -166,6 +173,8 @@ func (f selectionFields) applyTo(sel *domain.Selection) {
 		{f.Payment, nil, &sel.Payment},
 		{f.Telemetry, nil, &sel.Telemetry},
 		{f.Lambda, nil, &sel.Lambda},
+		{f.Github, nil, &sel.Github},
+		{f.Mcp, nil, &sel.Mcp},
 	} {
 		switch {
 		case field.stated != nil:
@@ -208,7 +217,9 @@ func (s *Store) ReadSelection(worktreeDir string) (domain.Selection, bool) {
 // on the default-keeping behaviour above — that is there for files it did not
 // write.
 func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
+	isAppOn := !sel.AppOff
 	b, err := json.MarshalIndent(selectionFile{Mode: sel.Mode, Services: &selectionFields{
+		App:          &isAppOn,
 		Gateway:      &sel.Gateway,
 		NLP:          &sel.NLP,
 		Langy:        &sel.Langy,
@@ -225,6 +236,8 @@ func (s *Store) WriteSelection(worktreeDir string, sel domain.Selection) error {
 		Payment:      &sel.Payment,
 		Telemetry:    &sel.Telemetry,
 		Lambda:       &sel.Lambda,
+		Github:       &sel.Github,
+		Mcp:          &sel.Mcp,
 	}}, "", "  ")
 	if err != nil {
 		return err
@@ -485,7 +498,6 @@ func readHeavyRunClaim(path string) (heavyRunClaim, bool) {
 // A timestamp in the FUTURE is expired, not fresh. Its age is negative, so it
 // would otherwise sit under the TTL until that date arrived — a clock rollback
 // or one corrupt record holding machine-wide capacity for as long as it likes.
-// The same rule as domain.LiveSpawns, for the same reason.
 func (s *Store) heavyRunExpired(path string) bool {
 	rec, ok := readHeavyRunClaim(path)
 	if !ok {
@@ -554,6 +566,12 @@ type WaiterClaim struct {
 	AgentID         string            `json:"agentId,omitempty"`
 	QueuedAt        time.Time         `json:"queuedAt"`
 	OverrideHonored bool              `json:"overrideHonored,omitempty"`
+	// Blocked marks a run that is part of a boot someone is waiting on.
+	Blocked bool `json:"blocked,omitempty"`
+	// Class, Units and Worktree name what the run will take of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // WaiterSnapshot is one currently-queued run, as WaiterClaim plus the pid it
@@ -589,6 +607,16 @@ func (s *Store) ClaimWaiter(pid int, name string, claim WaiterClaim) (func(), er
 // dead pid or an expired marker is swept as it is found rather than reported,
 // and a marker this cannot parse is dropped rather than reaching code that
 // assumes its fields.
+// WaiterClaims is WaiterSnapshots as unit claims, for `haven status`.
+func (s *Store) WaiterClaims(name string) []domain.SlotClaim {
+	snaps := s.WaiterSnapshots(name)
+	out := make([]domain.SlotClaim, 0, len(snaps))
+	for _, w := range snaps {
+		out = append(out, domain.SlotClaim{PID: w.PID, Class: w.Class, Units: w.Units, Worktree: w.Worktree, Label: w.Command, StartedAt: w.QueuedAt})
+	}
+	return out
+}
+
 func (s *Store) WaiterSnapshots(name string) []WaiterSnapshot {
 	dir := s.waitersDir(name)
 	entries, err := os.ReadDir(dir)
@@ -650,6 +678,10 @@ func (s *Store) holdersDir(name string) string { return filepath.Join(s.home, "h
 type HolderClaim struct {
 	Label     string    `json:"label"`
 	StartedAt time.Time `json:"startedAt"`
+	// Class, Units and Worktree name what the run holds of the unit budget.
+	Class    string `json:"class,omitempty"`
+	Units    int    `json:"units,omitempty"`
+	Worktree string `json:"worktree,omitempty"`
 }
 
 // HolderSnapshot is one live slot holder, with the pid it registered under.

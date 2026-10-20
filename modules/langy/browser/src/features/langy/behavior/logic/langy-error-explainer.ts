@@ -1,5 +1,6 @@
 import {
   explainHandledError,
+  PROVIDER_ALLOWANCE_REASONS,
   PROVIDER_CONFIG_PROBLEMS,
   PROVIDER_CREDENTIAL_REASONS,
   PROVIDER_INVALID_REQUEST_REASONS,
@@ -106,6 +107,10 @@ export const KNOWN_LANGY_ERROR_KINDS = [
   // classifier — so they need their own copy rather than the generic default.
   "langy_model_not_configured",
   "langy_model_not_allowed",
+  "langy_agent_not_configured",
+  "langy_not_enabled",
+  "langy_skill_not_available",
+  "langy_dispatch_rejected",
   "langy_egress_misconfigured",
   "langy_insufficient_scope",
   "langy_turn_in_progress",
@@ -367,16 +372,31 @@ export function resolveLiveTurnError({
   error: { message: string } & object;
   durableLastError: string | null | undefined;
 }): LangyDomainError {
+  const durable = durableLastError ? readLangyStreamError(durableLastError) : null;
+  const slug = readLangyCodeSlug(error.message);
+  // A bare code names the same failure as the durable record, which holds its reasons.
+  const bareCode = slug && durable?.code === slug.code ? durable : slug;
   return (
     readLangyTrpcError(error) ??
     readLangyStreamError(error.message) ??
-    (durableLastError ? readLangyStreamError(durableLastError) : null) ?? {
+    bareCode ??
+    durable ?? {
       code: "unknown",
       meta: {},
       httpStatus: 500,
       retryable: false,
     }
   );
+}
+
+/**
+ * A tRPC refusal whose envelope was dropped on the way (the chat SDK keeps only the
+ * message) still carries its code: the wire message is the code slug.
+ */
+function readLangyCodeSlug(message: string): LangyDomainError | null {
+  const code = message.trim();
+  if (!(KNOWN_LANGY_ERROR_KINDS as readonly string[]).includes(code)) return null;
+  return { code, meta: {}, httpStatus: 500, retryable: false };
 }
 
 /** Read a Langy domain error off a tRPC client error (`error.data.error`). */
@@ -522,11 +542,12 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
     }
 
     case "llm_upstream_error": {
-      // The provider was reached and refused. A refused key, a model it
-      // does not serve or a request it reads as invalid fails the same way
-      // every time, so the card offers the model settings; anything else (a
+      // The provider was reached and refused. A refused key, a spent balance, a
+      // model it does not serve or a request it reads as invalid fails the same
+      // way every time, so the card offers the model settings; anything else (a
       // rate limit, an outage) can pass, so it offers another try.
       const deterministic =
+        hasReasonKind(domain.reasons, PROVIDER_ALLOWANCE_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_CREDENTIAL_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_MODEL_MISSING_REASONS) ||
         hasReasonKind(domain.reasons, PROVIDER_INVALID_REQUEST_REASONS);
@@ -601,6 +622,15 @@ export function explainLangyError(received: LangyDomainError): LangyErrorPresent
         traceId: domain.traceId,
         ...debug,
       };
+
+    case "langy_agent_not_configured":
+    case "langy_not_enabled":
+    case "langy_skill_not_available":
+    case "langy_dispatch_rejected":
+      // Refusals that answer the same way every time: a deployment without an agent,
+      // Langy off for the account, a skill this project lacks, a request the agent
+      // reads as invalid. No retry, which could only fail again.
+      return { ...copy, render: "card", ...debug };
 
     case "langy_egress_misconfigured":
       // Fail-closed network policy: Langy refuses to run rather than leak. Not a

@@ -58,6 +58,10 @@ class TableRecordingRepository extends AnalyticsRepository {
     return Promise.resolve({ events: [] });
   }
 
+  async findFeedbackEventsPage() {
+    return { rows: [], hasMore: false };
+  }
+
   findTopDocuments(): Promise<AnalyticsTopDocumentsResult> {
     return Promise.resolve({ topDocuments: [], totalUniqueDocuments: 0 });
   }

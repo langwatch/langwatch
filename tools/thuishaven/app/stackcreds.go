@@ -75,7 +75,7 @@ func (o *Orchestrator) removeStackCredentials(slug string) {
 	}
 }
 
-// toolEnv is what `haven env` hands a shell or a diff tool: the overlay, the
+// toolEnv is what `haven env` hands a shell or a tool: the overlay, the
 // generated credentials, and the model keys the tools need, taken from where
 // the stack itself resolves them (.env under the shell).
 func (o *Orchestrator) toolEnv(st domain.Stack) []string {

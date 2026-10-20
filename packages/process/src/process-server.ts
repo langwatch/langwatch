@@ -9,6 +9,7 @@ import { z } from "zod";
 
 import { bootInstalledProcess } from "./boot-installed-process.ts";
 import { processShutdownDeadlineMs } from "./lifecycle/shutdown-deadline.ts";
+import { warnIgnoredMigrationSkips } from "./migration/ignored-migration-skips.ts";
 import {
   type UpgradeGate,
   upgradeGateComponent,
@@ -37,7 +38,7 @@ import { processSurface } from "./transport/process-surface.ts";
 
 /** What `run` may be handed: a booted worker also lists its steps. */
 type RunnableApplication = ServedApplication &
-  Partial<Pick<BootedApplication, "migrationSteps" | "role">>;
+  Partial<Pick<BootedApplication, "migrationSteps" | "role" | "runListedWork">>;
 
 type ParsedConfig = Readonly<Record<string, unknown>>;
 
@@ -96,9 +97,20 @@ export class ProcessServer implements ProcessBoot {
     if (!this.config.http)
       throw new Error("The HTTP config owner must be installed before exposing transports.");
     const config = this.config.http as ApiHostConfig;
+    const storage = (this.config.stores as StoresConfig | undefined)?.objectStorage;
     return {
       production: this.production,
       assetOrigin: assetBaseOrigin(normalizeAssetBase(config.assetBase)),
+      ...(storage
+        ? {
+            storage: {
+              s3Endpoint: storage.s3.endpoint,
+              s3Region: storage.s3.region,
+              s3Bucket: storage.s3.bucket,
+              azureBlobEndpoint: storage.azure.endpoint,
+            },
+          }
+        : {}),
     };
   }
 
@@ -208,7 +220,9 @@ export class ProcessServer implements ProcessBoot {
           }),
         );
       }
-      this.server.with(hostedStores(members));
+      this.server.with(
+        hostedStores({ source: members, drainTimeoutMs: config.shutdownDrainTimeoutMs }),
+      );
       // Hosted after the members, so the doors close their sessions while the stores are open.
       const hosted = doors;
       if (hosted) this.server.with({ name: "raw http doors", stop: () => hosted.close() });
@@ -247,6 +261,7 @@ export class ProcessServer implements ProcessBoot {
     logger: ServerLogger;
   }): void {
     this.upgradeGate = gate;
+    if (role === "worker") warnIgnoredMigrationSkips({ skips: this.settings, logger });
     this.server.with(
       upgradeGateComponent({
         server: this.server.name,
@@ -272,7 +287,8 @@ export class ProcessServer implements ProcessBoot {
       handler: application.handler,
       start: async () => {
         await application.start();
-        running = background.start(steps);
+        const runListedWork = application.runListedWork?.bind(application);
+        running = background.start(steps, runListedWork ? { runListedWork } : undefined);
       },
       stop: async () => {
         await running?.stop();
@@ -295,4 +311,6 @@ const processSettings = z.object({
   nlpCodeBlockTimeoutSeconds: z.string().optional(),
   outboundProxy: z.record(z.string(), z.string().optional()).optional(),
   rawSocketPort: z.number().int().min(0).max(65535).default(3300),
+  skipPrismaMigrate: z.string().optional(),
+  skipClickHouseMigrate: z.string().optional(),
 });

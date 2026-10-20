@@ -19,7 +19,15 @@ export type TraceIdPeekProps = {
 
 /** What an empty state hands trace's "Setup via Agent" menu. */
 export type SetupWithAgentButtonProps = {
-  surface: "simulations" | "simulationRuns" | "connectedAgents" | "prompts" | "evaluators";
+  surface:
+    | "simulations"
+    | "simulationRuns"
+    | "connectedAgents"
+    | "prompts"
+    | "evaluators"
+    | "onlineEvaluations"
+    | "experiments"
+    | "datasets";
   size?: "sm" | "md";
 };
 

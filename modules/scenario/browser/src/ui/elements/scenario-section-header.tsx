@@ -7,7 +7,7 @@ type ScenarioSectionHeaderProps = {
 export function ScenarioSectionHeader({ children, ...props }: ScenarioSectionHeaderProps) {
   return (
     <Text
-      fontSize="11px"
+      textStyle="micro"
       fontWeight="bold"
       textTransform="uppercase"
       color="fg.muted"

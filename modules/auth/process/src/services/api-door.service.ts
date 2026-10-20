@@ -1,12 +1,5 @@
 import type { Entitlements } from "@langwatch/api/access";
-import type {
-  ApiDoor,
-  RestAuditRow,
-  RestAuditSink,
-  RestCaller,
-  RestIdentity,
-  TrpcAuditSink,
-} from "@langwatch/api/hosting";
+import type { ApiDoor, RestCaller, RestIdentity } from "@langwatch/api/hosting";
 import {
   ForbiddenError,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -14,7 +7,7 @@ import {
   recordOrganizationCredential,
   recordProjectCredential,
 } from "@langwatch/api/rest";
-import { recordAuditLogCommandSchema, type AuditLogApi } from "@langwatch/audit-log-contract";
+import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type { AuthApi } from "@langwatch/auth-contract";
 import { PermissionDeniedError, type Actor, type Authorization } from "@langwatch/authorization";
 import {
@@ -34,6 +27,7 @@ import {
 } from "@langwatch/identity-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 
+import { ApiDoorAuditService } from "./api-door-audit.service.ts";
 import {
   ApiRestCredentialsService,
   type ApiRestCredentialPeers,
@@ -80,6 +74,7 @@ export class ApiDoorService {
   readonly #peers: ApiDoorPeers;
   readonly #credentials: ApiRestCredentialsService;
   readonly #sessions: BrowserSessionVerificationService;
+  readonly #audit: ApiDoorAuditService;
   readonly #callerCredentials = new WeakMap<RestCaller, ApiOrganizationCredential["resolved"]>();
   readonly #projectCredentials = new WeakMap<RestCaller, ApiProjectCredential>();
   readonly #standings = new Map<string, Promise<OrganizationMfaStanding>>();
@@ -93,6 +88,7 @@ export class ApiDoorService {
       organizations: peers.organizations,
     });
     this.#sessions = BrowserSessionVerificationService.create({ sessions: peers.sessions });
+    this.#audit = ApiDoorAuditService.create({ authz: peers.authz, auditLog: peers.auditLog });
   }
 
   door(): ApiDoor {
@@ -108,7 +104,7 @@ export class ApiDoorService {
         api_key: this.#keyDoor(),
       },
       entitlements: this.#planEntitlements(),
-      audit: { rest: this.#restAudit(), trpc: this.#trpcAudit() },
+      audit: { rest: this.#audit.restAudit(), trpc: this.#audit.trpcAudit() },
     };
   }
 
@@ -128,14 +124,7 @@ export class ApiDoorService {
           scope: { type: "platform" },
         }),
       }),
-      organizationOf: async (scope) => {
-        const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
-        const resolved = await authz.getScope(ids).catch((error: unknown) => {
-          if (AuthzScopeNotFoundError.is(error)) return null;
-          throw error;
-        });
-        return resolved?.type === scope.tier ? resolved.organizationId : null;
-      },
+      organizationOf: async (scope) => (await this.#audit.findOrganizationIds(scope))[0] ?? null,
       projectKindOf: (projectId) => this.#projectKindOf(projectId),
       authorization: (input) => this.#mintProof(input),
       assertSecondFactor: (input) => this.#assertSecondFactor(input),
@@ -390,100 +379,6 @@ export class ApiDoorService {
             ),
     };
   }
-
-  #restAudit(): RestAuditSink {
-    const audit = this.#peers.auditLog;
-
-    return {
-      record: async (row) => {
-        const { organizationId, projectId } = await this.#auditScopeOf(row);
-        const metadata: Record<string, string> = { channel: "api" };
-        if (row.impersonatorId) metadata.impersonatorId = row.impersonatorId;
-        if (row.actorId && row.apiKeyId) metadata.apiKeyId = row.apiKeyId;
-        await audit.record({
-          userId: auditUserIdOf(row),
-          action: row.action,
-          args: { ...row.params, scope: row.scope },
-          projectId,
-          organizationId,
-          targetId: row.resultId || void 0,
-          error: row.errorCode,
-          metadata,
-          ...(row.impersonatorId ? { actorUserId: row.impersonatorId } : {}),
-          ...(row.ipAddress ? { ipAddress: row.ipAddress } : {}),
-          ...(row.userAgent ? { userAgent: row.userAgent } : {}),
-        });
-      },
-    };
-  }
-
-  /** E11: a REST row's organization and project come from its declared scope, else its path. */
-  async #auditScopeOf(
-    row: RestAuditRow,
-  ): Promise<{ organizationId: string | undefined; projectId: string | undefined }> {
-    const param = (name: string) =>
-      typeof row.params[name] === "string" ? (row.params[name] as string) : void 0;
-    const { scope } = row;
-    if (scope?.tier === "organization") {
-      return { organizationId: scope.id, projectId: param("projectId") };
-    }
-    if (scope?.tier === "project" || scope?.tier === "team") {
-      const organizationId =
-        (await this.#organizationOf({ tier: scope.tier, id: scope.id })) ?? param("organizationId");
-      const projectId = scope.tier === "project" ? scope.id : param("projectId");
-      return { organizationId, projectId };
-    }
-
-    return { organizationId: param("organizationId"), projectId: param("projectId") };
-  }
-
-  /** The organization holding a project or team; null where authz resolves no such scope. */
-  async #organizationOf(scope: { tier: "project" | "team"; id: string }): Promise<string | null> {
-    const ids = scope.tier === "project" ? { projectId: scope.id } : { teamId: scope.id };
-    const resolved = await this.#peers.authz.getScope(ids).catch((error: unknown) => {
-      if (AuthzScopeNotFoundError.is(error)) return null;
-      throw error;
-    });
-    return resolved?.type === scope.tier ? resolved.organizationId : null;
-  }
-
-  #trpcAudit(): TrpcAuditSink {
-    const audit = this.#peers.auditLog;
-
-    return {
-      record: async (entry) => {
-        let args: unknown;
-        if (entry.args !== void 0) args = JSON.parse(JSON.stringify(entry.args));
-        await audit.record(
-          recordAuditLogCommandSchema.parse({
-            userId: entry.userId,
-            action: entry.action,
-            args,
-            organizationId: entry.organizationId,
-            projectId: entry.projectId,
-            error: entry.error?.toString(),
-            targetKind: entry.targetKind,
-            targetId: entry.targetId,
-            metadata: { ...entry.metadata, channel: "app" },
-            actorUserId: entry.actorUserId,
-            ipAddress: entry.ipAddress,
-            userAgent: entry.userAgent,
-          }),
-        );
-      },
-      organizationOf: (scope) => this.#organizationOf(scope),
-    };
-  }
-}
-
-/**
- * Whom a REST row names (E11): its person, a key acting as nobody as `apikey:<id>` (main's
- * spelling, `managementActor`), else no one.
- */
-function auditUserIdOf(row: RestAuditRow): string {
-  if (row.actorId) return row.actorId;
-
-  return row.apiKeyId ? `apikey:${row.apiKeyId}` : "anonymous";
 }
 
 function projectCaller(request: Request, credential: ApiProjectCredential): RestCaller {

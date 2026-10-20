@@ -13,7 +13,7 @@
   },
   "scripts": {
     "build": "node scripts/build-child.mjs",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -24,7 +24,6 @@
     "@langwatch/automation-contract": "workspace:*",
     "@langwatch/config": "workspace:*",
     "@langwatch/egress": "workspace:*",
-    "@langwatch/handled-error": "workspace:*",
     "@langwatch/ksuid": "workspace:*",
     "@langwatch/observability": "workspace:*",
     "@langwatch/process": "workspace:*",
@@ -37,9 +36,10 @@
     "@opentelemetry/api-logs": "catalog:",
     "@opentelemetry/context-async-hooks": "catalog:",
     "@opentelemetry/core": "catalog:",
-    "@opentelemetry/exporter-logs-otlp-http": "catalog:",
-    "@opentelemetry/exporter-trace-otlp-http": "catalog:",
+    "@opentelemetry/exporter-logs-otlp-proto": "catalog:",
+    "@opentelemetry/exporter-trace-otlp-proto": "catalog:",
     "@opentelemetry/instrumentation": "catalog:",
+    "@opentelemetry/otlp-exporter-base": "catalog:",
     "@opentelemetry/resources": "catalog:",
     "@opentelemetry/sdk-logs": "catalog:",
     "@opentelemetry/sdk-metrics": "catalog:",

@@ -25,7 +25,7 @@ const (
 	SeededOrgKey = "sk-lw-LocalDevPrivate1_LocalDevPrivateAccessTokenSecretFixedValue000000" // #nosec G101 -- the public local-dev token every haven stack seeds.
 )
 
-// ToolOrg is one tool's own organisation on the shared stack: its org key, a
+// ToolOrg is one tool's own organization on the shared stack: its org key, a
 // project (key and id), and a read-only key, so every tool seeds the same way.
 // Separate reports whether it is a genuinely separate tenant (admin-key mode)
 // or the shared seeded org (fallback), which the cross-tenant oracle needs.
@@ -57,7 +57,7 @@ type SeedOptions struct {
 
 // The ceremony signs in as the seeded local-dev admin (the account behind the
 // stack's ADMIN_EMAILS) over /api/auth/sign-in/email, then creates the tool's
-// own organisation with organization.createAndAssign. HTTP sign-up is not
+// own organization with organization.createAndAssign. HTTP sign-up is not
 // mounted here (404) and POST /api/organizations needs an instance admin key
 // the stack has not configured, so this is the path that works.
 const (
@@ -71,9 +71,9 @@ const (
 // CeremonyEmail is the sign-in identity the UI runner uses: the seeded admin.
 func CeremonyEmail(string) string { return SeededAdminEmail }
 
-// SeedToolOrg provisions (or reuses) the tool's organisation through the public
+// SeedToolOrg provisions (or reuses) the tool's organization through the public
 // API, idempotent and recorded, under a flock. With an admin key it makes a
-// separate organisation; without one it uses the seeded org and dedicated
+// separate organization; without one it uses the seeded org and dedicated
 // projects. It never seeds twice at once and never restarts the stack.
 func SeedToolOrg(ctx context.Context, options SeedOptions) (ToolOrg, error) {
 	if options.Projects < 1 {
@@ -92,7 +92,7 @@ func SeedToolOrg(ctx context.Context, options SeedOptions) (ToolOrg, error) {
 	seeder := &orgSeeder{options: options, client: clientOr(options.Client)}
 	seeder.origin = options.BaseURL
 	if org, ok := seeder.reuse(ctx, path); ok {
-		say(fmt.Sprintf("seed: %s reuses its recorded organisation", options.Tool))
+		say(fmt.Sprintf("seed: %s reuses its recorded organization", options.Tool))
 		return org, nil
 	}
 	org, err := seeder.provision(ctx)
@@ -177,7 +177,7 @@ func seededFallbackOrg(tool string) ToolOrg {
 }
 
 // baseOrg runs the sign-up ceremony: a fresh user, whose onboarding creates
-// the tool's own organisation, then an org service key minted through the
+// the tool's own organization, then an org service key minted through the
 // session. This is the path that works on any stack (POST /api/organizations
 // needs a configured instance admin key it does not have here).
 func (seeder *orgSeeder) baseOrg(ctx context.Context) (ToolOrg, error) {
@@ -214,12 +214,12 @@ func (seeder *orgSeeder) authenticated(ctx context.Context) bool {
 }
 
 // grantPending is the code createAndAssign returns while the founder's ADMIN
-// grants are still being confirmed. The organisation itself is already
+// grants are still being confirmed. The organization itself is already
 // committed, so the ceremony polls getAll for it rather than retrying (which
-// would strand a second, empty organisation).
+// would strand a second, empty organization).
 const grantPending = "authz_grant_not_confirmed"
 
-// createOrganization makes the tool's own organisation, then waits for the
+// createOrganization makes the tool's own organization, then waits for the
 // grant to confirm by polling getAll for it, returning its confirmed ids.
 func (seeder *orgSeeder) createOrganization(ctx context.Context) (orgID, teamID string, err error) {
 	_, code, postErr := seeder.trpcPost(ctx, "organization.createAndAssign", map[string]any{"orgName": seeder.options.Tool})
@@ -229,7 +229,7 @@ func (seeder *orgSeeder) createOrganization(ctx context.Context) (orgID, teamID 
 	return seeder.awaitOrganization(ctx)
 }
 
-// awaitOrganization polls getAll until the tool's organisation is visible (its
+// awaitOrganization polls getAll until the tool's organization is visible (its
 // grant confirmed), returning its id and first team id.
 func (seeder *orgSeeder) awaitOrganization(ctx context.Context) (string, string, error) {
 	deadline := time.Now().Add(15 * time.Second)
@@ -246,7 +246,7 @@ func (seeder *orgSeeder) awaitOrganization(ctx context.Context) (string, string,
 	}
 }
 
-// lookupOrganization asks getAll once for the tool's organisation; on a first
+// lookupOrganization asks getAll once for the tool's organization; on a first
 // miss with report set it tells Progress what getAll answered.
 func (seeder *orgSeeder) lookupOrganization(ctx context.Context, report bool) (orgID, teamID string, ok bool) {
 	raw, code, err := seeder.trpcGet(ctx, "organization.getAll", map[string]any{})
@@ -261,7 +261,7 @@ func (seeder *orgSeeder) lookupOrganization(ctx context.Context, report bool) (o
 	return "", "", false
 }
 
-// orgNames lists getAll's organisation names, each followed by a space.
+// orgNames lists getAll's organization names, each followed by a space.
 func orgNames(raw any) string {
 	names := ""
 	list, _ := raw.([]any)
@@ -283,7 +283,7 @@ func pause(ctx context.Context) error {
 	}
 }
 
-// findOrg picks the tool's organisation (the last match, so a re-run's newest
+// findOrg picks the tool's organization (the last match, so a re-run's newest
 // wins) from getAll's list and returns its id and first team id.
 func findOrg(raw any, name string) (orgID, teamID string, ok bool) {
 	list, _ := raw.([]any)
@@ -305,7 +305,7 @@ func findOrg(raw any, name string) (orgID, teamID string, ok bool) {
 	return orgID, teamID, ok
 }
 
-// mintOrgKey mints an all-permissions service key for the organisation, the org
+// mintOrgKey mints an all-permissions service key for the organization, the org
 // key every later seeding call authenticates with. It retries while the founder
 // ADMIN grant is still confirming (api_key_admin_required), the same eventual
 // consistency that makes createAndAssign answer grant-pending.
@@ -331,7 +331,7 @@ func (seeder *orgSeeder) mintOrgKey(ctx context.Context, orgID string) (string, 
 func (seeder *orgSeeder) tryMintOrgKey(ctx context.Context, input map[string]any) (token string, retry bool, err error) {
 	result, code, err := seeder.trpcPost(ctx, "apiKey.create", input)
 	if code == "api_key_admin_required" && err != nil {
-		return "", true, nil
+		return "", true, nil //nolint:nilerr // the founder grant is still confirming: retry, not fail
 	}
 	if err != nil {
 		return "", false, fmt.Errorf("apiKey.create: %s: %w", code, err)

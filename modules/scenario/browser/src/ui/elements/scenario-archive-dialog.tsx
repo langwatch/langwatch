@@ -1,5 +1,5 @@
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, List, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
+import { List, Text, VStack } from "@langwatch/design-system/primitives";
 
 import type { ScenarioArchiveItem } from "../../model/scenario-list.types.ts";
 
@@ -22,59 +22,37 @@ export function ScenarioArchiveDialog({
   const title = isBatch ? `Archive ${scenarios.length} scenarios?` : "Archive scenario?";
 
   return (
-    <Dialog.Root open={open} onOpenChange={onClose} placement="center">
-      <Dialog.Content maxWidth="500px" onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>{title}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack align="stretch" gap={4}>
-            {isBatch ? (
-              <List.Root paddingLeft={4}>
-                {scenarios.map((scenario) => (
-                  <List.Item key={scenario.id} fontSize="sm">
-                    {scenario.name}
-                  </List.Item>
-                ))}
-              </List.Root>
-            ) : (
-              scenarios[0] && (
-                <Text>
-                  <Text as="span" fontWeight="semibold">
-                    {scenarios[0].name}
-                  </Text>
-                </Text>
-              )
-            )}
-            <Text color="fg.muted" fontSize="sm">
-              Archived scenarios will no longer appear in the library.
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      size="md"
+      placement="center"
+      busy={isLoading}
+      primaryAction={{ label: "Archive", loading: isLoading, onClick: onConfirm }}
+    >
+      <VStack align="stretch" gap={4}>
+        {isBatch ? (
+          <List.Root paddingLeft={4}>
+            {scenarios.map((scenario) => (
+              <List.Item key={scenario.id} fontSize="sm">
+                {scenario.name}
+              </List.Item>
+            ))}
+          </List.Root>
+        ) : (
+          scenarios[0] && (
+            <Text>
+              <Text as="span" fontWeight="semibold">
+                {scenarios[0].name}
+              </Text>
             </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button
-            variant="outline"
-            onClick={(e) => {
-              e.stopPropagation();
-              onClose();
-            }}
-            disabled={isLoading}
-          >
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={(event) => {
-              event.stopPropagation();
-              onConfirm();
-            }}
-            disabled={isLoading}
-          >
-            {isLoading ? <Spinner size="sm" /> : "Archive"}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+          )
+        )}
+        <Text color="fg.muted" fontSize="sm">
+          Archived scenarios will no longer appear in the library.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }

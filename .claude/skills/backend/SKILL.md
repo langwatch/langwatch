@@ -10,9 +10,10 @@ argument-hint: "<question or backend task>"
 Read `dev/docs/ARCHITECTURE.md` first — this skill is a pointer into it, plus
 the procedure. `@langwatch/process` is the Node runtime **and** the
 process-half vocabulary: `Server`, the container, `defineProcessModule`,
-`defineRepositories`, `definePipeline`. An application (`apps/api`,
-`apps/worker`, `apps/tasks`) is only `main.ts` + `config.ts` — everything else
-lives in a module's `process/` package or in this framework. Full shape:
+`defineRepositories`; `definePipeline` comes from `@langwatch/eventing`. An application (`apps/api`,
+`apps/worker`, `apps/tasks`, and `apps/backend`, which hosts the api and worker in one process) is only
+`main.ts` + `config.ts`; everything else lives in a module's `process/` package or in this
+framework (the isolated `apps/scenario-child` is the one narrow runner). Full shape:
 record §2, §4. In depth: `process-composition` (§4-§7) and
 `module-dependencies` (§3.3, §6, §11).
 
@@ -24,13 +25,15 @@ const server = await Server.create("langwatch-api")
   .withEnvironment(processEnvironment) // config.ts: the one process.env seam
   .withConfig(processConfig(processModules)) // the installed list IS the schema
   .withSecrets((config, secrets) => secrets.withEnv().withFile())
+  .withUpgradeGate({ role: "api", gate: servingUpgradeGate })
   .withTelemetry(processTelemetry("langwatch-api"))
   .start();
 const app = await server
   .container("api")
   .exposeTransports((transports) => transports.trpc().rest().browserBundle())
   .boot();
-await server.serve(app); // worker: server.container("worker").boot(), server.run(app)
+await server.serve(app);
+// worker: server.container("worker").boot({ classifyEventLogRetention }), then server.run(app)
 ```
 
 `boot()` (record §5): the container opens the stores, orders installers by
@@ -54,11 +57,15 @@ tasks, a module's own declared with `.withTasks(...)` (§5). A test passes no
 server: `bootInstalledProcess({ role: "api", ... })` registers nothing
 anywhere and returns the runtime for the test to drive (see Testing, below).
 
+The shipped backend (`apps/backend`, `runBackend` from `@langwatch/process/backend-host`) runs the api
+and the worker in one Node process, as `npx @langwatch/server` does; dev-runtime reuses the same host.
+
 ## A module's process half (record §3.2)
 
 ```ts
 // modules/<name>/process/src/<name>.module.ts — the installer; the class is app/<name>.app.ts (§3.2)
-export const <name>ProcessModule = defineProcessModule("<name>")
+export const <name>ProcessModule: PublishedProcessModule<"<name>", <Name>Api, <Name>ServerConfig> =
+  defineProcessModule("<name>")
   .withRepositories(<name>Repositories)   // registry: { live, memory }
   .withChannels(<name>Channels)           // registry: { live, memory }; only if it has channels
   .withApi(<Name>Module)                  // the one class implementing <Name>Api
@@ -67,10 +74,13 @@ export const <name>ProcessModule = defineProcessModule("<name>")
 ```
 
 No `.build()`; every `with*` result is installable. `index.ts` exports the
-installer and transport declarations, **nothing else**. The installer and the
-`<Name>Module` class share this one file on purpose — the file is the
-module's identity, and the class stays thin forwarding onto `services/`
-(private, `#`-prefixed), which carry the weight. `<Name>Module` never holds a
+installer and transport declarations, **nothing else**. The installer is annotated
+`PublishedProcessModule<name, Api, Config>` (`@langwatch/process`), an opaque type, so the module
+class, repositories and generated database types never reach the emitted `.d.ts`; a test reads the
+module through its Api, and boot still refuses a missing store by name. The installer lives in
+`<name>.module.ts`, the module's identity (`modules/monitor/process/src/monitor.module.ts`); the
+`<Name>Module` class lives in `app/<name>.app.ts` and stays thin, forwarding onto `services/`
+held in private, `#`-prefixed fields, which carry the weight. `<Name>Module` never holds a
 raw client, another service, or a peer's internals.
 
 Folder grammar (linter-enforced): `services/` (one class per entity, never
@@ -101,7 +111,12 @@ container calls (record §3.2, §5). There are no members (§3.3).
    the module decides it from its own config and secrets, and its public
    config projects the answer to the browser. Off refuses by name with a
    stable code, or is a visible state; never a silent absence. Nothing
-   outside the module answers it (no supply tokens, no `.provide`).
+   outside the module answers it (no supply tokens; `.provide` survives only as a test stand-in
+   for a channel-bound `*Api`, record §3.3).
+
+A fifth shape is sanctioned for one case: a **channel bound to another module's `*Api`**
+(`static readonly binds = { key: XApi }`, received as `bound.key` in the channel's `create`). It
+is not a peer and adds no peer-cycles edge (record §5; `modules/analytics/process/src/channels/analytics.channels.ts`).
 
 If a need does not fit one of the four, it is an architecture decision — stop
 and say so; do not invent a fifth path (an optional constructor argument, a
@@ -131,7 +146,8 @@ export const <name>TrpcTransport = defineTrpcRouter(<Name>Api, <name>Trpc)
     .handle(({ app, input }) => app.create(input))
   .build();
 
-// REST: one complete endpoint per route, withInput/withOutput mandatory
+// REST: one complete endpoint per route; a single-response route declares withOutput,
+// a multi-status route declares .responds(...) (see api-transports)
 export const <name>Rest = defineRestRouter(<Name>Api)
   .withNamespace("<name>s").withVersion(MANAGEMENT_API_VERSION)
   .post("/", "create<Name>")
@@ -151,17 +167,18 @@ hand-written map for a namespace the module owns.
 
 ## The worker role (record §4, §9)
 
-The worker is **the same process file** with `server.container("worker")` and
-`server.run()` instead of `serve()`. The role decides what `boot()` hosts —
-subscriptions, projections and process managers instead of HTTP doors —
-nothing more. Boot order is
-worker then api; **shutdown drains the worker before closing the api
+The worker is the same chain with `server.container("worker")`, `server.run()` instead of
+`serve()`, and a required retention classifier: `.boot({ classifyEventLogRetention })`
+(`apps/worker/src/main.ts`). The role decides what `boot()` hosts: subscriptions, projections and
+process managers instead of HTTP doors. The shipped backend starts both halves together (the api
+answers at once while the worker upgrades); **shutdown drains the worker before closing the api
 listener**, because worker consumers call back into the api's in-process graph.
 Every eventing consumer registers **drain-first** on `server.graceful` — a
 structural fact, not a convention someone could skip.
 
 The worker also owns the upgrade: at boot, while the ledger is behind its image, its gate runs
-`pnpm task upgrade` under the runner's lease and takes no job until the ledger is current; the api
+the upgrade in-process (`runImageUpgrade`) under the runner's lease and takes no job until the ledger
+is current; `pnpm task upgrade` is the run-once entry to the same code. The api
 holds nothing and serves every route meanwhile (`upgrade` skill, UPGRADE-IN-WORKER, NO-HOLDS).
 
 A module declares its whole pipeline once:
@@ -189,8 +206,9 @@ Worker semantics: delivery is at-least-once, so every subscriber must be
 idempotent; ordering is per aggregate via the group queue, so one poisoned
 aggregate retries with backoff without blocking its neighbours; projections
 fold from the same ordered stream. A reaction to another module's event is a
-`withPeerSubscriber` in the reacting module that sends its own command (§9);
-its edge runs reactor → owner, so it closes no cycle. A subscriber follows
+`withPeerSubscriber` in the reacting module; it writes its own read-model row directly, and sends
+its own command only when the reaction is a fact others react to (§9). Its edge runs
+reactor → owner, so it closes no cycle. A subscriber follows
 the same rules as any other process code.
 
 ## Creating a new process module, end to end
@@ -209,8 +227,8 @@ copy that record §15 lists is deleted: write its replacement, not the copy.
    (`defineTrpcContract`), `<name>.errors.ts` (`HandledError` subclasses,
    stable `code`), and `<name>.config.ts` **only if** a deployment fact is
    needed (four-way case 3) — omit otherwise. Register each new error code in
-   `packages/handled-error/src/app-codes.ts` and its customer copy in
-   `presentation.ts`, same change.
+   `packages/handled-error/src/app-codes.ts`, its customer copy in `presentation.ts` and its
+   tip in `remediation.ts`, same change.
 4. **Process** (`@langwatch/<name>-process`): repositories first (interface,
    `prisma/`, `memory/`, `defineRepositories({ live, memory })`), channels
    the same way if it talks to anything it does not own, then `services/`, then the `<name>.module.ts` installer above and the module class in
@@ -226,17 +244,21 @@ copy that record §15 lists is deleted: write its replacement, not the copy.
 next to `src/`** (record §13; a top-level `tests/` folder is the old shape and
 a `module-review`-class finding). `.unit.test.ts` is pure logic or a service
 over a memory repository; `.integration.test.ts` is still a **level**, not a
-datastore marker — whether it also needs Postgres/ClickHouse/Redis is derived
-from whether the file mentions one of those clients, declared in the
-package's own `vitest.config.ts`. Describe blocks nest `given`/`when`; `it`
+datastore marker: it proves several components together (a rendered component, a service
+over a datastore, or a whole installed list over memory twins). Whether a file also needs
+Postgres/ClickHouse/Redis is derived from whether it mentions one of those clients (the
+`test:integration` script is that datastore lane), declared in the package's own `vitest.config.ts`. Describe blocks nest `given`/`when`; `it`
 titles are action-based (`it("checks local first")`, never `it("should...")`).
 
 The installation test boots the installed list over memory twins, with no
 server (record §13): `bootInstalledProcess({ role, modules:
 processModules.map(overMemory), config, secrets, ... })` over `memoryStores()`,
-then `runtime.service(<Name>Api)`. Copy
-`apps/api/src/__tests__/api-installation.fixture.ts`; it still hands stores in
-as members until record §16's store-client row lands.
+then `runtime.service(<Name>Api)`. A peer the test does not install is answered by
+`testPeer({ token, instance })` from `@langwatch/process/testing`, passed as `peers: [...]`. Copy
+`apps/api/src/__tests__/share-link-engine.integration.test.ts`. The older
+`apps/api/src/__tests__/api-installation.fixture.ts` still builds with `createApp(...).withMembers(...)`
+and `modules/monitor/process/src/app/__tests__/monitor-installation.unit.test.ts` with a
+memory builder and `.provide`: that is conversion debt, not the pattern to copy.
 
 Memory bundles need no datastore and no Docker, while peers still resolve
 each other for real through the same tokens production uses — no test-only
@@ -252,7 +274,8 @@ tracked-but-not-yet-done scenario); annotate the covering test with
 `it`/`test` call; run `pnpm --filter @langwatch/architecture-enforcer
 check:feature-parity` and read the `✗ THIS RUN FAILS: ...` banner, not a
 per-file `✓` (a `✓ all bound` is scoped to one file and can coexist with a
-failing run). Sabotage once per changed behaviour: break the path, watch the
+failing run). An untagged scenario binds nothing, and a new feature file that is wholly inert or
+partly untagged fails the ratchet (`newInert`, `newPartial`). Sabotage once per changed behaviour: break the path, watch the
 bound test fail for the stated reason, restore.
 
 **Assert on `code`, never on message prose.** `message` is customer copy and

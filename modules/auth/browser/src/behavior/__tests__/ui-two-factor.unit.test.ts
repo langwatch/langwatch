@@ -4,7 +4,7 @@
  * Spec: specs/identity/mfa-and-session-shape.feature
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   confirmUiTwoStepSetup,
@@ -56,6 +56,31 @@ describe("startUiTwoStepSetup", () => {
       );
 
       expect(answer).toEqual({ ok: false, error: REFUSAL });
+    });
+
+    describe("and the real endpoint answered with a handled body", () => {
+      afterEach(() => {
+        vi.unstubAllGlobals();
+      });
+
+      /** @scenario "The browser hands a refused setup on whole, so the screen words its code" */
+      it("hands the screen the handled body whole, code included", async () => {
+        const handled = {
+          type: "bad_request",
+          code: "identity_mfa_password_invalid",
+          message: "identity_mfa_password_invalid",
+          retryable: false,
+          fault: "customer",
+        };
+        vi.stubGlobal(
+          "fetch",
+          vi.fn(() => Promise.resolve(new Response(JSON.stringify(handled), { status: 400 }))),
+        );
+
+        const answer = await startUiTwoStepSetup({ password: "wrong" });
+
+        expect(answer).toEqual({ ok: false, error: handled });
+      });
     });
   });
 

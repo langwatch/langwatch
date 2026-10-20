@@ -18,10 +18,10 @@ Metrics: receiving OTLP metrics, canonicalising and recording their data points.
 
 | Kind                      | Name                                          | Declared at                                                                                 |
 | ------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| ClickHouse table (writes) | `metric_data_points`                          | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:203` |
-| ClickHouse table (writes) | `metric_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:209` |
-| ClickHouse table (writes) | `metric_series`                               | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:262` |
-| ClickHouse table (writes) | `metric_time_rollups`                         | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:315` |
+| ClickHouse table (writes) | `metric_data_points`                          | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:215` |
+| ClickHouse table (writes) | `metric_usage_estimates`                      | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:221` |
+| ClickHouse table (writes) | `metric_series`                               | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:274` |
+| ClickHouse table (writes) | `metric_time_rollups`                         | `process/src/repositories/clickhouse/clickhouse.metric-data-point-append.repository.ts:327` |
 | Stores required           | clickhouse                                    | `process/src/repositories/live/live.metric.repositories.ts:9`                               |
 | Config                    | `processingShards` (METRIC_PROCESSING_SHARDS) | `contract/src/metric.config.ts:10`                                                          |
 

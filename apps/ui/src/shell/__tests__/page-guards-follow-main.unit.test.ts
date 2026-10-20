@@ -48,7 +48,8 @@ const MAIN_GUARDS: readonly MainGuard[] = [
   { page: "pages/me/budget/request", flags: [GOVERNANCE_FLAG] },
   { page: "pages/settings", permission: "organization:view" },
   { page: "pages/settings/roles", permission: "organization:manage" },
-  { page: "pages/settings/audit-log", permission: "organization:manage" },
+  // Main asked organization:manage; the page now asks the grant its read asks (Alex, 2026-10-11).
+  { page: "pages/settings/audit-log", permission: "auditLog:view" },
   { page: "pages/settings/authentication", permission: "sso:view" },
   { page: "pages/settings/authentication/provider", permission: "sso:view" },
   { page: "pages/settings/authentication/connectors", permission: "sso:view" },
@@ -122,12 +123,15 @@ describe("given the pages main guarded", () => {
     expect(accessFor({ page, grants, flagsOn: true })).toEqual({ kind: "open" });
   });
 
-  /** @scenario "Only an organization administrator may open the audit trail" */
-  it("refuses the audit trail to a reader holding organization:view without organization:manage", () => {
+  /** @scenario "Only a reader holding the audit-log grant may open the audit trail" */
+  it("refuses the audit trail to a reader holding organization:manage without auditLog:view", () => {
     const page = "pages/settings/audit-log";
     expect(
-      accessFor({ page, grants: ["organization:view", "auditLog:view"], flagsOn: true }),
-    ).toEqual({ kind: "forbidden", permission: "organization:manage" });
+      accessFor({ page, grants: ["organization:view", "organization:manage"], flagsOn: true }),
+    ).toEqual({ kind: "forbidden", permission: "auditLog:view" });
+    expect(accessFor({ page, grants: ["auditLog:view"], flagsOn: true })).toEqual({
+      kind: "open",
+    });
     expect(declared[page]?.within).toBe("settings");
   });
 

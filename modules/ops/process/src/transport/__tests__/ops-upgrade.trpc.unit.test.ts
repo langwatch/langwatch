@@ -42,7 +42,6 @@ const RUN_SUMMARY = {
   id: "run_1",
   kind: "upgrade",
   release: "3.23.0",
-  floor: "3.20.1",
   startedAt: "2026-10-06T10:00:00.000Z",
   finishedAt: "2026-10-06T10:01:00.000Z",
   outcome: "succeeded",
@@ -121,7 +120,7 @@ function mount({
       createSystemMigrations: () =>
         SystemMigrationsService.create(
           createApiFixture<SystemMigrationsServiceDependencies>({
-            state: repositories.migrationState,
+            state: repositories.tenantStepState,
           }),
         ),
     },
@@ -164,10 +163,13 @@ function boundAccess(): Record<string, string> {
 
 describe("the ops.upgrade reads", () => {
   /** @scenario "Every upgrade read asks the operator view grant at the door" */
-  it("declares each of the nine reads behind ops:view at the platform scope", () => {
+  it("declares each of the eight reads behind ops:view at the platform scope", () => {
     const reads = Object.fromEntries(
       Object.entries(boundAccess()).filter(
-        ([name]) => !MIGRATION_PROCEDURE_NAMES.includes(name) && name !== "ops.upgrade.retryStep",
+        ([name]) =>
+          !MIGRATION_PROCEDURE_NAMES.includes(name) &&
+          name !== "ops.upgrade.retryStep" &&
+          name !== "ops.upgrade.attentionNotice",
       ),
     );
 
@@ -178,9 +180,21 @@ describe("the ops.upgrade reads", () => {
       "ops.upgrade.getStep": "permission-platform:ops:view",
       "ops.upgrade.listRuns": "permission-platform:ops:view",
       "ops.upgrade.getRun": "permission-platform:ops:view",
-      "ops.upgrade.preview": "permission-platform:ops:view",
       "ops.upgrade.listTargets": "permission-platform:ops:view",
       "ops.upgrade.listTenants": "permission-platform:ops:view",
+    });
+  });
+
+  /** @scenario "Any signed-in member may ask whether the last upgrade needs attention" */
+  it("declares the attention notice with no permission beyond being signed in", () => {
+    expect(boundAccess()["ops.upgrade.attentionNotice"]).toBe("no-permission");
+  });
+
+  describe("given a signed-in member without ops:view", () => {
+    it("answers the attention notice instead of refusing", async () => {
+      const { outsider } = mount({ reader: readerOfOneRelease() });
+
+      await expect(outsider.attentionNotice()).resolves.toEqual({ show: false });
     });
   });
 
@@ -201,7 +215,12 @@ describe("the ops.upgrade reads", () => {
       const reader = readerOfOneRelease();
       const { operator } = mount({ reader });
 
-      expect(await operator.status()).toEqual({ ...(await reader.status()), deprecations: [] });
+      expect(await operator.status()).toEqual({
+        ...(await reader.status()),
+        deprecations: [],
+        version: { kind: "development", containsRelease: null, commit: null },
+        latestRelease: null,
+      });
       expect(await operator.listReleases()).toEqual(await reader.listReleases());
       expect(await operator.listSteps({ release: "3.23.0" })).toEqual(
         await reader.listSteps({ release: "3.23.0" }),
@@ -337,7 +356,7 @@ describe("ops.upgrade.listTenants", () => {
         { migrationName: "ops:second", tenantId: "org_a", status: "parked" },
       ] as const;
       for (const tenant of tenants) {
-        await mounted.repositories.migrationState.upsertRecord({ ...tenant, report: null });
+        await mounted.repositories.tenantStepState.upsertRecord({ ...tenant, report: null });
       }
       return mounted;
     }

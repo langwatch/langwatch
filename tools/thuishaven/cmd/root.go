@@ -63,11 +63,48 @@ func tsgoLimits(ram uint64) domain.TsgoLimits {
 	return l
 }
 
+// browserLimits resolves the headless browser governor's knobs with env
+// overrides (0 disables a rule). Its memory ceiling is the browser-memory-mb
+// limit plus headroom, so the daemon refuses lanes long before a kill.
+func browserLimits() domain.BrowserLimits {
+	l := domain.DefaultBrowserLimits()
+	l.MaxRSS = domain.BrowserKillRSS(browserMemoryMB())
+	if pct := envInt("HAVEN_BROWSER_SHELL_MAX_CPU_PCT", -1); pct >= 0 {
+		l.MaxCPU = float64(pct)
+	}
+	l.CPUSustain = envDuration("HAVEN_BROWSER_SHELL_CPU_SUSTAIN", l.CPUSustain)
+	l.MaxAge = envDuration("HAVEN_BROWSER_SHELL_MAX_AGE", l.MaxAge)
+	l.IdleTTL = envDuration("HAVEN_BROWSER_SHELL_IDLE_TTL", l.IdleTTL)
+	return l
+}
+
+// browserOwnerRoots is the main checkout holding root: a worktree under
+// .worktrees resolves to its main checkout, whose prefix covers every worktree.
+func browserOwnerRoots(root string) []string {
+	if root == "" {
+		return nil
+	}
+	if main, _, found := strings.Cut(root, "/.worktrees/"); found {
+		root = main
+	}
+	return []string{root}
+}
+
+// orphanLimits are the orphan sweep's defaults, each overridable (0 disables).
+func orphanLimits() domain.OrphanLimits {
+	l := domain.DefaultOrphanLimits()
+	l.Grace = envDuration("HAVEN_ORPHAN_GRACE", l.Grace)
+	l.TypecheckMaxAge = envDuration("HAVEN_TYPECHECK_MAX_AGE", l.TypecheckMaxAge)
+	return l
+}
+
 // Root parses the global flags, wires the object graph, and dispatches. The three
 // steps are separate so none of them grows the others: meta commands answer
 // before anything is built, wire() is the only place adapters are constructed,
 // and the command table is a table, not a ladder of branches.
 func Root(ctx context.Context, logger *zap.Logger, version string, args []string) error {
+	args, profile := stripProfileFlags(args)
+	defer profile.start()()
 	var hasAgentFlag bool
 	args, hasAgentFlag = stripFlag(args, "--agent")
 	isAgent := hasAgentFlag || resolveAgent()
@@ -97,6 +134,13 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 	if len(args) > 0 {
 		name = args[0]
 	}
+	// The slot wraps every check start; it needs no worktree, so no git and no wiring.
+	if isSlotCommand(args) {
+		if _, _, err := resolveTarget(name, stackFlag, "", isAgent); err != nil {
+			return err
+		}
+		return (deps{isAgent: isAgent}).dispatch(ctx, args[0], args[1:])
+	}
 	cwd, _ := os.Getwd()
 	worktree, target, err := resolveTarget(name, stackFlag, gitTopLevel(cwd), isAgent)
 	if err != nil {
@@ -109,6 +153,12 @@ func Root(ctx context.Context, logger *zap.Logger, version string, args []string
 		return printBareHaven(d)
 	}
 	return d.dispatch(ctx, args[0], args[1:])
+}
+
+// isSlotCommand reports `haven machine slot …`, the one machine-wide command on
+// the start path of every check, which runs against no stack.
+func isSlotCommand(args []string) bool {
+	return len(args) > 1 && args[0] == "machine" && args[1] == "slot"
 }
 
 // runMetaCommand answers the subcommands that need no wiring at all, so `haven
@@ -172,16 +222,18 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 	// Docker Desktop): its ceiling is explicit and per-profile, so neither
 	// container can quietly take the machine. Both containers are sized against this machine's RAM/CPU.
 	ram, cpus := sys.TotalMemory(), runtime.NumCPU()
-	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup).WithHome(havenHome())
-	chRuntime, ch := managedClickHouse(rt)
+	settings := store.ReadMachineSettings()
+	rt := colima.New(envOr("HAVEN_COLIMA_PROFILE", "default"), colimaLimits(ram, cpus), sup).WithHome(havenHome()).
+		WithRefusal(func() error { return store.ReadMachineSettings().RefuseVM("") })
+	chRuntime, ch := managedClickHouse(rt, settings)
 	pg := postgresbrew.New(envOr("HAVEN_PG_FORMULA", domain.DefaultPostgresFormula), envInt("HAVEN_PG_PORT", domain.DefaultPostgresPort))
 	rds := redisbrew.New(
 		envOr("HAVEN_REDIS_FORMULA", domain.DefaultRedisFormula),
 		envInt("HAVEN_REDIS_PORT", domain.DefaultRedisPort),
 		envInt("HAVEN_REDIS_MAXMEMORY_MB", domain.DefaultRedisMaxMemoryMB),
 	)
-	obs := observabilityStack(rt, ram, cpus)
-	obsTier, _, _ := selectedObservabilityTier()
+	obs := observabilityStack(rt, observabilityLimits(ram, cpus), settings)
+	obsTier, _, _ := selectedObservabilityTier(settings)
 
 	// The console floor haven imposes while the observability stack is up: default
 	// warn, because the full info/debug stream is in Grafana and the terminal only
@@ -214,15 +266,21 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		// old default) meant a dozen dead stacks' databases sat on the shared
 		// ClickHouse's small memory cap before the first prune ever fired.
 		DBIdleTTL:               envDuration("HAVEN_DB_TTL", 4*24*time.Hour),
+		ClickHousePressure:      app.DefaultClickHousePressure(),
 		TestContainerTTL:        envDuration("HAVEN_TESTCONTAINER_TTL", domain.DefaultTestContainerTTL),
 		RunningTestContainerTTL: envDuration("HAVEN_TESTCONTAINER_RUNNING_TTL", domain.DefaultRunningTestContainerTTL),
 		Tsgo:                    tsgoLimits(ram),
+		Browser:                 browserLimits(),
+		BrowserOwnerRoots:       browserOwnerRoots(trustedRepoRoot()),
+		Orphans:                 orphanLimits(),
+		Duplicates:              app.DuplicateLimitsFromEnv(devEnv),
 		HeartbeatEvery:          30 * time.Second,
 		DaemonArgv:              selfArgv(trustedRepoRoot(), "daemon"),
 		SimulatorArgv:           simulatorArgv(),
 		GoWatchArgv:             goWatchArgv(),
 		UIWatchArgv:             uiWatchArgv(),
 		UpArgv:                  selfArgv(worktree, "up"),
+		ServiceArgv:             selfArgv(worktree, "service"),
 		KeepArgv:                selfArgv(trustedRepoRoot(), "keep"),
 		IsAgent:                 isAgent,
 		PortlessDisabled:        devEnv("PORTLESS") == "0",
@@ -247,10 +305,15 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 		ObservabilityConsoleLevel:  obsConsoleLevel,
 		ShouldDisableGoogleDLP:     shouldDisableGoogleDLP(disableDLP, disableDLPSet),
 		ShouldMockInstantEvalJudge: devEnv(domain.InstantEvalMockJudgeEnv) == "1",
-		JobsRoot:                   jobsRoot(),
-		ClaudeHome:                 claudeHome(),
-		ClaudeTmp:                  claudeTmpRoot(),
-		OwnJobDirs:                 ownJobDirs(),
+		LaneMemory: domain.LaneMemoryCaps{
+			UIMB:     envInt(domain.UILaneMemoryEnv, domain.DefaultUILaneMemoryMB),
+			APIMB:    envInt(domain.APILaneMemoryEnv, domain.DefaultAPILaneMemoryMB),
+			WorkerMB: envInt(domain.WorkerLaneMemoryEnv, domain.DefaultWorkerLaneMemoryMB),
+		},
+		JobsRoot:   jobsRoot(),
+		ClaudeHome: claudeHome(),
+		ClaudeTmp:  claudeTmpRoot(),
+		OwnJobDirs: ownJobDirs(),
 	}
 
 	orch := app.New(app.Deps{
@@ -288,17 +351,18 @@ func wire(logger *zap.Logger, isAgent bool, worktree, target string) deps {
 				Start:   orch.StartWorktreeStack,
 				Down:    orch.DownStack,
 				Destroy: orch.DestroyStack,
-				// Add one service to a live stack; reset a stack's databases.
-				StartService:   orch.StartStackService,
-				ResetDatabases: orch.ResetStackDatabases,
-				Seed:           orch.SeedStack,
-				SeedReport:     orch.SeedReport,
+				// Add one service to a live stack.
+				StartService: orch.StartStackService,
+				StopService:  orch.StopStackService,
+				Seed:         orch.SeedStack,
+				SeedReport:   orch.SeedReport,
 				// The up's hand-over: the daemon is the one place keepers start.
 				StartKeeper: orch.StartKeeper,
 			},
-			Limits:   dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
-			CLIReads: dashboardCLIReads(orch),
-			Browser:  dashboardBrowser(),
+			Limits:          dashboard.Limits{Report: limitsReport, Set: setLimit, Unset: unsetLimit},
+			MachineSettings: dashboard.MachineSettings{Report: orch.MachineSettingsView, Set: orch.SetMachineSetting},
+			CLIReads:        dashboardCLIReads(orch),
+			Browser:         dashboardBrowser(),
 		}),
 		params:   app.UpParams{WorktreeDir: worktree, Branch: gitBranch(worktree), ExplicitSlug: explicitSlug(target), IsBaseline: os.Getenv("HAVEN_BASELINE") == "1", IsLinkedWorktree: gitIsLinkedWorktree(worktree), UntrustedCheckout: os.Getenv("HAVEN_UNTRUSTED_CHECKOUT") == "1"},
 		opts:     optionsFromEnv(worktree),
@@ -383,10 +447,14 @@ func observabilityEndpoints() domain.ObservabilityEndpoints {
 
 // managedClickHouse picks the shared server's runtime (HAVEN_CH_RUNTIME, else
 // native where a binary is pinned): a bad statement is reported, then the
-// container is used, the way a bad LANGWATCH_HAVEN_REDIS_DB is ignored.
-func managedClickHouse(rt *colima.Runtime) (domain.ClickHouseRuntime, app.ClickHouse) {
-	chRuntime, err := domain.ResolveClickHouseRuntime(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
-	if err != nil {
+// container is used, the way a bad LANGWATCH_HAVEN_REDIS_DB is ignored. With
+// the vm setting off it is native, or the install line and a refused VM.
+func managedClickHouse(rt *colima.Runtime, settings domain.MachineSettings) (domain.ClickHouseRuntime, app.ClickHouse) {
+	chRuntime, err := settings.ClickHouseRuntimeFor(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	switch {
+	case err != nil && settings.VMOff:
+		fmt.Fprintf(os.Stderr, "haven: %v\n", err)
+	case err != nil:
 		fmt.Fprintf(os.Stderr, "haven: %v; using the ClickHouse container\n", err)
 	}
 	if artifact, ok := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH); ok && chRuntime == domain.ClickHouseRuntimeNative {
@@ -653,45 +721,6 @@ func childEnvWithTrustedRoot(repoRoot string) []string {
 	return append(os.Environ(), "HAVEN_TRUSTED_REPO_ROOT="+repoRoot)
 }
 
-func gitTopLevel(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--show-toplevel").Output()
-	if err != nil {
-		return dir
-	}
-	return strings.TrimSpace(string(out))
-}
-
-func gitBranch(dir string) string {
-	out, err := exec.Command("git", "-C", dir, "rev-parse", "--abbrev-ref", "HEAD").Output()
-	if err != nil {
-		return "unknown"
-	}
-	return strings.TrimSpace(string(out))
-}
-
-// gitIsLinkedWorktree reports whether dir is a linked git worktree (created by
-// `git worktree add`) rather than the primary checkout. Git points a linked
-// worktree's --git-dir at .git/worktrees/<name> while --git-common-dir stays the
-// shared .git, so the two diverge only for linked worktrees.
-func gitIsLinkedWorktree(dir string) bool {
-	gitDir, err1 := exec.Command("git", "-C", dir, "rev-parse", "--git-dir").Output()
-	commonDir, err2 := exec.Command("git", "-C", dir, "rev-parse", "--git-common-dir").Output()
-	if err1 != nil || err2 != nil {
-		return false
-	}
-	abs := func(p string) string {
-		p = strings.TrimSpace(p)
-		if !filepath.IsAbs(p) {
-			p = filepath.Join(dir, p)
-		}
-		if c, err := filepath.Abs(p); err == nil {
-			return c
-		}
-		return p
-	}
-	return abs(string(gitDir)) != abs(string(commonDir))
-}
-
 // runHavenUpIn re-invokes haven's own `up` with cwd set to a PR worktree, so the
 // whole provision/supervise pipeline runs there (haven derives everything from
 // cwd). Foreground: it blocks supervising the stack until the user stops it,
@@ -750,7 +779,26 @@ func runSwitch(d deps, inv invocation) error {
 	if err != nil {
 		return err
 	}
+	d.orch.FocusWorktree(dir)
 	fmt.Println(dir)
+	return nil
+}
+
+// runFocus prints the focused stack, or with a slug makes that stack the focus.
+func runFocus(_ context.Context, d deps, inv invocation) error {
+	if len(inv.args) == 0 {
+		if slug := d.orch.FocusedSlug(); slug != "" {
+			fmt.Printf("focus: %s\n", slug)
+		} else {
+			fmt.Println("focus: none")
+		}
+		return nil
+	}
+	slug, err := d.orch.SetFocus(inv.args[0])
+	if err != nil {
+		return err
+	}
+	fmt.Printf("focus: %s\n", slug)
 	return nil
 }
 
@@ -875,6 +923,7 @@ func runUpAttached(ctx context.Context, d deps, rest []string) error {
 	if err != nil {
 		return err
 	}
+	defer claimBootWait(ctx, d, st.slug)()
 	logDir, _ := domain.StackLogPaths(d.worktree, st.slug)
 	if err := runUpViewer(ctx, viewerTarget{slug: st.slug, logPath: st.logPath, logDir: logDir, session: d.sessionActions(st.slug)}, preferredGroup(rest)); err != nil {
 		return err
@@ -1069,9 +1118,34 @@ func resolveKnobSource(key string, layers knobLayers) (string, string, bool) {
 func dotenvKnobs() map[string]string {
 	dotenvOnce.Do(func() {
 		cwd, _ := os.Getwd()
-		dotenvVars = domain.LoadDotenv(gitTopLevel(cwd))
+		dotenvVars = domain.LoadDotenv(dotenvRoot(cwd))
 	})
 	return dotenvVars
+}
+
+// dotenvRoot finds the workspace root .env lives in without spawning git: the
+// nearest ancestor holding a .git entry (a linked worktree's is a file).
+// Outside any checkout, git itself answers.
+func dotenvRoot(dir string) string {
+	if root, ok := nearestGitAncestor(dir); ok {
+		return root
+	}
+	return gitTopLevel(dir)
+}
+
+// nearestGitAncestor walks up from dir to the first directory with a .git entry.
+func nearestGitAncestor(dir string) (string, bool) {
+	for dir != "" {
+		if _, err := os.Lstat(filepath.Join(dir, ".git")); err == nil {
+			return dir, true
+		}
+		parent := filepath.Dir(dir)
+		if parent == dir {
+			return "", false
+		}
+		dir = parent
+	}
+	return "", false
 }
 
 var (

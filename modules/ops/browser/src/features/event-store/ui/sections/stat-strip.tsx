@@ -1,4 +1,4 @@
-import { Card, HStack, VStack } from "@langwatch/design-system/primitives";
+import { HStack, VStack } from "@langwatch/design-system/primitives";
 import { StatTile, StatTileFigure, StatTileGrid } from "@langwatch/design-system/stat-tile";
 import { LATENCY_SAMPLE_SIZE, type DashboardData } from "@langwatch/ops-contract";
 
@@ -28,34 +28,30 @@ export function StatStrip({ data }: { data: DashboardData }) {
   return (
     <VStack align="stretch" gap={3} data-testid="ops-stat-strip">
       <ThroughputStats data={data} />
-      <Card.Root variant="subtle">
-        <Card.Body padding={2}>
-          <HStack gap={3} align="stretch" flexWrap="wrap">
-            <LinkedStat
-              label="Blocked"
-              value={formatCount(totalBlocked)}
-              sublabel={`${formatCount(data.totalGroups)} groups`}
-              color={totalBlocked > 0 ? "fg.error" : undefined}
-            />
-            <LinkedStat
-              label="Parked"
-              value={formatCount(totalParked)}
-              // Says what it MEANS, not just what it counts: parked is a capacity
-              // limit doing its job, and an unexplained orange six-figure number
-              // reads as an outage to whoever is on call.
-              sublabel={totalParked > 0 ? "at capacity limit" : "none at limit"}
-              color={totalParked > 0 ? "fg.warning" : undefined}
-            />
-            <LatencyStats data={data} />
-            <DeadLetterStat
-              queueDead={totalDlq}
-              outboxDead={outboxDead}
-              isOutboxCountKnown={outboxDeadQuery.data !== undefined}
-            />
-            <RedisStatTile data={data} />
-          </HStack>
-        </Card.Body>
-      </Card.Root>
+      <HStack gap={3} align="stretch" flexWrap="wrap">
+        <LinkedStat
+          label="Blocked"
+          value={formatCount(totalBlocked)}
+          sublabel={`${formatCount(data.totalGroups)} groups`}
+          color={totalBlocked > 0 ? "fg.error" : undefined}
+        />
+        <LinkedStat
+          label="Parked"
+          value={formatCount(totalParked)}
+          // Says what it MEANS, not just what it counts: parked is a capacity
+          // limit doing its job, and an unexplained orange six-figure number
+          // reads as an outage to whoever is on call.
+          sublabel={totalParked > 0 ? "at capacity limit" : "none at limit"}
+          color={totalParked > 0 ? "fg.warning" : undefined}
+        />
+        <LatencyStats data={data} />
+        <DeadLetterStat
+          queueDead={totalDlq}
+          outboxDead={outboxDead}
+          isOutboxCountKnown={outboxDeadQuery.data !== undefined}
+        />
+        <RedisStatTile data={data} />
+      </HStack>
     </VStack>
   );
 }

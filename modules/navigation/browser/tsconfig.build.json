@@ -21,67 +21,79 @@
   ],
   "references": [
     {
-      "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../dataset/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../evaluator/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../feature-flag/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../feature-flag/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../langy/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../ops/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../organization/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../prompt/client/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../user/contract/tsconfig.build.json"
+      "path": "../../prompt/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../organization/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../ops/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
+      "path": "../../langy/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../insight/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../evaluator/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../dataset/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../analytics/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../agent/contract/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

@@ -25,85 +25,86 @@
   ],
   "references": [
     {
-      "path": "../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../auth/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../authz/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/browser-host/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/csv/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/design-system/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/billing/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/billing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/licensing/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/scim/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../../enterprise/modules/scim/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/error-views/tsconfig.build.json"
-    },
-    {
-      "path": "../../feature-flag/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../identity/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../identity/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../client/tsconfig.build.json"
-    },
-    {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../project/client/tsconfig.build.json"
-    },
-    {
-      "path": "../../project/contract/tsconfig.build.json"
+      "path": "../../user/contract/tsconfig.build.json"
     },
     {
       "path": "../../../packages/time/tsconfig.build.json"
     },
     {
-      "path": "../../user/contract/tsconfig.build.json"
+      "path": "../../project/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../project/client/tsconfig.build.json"
+    },
+    {
+      "path": "../contract/tsconfig.build.json"
+    },
+    {
+      "path": "../client/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../identity/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../feature-flag/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/error-views/tsconfig.build.json"
+    },
+    {
+      "path": "../../entitlement/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/scim/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/design-system/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/csv/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser-host/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../authz/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../auth/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/api/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": [
+        "@langwatch/enterprise-billing-client",
+        "@langwatch/enterprise-billing-contract",
+        "@langwatch/enterprise-licensing-contract",
+        "@langwatch/enterprise-scim-contract",
+        "@langwatch/test-harness",
+        "@langwatch/vitest-config"
+      ]
+    }
+  }
 }

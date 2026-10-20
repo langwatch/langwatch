@@ -1,12 +1,14 @@
 package app
 
 import (
+	"context"
 	"slices"
 	"testing"
 	"time"
 
 	"go.uber.org/zap"
 
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/semaphore"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
 
@@ -163,4 +165,44 @@ func TestUpDeregistersADeadStacksRoutesBeforeProvisioning(t *testing.T) {
 			t.Errorf("route %q outlived the stack it pointed at (removed: %v)", route, proxy.removed)
 		}
 	}
+}
+
+// @scenario "A stack whose launcher died gives its hostnames up"
+func TestDaemonNeverReapsAStackAnUpReRegistered(t *testing.T) {
+	now := time.Date(2026, 8, 25, 12, 0, 30, 0, time.UTC)
+	old := droppedStack(42)
+
+	t.Run("given the tick judged the old, dead record but an up has since registered the slug", func(t *testing.T) {
+		fresh := droppedStack(77)
+		store := &fakeStore{stacks: []domain.Stack{fresh}}
+		sys := &fakeSystem{alive: map[int]bool{42: false, 77: true}, now: now}
+		o, proxy := deadStackOrch(store, sys, time.Hour)
+
+		o.reapIfUnchanged(old, true, false)
+
+		if len(store.stacks) != 1 || store.stacks[0].LauncherPID != 77 {
+			t.Fatalf("the new up's record must survive a reap judged on the old one, got %v", store.stacks)
+		}
+		if len(proxy.removed) != 0 {
+			t.Fatalf("the new up's routes must survive too, removed %v", proxy.removed)
+		}
+	})
+
+	t.Run("given an up holds the slug's lock while it registers", func(t *testing.T) {
+		store := &fakeStore{stacks: []domain.Stack{old}}
+		sys := &fakeSystem{alive: map[int]bool{42: false}, now: now}
+		o, proxy := deadStackOrch(store, sys, time.Hour)
+		o.sem = semaphore.New(t.TempDir())
+		release, _, err := o.sem.Acquire(context.Background(), "up-"+old.Slug, 1)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer release()
+
+		o.reapDeadStacks()
+
+		if len(store.stacks) != 1 || len(proxy.removed) != 0 {
+			t.Fatalf("a tick must leave a slug an up is registering alone, got %v, removed %v", store.stacks, proxy.removed)
+		}
+	})
 }

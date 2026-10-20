@@ -244,9 +244,13 @@ export class OrganizationService {
   ): Promise<UpdateOrganizationSettingsResult> {
     return this.settingsService.updateSettings(input, by);
   }
-  /** The backfill's record of one organization's stored presence switch; keyed once per row. */
-  async recordStoredPresenceSetting(input: { organizationId: string }): Promise<boolean> {
-    return this.settingsService.recordStoredPresenceSetting(input);
+  /** The presence step's record of one page of stored presence switches; keyed once per row. */
+  async recordStoredPresenceSettingPage(input: {
+    afterOrganizationId: string | null;
+    limit: number;
+    dryRun: boolean;
+  }): Promise<{ lastOrganizationId: string | null; organizations: number }> {
+    return this.settingsService.recordStoredPresenceSettingPage(input);
   }
 
   static create(options: OrganizationServiceDependencies): OrganizationService {

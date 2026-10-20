@@ -27,14 +27,22 @@ type tsgoSeen struct {
 // governProcesses runs on every daemon tick. Sampling is one ps invocation;
 // with nothing watched alive it records an empty sample and does no more.
 func (o *Orchestrator) governProcesses() {
-	if o.cfg.Tsgo.RunMaxRSS <= 0 {
+	tsgoOn, browserOn := o.cfg.Tsgo.RunMaxRSS > 0, o.cfg.Browser.MaxRSS > 0
+	if !tsgoOn && !browserOn {
+		return
+	}
+	now := o.sys.Now()
+	samples := o.processSamples()
+	if browserOn {
+		o.governBrowser(samples, now)
+	}
+	if !tsgoOn {
 		return
 	}
 	if o.procActivity == nil {
 		o.procActivity = map[int]tsgoSeen{}
 	}
-	now := o.sys.Now()
-	watched, tsgo := o.sampleWatched(now)
+	watched, tsgo := o.sampleWatched(samples, now)
 	if o.procTel != nil {
 		o.procTel.RecordSample(watched)
 	}
@@ -57,9 +65,9 @@ func (o *Orchestrator) governProcesses() {
 // cross-tick idle memory. Returns every watched process plus the compiler
 // subset the governor rules on — both binary names land in that one subset, so
 // a `tsc` run and a `tsgo` run are weighed against one combined budget.
-func (o *Orchestrator) sampleWatched(now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
+func (o *Orchestrator) sampleWatched(samples []ProcessSample, now time.Time) (watched []domain.WatchedProcess, tsgo []domain.TsgoProcess) {
 	live := map[int]bool{}
-	for _, s := range o.sys.ProcessSamples() {
+	for _, s := range samples {
 		w, ok := domain.ClassifyWatchedProcess(s.Command)
 		if !ok {
 			continue

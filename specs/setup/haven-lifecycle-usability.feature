@@ -65,6 +65,32 @@ Feature: haven lifecycle usability
     And each service states whether anything is listening on its port
 
   @unit
+  Scenario: Status shows the shared check budget and who holds it
+    Given two typecheck runs hold 2 units each of an 8-unit budget at green
+    When a person runs "haven status"
+    Then a slots line reads "4/8 units (green)" with the units per class
+    And each holder has one line with its class, units, pid, worktree, label and time held
+    And "haven status --json" carries the same under "slots"
+
+  @unit
+  Scenario: Status lists waiting runs in queue order
+    Given a test run queued before a typecheck run
+    When a person runs "haven status"
+    Then the test run is waiting #1 and the typecheck run waiting #2, each with its class, units and time waited
+
+  @unit
+  Scenario: Status caps the slot lines at ten
+    Given twelve runs hold a unit each and twelve wait
+    When a person runs "haven status"
+    Then ten holder lines and ten waiter lines show, each list ending in "+2 more"
+
+  @unit
+  Scenario: Status warns when a launcher uses a fallback lock folder
+    Given "~/.cache/langwatch/tsc-slots" holds one entry
+    When a person runs "haven status"
+    Then a warn line names tsc-slots as a run outside the shared budget
+
+  @unit
   Scenario: Restarting one service bounces only that service
     Given the stack's launcher is running
     When the developer runs "haven restart nlp"
@@ -197,6 +223,13 @@ Feature: haven lifecycle usability
     When the up hands its provisioned stack over
     Then it starts the daemon in the background
     And that daemon starts the stack's keeper
+
+  @integration
+  Scenario: Up's hand-over survives the daemon restarting after a rebuild
+    Given the haven daemon answers the hand-over with 404 unknown stack while it restarts
+    When the up hands its provisioned stack over
+    Then the up keeps asking the daemon that runs now, starting one if none does
+    And the successor daemon starts the stack's keeper
 
   @unit
   Scenario: The daemon refuses to start a keeper for a stack it does not know

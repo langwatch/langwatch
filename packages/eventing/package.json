@@ -29,7 +29,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.json tsconfig.tests.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts"
   },
@@ -45,7 +45,6 @@
     "ioredis": "catalog:",
     "langwatch": "workspace:*",
     "nanoid": "catalog:",
-    "prom-client": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

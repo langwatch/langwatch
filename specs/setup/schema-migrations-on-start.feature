@@ -58,7 +58,7 @@ Feature: Schema migrations run before the API serves, never inside it
   @unit
   Scenario: An operator can skip a migration step that a deploy already applied
     Given a deploy that migrates elsewhere
-    When it sets SKIP_PRISMA_MIGRATE, SKIP_CLICKHOUSE_MIGRATE or SKIP_LWQL_PROVISION to "true"
+    When it sets SKIP_LWQL_PROVISION to "true"
     Then the step it names does nothing and the boot continues
 
   @unit

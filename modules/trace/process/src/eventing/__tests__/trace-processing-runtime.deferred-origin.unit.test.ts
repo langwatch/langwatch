@@ -34,6 +34,7 @@ function compose({ storedSummary }: { storedSummary: TraceSummaryData | null }) 
     peers: createApiFixture<Input["peers"]>(),
     repositories: MemoryTraceRepositories.create(),
     canonicalisation: TraceCanonicalisationService.create(),
+    spool: createApiFixture<Input["spool"]>(),
     commands: createApiFixture<Input["commands"]>({ resolveOrigin }),
     findSummary,
     recordTrackedEvent: async () => undefined,
@@ -47,8 +48,10 @@ function compose({ storedSummary }: { storedSummary: TraceSummaryData | null }) 
 }
 
 /** The job fires with the fold captured when the first span armed it: no origin yet. */
+const SPAN_OCCURRED_AT = Date.now();
+
 async function fireArmedJob(subscriber: ReturnType<typeof compose>["subscriber"]) {
-  await subscriber.definition.handle(createSpanReceivedEvent({ occurredAt: Date.now() }), {
+  await subscriber.definition.handle(createSpanReceivedEvent({ occurredAt: SPAN_OCCURRED_AT }), {
     tenantId: "tenant-1",
     aggregateId: TRACE_ID,
     foldState: summaryWith(),
@@ -63,7 +66,11 @@ describe("the composed deferredOriginResolution subscriber", () => {
 
       await fireArmedJob(subscriber);
 
-      expect(findSummary).toHaveBeenCalledWith({ projectId: "tenant-1", traceId: TRACE_ID });
+      expect(findSummary).toHaveBeenCalledWith({
+        projectId: "tenant-1",
+        traceId: TRACE_ID,
+        occurredAtMs: SPAN_OCCURRED_AT,
+      });
       expect(resolveOrigin).toHaveBeenCalledWith(
         expect.objectContaining({
           tenantId: "tenant-1",

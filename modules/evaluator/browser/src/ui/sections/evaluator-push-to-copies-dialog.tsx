@@ -6,7 +6,8 @@
 
 import { Checkbox } from "@langwatch/design-system/checkbox";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { Button, Text, VStack } from "@langwatch/design-system/primitives";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Text, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import { useState } from "react";
 
@@ -25,6 +26,7 @@ export function EvaluatorPushToCopiesDialog({
 }) {
   const host = useEvaluatorHost();
   const { projectId } = host.scope();
+  const [attempted, setAttempted] = useState(false);
   const [edited, setEdited] = useState<{ copyIds: string; selected: ReadonlySet<string> } | null>(
     null,
   );
@@ -54,7 +56,9 @@ export function EvaluatorPushToCopiesDialog({
   };
 
   const push = async () => {
-    if (selected.size === 0 || !projectId) return;
+    if (pushToCopies.isPending) return;
+    if (selected.size === 0) return setAttempted(true);
+    if (!projectId) return;
     try {
       const result = await pushToCopies.mutateAsync({
         evaluatorId,
@@ -71,64 +75,109 @@ export function EvaluatorPushToCopiesDialog({
       host.failed({ error, fallbackTitle: "Couldn't push the evaluator" });
     }
   };
-  const copiesFailed = !copies.isLoading && copies.isError;
-  const copiesReady = !copies.isLoading && !copies.isError;
-  const hasNoCopies = copiesReady && (copies.data?.length ?? 0) === 0;
-  const hasCopies = copiesReady && (copies.data?.length ?? 0) !== 0;
+  const { copiesFailed, hasNoCopies, hasCopies } = replicaStateOf({
+    isLoading: copies.isLoading,
+    isError: copies.isError,
+    count: copies.data?.length ?? 0,
+  });
+  const unavailable = pushUnavailableReason({
+    isLoading: copies.isLoading,
+    failed: copiesFailed,
+    empty: hasNoCopies,
+  });
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open: isOpen }) => !isOpen && onClose()}>
-      <Dialog.Content onClick={(event) => event.stopPropagation()}>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Push to Replicas</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} align="start">
-            <Text fontSize="sm" color="fg.muted">
-              Select which replicas to push the latest config to:
-            </Text>
-            {copies.isLoading && <Text>Loading replicas...</Text>}
-            {copiesFailed && (
-              <Text role="alert" color="red.fg">
-                Couldn&apos;t load replicas.
-              </Text>
-            )}
-            {hasNoCopies && <Text color="fg.muted">No replicas found.</Text>}
-            {hasCopies && (
-              <VStack gap={2} align="start" width="full">
-                {copies.data?.map((copy) => (
-                  <Checkbox
-                    key={copy.id}
-                    checked={selected.has(copy.id)}
-                    onChange={() => toggle(copy.id)}
-                  >
-                    <VStack align="start" gap={0}>
-                      <Text fontWeight="medium">{copy.name}</Text>
-                      <Text fontSize="sm" color="fg.muted">
-                        {copy.fullPath}
-                      </Text>
-                    </VStack>
-                  </Checkbox>
-                ))}
-              </VStack>
-            )}
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Push to Replicas"
+      busy={pushToCopies.isPending}
+      primaryAction={{
+        label: `Push to ${selected.size} replica${selected.size !== 1 ? "s" : ""}`,
+        onClick: () => void push(),
+        loading: pushToCopies.isPending,
+        ...(unavailable ? { disabledReason: unavailable } : {}),
+      }}
+    >
+      <VStack gap={4} align="start">
+        <Text fontSize="sm" color="fg.muted">
+          Select which replicas to push the latest config to:
+        </Text>
+        {copies.isLoading && <Text>Loading replicas...</Text>}
+        {copiesFailed && (
+          <Text role="alert" color="red.fg">
+            Couldn&apos;t load replicas.
+          </Text>
+        )}
+        {hasNoCopies && (
+          <NoDataInfoBlock
+            size="line"
+            title="No replicas found. Use Replicate on the evaluator's menu to create one."
+            next={[
+              {
+                kind: "docs",
+                label: "Saved evaluators",
+                href: "https://docs.langwatch.ai/evaluations/evaluators/saved-evaluators",
+              },
+            ]}
+          />
+        )}
+        {hasCopies && (
+          <VStack gap={2} align="start" width="full">
+            {copies.data?.map((copy) => (
+              <Checkbox
+                key={copy.id}
+                checked={selected.has(copy.id)}
+                onChange={() => toggle(copy.id)}
+              >
+                <VStack align="start" gap={0}>
+                  <Text fontWeight="medium">{copy.name}</Text>
+                  <Text fontSize="sm" color="fg.muted">
+                    {copy.fullPath}
+                  </Text>
+                </VStack>
+              </Checkbox>
+            ))}
           </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette="orange"
-            onClick={() => void push()}
-            loading={pushToCopies.isPending}
-            disabled={selected.size === 0 || copies.isLoading}
-          >
-            Push to {selected.size} replica{selected.size !== 1 ? "s" : ""}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+        )}
+        {attempted && hasCopies && selected.size === 0 && (
+          <Text role="alert" color="red.fg" textStyle="sm">
+            Select at least one replica to push to.
+          </Text>
+        )}
+      </VStack>
+    </Dialog>
   );
+}
+
+function pushUnavailableReason({
+  isLoading,
+  failed,
+  empty,
+}: {
+  isLoading: boolean;
+  failed: boolean;
+  empty: boolean;
+}) {
+  if (isLoading) return "Replicas are still loading.";
+  if (failed) return "Replicas could not be loaded.";
+  if (empty) return "There are no replicas to push to.";
+  return void 0;
+}
+
+function replicaStateOf({
+  isLoading,
+  isError,
+  count,
+}: {
+  isLoading: boolean;
+  isError: boolean;
+  count: number;
+}) {
+  const ready = !isLoading && !isError;
+  return {
+    copiesFailed: !isLoading && isError,
+    hasNoCopies: ready && count === 0,
+    hasCopies: ready && count !== 0,
+  };
 }

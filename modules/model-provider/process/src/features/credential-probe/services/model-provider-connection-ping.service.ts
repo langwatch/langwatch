@@ -1,5 +1,6 @@
 import {
   CODEX_PROVIDER_KEY,
+  CodexAuthError,
   CODING_ASSISTANT_SURFACES_ONLY_NEEDLE,
   CONNECTION_TEST_FEATURE_KEY,
   isModelAllowedForFeature,
@@ -165,7 +166,11 @@ export class ModelProviderConnectionPingService {
       unreachable: () => new ProviderUnreachableError({ provider, hasConfigurableEndpoint }),
       credit: () => new ProviderOutOfCreditError({ provider }),
       usage_limit: () => new ProviderUsageLimitError({ provider }),
-      auth: () => new ProviderKeyInvalidError({ provider }),
+      // Codex holds no key: a refused credential there is a sign-in that ran out.
+      auth: () =>
+        provider === CODEX_PROVIDER_KEY
+          ? new CodexAuthError("refresh_rejected", "OpenAI session expired; sign in to Codex again")
+          : new ProviderKeyInvalidError({ provider }),
       other: () => new ProviderRefusedError({ provider, status: status ?? 502 }),
     }[classified];
     return { outcome: "refused", valid: false, domainError: refusal().serialize() };

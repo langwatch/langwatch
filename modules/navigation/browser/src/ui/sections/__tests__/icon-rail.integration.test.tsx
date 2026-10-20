@@ -3,6 +3,7 @@
  * Spec: modules/navigation/specs/icon-rail-navigation.feature
  */
 
+import { ProductScope } from "@langwatch/design-system/product-scope";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { cleanup, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -110,10 +111,36 @@ describe("the icon-rail shell", () => {
     it("raises the active tile and leaves the other tiles flat", () => {
       renderShell();
 
-      expect(railTile("LLM Ops")).toHaveStyle({ backgroundColor: "var(--chakra-colors-bg-panel)" });
-      expect(railTile("Gateway")).not.toHaveStyle({
-        backgroundColor: "var(--chakra-colors-bg-panel)",
+      expect(railTile("LLM Ops")).toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-selected)",
       });
+      expect(railTile("Gateway")).not.toHaveStyle({
+        backgroundColor: "var(--chakra-colors-bg-selected)",
+      });
+    });
+  });
+
+  describe("when the rail renders inside a product scope", () => {
+    /** @scenario "The switcher, rail and sidebar stay neutral inside any product scope" */
+    it("keeps the raised tile neutral and draws no product colour", () => {
+      renderWithDesignSystem(
+        <ProductScope product="me">
+          <WithStubNavigationHost
+            readings={{ ...BASE_READINGS, pathname: "/me" }}
+            actions={{ navigate: navigateMock }}
+          >
+            <NavigationShell mode="icon-rail">
+              <div data-testid="page-body" />
+            </NavigationShell>
+          </WithStubNavigationHost>
+        </ProductScope>,
+      );
+
+      expect(railTile("Me")).toHaveStyle({ backgroundColor: "var(--chakra-colors-bg-selected)" });
+      const css = Array.from(document.querySelectorAll("style"))
+        .map((style) => style.textContent ?? "")
+        .join("\n");
+      expect(css).not.toContain("var(--chakra-colors-product-");
     });
   });
 

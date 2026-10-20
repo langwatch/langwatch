@@ -4,18 +4,18 @@
     "rootDir": "src",
     "outDir": "dist",
     "lib": ["es2023", "dom", "dom.iterable"],
-    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo"
+    "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

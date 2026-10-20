@@ -59,6 +59,11 @@ interface KbdProps {
   demoEveryMs?: number;
   /** Delay before the very first demo press fires. Useful for staggering. */
   demoFirstDelayMs?: number;
+  /**
+   * "static" installs no key listener and no timer, so the chip never pulses.
+   * Default "live" keeps today's behaviour for every existing caller.
+   */
+  interaction?: "static" | "live";
 }
 
 const PRESSED_STYLE = {
@@ -163,7 +168,9 @@ export function Kbd({
   demo = false,
   demoEveryMs = DEMO_INTERVAL_MS,
   demoFirstDelayMs = DEMO_FIRST_DELAY_MS,
+  interaction = "live",
 }: KbdProps) {
+  const isLive = interaction === "live";
   const [userPressed, setUserPressed] = useState(false);
   const { pressed, flash } = useKeyFlash();
   const targetKey = useMemo(() => deriveKey(flattenChildrenToString(children)), [children]);
@@ -173,9 +180,9 @@ export function Kbd({
     flash();
   }, [flash]);
 
-  useRealKeyPress({ targetKey, onPress: onRealPress });
+  useRealKeyPress({ targetKey: isLive ? targetKey : null, onPress: onRealPress });
   useDemoPresses({
-    active: demo && !userPressed,
+    active: isLive && demo && !userPressed,
     everyMs: demoEveryMs,
     firstDelayMs: demoFirstDelayMs,
     flash,

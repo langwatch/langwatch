@@ -16,6 +16,8 @@ const AUTHORIZED_BY_THE_APP =
   "the feature's own resolver authorizes the exact tenant target before any flag is read or written";
 
 const TENANT_READ_PERMISSIONS = ["project:view", "organization:view"] as const;
+/** A flag read at a project asks organization:view on the project's own organization. */
+const FLAG_READ_PERMISSIONS = ["organization:view"] as const;
 const EXPERIMENT_PERMISSIONS = [
   "project:view",
   "organization:view",
@@ -34,7 +36,7 @@ export const featureFlagTrpcTransport: TrpcRouterDeclaration<
   .withMiddlewareContext(callerEmailContext)
   .serviceAuthorized({
     reason: AUTHORIZED_BY_THE_APP,
-    permissions: TENANT_READ_PERMISSIONS,
+    permissions: FLAG_READ_PERMISSIONS,
   })
   .handle(async ({ app, input, actor }, callerEmail) => ({
     enabled: await app.isEnabledForCaller({
@@ -73,7 +75,7 @@ export const featureFlagTrpcTransport: TrpcRouterDeclaration<
   .procedure("resolve")
   .serviceAuthorized({
     reason: AUTHORIZED_BY_THE_APP,
-    permissions: TENANT_READ_PERMISSIONS,
+    permissions: FLAG_READ_PERMISSIONS,
   })
   .handle(async ({ app, input, actor }) => ({
     flags: await app.resolveFrontendFlagsForCaller({ ...input, userId: actor.id }),

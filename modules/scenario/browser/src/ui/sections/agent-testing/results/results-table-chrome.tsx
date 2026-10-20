@@ -1,148 +1,132 @@
 /**
- * The card, the header line and the row separators every results table is drawn with.
+ * The column layout, the empty line and the truncation note every results table shares,
+ * over the design system's ListTable.
  * @see specs/features/agent-testing/results-tabs.feature
  */
 
-import { Box, chakra, Text } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
+import type { EmptyNext } from "@langwatch/design-system/no-data-info-block";
+import { Text } from "@langwatch/design-system/primitives";
 import type { ReactNode } from "react";
 
-import {
-  FG_MUTED,
-  ROW_HOVER_BG,
-  TABLE_HEADER_BG,
-} from "../../../../model/agent-testing/shared/design.ts";
+/**
+ * One column of a results table. A column without a width shares the free width; a width
+ * holds the cell padding as well as the content. `action` is the pinned row-menu column.
+ */
+export type ResultsColumn = {
+  key: string;
+  text: string;
+  /** The hidden name of a column whose heading is empty. */
+  label?: string;
+  width?: `${number}px`;
+  align?: "end";
+  action?: boolean;
+};
 
-/** The card every results table sits in. */
-export function ResultsTableCard({ children, testId }: { children: ReactNode; testId?: string }) {
-  return (
-    <Box
-      borderWidth="1px"
-      borderColor="border"
-      borderRadius="xl"
-      background="bg.panel"
-      overflow="hidden"
-      boxShadow="0 1px 2px color-mix(in srgb, var(--chakra-colors-bg-scrim) 4%, transparent)"
-      data-testid={testId}
-    >
-      {children}
-    </Box>
-  );
-}
-
-/** The uppercase header line of a table, laid out on the given columns. */
-export function ResultsTableHead({
+/** The table, laid out by its columns so a long name truncates rather than widening it. */
+export function ResultsTable({
   columns,
-  headings,
-}: {
-  columns: string;
-  /** One entry per column. An empty string draws a column with no heading. */
-  headings: { key: string; text: string; align?: "right" }[];
-}) {
-  return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={2}
-      background={TABLE_HEADER_BG}
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      fontSize="10.5px"
-      fontWeight="semibold"
-      textTransform="uppercase"
-      letterSpacing="0.025em"
-      color={FG_MUTED}
-    >
-      {headings.map((heading) => (
-        <Text key={heading.key} as="span" textAlign={heading.align}>
-          {heading.text}
-        </Text>
-      ))}
-    </Box>
-  );
-}
-
-/** The rows of a table, hairlined between one another. */
-export function ResultsTableBody({ children }: { children: ReactNode }) {
-  return (
-    <chakra.div
-      css={{
-        "& > * + *": {
-          borderTopWidth: "1px",
-          borderTopColor: "var(--chakra-colors-border-muted)",
-        },
-      }}
-    >
-      {children}
-    </chakra.div>
-  );
-}
-
-/** One row: the grid, the padding and the hover every table shares. */
-export function ResultsTableRow({
-  columns,
-  onClick,
+  minWidth,
   testId,
-  paddingY = "10px",
   children,
 }: {
-  columns: string;
-  onClick?: () => void;
+  columns: ResultsColumn[];
+  /** The width under which the table scrolls sideways rather than squeezing its columns. */
+  minWidth?: string;
   testId?: string;
-  paddingY?: string;
   children: ReactNode;
 }) {
   return (
-    <Box
-      display="grid"
-      gridTemplateColumns={columns}
-      columnGap={3}
-      alignItems="center"
-      paddingX={4}
-      paddingY={paddingY}
-      cursor={onClick ? "pointer" : undefined}
-      _hover={onClick ? { background: ROW_HOVER_BG } : undefined}
-      onClick={onClick}
+    <ListTable
+      tableLayout="fixed"
+      minWidth={minWidth}
+      containerProps={{ overflowX: "auto" }}
       data-testid={testId}
     >
+      <ListTable.ColumnGroup>
+        {columns.map((column) => (
+          <ListTable.Column key={column.key} width={column.width} data-column={column.key} />
+        ))}
+      </ListTable.ColumnGroup>
       {children}
-    </Box>
+    </ListTable>
   );
 }
 
-/** What a table says when the filters leave it nothing. */
-export function ResultsTableEmptyLine({ text }: { text: string }) {
+/** The header line: one heading per column, the row-menu column named for screen readers. */
+export function ResultsTableHead({
+  columns,
+  testId,
+}: {
+  columns: ResultsColumn[];
+  testId?: string;
+}) {
   return (
-    <Text
-      fontSize="12.5px"
-      color={FG_MUTED}
-      textAlign="center"
-      paddingX={4}
-      paddingY={10}
-      data-testid="results-table-empty"
-    >
-      {text}
-    </Text>
+    <ListTable.Header data-testid={testId}>
+      <ListTable.Row>
+        {columns.map((column) =>
+          column.action ? (
+            <ListTable.ActionHeader key={column.key} />
+          ) : (
+            <ListTable.ColumnHeader key={column.key} align={column.align} label={column.label}>
+              {column.text}
+            </ListTable.ColumnHeader>
+          ),
+        )}
+      </ListTable.Row>
+    </ListTable.Header>
   );
 }
 
-/**
- * The line under a table that has more rows than it drew.
- */
-export function ResultsTableTruncationLine({ text }: { text: string }) {
+/** Where a table with nothing in it sends the reader. */
+const RESULTS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "Read about results",
+    href: "https://docs.langwatch.ai/agent-testing/results",
+  },
+];
+
+/** What a table says when it has nothing to draw, and where to go from there. */
+export function ResultsTableEmptyLine({
+  columns,
+  state,
+  title,
+  description,
+  onClearFilters,
+}: {
+  columns: number;
+  state: "empty" | "no-results";
+  title: string;
+  description?: string;
+  /** Offered beside the next step when filters left the table empty. */
+  onClearFilters?: () => void;
+}) {
   return (
-    <Text
-      fontSize="11px"
-      color={FG_MUTED}
-      borderTopWidth="1px"
-      borderTopColor="border"
-      paddingX={4}
-      paddingY={2}
-      data-testid="results-table-truncation"
-    >
-      {text}
-    </Text>
+    <ListTable.EmptyRow
+      columns={columns}
+      state={state}
+      title={title}
+      description={description}
+      next={RESULTS_NEXT}
+      onClearFilters={onClearFilters}
+    />
+  );
+}
+
+/** The line under a table that has more rows than it drew. */
+export function ResultsTableTruncationLine({ text, columns }: { text: string; columns: number }) {
+  return (
+    <ListTable.SpanRow columns={columns}>
+      <Text
+        textStyle="micro"
+        color="fg.muted"
+        paddingX={4}
+        paddingY={2}
+        data-testid="results-table-truncation"
+      >
+        {text}
+      </Text>
+    </ListTable.SpanRow>
   );
 }

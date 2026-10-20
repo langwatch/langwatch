@@ -9,10 +9,12 @@ import {
 import type { TraceModule } from "../app/trace.app.ts";
 import {
   RecordFirstTraceCommand,
+  RecordMonthTraceIdsCommand,
   RecordTraceReceivedCommand,
 } from "./trace-project-milestones.commands.ts";
 import {
   firstTraceRecordedEventSchema,
+  monthTraceIdsListedEventSchema,
   TRACE_PROJECT_AGGREGATE_TYPE,
   TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
   traceReceivedEventSchema,
@@ -23,9 +25,14 @@ function milestoneCommands(retention?: RetentionPolicyResolver) {
     name: TRACE_PROJECT_MILESTONES_PIPELINE_NAME,
     aggregate: defineAggregate({ type: TRACE_PROJECT_AGGREGATE_TYPE }),
   })
-    .withEvents([firstTraceRecordedEventSchema, traceReceivedEventSchema])
+    .withEvents([
+      firstTraceRecordedEventSchema,
+      traceReceivedEventSchema,
+      monthTraceIdsListedEventSchema,
+    ])
     .withCommand("recordFirstTrace", RecordFirstTraceCommand)
-    .withCommand("recordTraceReceived", RecordTraceReceivedCommand);
+    .withCommand("recordTraceReceived", RecordTraceReceivedCommand)
+    .withCommand("recordMonthTraceIds", RecordMonthTraceIdsCommand);
   return retention === undefined ? pipeline : pipeline.withRetention(retention);
 }
 
@@ -33,7 +40,7 @@ export type TraceProjectMilestonesDefinition = ReturnType<
   ReturnType<typeof milestoneCommands>["build"]
 >;
 
-/** trace_project_milestones records; peers (nurturing) react to its events from their side (§9). */
+/** trace_project_milestones records; peers (nurturing, entitlement) react from their side (§9). */
 export function buildTraceProjectMilestonesPipeline(
   retention?: RetentionPolicyResolver,
 ): TraceProjectMilestonesDefinition {

@@ -1,5 +1,7 @@
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Button, HStack, Icon, Spinner, Text } from "@langwatch/design-system/primitives";
 import { toaster } from "@langwatch/design-system/toaster";
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { LuFileOutput, LuPencil } from "react-icons/lu";
 
@@ -17,8 +19,9 @@ import {
   summarizeTraceEdit,
   useTraceEditStore,
 } from "../../../../../features/trace-drawer/behavior/trace-edit.store.ts";
-import { Dialog } from "../../../dialog.tsx";
 import { showErrorToast } from "../../../errors/index.ts";
+
+const logger = createLogger("langwatch:trace:edit-mode");
 
 /** "3 fields changed, 1 span deleted", with only the non-zero parts. */
 function describeEdit({
@@ -89,9 +92,7 @@ function useTraceEditDraft() {
  */
 function holdsSessionFor(traceId: string): boolean {
   if (useTraceEditStore.getState().editingTraceId === traceId) return true;
-  console.warn(
-    "[traces-v2] trace edit save skipped: the session in the store belongs to another trace",
-  );
+  logger.warn("trace edit save skipped: the session in the store belongs to another trace");
   return false;
 }
 
@@ -244,7 +245,8 @@ export function EditModeBar({ traceId }: { traceId: string }) {
           </Button>
           <Button
             size="xs"
-            colorPalette="blue"
+            colorPalette="orange"
+            variant="solid"
             onClick={handleSave}
             disabled={!isDirty || isSaving}
             gap={1.5}
@@ -277,34 +279,17 @@ function DiscardTraceEditsDialog({
   onDiscard: () => void;
 }) {
   return (
-    <Dialog.Root
+    <Dialog
       open={open}
-      onOpenChange={(e) => {
-        if (!e.open) onKeepEditing();
-      }}
-      size="sm"
-      placement="center"
+      onClose={onKeepEditing}
+      title="Discard trace corrections?"
+      secondaryAction={{ label: "Keep annotating", onClick: onKeepEditing }}
+      primaryAction={{ label: "Discard corrections", onClick: onDiscard, danger: true }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Discard trace corrections?</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text textStyle="sm" color="fg.muted">
-            Your corrections to this trace have not been saved. Comments are saved as you write them
-            and are not discarded.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button size="sm" variant="outline" onClick={onKeepEditing}>
-            Keep annotating
-          </Button>
-          <Button size="sm" colorPalette="red" onClick={onDiscard}>
-            Discard corrections
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+      <Text textStyle="sm" color="fg.muted">
+        Your corrections to this trace have not been saved. Comments are saved as you write them and
+        are not discarded.
+      </Text>
+    </Dialog>
   );
 }

@@ -7,10 +7,14 @@ import { describe, expect, it } from "vitest";
 import { storesOwner, type StoresConfig } from "../config-owner.ts";
 import { openStores } from "../open-stores.ts";
 import { PipelineParticipation } from "../pipeline-selection.ts";
+import { PLATFORM_TENANT_ID } from "./object-storage-stores.fixture.ts";
 
 const baseConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  queueConcurrency: undefined,
+  queueTenantCap: undefined,
+  queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
@@ -38,7 +42,7 @@ const baseConfig: StoresConfig = {
   },
 };
 
-/** Never dialled: the tenant directory the storage member takes opens no connection until asked. */
+/** Never dialled: destinations are asked for PLATFORM_TENANT_ID, answered with no read. */
 const UNREACHED_DATABASE = "postgresql://nobody:nothing@127.0.0.1:9/unreached";
 
 type AzureSettings = StoresConfig["objectStorage"]["azure"];
@@ -64,7 +68,7 @@ async function objectStorageFor(options: { production: boolean; azure?: Partial<
   });
   try {
     const storage = members.read("objectStorage");
-    return { storage, destination: await storage.destination("project-1") };
+    return { storage, destination: await storage.destination(PLATFORM_TENANT_ID) };
   } catch (error) {
     return { refusal: error };
   } finally {

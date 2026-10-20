@@ -78,6 +78,18 @@
       "types": "./dist/system/index.d.ts",
       "default": "./src/system/index.ts"
     },
+    "./product-colours": {
+      "types": "./dist/system/product-colours.d.ts",
+      "default": "./src/system/product-colours.ts"
+    },
+    "./product-scope": {
+      "types": "./dist/components/scope/product-scope.d.ts",
+      "default": "./src/components/scope/product-scope.tsx"
+    },
+    "./use-product-accent": {
+      "types": "./dist/components/scope/use-product-accent.d.ts",
+      "default": "./src/components/scope/use-product-accent.ts"
+    },
     "./provider": {
       "types": "./dist/provider/index.d.ts",
       "default": "./src/provider/index.tsx"
@@ -150,6 +162,10 @@
       "types": "./dist/components/brand/full-logo.d.ts",
       "default": "./src/components/brand/full-logo.tsx"
     },
+    "./logo-paths": {
+      "types": "./dist/components/brand/logo-paths.d.ts",
+      "default": "./src/components/brand/logo-paths.ts"
+    },
     "./logo-icon": {
       "types": "./dist/components/brand/logo-icon.d.ts",
       "default": "./src/components/brand/logo-icon.tsx"
@@ -185,6 +201,10 @@
     "./langwatch-endpoint-env": {
       "types": "./dist/langwatch-endpoint-env.d.ts",
       "default": "./src/langwatch-endpoint-env.ts"
+    },
+    "./ambient-ground-shader": {
+      "types": "./dist/components/brand/ambient-ground-shader.d.ts",
+      "default": "./src/components/brand/ambient-ground-shader.ts"
     },
     "./ambient-ground": {
       "types": "./dist/components/brand/ambient-ground.d.ts",
@@ -263,6 +283,10 @@
       "types": "./dist/components/overlays/dialog.d.ts",
       "default": "./src/components/overlays/dialog.tsx"
     },
+    "./action-row": {
+      "types": "./dist/components/overlays/action-row.d.ts",
+      "default": "./src/components/overlays/action-row.tsx"
+    },
     "./display-formatters": {
       "types": "./dist/display-formatters.d.ts",
       "default": "./src/display-formatters.ts"
@@ -319,9 +343,17 @@
       "types": "./dist/components/layout/pagination.d.ts",
       "default": "./src/components/layout/pagination.tsx"
     },
+    "./load-more": {
+      "types": "./dist/components/layout/load-more.d.ts",
+      "default": "./src/components/layout/load-more.tsx"
+    },
     "./popover": {
       "types": "./dist/components/overlays/popover.d.ts",
       "default": "./src/components/overlays/popover.tsx"
+    },
+    "./date-range-picker": {
+      "types": "./dist/components/forms/date-range-picker.d.ts",
+      "default": "./src/components/forms/date-range-picker.tsx"
     },
     "./radio": {
       "types": "./dist/components/forms/radio.d.ts",
@@ -338,6 +370,10 @@
     "./shiki-chunking": {
       "types": "./dist/shiki-chunking.d.ts",
       "default": "./src/shiki-chunking.ts"
+    },
+    "./emoji-picker": {
+      "types": "./dist/components/forms/emoji-picker.d.ts",
+      "default": "./src/components/forms/emoji-picker.tsx"
     },
     "./search-input": {
       "types": "./dist/components/forms/search-input.d.ts",
@@ -375,6 +411,10 @@
       "types": "./dist/components/forms/small-label.d.ts",
       "default": "./src/components/forms/small-label.tsx"
     },
+    "./typography": {
+      "types": "./dist/components/typography/typography.d.ts",
+      "default": "./src/components/typography/typography.tsx"
+    },
     "./switch": {
       "types": "./dist/components/forms/switch.d.ts",
       "default": "./src/components/forms/switch.tsx"
@@ -411,6 +451,10 @@
       "types": "./dist/components/display/inline-code.d.ts",
       "default": "./src/components/display/inline-code.tsx"
     },
+    "./shortcut-hint": {
+      "types": "./dist/components/display/shortcut-hint.d.ts",
+      "default": "./src/components/display/shortcut-hint.tsx"
+    },
     "./kbd": {
       "types": "./dist/components/display/kbd.d.ts",
       "default": "./src/components/display/kbd.tsx"
@@ -422,6 +466,10 @@
     "./stat-tile": {
       "types": "./dist/components/values/stat-tile.d.ts",
       "default": "./src/components/values/stat-tile.tsx"
+    },
+    "./time-series-chart": {
+      "types": "./dist/components/display/time-series-chart.d.ts",
+      "default": "./src/components/display/time-series-chart.tsx"
     },
     "./tab-count": {
       "types": "./dist/components/values/tab-count.d.ts",
@@ -435,9 +483,45 @@
       "types": "./dist/components/layout/settings-section.d.ts",
       "default": "./src/components/layout/settings-section.tsx"
     },
+    "./field-editor": {
+      "types": "./dist/components/forms/field-editor.d.ts",
+      "default": "./src/components/forms/field-editor.tsx"
+    },
+    "./settings-field": {
+      "types": "./dist/components/forms/settings-field.d.ts",
+      "default": "./src/components/forms/settings-field.tsx"
+    },
+    "./chart-empty-state": {
+      "types": "./dist/components/states/chart-empty-state.d.ts",
+      "default": "./src/components/states/chart-empty-state.tsx"
+    },
+    "./skeletons": {
+      "types": "./dist/components/states/skeletons.d.ts",
+      "default": "./src/components/states/skeletons.tsx"
+    },
+    "./id-text": {
+      "types": "./dist/components/values/id-text.d.ts",
+      "default": "./src/components/values/id-text.tsx"
+    },
+    "./empty-value": {
+      "types": "./dist/components/values/empty-value.d.ts",
+      "default": "./src/components/values/empty-value.tsx"
+    },
     "./settings-card": {
       "types": "./dist/components/layout/settings-card.d.ts",
       "default": "./src/components/layout/settings-card.tsx"
+    },
+    "./card": {
+      "types": "./dist/components/layout/card.d.ts",
+      "default": "./src/components/layout/card.tsx"
+    },
+    "./resource-tile": {
+      "types": "./dist/components/layout/resource-tile.d.ts",
+      "default": "./src/components/layout/resource-tile.tsx"
+    },
+    "./scroll-fade": {
+      "types": "./dist/components/layout/scroll-fade.d.ts",
+      "default": "./src/components/layout/scroll-fade.tsx"
     },
     "./section-navigation-frame": {
       "types": "./dist/components/layout/section-navigation-frame.d.ts",
@@ -502,18 +586,40 @@
     "./charts": {
       "types": "./dist/charts.d.ts",
       "default": "./src/charts.ts"
+    },
+    "./content-tabs": {
+      "types": "./dist/components/layout/content-tabs.d.ts",
+      "default": "./src/components/layout/content-tabs.tsx"
+    },
+    "./code-tabs": {
+      "types": "./dist/components/layout/code-tabs.d.ts",
+      "default": "./src/components/layout/code-tabs.tsx"
+    },
+    "./metric-tabs": {
+      "types": "./dist/components/layout/metric-tabs.d.ts",
+      "default": "./src/components/layout/metric-tabs.tsx"
+    },
+    "./table-toolbar": {
+      "types": "./dist/components/layout/table-toolbar.d.ts",
+      "default": "./src/components/layout/table-toolbar.tsx"
+    },
+    "./column-picker": {
+      "types": "./dist/components/layout/column-picker.d.ts",
+      "default": "./src/components/layout/column-picker.tsx"
     }
   },
   "scripts": {
     "storybook": "storybook dev --port 6006",
     "build:storybook": "storybook build",
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
+    "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@chakra-ui/charts": "^3.36.0",
     "@langwatch/time": "workspace:*",
+    "@paper-design/shaders": "catalog:",
     "@paper-design/shaders-react": "catalog:",
     "lodash-es": "catalog:",
     "lucide-react": "catalog:",
@@ -524,6 +630,7 @@
     "react-feather": "catalog:",
     "react-hook-form": "catalog:",
     "react-icons": "catalog:",
+    "recharts": "catalog:",
     "shiki": "catalog:",
     "slugify": "catalog:",
     "zod": "catalog:"
@@ -544,6 +651,7 @@
     "@types/react-dom": "catalog:",
     "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "oxc-parser": "catalog:",
     "playwright": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
@@ -564,7 +672,7 @@
   "nx": {
     "targets": {
       "build:storybook": {
-        "cache": true,
+        "cache": false,
         "dependsOn": [
           "^build"
         ],
@@ -572,12 +680,7 @@
           "production",
           "^production",
           "jsBuild",
-          "{projectRoot}/.storybook/**/*",
-          "{workspaceRoot}/apps/ui/public/**/*",
-          "{workspaceRoot}/apps/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/modules/*/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/enterprise/modules/*/*/src/**/*.{ts,tsx}",
-          "{workspaceRoot}/packages/*/src/**/*.{ts,tsx}"
+          "{projectRoot}/.storybook/**/*"
         ],
         "outputs": [
           "{projectRoot}/storybook-static"

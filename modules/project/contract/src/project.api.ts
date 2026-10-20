@@ -63,6 +63,8 @@ export interface ProjectOrganizationRef {
 
 export interface ProjectOrganizationPage {
   projects: ProjectOrganizationRef[];
+  /** Projects on the page whose team is gone, so no organisation owns them or routes their data. */
+  orphanIds: string[];
   next: string | null;
 }
 
@@ -120,6 +122,8 @@ export interface ProjectApi {
   }): Promise<SearchProjectsResult[]>;
   findById(id: string): Promise<Project | null>;
   getOrganizationId(projectId: string): Promise<string>;
+  /** Whether the user belongs to the team that owns this project; false when no such project. */
+  isTeamMember(input: { projectId: string; userId: string }): Promise<boolean>;
   getWithTeam(id: string): Promise<ProjectWithTeam>;
   findWithTeam(id: string): Promise<ProjectWithTeam | null>;
   listByOrganization(input: {
@@ -210,9 +214,9 @@ export interface ProjectApi {
   touchCodingAgentPullRequestSeen(input: { projectId: string; at: Instant }): Promise<void>;
   /** Stamps a project as having just seen coding-agent session activity. */
   touchCodingAgentSessionSeen(input: { projectId: string; at: Instant }): Promise<void>;
-  /** The organisation's internal governance project, or nothing when it has none. */
+  /** The organisation's internal project of this kind, or nothing when it has none. */
   findInternal(input: InternalProjectQuery): Promise<InternalProject | null>;
-  /** The organisation's internal governance project, created on first ask. */
+  /** The organisation's internal project of this kind, created on first ask. */
   ensureInternal(input: InternalProjectQuery): Promise<InternalProject>;
   /** Every live internal project of this kind, across organisations: its id only. */
   findInternalIds(input: { kind: InternalProjectKind }): Promise<string[]>;

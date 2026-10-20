@@ -2,10 +2,10 @@
 // that adds up to on the right. Creating and editing are one screen (main's RoleDialog).
 
 import { type AuthzPermission, isRegistryPermission } from "@langwatch/authorization";
+import { Card } from "@langwatch/design-system/card";
 import { Dialog } from "@langwatch/design-system/dialog";
 import {
   Box,
-  Button,
   Field,
   Grid,
   Input,
@@ -14,7 +14,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import type { ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
-import { useEffect, useState } from "react";
+import { type FormEvent, useEffect, useRef, useState } from "react";
 import {
   type Control,
   type UseFormRegister,
@@ -27,6 +27,8 @@ import { authzApi } from "../../behavior/authz-api.ts";
 import { useAuthzHost } from "../../model/authz-host.ts";
 import { RoleEffectPreview } from "../blocks/role-effect-preview.tsx";
 import { RolePermissionComposer } from "../blocks/role-permission-composer.tsx";
+
+const ROLE_FORM_ID = "role-form";
 
 type RoleFormValues = {
   name: string;
@@ -53,36 +55,20 @@ export function RoleDialog(props: RoleDialogProps) {
   const form = useRoleForm(props);
 
   return (
-    <Dialog.Root open={props.open} onOpenChange={({ open }) => !open && props.onClose()}>
-      <Dialog.Content maxWidth="1040px" maxHeight="90vh" overflowY="auto">
-        <Dialog.Header>
-          <Dialog.Title>{props.editing ? "Edit role" : "New role"}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <RoleFormBody organizationId={props.organizationId} {...form} />
-        </Dialog.Body>
-        <Dialog.Footer>
-          {form.permissions.length === 0 && (
-            <Text fontSize="xs" color="fg.muted" marginRight="auto">
-              Choose at least one permission before saving.
-            </Text>
-          )}
-          <Button variant="outline" onClick={props.onClose}>
-            Cancel
-          </Button>
-          <Button
-            type="submit"
-            form="role-form"
-            colorPalette="orange"
-            loading={form.saving}
-            disabled={form.permissions.length === 0}
-          >
-            {props.editing ? "Save role" : "Create role"}
-          </Button>
-        </Dialog.Footer>
-        <Dialog.CloseTrigger />
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={props.open}
+      onClose={form.close}
+      title={props.editing ? "Edit role" : "New role"}
+      size="xl"
+      primaryAction={{
+        label: props.editing ? "Save role" : "Create role",
+        type: "submit",
+        form: ROLE_FORM_ID,
+        loading: form.saving,
+      }}
+    >
+      <RoleFormBody organizationId={props.organizationId} {...form} />
+    </Dialog>
   );
 }
 
@@ -90,10 +76,12 @@ function useRoleForm({ open, organizationId, editing, onClose }: RoleDialogProps
   const [previewScope, setPreviewScope] = useState<ScopeTriadEntry[]>([
     { scopeType: "ORGANIZATION", scopeId: organizationId },
   ]);
-  const { control, register, handleSubmit, reset, setValue } = useForm<RoleFormValues>({
+  const { control, register, handleSubmit, reset, setFocus, setValue } = useForm<RoleFormValues>({
     defaultValues: { name: "", description: "", permissions: [] },
   });
   const permissions = useWatch({ control, name: "permissions" }) ?? [];
+  const [attempted, setAttempted] = useState(false);
+  const searchRef = useRef<HTMLInputElement>(null);
 
   // Mounted once and reused, so each opening refills it from the role in hand.
   useEffect(() => {
@@ -110,18 +98,41 @@ function useRoleForm({ open, organizationId, editing, onClose }: RoleDialogProps
     setPreviewScope([{ scopeType: "ORGANIZATION", scopeId: organizationId }]);
   }, [open, editing, organizationId, reset]);
 
-  const { saving, save } = useRoleMutations({ organizationId, editing, onClose });
+  const close = () => {
+    setAttempted(false);
+    onClose();
+  };
+  const { saving, save } = useRoleMutations({ organizationId, editing, onClose: close });
+
+  const submit = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (saving) return;
+    setAttempted(true);
+    void handleSubmit(
+      (values) => {
+        if (values.permissions.length === 0) {
+          searchRef.current?.focus();
+          return;
+        }
+        return save(values);
+      },
+      () => setFocus("name"),
+    )(event);
+  };
 
   return {
+    attempted,
+    close,
     control,
     permissions,
+    searchRef,
     previewScope,
     register,
     saving,
     setPreviewScope,
     setPermissions: (next: AuthzPermission[]) =>
       setValue("permissions", next, { shouldDirty: true }),
-    submit: handleSubmit(save),
+    submit,
   };
 }
 
@@ -161,6 +172,8 @@ function useRoleMutations({
 
 function RoleFormBody({
   organizationId,
+  attempted,
+  searchRef,
   control,
   permissions,
   previewScope,
@@ -172,7 +185,7 @@ function RoleFormBody({
   const structure = useAuthzHost().organizationStructure();
 
   return (
-    <form id="role-form" onSubmit={(event) => void submit(event)}>
+    <form id={ROLE_FORM_ID} onSubmit={submit}>
       <Grid templateColumns={{ base: "1fr", lg: "1.4fr 1fr" }} gap={8} alignItems="start">
         <VStack align="stretch" gap={5}>
           <RoleIdentityFields register={register} control={control} />
@@ -186,27 +199,31 @@ function RoleFormBody({
             </Text>
           </Box>
 
-          <RolePermissionComposer selected={permissions} onChange={setPermissions} />
+          {attempted && permissions.length === 0 && (
+            <Text role="alert" fontSize="xs" color="fg.error">
+              Choose at least one permission before saving.
+            </Text>
+          )}
+
+          <RolePermissionComposer
+            selected={permissions}
+            onChange={setPermissions}
+            searchRef={searchRef}
+          />
         </VStack>
 
-        <Box
-          position={{ base: "static", lg: "sticky" }}
-          top={0}
-          borderWidth="1px"
-          borderColor="border"
-          borderRadius="md"
-          padding={4}
-          background="bg.subtle"
-        >
-          <RoleEffectPreview
-            permissions={permissions}
-            previewScope={previewScope}
-            onPreviewScopeChange={setPreviewScope}
-            organizationId={organizationId}
-            organizationName={structure.organizationName}
-            availableTeams={structure.teams}
-            availableProjects={structure.projects}
-          />
+        <Box position={{ base: "static", lg: "sticky" }} top={0}>
+          <Card variant="nested">
+            <RoleEffectPreview
+              permissions={permissions}
+              previewScope={previewScope}
+              onPreviewScopeChange={setPreviewScope}
+              organizationId={organizationId}
+              organizationName={structure.organizationName}
+              availableTeams={structure.teams}
+              availableProjects={structure.projects}
+            />
+          </Card>
         </Box>
       </Grid>
     </form>

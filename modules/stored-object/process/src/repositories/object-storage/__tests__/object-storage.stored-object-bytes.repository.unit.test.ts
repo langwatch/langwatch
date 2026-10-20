@@ -38,6 +38,7 @@ function recordingStorage() {
     signDownload: (at, facts) => inner.signDownload(at, facts),
     destination: (projectId) => inner.destination(projectId),
     probe: (projectId) => inner.probe(projectId),
+    privateAccountVariables: () => inner.privateAccountVariables(),
   };
 
   return { reached, storage: ObjectStorageStoredObjectBytesRepository.create({ objectStorage }) };

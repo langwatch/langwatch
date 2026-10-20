@@ -29,7 +29,7 @@ export function ConversationSkeleton({ count, dense = false }: { count: number; 
             <Skeleton height="34px" borderRadius="15px" variant={reduceMotion ? "none" : "pulse"} />
           </Box>
         ) : (
-          <VStack key={index} align="stretch" gap="8px" width="100%">
+          <VStack key={index} align="stretch" gap="2" width="100%">
             <Skeleton
               height="12px"
               width="92%"

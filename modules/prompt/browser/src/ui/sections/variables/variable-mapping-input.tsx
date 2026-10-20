@@ -772,7 +772,7 @@ function MappingField({
           background="transparent"
           _focus={{ boxShadow: "none", border: "none" }}
           _hover={{ border: "none" }}
-          fontSize="13px"
+          textStyle="bodySm"
           disabled={disabled}
           flex={1}
           minWidth={isSourceMapping || state.inProgressPath ? "20px" : undefined}
@@ -798,9 +798,7 @@ function SourceMappingTag({
   return (
     <Tag.Root size="md" colorPalette="blue" variant="subtle" data-testid="source-mapping-tag">
       {renderSourceIcon?.(sourceInfo.source.type)}
-      <Tag.Label fontFamily="mono" fontSize="12px">
-        {sourceTagLabel(sourceInfo)}
-      </Tag.Label>
+      <Tag.Label textStyle="monoSm">{sourceTagLabel(sourceInfo)}</Tag.Label>
       <Tag.EndElement>
         <Tag.CloseTrigger
           onClick={(e) => {
@@ -844,9 +842,7 @@ function PathSegmentTags({
         data-testid={`path-segment-tag-${index}`}
       >
         {index === 0 && source && renderSourceIcon?.(source.type)}
-        <Tag.Label fontFamily="mono" fontSize="12px">
-          {segment}
-        </Tag.Label>
+        <Tag.Label textStyle="monoSm">{segment}</Tag.Label>
         <Tag.EndElement>
           <Tag.CloseTrigger
             onClick={(e) => {
@@ -991,7 +987,7 @@ function UseAllOption({ view }: { view: MappingView }) {
       marginBottom={1}
     >
       <Check size={12} color="var(--chakra-colors-green-fg)" />
-      <Text fontSize="13px" fontWeight="medium" color="green.fg">
+      <Text textStyle="label" color="green.fg">
         {context.parentIsCompleteLabel ?? `Use all ${context.parentFieldName}`}
       </Text>
     </HStack>
@@ -1080,7 +1076,7 @@ function FieldOption({
       data-testid={`field-option-${field.name}`}
     >
       <VariableTypeIcon type={field.type} size={12} />
-      <Text fontSize="13px" fontFamily="mono" flex={1}>
+      <Text textStyle="mono" flex={1}>
         <FieldOptionLabel label={field.label ?? field.name ?? ""} />
       </Text>
       {hasChildren(field) ? (
@@ -1134,7 +1130,7 @@ function UseAsValueOption({ view }: { view: MappingView }) {
         data-testid="use-as-value-option"
       >
         <Type size={14} color="var(--chakra-colors-fg-muted)" />
-        <Text fontSize="13px" color="fg.muted">
+        <Text textStyle="bodySm" color="fg.muted">
           Use "
           <Text as="span" fontWeight="medium" color="fg">
             {typed}

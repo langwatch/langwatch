@@ -169,7 +169,7 @@ function EditorField({
       <VStack width="full" align="start" gap={2}>
         <VStack align="start" gap={1} width="full">
           <Field.Label margin={0}>{label}</Field.Label>
-          <Field.HelperText margin={0} fontSize="13px">
+          <Field.HelperText margin={0} textStyle="bodySm">
             {helper}
           </Field.HelperText>
         </VStack>

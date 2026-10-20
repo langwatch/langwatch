@@ -5,7 +5,8 @@
  * for teardown with its grace. Rendered only for `sso:manage`, where the
  * screen already decided that — it is the page's danger zone.
  */
-import { Box, Button, Card, HStack, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import type { SsoConnectionLifecycleState } from "@langwatch/identity-contract";
 import { format } from "@langwatch/time";
 import { TriangleAlert } from "lucide-react";
@@ -51,13 +52,13 @@ export function ConnectionRemovalSection({
   });
 
   return (
-    <Card.Root borderColor="red.muted" background="red.subtle" data-testid="sso-remove">
-      <Card.Body paddingX={4} paddingY={3.5} gap={3}>
+    <Card variant="nested" tone="red" padding="none" data-testid="sso-remove">
+      <VStack align="stretch" paddingX={4} paddingY={3.5} gap={3}>
         <HStack gap={2} align="center">
           <Box color="red.fg" display="flex" flexShrink={0} aria-hidden="true">
             <TriangleAlert size={14} />
           </Box>
-          <Text fontSize="13.5px" fontWeight="semibold" color="red.fg">
+          <Text textStyle="bodySm" fontWeight="semibold" color="red.fg">
             Danger zone
           </Text>
         </HStack>
@@ -117,7 +118,7 @@ export function ConnectionRemovalSection({
             Removal accepted. Updating your connection status…
           </Text>
         )}
-      </Card.Body>
-    </Card.Root>
+      </VStack>
+    </Card>
   );
 }

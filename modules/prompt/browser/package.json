@@ -15,8 +15,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
-    "test": "vitest run"
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
+    "test": "vitest run",
+    "test:browser": "playwright install --with-deps chromium && vitest run --config vitest.browser.config.ts"
   },
   "dependencies": {
     "@chakra-ui/react": "catalog:",
@@ -77,7 +78,10 @@
     "@types/lodash-es": "catalog:",
     "@types/react": "catalog:",
     "@types/react-dom": "catalog:",
+    "@vitest/browser": "catalog:",
+    "@vitest/browser-playwright": "catalog:",
     "jsdom": "catalog:",
+    "playwright": "catalog:",
     "react-dom": "catalog:",
     "typescript": "catalog:",
     "vite": "catalog:",

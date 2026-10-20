@@ -4,14 +4,14 @@ import { createLogger, type Logger } from "@langwatch/observability";
 import { Temporal } from "@langwatch/time";
 
 import type { BillableEventsMeterRepository } from "../repositories/billable-events-meter.repository.ts";
-import type { TraceMeterRepository } from "../repositories/trace-meter.repository.ts";
+import type { TraceCountRepository } from "../repositories/trace-count.repository.ts";
 import { isCapped, usageLimitOf, usageUnitOf } from "../rules/usage-limit.rules.ts";
 
 const defaultLogger = createLogger("langwatch:usage:count");
 
 type UsageCountingDependencies = Readonly<{
   meter: BillableEventsMeterRepository;
-  traceMeter: TraceMeterRepository;
+  traceMeter: TraceCountRepository;
   plans: Pick<EntitlementApi, "getActivePlan">;
   billing: Pick<BillingApi, "getPricingModel">;
   logger?: Pick<Logger, "warn">;
@@ -20,7 +20,7 @@ type UsageCountingDependencies = Readonly<{
 /** Counts an organization's month from its own meters, against the plan the month is held to. */
 export class UsageCountingService {
   private readonly meter: BillableEventsMeterRepository;
-  private readonly traceMeter: TraceMeterRepository;
+  private readonly traceMeter: TraceCountRepository;
   private readonly plans: Pick<EntitlementApi, "getActivePlan">;
   private readonly billing: Pick<BillingApi, "getPricingModel">;
   private readonly logger: Pick<Logger, "warn">;

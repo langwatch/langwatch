@@ -191,7 +191,6 @@ describe("given one organization on a private ClickHouse instance and one on the
             await ClickHouseMigrateTask.createFromConfig({
               config: {
                 buildTime: false,
-                skipped: false,
                 sharedUrl: endpoint.url,
                 privateEndpoints: [],
                 settings: {
@@ -264,15 +263,31 @@ describe("given one organization on a private ClickHouse instance and one on the
         recordFor({ tenantId: PRIVATE_PROJECT, organizationId: PRIVATE_ORGANIZATION, recordId }),
       );
 
-      // Routed as the shared project, naming the private one: the shared route must not reach it.
+      const sql = `SELECT RecordId FROM log_records
+              WHERE TenantId = {tenantId:String} AND RecordId = {recordId:String}`;
+      // Routed as the shared project, by the private record's id: the shared route holds none.
       const read = await routed.clickhouse.query<{ RecordId: string }>({
         tenantId: SHARED_PROJECT,
-        sql: `SELECT RecordId FROM log_records
-              WHERE TenantId = {tenantId:String} AND RecordId = {recordId:String}`,
-        params: { tenantId: PRIVATE_PROJECT, recordId },
+        sql,
+        params: { tenantId: SHARED_PROJECT, recordId },
       });
 
       expect(read.rows).toEqual([]);
+      expect(
+        await recordIdsOn(sharedProbe, {
+          table: "log_records",
+          tenantId: PRIVATE_PROJECT,
+          recordId,
+        }),
+      ).toEqual([]);
+      // Naming the private project from the shared route is refused before any instance is asked.
+      await expect(
+        routed.clickhouse.query({
+          tenantId: SHARED_PROJECT,
+          sql,
+          params: { tenantId: PRIVATE_PROJECT, recordId },
+        }),
+      ).rejects.toMatchObject({ violation: { kind: "param-mismatch" } });
     });
   });
 

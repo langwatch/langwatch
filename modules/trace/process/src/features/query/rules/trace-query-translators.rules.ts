@@ -12,7 +12,7 @@ import {
   type TranslationContext,
 } from "@langwatch/trace-contract";
 
-import { boundedSubquery } from "./trace-query-subquery.rules.ts";
+import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
 import {
   extractNumericValue,
   extractStringValue,
@@ -140,7 +140,10 @@ function crossTableStringHandler({
     validateValueLength(value);
     const p = nextParam(ctx, name);
     ctx.params[p] = value;
-    return wrap(boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`), negated);
+    return wrapMembership(
+      boundedSubquery(table, timeColumn, `${expression} = {${p}:String}`),
+      negated,
+    );
   };
 }
 
@@ -163,7 +166,7 @@ function crossTableNumericHandler({
       const pMax = nextParam(ctx, `${name}Max`);
       ctx.params[pMin] = min;
       ctx.params[pMax] = max;
-      return wrap(
+      return wrapMembership(
         boundedSubquery(
           table,
           timeColumn,
@@ -180,7 +183,10 @@ function crossTableNumericHandler({
     if (!cmp) {
       throw new FilterParseError(`Unsupported operator: ${operator}`);
     }
-    return wrap(boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`), negated);
+    return wrapMembership(
+      boundedSubquery(table, timeColumn, `${expression} ${cmp} {${p}:Float64}`),
+      negated,
+    );
   };
 }
 

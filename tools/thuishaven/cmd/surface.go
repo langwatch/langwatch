@@ -119,13 +119,10 @@ var gone retiredSpelling
 // with the exact new argv; it never keeps working.
 var retired = map[string]retiredSpelling{
 	"ls": to("status"), "list": to("status"), "jobs": to("status"), "stores": to("status"),
-	"doctor": to("self", "doctor"), "watch": to("hub"), "ps": to("hub"), "active": to("hub"),
-	"rs": to("restart"), "sw": to("switch"), "cd": to("switch"),
-	"ch": to("db", "url", "clickhouse"), "clickhouse": to("db", "url", "clickhouse"),
-	"pg": to("db", "url", "postgres"), "postgres": to("db", "url", "postgres"),
+	"doctor": to("self", "doctor"), "ps": to("hub"),
 	"observability": to("obs"),
-	"tc":            to("machine", "typecheck"), "oc": to("machine", "clean"), "cleanup": to("machine", "clean"), "prune": to("machine", "clean"),
-	"moron": gone, "git": gone, "hmr": gone, "play-launch": gone,
+	"cleanup":       to("machine", "clean"), "prune": to("machine", "clean"),
+	"moron": gone, "git": gone, "hmr": gone,
 	"limits": to("machine", "limits"), "run": to("machine", "run"), "slot": to("machine", "slot"),
 	"typecheck": to("machine", "typecheck"), "clean": to("machine", "clean"),
 	"install": to("self", "install"), "setup": to("self", "setup"), "upgrade": to("self", "upgrade"),
@@ -166,7 +163,8 @@ var retired = map[string]retiredSpelling{
 
 func init() {
 	for _, sim := range simulators {
-		if sim.name == "idp" {
+		// githubsim and mcpsim never had a top-level command, so they have no old spelling.
+		if sim.name == "idp" || sim.name == "github" || sim.name == "mcp" {
 			continue
 		}
 		retired[sim.name] = func(rest []string) []string {

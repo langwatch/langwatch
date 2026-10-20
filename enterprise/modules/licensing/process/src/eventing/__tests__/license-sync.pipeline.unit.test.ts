@@ -86,7 +86,11 @@ describe("given the license sync's eventing declaration", () => {
       const definition = buildLicenseSync({
         participation: "consume",
         repositories: undefined,
-        app: { syncLicenses, activateConfiguredLicense: vi.fn() },
+        app: {
+          syncLicenses,
+          activateConfiguredLicense: vi.fn(),
+          applySignInProvider: vi.fn(),
+        },
         processStore,
         bootedAt: BOOTED_AT,
       });
@@ -118,6 +122,7 @@ describe("given the license sync's eventing declaration", () => {
         app: {
           syncLicenses: async () => Promise.reject(new Error("host down")),
           activateConfiguredLicense: vi.fn(),
+          applySignInProvider: vi.fn(),
         },
         processStore: InMemoryProcessStore.createForTesting(),
       });
@@ -146,7 +151,7 @@ describe("given the license sync's eventing declaration", () => {
       const definition = buildLicenseSync({
         participation: "consume",
         repositories: undefined,
-        app: { syncLicenses: vi.fn(), activateConfiguredLicense },
+        app: { syncLicenses: vi.fn(), activateConfiguredLicense, applySignInProvider: vi.fn() },
         processStore: InMemoryProcessStore.createForTesting(),
       });
       const subscriber = configuredLicenseOnSignUp({ activateConfiguredLicense });

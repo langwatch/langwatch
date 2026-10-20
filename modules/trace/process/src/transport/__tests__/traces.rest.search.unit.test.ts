@@ -41,13 +41,13 @@ vi.mock("#features/projection/rules/trace-projection-compile.rules", async (impo
  * here over the same production translator and rules so this door's filter
  * behavior is exercised for real — only `TraceApi` itself is a double.
  */
-function compileExplorerTraceFilter(input: {
+async function compileExplorerTraceFilter(input: {
   query: string;
   tenantId: string;
   timeRange: { from: number; to: number };
   originNamed?: boolean;
   dateField?: "occurred" | "updated";
-}): { sql: string; params: Record<string, unknown> } {
+}): Promise<{ sql: string; params: Record<string, unknown> }> {
   const compiled = traceQueryTranslation.translateFilter({
     queryText: input.query,
     timeRange: input.timeRange,

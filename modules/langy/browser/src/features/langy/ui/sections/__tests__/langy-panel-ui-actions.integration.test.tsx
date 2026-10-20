@@ -7,7 +7,7 @@
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { act, cleanup, render, waitFor } from "@testing-library/react";
 import type { ChatTransport, UIMessage } from "ai";
-import type { ReactNode } from "react";
+import { type ReactNode, useSyncExternalStore } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
@@ -192,13 +192,29 @@ const PROJECT_ID = "project-demo";
 // the panel as it was.
 const flagsRef = {
   current: { release_langy_ui_actions: true } as Record<string, boolean>,
+  version: 0,
+  listeners: new Set<() => void>(),
 };
 
+function setFlags(flags: Record<string, boolean>) {
+  flagsRef.current = flags;
+  flagsRef.version += 1;
+  flagsRef.listeners.forEach((listener) => listener());
+}
+
+// Subscribes, so a flag flipped mid-turn reaches the compiled panel.
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: ({ name: flag }: { name: string }) => ({
-    enabled: flagsRef.current[flag] ?? false,
-    isLoading: false,
-  }),
+  useFeatureFlag: ({ name: flag }: { name: string }) => {
+    "use no memo";
+    useSyncExternalStore(
+      (listener) => {
+        flagsRef.listeners.add(listener);
+        return () => void flagsRef.listeners.delete(listener);
+      },
+      () => flagsRef.version,
+    );
+    return { enabled: flagsRef.current[flag] ?? false, isLoading: false };
+  },
 }));
 
 class FakeLangyHost extends LangyHostApi {
@@ -290,7 +306,7 @@ const UI_ENTRY = {
 };
 
 beforeEach(() => {
-  flagsRef.current = { release_langy_ui_actions: true };
+  setFlags({ release_langy_ui_actions: true });
   chatRef.messages = [];
   chatRef.status = "ready";
   chatRef.sendMessage.mockReset();
@@ -364,12 +380,11 @@ describe("Feature: Langy drives the open page through typed UI actions", () => {
       describe("when the action arrives on the turn's stream", () => {
         /** @scenario "With page control rolled back, the open page ignores dispatched actions" */
         it("never claims the action, and the page's handler never runs", async () => {
-          const { rerender } = await startTurn();
+          await startTurn();
 
           // The flag flips mid-turn: the panel is already mounted and the
           // transport is memoised, so this is the case the ref exists for.
-          flagsRef.current = { release_langy_ui_actions: false };
-          rerender(<LangySidecar actionHandlersRef={handlersRef} />);
+          act(() => setFlags({ release_langy_ui_actions: false }));
 
           act(() => {
             latestOnData()(UI_ENTRY);

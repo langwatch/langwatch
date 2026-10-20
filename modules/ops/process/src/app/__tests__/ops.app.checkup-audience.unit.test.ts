@@ -16,11 +16,13 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { MemoryCheckupProbeChannel } from "../../channels/memory/memory.checkup-probe.channel.ts";
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
 import { OpsCheckupService } from "../../features/checkup/services/ops-checkup.service.ts";
+import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
 import {
   MemoryClickHouseHealthRepository,
   MemoryPostgresHealthRepository,
   MemoryRedisHealthRepository,
 } from "../../repositories/memory/memory.datastore-health.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { MemoryUpgradeLedgerRepository } from "../../repositories/memory/memory.upgrade-ledger.repository.ts";
 import { UsageReportWorld } from "../../services/__tests__/support/usage-report-peers.ts";
 import {
@@ -67,6 +69,7 @@ function checkupService(): OpsCheckupService {
       productAnalytics: { key: undefined, host: undefined },
       grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
       bugReportSlackChannel: undefined,
+      slackApiBase: "https://slack.com/api",
       cloudOps: false,
       adminEmails: [],
       nodeEnvironment: "production",
@@ -119,6 +122,9 @@ function checkupService(): OpsCheckupService {
       clickhouse: MemoryClickHouseHealthRepository.create(),
       redis: MemoryRedisHealthRepository.create(),
       upgradeLedger: MemoryUpgradeLedgerRepository.create(),
+      cloudLatestRelease: MemoryCloudLatestReleaseRepository.create({
+        store: MemoryOpsStore.create(),
+      }),
     },
     channels: {
       usageReport: MemoryUsageReportChannel.create(),
@@ -265,15 +271,17 @@ describe("given no platform operator exists and the caller manages the organizat
   });
 
   describe("when the usage report switches are changed", () => {
-    /** @scenario "An organization manager changes what the install reports" */
-    it("writes the switches", async () => {
-      await managerApp().setUsageReportSwitches({
-        organizationId: "org-1",
-        operator: MANAGER,
-        hostnameOptOut: true,
-      });
+    /** @scenario "An organization manager cannot change what the install reports" */
+    it("refuses as operator-only and writes nothing", async () => {
+      await expect(
+        managerApp().setUsageReportSwitches({
+          organizationId: "org-1",
+          operator: MANAGER,
+          hostnameOptOut: true,
+        }),
+      ).rejects.toMatchObject({ code: "permission_denied" });
 
-      expect(switchWrites).toEqual([{ hostnameOptOut: true }]);
+      expect(switchWrites).toEqual([]);
     });
   });
 

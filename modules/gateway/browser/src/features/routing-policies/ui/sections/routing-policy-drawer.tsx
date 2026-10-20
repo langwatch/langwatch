@@ -16,10 +16,11 @@ import {
 import { ProviderScopeChips } from "@langwatch/design-system/provider-scope-chips";
 import { ScopeChipPicker, type ScopeTriadEntry } from "@langwatch/design-system/scope-chip-picker";
 import { X } from "lucide-react";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type { UseFormReturn } from "react-hook-form";
 
 import { useOrganizationTeamProject } from "../../../../behavior/gateway-session.ts";
+import { useCloseGatewayDrawer } from "../../../../behavior/use-close-gateway-drawer.ts";
 import { useRoutingPolicyDrawerForm } from "../../behavior/use-routing-policy-drawer-form.ts";
 import { useRoutingPolicyMutations } from "../../behavior/use-routing-policy-mutations.ts";
 import type { ModelTier } from "../../model/model-tier-presets.ts";
@@ -46,9 +47,10 @@ export function RoutingPolicyDrawer({
   seedScopeType?: string;
   seedScopeId?: string;
   seedIsDefault?: string;
-  /** Puts the address back where it was before the drawer opened. */
-  onClose: () => void;
+  /** Puts the address back where it was before the drawer opened; absent when a link opened it. */
+  onClose?: () => void;
 }) {
+  const close = useCloseGatewayDrawer(onClose);
   const { organization } = useOrganizationTeamProject();
   const organizationId = organization?.id ?? "";
   const isEditing = !!policyId;
@@ -70,79 +72,77 @@ export function RoutingPolicyDrawer({
 
   const { save, isSaving, saveError, clearSaveError } = useRoutingPolicyMutations({
     organizationId,
-    onSaved: onClose,
+    onSaved: close,
   });
 
-  const { values, problems } = drawer;
-  const canSave =
-    !!values.name.trim() &&
-    values.scopes.length > 0 &&
-    values.modelProviderIds.length > 0 &&
-    problems.length === 0 &&
-    !isSaving;
-
-  const onSubmit = drawer.form.handleSubmit((formValues) =>
-    save({ policyId: policyId ?? null, values: formValues }),
+  const { values, problems, form } = drawer;
+  const [refusals, setRefusals] = useState(0);
+  const onSubmit = drawer.form.handleSubmit(
+    (formValues) => {
+      if (isSaving || problems.length > 0) return;
+      save({ policyId: policyId ?? null, values: formValues });
+    },
+    () => setRefusals((count) => count + 1),
   );
 
+  useEffect(() => {
+    if (refusals === 0) return;
+    if (form.getFieldState("name").invalid) {
+      form.setFocus("name");
+      return;
+    }
+    const id = form.getFieldState("scopes").invalid
+      ? "gateway-routing-policy-scopes-error"
+      : "gateway-routing-policy-providers-error";
+    document.getElementById(id)?.focus();
+  }, [refusals, form]);
+
   return (
-    <Drawer.Root
-      open={true}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
-      placement="end"
+    <Drawer
+      onClose={close}
+      title={isEditing ? "Edit routing policy" : "New routing policy"}
       size="md"
-    >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{isEditing ? "Edit routing policy" : "New routing policy"}</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          {isEditing && drawer.policyLoading ? (
-            <HStack gap={2}>
-              <Spinner size="sm" />
-              <Text fontSize="sm" color="fg.muted">
-                Loading the policy
-              </Text>
-            </HStack>
-          ) : (
-            <DrawerBody
-              form={drawer.form}
-              values={values}
-              isEditing={isEditing}
-              organizationId={organizationId}
-              organizationName={organization?.name}
-              availableTeams={drawer.availableTeams}
-              availableProjects={drawer.availableProjects}
-              scopesWithNames={drawer.scopesWithNames}
-              providerOptions={drawer.providerOptions}
-              providersLoading={drawer.providersLoading}
-              boundProviderTypes={drawer.boundProviderTypes}
-            />
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
+      busy={isSaving}
+      footer={{
+        summary: (
           <VStack align="stretch" gap={3} width="full">
             <Problems problems={problems} />
             {saveError && (
               <SaveError isEditing={isEditing} message={saveError} onDismiss={clearSaveError} />
             )}
-            <HStack justifyContent="flex-end" width="full">
-              <Button
-                data-testid="gateway-routing-policy-submit"
-                onClick={onSubmit}
-                loading={isSaving}
-                disabled={!canSave}
-              >
-                {isEditing ? "Save changes" : "Create policy"}
-              </Button>
-            </HStack>
           </VStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+        ),
+        primaryAction: {
+          label: isEditing ? "Save changes" : "Create policy",
+          loading: isSaving,
+          onClick: () => void onSubmit(),
+          "data-testid": "gateway-routing-policy-submit",
+        },
+      }}
+    >
+      {isEditing && drawer.policyLoading ? (
+        <HStack gap={2}>
+          <Spinner size="sm" />
+          <Text fontSize="sm" color="fg.muted">
+            Loading the policy
+          </Text>
+        </HStack>
+      ) : (
+        <DrawerBody
+          form={drawer.form}
+          values={values}
+          isEditing={isEditing}
+          organizationId={organizationId}
+          organizationName={organization?.name}
+          availableTeams={drawer.availableTeams}
+          availableProjects={drawer.availableProjects}
+          scopesWithNames={drawer.scopesWithNames}
+          providerOptions={drawer.providerOptions}
+          providersLoading={drawer.providersLoading}
+          boundProviderTypes={drawer.boundProviderTypes}
+        />
+      )}
+    </Drawer>
   );
 }
 
@@ -172,16 +172,18 @@ function DrawerBody({
   boundProviderTypes: string[];
 }) {
   const { control, register, setValue } = form;
+  const { errors } = form.formState;
 
   return (
     <VStack align="stretch" gap={5}>
-      <Field.Root required>
+      <Field.Root required invalid={!!errors.name}>
         <Field.Label>Name</Field.Label>
         <Input
           placeholder="Developer default"
           data-testid="gateway-routing-policy-name"
           {...register("name")}
         />
+        <Field.ErrorText>{errors.name?.message}</Field.ErrorText>
       </Field.Root>
 
       <Field.Root>
@@ -200,7 +202,7 @@ function DrawerBody({
 
       <Separator />
 
-      <Field.Root required>
+      <Field.Root required invalid={!!errors.scopes}>
         <Field.Label>Where it applies</Field.Label>
         {isEditing ? (
           <>
@@ -222,9 +224,12 @@ function DrawerBody({
             currentOrganizationId={organizationId}
           />
         )}
+        <Field.ErrorText id="gateway-routing-policy-scopes-error" tabIndex={-1}>
+          {errors.scopes?.message}
+        </Field.ErrorText>
       </Field.Root>
 
-      <Field.Root required>
+      <Field.Root required invalid={!!errors.modelProviderIds}>
         <Field.Label>
           Model providers, in order
           <FieldInfoTooltip
@@ -239,6 +244,9 @@ function DrawerBody({
           loading={providersLoading}
           modelProvidersAdminPath="/settings/model-providers"
         />
+        <Field.ErrorText id="gateway-routing-policy-providers-error" tabIndex={-1}>
+          {errors.modelProviderIds?.message}
+        </Field.ErrorText>
       </Field.Root>
 
       <Separator />

@@ -57,24 +57,43 @@ func (r *Runtime) StoppedByHaven() bool {
 // stopped the VM.
 func (r *Runtime) StopIfIdle(ctx context.Context) (bool, error) {
 	rec, ok := r.readRecord()
-	if !ok || !rec.StoppedAt.IsZero() || !r.IsRunning(ctx) {
+	if !ok || !rec.StoppedAt.IsZero() {
 		return false, nil
 	}
-	host, err := r.DockerHost(ctx)
-	if err != nil {
-		return false, err
-	}
-	out, err := r.Docker(ctx, host, "ps", "-q").Output()
-	if err != nil {
-		return false, err // unknown: leave the VM alone
-	}
-	if strings.TrimSpace(string(out)) != "" {
+	return r.StopWhenEmpty(ctx)
+}
+
+// StopWhenEmpty stops the VM whoever started it, but only while it runs and no
+// container runs on it. The stop is recorded, so status says haven stopped it.
+func (r *Runtime) StopWhenEmpty(ctx context.Context) (bool, error) {
+	if !r.IsRunning(ctx) {
 		return false, nil
+	}
+	n, err := r.RunningContainers(ctx)
+	if err != nil || n > 0 {
+		return false, err // unknown or busy: leave the VM alone
 	}
 	if err := r.run(ctx, "stop", "-p", r.profile); err != nil {
 		return false, err
 	}
+	rec, ok := r.readRecord()
+	if !ok {
+		rec = startRecord{Profile: r.profile}
+	}
 	rec.StoppedAt = time.Now()
 	r.writeRecord(rec)
 	return true, nil
+}
+
+// RunningContainers counts every running container on the VM, haven's or not.
+func (r *Runtime) RunningContainers(ctx context.Context) (int, error) {
+	host, err := r.DockerHost(ctx)
+	if err != nil {
+		return 0, err
+	}
+	out, err := r.Docker(ctx, host, "ps", "-q").Output()
+	if err != nil {
+		return 0, err
+	}
+	return len(strings.Fields(string(out))), nil
 }

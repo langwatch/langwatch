@@ -13,6 +13,7 @@ Project coding conventions. See also `../TESTING_PHILOSOPHY.md`.
 - **inline-fix-links.md** - Links to settings from a working context open in a new tab
 - **ops-dashboard.md** - Ops surfaces: space is proportional to trouble; identifiers, dual-axis charts, cross-tenant controls
 - **list-table.md** - Shared look for resource index tables
+- **type-scale.md** - The product text styles, and the mapping from every old px size to one
 - **alerts-toasts-and-field-errors.md** - When to use an alert, a toast or a field error; the alert variants
 - URL-routed drawers are the record's (ARCHITECTURE.md §10, §10.1) and the `browser-module` skill's
 - **async-processing-ui.md** - Poll/banner/read-gate pattern for a processing→ready/failed resource

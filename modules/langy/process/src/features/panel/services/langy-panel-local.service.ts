@@ -22,13 +22,11 @@ import type { z } from "zod";
 
 import type { LangyConversationCommands } from "../../../eventing/langy-conversation.commands.ts";
 import type { ConnectedWorkspace } from "../../../repositories/langy-local-presence.repository.ts";
-import { workspaceChannel } from "../../../rules/langy-local-control-keys.rules.ts";
 import { controlRequestState } from "../../../rules/langy-local-control-request-state.rules.ts";
 import {
   conversationTitle,
   conversationUrl,
 } from "../../../rules/langy-local-session-text.rules.ts";
-import { reconcileSkipPolicy } from "../../../rules/langy-local-skip-policy.rules.ts";
 import type { LangyService } from "../../../services/langy.service.ts";
 import { ControlRequestService } from "../../local-control/services/langy-local-control-request.service.ts";
 import type { LocalControlRuntime } from "../../local-control/services/langy-local-control-runtime.service.ts";
@@ -108,8 +106,7 @@ export class LangyPanelLocalService {
       connected: connected !== undefined,
       workspace: connected ? { ...connected.workspace, hostname: connected.hostname } : null,
       skipAllowed,
-      skipPermissions: await reconcileSkipPolicy({
-        runtime,
+      skipPermissions: await runtime.skipPolicy.reconcile({
         projectId: input.projectId,
         conversationId: input.conversationId,
         model: conversation.lastModel,
@@ -240,10 +237,10 @@ export class LangyPanelLocalService {
       skipPermissions: input.skipPermissions,
       model,
     });
-    await runtime.store.publish(
-      workspaceChannel(input.conversationId),
-      JSON.stringify({ policy: { skipPermissions: input.skipPermissions } }),
-    );
+    await runtime.workspace.nudge({
+      conversationId: input.conversationId,
+      nudge: { policy: { skipPermissions: input.skipPermissions } },
+    });
     return { skipPermissions: input.skipPermissions };
   }
 
@@ -257,10 +254,10 @@ export class LangyPanelLocalService {
     const [workspace] = await this.findConnectedWorkspaces(input.conversationId);
 
     await runtime.requests.revokeConversationBindings(input.conversationId);
-    await runtime.store.publish(
-      workspaceChannel(input.conversationId),
-      JSON.stringify({ disconnect: { reason: "Disconnected from the LangWatch panel." } }),
-    );
+    await runtime.workspace.nudge({
+      conversationId: input.conversationId,
+      nudge: { disconnect: { reason: "Disconnected from the LangWatch panel." } },
+    });
     await runtime.presence.deregister({ conversationId: input.conversationId });
     for (const call of await runtime.dispatcher.listPendingForConversation(input.conversationId)) {
       await runtime.dispatcher.cancel({

@@ -29,6 +29,9 @@ func ask(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 	var out bytes.Buffer
 	o.Gate(bytes.NewReader(in), &out)
 
+	if bytes.Contains(out.Bytes(), []byte("updatedInput")) {
+		t.Fatalf("the gate never rewrites the command it admits, got %q", out.String())
+	}
 	var reply hookReply
 	if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
 		t.Fatalf("the gate wrote something undecodable: %q", out.String())
@@ -60,6 +63,9 @@ func askCodex(t *testing.T, o *Orchestrator, payload map[string]any) hookReply {
 	var out bytes.Buffer
 	o.GateCodex(bytes.NewReader(in), &out)
 
+	if bytes.Contains(out.Bytes(), []byte("updatedInput")) {
+		t.Fatalf("the gate never rewrites the command it admits, got %q", out.String())
+	}
 	var reply hookReply
 	if err := json.Unmarshal(out.Bytes(), &reply); err != nil {
 		t.Fatalf("the gate wrote something undecodable: %q", out.String())
@@ -78,13 +84,7 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 	t.Run("given a heavy command with no free slot", func(t *testing.T) {
 		store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
-		reply := ask(t, gateOrch(store, sys), bashPayload("pnpm test:unit run src/x"))
-
-		t.Run("the command is not rewritten", func(t *testing.T) {
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected no updatedInput at all, got %+v", reply.Specific)
-			}
-		})
+		reply := ask(t, gateOrch(store, sys), bashPayload("pnpm lint"))
 
 		t.Run("and no allow is handed out on its strength", func(t *testing.T) {
 			if reply.Specific.PermissionDecision == "allow" {
@@ -117,11 +117,6 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 			}
 		})
 
-		t.Run("and it still carries no updatedInput", func(t *testing.T) {
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("a refusal is not a rewrite: %+v", reply.Specific)
-			}
-		})
 	})
 
 	t.Run("given a command that is not heavy", func(t *testing.T) {
@@ -130,7 +125,7 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 		reply := ask(t, gateOrch(store, sys), bashPayload("git status"))
 
 		t.Run("it is waved through untouched", func(t *testing.T) {
-			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
+			if reply.Specific.PermissionDecision != "" {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
 			}
 		})
@@ -140,21 +135,14 @@ func TestClaudeGateNeverRewritesTheCommand(t *testing.T) {
 // @scenario "Codex heavy commands use the existing Haven gate"
 // @scenario "The gate never changes the command it admits"
 func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
-	t.Run("given a sub-agent whose short unit run finds no free slot", func(t *testing.T) {
-		// One slot, one run already in it: the machine is full, and a run
-		// observed to finish well inside five minutes is narrowed rather than
-		// queued.
+	t.Run("given a sub-agent whose lint run finds no free slot", func(t *testing.T) {
+		// One slot, one run already in it: the machine is full, so a lint (still
+		// gated, unlike the launcher-owned tsc and vitest runs) is queued.
 		store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
 
 		t.Run("when Codex's gate answers", func(t *testing.T) {
-			reply := askCodex(t, gateOrch(store, sys), bashPayload("pnpm test:unit run src/x"))
-
-			t.Run("the command is not rewritten", func(t *testing.T) {
-				if reply.Specific.UpdatedInput != nil {
-					t.Fatalf("expected no updatedInput at all, got %+v", reply.Specific)
-				}
-			})
+			reply := askCodex(t, gateOrch(store, sys), bashPayload("pnpm lint"))
 
 			t.Run("and no allow is handed out on its strength", func(t *testing.T) {
 				if reply.Specific.PermissionDecision == "allow" {
@@ -173,13 +161,13 @@ func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 	t.Run("given a session that already permits its own shell commands", func(t *testing.T) {
 		store := &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}}
 		sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
-		payload := bashPayload("pnpm test:unit run src/x")
+		payload := bashPayload("pnpm lint")
 		payload["permission_mode"] = "bypassPermissions"
 
 		t.Run("permission_mode changes nothing: still no rewrite, only a message", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), payload)
-			if reply.Specific.UpdatedInput != nil {
-				t.Fatalf("expected no updatedInput regardless of permission mode, got %+v", reply.Specific)
+			if reply.Specific.PermissionDecision == "allow" {
+				t.Fatalf("expected no allow regardless of permission mode, got %+v", reply.Specific)
 			}
 		})
 	})
@@ -190,7 +178,7 @@ func TestCodexGateNeverRewritesTheCommandEither(t *testing.T) {
 
 		t.Run("it is waved through untouched, and keeps Codex's normal permission flow", func(t *testing.T) {
 			reply := askCodex(t, gateOrch(store, sys), bashPayload("git status"))
-			if reply.Specific.PermissionDecision != "" || reply.Specific.UpdatedInput != nil {
+			if reply.Specific.PermissionDecision != "" {
 				t.Fatalf("gating `git status` is its own outage; got %+v", reply.Specific)
 			}
 		})
@@ -283,8 +271,7 @@ func editPayload(t *testing.T, tool string) map[string]any {
 // warning, no rewrite.
 func isBareDefer(reply hookReply) bool {
 	return reply.Specific.PermissionDecision == "" &&
-		reply.SystemMessage == "" &&
-		reply.Specific.UpdatedInput == nil
+		reply.SystemMessage == ""
 }
 
 // gatedToolPayload builds a payload that SHOULD produce an answer for one tool.
@@ -294,9 +281,11 @@ func gatedToolPayload(t *testing.T, tool string) map[string]any {
 	t.Helper()
 	switch tool {
 	case "Bash":
-		return bashPayload("pnpm test:unit run src/x")
+		return bashPayload("pnpm lint")
 	case "Edit", "Write":
 		return editPayload(t, tool)
+	case domain.PlaywrightToolMatcher:
+		return map[string]any{"tool_name": "mcp__playwright__browser_navigate", "tool_input": map[string]any{"url": "https://example.com"}}
 	default:
 		t.Fatalf("%q is routed to the gate but nothing here answers for it; "+
 			"either give it a branch or take it out of domain.GatedTools", tool)
@@ -393,5 +382,49 @@ func TestGateAlwaysAnswers(t *testing.T) {
 				t.Fatalf("expected no permission decision, got %q", reply.Specific.PermissionDecision)
 			}
 		})
+	})
+}
+
+// @scenario "The gate leaves compile and test runs to their launchers"
+// @scenario "At critical pressure a compile or test run with no slot is still refused"
+// @scenario "Lint and builds keep the gate until they have launchers"
+func TestGateLeavesLauncherRunsAloneButKeepsRedAndLint(t *testing.T) {
+	full := func() (*fakeStore, *fakeSystem) {
+		return &fakeStore{heavyRuns: 1, observed: map[string]time.Duration{"unit": 20 * time.Second}},
+			&fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: time.Now()}
+	}
+	launcherRuns := []string{
+		"tsc --noEmit --ignoreConfig f.ts", "vitest run src/x", "pnpm typecheck",
+		"pnpm typecheck:src", "pnpm test:affected", "pnpm --filter @langwatch/time typecheck",
+		"pnpm --filter @langwatch/time test", "pnpm test:unit run src/x",
+		"nx run-many -t typecheck -p @langwatch/time",
+	}
+	t.Run("given a full machine that is not red, launcher runs get a bare answer", func(t *testing.T) {
+		for _, command := range launcherRuns {
+			store, sys := full()
+			if reply := ask(t, gateOrch(store, sys), bashPayload(command)); !isBareDefer(reply) {
+				t.Errorf("%q: want no decision and no message, got %+v", command, reply)
+			}
+		}
+	})
+	t.Run("given the same full machine, a lint is still described", func(t *testing.T) {
+		for _, command := range []string{"pnpm lint", "pnpm typecheck && pnpm lint"} {
+			store, sys := full()
+			if reply := ask(t, gateOrch(store, sys), bashPayload(command)); reply.SystemMessage == "" {
+				t.Errorf("%q: want a queue message, got %+v", command, reply)
+			}
+		}
+	})
+	t.Run("given red pressure with no slot free, launcher runs are still refused", func(t *testing.T) {
+		for _, command := range []string{"pnpm test:unit run src/x", "tsc -b", "pnpm --filter x typecheck"} {
+			now := time.Now()
+			store := &fakeStore{heavyRuns: 999, hasWrittenPressure: true, pressure: domain.PressureRecord{
+				Version: domain.PressureRecordVersion, Level: "red", WrittenAt: now,
+			}}
+			sys := &fakeSystem{memStat: domain.MemStat{TotalBytes: 4 << 30}, now: now}
+			if reply := ask(t, gateOrch(store, sys), bashPayload(command)); reply.Specific.PermissionDecision != "deny" {
+				t.Errorf("%q: want a deny at red, got %+v", command, reply.Specific)
+			}
+		}
 	})
 }

@@ -226,6 +226,17 @@ export interface ProcessStore {
     now: number;
   }): Promise<{ applied: boolean }>;
 
+  /**
+   * Push a held lease out to `now + leaseDurationMs` while its delivery runs. Fenced on the
+   * token like the acknowledgements: `applied: false` means another dispatcher took the message.
+   */
+  renewLease(params: {
+    identity: OutboxMessageIdentity;
+    leaseToken: string;
+    now: number;
+    leaseDurationMs: number;
+  }): Promise<{ applied: boolean }>;
+
   /** Record a failed attempt; `dead: true` retires the message permanently. */
   markFailed(params: {
     identity: OutboxMessageIdentity;
@@ -269,6 +280,31 @@ export interface ProcessStore {
     /** Restrict the global wake scan to process managers mounted here. */
     processNames?: readonly string[];
   }): Promise<DueWake[]>;
+
+  /**
+   * Claims due wakes for one worker, oldest first: each instance's nextWakeAt moves to `now +
+   * leaseDurationMs`, revision untouched, so concurrent callers get disjoint batches. `wakeAt` is
+   * the due time before the claim; a claim nobody commits or releases fires when its lease ends.
+   */
+  leaseDueWakes(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    /** Restrict the claim to process managers mounted here. */
+    processNames?: readonly string[];
+  }): Promise<DueWake[]>;
+
+  /**
+   * Hands a claimed wake back unhandled: nextWakeAt returns to `wakeAt` only while the row still
+   * holds the claim's lease end at the claimed revision. Every commit moves the revision, so one
+   * that re-armed the wake, even at the lease end, is never overwritten.
+   */
+  releaseWakeClaim(params: {
+    ref: ProcessRef;
+    revision: number;
+    wakeAt: number;
+    claimedUntil: number;
+  }): Promise<{ applied: boolean }>;
 
   /**
    * Retention for high-frequency recurring intents (ADR-052): deletes

@@ -201,6 +201,29 @@ Feature: IngestionSource — admin configuration of cross-platform feeds
       When the admin opens it for editing
       Then the drawer title reads "Edit source"
 
+  Rule: The source drawers and the once-shown secret keep their controls
+
+    @integration
+    Scenario: The source drawers keep Cancel and say why Save is off
+      When the admin opens the Add or Edit drawer
+      Then the provider's logo is decorative and the title names the source
+      And the footer has Cancel, which closes the drawer once
+      And the primary action is off with a reason while the display name is blank
+
+    @integration
+    Scenario: The once-shown secret ignores an outside click but closes by X or Escape
+      Given a new source's secret is shown
+      When the admin clicks outside the dialog
+      Then the dialog stays open
+      And the X closes it, and so does Escape
+      And "I've saved it" closes it
+
+    @integration
+    Scenario: The secret dialog leads to the source page
+      Given a new source's secret is shown
+      When the admin chooses "View source page"
+      Then the admin goes to that source's page
+
   Rule: Notes about why a field is locked sit behind the title, not above the fields
 
     @integration

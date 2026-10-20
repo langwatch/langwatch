@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Badge,
@@ -87,9 +88,7 @@ function EmittedCommands({ outbox }: { outbox: DejaViewProcessManagerOutboxMessa
       <VStack align="stretch" gap={1}>
         {outbox.map((msg) => (
           <HStack key={msg.messageKey} gap={2}>
-            <Text textStyle="xs" fontFamily="mono" truncate>
-              {msg.intentType}
-            </Text>
+            <InlineCode variant="neutral">{msg.intentType}</InlineCode>
             <Spacer />
             {msg.attempts > 0 && (
               <Text textStyle="2xs" color="fg.muted">
@@ -111,51 +110,50 @@ export function ManagerCard({ manager }: { manager: DejaViewProcessManager }) {
   const { instance } = manager;
 
   return (
-    <Box borderWidth="1px" borderColor="border" borderRadius="md" padding={3}>
-      <VStack align="stretch" gap={3}>
-        <HStack gap={2}>
-          <Text fontWeight="semibold" textStyle="sm" truncate>
-            {manager.processName}
-          </Text>
-          <Spacer />
-          <Badge colorPalette={status.palette} variant="subtle">
-            {status.label}
-          </Badge>
-        </HStack>
-
-        <Field label="Triggers">
-          <Chips items={manager.eventTypes} />
+    <Card
+      variant="frame"
+      padding="sm"
+      bodyLayout="spaced"
+      title={manager.processName}
+      titleLevel={3}
+      badge={
+        <Badge colorPalette={status.palette} variant="subtle">
+          {status.label}
+        </Badge>
+      }
+    >
+      <Field label="Triggers">
+        <Chips items={manager.eventTypes} />
+      </Field>
+      {manager.intentTypes.length > 0 && (
+        <Field label="Emits">
+          <Chips items={manager.intentTypes} />
         </Field>
-        {manager.intentTypes.length > 0 && (
-          <Field label="Emits">
-            <Chips items={manager.intentTypes} />
-          </Field>
-        )}
+      )}
 
-        {instance ? (
-          <>
-            <HStack gap={4} flexWrap="wrap">
-              <Text textStyle="xs" color="fg.muted">
-                rev {instance.revision}
-              </Text>
-              <Text textStyle="xs" color="fg.muted">
-                updated {formatTimeAgo(instance.updatedAt)}
-              </Text>
-              <Text textStyle="xs" color="fg.muted">
-                next wake {formatTimeAgo(instance.nextWakeAt)}
-              </Text>
-            </HStack>
-            <Field label="State">
-              <JsonViewer data={instance.state} maxHeight="220px" />
-            </Field>
-            {manager.outbox.length > 0 && <EmittedCommands outbox={manager.outbox} />}
-          </>
-        ) : (
-          <Text textStyle="xs" color="fg.muted">
-            This machine has not started for this aggregate.
-          </Text>
-        )}
-      </VStack>
-    </Box>
+      {instance ? (
+        <>
+          <HStack gap={4} flexWrap="wrap">
+            <Text textStyle="xs" color="fg.muted">
+              rev {instance.revision}
+            </Text>
+            <Text textStyle="xs" color="fg.muted">
+              updated {formatTimeAgo(instance.updatedAt)}
+            </Text>
+            <Text textStyle="xs" color="fg.muted">
+              next wake {formatTimeAgo(instance.nextWakeAt)}
+            </Text>
+          </HStack>
+          <Field label="State">
+            <JsonViewer data={instance.state} maxHeight="220px" />
+          </Field>
+          {manager.outbox.length > 0 && <EmittedCommands outbox={manager.outbox} />}
+        </>
+      ) : (
+        <Text textStyle="xs" color="fg.muted">
+          This machine has not started for this aggregate.
+        </Text>
+      )}
+    </Card>
   );
 }

@@ -10,7 +10,9 @@ const { url, email, password, shots, phase, signIn } = JSON.parse(process.argv[2
 const states =
   /Up to date|Finishing in background|Behind|Never upgraded|Upgrading|Rolled back|Needs attention|Unsupported|Access Restricted|LangWatch is upgrading/;
 const results = [];
-const browser = await chromium.launch();
+const browser = await chromium.launch({
+  args: ["--disable-gpu", "--disable-accelerated-2d-canvas", "--disable-webgl"],
+});
 
 async function capture(page, name, path, settle) {
   const file = `${phase}-${name}.png`;

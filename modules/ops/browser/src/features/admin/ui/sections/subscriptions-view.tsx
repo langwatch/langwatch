@@ -5,28 +5,29 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
-  Button,
   Field,
   Heading,
   HStack,
   Input,
   NativeSelect,
   SimpleGrid,
-  Spacer,
-  Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Temporal, toEpochMs } from "@langwatch/time";
 import { MoreVertical, Pencil, SearchX } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
-import { dateInputToISO, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
+
+/** The controls a failed submit can land on; wrappers that carry the state are skipped. */
+const INVALID_CONTROL =
+  'input[aria-invalid="true"], textarea[aria-invalid="true"], select[aria-invalid="true"]';
 interface AdminSubscription {
   id: string;
   organizationId: string;
@@ -144,60 +145,55 @@ export default function SubscriptionsView() {
         onCreate={() => setCreating(true)}
         createLabel="New subscription"
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          variant="line"
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>Organization</Table.ColumnHeader>
-              <Table.ColumnHeader>Plan</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader>Stripe ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Start</Table.ColumnHeader>
-              <Table.ColumnHeader>End</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Subscriptions table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>Organization</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Plan</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Stripe ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Start</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>End</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={7}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No subscriptions match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={7}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No subscriptions match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((sub) => (
-              <Table.Row key={sub.id}>
-                <Table.Cell>
+              <ListTable.Row key={sub.id}>
+                <ListTable.Cell>
                   {sub.organization?.name ?? (
                     <Text fontSize="xs" color="fg.muted">
                       {sub.organizationId}
                     </Text>
                   )}
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <Badge size="sm" variant="subtle">
                     {sub.plan}
                   </Badge>
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <Badge size="sm" colorPalette={statusColor[sub.status]}>
                     {sub.status}
                   </Badge>
-                </Table.Cell>
-                <Table.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{formatDate(sub.startDate)}</Table.Cell>
-                <Table.Cell>{formatDate(sub.endDate)}</Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell>{sub.stripeSubscriptionId ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
+                  <AdminDate value={sub.startDate} display="date" />
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <AdminDate value={sub.endDate} display="date" />
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
                       <Menu.Trigger>
@@ -211,10 +207,10 @@ export default function SubscriptionsView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 
@@ -303,10 +299,14 @@ function SubscriptionDrawer({
   const mutation = mode === "edit" ? update : create;
 
   const [form, setForm] = useState<FormState>(EMPTY_FORM);
+  const [attempts, setAttempts] = useState(0);
+  const formId = useId();
+  const formRef = useRef<HTMLFormElement>(null);
   const isOpen = mode === "edit" ? !!subscription : subscription !== undefined;
 
   useEffect(() => {
     if (!isOpen) return;
+    setAttempts(0);
     if (mode === "edit" && subscription) {
       setForm(formFromSubscription(subscription));
     } else if (mode === "create") {
@@ -320,13 +320,16 @@ function SubscriptionDrawer({
   const copy = DRAWER_COPY[mode];
   const title = copy.title;
 
-  const handleSave = () => {
+  useEffect(() => {
+    if (attempts === 0) return;
+    formRef.current?.querySelector<HTMLElement>(INVALID_CONTROL)?.focus();
+  }, [attempts]);
+
+  const handleSave = (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    if (mutation.isPending) return;
     if (!form.organizationId) {
-      toaster.create({
-        title: "Organization is required",
-        type: "error",
-        duration: 3000,
-      });
+      setAttempts((count) => count + 1);
       return;
     }
     const payload = payloadFromForm(form);
@@ -353,116 +356,108 @@ function SubscriptionDrawer({
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={isOpen}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
-      }}
+      onClose={onClose}
+      title={title}
       size="lg"
+      footer={{
+        cancel: { onClick: onClose },
+        primaryAction: {
+          label: mode === "edit" ? "Save" : "Create",
+          type: "submit",
+          form: formId,
+          loading: mutation.isPending,
+        },
+      }}
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{title}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          <VStack gap={4} align="stretch">
-            <SectionHeading>Subscription</SectionHeading>
-            <OrganizationPicker
-              value={form.organizationId}
-              onChange={(id) => setField("organizationId", id)}
-              currentName={subscription?.organization?.name}
-            />
-            <HStack gap={3} align="start">
-              <Field.Root>
-                <Field.Label>Plan</Field.Label>
-                <EnumSelect
-                  value={form.plan}
-                  options={Object.values(PlanTypes)}
-                  onChange={(v) => setField("plan", v as PlanTypes)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Status</Field.Label>
-                <EnumSelect
-                  value={form.status}
-                  options={Object.values(SubscriptionStatus)}
-                  onChange={(v) => setField("status", v as SubscriptionStatus)}
-                />
-              </Field.Root>
-            </HStack>
+      <form id={formId} ref={formRef} noValidate onSubmit={handleSave}>
+        <VStack gap={4} align="stretch">
+          <SectionHeading>Subscription</SectionHeading>
+          <OrganizationPicker
+            value={form.organizationId}
+            onChange={(id) => setField("organizationId", id)}
+            currentName={subscription?.organization?.name}
+            invalid={attempts > 0 && !form.organizationId}
+          />
+          <HStack gap={3} align="start">
             <Field.Root>
-              <Field.Label>Stripe subscription ID</Field.Label>
-              <Input
-                value={form.stripeSubscriptionId}
-                onChange={(e) => setField("stripeSubscriptionId", e.target.value)}
+              <Field.Label>Plan</Field.Label>
+              <EnumSelect
+                value={form.plan}
+                options={Object.values(PlanTypes)}
+                onChange={(v) => setField("plan", v as PlanTypes)}
               />
             </Field.Root>
-            <HStack gap={3}>
-              <Field.Root>
-                <Field.Label>Start date</Field.Label>
-                <Input
-                  type="date"
-                  value={form.startDate}
-                  onChange={(e) => setField("startDate", e.target.value)}
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>End date</Field.Label>
-                <Input
-                  type="date"
-                  value={form.endDate}
-                  onChange={(e) => setField("endDate", e.target.value)}
-                />
-              </Field.Root>
-            </HStack>
-
-            {GROUPED_LIMITS.map(([group, fields]) => (
-              <VStack key={group} gap={3} align="stretch">
-                <SectionHeading>{group} limits</SectionHeading>
-                <SimpleGrid columns={2} gap={3}>
-                  {fields.map((f) => (
-                    <Field.Root key={f.key}>
-                      <Field.Label>{f.label}</Field.Label>
-                      <Input
-                        type="number"
-                        value={form[f.key as LimitKey]}
-                        onChange={(e) => setField(f.key as LimitKey, e.target.value)}
-                        placeholder="—"
-                      />
-                    </Field.Root>
-                  ))}
-                </SimpleGrid>
-              </VStack>
-            ))}
-
-            {mode === "edit" && subscription && (
-              <VStack align="start" gap={0} pt={2}>
-                <Text fontSize="xs" color="fg.muted">
-                  Subscription ID: {subscription.id}
-                </Text>
-                {subscription.lastPaymentFailedDate && (
-                  <Text fontSize="xs" color="fg.error">
-                    Last payment failed: {formatDate(subscription.lastPaymentFailedDate)}
-                  </Text>
-                )}
-              </VStack>
-            )}
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={mutation.isPending} onClick={handleSave}>
-              {mode === "edit" ? "Save" : "Create"}
-            </Button>
+            <Field.Root>
+              <Field.Label>Status</Field.Label>
+              <EnumSelect
+                value={form.status}
+                options={Object.values(SubscriptionStatus)}
+                onChange={(v) => setField("status", v as SubscriptionStatus)}
+              />
+            </Field.Root>
           </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+          <Field.Root>
+            <Field.Label>Stripe subscription ID</Field.Label>
+            <Input
+              value={form.stripeSubscriptionId}
+              onChange={(e) => setField("stripeSubscriptionId", e.target.value)}
+            />
+          </Field.Root>
+          <HStack gap={3}>
+            <Field.Root>
+              <Field.Label>Start date</Field.Label>
+              <Input
+                type="date"
+                value={form.startDate}
+                onChange={(e) => setField("startDate", e.target.value)}
+              />
+            </Field.Root>
+            <Field.Root>
+              <Field.Label>End date</Field.Label>
+              <Input
+                type="date"
+                value={form.endDate}
+                onChange={(e) => setField("endDate", e.target.value)}
+              />
+            </Field.Root>
+          </HStack>
+
+          {GROUPED_LIMITS.map(([group, fields]) => (
+            <VStack key={group} gap={3} align="stretch">
+              <SectionHeading>{group} limits</SectionHeading>
+              <SimpleGrid columns={2} gap={3}>
+                {fields.map((f) => (
+                  <Field.Root key={f.key}>
+                    <Field.Label>{f.label}</Field.Label>
+                    <Input
+                      type="number"
+                      value={form[f.key as LimitKey]}
+                      onChange={(e) => setField(f.key as LimitKey, e.target.value)}
+                      placeholder="—"
+                    />
+                  </Field.Root>
+                ))}
+              </SimpleGrid>
+            </VStack>
+          ))}
+
+          {mode === "edit" && subscription && (
+            <VStack align="start" gap={0} pt={2}>
+              <Text fontSize="xs" color="fg.muted">
+                Subscription ID: {subscription.id}
+              </Text>
+              {subscription.lastPaymentFailedDate && (
+                <Text fontSize="xs" color="fg.error">
+                  Last payment failed: {formatDate(subscription.lastPaymentFailedDate)}
+                </Text>
+              )}
+            </VStack>
+          )}
+        </VStack>
+      </form>
+    </Drawer>
   );
 }
 
@@ -512,10 +507,12 @@ function OrganizationPicker({
   value,
   onChange,
   currentName,
+  invalid,
 }: {
   value: string;
   onChange: (id: string) => void;
   currentName?: string;
+  invalid: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [debouncedQuery] = useDebounce(query, 250);
@@ -529,7 +526,7 @@ function OrganizationPicker({
   const options = list.data?.data ?? [];
 
   return (
-    <Field.Root required>
+    <Field.Root required invalid={invalid}>
       <Field.Label>Organization</Field.Label>
       {value && !query && currentName && (
         <Text fontSize="xs" color="fg.muted">
@@ -540,6 +537,7 @@ function OrganizationPicker({
         placeholder="Type to search organizations"
         value={query}
         onChange={(e) => setQuery(e.target.value)}
+        aria-invalid={invalid || undefined}
       />
       <NativeSelect.Root size="sm" width="full" mt={1}>
         <NativeSelect.Field value={value} onChange={(e) => onChange(e.target.value)}>
@@ -552,6 +550,7 @@ function OrganizationPicker({
         </NativeSelect.Field>
         <NativeSelect.Indicator />
       </NativeSelect.Root>
+      <Field.ErrorText>Choose an organization.</Field.ErrorText>
     </Field.Root>
   );
 }

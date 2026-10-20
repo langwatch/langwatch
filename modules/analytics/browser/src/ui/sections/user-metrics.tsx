@@ -1,12 +1,7 @@
-import {
-  Card,
-  EmptyState,
-  Grid,
-  GridItem,
-  Heading,
-  Tabs,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
+import { Box, Grid, GridItem, Tabs } from "@langwatch/design-system/primitives";
+import { Users } from "lucide-react";
 
 import { analyticsMetrics } from "../../model/analytics-registry.ts";
 import { CustomGraph, type CustomGraphInput } from "./custom-graph.tsx";
@@ -47,24 +42,14 @@ const threadMetrics: CustomGraphInput = {
 };
 
 const userEmptyState = (
-  <EmptyState.Root size="sm" paddingY={10}>
-    <EmptyState.Content>
-      <VStack textAlign="center">
-        <EmptyState.Title textStyle="sm">No user data yet</EmptyState.Title>
-        <EmptyState.Description textStyle="xs">
-          Start tracking users to see metrics here.{" "}
-          <a
-            href="https://langwatch.ai/docs/integration/metadata-and-labels"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ textDecoration: "underline" }}
-          >
-            Learn how to set up
-          </a>
-        </EmptyState.Description>
-      </VStack>
-    </EmptyState.Content>
-  </EmptyState.Root>
+  <NoDataInfoBlock
+    size="inline"
+    bordered={false}
+    icon={<Users size={20} />}
+    title="No user data yet"
+    description="Start tracking users to see metrics here."
+    docsHref="https://langwatch.ai/docs/integration/metadata-and-labels"
+  />
 );
 
 export function UserMetrics() {
@@ -129,10 +114,10 @@ export function UserMetrics() {
       gap={6}
     >
       <GridItem>
-        <Card.Root border="1px solid" borderColor="border.emphasized">
-          <Card.Body paddingTop={2}>
+        <Card padding="none">
+          <Box paddingX={5} paddingBottom={5} paddingTop={2}>
             <Tabs.Root
-              variant="plain"
+              variant="line"
               defaultValue="messages"
               // Every panel here is a read-only CustomGraph analytics
               // query with no user-entered state, so fully unmounting
@@ -169,13 +154,6 @@ export function UserMetrics() {
                     }}
                   />
                 </Tabs.Trigger>
-                <Tabs.Indicator
-                  mt="-1.5px"
-                  height="4px"
-                  bg="orange.solid"
-                  borderRadius="1px"
-                  bottom={0}
-                />
               </Tabs.List>
               <Tabs.Content value="messages">
                 <CustomGraph input={messagesGraph} />
@@ -187,28 +165,20 @@ export function UserMetrics() {
                 <CustomGraph input={usersGraph} emptyState={userEmptyState} />
               </Tabs.Content>
             </Tabs.Root>
-          </Card.Body>
-        </Card.Root>
+          </Box>
+        </Card>
       </GridItem>
       <GridItem rowSpan={2}>
-        <Card.Root width="100%" height="100%">
-          <Card.Header paddingBottom={4}>
-            <Heading size="sm">Top Topics</Heading>
-          </Card.Header>
-          <Card.Body overflowY="auto">
+        <Card variant="panel-fill" padding="lg" title="Top topics">
+          <Box overflowY="auto" flex={1} minHeight={0}>
             <TopicsSelector showTitle={false} />
-          </Card.Body>
-        </Card.Root>
+          </Box>
+        </Card>
       </GridItem>
       <GridItem>
-        <Card.Root overflow="auto">
-          <Card.Header>
-            <Heading size="sm">Thread Metrics</Heading>
-          </Card.Header>
-          <Card.Body>
-            <CustomGraph input={threadMetrics} />
-          </Card.Body>
-        </Card.Root>
+        <Card padding="lg" title="Thread metrics">
+          <CustomGraph input={threadMetrics} />
+        </Card>
       </GridItem>
     </Grid>
   );

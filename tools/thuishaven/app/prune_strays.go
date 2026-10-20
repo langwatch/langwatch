@@ -12,14 +12,14 @@ import (
 )
 
 // StrayLister is implemented by a database server adapter that can name
-// databases haven did not create (test suites, apidiff runs) and that have sat
+// databases haven did not create (test suites) and that have sat
 // untouched for olderThan. Optional: an adapter without it has no strays.
 type StrayLister interface {
 	StrayDatabases(ctx context.Context, olderThan time.Duration) ([]string, error)
 }
 
-// PruneStrayDatabases drops (shouldAct) or lists ClickHouse test_*, lw_apidiff_*
-// and langwatch* databases and Postgres lw_*_test / lw_*_ci databases older than
+// PruneStrayDatabases drops (shouldAct) or lists ClickHouse test_* and
+// langwatch* databases and Postgres lw_*_test / lw_*_ci databases older than
 // HAVEN_DB_TTL. A database a registered stack owns, and the protected main
 // database, are never touched. Returns "name (engine)" for each.
 func (o *Orchestrator) PruneStrayDatabases(ctx context.Context, shouldAct bool) ([]string, error) {

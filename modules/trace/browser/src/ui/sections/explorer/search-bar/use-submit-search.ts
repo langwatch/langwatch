@@ -1,6 +1,7 @@
 import { toaster } from "@langwatch/design-system/toaster";
 import type { ExplorerSearchClassification } from "@langwatch/instant-eval-contract";
 import {
+  combineQueries,
   isRouteKind,
   type ModelTrouble,
   queryWithoutInstantEvalChip,
@@ -190,6 +191,36 @@ function typedEvalRunOf({
 }
 
 /**
+ * What routeSearch's answer does: the route is applied, or a failure searches the words and says
+ * so, since a quoted phrase with nothing said about it reads as the search having worked.
+ */
+function routeCallbacks({
+  isCurrent,
+  onRoute,
+  onPhrase,
+}: {
+  isCurrent: () => boolean;
+  onRoute: (result: RouteSearchResult) => void;
+  onPhrase: () => void;
+}): { onSuccess: (result: RouteSearchResult) => void; onError: (error: unknown) => void } {
+  return {
+    onSuccess: (result) => {
+      if (isCurrent()) onRoute(result);
+    },
+    onError: (error) => {
+      if (!isCurrent()) return;
+      onPhrase();
+      const { title, description } = explainAnyError(error);
+      toaster.create({
+        title,
+        description: [description, PHRASE_INSTEAD_NOTE].filter(Boolean).join(" "),
+        type: "warning",
+      });
+    },
+  };
+}
+
+/**
  * Asks Instant Eval to classify a sentence, then the router to route it, and
  * applies the route. A classification that fails routes with none (T2 D3).
  */
@@ -201,7 +232,12 @@ function useRouteSubmit({
 }: Pick<UseSubmitSearchOptions, "isLangyAvailable" | "onLangy" | "onInstantEval"> & {
   submitSeqRef: RefObject<number>;
 }): {
-  route: (args: { text: string; seq: number; projectId: string }) => void;
+  route: (args: {
+    text: string;
+    seq: number;
+    projectId: string;
+    withoutInstantEval?: boolean;
+  }) => void;
   isRouting: boolean;
 } {
   const applyQueryText = useFilterStore((s) => s.applyQueryText);
@@ -210,7 +246,17 @@ function useRouteSubmit({
   const applyRoute = useApplyRoute({ onLangy, onInstantEval });
 
   const route = useCallback(
-    ({ text, seq, projectId }: { text: string; seq: number; projectId: string }) => {
+    ({
+      text,
+      seq,
+      projectId,
+      withoutInstantEval = false,
+    }: {
+      text: string;
+      seq: number;
+      projectId: string;
+      withoutInstantEval?: boolean;
+    }) => {
       // Read at submit time: the range the user sees is the one the search
       // runs in, not the debounced copy a pending timer may still hold.
       const { timeRange, queryText } = useFilterStore.getState();
@@ -228,26 +274,17 @@ function useRouteSubmit({
       ) =>
         routeSearch.mutate(
           { ...search, ...classification },
-          {
-            onSuccess: (result) => {
-              if (seq !== submitSeqRef.current) return;
-              applyRoute({ result, text, projectId, timeRange: range });
-            },
-            onError: (error) => {
-              if (seq !== submitSeqRef.current) return;
-              // The words still get searched, and the reader is told that is
-              // what happened. A sentence coming back as a quoted phrase with
-              // nothing said about it reads as the search having worked.
-              applyQueryText(requoteBareTerms(text));
-              const { title, description } = explainAnyError(error);
-              toaster.create({
-                title,
-                description: [description, PHRASE_INSTEAD_NOTE].filter(Boolean).join(" "),
-                type: "warning",
-              });
-            },
-          },
+          routeCallbacks({
+            isCurrent: () => seq === submitSeqRef.current,
+            onRoute: (result) => applyRoute({ result, text, projectId, timeRange: range }),
+            onPhrase: () => applyQueryText(requoteBareTerms(text)),
+          }),
         );
+      // After a refused judgement the eval option is closed, so the classifier is not asked.
+      if (withoutInstantEval) {
+        routeWith({ isInstantEvalAvailable: false });
+        return;
+      }
       classifySearch.mutate(search, {
         onSuccess: (answer) => {
           if (seq !== submitSeqRef.current) return;
@@ -309,6 +346,8 @@ export function useSubmitSearch({
   onSupersede,
 }: UseSubmitSearchOptions): {
   submitSearch: (text: string) => void;
+  /** Routes a refused judgement's words again, with the eval option left out (Skip). */
+  submitWithoutInstantEval: (payload: InstantEvalRoutePayload) => void;
   isRouting: boolean;
 } {
   const { project } = useOrganizationTeamProject();
@@ -384,5 +423,19 @@ export function useSubmitSearch({
     ],
   );
 
-  return { submitSearch, isRouting };
+  const submitWithoutInstantEval = useCallback(
+    (payload: InstantEvalRoutePayload) => {
+      const seq = ++submitSeqRef.current;
+      onSupersede();
+      const text = combineQueries({ base: payload.otherQuery, addition: payload.sentence });
+      if (!splitBareWords(text).sentence || isSamplePreview) {
+        applyQueryText(requoteBareTerms(text));
+        return;
+      }
+      route({ text, seq, projectId: payload.projectId, withoutInstantEval: true });
+    },
+    [applyQueryText, isSamplePreview, onSupersede, route],
+  );
+
+  return { submitSearch, submitWithoutInstantEval, isRouting };
 }

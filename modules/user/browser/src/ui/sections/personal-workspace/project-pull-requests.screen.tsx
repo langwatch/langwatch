@@ -1,7 +1,9 @@
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { PageLayout } from "@langwatch/design-system/page-layout";
 import { Skeleton, Text, VStack } from "@langwatch/design-system/primitives";
 
 import { CodingAgentPullRequestsTable } from "../../../behavior/lent-coding-agent-tables.tsx";
+import { usePersonalRouter } from "../../../behavior/personal-workspace-router.ts";
 import { useOrganizationTeamProject } from "../../../behavior/personal-workspace-session.ts";
 
 /**
@@ -10,6 +12,7 @@ import { useOrganizationTeamProject } from "../../../behavior/personal-workspace
  * owns its own reads. Spec: specs/coding-agent/project-menu-links.feature.
  */
 export function ProjectPullRequestsScreen() {
+  const router = usePersonalRouter();
   const { project, isResolved } = useOrganizationTeamProject();
 
   return (
@@ -29,9 +32,18 @@ export function ProjectPullRequestsScreen() {
         {!isResolved && <Skeleton height="180px" borderRadius="md" />}
         {isResolved && project ? <CodingAgentPullRequestsTable projectId={project.id} /> : null}
         {isResolved && !project && (
-          <Text fontSize="sm" color="fg.muted">
-            No pull requests yet
-          </Text>
+          <NoDataInfoBlock
+            size="line"
+            title="No pull requests yet"
+            next={[
+              {
+                kind: "setting",
+                label: "Connect your AI tools",
+                href: "/me/configure",
+                onNavigate: ({ href }) => router.push(href),
+              },
+            ]}
+          />
         )}
       </VStack>
     </>

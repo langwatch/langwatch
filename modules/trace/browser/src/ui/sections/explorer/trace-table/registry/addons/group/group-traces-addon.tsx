@@ -73,7 +73,7 @@ const GroupedTraceRow: React.FC<GroupedTraceRowProps> = ({ trace, groupBy, colCo
             <MonoCell color="fg.subtle" flexShrink={0}>
               {formatRelativeTime(trace.timestamp)}
             </MonoCell>
-            <Text textStyle="sm" fontWeight="500" color="fg" truncate flex={1} minWidth={0}>
+            <Text textStyle="sm" fontWeight="medium" color="fg" truncate flex={1} minWidth={0}>
               {trace.name}
             </Text>
             {groupBy !== "service" && trace.serviceName && (

@@ -1,3 +1,4 @@
+import { createLogger } from "@langwatch/observability/browser";
 import { useCallback } from "react";
 
 import { usePrompts } from "../../../../../behavior/use-prompts.ts";
@@ -7,6 +8,8 @@ import { useWarnBeforeReload } from "../../../../../features/tabs/behavior/use-w
 import { versionedPromptToPromptConfigFormValuesWithSystemMessage } from "../../../../../prompt-form.ts";
 import { useTabId } from "../../studio-internals.ts";
 import { usePromptTabSummary } from "./use-prompt-tab-summary.ts";
+
+const logger = createLogger("langwatch:prompt:browser-tab");
 
 /**
  * Manages tab state and provides close handler with unsaved changes confirmation.
@@ -59,7 +62,7 @@ export function usePromptBrowserTabController() {
         }),
       });
     } catch (error) {
-      console.error("Failed to load latest prompt version:", error);
+      logger.error({ error }, "Failed to load latest prompt version");
     }
   }, [configId, getPromptById, tabId, updateTabData]);
 

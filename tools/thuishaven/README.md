@@ -22,14 +22,18 @@ Predictable hostnames, not a random `happy-tiger`. Its services are reached at:
 | `nlp.<slug>.langwatch.localhost`        | NLP engine (Go)                                                             |
 | `clickhouse.<slug>.langwatch.localhost` | ClickHouse — this stack's own database                                      |
 
-The nine simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
-`outbound`, `payment`, `telemetry`) each serve a console at `<name>.<slug>.langwatch.localhost`.
+The twelve simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`,
+`outbound`, `payment`, `telemetry`, `lambda`, `github`, `mcp`) each serve a console at `<name>.<slug>.langwatch.localhost`.
 `mail`, `idp`, `storage`, `payment` and `telemetry` run by default; the rest need `haven up +<name>`.
 `haven logs <name>` reads any of them. `haven sim --json` is the agent's entry:
 one row per simulator with whether it runs in this stack, its console URL, the
 `haven up +<name>` it needs if off, its verbs and its skill. `telemetry` sends
 OTLP traffic:
-`haven sim telemetry send|load|fuzz|status|stop`.
+`haven sim telemetry send|load|fuzz|status|stop`. `mcp` (mcpsim, `haven up +mcp`)
+stands in for Claude Desktop, Claude Code and Cursor against the app's hosted MCP
+endpoint (`/mcp`, `/sse`) with the seeded key or an OAuth grant:
+`haven sim mcp connect|stream|refresh|reconnect|idle|soak|oauth`, each exiting
+non-zero unless the run passed.
 
 Forced errors: `haven llm|analytics|mail|storage set --error <0|4xx|5xx>` makes that sim
 refuse calls (llm: generation; analytics: captures; mail: SMTP sends; storage: PUT/GET
@@ -212,22 +216,25 @@ haven help       exhaustive, copy-pasteable reference
 
 **Service selection.** `haven up +langy` / `haven up -nlp` — sticky per
 worktree (`.haven.json`), shown by `status`, remembered across terminals and
-reboots. A running stack reconciles: matching selection is a no-op, a changed
-one replaces the stack in place. langy is off by default (it costs a container
+reboots. A running stack reconciles: matching selection is a no-op, and a
+change of services alone (same mode) starts and stops only the lanes it touches:
+the keeper rereads its plan on SIGHUP (`app/keeper_live.go`). `haven service
+on|off <name>` does the same and keeps the stack's mode; `app` is the ui, api
+and worker as one switch, and the stack home's surface table has a switch per
+row. A keeper older than this is not signalled; `haven up --force` once. langy is off by default (it costs a container
 image and a hard memory cap); the worktrees that need it say `+langy` once.
 langevals — the Python evaluator service monitors and evaluations call — is
 off by default too (its imports hold a few GiB). `haven up +langevals` runs
 `services/langevals` with `uv` on an allocated port, routed at
 `langevals.<slug>.langwatch.localhost`, and sets `LANGEVALS_ENDPOINT` to its
-loopback port for every lane; without it `.env`'s value stands. diffsuite's
-`-langevals` passes `+langevals` to the branch stack it starts with `-up`.
-idp — the identity-provider simulator (`services/idpsim`: a range of OIDC +
+loopback port for every lane; without it `.env`'s value stands.
+idp — the identity-provider simulator (`services/sims/idpsim`: a range of OIDC +
 SAML + SCIM tenants with DNS/HTTP domain verification, routed at
 `idp.<slug>.langwatch.localhost`) — runs by default; a worktree that does not
 want it says `haven up -idp` once. `haven simulator idp` runs the simulator alone —
 no app, API or databases — routed machine-wide at `idp.langwatch.localhost`.
 
-storage — the S3 stand-in (`services/storagesim`) — runs by default too, as
+storage — the S3 stand-in (`services/sims/storagesim`) — runs by default too, as
 the `storage` lane routed at `storage.<slug>.langwatch.localhost`; a worktree
 that does not want it says `haven up -storage` once. It answers only the S3
 calls the product makes (path-style PUT/GET/HEAD/DELETE object, HEAD bucket),
@@ -241,7 +248,7 @@ environment already names `STORED_OBJECTS_BACKEND`, `S3_BUCKET_NAME`,
 `S3_ENDPOINT` or `LANGWATCH_LOCAL_STORAGE_PATH`: the root `.env` beats the
 overlay, so haven stays out of a storage choice rather than half-overriding it.
 
-payment — the Stripe stand-in (`services/paymentsim`) — runs by default, so no
+payment — the Stripe stand-in (`services/sims/paymentsim`) — runs by default, so no
 local or CI stack needs a Stripe account. Unless `.env` or the shell names
 `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET` or `STRIPE_API_BASE`, the overlay
 points billing at it (`STRIPE_API_BASE=https://payment.<slug>.langwatch.localhost`,
@@ -255,7 +262,7 @@ it. `haven up` prints `Stripe: paymentsim`, `Stripe: your test key from .env` or
 the old `"payment"` key, written as false while it was opt-in, is not read.
 Objects persist in `storage/<slug>/` under Haven's home.
 
-llm — the LLM provider stand-in (`services/llmsim`) — is opt-in: `haven up
+llm — the LLM provider stand-in (`services/sims/llmsim`) — is opt-in: `haven up
 +llm` runs it as the `llm` lane routed at `llm.<slug>.langwatch.localhost`. It
 answers OpenAI chat completions (JSON and SSE), embeddings and models, and
 Anthropic messages, from a seeded Markov chain, so the same prompt gets the
@@ -275,7 +282,7 @@ instead of meeting the vendor's 401. It also sets `ALLOWED_PROXY_HOSTS` to
 loopback sims. Vertex, Azure and Bedrock are never probed. Its console at the
 lane's URL lists the last 500 calls.
 
-voice — the voice provider stand-in (`services/voicesim`) — is opt-in: `haven
+voice — the voice provider stand-in (`services/sims/voicesim`) — is opt-in: `haven
 up +voice` once runs the `voice` lane, routed at
 `voice.<slug>.langwatch.localhost`. It fakes what a scenario voice call needs
 from ElevenLabs (the signed-URL mint and the Conversational AI socket, with a
@@ -288,7 +295,7 @@ own URL, lists recent calls with their turns and protocol events. That
 `ELEVENLABS_BASE_URL` is also where the model-provider credential probe goes:
 voicesim answers `GET /models` and `GET /v1/models` for any key.
 
-analytics — the product-analytics stand-in (`services/analyticssim`) — is
+analytics — the product-analytics stand-in (`services/sims/analyticssim`) — is
 opt-in: `haven up +analytics` once runs the `analytics` lane, routed at
 `analytics.<slug>.langwatch.localhost`. It accepts PostHog's capture calls
 (posthog-node's `/batch/`, posthog-js's `/e/`, flags answered empty) and
@@ -297,8 +304,7 @@ each call as one record (provider, kind, id, name, properties, raw). The overlay
 sets `POSTHOG_HOST` and `CUSTOMER_IO_BASE_URL` to its route, plus
 `POSTHOG_KEY=phc_analyticssim` and `CUSTOMER_IO_API_KEY=analyticssim` where no
 key is set, leaving any provider whose host `.env` names alone. Its console and
-`/_sim/api/records?provider=&kind=&id=&name=` list what was sent; apidiff's
-`analytics` verify step reads the same list.
+`/_sim/api/records?provider=&kind=&id=&name=` list what was sent.
 
 Mail, IdP, storage and voice are bundled into the installed Haven binary. Each stack runs its
 own supervised simulator processes with its own ports. Under Haven's home
@@ -308,7 +314,7 @@ preserve received messages, registered IdP applications, users, groups,
 provisioning connections, domain proofs, and signing keys. Standalone
 `haven simulator idp` uses a separate `idp-standalone/` directory.
 They work even when the checkout predates
-`services/mailsim` or `services/idpsim`, without Go or Make on the child process's
+`services/sims/mailsim` or `services/sims/idpsim`, without Go or Make on the child process's
 PATH. Their browser pages are linked from the stack's `mail` and `idp` rows on
 the web dashboard.
 
@@ -376,8 +382,7 @@ the coding agents and dev tooling beside them, and everything that is not dev
 work as its own colour in the chart — with the daemon's pressure level when it
 is not green. Below it, every stack (liveness, branch, service health, RAM);
 idle worktrees stay collapsed behind `t` while stacks run and show by default
-otherwise. Actions run on the selected row — `g` opens its git view (and
-returns to the hub on quit), `Enter`/`l` opens its project viewer, `e` opens its mail
+otherwise. Actions run on the selected row — `Enter`/`l` opens its project viewer, `e` opens its mail
 inbox, `i` opens its identity simulator, `o` opens the stack's app, `r` restarts it, `d`
 shuts it down keeping its databases, and `x` destroys the worktree entirely:
 stack stopped, ClickHouse + Postgres databases dropped, directory deleted,
@@ -627,9 +632,8 @@ downstream reads that one answer:
 A checkout with neither shape is planned as modular and fails on its own lane's
 error rather than on a guess.
 
-The monolith layout is `origin/main`, and it exists here so `apidiff` and
-`visualdiff` can boot their base ref as its own haven stack (`tools/havenrun`,
-`specs/tooling/visualdiff-on-haven.feature`). On such a stack:
+The monolith layout is `origin/main`, so a checkout of it can run as its own
+haven stack. On such a stack:
 
 - The one Node lane is `app`: `pnpm --filter @langwatch/web run dev:app`, handed
   `PORT` as the app port haven allocated and reached at the routed `app.<slug>`
@@ -843,14 +847,12 @@ refuse`. That one line is the whole point: a quieter isolation posture than the 
   regenerable build artifacts of idle worktrees and orphaned dev runtimes.
   Two more categories are pre-ticked on their class rather than their age, with
   the reason in the row:
-  - **temporary** worktrees — a detached checkout under `.apidiff/` or
-    `.claude/worktrees/`, a `visual-*` / `apidiff-*` directory under a
-    `worktrees` parent, anything under `.claude/jobs/`, or any worktree on a
+  - **temporary** worktrees — a detached checkout under `.claude/worktrees/`,
+    anything under `.claude/jobs/`, or any worktree on a
     `worktree-agent-` / `agent/` branch — once nothing has been written in the
     directory itself for a day. That clock is the directory's own mtime, not its
-    HEAD's committer date: a diff drive checks out whatever ref it is comparing,
-    so a comparison made five minutes ago against a year-old tag would otherwise
-    read as a year idle.
+    HEAD's committer date: a scratch worktree may check out any ref, so one
+    made five minutes ago at a year-old tag would otherwise read as a year idle.
   - **merged** worktrees, whose branch is already an ancestor of `origin/main`
     (`git merge-base --is-ancestor`), at any age.
 

@@ -7,10 +7,12 @@ import { createHash, randomBytes } from "node:crypto";
 import { hostname } from "node:os";
 import { setTimeout as sleep } from "node:timers/promises";
 
-import { setLedgerCurrent } from "@langwatch/api";
+import { setLedgerCurrent, setOrganizationsCatchingUp } from "@langwatch/api";
+import type { ListedWork } from "@langwatch/eventing";
 
 import type { ServerRole } from "../feature-installer.ts";
 import { UPGRADE_CONSOLE_TOKEN_TTL_MS, type UpgradeConsole } from "../lifecycle/liveness-thread.ts";
+import type { BootedApplication } from "../process-container.ts";
 import type { ServerComponent, ServerLogger } from "../server.ts";
 
 /** Tasks runs `upgrade` itself and is never gated. */
@@ -29,13 +31,22 @@ export type UpgradeGateWaiting = Readonly<{
 }>;
 
 export type UpgradeGateVerdict =
-  | Readonly<{ admitted: true } | { admitted: false; refusal: string }>
+  | Readonly<{ admitted: true } | { admitted: false; outcome?: string; refusal: string }>
   | UpgradeGateWaiting;
 
 /** A worker's declared background steps, run by the gate's package (round 14: framework runs). */
 export type UpgradeGateBackgroundSteps = Readonly<{
   isStep: (contribution: unknown) => contribution is { readonly id: string };
-  start: (steps: readonly { readonly id: string }[]) => Readonly<{ stop: () => Promise<void> }>;
+  /** `queue` runs a step's jobs ahead of any backlog and waits for them (Alex, 2026-10-11). */
+  start: (
+    steps: readonly { readonly id: string }[],
+    queue?: UpgradeGateStepQueue,
+  ) => Readonly<{ stop: () => Promise<void> }>;
+}>;
+
+/** The worker's job queue, as a background step's listed runs see it. */
+export type UpgradeGateStepQueue = Readonly<{
+  runListedWork: <Result>(input: ListedWork<Result>) => Promise<Result>;
 }>;
 
 /** What a gate answers: `admit` before the application starts, `release` at a graceful stop. */
@@ -45,7 +56,21 @@ export type UpgradeGate = Readonly<{
   backgroundSteps?: UpgradeGateBackgroundSteps;
   /** The console's Retry: the ledger's failed steps back to `pending` for the worker's run. */
   retryFailedSteps?: () => Promise<void>;
+  /** Runs the upgrade once in this process and answers its exit code: `pnpm task upgrade`. */
+  runOnce?: () => Promise<number>;
+  /** Hands on the private ClickHouse targets still catching up, read every few seconds (T7-F18). */
+  watchTargetsCatchingUp?: (
+    onChange: (organizationIds: readonly string[]) => void,
+  ) => Readonly<{ stop: () => Promise<void> }>;
 }>;
+
+/**
+ * Boots the installed list in the tasks role, in this process, hands it to `use` and closes it:
+ * the worker's upgrade reads the declared steps and module tasks from it (Alex, 2026-10-11).
+ */
+export type UpgradeGateModules = <Result>(
+  use: (app: BootedApplication) => Promise<Result>,
+) => Promise<Result>;
 
 /** Shows a failure's console (true on Retry, never settling after), writes its Retry, lifts it. */
 type OperatorConsole = Readonly<{
@@ -67,8 +92,18 @@ const REFUSED_NEXT = "do what the refusal names, then start this process again";
 /** How often an upgrading api asks the ledger again (UPGRADE-IN-WORKER). */
 const RE_ASK_MS = 10_000;
 
+/** The line names at most five ids; `pnpm task upgrade status` lists every one (T0-F5). */
+const NAMED_OUTSTANDING = 5;
+
+export function outstandingSummary({ outstanding }: { outstanding: readonly string[] }): string {
+  const named = outstanding.slice(0, NAMED_OUTSTANDING).join(", ");
+  const more = outstanding.length > NAMED_OUTSTANDING ? ", …" : "";
+  const count = `${outstanding.length} ${outstanding.length === 1 ? "step" : "steps"} outstanding`;
+  return named ? `${count}: ${named}${more}` : count;
+}
+
 const isWaiting = (verdict: UpgradeGateVerdict): verdict is UpgradeGateWaiting =>
-  !verdict.admitted && "outcome" in verdict;
+  !verdict.admitted && "outcome" in verdict && verdict.outcome === "upgrading";
 
 export class UpgradeGateRefusedError extends Error {
   readonly code = "upgrade_gate_refused";
@@ -123,6 +158,7 @@ export function upgradeGateComponent({
   let admitted = false;
   /** Set while an upgrading api serves and asks on until current. */
   let upgrading: Readonly<{ stop: AbortController; asking: Promise<void> }> | undefined;
+  let catchingUp: Readonly<{ stop: () => Promise<void> }> | undefined;
   /** D1, D2: a fresh token per failed run, printed on one log line; only its hash is kept. */
   const issueConsoleToken = (): Pick<UpgradeConsole, "tokenSha256" | "tokenTtlMs"> => {
     const token = randomBytes(32).toString("base64url");
@@ -189,6 +225,9 @@ export function upgradeGateComponent({
       const serving = () => {
         admitted = true;
         setLedgerCurrent({ current: true });
+        catchingUp = gate.watchTargetsCatchingUp?.((organizationIds) =>
+          setOrganizationsCatchingUp({ organizationIds }),
+        );
         const elapsedMs = Math.round(performance.now() - startedAt);
         logger.info(
           {
@@ -208,7 +247,7 @@ export function upgradeGateComponent({
             waitingOn: "the worker's upgrade run",
             next: "nothing to do: this api serves meanwhile",
           },
-          `the installation is upgrading (${verdict.outstanding.join(", ")}); serving and asking again every ${reAskMs / 1000} s`,
+          `the installation is upgrading (${outstandingSummary({ outstanding: verdict.outstanding })}); serving and asking again every ${reAskMs / 1000} s`,
         );
         upgrading = askInBackground({
           first: verdict,
@@ -232,6 +271,7 @@ export function upgradeGateComponent({
     stop: async () => {
       upgrading?.stop.abort();
       await upgrading?.asking;
+      await catchingUp?.stop();
       setLedgerCurrent({ current: false });
       if (admitted) await gate.release();
     },

@@ -17,7 +17,7 @@ database and Redis db). `haven obs query` is not SQL: it reads the stack's telem
 | `haven db url [postgres\|clickhouse\|redis]` | prints the real loopback connection string(s), engine optional                                   | no            |
 | `haven db status`                            | connection URLs, the last seed run and its preset, the migration state (was `haven seed status`) | no            |
 | `haven db logins [--reveal]`                 | prints the seeded logins, credentials masked unless `--reveal`                                   | no            |
-| `haven db prune [--dry-run\|--yes]`          | lists (dry run, the default) or drops stray test and apidiff databases older than `HAVEN_DB_TTL` | with `--yes`  |
+| `haven db prune [--dry-run\|--yes]`          | lists (dry run, the default) or drops stray test databases older than `HAVEN_DB_TTL`             | with `--yes`  |
 
 Presets: `bare`, `demo`, `onboarding`, `post-onboarding` (`haven db` with no verb lists them;
 `haven help db` does not). `demo` maps to `haven db seed --size tiny --persona startup`
@@ -33,8 +33,7 @@ agent, haven refuses without `--yes`; adding `--yes` is the user's decision, not
   is louder: a person must type the database's name; `--yes` still works and says what it drops.
 - `haven down --destroy --stack <slug> --yes` stops a stack by slug and drops its databases (`haven-lifecycle`).
 - `db seed` refuses `--yes` (nothing to confirm). `db url` refuses it too.
-- `haven db reset` on the stack home: an api refused because the database is below the LTS floor
-  shows a reset button; it migrates and seeds exactly the databases it dropped.
+- `haven db reset` migrates and seeds exactly the databases it dropped.
 - The seed guard refuses when a database URL points anywhere but local dev.
 
 ## Connection strings

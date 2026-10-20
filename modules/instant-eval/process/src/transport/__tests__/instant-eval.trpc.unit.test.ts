@@ -220,7 +220,10 @@ describe("given the instantEval router", () => {
         classified: "instant_eval",
         isInstantEvalAvailable: true,
       });
-      expect(classifySearch).toHaveBeenCalledWith(CLASSIFY_REQUEST);
+      expect(classifySearch).toHaveBeenCalledWith({
+        ...CLASSIFY_REQUEST,
+        actor: { id: "reader-1", type: "user" },
+      });
       expect(permissions).toEqual(["analytics:view"]);
     });
   });
@@ -247,7 +250,7 @@ describe("given the instantEval router", () => {
   });
 
   describe("when the deployment has no judge for a released project", () => {
-    /** @scenario "A missing classifier opens the model popover and the phrase search runs" */
+    /** @scenario "A released project on a deployment with no judge is told what to configure" */
     it("refuses the estimate with the handled code the Explorer's popover reads", async () => {
       const { caller } = harness();
 

@@ -56,8 +56,10 @@ const CONNECT_HOSTS = "connect.langwatch.ai and gateway.langwatch.ai";
 
 interface InstantEvalRefusalPopoverProps {
   refusal: InstantEvalRefusal | null;
-  /** The X, a click outside or the secondary button. */
+  /** A click outside or Escape: the popover closes and the eval chip stays. */
   onClose: () => void;
+  /** The secondary button when it reads "Skip": the words are routed again without the eval. */
+  onSkip: () => void;
   /** The organization's switch, pressed by the `opt_in` popover only. */
   onEnable: () => void;
   isEnabling: boolean;
@@ -129,11 +131,11 @@ export function instantEvalRefusalCopy(
 ): InstantEvalRefusalCopy {
   const what =
     "An Instant Eval reads every result in this view and keeps the ones that answer your question, which no filter can do.";
-  const meanwhile = "The words are searched as a phrase in the meantime.";
+  const skip = "Skip searches your words without the eval.";
   if (refusal.kind === "budget") {
     return {
       title: "Your free Instant Evals quota is used up",
-      body: `${what} Upgrade to keep judging. ${meanwhile}`,
+      body: `${what} Upgrade to keep judging. ${skip}`,
       action: { label: "Compare plans", href: UPGRADE_HREF },
       dismiss: "Skip",
     };
@@ -142,11 +144,11 @@ export function instantEvalRefusalCopy(
     // No judge, or a judge that is down: the reader's own model settings fix neither. An install
     // judging through LangWatch may just not be reaching it, which its operator can check first.
     const network = viaConnect
-      ? ` This install judges through LangWatch, so check that it can reach ${CONNECT_HOSTS}.`
+      ? `This install judges through LangWatch, so check that it can reach ${CONNECT_HOSTS}. `
       : "";
     return {
       title: "Instant Evals can't run right now",
-      body: `${meanwhile}${network} If it keeps happening, contact us.`,
+      body: `${network}${skip} If it keeps happening, contact us.`,
       action: { label: "Contact us", href: CONTACT_US_HREF },
       dismiss: "Skip",
     };
@@ -184,6 +186,7 @@ export function instantEvalRefusalCopy(
 export function InstantEvalRefusalPopover({
   refusal,
   onClose,
+  onSkip,
   onEnable,
   isEnabling,
   viaConnect,
@@ -192,6 +195,8 @@ export function InstantEvalRefusalPopover({
   const copy = refusal ? instantEvalRefusalCopy(refusal, { viaConnect }) : null;
   const action = copy?.action;
   const actionHref = action?.href;
+  // Only a button that says Skip routes the words again; "Not now" just closes.
+  const onDismiss = copy?.dismiss === "Skip" ? onSkip : onClose;
   return (
     <PopoverRoot
       open={refusal !== null}
@@ -220,7 +225,7 @@ export function InstantEvalRefusalPopover({
                   <Button asChild size="sm" colorPalette="orange">
                     <RoutedLink href={actionHref}>{action?.label}</RoutedLink>
                   </Button>
-                  <Button size="sm" variant="outline" onClick={onClose}>
+                  <Button size="sm" variant="outline" onClick={onDismiss}>
                     {copy.dismiss}
                   </Button>
                   {copy.more && (
@@ -285,7 +290,7 @@ export function InstantEvalRefusalPopover({
                       </Button>
                     </RoutedLink>
                   )}
-                  <Button size="xs" variant="ghost" onClick={onClose}>
+                  <Button size="xs" variant="ghost" onClick={onDismiss}>
                     {copy.dismiss}
                   </Button>
                 </HStack>

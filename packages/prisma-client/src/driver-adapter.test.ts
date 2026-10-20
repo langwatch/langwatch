@@ -1,6 +1,7 @@
+import { Pool } from "pg";
 import { describe, expect, it } from "vitest";
 
-import { PrismaDriverAdapterService } from "./driver-adapter.ts";
+import { guardPoolErrors, PrismaDriverAdapterService } from "./driver-adapter.ts";
 
 describe("PrismaDriverAdapterService", () => {
   const service = PrismaDriverAdapterService.create();
@@ -60,5 +61,17 @@ describe("PrismaDriverAdapterService", () => {
       options: "-c TimeZone=UTC",
     });
     expect(() => service.createOwnedAdapter("not a url")).not.toThrow();
+  });
+});
+
+describe("guardPoolErrors", () => {
+  /** @scenario "An idle connection lost to Postgres is logged and never crashes the process" */
+  it("absorbs an idle connection loss, also once the pool is ending", () => {
+    const pool = guardPoolErrors({ pool: new Pool() });
+    const lost = new Error("terminating connection due to administrator command");
+
+    expect(() => pool.emit("error", lost)).not.toThrow();
+    Object.defineProperty(pool, "ending", { value: true });
+    expect(() => pool.emit("error", lost)).not.toThrow();
   });
 });

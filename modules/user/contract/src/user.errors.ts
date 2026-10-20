@@ -219,36 +219,6 @@ export class UserLinkedAccountNotFoundError extends NotFoundError {
   }
 }
 
-/**
- * Only the identity provider's own database identity has a password this
- * deployment can change; a federated social identity belongs to its upstream.
- */
-export class UserFederatedPasswordAccountMissingError extends NotFoundError {
-  declare readonly code: "federated_password_account_missing";
-
-  constructor(userId: string) {
-    super("federated_password_account_missing", {
-      resource: "Password sign-in method",
-      id: userId,
-    });
-    this.name = "UserFederatedPasswordAccountMissingError";
-  }
-}
-
-/** The identity provider refused the change for a reason only an operator can fix. */
-export class UserFederatedPasswordChangeUnavailableError extends HandledError {
-  declare readonly code: "federated_password_change_unavailable";
-
-  constructor(reason: string) {
-    super(
-      "federated_password_change_unavailable",
-      "The identity provider could not change this password",
-      { httpStatus: 502, fault: "platform", meta: { reason } },
-    );
-    this.name = "UserFederatedPasswordChangeUnavailableError";
-  }
-}
-
 /** The caller asked for a personal rollup inside an organization they do not belong to. */
 export class UserNotOrganizationMemberError extends HandledError {
   declare readonly code: "user_not_in_organization";
@@ -358,19 +328,5 @@ export class UserLastPlatformOperatorError extends HandledError {
       { httpStatus: 409, fault: "customer", meta: { userId } },
     );
     this.name = "UserLastPlatformOperatorError";
-  }
-}
-
-/** More than one account holds this address in different case, and none holds it exactly. */
-export class UserEmailAmbiguousError extends HandledError {
-  declare readonly code: "user_email_ambiguous";
-
-  constructor() {
-    super(
-      "user_email_ambiguous",
-      "More than one account holds this address in different case; change one of their addresses first",
-      { httpStatus: 409, fault: "customer" },
-    );
-    this.name = "UserEmailAmbiguousError";
   }
 }

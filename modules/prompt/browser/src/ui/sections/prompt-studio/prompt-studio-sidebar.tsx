@@ -65,7 +65,7 @@ function SidebarSectionHeader({ children, ...props }: SidebarSectionHeaderProps)
     <Box
       paddingX="2.5"
       paddingY="1.5"
-      fontSize="10px"
+      textStyle="micro"
       fontWeight="semibold"
       textTransform="uppercase"
       letterSpacing="0.025em"
@@ -191,7 +191,7 @@ function SidebarItem({
 }: SidebarItemProps) {
   if (variant === "empty") {
     return (
-      <Box padding="2.5" fontSize="12px" color="fg.muted" textAlign="center">
+      <Box padding="2.5" textStyle="caption" color="fg.muted" textAlign="center">
         {children}
       </Box>
     );
@@ -199,7 +199,7 @@ function SidebarItem({
 
   return (
     <Box
-      fontSize="12.5px"
+      textStyle="bodySm"
       color={active ? "blue.fg" : "fg"}
       bg={active ? "blue.subtle" : "transparent"}
       borderRadius="lg"
@@ -229,7 +229,7 @@ function SidebarItem({
         {children}
         {meta && (
           <Text
-            fontSize="10.5px"
+            textStyle="micro"
             color="fg.muted"
             overflow="hidden"
             textOverflow="ellipsis"

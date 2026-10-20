@@ -1,7 +1,8 @@
-import type { IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
+import { type IncomingUsageReport, LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import { SaasApi } from "@langwatch/enterprise-saas-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * @vitest-environment node
@@ -12,21 +13,25 @@ import { describe, expect, it } from "vitest";
 import { saasProcessModule } from "../../saas.module.ts";
 
 function boot({ isSaas, recorded }: { isSaas: boolean; recorded: IncomingUsageReport[] }) {
-  return createApp({ role: "api" })
-    .withModules([saasProcessModule])
-    .withStores(memoryStores())
-    .withConfig({
-      saas: { isSaas, latestRelease: void 0, latestReleaseCommit: void 0, releaseFloor: void 0 },
-    })
-    .provide({
-      licensing: createApiFixture<LicensingApi>({
-        recordUsageReport: (report) => {
-          recorded.push(report);
-          return Promise.resolve([]);
-        },
+  return bootInstalledProcess({
+    role: "api",
+    modules: [saasProcessModule],
+    config: {
+      saas: { isSaas, latestRelease: void 0, latestReleaseCommit: void 0 },
+    },
+    stores: memoryStores(),
+    peers: [
+      testPeer({
+        token: LicensingApi,
+        instance: createApiFixture<LicensingApi>({
+          recordUsageReport: (report) => {
+            recorded.push(report);
+            return Promise.resolve([]);
+          },
+        }),
       }),
-    })
-    .boot();
+    ],
+  });
 }
 
 const REQUEST = {

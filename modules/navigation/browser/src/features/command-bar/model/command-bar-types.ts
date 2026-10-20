@@ -12,6 +12,8 @@ export interface Command {
   id: string;
   label: string;
   description?: string;
+  /** The product the page belongs to, drawn as a muted tag and matched by search. */
+  productLabel?: string;
   icon: LucideIcon;
   category: CommandCategory;
   keywords?: string[];

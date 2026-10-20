@@ -22,6 +22,7 @@ const project = (over: Record<string, unknown> = {}) => ({
   organizationId: "organization-1",
   isPersonal: false,
   ownerUserId: null,
+  kind: "application",
   ...over,
 });
 

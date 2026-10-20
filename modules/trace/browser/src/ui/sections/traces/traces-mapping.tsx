@@ -149,7 +149,7 @@ function ExpansionSwitches({
       <Field.Root width="full">
         <VStack align="start">
           <Field.Label margin={0}>Expansions</Field.Label>
-          <Field.HelperText margin={0} fontSize="13px" marginBottom={2} maxWidth="600px">
+          <Field.HelperText margin={0} textStyle="bodySm" marginBottom={2} maxWidth="600px">
             Normalize the dataset to duplicate the rows and have one entry per line instead of an
             array for the following mappings:
           </Field.HelperText>

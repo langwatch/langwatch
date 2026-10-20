@@ -11,6 +11,7 @@ import type {
 } from "@trpc/server";
 
 import type {
+  BuiltTrpcContract,
   TrpcContractProcedures,
   TrpcFeatureApiWitness,
   TrpcProcedureFactory,
@@ -27,7 +28,7 @@ export type ComposableTrpcRouter<Namespace extends string = string> = Readonly<{
   readonly protocol: "trpc";
   readonly api: object;
   readonly namespace: Namespace;
-  readonly contract: TrpcContract<Namespace>;
+  readonly contract: BuiltTrpcContract<Namespace>;
   readonly router: <TContext extends object>(
     runtime: TrpcProcedureFactory<TContext>,
     app: (ctx: TContext) => never,
@@ -68,7 +69,7 @@ type MergedMembers<Members extends TrpcContractMembers> = (
 /** The one contract a composed declaration answers for. */
 export type ComposedTrpcContract<
   Namespace extends string,
-  Declarations extends readonly { readonly contract: TrpcContract }[],
+  Declarations extends readonly { readonly contract: BuiltTrpcContract }[],
 > = TrpcContract<Namespace, MergedMembers<MembersOf<Declarations[number]>>>;
 
 /**

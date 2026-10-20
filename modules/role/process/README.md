@@ -118,18 +118,18 @@ getPermissionCatalog(): Promise<RolePermissionCatalog>;
 
 #### `GET /` · `listRoles`
 
-List the organization's roles with their permission sets: the built-in roles `admin`, `member` and `viewer` first (marked `builtIn`), then the custom roles. `?builtIn=true` lists only the built-in roles, `?builtIn=false` only the custom ones.
+List the organization's custom roles with their permission sets. Omitted `builtIn`: custom roles only. `?builtIn=true` lists only the built-in roles `admin`, `member` and `viewer`, `?builtIn=false` only the custom ones.
 
 Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Declared at `src/transport/role.rest.ts:59`.
 
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:55
+// Query: roleRestListQuerySchema, ../contract/src/role-rest.schemas.ts:68
 interface Query {
   builtIn?: "true" | "false";
 }
-// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:62
+// Response: roleRestListSchema, ../contract/src/role-rest.schemas.ts:72
 interface Response {
   roles: {
     id: string;
@@ -152,13 +152,13 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles`, `/api/v1/roles`; also, undocumented, `/api/roles/2026-08-07`, `/api/v1/roles/2026-08-07`, `/api/roles/latest`, `/api/v1/roles/latest`.
 
 ```typescript
-// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:66
+// Body: roleRestCreateSchema, ../contract/src/role-rest.schemas.ts:84
 interface Body {
   name: string;
   description?: string;
   permissions: string[];
 }
-// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:41
+// Response: roleRestSchema, ../contract/src/role-rest.schemas.ts:54
 interface Response {
   id: string;
   name: string;
@@ -179,7 +179,7 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/permissions`, `/api/v1/roles/permissions`; also, undocumented, `/api/roles/2026-08-07/permissions`, `/api/v1/roles/2026-08-07/permissions`, `/api/roles/latest/permissions`, `/api/v1/roles/latest/permissions`.
 
 ```typescript
-// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:81
+// Response: rolePermissionCatalogSchema, ../contract/src/role-rest.schemas.ts:118
 interface Response {
   resources: {
     resource: string;
@@ -200,11 +200,11 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:64
+// Params: roleRestParamsSchema, ../contract/src/role-rest.schemas.ts:76
 interface Params {
   id: string;
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:41
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
 ```
 
 #### `PATCH /:id` · `updateRole`
@@ -216,14 +216,14 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:64
-// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:72
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
+// Body: roleRestUpdateSchema, ../contract/src/role-rest.schemas.ts:93
 interface Body {
   name?: string;
   description?: string | null;
   permissions?: string[];
 }
-type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:41
+type Response = z.infer<typeof roleRestSchema>; // ../contract/src/role-rest.schemas.ts:54
 ```
 
 #### `DELETE /:id` · `deleteRole`
@@ -235,8 +235,8 @@ Permission `organization:manage`. Entitlement `enterprise` (feature `RBAC`). Dec
 Answers at `/api/roles/:id`, `/api/v1/roles/:id`; also, undocumented, `/api/roles/2026-08-07/:id`, `/api/v1/roles/2026-08-07/:id`, `/api/roles/latest/:id`, `/api/v1/roles/latest/:id`.
 
 ```typescript
-type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:64
-// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:79
+type Params = z.infer<typeof roleRestParamsSchema>; // ../contract/src/role-rest.schemas.ts:76
+// Response: roleRestDeletedSchema, ../contract/src/role-rest.schemas.ts:97
 interface Response {
   success: true;
 }
@@ -260,7 +260,7 @@ Contract `../contract/src/role.trpc.ts:17`, router `src/transport/role.trpc.ts:1
 
 ```typescript
 // role.getAll
-// Input: roleApiOrganizationInputSchema, ../contract/src/role.schemas.ts:10
+// Input: roleApiOrganizationInputSchema, ../contract/src/role.schemas.ts:16
 interface Input {
   organizationId: string;
 }
@@ -277,11 +277,11 @@ type Output = {
 }[];
 
 // role.getById
-// Input: roleApiRoleInputSchema, ../contract/src/role.schemas.ts:13
+// Input: roleApiRoleInputSchema, ../contract/src/role.schemas.ts:21
 interface Input {
   roleId: string;
 }
-// Output: roleSchema, ../contract/src/role.ts:17
+// Output: roleSchema, ../contract/src/role.ts:32
 interface Output {
   id: string;
   organizationId: string;
@@ -294,32 +294,32 @@ interface Output {
 }
 
 // role.create
-type Input = z.infer<typeof roleApiCreateInputSchema>; // ../contract/src/role.schemas.ts:23
-type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:17
+type Input = z.infer<typeof roleApiCreateInputSchema>; // ../contract/src/role.schemas.ts:46
+type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:32
 
 // role.update
-type Input = z.infer<typeof roleApiUpdateInputSchema>; // ../contract/src/role.schemas.ts:31
-type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:17
+type Input = z.infer<typeof roleApiUpdateInputSchema>; // ../contract/src/role.schemas.ts:59
+type Output = z.infer<typeof roleSchema>; // ../contract/src/role.ts:32
 
 // role.delete
-type Input = z.infer<typeof roleApiRoleInputSchema>; // ../contract/src/role.schemas.ts:13
-// Output: roleWriteAcknowledgedSchema, ../contract/src/role.ts:37
+type Input = z.infer<typeof roleApiRoleInputSchema>; // ../contract/src/role.schemas.ts:21
+// Output: roleWriteAcknowledgedSchema, ../contract/src/role.ts:45
 interface Output {
   success: true;
 }
 
 // role.assignToUser
-// Input: roleApiUserRoleAssignmentInputSchema, ../contract/src/role.schemas.ts:16
+// Input: roleApiUserRoleAssignmentInputSchema, ../contract/src/role.schemas.ts:33
 interface Input {
   userId: string;
   teamId: string;
   customRoleId: string;
 }
-type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:37
+type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:45
 
 // role.removeFromUser
-type Input = z.infer<typeof roleApiUserRoleAssignmentInputSchema>; // ../contract/src/role.schemas.ts:16
-type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:37
+type Input = z.infer<typeof roleApiUserRoleAssignmentInputSchema>; // ../contract/src/role.schemas.ts:33
+type Output = z.infer<typeof roleWriteAcknowledgedSchema>; // ../contract/src/role.ts:45
 ```
 
 ## Sockets

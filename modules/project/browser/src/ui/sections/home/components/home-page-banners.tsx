@@ -1,18 +1,7 @@
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
 import { getRawColorValue, useColorModeValue } from "@langwatch/design-system/color-mode";
-import { RawKbd } from "@langwatch/design-system/kbd";
 import { LangyMark } from "@langwatch/design-system/langy-mark";
-import {
-  Box,
-  Button,
-  chakra,
-  Heading,
-  HStack,
-  Icon,
-  IconButton,
-  Text,
-  VStack,
-} from "@langwatch/design-system/primitives";
+import { Box, chakra, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { MeshGradient } from "@paper-design/shaders-react";
 import {
   motion,
@@ -32,10 +21,9 @@ import {
   useState,
 } from "react";
 import type { IconType } from "react-icons";
-import { LuArrowLeft, LuArrowRight, LuMic, LuZap } from "react-icons/lu";
+import { LuMic, LuZap } from "react-icons/lu";
 
 import { useLangyStore } from "../../../../behavior/langy/langy.store.ts";
-import { SERIF } from "../../../../model/langy/asaplangy-tokens.ts";
 import { useProjectHomeHost } from "../../../../model/project-home-host.ts";
 
 // ---- Timing knobs -------------------------------------------------------
@@ -92,14 +80,7 @@ const LANGY_SLIDE: Slide = {
   iconNode: <LangyHomebarMark />,
   heading: "Langy can ship the fix, not just find it",
   badge: "New",
-  subtitle: (
-    <>
-      Ask about a failing trace and Langy digs through your data, explains what broke, and opens a
-      pull request with the change.
-    </>
-  ),
   ctaLabel: "Ask Langy to investigate",
-  legacyCtaColor: "accent.fg",
   posthogEvent: "langy_banner_click",
   navigate: ({ askLangy }) =>
     askLangy?.(
@@ -118,9 +99,8 @@ const TRANSITION_S = TRANSITION_MS / 1000;
 /** Shared ease-in-out (CSS-standard bezier) for the copy crossfade; mirrors the
  *  gradient morph's symmetric easeInOut so both sides of the change feel as one. */
 const TRANSITION_EASE = [0.42, 0, 0.58, 1] as const;
-/** Time-constant for the hover slow-down: the auto-advance eases to a stop
- *  instead of cutting out, so nothing changes under the pointer. */
-const HOVER_TAU = 0.32;
+/** Time-constant for the auto-advance easing to a stop (reduced motion) instead of cutting out. */
+const SPEED_TAU = 0.32;
 /** GPU health probe: sample fps between warmup and warmup+window; below the
  *  floor we treat the GPU as too weak and freeze the shader (CSS base only). */
 const PERF_WARMUP_MS = 1500;
@@ -164,14 +144,7 @@ interface Slide {
   heading: string;
   /** The pill next to the heading ("New", "Coming soon"). Absent = no pill. */
   badge?: string;
-  subtitle: React.ReactNode;
-  /** An extra row between subtitle and CTA. */
-  extra?: React.ReactNode;
   ctaLabel: string;
-  /** Show the Langy toggle shortcut as a kbd chip inside the CTA button. */
-  showCtaKbd?: boolean;
-  /** Text colour of the CTA in the legacy full-colour banner. */
-  legacyCtaColor: string;
   /** Shader speed while this slide is active (default 0.45). */
   speed?: number;
   posthogEvent: string;
@@ -194,15 +167,7 @@ const SLIDES: Slide[] = [
     Icon: LuZap,
     heading: "React the moment it matters",
     badge: "New",
-    subtitle: (
-      <>
-        React to traces, alert on metrics, or get reports of anything.
-        <br />
-        Delivered to Slack or email, on the schedule you choose.
-      </>
-    ),
     ctaLabel: "Explore automations",
-    legacyCtaColor: "accent.fg",
     posthogEvent: "automations_banner_click",
     navigate: ({ go, projectSlug }) => go(`/${projectSlug}/automations`),
   },
@@ -221,14 +186,7 @@ const SLIDES: Slide[] = [
     Icon: LuMic,
     heading: "Voice agent simulations are here",
     badge: "New",
-    subtitle: (
-      <>
-        Real voices, real audio, plain-English judges. Works with ElevenLabs, OpenAI Realtime, Vapi,
-        and more.
-      </>
-    ),
     ctaLabel: "Try voice agent testing",
-    legacyCtaColor: "teal.fg",
     posthogEvent: "voice_agents_banner_click",
     navigate: () =>
       window.open(
@@ -415,7 +373,6 @@ function useBannerAnimation({
   displayColorsRef,
   displayMeshRef,
   eligibleLenRef,
-  hoveredRef,
   instantRef,
   morphRef,
   perfRef,
@@ -428,12 +385,10 @@ function useBannerAnimation({
   speedRef,
   targetColorsRef,
   targetMeshRef,
-  variant,
 }: {
   displayColorsRef: MutableRefObject<string[]>;
   displayMeshRef: MutableRefObject<Mesh>;
   eligibleLenRef: MutableRefObject<number>;
-  hoveredRef: MutableRefObject<boolean>;
   instantRef: MutableRefObject<boolean>;
   morphRef: MutableRefObject<MorphState | null>;
   perfRef: MutableRefObject<PerformanceState>;
@@ -446,20 +401,16 @@ function useBannerAnimation({
   speedRef: MutableRefObject<number>;
   targetColorsRef: MutableRefObject<string[]>;
   targetMeshRef: MutableRefObject<Mesh | undefined>;
-  variant: "briefing" | "legacy" | "lantern";
 }) {
   useAnimationFrame((time, delta) => {
     if (eligibleLenRef.current === 0) return;
     const deltaSeconds = delta / 1000;
     if (probeBannerPerformance(perfRef.current, time, instantRef.current)) setLowPerf(true);
 
-    const wantsMovement =
-      (variant === "lantern" || !hoveredRef.current) &&
-      !reduceMotionRef.current &&
-      eligibleLenRef.current > 1;
+    const wantsMovement = !reduceMotionRef.current && eligibleLenRef.current > 1;
     const targetSpeed = wantsMovement ? 1 : 0;
     speedRef.current +=
-      (targetSpeed - speedRef.current) * (1 - Math.exp(-deltaSeconds / HOVER_TAU));
+      (targetSpeed - speedRef.current) * (1 - Math.exp(-deltaSeconds / SPEED_TAU));
 
     if (eligibleLenRef.current > 1) {
       const nextProgress = progress.get() + (delta / DWELL_MS) * speedRef.current;
@@ -491,30 +442,18 @@ function useBannerAnimation({
  * The home-page announcement slot, as a morphing carousel. Rotates through every eligible slide
  * (each owns its own per-project 7-day snooze).
  */
-export function HomePageBanners({
-  variant = "briefing",
-  children,
-}: {
-  /**
-   * `lantern` is the Langy home's block: this component keeps owning the one shared canvas, the
-   * announcement compresses to a single line of chrome across the top, and `children` (the
-   * composer and its capability row) are laid over the same ground beneath it.
-   */
-  variant?: "briefing" | "legacy" | "lantern";
-  /** Lantern only: what sits under the chrome line, over the same ground. */
-  children?: ReactNode;
-}) {
-  const project = useProjectHomeHost().project();
+export function HomePageBanners({ children }: { children?: ReactNode }) {
+  const host = useProjectHomeHost();
+  const project = host.project();
   const projectId = project?.id;
   const projectSlug = project?.slug;
   const analytics = useUiAnalytics();
-  const navigate = useProjectHomeHost().navigate.bind(useProjectHomeHost());
-  const reduceMotion = useProjectHomeHost().reducedMotion();
+  const navigate = host.navigate.bind(host);
+  const reduceMotion = host.reducedMotion();
   const isDark = useColorModeValue(false, true);
 
-  // The lantern variant only ever renders on the Langy home, so it is the
-  // honest signal for "this reader has Langy" without re-deriving the gate.
-  const slides = useSlides(projectId, { includeLangy: variant === "lantern" });
+  // An announcement about Langy is noise to a reader who cannot reach Langy.
+  const slides = useSlides(projectId, { includeLangy: host.langyVisibility().show });
   const askLangy = useLangyStore((s) => s.askLangy);
 
   const [hasMounted, setHasMounted] = useState(false);
@@ -556,7 +495,6 @@ export function HomePageBanners({
   const progress = useMotionValue(0);
 
   // Refs the animation-frame loop reads so it never runs on stale state.
-  const hoveredRef = useRef(false);
   const speedRef = useRef(0);
   const eligibleLenRef = useRef(eligible.length);
   const reduceMotionRef = useRef(reduceMotion);
@@ -597,7 +535,6 @@ export function HomePageBanners({
     displayColorsRef,
     displayMeshRef,
     eligibleLenRef,
-    hoveredRef,
     instantRef,
     morphRef,
     perfRef,
@@ -610,7 +547,6 @@ export function HomePageBanners({
     speedRef,
     targetColorsRef,
     targetMeshRef,
-    variant,
   });
 
   // Nothing renders until the project resolves: the snooze map is keyed per project, so before
@@ -619,7 +555,6 @@ export function HomePageBanners({
   // is the block the composer lives in, so it still has to render once every announcement has
   // been dismissed. It just renders without a chrome line.
   if (!hasMounted || !projectId) return null;
-  if (variant !== "lantern" && (eligible.length === 0 || !slide)) return null;
 
   const handleCta = (slideToOpen: Slide) => {
     analytics.track({
@@ -657,7 +592,6 @@ export function HomePageBanners({
     displayMesh,
     eligible,
     handleCta,
-    hoveredRef,
     lanternColors,
     lowPerf,
     multi,
@@ -668,12 +602,7 @@ export function HomePageBanners({
     slideTransition,
   };
 
-  if (variant === "lantern") {
-    return <LanternBanner {...bannerProps}>{children}</LanternBanner>;
-  }
-  if (!slide) return null;
-  if (variant === "legacy") return <LegacyBanner {...bannerProps} />;
-  return <BriefingBanner {...bannerProps} />;
+  return <LanternBanner {...bannerProps}>{children}</LanternBanner>;
 }
 
 interface BannerViewProps {
@@ -682,7 +611,6 @@ interface BannerViewProps {
   displayMesh: Mesh;
   eligible: Slide[];
   handleCta: (slide: Slide) => void;
-  hoveredRef: MutableRefObject<boolean>;
   lanternColors: string[];
   lowPerf: boolean;
   multi: boolean;
@@ -698,27 +626,12 @@ function CarouselOnly({ children, multi }: { children: ReactNode; multi: boolean
   return children;
 }
 
-function isMacKeyboard(): boolean {
-  return typeof navigator !== "undefined" && /Mac/i.test(navigator.userAgent);
-}
-
-function BriefingCtaIcon({ showKeyboard }: { showKeyboard: boolean }) {
-  if (!showKeyboard) return <Icon as={LuArrowRight} boxSize={3.5} />;
-  return <RawKbd fontSize="0.6875rem">{isMacKeyboard() ? "⌘I" : "Ctrl+I"}</RawKbd>;
-}
-
-function AnimatedBannerOnly({ children, lowPerf }: { children: ReactNode; lowPerf: boolean }) {
-  if (lowPerf) return null;
-  return children;
-}
-
 function LanternBanner({
   active,
   children,
   displayMesh,
   eligible,
   handleCta,
-  hoveredRef,
   lanternColors,
   lowPerf,
   multi,
@@ -728,16 +641,7 @@ function LanternBanner({
   slide,
 }: BannerViewProps & { children?: ReactNode }) {
   return (
-    <Box
-      position="relative"
-      width="full"
-      onMouseEnter={() => {
-        hoveredRef.current = true;
-      }}
-      onMouseLeave={() => {
-        hoveredRef.current = false;
-      }}
-    >
+    <Box position="relative" width="full">
       {/* Light bloom background; bleeds past box intentionally as the source
             of illumination for the hero. Both bleed layers sit at zIndex -1:
             they light the page from behind, so neighbours never paint under
@@ -851,12 +755,12 @@ function LanternBanner({
                   {slide.iconNode ?? (slide.Icon ? <slide.Icon size={14} /> : null)}
                 </Box>
                 {slide.badge ? (
-                  <chakra.span flexShrink={0} fontSize="11px" fontWeight="600" color="accent.fg">
+                  <chakra.span flexShrink={0} textStyle="micro" fontWeight="600" color="accent.fg">
                     {slide.badge}
                   </chakra.span>
                 ) : null}
                 <Text
-                  fontSize="12.5px"
+                  textStyle="bodySm"
                   color="fg.muted"
                   truncate
                   /* A flex child's min-width is `auto`, so without this it
@@ -872,7 +776,7 @@ function LanternBanner({
                   aria-hidden
                   flexShrink={0}
                   color="fg.subtle"
-                  fontSize="12px"
+                  textStyle="caption"
                   lineHeight="1"
                   transition="transform 130ms ease, color 130ms ease"
                 >
@@ -957,616 +861,6 @@ function LanternBanner({
           ) : null}
         </VStack>
       </VStack>
-    </Box>
-  );
-}
-
-function LegacyBanner({
-  active,
-  colors,
-  displayMesh,
-  eligible,
-  handleCta,
-  hoveredRef,
-  lowPerf,
-  multi,
-  progress,
-  reduceMotion,
-  selectSlide,
-  slide,
-  slideTransition,
-}: BannerViewProps) {
-  if (!slide) return null;
-
-  return (
-    <Box
-      position="relative"
-      width="full"
-      borderRadius="xl"
-      overflow="hidden"
-      color="fg"
-      boxShadow="lg"
-      minHeight={{ base: "160px", md: "172px" }}
-      onMouseEnter={() => {
-        hoveredRef.current = true;
-      }}
-      onMouseLeave={() => {
-        hoveredRef.current = false;
-      }}
-      data-banner-variant="legacy"
-    >
-      <Box
-        position="absolute"
-        inset={0}
-        pointerEvents="none"
-        style={{
-          background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
-            colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
-          } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
-        }}
-      />
-      {!lowPerf ? (
-        <Box position="absolute" inset={0} pointerEvents="none">
-          <MeshGradient
-            colors={colors}
-            distortion={displayMesh.distortion}
-            swirl={displayMesh.swirl}
-            offsetX={displayMesh.offsetX}
-            offsetY={displayMesh.offsetY}
-            rotation={displayMesh.rotation}
-            grainMixer={0.15}
-            grainOverlay={0.18}
-            speed={reduceMotion ? 0 : 0.45}
-            scale={displayMesh.scale}
-            style={{ width: "100%", height: "100%" }}
-          />
-        </Box>
-      ) : null}
-      <Box
-        position="absolute"
-        inset={0}
-        pointerEvents="none"
-        backgroundImage="linear-gradient(120deg, var(--chakra-colors-bg-scrim) 0%, color-mix(in srgb, var(--chakra-colors-bg-scrim) 20%, transparent) 55%, transparent 100%)"
-      />
-
-      <Box display="grid" position="relative" zIndex={1} width="full" bg="bg.panel">
-        {eligible.map((s) => {
-          const isActive = s.id === slide.id;
-          return (
-            <motion.div
-              key={s.id}
-              inert={!isActive}
-              initial={false}
-              animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 8 }}
-              transition={slideTransition}
-              style={{
-                gridArea: "1 / 1",
-                zIndex: isActive ? 1 : 0,
-                pointerEvents: isActive ? "auto" : "none",
-                willChange: "opacity, transform",
-              }}
-            >
-              <HStack
-                align="center"
-                gap={{ base: 4, md: 6 }}
-                paddingLeft={{ base: 5, md: 7 }}
-                paddingRight={{ base: 5, md: 7 }}
-                paddingY={{ base: 5, md: 6 }}
-                width="full"
-                height="full"
-              >
-                <Box
-                  flexShrink={0}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  boxSize="44px"
-                  borderRadius="full"
-                  bg="bg.panel/20"
-                  boxShadow="inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-border-strong) 35%, transparent)"
-                >
-                  {s.Icon ? <Icon as={s.Icon} boxSize={5} color="fg" /> : s.iconNode}
-                </Box>
-
-                <VStack align="start" gap={1.5} flex={1} minWidth={0}>
-                  <HStack gap={2} minWidth={0}>
-                    <Heading
-                      as="h2"
-                      size="md"
-                      fontWeight="600"
-                      color="fg"
-                      letterSpacing="-0.01em"
-                      lineHeight={1.25}
-                    >
-                      {s.heading}
-                    </Heading>
-                    {s.badge ? (
-                      <Box
-                        paddingX={2}
-                        paddingY="2px"
-                        borderRadius="full"
-                        bg="bg.panel/30"
-                        flexShrink={0}
-                      >
-                        <Text
-                          textStyle="2xs"
-                          fontWeight="700"
-                          color="fg"
-                          letterSpacing="0.08em"
-                          textTransform="uppercase"
-                          lineHeight={1.2}
-                        >
-                          {s.badge}
-                        </Text>
-                      </Box>
-                    ) : null}
-                  </HStack>
-                  <Text
-                    textStyle="sm"
-                    color="fg.muted"
-                    lineHeight={1.6}
-                    maxWidth={{ base: "full", md: "560px" }}
-                  >
-                    {s.subtitle}
-                  </Text>
-                  <HStack gap={2} marginTop={1.5}>
-                    <Button
-                      size="sm"
-                      bg="bg.panel"
-                      color={s.legacyCtaColor}
-                      fontWeight="600"
-                      paddingX={4}
-                      boxShadow="sm"
-                      _hover={{
-                        bg: "bg.panel/90",
-                        transform: "translateY(-1px)",
-                      }}
-                      _active={{
-                        bg: "bg.panel/80",
-                        transform: "translateY(0)",
-                      }}
-                      transition="background-color 0.12s ease, transform 0.12s ease"
-                      onClick={() => handleCta(s)}
-                      aria-label={s.ctaLabel}
-                    >
-                      {s.ctaLabel}
-                      <Icon as={LuArrowRight} boxSize={3.5} marginLeft={1} />
-                    </Button>
-                  </HStack>
-                </VStack>
-              </HStack>
-            </motion.div>
-          );
-        })}
-      </Box>
-
-      <CarouselOnly multi={multi}>
-        <Box position="absolute" bottom={2.5} right={3} zIndex={2}>
-          <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden>
-            <circle
-              cx="12"
-              cy="12"
-              r="9"
-              fill="none"
-              stroke="var(--chakra-colors-border-strong)"
-              strokeWidth="2.5"
-            />
-            <g transform="rotate(-90 12 12)">
-              <motion.circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="var(--chakra-colors-fg)"
-                strokeWidth="2.5"
-                strokeLinecap="round"
-                style={{ pathLength: progress }}
-              />
-            </g>
-          </svg>
-        </Box>
-      </CarouselOnly>
-
-      <CarouselOnly multi={multi}>
-        <HStack
-          gap={2}
-          justify="center"
-          position="absolute"
-          bottom={3}
-          left={0}
-          right={0}
-          zIndex={2}
-        >
-          {eligible.map((s, i) => (
-            <Box
-              as="button"
-              key={s.id}
-              aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-              onClick={() => selectSlide(i)}
-              width={i === active ? "18px" : "7px"}
-              height="7px"
-              borderRadius="full"
-              bg={i === active ? "bg.panel" : "fg/40"}
-              transition="width 0.2s ease, background-color 0.2s ease"
-              cursor="pointer"
-              _hover={{
-                bg: i === active ? "bg.panel" : "fg/60",
-              }}
-            />
-          ))}
-        </HStack>
-      </CarouselOnly>
-    </Box>
-  );
-}
-
-function BriefingBanner({
-  active,
-  colors,
-  displayMesh,
-  eligible,
-  handleCta,
-  hoveredRef,
-  lowPerf,
-  multi,
-  progress,
-  reduceMotion,
-  selectSlide,
-  slide,
-  slideTransition,
-}: BannerViewProps) {
-  if (!slide) return null;
-
-  return (
-    <Box position="relative" width="full" isolation="isolate">
-      <Box
-        position="relative"
-        width="full"
-        // One card among the page's cards: the app surface, the hairline, the
-        // shared 14px radius. The announcement's colour lives in the icon tile
-        // and a whisper of mesh under the copy — never a billboard — so the
-        // briefing stays the loudest thing on the home.
-        borderRadius="14px"
-        borderWidth="1px"
-        borderColor="border.muted"
-        background="bg.card"
-        overflow="hidden"
-        onMouseEnter={() => {
-          hoveredRef.current = true;
-        }}
-        onMouseLeave={() => {
-          hoveredRef.current = false;
-        }}
-      >
-        {/* Liquid-glass edges: the slide's colour "refracting" off all four
-            borders — four inset glows, one per edge, that follow every
-            palette morph. Colour at the rim, calm in the middle. */}
-        <Box
-          aria-hidden
-          position="absolute"
-          inset={0}
-          borderRadius="inherit"
-          pointerEvents="none"
-          zIndex={2}
-          opacity={0.45}
-          style={{
-            boxShadow: [
-              `inset 0 10px 18px -14px ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
-              `inset 0 -10px 18px -14px ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
-              `inset 10px 0 18px -14px ${colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
-              `inset -10px 0 18px -14px ${colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"}`,
-            ].join(", "),
-          }}
-        />
-        {/* The mesh, back inside the card as a subtle wash: the one shared
-            canvas, still morphing palette + shape between slides, dialled to
-            whisper opacity under the copy. */}
-        <Box
-          position="absolute"
-          inset={0}
-          pointerEvents="none"
-          opacity={{ base: 0.09, _dark: 0.14 }}
-        >
-          {/* Static gradient base: the cheap fallback shown alone under a
-              struggling GPU, and a colour bed behind the shader otherwise. */}
-          <Box
-            position="absolute"
-            inset={0}
-            style={{
-              background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
-                colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
-              } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
-            }}
-          />
-          <AnimatedBannerOnly lowPerf={lowPerf}>
-            <Box position="absolute" inset={0}>
-              <MeshGradient
-                colors={colors}
-                distortion={displayMesh.distortion}
-                swirl={displayMesh.swirl}
-                offsetX={displayMesh.offsetX}
-                offsetY={displayMesh.offsetY}
-                rotation={displayMesh.rotation}
-                grainMixer={0.12}
-                grainOverlay={0.12}
-                speed={reduceMotion ? 0 : (slide.speed ?? 0.45)}
-                scale={displayMesh.scale}
-                style={{ width: "100%", height: "100%" }}
-              />
-            </Box>
-          </AnimatedBannerOnly>
-        </Box>
-
-        <HStack
-          position="relative"
-          zIndex={1}
-          align="center"
-          gap={{ base: 3, md: 4 }}
-          paddingX={{ base: 4, md: 5 }}
-          paddingTop={4}
-          paddingBottom={multi ? "22px" : 4}
-          width="full"
-          height="full"
-        >
-          {/* The icon tile: the slide's palette as a plain gradient (it still
-              follows the morph — `colors` interpolates every frame). */}
-          <Box
-            position="relative"
-            flexShrink={0}
-            boxSize="44px"
-            borderRadius="11px"
-            overflow="hidden"
-            boxShadow="inset 0 0 0 1px color-mix(in srgb, var(--chakra-colors-border-strong) 14%, transparent)"
-          >
-            <Box
-              position="absolute"
-              inset={0}
-              pointerEvents="none"
-              style={{
-                background: `linear-gradient(120deg, ${colors[0] ?? "var(--chakra-colors-bg-emphasized)"}, ${
-                  colors[1] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"
-                } 45%, ${colors[2] ?? colors[0] ?? "var(--chakra-colors-bg-emphasized)"})`,
-              }}
-            />
-            {/* Per-slide glyph, crossfading on the morph's clock. */}
-            <Box display="grid" position="relative" width="full" height="full">
-              {eligible.map((s) => (
-                <motion.div
-                  key={s.id}
-                  initial={false}
-                  animate={{ opacity: s.id === slide.id ? 1 : 0 }}
-                  transition={slideTransition}
-                  style={{
-                    gridArea: "1 / 1",
-                    display: "grid",
-                    placeItems: "center",
-                  }}
-                >
-                  {s.iconNode ?? (s.Icon ? <Icon as={s.Icon} boxSize={5} color="fg" /> : null)}
-                </motion.div>
-              ))}
-            </Box>
-          </Box>
-
-          {/* Every eligible slide's copy is stacked in one grid cell, so the
-              card is always the tallest slide's height and never resizes
-              mid-change. Only the active slide is visible; a change fades the
-              copy with a small lift on the same clock as the tile morph. */}
-          <Box display="grid" flex={1} minWidth={0}>
-            {eligible.map((s) => {
-              const isActive = s.id === slide.id;
-              return (
-                <motion.div
-                  key={s.id}
-                  inert={!isActive}
-                  initial={false}
-                  animate={{ opacity: isActive ? 1 : 0, y: isActive ? 0 : 6 }}
-                  transition={slideTransition}
-                  style={{
-                    gridArea: "1 / 1",
-                    zIndex: isActive ? 1 : 0,
-                    pointerEvents: isActive ? "auto" : "none",
-                    willChange: "opacity, transform",
-                  }}
-                >
-                  <VStack align="start" gap={1} width="full" minWidth={0}>
-                    <HStack gap={2} minWidth={0}>
-                      <Heading
-                        as="h2"
-                        // The announcement speaks in the page's serif display
-                        // voice, so it reads as the same publication as the
-                        // briefing above it.
-                        fontFamily={SERIF}
-                        fontWeight="500"
-                        fontSize="15px"
-                        letterSpacing="-0.01em"
-                        lineHeight={1.3}
-                        color="fg"
-                      >
-                        {s.heading}
-                      </Heading>
-                      {s.badge ? (
-                        <Box
-                          paddingX="7px"
-                          borderRadius="full"
-                          borderWidth="1px"
-                          borderColor="orange.emphasized"
-                          flexShrink={0}
-                        >
-                          <Text
-                            fontFamily="mono"
-                            fontSize="9.5px"
-                            fontWeight="600"
-                            color="orange.fg"
-                            letterSpacing="0.08em"
-                            textTransform="uppercase"
-                            lineHeight={1.6}
-                          >
-                            {s.badge}
-                          </Text>
-                        </Box>
-                      ) : null}
-                    </HStack>
-                    <Text fontSize="12.5px" color="fg.muted" lineHeight={1.5}>
-                      {s.subtitle}
-                    </Text>
-                    {s.extra ? (
-                      <Box width="full" minWidth={0}>
-                        {s.extra}
-                      </Box>
-                    ) : null}
-                    <chakra.button
-                      type="button"
-                      onClick={() => handleCta(s)}
-                      aria-label={s.ctaLabel}
-                      flexShrink={0}
-                      display="inline-flex"
-                      alignItems="center"
-                      gap={1}
-                      marginTop={1.5}
-                      fontFamily="mono"
-                      fontSize="11.5px"
-                      whiteSpace="nowrap"
-                      cursor="pointer"
-                      // Wears the same orange as the "New" pill beside the
-                      // heading so the call to action reads as the announcement's
-                      // own colour, not a muted default. A filled subtle pill (vs
-                      // the badge's outline) keeps it clearly a button.
-                      color="orange.fg"
-                      borderWidth="1px"
-                      borderColor="orange.emphasized"
-                      borderRadius="8px"
-                      paddingX={2.5}
-                      paddingY="4px"
-                      background="orange.subtle"
-                      transition="background-color 130ms ease, border-color 130ms ease"
-                      _hover={{
-                        background: "orange.muted",
-                        borderColor: "orange.solid",
-                      }}
-                    >
-                      {s.ctaLabel}
-                      <BriefingCtaIcon showKeyboard={s.showCtaKbd === true} />
-                    </chakra.button>
-                  </VStack>
-                </motion.div>
-              );
-            })}
-          </Box>
-        </HStack>
-
-        {/* Countdown ring — sweeps to full over the dwell, and eases to a stop
-            on hover so it never advances under the pointer. */}
-        <CarouselOnly multi={multi}>
-          <Box position="absolute" bottom={2} right={2.5} zIndex={2}>
-            <svg width="20" height="20" viewBox="0 0 24 24" aria-hidden>
-              <circle
-                cx="12"
-                cy="12"
-                r="9"
-                fill="none"
-                stroke="var(--chakra-colors-border-emphasized)"
-                strokeWidth="2.5"
-              />
-              <g transform="rotate(-90 12 12)">
-                <motion.circle
-                  cx="12"
-                  cy="12"
-                  r="9"
-                  fill="none"
-                  stroke="var(--chakra-colors-fg-muted)"
-                  strokeWidth="2.5"
-                  strokeLinecap="round"
-                  style={{ pathLength: progress }}
-                />
-              </g>
-            </svg>
-          </Box>
-        </CarouselOnly>
-
-        {/* Progress and navigation: the line shows dwell time; the dots and
-            arrows make the carousel explicit and usable without waiting. */}
-        <CarouselOnly multi={multi}>
-          <HStack
-            gap={1}
-            justify="center"
-            position="absolute"
-            bottom="0px"
-            left={0}
-            right={0}
-            zIndex={2}
-          >
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              aria-label="Previous announcement"
-              onClick={() => selectSlide(active - 1)}
-            >
-              <LuArrowLeft />
-            </IconButton>
-            <HStack gap={0}>
-              {eligible.map((s, i) => (
-                <Box
-                  as="button"
-                  key={s.id}
-                  aria-label={`Show announcement ${i + 1} of ${eligible.length}`}
-                  aria-current={i === active ? "true" : undefined}
-                  onClick={() => selectSlide(i)}
-                  display="flex"
-                  alignItems="center"
-                  justifyContent="center"
-                  paddingX="6px"
-                  paddingY="8px"
-                  cursor="pointer"
-                  css={{
-                    "&:hover .banner-dot": {
-                      background: "var(--chakra-colors-fg-muted)",
-                    },
-                  }}
-                >
-                  <Box
-                    className="banner-dot"
-                    width={i === active ? "16px" : "6px"}
-                    height="6px"
-                    borderRadius="full"
-                    background={i === active ? "fg.muted" : "border.emphasized"}
-                    transition="width 0.2s ease, background-color 0.2s ease"
-                  />
-                </Box>
-              ))}
-            </HStack>
-            <IconButton
-              size="2xs"
-              variant="ghost"
-              aria-label="Next announcement"
-              onClick={() => selectSlide(active + 1)}
-            >
-              <LuArrowRight />
-            </IconButton>
-          </HStack>
-        </CarouselOnly>
-        <CarouselOnly multi={multi}>
-          <Box
-            position="absolute"
-            bottom={0}
-            left={0}
-            right={0}
-            height="2px"
-            background="border.muted"
-            zIndex={1}
-            pointerEvents="none"
-          >
-            <motion.div
-              style={{
-                height: "100%",
-                background: "var(--chakra-colors-fg-muted)",
-                scaleX: progress,
-                transformOrigin: "left",
-              }}
-            />
-          </Box>
-        </CarouselOnly>
-      </Box>
     </Box>
   );
 }

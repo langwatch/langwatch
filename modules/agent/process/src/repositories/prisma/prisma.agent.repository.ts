@@ -216,7 +216,7 @@ export class PrismaAgentRepository
           ownerUserId: input.identity?.ownerUserId,
           hostLabel: input.identity?.hostLabel,
           identityKey: input.identity?.identityKey ?? input.identityKey,
-          lastSeenAt: input.identity ? new Date() : void 0,
+          lastSeenAt: input.identity ? toDate(nowInstant()) : void 0,
         },
       })
       .catch((error: unknown) => this.#writeError(error, input));
@@ -255,7 +255,7 @@ export class PrismaAgentRepository
     const row = await this.prisma.agent
       .update({
         where: { id: input.id, projectId: input.projectId, archivedAt: null },
-        data: { archivedAt: new Date() },
+        data: { archivedAt: toDate(nowInstant()) },
       })
       .catch((error: unknown) => this.#writeError(error, input));
 
@@ -323,7 +323,7 @@ export class PrismaAgentRepository
 
   async registerConnected(input: RegisterPersistedAgentInput): Promise<Agent> {
     const config = configSchema.parse(input.config);
-    const lastSeenAt = new Date();
+    const lastSeenAt = toDate(nowInstant());
     const identity = { projectId: input.projectId, identityKey: input.identity.identityKey };
     const row = await this.prisma.agent
       .upsert({

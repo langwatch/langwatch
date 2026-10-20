@@ -36,3 +36,21 @@ Feature: Organisation query routing
     Given two projects that belong to different organisations
     When a read declares both as its tenant set
     Then it is refused as spanning organisations and no instance receives the statement
+
+  @unit
+  Scenario: A batch across one organisation's tenants is written as one insert on that organisation's server
+    Given two tenants of an organisation with a private ClickHouse instance
+    When one insert declares both as its tenant set and carries rows of each
+    Then the private instance receives that one insert and the shared instance receives none
+
+  @unit
+  Scenario: A batch's rows must be exactly its declared tenant set
+    Given an insert declaring a tenant set
+    When a row names a tenant outside the set, a declared tenant has no row, or the request's tenant is not in the set
+    Then the tenant guard refuses it before any instance receives the insert
+
+  @unit
+  Scenario: A batch whose tenant set spans organisations is refused
+    Given two tenants that belong to different organisations
+    When one insert declares both as its tenant set
+    Then it is refused as spanning organisations and no instance receives the insert

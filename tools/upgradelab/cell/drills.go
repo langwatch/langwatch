@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -71,8 +72,11 @@ func (cell *run) retryFailedStep(ctx context.Context) error {
 		return nil
 	}
 	step, err := psql(ctx, cell.stores.psqlURL(), `SELECT id FROM mydb_upgrade_ledger._langwatch_upgrade_step WHERE mode = 'background' AND status = 'done' ORDER BY id LIMIT 1`)
-	if err != nil || step == "" {
-		return fmt.Errorf("no finished background step to fail: %v", err)
+	if err != nil {
+		return fmt.Errorf("no finished background step to fail: %w", err)
+	}
+	if step == "" {
+		return errors.New("no finished background step to fail")
 	}
 	cell.drills.retried = step
 	if _, err := psql(ctx, cell.stores.psqlURL(), `UPDATE mydb_upgrade_ledger._langwatch_upgrade_step SET status = 'failed', last_error = 'upgradelab drill: injected after five attempts' WHERE id = '`+strings.ReplaceAll(step, "'", "")+`'`); err != nil {
@@ -81,6 +85,7 @@ func (cell *run) retryFailedStep(ctx context.Context) error {
 	if cell.options.Shots {
 		cell.shoot(ctx, "drill-failed")
 		cell.drills.failedShot = cell.lastShotState("drill-failed")
+		cell.memberNoticeShot(ctx)
 	}
 	cell.drills.retryStatus, cell.drills.retryBody = cell.operatorMutation(ctx, "ops.upgrade.retryStep", map[string]any{"id": step})
 	_ = waitFor(ctx, 3*time.Minute, func() bool {
@@ -134,9 +139,13 @@ func (cell *run) drillVerdicts(final []LedgerRow) []Verdict {
 		verdicts = append(verdicts, verdict("D2", state.killedAtMs > 0 && state.restartErr == "" && ready > int64(state.killedAtMs),
 			fmt.Sprintf("worker killed at %d ms with %d of %d steps done, restarted%s; ready at %d ms", state.killedAtMs, state.killedDone, state.killedTotal, errSuffix(state.restartErr), ready)))
 	}
+	if cell.drill(DrillOldWorker) {
+		verdicts = append(verdicts, cell.oldWorkerVerdict())
+	}
 	if cell.drill(DrillRetry) {
 		state, finalStatus := cell.drills, ""
-		for _, row := range final {
+		for i := range final {
+			row := &final[i]
 			if row.ID == state.retried {
 				finalStatus = row.Status
 			}
@@ -151,7 +160,8 @@ func (cell *run) drillVerdicts(final []LedgerRow) []Verdict {
 // apiEarlyDrillVerdict (D1): reads met upgrade_in_progress with Retry-After and each succeeded on retry.
 func apiEarlyDrillVerdict(calls []Call) Verdict {
 	met, recovered, missingHeader := 0, 0, 0
-	for _, call := range calls {
+	for i := range calls {
+		call := &calls[i]
 		if call.UpgradeInProgress == 0 {
 			continue
 		}

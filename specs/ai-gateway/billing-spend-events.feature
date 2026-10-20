@@ -21,6 +21,13 @@ Feature: Billing spend events, one durable record per gateway request
       And its attribution is already resolved
 
     @unit
+    Scenario: A request that names no model opens no spend record
+      Given a request whose body names no model
+      When it enters the gateway pipeline
+      Then no admit or fail command is emitted
+      And the caller is answered with the missing-model error
+
+    @unit
     Scenario: A gateway rejection admits and fails with its own taxonomy token
       Given a request a budget or guardrail rejects
       When the gateway refuses it
@@ -207,8 +214,8 @@ Feature: Billing spend events, one durable record per gateway request
     Scenario: A worker without the spend pipeline refuses the command instead of acknowledging it
       Given a worker whose build does not register the gateway spend pipeline
       When a confirm command for that pipeline reaches it
-      Then the command is rejected so another worker retries it
-      And the rejection names the gateway request at error level
+      Then the command is rejected so another worker runs it
+      And the rejection names the gateway request at warn level
 
     # The same rule one tier earlier. The API process is where the drained
     # batch arrives, and it can only queue a command on a pipeline it has

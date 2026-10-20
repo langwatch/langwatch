@@ -151,7 +151,7 @@ export function TraceDrawerEmptyState({
       </Box>
 
       <VStack gap={2} maxWidth="360px">
-        <Text textStyle="lg" fontWeight="600" color="fg">
+        <Text textStyle="lg" fontWeight="semibold" color="fg">
           {title}
         </Text>
         {/* The sentence that decides what the customer does next, directly
@@ -181,7 +181,7 @@ export function TraceDrawerEmptyState({
             color="fg.subtle"
             textTransform="uppercase"
             letterSpacing="0.08em"
-            fontWeight="600"
+            fontWeight="semibold"
           >
             Trace ID
           </Text>
@@ -222,7 +222,7 @@ export function TraceDrawerEmptyState({
             <Text>Try again</Text>
           </Button>
         )}
-        <Button size="sm" variant="solid" colorPalette="blue" onClick={onClose}>
+        <Button size="sm" variant="solid" colorPalette="orange" onClick={onClose}>
           Close
         </Button>
       </HStack>

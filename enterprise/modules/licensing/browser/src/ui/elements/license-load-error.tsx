@@ -1,4 +1,4 @@
-import { Alert, Button } from "@langwatch/design-system/primitives";
+import { BannerAction, Banner } from "@langwatch/design-system/banner";
 
 /**
  * Shown when the license status could not be fetched. Distinct from having no
@@ -7,18 +7,13 @@ import { Alert, Button } from "@langwatch/design-system/primitives";
  */
 export function LicenseLoadError({ onRetry }: { onRetry: () => void }) {
   return (
-    <Alert.Root status="error">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Title>Unable to load license</Alert.Title>
-        <Alert.Description>
-          Your license status could not be retrieved. Please try again or contact support if the
-          issue persists.
-        </Alert.Description>
-      </Alert.Content>
-      <Button size="sm" variant="outline" colorPalette="orange" onClick={onRetry}>
-        Retry
-      </Button>
-    </Alert.Root>
+    <Banner
+      status="error"
+      title="Unable to load license"
+      action={<BannerAction onClick={onRetry}>Retry</BannerAction>}
+    >
+      Your license status could not be retrieved. Try again, or contact support if the problem
+      persists.
+    </Banner>
   );
 }

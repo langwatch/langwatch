@@ -9,7 +9,11 @@ import {
   type RestDoorDefinition,
 } from "@langwatch/api/rest";
 import type { ConfigOf, ConfigSlice } from "@langwatch/config";
-import { type FeatureEventing, type ProjectionLaneReplayer } from "@langwatch/eventing";
+import {
+  type FeatureEventing,
+  type ListedWork,
+  type ProjectionLaneReplayer,
+} from "@langwatch/eventing";
 import {
   type DependencyIdentity,
   type DependencyToken,
@@ -33,6 +37,7 @@ import {
   type ChannelRegistry,
   type ChannelsFor,
 } from "./channel-registry.ts";
+import { trackedForRole } from "./delivery-progress.ts";
 /** One feature installer. A feature declares its config, the contract services */
 import { processProjectionReplayer } from "./migration/projection-replayer.ts";
 import { withAnotherPipeline } from "./module-eventing.ts";
@@ -84,6 +89,8 @@ export type FeatureSetup<
   readonly role?: ServerRole;
   /** Every installed module's built migration steps, read once all have installed (S6-FEED). */
   readonly declaredMigrationSteps?: () => readonly unknown[];
+  /** Runs work whose queue jobs run ahead of any backlog, paced by and waited for (ops' passes). */
+  readonly runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result>;
 }> &
   ([Repositories] extends [never]
     ? object
@@ -340,6 +347,7 @@ export interface FeatureSetupArguments<Config, Dependencies> {
   readonly secrets: ScopedSecrets;
   readonly repositorySelection?: FeatureInstallArguments["repositorySelection"];
   readonly declaredMigrationSteps?: FeatureInstallArguments["declaredMigrationSteps"];
+  readonly runListedWork?: FeatureInstallArguments["runListedWork"];
   /**
    * What the module's registry answered on the selected backend, instantiated
    * once per install so the app and its eventing declaration read the same
@@ -435,6 +443,8 @@ export interface FeatureInstallArguments {
    * the modules whose tenant steps it drives (S6-FEED). Absent where the root composed none.
    */
   readonly declaredMigrationSteps?: () => readonly unknown[];
+  /** The process's listed queue runs; absent where no queue runs them. */
+  readonly runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result>;
   /** The instance the graph resolved for one token. */
   resolve: (token: TokenIdentity) => unknown;
 }
@@ -982,6 +992,7 @@ export class ServerFeatureAssembly<
           repositories: args.repositories,
           channels: args.channels,
           declaredMigrationSteps: args.declaredMigrationSteps,
+          runListedWork: args.runListedWork,
         };
         // A module resolving a secret does so in `create()`, so the whole
         // install awaits: only the constructed collaborator comes back.
@@ -1469,6 +1480,7 @@ class RepositoryAppBuilder<
           repositorySelection,
           channels,
           declaredMigrationSteps,
+          runListedWork,
         }): App | Promise<App> => {
           return app.create({
             dependencies,
@@ -1480,6 +1492,7 @@ class RepositoryAppBuilder<
             ...(repositorySelection ? { tier: repositorySelection.tier } : {}),
             ...(channels === undefined ? {} : { channels }),
             ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+            ...(runListedWork === undefined ? {} : { runListedWork }),
           });
         },
       )
@@ -1499,9 +1512,12 @@ class RepositoryAppBuilder<
           if (!args.repositorySelection) {
             throw new Error(`Module "${name}" was installed without a repository tier.`);
           }
-          const repositories = instantiateRepositories(registry, {
-            ...args.repositorySelection,
-            config: args.config,
+          const repositories = trackedForRole({
+            role: args.role,
+            dependency: instantiateRepositories(registry, {
+              ...args.repositorySelection,
+              config: args.config,
+            }),
           });
           return { ...(await setup.install({ ...args, repositories })), repositories };
         },
@@ -1709,7 +1725,16 @@ class ConfiguredAppBuilder<
       .withConfigType<Config>()
       .withDependencies(app.dependencies)
       .withSetup(
-        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+        ({
+          dependencies,
+          config,
+          secrets,
+          resources,
+          role,
+          channels,
+          declaredMigrationSteps,
+          runListedWork,
+        }) =>
           app.create({
             dependencies,
             config,
@@ -1718,6 +1743,7 @@ class ConfiguredAppBuilder<
             role,
             ...(channels === undefined ? {} : { channels }),
             ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+            ...(runListedWork === undefined ? {} : { runListedWork }),
           }),
       )
       .provides(app.contract)
@@ -1834,7 +1860,16 @@ class UnconfiguredAppBuilder<
       .withConfigType<undefined>()
       .withDependencies(app.dependencies)
       .withSetup(
-        ({ dependencies, config, secrets, resources, role, channels, declaredMigrationSteps }) =>
+        ({
+          dependencies,
+          config,
+          secrets,
+          resources,
+          role,
+          channels,
+          declaredMigrationSteps,
+          runListedWork,
+        }) =>
           app.create({
             dependencies,
             config,
@@ -1843,6 +1878,7 @@ class UnconfiguredAppBuilder<
             role,
             ...(channels === undefined ? {} : { channels }),
             ...(declaredMigrationSteps === undefined ? {} : { declaredMigrationSteps }),
+            ...(runListedWork === undefined ? {} : { runListedWork }),
           }),
       )
       .provides(app.contract)
@@ -2252,12 +2288,15 @@ function declaringChannels<Declaration extends Readonly<{ name: string; install:
   const declaring: ChannelInstall = async (args) => {
     const selection = args.repositorySelection;
     if (!selection) throw new Error(`Module "${name}" was installed without a store tier.`);
-    const channels = await instantiateChannels(registry, {
-      tier: selection.tier,
-      members: selection.members,
-      config: args.config,
-      secrets: args.secrets ?? undeclaredSecrets(name),
-      resolve: args.resolve,
+    const channels = trackedForRole({
+      role: args.role,
+      dependency: await instantiateChannels(registry, {
+        tier: selection.tier,
+        members: selection.members,
+        config: args.config,
+        secrets: args.secrets ?? undeclaredSecrets(name),
+        resolve: args.resolve,
+      }),
     });
     return install({ ...args, channels });
   };

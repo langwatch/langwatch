@@ -5,7 +5,10 @@
  */
 
 import { Alert } from "@langwatch/design-system/primitives";
+import { createLogger } from "@langwatch/observability/browser";
 import { Component, type ErrorInfo, type ReactNode } from "react";
+
+const logger = createLogger("langwatch:workflow:error-boundary");
 
 export class WorkflowErrorBoundary extends Component<{ children: ReactNode }, { failed: boolean }> {
   override state = { failed: false };
@@ -17,7 +20,7 @@ export class WorkflowErrorBoundary extends Component<{ children: ReactNode }, { 
   override componentDidCatch(error: Error, info: ErrorInfo) {
     // Default-log so dev tooling and any session-replay scraper catch it even
     // though nothing else here reports it.
-    console.error("[WorkflowErrorBoundary]", error, info.componentStack);
+    logger.error({ error, componentStack: info.componentStack }, "Workflow section failed");
   }
 
   override render() {

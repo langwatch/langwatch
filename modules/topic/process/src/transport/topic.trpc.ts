@@ -51,6 +51,10 @@ export const topicTrpcTransport: TrpcRouterDeclaration<TopicBrowserApi, typeof t
       app.topics().getClusteringRunHistory({ projectId: input.projectId }),
     )
 
+    .procedure("getClusteringRunHistoryPage")
+    .withPermission("project:view")
+    .handle(async ({ app, input }) => app.topics().getClusteringRunHistoryPage(input))
+
     .procedure("triggerTopicClustering")
     .refusedOnAggregate()
     .withPermission("project:update")

@@ -1,3 +1,4 @@
+import { runOutsideDelivery } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type { Instant } from "@langwatch/time";
 
@@ -28,16 +29,32 @@ const DEFAULT_LEASE_RENEW_INTERVAL_MS = 20_000;
  *  convergence polls, not throughput - each tenant's own claim keeps one
  *  large import from holding the rest of the fleet behind it. */
 const DEFAULT_TENANT_CONCURRENCY = 25;
+const DEFAULT_PACING_WAIT_MS = 5_000;
+/** On a queue list, a migration declaring no `pauseWhileQueuedAbove` waits at this many jobs. */
+export const DEFAULT_PAUSE_WHILE_QUEUED_ABOVE = 5_000;
+/** How long a paced pass's own queue work may stand still before the pass stops waiting on it. */
+const PASS_QUEUE_WAIT_MS = 5 * 60_000;
+
+/** A listed queue run as a paced pass sees it: room for its own jobs, never the whole queue's. */
+export type PassQueueRun = Readonly<{
+  waitForRoom: (input: { maxOutstanding: number; signal?: AbortSignal }) => Promise<void>;
+}>;
+
+/** A page's terminal statuses: tenant id, then migration name. */
+type FinishedOnPage = Map<string, Map<string, TenantMigrationRecord["status"]>>;
 
 /**
  * Which (tenant, migration) pairs a pass may touch, read fresh each pass. A
  * pair outside the cohort gets no state record - "not started" and "not in
  * the cohort yet" are the same pending state, so a rollout can widen later.
  */
-export type MigrationCohort = (args: {
+export type MigrationCohort = ((args: {
   tenantId: string;
   migrationName: string;
-}) => boolean | Promise<boolean>;
+}) => boolean | Promise<boolean>) & {
+  /** Reads what a page of tenants needs in one go, before the page is asked per tenant. */
+  prepare?: (args: { tenantIds: readonly string[] }) => Promise<void>;
+};
 
 export type SystemMigrationRunnerDeps = {
   state: SystemMigrationStateRepository;
@@ -53,6 +70,22 @@ export type SystemMigrationRunnerDeps = {
   leaseRenewIntervalMs?: number;
   /** How many organizations to migrate concurrently. Defaults to 25. */
   tenantConcurrency?: number;
+  /**
+   * The group queues' waiting-job count, read before each page a paced migration drives. Omitted,
+   * the runner cannot pace; a throw reads as over the limit, never as empty.
+   */
+  queuedJobs?: () => Promise<number>;
+  /** How long a paced page waits before reading the count again. Defaults to five seconds. */
+  pacingWaitMs?: number;
+  /**
+   * Runs a paced pass on a queue list of its own: its jobs run ahead of any backlog, and each page
+   * waits only for the pass's own outstanding jobs, never the queue's total (Alex, 2026-10-12).
+   */
+  runListedWork?: <Result>(input: {
+    name: string;
+    timeoutMs: number;
+    work: (list?: PassQueueRun) => Promise<Result>;
+  }) => Promise<Result>;
 };
 
 /**
@@ -81,7 +114,7 @@ export class SystemMigrationRunnerService {
     };
     if (this.deps.migrations.length === 0) return summary;
 
-    await this.driveTenants({ summary, signal });
+    await this.driveOnOwnList({ summary, signal });
     if (summary.claimed > 0 && summary.claimed === summary.tenantsSeen) {
       // Every organization read as claimed. Genuine when another pass is
       // sweeping the same page at the same moment - but it is also the only
@@ -98,8 +131,8 @@ export class SystemMigrationRunnerService {
 
   /**
    * Whether an eligible tenant (this runner's source, inside the cohort) holds no finished row
-   * for `migrationName`. Read from state, never from a pass: a tenant claimed elsewhere, or by
-   * nobody while the lease store is down, counts until its row is finished.
+   * for `migrationName` (a steady step's `migrated` counts as finished). Read from state, never a
+   * pass: a tenant claimed elsewhere, or by nobody while the lease is down, counts until finished.
    */
   async hasUnfinishedTenant({ migrationName }: { migrationName: string }): Promise<boolean> {
     let cursor: string | null = null;
@@ -107,20 +140,93 @@ export class SystemMigrationRunnerService {
       const page = await this.deps.tenants.findTenantIdsAfter({ cursor, limit: TENANT_PAGE_SIZE });
       if (page.length === 0) return false;
       cursor = page[page.length - 1] ?? null;
+      await this.deps.cohort.prepare?.({ tenantIds: page });
+      const eligible: string[] = [];
       for (const tenantId of page) {
-        if (!(await this.deps.cohort({ tenantId, migrationName }))) continue;
-        const record = await this.deps.state
-          .getRecord({ migrationName, tenantId })
-          .catch(undefinedWhenNotFound);
-        if (!isTerminalTenantStatus(record?.status)) return true;
+        if (await this.deps.cohort({ tenantId, migrationName })) eligible.push(tenantId);
       }
+      if (eligible.length === 0) continue;
+      const records = await this.deps.state.findRecords({ migrationName, tenantIds: eligible });
+      const steady = this.deps.migrations.some(
+        (migration) => migration.name === migrationName && migration.migratedIsSteady,
+      );
+      const finished = new Set(
+        records
+          .filter(
+            (record) =>
+              isTerminalTenantStatus(record.status) || (steady && record.status === "migrated"),
+          )
+          .map((r) => r.tenantId),
+      );
+      if (eligible.some((tenantId) => !finished.has(tenantId))) return true;
     }
+  }
+
+  /**
+   * A pass with a queue runs on a list of its own, paced by default; one whose work stops draining
+   * keeps what it recorded and leaves the rest to the next pass, which is level-triggered.
+   */
+  private async driveOnOwnList(args: {
+    summary: MigrationPassSummary;
+    signal?: AbortSignal;
+  }): Promise<void> {
+    const { runListedWork } = this.deps;
+    if (runListedWork === undefined) return this.driveTenants(args);
+    const names = this.deps.migrations.map((migration) => migration.name).join(",");
+    // Only the queue's own refusals (its wait for room, its closing wait) leave the rest to the
+    // next pass; a failed tenant read or claim fails the pass as it does off the list.
+    let queueRefused = false;
+    let driveFailure: { error: unknown } | undefined;
+    const work = async (list?: PassQueueRun): Promise<void> => {
+      const watched: PassQueueRun | undefined = list && {
+        waitForRoom: (input) =>
+          list.waitForRoom(input).catch((error: unknown) => {
+            queueRefused = true;
+            throw error;
+          }),
+      };
+      await this.driveTenants({ ...args, list: watched }).catch((error: unknown) => {
+        if (!queueRefused) driveFailure = { error };
+        throw error;
+      });
+    };
+    try {
+      await runListedWork({
+        name: `system-migrations:${names}:${crypto.randomUUID()}`,
+        timeoutMs: PASS_QUEUE_WAIT_MS,
+        work,
+      });
+    } catch (error) {
+      if (driveFailure) throw driveFailure.error;
+      logger.warn(
+        { error, migrations: names },
+        "the pass's own queue work did not drain; the next pass picks up where it stopped",
+      );
+    }
+  }
+
+  /** The strictest declared pacing limit among the pass's migrations; undefined when none does. */
+  private pacingLimit(): number | undefined {
+    const limits = this.deps.migrations.flatMap((migration) =>
+      migration.pauseWhileQueuedAbove === undefined ? [] : [migration.pauseWhileQueuedAbove],
+    );
+    return limits.length === 0 ? undefined : Math.min(...limits);
+  }
+
+  /** On a queue list every migration is paced: one that declares no limit takes the default. */
+  private listPacingLimit(): number {
+    return Math.min(
+      ...this.deps.migrations.map(
+        (migration) => migration.pauseWhileQueuedAbove ?? DEFAULT_PAUSE_WHILE_QUEUED_ABOVE,
+      ),
+    );
   }
 
   /** Every cohort tenant, a page at a time, until abort. */
   private async driveTenants(args: {
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    list?: PassQueueRun;
   }): Promise<void> {
     let cursor: string | null = null;
     for (;;) {
@@ -130,7 +236,45 @@ export class SystemMigrationRunnerService {
       });
       if (page.length === 0) return;
       cursor = page[page.length - 1] ?? null;
+      if (!(await this.waitForQueueRoom({ signal: args.signal, list: args.list }))) return;
       if (!(await this.drivePage({ ...args, page }))) return;
+    }
+  }
+
+  /**
+   * Holds the next page while more of the pass's own jobs wait than its strictest migration allows;
+   * with no list, while the whole queue holds more than a declared limit. False means aborted.
+   */
+  private async waitForQueueRoom({
+    signal,
+    list,
+  }: {
+    signal?: AbortSignal;
+    list?: PassQueueRun;
+  }): Promise<boolean> {
+    if (list) {
+      const maxOutstanding = this.listPacingLimit();
+      await list.waitForRoom({ maxOutstanding, ...(signal ? { signal } : {}) });
+      return !signal?.aborted;
+    }
+    const limit = this.pacingLimit();
+    const { queuedJobs } = this.deps;
+    if (limit === undefined || queuedJobs === undefined) return !signal?.aborted;
+    for (;;) {
+      if (signal?.aborted) return false;
+      const queued = await queuedJobs().catch((error: unknown) => {
+        logger.warn(
+          { error },
+          "could not read the queue depth; pacing as if it were over the limit",
+        );
+        return Number.POSITIVE_INFINITY;
+      });
+      if (queued <= limit) return true;
+      logger.info(
+        { queued, limit },
+        "queue over the pacing limit; holding the next page of tenants",
+      );
+      await pause({ ms: this.deps.pacingWaitMs ?? DEFAULT_PACING_WAIT_MS, signal });
     }
   }
 
@@ -139,11 +283,18 @@ export class SystemMigrationRunnerService {
     page,
     summary,
     signal,
+    list,
   }: {
     page: string[];
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    list?: PassQueueRun;
   }): Promise<boolean> {
+    // A failed read only costs the shortcut: every tenant then takes its claim, as before.
+    const finished = await this.readFinished({ page }).catch((error: unknown) => {
+      logger.warn({ error }, "could not read the page's finished tenants; claiming each one");
+      return new Map() as FinishedOnPage;
+    });
     const pending = [...page];
     const width = Math.min(
       Math.max(1, this.deps.tenantConcurrency ?? DEFAULT_TENANT_CONCURRENCY),
@@ -155,7 +306,7 @@ export class SystemMigrationRunnerService {
         const tenantId = pending.shift();
         if (tenantId === undefined) return;
         try {
-          await this.driveTenant({ tenantId, summary, signal });
+          await this.driveTenant({ tenantId, summary, signal, finished, list });
         } catch (error) {
           // Contained here, not just around migrateTenant: a throw outside
           // that inner net (the state read, the cohort read) would reject
@@ -175,6 +326,54 @@ export class SystemMigrationRunnerService {
   }
 
   /**
+   * The page's terminal rows, one read per migration: a tenant whose every migration is finished
+   * or out of the cohort is counted from these and takes no claim.
+   */
+  private async readFinished({ page }: { page: readonly string[] }): Promise<FinishedOnPage> {
+    await this.deps.cohort.prepare?.({ tenantIds: page });
+    const finished: FinishedOnPage = new Map();
+    for (const migration of this.deps.migrations) {
+      const records = await this.deps.state.findRecords({
+        migrationName: migration.name,
+        tenantIds: page,
+      });
+      for (const record of records) {
+        if (!isTerminalTenantStatus(record.status)) continue;
+        const statuses = finished.get(record.tenantId) ?? new Map();
+        statuses.set(migration.name, record.status);
+        finished.set(record.tenantId, statuses);
+      }
+    }
+    return finished;
+  }
+
+  /** Counts a tenant with nothing left to run without claiming it; false when it has work. */
+  private async countedAsFinished({
+    tenantId,
+    summary,
+    finished,
+  }: {
+    tenantId: string;
+    summary: MigrationPassSummary;
+    finished: FinishedOnPage;
+  }): Promise<boolean> {
+    const statuses = finished.get(tenantId);
+    if (!statuses) return false;
+    const counts = { skipped: 0, alreadyFinalized: 0, alreadyRolledBack: 0 };
+    for (const migration of this.deps.migrations) {
+      const status = statuses.get(migration.name);
+      if (status === "finalized") counts.alreadyFinalized += 1;
+      else if (status === "rolled_back") counts.alreadyRolledBack += 1;
+      else if (await this.deps.cohort({ tenantId, migrationName: migration.name })) return false;
+      else counts.skipped += 1;
+    }
+    summary.skipped += counts.skipped;
+    summary.alreadyFinalized += counts.alreadyFinalized;
+    summary.alreadyRolledBack += counts.alreadyRolledBack;
+    return true;
+  }
+
+  /**
    * One tenant, under its own claim. A tenant claimed elsewhere is left to
    * that process; one this pass claims runs its migrations in registration
    * order, heartbeat-renewed for as long as they take.
@@ -183,13 +382,18 @@ export class SystemMigrationRunnerService {
     tenantId,
     summary,
     signal,
+    finished,
+    list,
   }: {
     tenantId: string;
     summary: MigrationPassSummary;
     signal?: AbortSignal;
+    finished: FinishedOnPage;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { lease, cohort, migrations } = this.deps;
     summary.tenantsSeen += 1;
+    if (await this.countedAsFinished({ tenantId, summary, finished })) return;
 
     const claimName = `${TENANT_CLAIM_PREFIX}${tenantId}`;
     const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
@@ -222,6 +426,7 @@ export class SystemMigrationRunnerService {
           tenantId,
           signal,
           summary,
+          list,
         });
       }
     } finally {
@@ -241,16 +446,19 @@ export class SystemMigrationRunnerService {
   } {
     let lost = false;
     const ttlMs = this.deps.leaseTtlMs ?? DEFAULT_LEASE_TTL_MS;
-    const timer = setInterval(() => {
-      void this.deps.lease
-        .renew({ name: claimName, ttlMs })
-        .then((held) => {
-          if (!held) lost = true;
-        })
-        .catch(() => {
-          lost = true;
-        });
-    }, this.deps.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS);
+    // A renewal is not the pass's progress: a hung tenant step must still go silent.
+    const timer = runOutsideDelivery(() =>
+      setInterval(() => {
+        void this.deps.lease
+          .renew({ name: claimName, ttlMs })
+          .then((held) => {
+            if (!held) lost = true;
+          })
+          .catch(() => {
+            lost = true;
+          });
+      }, this.deps.leaseRenewIntervalMs ?? DEFAULT_LEASE_RENEW_INTERVAL_MS),
+    );
     // Never let a heartbeat alone hold the process open at shutdown.
     timer.unref?.();
     return { claimLost: () => lost, stop: () => clearInterval(timer) };
@@ -261,11 +469,13 @@ export class SystemMigrationRunnerService {
     tenantId,
     signal,
     summary,
+    list,
   }: {
     migration: SystemMigration;
     tenantId: string;
     signal?: AbortSignal;
     summary: MigrationPassSummary;
+    list?: PassQueueRun;
   }): Promise<void> {
     const { state } = this.deps;
     const existing = await state
@@ -288,6 +498,10 @@ export class SystemMigrationRunnerService {
         // A migration that writes before it records anything needs to know
         // its last attempt died, so it can finish work the crash stranded.
         previous: existing,
+        // The bound the pass holds between pages of tenants, offered between pages of commands.
+        waitForRoom: async () => {
+          await this.waitForQueueRoom({ signal, list });
+        },
       });
       // Compare-and-set, not a blind upsert: an operator may have pinned the
       // row `rolled_back` while `migrateTenant` ran, and that pin outranks
@@ -299,7 +513,7 @@ export class SystemMigrationRunnerService {
         tenantId,
         status: outcome.status,
         report: outcome.report ?? null,
-        ...heldFields({ outcome, existing, now: this.deps.now }),
+        ...heldFields({ migration, outcome, existing, now: this.deps.now }),
       };
       const wasWritten = await state.upsertRecordUnlessRolledBack(record);
       if (!wasWritten) {
@@ -321,7 +535,7 @@ export class SystemMigrationRunnerService {
       const { heldReason } = record;
       const fields = { migration: migration.name, tenantId, status: outcome.status };
       if (heldReason) {
-        logger.warn(
+        logger[heldNoticeLevel({ existing })](
           { ...fields, heldReason },
           "tenant migration held; it stays on its legacy path and nothing waits on it",
         );
@@ -340,17 +554,32 @@ export class SystemMigrationRunnerService {
   }
 }
 
+/**
+ * A first hold is usually a projection still folding, and the next pass re-proves it, so it is
+ * info; a tenant still held from an earlier pass is a warn.
+ */
+export function heldNoticeLevel({
+  existing,
+}: {
+  existing: TenantMigrationRecord | undefined;
+}): "info" | "warn" {
+  return existing?.status === "migrated" ? "warn" : "info";
+}
+
 /** Held carries why and since when (the first moment, while still held); else neither. */
 function heldFields({
+  migration,
   outcome,
   existing,
   now,
 }: {
+  migration: SystemMigration;
   outcome: TenantMigrationOutcome;
   existing: TenantMigrationRecord | undefined;
   now: () => Instant;
 }): Pick<TenantMigrationRecord, "heldReason" | "heldSince"> {
-  if (outcome.status !== "migrated") return {};
+  // A steady step's `migrated` is its settled state, never a hold (`migratedIsSteady`).
+  if (outcome.status !== "migrated" || migration.migratedIsSteady) return {};
   const heldSince = existing?.status === "migrated" ? existing.heldSince : undefined;
   return { heldReason: outcome.heldReason ?? "proof", heldSince: heldSince ?? now() };
 }
@@ -407,4 +636,17 @@ async function recordParkedTenant({
 function undefinedWhenNotFound(error: unknown): undefined {
   if (error instanceof SystemMigrationRecordNotFoundError) return undefined;
   throw error;
+}
+
+/** A wait that ends early, without throwing, when the pass is aborted. */
+function pause({ ms, signal }: { ms: number; signal?: AbortSignal }): Promise<void> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(done, ms);
+    function done(): void {
+      clearTimeout(timer);
+      signal?.removeEventListener("abort", done);
+      resolve();
+    }
+    signal?.addEventListener("abort", done, { once: true });
+  });
 }

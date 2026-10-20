@@ -8,7 +8,11 @@ import {
   type Unsupported,
 } from "@langwatch/trace-contract";
 
-import { boundedSubquery, scenarioRunSubquery } from "./trace-query-subquery.rules.ts";
+import {
+  boundedSubquery,
+  scenarioRunSubquery,
+  wrapMembership,
+} from "./trace-query-subquery.rules.ts";
 import {
   TRACE_ATTRIBUTE_PREFIX_LEGACY,
   extractStringValue,
@@ -103,7 +107,7 @@ const EVAL_DEF: FieldDef = {
     validateValueLength(value);
     const p = nextParam(ctx, "evaluatorName");
     ctx.params[p] = value;
-    return wrap(
+    return wrapMembership(
       boundedSubquery("evaluation_runs", "ScheduledAt", `EvaluatorName = {${p}:String}`),
       negated,
     );
@@ -123,7 +127,7 @@ const EVENT_DEF: FieldDef = {
     validateValueLength(value);
     const p = nextParam(ctx, "eventName");
     ctx.params[p] = value;
-    return wrap(
+    return wrapMembership(
       boundedSubquery("stored_spans", "StartTime", `has(\`Events.Name\`, {${p}:String})`),
       negated,
     );
@@ -168,13 +172,16 @@ const SPAN_ID_DEF: FieldDef = {
     const p = nextParam(ctx, "spanId");
     if (value.includes("*")) {
       ctx.params[p] = value.replace(/\*/g, "%");
-      return wrap(
+      return wrapMembership(
         boundedSubquery("stored_spans", "StartTime", `SpanId LIKE {${p}:String}`),
         negated,
       );
     }
     ctx.params[p] = value;
-    return wrap(boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`), negated);
+    return wrapMembership(
+      boundedSubquery("stored_spans", "StartTime", `SpanId = {${p}:String}`),
+      negated,
+    );
   },
   evaluateInMemory: () => UNSUPPORTED,
 };
@@ -213,7 +220,7 @@ const SCENARIO_VERDICT_DEF: FieldDef = {
     }
     const p = nextParam(ctx, "scenarioVerdict");
     ctx.params[p] = mapped;
-    return wrap(scenarioRunSubquery(`Verdict = {${p}:String}`), negated);
+    return wrapMembership(scenarioRunSubquery(`Verdict = {${p}:String}`), negated);
   },
   evaluateInMemory: () => UNSUPPORTED,
 };
@@ -230,7 +237,7 @@ const SCENARIO_STATUS_DEF: FieldDef = {
     }
     const p = nextParam(ctx, "scenarioStatus");
     ctx.params[p] = mapped;
-    return wrap(scenarioRunSubquery(`Status = {${p}:String}`), negated);
+    return wrapMembership(scenarioRunSubquery(`Status = {${p}:String}`), negated);
   },
   evaluateInMemory: () => UNSUPPORTED,
 };
@@ -296,10 +303,10 @@ function translateExistence(tag: TagToken, negated: boolean, ctx: TranslationCon
       return wrap("ContainsErrorStatus = 1", negated);
 
     case "eval":
-      return wrap(boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"), negated);
+      return wrapMembership(boundedSubquery("evaluation_runs", "ScheduledAt", "1 = 1"), negated);
 
     case "feedback":
-      return wrap(
+      return wrapMembership(
         boundedSubquery(
           "stored_spans",
           "StartTime",
@@ -434,7 +441,7 @@ function scenarioColumnDef(column: string): FieldDef {
       validateValueLength(value);
       const p = nextParam(ctx, column);
       ctx.params[p] = value;
-      return wrap(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
+      return wrapMembership(scenarioRunSubquery(`${column} = {${p}:String}`), negated);
     },
     evaluateInMemory: () => UNSUPPORTED,
   };

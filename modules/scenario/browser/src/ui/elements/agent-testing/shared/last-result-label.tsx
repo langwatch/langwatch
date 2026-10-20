@@ -53,7 +53,7 @@ export function LastResultLabel({
     return (
       <HStack gap={1.5}>
         <Spinner size="xs" color={config.fgColor} />
-        <Text fontSize="12px" fontWeight="medium" color={config.fgColor}>
+        <Text textStyle="caption" fontWeight="medium" color={config.fgColor}>
           {label}
         </Text>
       </HStack>
@@ -69,7 +69,7 @@ export function LastResultLabel({
         background={config.fgColor}
         flexShrink={0}
       />
-      <Text fontSize="12px" fontWeight="semibold" color={config.fgColor}>
+      <Text textStyle="caption" fontWeight="semibold" color={config.fgColor}>
         {label}
       </Text>
     </HStack>

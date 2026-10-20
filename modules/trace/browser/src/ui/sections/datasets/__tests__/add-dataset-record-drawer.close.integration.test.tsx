@@ -18,6 +18,7 @@ const harness = vi.hoisted(() => {
   return {
     PATH,
     createRecord: vi.fn(),
+    editorOpen: false,
     openHostDrawer: vi.fn(),
     rememberCreatedDataset: vi.fn(),
     router: {
@@ -140,7 +141,11 @@ vi.mock("../dataset-mapping-preview.tsx", () => ({
     useEffect(() => {
       onRowDataChange([{ selected: true, input: "hello" }]);
     }, [onRowDataChange]);
-    return <div data-testid="mapping-preview" />;
+    return (
+      <div data-testid="mapping-preview">
+        {harness.editorOpen ? <div data-floating-cell-editor="" /> : null}
+      </div>
+    );
   },
 }));
 
@@ -203,6 +208,7 @@ function drawerInUrl(): Record<string, string> {
 
 beforeEach(() => {
   vi.clearAllMocks();
+  harness.editorOpen = false;
   window.history.replaceState({}, "", harness.PATH);
   useAnnotationQueueSessionStore.setState({
     active: false,
@@ -333,5 +339,31 @@ describe("given the reader wants a new dataset from the drawer", () => {
 
       expect(harness.rememberCreatedDataset).toHaveBeenCalledWith("dataset-new");
     });
+  });
+});
+
+describe("given a floating cell editor is open in the drawer", () => {
+  /** @scenario "Escape in Add to Dataset leaves the drawer open while a cell editor is open" */
+  it("keeps the drawer open on Escape, and closes it once the editor is gone", async () => {
+    harness.editorOpen = true;
+    const { rerender } = renderDrawer(OpenFromSelection);
+    await screen.findByRole("button", { name: "Close" });
+    expect(drawerInUrl()).toMatchObject({ open: "addDatasetRecord" });
+
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+    expect(drawerInUrl()).toMatchObject({ open: "addDatasetRecord" });
+
+    harness.editorOpen = false;
+    rerender(
+      <>
+        <OpenFromSelection />
+        <AddDatasetRecordDrawer traceId="trace-1" />
+      </>,
+    );
+    fireEvent.keyDown(document.activeElement ?? document.body, { key: "Escape" });
+    await waitFor(() => expect(drawerInUrl()).toEqual({}));
   });
 });

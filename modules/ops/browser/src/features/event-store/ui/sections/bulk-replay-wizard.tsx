@@ -1,20 +1,22 @@
 import { Checkbox } from "@langwatch/design-system/checkbox";
+import { ListTable } from "@langwatch/design-system/list-table";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
   Button,
   Center,
-  EmptyState,
   HStack,
   Input,
   Spinner,
   Stat,
-  Table,
   Text,
   Textarea,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { nowInstant, toDate } from "@langwatch/time";
+import { Layers } from "lucide-react";
 import { useEffect, useMemo, useRef, useState } from "react";
 
 import { api } from "../../../../behavior/ops-api.ts";
@@ -168,25 +170,18 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
   }
 
   if (projectionsQuery.isLoading) {
-    return (
-      <Center paddingY={20}>
-        <Spinner size="lg" />
-      </Center>
-    );
+    return <SkeletonRows rows={6} />;
   }
 
   const projections = projectionsQuery.data?.projections;
   if (projections?.length === 0) {
     return (
       <Center paddingY={20}>
-        <EmptyState.Root>
-          <EmptyState.Content>
-            <EmptyState.Title>No projections registered</EmptyState.Title>
-            <EmptyState.Description>
-              No projections were found in the pipeline registry.
-            </EmptyState.Description>
-          </EmptyState.Content>
-        </EmptyState.Root>
+        <NoDataInfoBlock
+          icon={<Layers />}
+          title="No projections registered"
+          description="No projections were found in the pipeline registry."
+        />
       </Center>
     );
   }
@@ -253,32 +248,30 @@ export function BulkReplayWizard({ onReplayStarted }: { onReplayStarted: () => v
               </Button>
             }
           >
-            <Table.ScrollArea borderRadius="lg" overflow="hidden">
-              <Table.Root size="sm" variant="line">
-                <Table.Header>
-                  <Table.Row>
-                    <Table.ColumnHeader width="40px" />
-                    <Table.ColumnHeader>Projection</Table.ColumnHeader>
-                    <Table.ColumnHeader>Pipeline</Table.ColumnHeader>
-                    <Table.ColumnHeader textAlign="end">Aggregates</Table.ColumnHeader>
-                    <Table.ColumnHeader>Tenants</Table.ColumnHeader>
-                  </Table.Row>
-                </Table.Header>
-                <Table.Body>
-                  {discoverQuery.data!.projections.map((proj) => (
-                    <ProjectionRow
-                      key={proj.projectionName}
-                      projectionName={proj.projectionName}
-                      aggregateCount={proj.aggregateCount}
-                      tenantCount={proj.tenantBreakdown.length}
-                      meta={projectionMetaByName.get(proj.projectionName)}
-                      isSelected={selectedProjections.has(proj.projectionName)}
-                      onToggle={toggleProjection}
-                    />
-                  ))}
-                </Table.Body>
-              </Table.Root>
-            </Table.ScrollArea>
+            <ListTable scroll="x" scrollLabel="Projections to replay table">
+              <ListTable.Header>
+                <ListTable.Row>
+                  <ListTable.ColumnHeader width={48} label="Select" />
+                  <ListTable.ColumnHeader>Projection</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Pipeline</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader align="end">Aggregates</ListTable.ColumnHeader>
+                  <ListTable.ColumnHeader>Tenants</ListTable.ColumnHeader>
+                </ListTable.Row>
+              </ListTable.Header>
+              <ListTable.Body>
+                {discoverQuery.data!.projections.map((proj) => (
+                  <ProjectionRow
+                    key={proj.projectionName}
+                    projectionName={proj.projectionName}
+                    aggregateCount={proj.aggregateCount}
+                    tenantCount={proj.tenantBreakdown.length}
+                    meta={projectionMetaByName.get(proj.projectionName)}
+                    isSelected={selectedProjections.has(proj.projectionName)}
+                    onToggle={toggleProjection}
+                  />
+                ))}
+              </ListTable.Body>
+            </ListTable>
           </WizardStep>
 
           {selectedProjections.size > 0 && (
@@ -381,21 +374,17 @@ function ProjectionRow({
   const hasData = aggregateCount > 0;
 
   return (
-    <Table.Row
-      cursor={hasData ? "pointer" : "default"}
-      opacity={hasData ? 1 : 0.4}
-      onClick={() => onToggle(projectionName)}
-      _hover={hasData ? { bg: "bg.subtle" } : undefined}
-      bg={isSelected ? "bg.subtle" : undefined}
+    <ListTable.Row
+      selected={isSelected}
+      disabled={!hasData}
+      onActivate={() => onToggle(projectionName)}
     >
-      <Table.Cell>
-        <Checkbox
-          checked={isSelected}
-          disabled={!hasData}
-          onCheckedChange={() => onToggle(projectionName)}
-        />
-      </Table.Cell>
-      <Table.Cell>
+      <ListTable.SelectCell
+        checked={isSelected}
+        label={`Select ${projectionName}`}
+        onCheckedChange={() => onToggle(projectionName)}
+      />
+      <ListTable.Cell>
         <HStack gap={2}>
           <Text textStyle="sm">{projectionName}</Text>
           {meta && (
@@ -409,22 +398,22 @@ function ProjectionRow({
             </Badge>
           )}
         </HStack>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted">
           {meta?.pipelineName ?? "—"}
         </Text>
-      </Table.Cell>
-      <Table.Cell textAlign="end">
+      </ListTable.Cell>
+      <ListTable.Cell align="end">
         <Text fontWeight="medium">{aggregateCount}</Text>
-      </Table.Cell>
-      <Table.Cell>
+      </ListTable.Cell>
+      <ListTable.Cell>
         <Text textStyle="xs" color="fg.muted">
           {tenantCount} tenant
           {tenantCount !== 1 ? "s" : ""}
         </Text>
-      </Table.Cell>
-    </Table.Row>
+      </ListTable.Cell>
+    </ListTable.Row>
   );
 }
 

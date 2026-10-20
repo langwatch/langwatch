@@ -26,6 +26,12 @@ Feature: Migration compatibility gates
     Then the job passes only if every suite file passed at least one test
 
   @unit
+  Scenario: Base's worker takes jobs while base's suites run
+    Given each base suite's upgrade waits for a worker to take the system-migrations pass request
+    When base's worker is started on head's schema before the suites
+    Then the suites wait only until it answers ready, and the job fails if it exits or never does
+
+  @unit
   Scenario: A base suite that silently skips fails the job
     Given base's live suites skip themselves when they cannot see the live stores
     When a suite file reports no passed test
@@ -44,7 +50,7 @@ Feature: Migration compatibility gates
     Given the base commit predates the live api fixture
     When the compatibility job runs on a pull request
     Then it emits a warning that the base suites cannot run and skips them
-    And it runs the LTS floor's published image and an image of main's head on head's migrated schema
+    And it runs the previous release's published image and an image of main's head on head's migrated schema
     And the job passes only if both images pass the HTTP smoke
 
   @unit
@@ -91,9 +97,9 @@ Feature: Migration compatibility gates
     Then the drift job fails rather than reading the error as no drift
 
   @unit
-  Scenario: The LTS floor's image boots on the schema head migrated
+  Scenario: The previous release's image boots on the schema head migrated
     Given the run is the nightly schedule or a manual dispatch
-    And the floor release is read from packages/upgrade/releases/lts-floor.json
-    When head's tasks have migrated the databases and the floor's langwatch/langwatch image starts against them
+    And the previous release is the newest release manifest in packages/upgrade/releases
+    When head's tasks have migrated the databases and that release's langwatch/langwatch image starts against them
     Then its health route answers within the timeout
     And its log names no missing column or table

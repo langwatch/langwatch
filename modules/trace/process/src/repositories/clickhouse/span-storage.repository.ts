@@ -12,7 +12,7 @@ import {
 import { EventUtils, SecurityError } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import { ATTR_KEYS } from "@langwatch/span-normalisation";
-import { nowInstant } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import {
   type DerivedTraceEvent,
   type NormalizedAttributes,
@@ -173,13 +173,13 @@ const SINGLE_TRACE_READ_SETTINGS = {
 } as const;
 
 /**
- * Settings for the single-span fetch paths (`findSpanByIds`, `getSpanEvents`).
- * Locks `query_plan_optimize_lazy_materialization=1` per-query so the LazilyRead
- * optimiser stays engaged even if a future cluster/profile config flips it off.
+ * Single-span fetches read eagerly: ClickHouse 25.10's lazy `Events.Attributes` read with
+ * `max_rows_to_read=1` raised ATTEMPT_TO_READ_AFTER_EOF on intact parts, and an eager read never
+ * enters that reader. The tenant, trace and span key prefix keeps the eager read small.
  */
 const SINGLE_SPAN_FETCH_SETTINGS = {
   ...SINGLE_TRACE_READ_SETTINGS,
-  query_plan_optimize_lazy_materialization: "1",
+  query_plan_optimize_lazy_materialization: "0",
 } as const;
 
 /**
@@ -1466,14 +1466,10 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
                 event_name AS event_type,
                 event_attrs AS attributes
               FROM (
-                -- Single-span fetch. Same rationale and same investigation
-                -- as findSpanByIds (see SINGLE_SPAN_FETCH_SETTINGS comment).
-                -- LazilyRead survives through this subquery + ARRAY JOIN
-                -- composition: Events.Timestamp / Events.Name /
-                -- Events.Attributes are deferred past the inner LIMIT 1
-                -- and only the granule's key columns are read up front.
-                -- ARRAY JOIN unrolls the events from the single picked
-                -- row after the lazy read materialises it.
+                -- Single-span fetch, read eagerly so the lazy reader that
+                -- raised ATTEMPT_TO_READ_AFTER_EOF is never entered (see
+                -- SINGLE_SPAN_FETCH_SETTINGS). ARRAY JOIN unrolls the events
+                -- from the latest version of the span.
                 SELECT
                   TenantId, TraceId, SpanId,
                   "Events.Timestamp" AS Events_Timestamp,
@@ -1863,8 +1859,8 @@ export class SpanStorageClickHouseRepository implements SpanStorageRepository {
       DroppedLinksCount: 0,
       Cost: span.cost,
       NonBilledCost: span.nonBilledCost,
-      CreatedAt: new Date(),
-      UpdatedAt: new Date(),
+      CreatedAt: toDate(nowInstant()),
+      UpdatedAt: toDate(nowInstant()),
       _retention_days: span.retentionDays ?? PLATFORM_DEFAULT_RETENTION_DAYS,
     } satisfies ClickHouseSpanWriteRecord;
   }

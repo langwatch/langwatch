@@ -8,6 +8,7 @@ import {
   dataPrivacyTestGraph,
   dataPrivacyTestTeam,
 } from "../../app/__tests__/data-privacy.fixture.ts";
+import { MemoryDataPrivacyDirectoryRepository } from "../../repositories/memory/memory.data-privacy-directory.repository.ts";
 import { MemoryDataPrivacyProjectScopeRepository } from "../../repositories/memory/memory.data-privacy-project-scope.repository.ts";
 import { MemoryDataPrivacyPolicyRepository } from "../../repositories/memory/memory.data-privacy.repository.ts";
 import { DataPrivacyProjectScopeService } from "../data-privacy-project-scope.service.ts";
@@ -38,7 +39,11 @@ const lineage = createApiFixture<AuthzApi>({
 
 function build({
   projectScopes = scopes,
-}: { projectScopes?: DataPrivacyProjectScopeService } = {}) {
+  departmentOrganizationId = null,
+}: {
+  projectScopes?: DataPrivacyProjectScopeService;
+  departmentOrganizationId?: string | null;
+} = {}) {
   const repository = MemoryDataPrivacyPolicyRepository.create();
 
   return {
@@ -47,6 +52,9 @@ function build({
       repository,
       scopes: projectScopes,
       lineage,
+      departments: MemoryDataPrivacyDirectoryRepository.create({
+        scopeOrganizationId: departmentOrganizationId,
+      }),
     }),
     stored: () => repository.findAllInOrganization({ organizationId: ORGANIZATION_ID }),
   };
@@ -206,9 +214,28 @@ describe("DataPrivacyService", () => {
     ]);
   });
 
-  /** @scenario "A rule aimed at a department is refused by name" */
-  it("refuses a department write by name so the reader can pick another tier", async () => {
-    const { service, stored } = build();
+  /** @scenario "A rule aimed at a department of the organization is stored" */
+  it("stores a rule on a department of the project's organization", async () => {
+    const { service, stored } = build({ departmentOrganizationId: ORGANIZATION_ID });
+
+    await service.setForScope({
+      organizationId: ORGANIZATION_ID,
+      scope: { scopeType: "DEPARTMENT", scopeId: "department-1" },
+      personalOnly: false,
+      config: { categories: { input: { disposition: "drop" } } },
+    });
+
+    await expect(stored()).resolves.toMatchObject([
+      { organizationId: ORGANIZATION_ID, scopeType: "DEPARTMENT", scopeId: "department-1" },
+    ]);
+  });
+
+  /** @scenario "A rule aimed at a department of another organization is refused as a missing scope" */
+  it.each([
+    ["another organization's department", "other-organization"],
+    ["an unknown department", null],
+  ])("refuses %s as a missing scope", async (_label, departmentOrganizationId) => {
+    const { service, stored } = build({ departmentOrganizationId });
 
     await expect(
       service.setForScope({
@@ -217,10 +244,7 @@ describe("DataPrivacyService", () => {
         personalOnly: false,
         config: { categories: { input: { disposition: "drop" } } },
       }),
-    ).rejects.toMatchObject({
-      code: "data_privacy_department_scope_unavailable",
-      httpStatus: 400,
-    });
+    ).rejects.toMatchObject({ code: "data_privacy_scope_target_not_found" });
     await expect(stored()).resolves.toHaveLength(0);
   });
 

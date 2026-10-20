@@ -1,5 +1,5 @@
 import { execFileSync } from "node:child_process";
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
+import { mkdtempSync, readFileSync, readdirSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { resolve } from "node:path";
 
@@ -8,23 +8,15 @@ import { describe, expect, it } from "vitest";
 import {
   GRACEFUL_RULES,
   type MigrationSource,
+  NOTHING_DELETED_RULES,
   formatFindings,
+  innerTableViews,
   parseBaseline,
   parseRelease,
   scanClickHouseMigration,
 } from "./migration-safety.rules.ts";
 
 const MIGRATIONS_DIR = resolve(import.meta.dirname, "../../migrations");
-const FLOOR_FILE = resolve(import.meta.dirname, "../../../upgrade/releases/lts-floor.json");
-
-/** The fixture floor the rule tests use, so they hold whatever the real floor becomes. */
-const FIXTURE_FLOOR = "3.20.1";
-
-/** The LTS floor in the tree; the fixture floor until `lts-floor.json` exists. */
-const treeFloor: string = existsSync(FLOOR_FILE)
-  ? (JSON.parse(readFileSync(FLOOR_FILE, "utf8")) as { release: string }).release
-  : FIXTURE_FLOOR;
-
 /**
  * The newest migration the baseline was recorded from. goose names sort by
  * sequence number, so anything written after the freeze sorts above this —
@@ -89,20 +81,30 @@ const migrations: MigrationSource[] = readdirSync(MIGRATIONS_DIR)
   .toSorted()
   .map((name) => ({ name, sql: readFileSync(resolve(MIGRATIONS_DIR, name), "utf8") }));
 
+/** Every materialised view the tree creates without `TO`, which owns an inner table. */
+const INNER_VIEWS = innerTableViews(migrations);
+
 const unshipped = migrations.filter((migration) => !baseline.includes(migration.name));
 
-/** What the tree scan reports for one file, with the graceful rules only above the floor. */
+/** What the tree scan reports for one file, with the graceful rules only above the marker. */
 function scanTree(migration: MigrationSource) {
-  return scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
-    (finding) => migration.name > RELEASED_THROUGH || !GRACEFUL_RULES.has(finding.rule),
+  return scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
+    (finding) =>
+      migration.name > RELEASED_THROUGH ||
+      (!GRACEFUL_RULES.has(finding.rule) && !NOTHING_DELETED_RULES.has(finding.rule)),
   );
 }
 
 const FIXTURE_STEPS: ReadonlySet<string> = new Set(["trace:track-index"]);
-const scanWith = (sql: string, floor: string) =>
-  scanClickHouseMigration({ name: "00999_fixture.sql", sql, floor, steps: FIXTURE_STEPS });
-const scan = (sql: string) => scanWith(sql, FIXTURE_FLOOR);
+const scan = (sql: string) =>
+  scanClickHouseMigration({ name: "00999_fixture.sql", sql, steps: FIXTURE_STEPS });
 const rules = (sql: string) => scan(sql).map((finding) => finding.rule);
+/** The rules a drop in released history answered to, before nothing was deleted automatically. */
+const historyScan = (sql: string) =>
+  scan(sql).filter((finding) => !NOTHING_DELETED_RULES.has(finding.rule));
+const historyRules = (sql: string) => historyScan(sql).map((finding) => finding.rule);
+/** Only the no-drop rule's findings, for the drops it lets through. */
+const noDropRules = (sql: string) => rules(sql).filter((rule) => NOTHING_DELETED_RULES.has(rule));
 
 describe("ClickHouse migration safety", () => {
   it("leaves every migration newer than the baseline safe in both directions", () => {
@@ -113,13 +115,15 @@ describe("ClickHouse migration safety", () => {
   describe("given each rule scanned on its own", () => {
     /** @scenario "Dropping a ClickHouse column or table without a note is refused by name" */
     it("refuses a drop with no retirement note, naming the object", () => {
-      const findings = scan(
+      const findings = historyScan(
         "-- +goose Up\nALTER TABLE ${D}.spans DROP COLUMN IF EXISTS `Legacy`;\n",
       );
       expect(findings[0]?.rule).toBe("drop-without-retirement-note");
       expect(findings[0]?.problem).toContain("Legacy");
       expect(
-        rules("-- +goose Up\n-- contract: retired in 1.42.0\nDROP TABLE IF EXISTS old_spans;\n"),
+        historyRules(
+          "-- +goose Up\n-- contract: retired in 1.42.0\nDROP TABLE IF EXISTS old_spans;\n",
+        ),
       ).toEqual([]);
     });
 
@@ -186,29 +190,12 @@ describe("ClickHouse migration safety", () => {
       expect(rules(commented)).toEqual([]);
     });
 
-    /** @scenario "A retirement note above the LTS floor is refused by name" */
-    it("refuses a drop whose note names a release above the floor, naming both", () => {
-      const findings = scan(
-        "-- +goose Up\n-- contract: retired in 3.21.0\nDROP TABLE IF EXISTS old_spans;\n",
-      );
-      expect(findings.map((finding) => finding.rule)).toEqual(["retirement-note-above-floor"]);
-      expect(findings[0]?.problem).toContain("3.21.0");
-      expect(findings[0]?.problem).toContain(FIXTURE_FLOOR);
-      expect(findings[0]?.fix).toContain("lts-floor.json names 3.21.0 or later");
-      const typed = scan(
-        "-- +goose Up\n-- contract: retired in 3.21.0\nALTER TABLE t MODIFY COLUMN IF EXISTS c Float64;\n",
-      );
-      expect(typed.map((finding) => finding.rule)).toEqual(["retirement-note-above-floor"]);
-    });
-
-    /** @scenario "A retirement note at or below the LTS floor is accepted" */
-    it("accepts a note naming the floor itself or an older release", () => {
+    /** @scenario "A ClickHouse drop under a retirement note naming any release was accepted in released history" */
+    it("accepts a note naming any release", () => {
       const drop = "DROP TABLE IF EXISTS old_spans;";
-      expect(rules(`-- +goose Up\n-- contract: retired in 3.20.1\n${drop}\n`)).toEqual([]);
-      expect(rules(`-- +goose Up\n-- contract: retired in 2.0.0\n${drop}\n`)).toEqual([]);
-      expect(scanWith(`-- +goose Up\n-- contract: retired in 3.21.0\n${drop}\n`, "3.21.0")).toEqual(
-        [],
-      );
+      expect(historyRules(`-- +goose Up\n-- contract: retired in 3.20.1\n${drop}\n`)).toEqual([]);
+      expect(historyRules(`-- +goose Up\n-- contract: retired in 2.0.0\n${drop}\n`)).toEqual([]);
+      expect(historyScan(`-- +goose Up\n-- contract: retired in 3.21.0\n${drop}\n`)).toEqual([]);
       expect(parseRelease("v3.20.1")).toEqual([3, 20, 1]);
     });
 
@@ -224,7 +211,9 @@ describe("ClickHouse migration safety", () => {
         rules("-- +goose Up\nALTER TABLE t ADD INDEX idx a TYPE minmax GRANULARITY 1;\n"),
       ).toEqual(["ddl-without-if-exists"]);
       expect(
-        rules("-- +goose Up\n-- contract: retired in 1.0.0\nALTER TABLE t DROP COLUMN `Old`;\n"),
+        historyRules(
+          "-- +goose Up\n-- contract: retired in 1.0.0\nALTER TABLE t DROP COLUMN `Old`;\n",
+        ),
       ).toEqual(["ddl-without-if-exists"]);
       expect(rules("-- +goose Up\nALTER TABLE t MODIFY COLUMN `Body` CODEC(ZSTD(3));\n")).toEqual([
         "ddl-without-if-exists",
@@ -292,6 +281,70 @@ describe("ClickHouse migration safety", () => {
         expect(finding.problem).not.toBe("");
         expect(finding.fix.length).toBeGreaterThan(40);
       }
+    });
+  });
+
+  describe("given a new goose file that drops something", () => {
+    /** @scenario "A new ClickHouse drop of a table or a column is refused by name, even under a retirement note" */
+    it("refuses DROP TABLE and DROP COLUMN in the up half, naming the object", () => {
+      const note = "-- +goose Up\n-- contract: retired in 3.20.1\n";
+      const findings = scan(`${note}ALTER TABLE \${D}.spans DROP COLUMN IF EXISTS \`Legacy\`;\n`);
+      expect(findings.map((finding) => finding.rule)).toEqual(["drop-table-or-column"]);
+      expect(findings[0]?.problem).toBe("drops column ${D}.spans.Legacy");
+      expect(findings[0]?.fix).toContain("operator step");
+      expect(rules(`${note}DROP TABLE IF EXISTS old_spans;\n`)).toEqual(["drop-table-or-column"]);
+    });
+
+    /** @scenario "Dropping a ClickHouse index, projection or view, or a table the file creates, is accepted" */
+    it("accepts the drops that hold no data of their own", () => {
+      expect(
+        noDropRules(
+          "-- +goose Up\nALTER TABLE t DROP INDEX IF EXISTS idx;\n" +
+            "ALTER TABLE u DROP PROJECTION IF EXISTS p;\n",
+        ),
+      ).toEqual([]);
+      expect(
+        noDropRules("-- +goose Up\n-- contract: retired in 1.0.0\nDROP VIEW IF EXISTS v_1;\n"),
+      ).toEqual([]);
+      expect(
+        noDropRules(
+          "-- +goose Up\nCREATE TABLE IF NOT EXISTS tmp_s (a UInt8) ENGINE = Memory;\n" +
+            "DROP TABLE IF EXISTS tmp_s;\n",
+        ),
+      ).toEqual([]);
+    });
+
+    /** @scenario "Dropping a ClickHouse materialised view that owns an inner table is refused by name" */
+    it("refuses dropping a view created without TO, and accepts one writing TO a table", () => {
+      const tree = [
+        {
+          name: "00001_views.sql",
+          sql:
+            "-- +goose Up\nCREATE MATERIALIZED VIEW IF NOT EXISTS inner_mv ENGINE = MergeTree ORDER BY a AS SELECT 1 AS a;\n" +
+            "CREATE MATERIALIZED VIEW IF NOT EXISTS to_mv TO t AS SELECT 1 AS a;\n",
+        },
+      ];
+      const innerViews = innerTableViews(tree);
+      expect([...innerViews]).toEqual(["inner_mv"]);
+      const dropOf = (view: string) =>
+        scanClickHouseMigration({
+          name: "00999_fixture.sql",
+          sql: `-- +goose Up\n-- contract: retired in 1.0.0\nDROP VIEW IF EXISTS \${D}.${view};\n`,
+          innerViews,
+        }).map((finding) => finding.rule);
+      expect(dropOf("inner_mv")).toEqual(["drop-table-or-column"]);
+      expect(dropOf("to_mv")).toEqual([]);
+    });
+
+    /** @scenario "A commented ClickHouse rollback note that drops is accepted" */
+    it("reads no drop in a comment or the commented down half", () => {
+      expect(
+        rules(
+          "-- +goose Up\nALTER TABLE t ADD COLUMN IF NOT EXISTS a UInt8;\n" +
+            "-- rollback: ALTER TABLE t DROP COLUMN IF EXISTS a;\n" +
+            "-- +goose Down\n-- DROP TABLE IF EXISTS t;\n",
+        ),
+      ).toEqual([]);
     });
   });
 
@@ -364,12 +417,26 @@ describe("ClickHouse migration safety", () => {
       expect(populate[0]?.fix).toContain("without POPULATE");
     });
 
+    /** @scenario "Released ClickHouse history keeps its drops" */
+    it("skips the no-drop rule up to the newest release tag's newest file", () => {
+      const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
+      const drops = history.flatMap((migration) =>
+        scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
+          (finding) => NOTHING_DELETED_RULES.has(finding.rule),
+        ),
+      );
+      expect(drops.length).toBeGreaterThan(0);
+      expect(
+        history.flatMap(scanTree).filter((finding) => NOTHING_DELETED_RULES.has(finding.rule)),
+      ).toEqual([]);
+    });
+
     /** @scenario "ClickHouse floor history answers only to the older rules" */
     it("skips the graceful rules up to the newest release tag's newest file, which is on disk", () => {
       expect(migrations.map((migration) => migration.name)).toContain(RELEASED_THROUGH);
       const history = migrations.filter((migration) => migration.name <= RELEASED_THROUGH);
       const graceful = history.flatMap((migration) =>
-        scanClickHouseMigration({ ...migration, floor: treeFloor, steps: STEPS }).filter(
+        scanClickHouseMigration({ ...migration, steps: STEPS, innerViews: INNER_VIEWS }).filter(
           (finding) => GRACEFUL_RULES.has(finding.rule),
         ),
       );

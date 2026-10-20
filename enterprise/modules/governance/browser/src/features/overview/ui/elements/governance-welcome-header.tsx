@@ -53,9 +53,8 @@ export function GovernanceWelcomeHeader() {
       as="h2"
       fontFamily={SERIF}
       fontWeight="500"
-      fontSize="26px"
+      textStyle="pageTitle"
       letterSpacing="-0.01em"
-      lineHeight="1.2"
     >
       {reader ? `${GREETINGS[timeOfDay]}, ${reader}` : GREETINGS[timeOfDay]}
     </Heading>

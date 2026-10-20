@@ -16,8 +16,8 @@
     }
   },
   "scripts": {
-    "task": "node --experimental-transform-types $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
-    "typecheck": "tsc -b tsconfig.test.json",
+    "task": "node --experimental-transform-types --disable-warning=ExperimentalWarning $(test -f ../../.env && echo --env-file=../../.env) src/main.ts",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -37,7 +37,6 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/dashboard-process": "workspace:*",
     "@langwatch/data-privacy-process": "workspace:*",
-    "@langwatch/data-retention-contract": "workspace:*",
     "@langwatch/data-retention-process": "workspace:*",
     "@langwatch/dataset-process": "workspace:*",
     "@langwatch/enterprise-billing-process": "workspace:*",
@@ -57,13 +56,13 @@
     "@langwatch/entitlement-process": "workspace:*",
     "@langwatch/evaluation-process": "workspace:*",
     "@langwatch/evaluator-process": "workspace:*",
-    "@langwatch/eventing": "workspace:*",
     "@langwatch/experiment-process": "workspace:*",
     "@langwatch/feature-flag-process": "workspace:*",
     "@langwatch/gateway-process": "workspace:*",
     "@langwatch/github-process": "workspace:*",
     "@langwatch/hosted-mcp-process": "workspace:*",
     "@langwatch/identity-process": "workspace:*",
+    "@langwatch/insight-process": "workspace:*",
     "@langwatch/instant-eval-judge-process": "workspace:*",
     "@langwatch/instant-eval-process": "workspace:*",
     "@langwatch/langy-process": "workspace:*",
@@ -100,6 +99,7 @@
     "@langwatch/task": "workspace:*",
     "@langwatch/time": "workspace:*",
     "@langwatch/topic-process": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "@langwatch/trace-process": "workspace:*",
     "@langwatch/upgrade": "workspace:*",
     "@langwatch/user-process": "workspace:*",
@@ -110,8 +110,8 @@
     "zod": "catalog:"
   },
   "devDependencies": {
+    "@langwatch/eventing": "workspace:*",
     "@langwatch/prompt-contract": "workspace:*",
-    "@langwatch/seedgen-runner": "workspace:*",
     "@langwatch/test-harness": "workspace:*",
     "@langwatch/vitest-config": "workspace:*",
     "@langwatch/workflow-contract": "workspace:*",

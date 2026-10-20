@@ -18,14 +18,8 @@ export default function CheckupScreen() {
 
   return (
     <>
-      <PageLayout.Header>
-        <VStack align="start" gap={1} minWidth={0}>
-          <PageLayout.Heading>Checkup</PageLayout.Heading>
-          <PageLayout.Subtitle>
-            Whether this install is correctly wired, what is broken and how to fix it, and exactly
-            what it sends to LangWatch.
-          </PageLayout.Subtitle>
-        </VStack>
+      <PageLayout.Header description="Whether this install is correctly wired, what is broken and how to fix it, and exactly what it sends to LangWatch.">
+        <PageLayout.Heading>Checkup</PageLayout.Heading>
       </PageLayout.Header>
       <VStack align="stretch" gap={6} width="full" paddingTop={4}>
         {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
@@ -37,6 +31,7 @@ export default function CheckupScreen() {
 function CheckupSettings({ organizationId }: { organizationId: string }) {
   const host = useCheckupHost();
   const canManage = host.canManageOrganization();
+  const canManageInstall = host.canManageInstall();
   const screen = useCheckupScreen(organizationId);
   const { status, usageReport } = screen;
 
@@ -88,7 +83,7 @@ function CheckupSettings({ organizationId }: { organizationId: string }) {
       {report && report.deployment === "self-hosted" ? (
         <UsageReportSection
           report={report}
-          canManage={canManage}
+          canManage={canManageInstall}
           isSaving={screen.isSavingSwitches}
           onSwitch={(change) => screen.setSwitches.mutate({ organizationId, ...change })}
         />

@@ -1,10 +1,17 @@
 import { Box } from "@langwatch/design-system/primitives";
 import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
-import { memo } from "react";
+import { memo, useId } from "react";
 
 import { useTraceDrawer } from "../../../../../behavior/trace-drawer.ts";
 import { IsolatedErrorBoundary } from "../../../isolated-error-boundary.tsx";
 import { SpanTabBar } from "../span-tab-bar.tsx";
+import {
+  hasSpanTab,
+  resolvePinnedSpans,
+  spanPanelElementId,
+  spanTabElementId,
+  spanTabLabel,
+} from "../span-tab-ids.ts";
 import { TraceAccordions } from "../trace-accordions/index.ts";
 
 interface SpanDetailPaneProps {
@@ -38,6 +45,17 @@ export const SpanDetailPane = memo(function SpanDetailPane({
   const selectedSpanId = useTraceDrawer((s) => s.selectedSpanId);
   const selectSpan = useTraceDrawer((s) => s.selectSpan);
   const collapsed = useTraceDrawer((s) => s.paneState.spanDetail.collapsed);
+  const pinnedSpanIds = useTraceDrawer((s) => s.pinnedSpanIds);
+  const idBase = useId();
+  const panelId = spanPanelElementId({ idBase });
+  // A span folded into the "+N more" menu has no tab, so the panel is named from its label.
+  const hasTab =
+    selectedSpan != null &&
+    hasSpanTab({
+      spanId: selectedSpan.spanId,
+      pinnedSpans: resolvePinnedSpans({ pinnedSpanIds, spanTree: spans }),
+    });
+  const panelName = selectedSpan ? spanTabLabel(selectedSpan) : "Span details";
 
   return (
     <Box
@@ -58,21 +76,33 @@ export const SpanDetailPane = memo(function SpanDetailPane({
           <SpanTabBar
             spanTree={spans}
             collapsePosition={layout === "horizontal" ? "leading" : "trailing"}
+            idBase={idBase}
+            panelId={panelId}
           />
         </IsolatedErrorBoundary>
       </Box>
-      {!collapsed && (
-        <Box
-          flex={1}
-          minHeight={0}
-          minWidth={0}
-          overflow="auto"
-          // Explicit `height: 100%` on the scroll body so it actually
-          // owns the available pane height even if a flex:1 collapse
-          // happens upstream — pairs with the `overflow: hidden` on
-          // the outer Box.
-          style={{ overflowAnchor: "none", height: "100%" }}
-        >
+      <Box
+        id={panelId}
+        role="tabpanel"
+        aria-labelledby={
+          hasTab && selectedSpan
+            ? spanTabElementId({ idBase, spanId: selectedSpan.spanId })
+            : void 0
+        }
+        aria-label={hasTab ? void 0 : panelName}
+        // Stays mounted when collapsed so the open tab's aria-controls has a target.
+        hidden={collapsed}
+        flex={1}
+        minHeight={0}
+        minWidth={0}
+        overflow="auto"
+        // Explicit `height: 100%` on the scroll body so it actually
+        // owns the available pane height even if a flex:1 collapse
+        // happens upstream — pairs with the `overflow: hidden` on
+        // the outer Box.
+        style={{ overflowAnchor: "none", height: "100%" }}
+      >
+        {!collapsed && (
           <IsolatedErrorBoundary
             scope="Couldn't render the span detail"
             resetKeys={[trace.traceId, selectedSpanId]}
@@ -87,8 +117,8 @@ export const SpanDetailPane = memo(function SpanDetailPane({
               onSelectSpan={selectSpan}
             />
           </IsolatedErrorBoundary>
-        </Box>
-      )}
+        )}
+      </Box>
     </Box>
   );
 });

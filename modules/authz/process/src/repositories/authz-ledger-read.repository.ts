@@ -1,4 +1,4 @@
-import type { OffboardCounts } from "@langwatch/authz-contract";
+import type { AuthzSharedProjectGrant, OffboardCounts } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { AuthzReadRepository } from "./authz-read.repository.ts";
@@ -68,11 +68,11 @@ export abstract class AuthzLedgerReadRepository {
     projectId?: string;
   }): Promise<boolean>;
 
-  /** One reader project's live `project-reader` grants (ADR-177) by member, condition unread. */
+  /** A reader project's live `project-reader` grants (ADR-177); a bad window reads null. */
   abstract findLiveSharedProjectGrants(input: {
     organizationId: string;
     readerProjectId: string;
-  }): Promise<{ grantId: string; memberProjectId: string }[]>;
+  }): Promise<AuthzSharedProjectGrant[]>;
 
   /** The ids of the live grants a translated compat filter names. */
   abstract findLiveGrantIds(input: { where: AuthzGrantFilter }): Promise<string[]>;

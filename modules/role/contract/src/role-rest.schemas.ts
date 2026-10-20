@@ -54,7 +54,10 @@ export interface RoleRestSchema extends Named<typeof roleRestSchemaDefinition> {
 export const roleRestSchema: RoleRestSchema = roleRestSchemaDefinition;
 export type RoleRest = z.infer<typeof roleRestSchema>;
 
-/** `?builtIn=true` lists only the built-in roles, `false` only the custom ones; omitted, both. */
+/**
+ * `?builtIn=true` lists only the built-in roles, `false` only the custom ones;
+ * omitted, custom roles only.
+ */
 const roleRestListQuerySchemaDefinition = z.object({
   builtIn: z
     .enum(["true", "false"])

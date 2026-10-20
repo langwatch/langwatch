@@ -32,6 +32,16 @@ describe("detectColdScan", () => {
     expect(detectColdScan(query)).toBeNull();
   });
 
+  it("ignores a table named only inside a string literal", () => {
+    const query = `SELECT mutation_id FROM system.mutations WHERE table = 'trace_summaries'`;
+    expect(detectColdScan(query)).toBeNull();
+  });
+
+  it("still flags a table read whose time column appears only inside a literal", () => {
+    const query = `SELECT 1 FROM trace_summaries WHERE TenantId = 't' AND Note = 'OccurredAt >= 1'`;
+    expect(detectColdScan(query)).toBe("trace_summaries");
+  });
+
   it("clears the flag for BETWEEN and IN predicates", () => {
     expect(detectColdScan("SELECT 1 FROM stored_spans WHERE StartTime BETWEEN a AND b")).toBeNull();
     expect(detectColdScan("SELECT 1 FROM stored_spans WHERE StartTime IN (1, 2, 3)")).toBeNull();

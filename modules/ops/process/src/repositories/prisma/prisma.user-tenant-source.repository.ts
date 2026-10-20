@@ -1,11 +1,16 @@
 import { skipTenantCheck } from "@langwatch/prisma-client";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { TERMINAL_TENANT_STATUSES, type TenantSource } from "@langwatch/system-migrations";
+import { ledgerTables, type UpgradePostgres } from "@langwatch/upgrade";
 
 import type {
   OrganizationMemberTenantSourceRepository,
   UserTenantSourceRepository,
 } from "../tenant-source.repository.ts";
+
+// The tenant source itself: an installation-wide walk whose answer IS the list of
+// users a pass drives.
+const TENANCY = `${skipTenantCheck({ SKIP_TENANT_CHECK: true }).sql}\n`;
 
 /** The rows this source walks, and nothing else it could reach. */
 export type PrismaUserTenantDatabase = {
@@ -17,7 +22,7 @@ export type PrismaUserTenantDatabase = {
       take: number;
     }): Promise<{ id: string }[]>;
   };
-  $queryRaw(strings: TemplateStringsArray, ...values: unknown[]): Promise<{ id: string }[]>;
+  $queryRawUnsafe<Row>(query: string, ...values: unknown[]): Promise<Row[]>;
 };
 
 /** Tenants for USER-rooted migration pass are users walked in id order.
@@ -31,7 +36,16 @@ export class PrismaUserTenantSourceRepository implements UserTenantSourceReposit
     return new PrismaUserTenantSourceRepository(prisma);
   }
 
-  private constructor(private readonly prisma: PrismaUserTenantDatabase) {}
+  /** The declared steps' state table, beside the ledger; resolved once per repository. */
+  private readonly ledger: UpgradePostgres;
+
+  private constructor(private readonly prisma: PrismaUserTenantDatabase) {
+    this.ledger = {
+      query: async <Row extends object>(text: string, values: unknown[] = []) => ({
+        rows: await prisma.$queryRawUnsafe<Row>(`${TENANCY}${text}`, ...values),
+      }),
+    };
+  }
 
   async findTenantIdsAfter({
     cursor,
@@ -74,28 +88,23 @@ export class PrismaUserTenantSourceRepository implements UserTenantSourceReposit
     if (migrationNames.length === 0) return [];
     const names = [...migrationNames];
     const statuses = [...TERMINAL_TENANT_STATUSES];
-    // A counted subquery rather than NOT EXISTS: the tenant is done only when
-    // EVERY named migration has latched, and `SystemMigrationTenantState` is
-    // keyed `(migrationName, tenantId)`, so the count cannot double-count.
-    const rows = await this.prisma.$queryRaw`
-      ${skipTenantCheck({
-        // The tenant source itself; an installation-wide walk whose answer IS the list of users a
-        // pass drives.
-        SKIP_TENANT_CHECK: true,
-      })}
-      SELECT u."id"
-      FROM "User" u
-      WHERE (${cursor}::text IS NULL OR u."id" > ${cursor}::text)
-        AND (
-          SELECT count(*)
-          FROM "SystemMigrationTenantState" s
-          WHERE s."tenantId" = u."id"
-            AND s."migrationName" = ANY(${names}::text[])
-            AND s."status" = ANY(${statuses}::text[])
-        ) < ${names.length}::int
-      ORDER BY u."id" ASC
-      LIMIT ${limit}::int
-    `;
+    const { tenantState } = await ledgerTables({ postgres: this.ledger });
+    // A counted subquery rather than NOT EXISTS: the tenant is done only when EVERY named step
+    // has finished, and the step state table is keyed (step_id, tenant_id), so it cannot
+    // double-count.
+    const { rows } = await this.ledger.query<{ id: string }>(
+      `SELECT u."id"
+         FROM "User" u
+        WHERE ($1::text IS NULL OR u."id" > $1::text)
+          AND (SELECT count(*)
+                 FROM ${tenantState} s
+                WHERE s."tenant_id" = u."id"
+                  AND s."step_id" = ANY($2::text[])
+                  AND s."status" = ANY($3::text[])) < $4::int
+        ORDER BY u."id" ASC
+        LIMIT $5::int`,
+      [cursor, names, statuses, names.length, limit],
+    );
 
     return rows.map((row) => row.id);
   }

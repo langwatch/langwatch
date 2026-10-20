@@ -4,7 +4,11 @@
  * button) share one validation gate, so a query runs identically either way.
  */
 
-import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
+import {
+  findLangWatchQLMissingGates,
+  type LangWatchQLAcceptedGranularityStep,
+  type LangWatchQLGranularityStep,
+} from "@langwatch/analytics-contract";
 import type {
   ChartFrameDashboardContext,
   ChartQueryError,
@@ -39,11 +43,17 @@ function toChartQueryError(error: unknown): ChartQueryError {
   // ADR-045: registry copy only, with the lwql_* code riding along.
   const explained = explainAnyError(error);
   const handled = readHandledError(error);
+  // A refusal about what the reader may see, not about the query: the card says so.
+  const missingGates =
+    handled?.code === "lwql_not_permitted"
+      ? findLangWatchQLMissingGates(handled.meta.violations)
+      : [];
   return {
     code: handled?.code ?? "unknown",
     title: explained.title,
     message: explained.description,
     ...(handled?.retryable === true ? { retryable: true } : {}),
+    ...(missingGates.length > 0 ? { missingGates } : {}),
   };
 }
 
@@ -51,7 +61,9 @@ export interface DashboardWidgetExecutorOverrides {
   /** Replaces the "last 24 hours from mount" default — the dashboard's own period. */
   readonly timeWindow?: { start: number; end: number };
   /** Replaces {@link DEFAULT_GRANULARITY} — the dashboard's own step. */
-  readonly granularitySeconds?: LangWatchQLGranularityStep;
+  readonly granularitySeconds?: LangWatchQLAcceptedGranularityStep;
+  /** Trace origins the dashboard leaves out; keep the reference stable, a new one re-runs. */
+  readonly excludeOrigins?: readonly string[];
 }
 
 // biome-ignore lint/complexity/noExcessiveLinesPerFunction: splits would scatter closured state.
@@ -69,7 +81,9 @@ export function useDashboardWidgetExecutor(
     return { start: end - 24 * 60 * 60 * 1000, end };
   });
   const pageWindow = overrides?.timeWindow ?? mountWindow;
-  const granularitySeconds = overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const granularitySeconds: LangWatchQLAcceptedGranularityStep =
+    overrides?.granularitySeconds ?? DEFAULT_GRANULARITY;
+  const excludeOrigins = overrides?.excludeOrigins;
   const execute = useMemo(
     () =>
       createLangWatchQLExecute({
@@ -98,6 +112,7 @@ export function useDashboardWidgetExecutor(
           parameters: params,
           timeWindow: pageWindow,
           granularitySeconds,
+          ...(excludeOrigins ? { excludeOrigins } : {}),
         },
         // `execute` requires a signal; callers without one (e.g. `runStandalone`)
         // get a fresh controller's signal, which simply never aborts.
@@ -105,7 +120,7 @@ export function useDashboardWidgetExecutor(
       );
       return toChartQueryResult(result);
     },
-    [execute, pageWindow, granularitySeconds],
+    [execute, pageWindow, granularitySeconds, excludeOrigins],
   );
 
   const executeQuery: ChartFrameExecuteQuery = useCallback(

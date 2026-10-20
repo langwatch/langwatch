@@ -139,6 +139,7 @@ function mount(
   };
   const runtime = createRestRuntime({
     authorization: restTestAuthorization(),
+    audit: { record: () => {} },
     identity: { authenticate: door, identify: door },
     doors: { api_key: { authenticate: authenticateKey, identify: identifyKey } },
     idempotency: passthroughIdempotency,

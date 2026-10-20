@@ -148,6 +148,23 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     And the event is written to event_log with the full content as EventPayload
     And after event_log INSERT succeeds the S3 spool object is best-effort DELETEd
 
+  # The spool object is deleted right after the event_log INSERT, so a
+  # redelivered command always finds it gone, and no retry brings it back.
+  @unit @track2
+  Scenario: A spooled command whose spool object is gone completes without retrying
+    Given a RecordSpan command that carries a {spoolRef}
+    And the spool object it names no longer exists
+    When the command worker picks up the command
+    Then it records no event and completes
+    And it logs a warning naming the trace and span
+
+  @unit @track2
+  Scenario: A spool read that fails for another reason is retried
+    Given a RecordSpan command that carries a {spoolRef}
+    And reading the spool object fails for a reason other than its absence
+    When the command worker picks up the command
+    Then the command fails so the queue retries it
+
   @unit @track2
   # Preservation is the default, so nobody has to discover a setting to get
   # it. Turning it off is the deliberate act, and it reaches only what the
@@ -276,7 +293,7 @@ Feature: Large trace payloads — event_log as single source of truth · transie
     Given the feature flag "release_trace_blob_offload" is disabled
     When a trace with a large output is ingested and then read back
     Then no S3 spool is written
-    And the existing capOversizedAttributes(256 KB) is the only cap in effect
+    And the 8 MiB record cap is the only cap applied before event_log
     And the trace-detail and list reads return the same shapes as before the feature
 
   # ===========================================================================

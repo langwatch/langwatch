@@ -5,6 +5,7 @@ import crypto from "node:crypto";
 
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
+import { type OtlpAnyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
 import { nowInstant } from "@langwatch/time";
 import {
   predefinedEventsSchemas,
@@ -16,8 +17,6 @@ import {
   isSpanReceivedEvent,
   type TraceProcessingEvent,
   type TraceSummaryData,
-  type OtlpAnyValue,
-  type OtlpSpan,
 } from "@langwatch/trace-contract";
 
 const logger = createLogger("langwatch:trace-processing:tracked-event-sync");

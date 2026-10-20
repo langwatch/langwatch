@@ -103,7 +103,7 @@ function GuidedOnboardingOfferInner({ space, spaceInUse }: GuidedOnboardingOffer
         background="orange.subtle"
         paddingX={4}
         paddingY={2}
-        fontSize="12.5px"
+        textStyle="caption"
         fontWeight="medium"
         color="orange.fg"
         opacity={busy ? 0.7 : 1}

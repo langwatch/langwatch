@@ -1,4 +1,5 @@
 import type { Meta, StoryObj } from "@storybook/react-vite";
+import { useRef, useState } from "react";
 
 import { ConfirmDialog } from "./confirm-dialog.tsx";
 
@@ -51,5 +52,35 @@ export const LongText: Story = {
     title: "Disable the provider binding for every project in this organization?",
     message:
       "Requests routed to this provider start failing the moment the binding is disabled. Traffic does not fall back to another provider automatically, so any virtual key pinned to it returns an error until a new binding is created.",
+  },
+};
+
+/** Focus goes where the caller says, asked when the dialog closes; the exit callback runs once. */
+export const ReturnsFocusToATarget: Story = {
+  args: { open: false },
+  render: (args) => {
+    const [open, setOpen] = useState(false);
+    const [exits, setExits] = useState(0);
+    const target = useRef<HTMLButtonElement>(null);
+    return (
+      <>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open
+        </button>
+        <button type="button" ref={target}>
+          Focus lands here ({exits} exits)
+        </button>
+        <ConfirmDialog
+          open={open}
+          onClose={() => setOpen(false)}
+          title={args.title}
+          description="Focus returns to the second button, not to Open."
+          confirmLabel={args.confirmLabel}
+          onConfirm={() => setOpen(false)}
+          finalFocusEl={() => target.current}
+          onExitComplete={() => setExits((count) => count + 1)}
+        />
+      </>
+    );
   },
 };

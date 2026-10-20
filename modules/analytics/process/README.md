@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The callable analytics capability shared by process peers.
 
-Peers call these through the token, declared at `../contract/src/analytics.api.ts:66`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/analytics.api.ts:75`; nothing else in this package is public.
 
 #### `getTimeseries`
 
@@ -26,6 +26,14 @@ getTimeseries(input: AnalyticsTimeseriesInput, options?: AnalyticsTimeseriesRead
 
 ```typescript
 getFeedbacks(input: AnalyticsReadInput): Promise<AnalyticsFeedbacksResult>;
+```
+
+#### `getFeedbacksPage`
+
+The same feedbacks as {@link getFeedbacks}, newest first, one bounded page at a time. Refuses a cursor from another project or filter set with `validation_error`.
+
+```typescript
+getFeedbacksPage(input: AnalyticsReadInput & AnalyticsFeedbacksPageParams): Promise<AnalyticsFeedbacksPageResult>;
 ```
 
 #### `getTopUsedDocuments`
@@ -40,12 +48,12 @@ getTopUsedDocuments(input: AnalyticsReadInput): Promise<AnalyticsTopDocumentsRes
 filterOptions(input: { readonly projectId: string; readonly field: string; readonly startDate: number; readonly endDate: number; readonly query?: string; readonly key?: string; readonly subkey?: string; readonly filters?: Record<string, unknown>; }): Promise<AnalyticsFilterOption[]>;
 ```
 
-#### `assertCustomChartPlaygroundEnabled`
+#### `assertDashboardWidgetsEnabled`
 
-Refuses the dashboard-widget surface while its project rollout is disabled.
+Refuses the dashboard-widget surface unless Dashboards and LangWatchQL are both on.
 
 ```typescript
-assertCustomChartPlaygroundEnabled(input: { projectId: string }): Promise<void>;
+assertDashboardWidgetsEnabled(input: { projectId: string }): Promise<void>;
 ```
 
 #### `upsertEvaluationAnalytics`
@@ -80,10 +88,10 @@ appendEvaluationAnalyticsRollupBatch(input: AnalyticsEvaluationRollupAppendBatch
 
 #### `findLastOccurredAt`
 
-When the project's newest trace or evaluation since `since` occurred, from the analytics tables this module owns; empty when none did. The graph-alert heartbeat reads it.
+When the project's newest trace or evaluation since `since` occurred, from the analytics tables this module owns; empty when none did. The graph-alert heartbeat reads it. `excludeOrigins` leaves out traces of those origins; an evaluation read ignores it.
 
 ```typescript
-findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; }): Promise<Instant[]>;
+findLastOccurredAt(input: { readonly projectId: string; readonly source: AnalyticsMetricSource; readonly since: Instant; readonly excludeOrigins?: readonly string[]; }): Promise<Instant[]>;
 ```
 
 #### `isLangWatchQLAvailable`
@@ -156,7 +164,7 @@ executeLangWatchQL(input: LangWatchQLExecuteInput): Promise<LangWatchQLQueryResu
 
 #### `executeLangWatchQLPass`
 
-Re-validates the statement with the full policy, eval gate resolved from the project's rollout, then runs it inside the fixed wrapper its pass names: an instant-eval read.
+Re-validates the statement with the full policy, eval gate taken from the caller's answer, then runs it inside the fixed wrapper its pass names: an instant-eval read.
 
 ```typescript
 executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
@@ -176,6 +184,14 @@ Whether this project's rollout admits it to the Workbench at all.
 
 ```typescript
 isWorkbenchEnabled(input: { projectId: string }): Promise<boolean>;
+```
+
+#### `isDashboardsEnabled`
+
+Whether this project's rollout admits it to the Dashboards area at all.
+
+```typescript
+isDashboardsEnabled(input: { projectId: string }): Promise<boolean>;
 ```
 
 #### `resolveProtections`
@@ -246,7 +262,7 @@ Permission `analytics:view`. Declared at `src/transport/analytics-legacy.rest.ts
 Answers at `/api/analytics`, `/api/v1/analytics`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:50)
+// Rawbody: "text" (inline, src/transport/analytics-legacy.rest.ts:51)
 ```
 
 ### `analyticsRest`
@@ -268,8 +284,8 @@ Permission `analytics:view`. Declared at `src/transport/analytics.rest.ts:25`.
 Answers at `/api/analytics/timeseries`, `/api/v1/analytics/timeseries`; also, undocumented, `/api/analytics/2026-08-07/timeseries`, `/api/v1/analytics/2026-08-07/timeseries`, `/api/analytics/latest/timeseries`, `/api/v1/analytics/latest/timeseries`.
 
 ```typescript
-type Body = z.infer<typeof analyticsTimeseriesRestBodySchema>; // ../contract/src/analytics.input-schemas.ts:164
-// Response: analyticsTimeseriesResponseSchema, ../contract/src/analytics.input-schemas.ts:170
+type Body = z.infer<typeof analyticsTimeseriesRestBodySchema>; // ../contract/src/analytics.input-schemas.ts:183
+// Response: analyticsTimeseriesResponseSchema, ../contract/src/analytics.input-schemas.ts:193
 interface Response {
   currentPeriod: Record<string, unknown>[];
   previousPeriod: Record<string, unknown>[];
@@ -294,7 +310,7 @@ Authenticated: Any API key reaches the projects it holds analytics:view on: the 
 Answers at `/api/v1/query`.
 
 ```typescript
-// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:117
+// Body: lwqlKeyStatementSchema, ../contract/src/features/lwql/analytics-lwql.schemas.ts:140
 interface Body {
   sql: string;
   parameters?: Record<string, string | number | boolean | null>;
@@ -302,67 +318,67 @@ interface Body {
     start: string | number | unknown;
     end: string | number | unknown;
   };
-  granularitySeconds?: 1 | 60 | 3600;
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
   projectId?: string;
 }
-type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:180
+type Response = z.infer<typeof lwqlResultSchema>; // ../contract/src/analytics.input-schemas.ts:205
 ```
 
 #### `GET /schema` · `getApiV1QuerySchema`
 
 Discover the queryable LangWatchQL schema
 
-Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:142`.
+Authenticated: Any API key reaches the projects it holds analytics:view on: the fan-out and the row policy enforce the scope, and a key that reads no project is a valid empty scope rather than a refusal. Declared at `src/transport/query.rest.ts:143`.
 
 Answers at `/api/v1/query/schema`.
 
 ```typescript
-type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.input-schemas.ts:182
+type Response = z.infer<typeof lwqlSchemaSchema>; // ../contract/src/analytics.input-schemas.ts:207
 ```
 
 #### `GET /reference` · `getApiV1QueryReference`
 
 Discover both query languages
 
-Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:166`.
+Authenticated: Any credential for the project may read the reference: half of what it describes is the traces family's own filter vocabulary, so a key without analytics:view is answered with the LangWatchQL half withheld rather than refused. Declared at `src/transport/query.rest.ts:167`.
 
 Answers at `/api/v1/query/reference`.
 
 ```typescript
-type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/features/lwql/query-reference.ts:177
+type Response = z.infer<typeof queryReferenceSchema>; // ../contract/src/features/lwql/query-reference.ts:228
 ```
 
 ## tRPC transport
 
 ### `analytics.lwql`
 
-Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:53`, router `src/transport/analytics-lwql.trpc.ts:68`.
+Contract `../contract/src/features/lwql/analytics-lwql.trpc.ts:74`, router `src/transport/analytics-lwql.trpc.ts:68`.
 
 | Procedure                     | Kind     | Gate                        | Input                    | Output                          |
 | ----------------------------- | -------- | --------------------------- | ------------------------ | ------------------------------- |
 | `analytics.lwql.availability` | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLAvailabilitySchema` |
 | `analytics.lwql.schema`       | query    | Permission `analytics:view` | `lwqlProjectScopeSchema` | `langWatchQLSchema`             |
 | `analytics.lwql.validate`     | query    | Permission `analytics:view` | `lwqlRunRequestSchema`   | `lwqlValidationResultSchema`    |
-| `analytics.lwql.query`        | mutation | Permission `analytics:view` | `lwqlRunRequestSchema`   | `langWatchQLQueryResultSchema`  |
+| `analytics.lwql.query`        | mutation | Permission `analytics:view` | `lwqlQueryRequestSchema` | `langWatchQLQueryResultSchema`  |
 
 ```typescript
 // analytics.lwql.availability
-// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:22
+// Input: lwqlProjectScopeSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
 interface Input {
   projectId: string;
 }
-// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:365
+// Output: langWatchQLAvailabilitySchema, ../contract/src/features/lwql/analytics.lwql.ts:464
 interface Output {
   available: boolean;
   reason?: "disabled" | "unprovisioned";
 }
 
 // analytics.lwql.schema
-type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:22
-type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:138
+type Input = z.infer<typeof lwqlProjectScopeSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:24
+type Output = z.infer<typeof langWatchQLSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:212
 
 // analytics.lwql.validate
-// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
+// Input: lwqlRunRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:32
 interface Input {
   projectId: string;
   sql: string;
@@ -371,18 +387,29 @@ interface Input {
     start: string | number | unknown;
     end: string | number | unknown;
   };
-  granularitySeconds?: 1 | 60 | 3600;
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
 }
-type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:47
+type Output = z.infer<typeof lwqlValidationResultSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:70
 
 // analytics.lwql.query
-type Input = z.infer<typeof lwqlRunRequestSchema>; // ../contract/src/features/lwql/analytics-lwql.trpc.ts:25
-type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:55
+// Input: lwqlQueryRequestSchema, ../contract/src/features/lwql/analytics-lwql.trpc.ts:43
+interface Input {
+  projectId: string;
+  sql: string;
+  parameters?: Record<string, string | number | boolean | null>;
+  timeWindow?: {
+    start: string | number | unknown;
+    end: string | number | unknown;
+  };
+  granularitySeconds?: 1 | 60 | 3600 | 86400 | 604800;
+  excludeOrigins?: string[];
+}
+type Output = z.infer<typeof langWatchQLQueryResultSchema>; // ../contract/src/features/lwql/analytics.lwql.ts:111
 ```
 
 ### `analytics`
 
-Contract `../contract/src/analytics.trpc.ts:34`, router `src/transport/analytics.trpc.ts:10`.
+Contract `../contract/src/analytics.trpc.ts:56`, router `src/transport/analytics.trpc.ts:11`.
 
 | Procedure                    | Kind  | Gate                        | Input                               | Output                               |
 | ---------------------------- | ----- | --------------------------- | ----------------------------------- | ------------------------------------ |
@@ -390,11 +417,12 @@ Contract `../contract/src/analytics.trpc.ts:34`, router `src/transport/analytics
 | `analytics.dataForFilter`    | query | Permission `analytics:view` | `analyticsDataForFilterInputSchema` | `analyticsFilterOptionsResultSchema` |
 | `analytics.topUsedDocuments` | query | Permission `cost:view`      | `sharedFiltersInputSchema`          | `analyticsTopDocumentsResultSchema`  |
 | `analytics.feedbacks`        | query | Permission `cost:view`      | `sharedFiltersInputSchema`          | `analyticsFeedbacksResultSchema`     |
+| `analytics.feedbacksPage`    | query | Permission `cost:view`      | `analyticsFeedbacksPageInputSchema` | `analyticsFeedbacksPageResultSchema` |
 
 ```typescript
 // analytics.getTimeseries
-type Input = z.infer<typeof timeseriesInputSchema>; // ../contract/src/analytics.input-schemas.ts:115
-// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:77
+type Input = z.infer<typeof timeseriesInputSchema>; // ../contract/src/analytics.input-schemas.ts:134
+// Output: analyticsTimeseriesResultSchema, ../contract/src/analytics.timeseries.ts:107
 interface Output {
   previousPeriod: {
     date: string;
@@ -407,8 +435,8 @@ interface Output {
 }
 
 // analytics.dataForFilter
-type Input = z.infer<typeof analyticsDataForFilterInputSchema>; // ../contract/src/analytics.trpc.ts:29
-// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:154
+type Input = z.infer<typeof analyticsDataForFilterInputSchema>; // ../contract/src/analytics.trpc.ts:44
+// Output: analyticsFilterOptionsResultSchema, ../contract/src/analytics.timeseries.ts:278
 interface Output {
   options: {
     field: string;
@@ -418,8 +446,8 @@ interface Output {
 }
 
 // analytics.topUsedDocuments
-type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:56
-// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:139
+type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
+// Output: analyticsTopDocumentsResultSchema, ../contract/src/analytics.timeseries.ts:254
 interface Output {
   topDocuments: {
     documentId: string;
@@ -431,8 +459,12 @@ interface Output {
 }
 
 // analytics.feedbacks
-type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:56
-type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:126
+type Input = z.infer<typeof sharedFiltersInputSchema>; // ../contract/src/analytics.input-schemas.ts:85
+type Output = z.infer<typeof analyticsFeedbacksResultSchema>; // ../contract/src/analytics.timeseries.ts:168
+
+// analytics.feedbacksPage
+type Input = z.infer<typeof analyticsFeedbacksPageInputSchema>; // ../contract/src/analytics.trpc.ts:54
+type Output = z.infer<typeof analyticsFeedbacksPageResultSchema>; // ../contract/src/analytics.timeseries.ts:230
 ```
 
 ## Sockets
@@ -443,19 +475,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `lwql_reconvergence` (aggregate `global`)
 
-Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:51`.
+Declared at `src/eventing/analytics-lwql-reconvergence.pipeline.ts:53`.
 
-| Kind            | Name                | Handles                                                                          | Declared at                                                |
-| --------------- | ------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------- |
-| process manager | `lwqlReconvergence` | every 5 s (`LWQL_RECONVERGENCE_INITIAL_DELAY_MS`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:61` |
-| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                     | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:56` |
+| Kind            | Name                | Handles                                                                                    | Declared at                                                |
+| --------------- | ------------------- | ------------------------------------------------------------------------------------------ | ---------------------------------------------------------- |
+| process manager | `lwqlReconvergence` | every 5 min (`LWQL_RECONVERGENCE_INTERVAL_MS = 5 * 60_000`); intents `reconverge` (outbox) | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:63` |
+| peer subscriber | `syncLwqlKeyMapRow` | `lw.project.created` from [project](../../project/README.md)                               | `src/eventing/analytics-lwql-reconvergence.pipeline.ts:58` |
 
 ## Configuration
 
 | Kind   | Leaf                          | Environment variable                      | Declared at                              |
 | ------ | ----------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:352`           |
-| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:353`           |
+| secret | `lwqlClickHousePassword`      | `LWQL_CLICKHOUSE_PASSWORD`                | `src/app/analytics.app.ts:401`           |
+| secret | `lwqlPostgresReaderPassword`  | `LWQL_POSTGRES_READER_PASSWORD`           | `src/app/analytics.app.ts:402`           |
 | config | `langwatchQl.url`             | `LWQL_CLICKHOUSE_URL`                     | `../contract/src/analytics.config.ts:11` |
 | config | `langwatchQl.username`        | `LWQL_CLICKHOUSE_USER`                    | `../contract/src/analytics.config.ts:12` |
 | config | `langwatchQl.database`        | `LWQL_DATABASE`                           | `../contract/src/analytics.config.ts:13` |

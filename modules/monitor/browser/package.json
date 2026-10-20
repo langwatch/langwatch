@@ -16,7 +16,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -28,6 +28,8 @@
     "@langwatch/evaluator-contract": "workspace:*",
     "@langwatch/experiment-contract": "workspace:*",
     "@langwatch/monitor-contract": "workspace:*",
+    "@langwatch/trace-client": "workspace:*",
+    "@langwatch/trace-contract": "workspace:*",
     "lucide-react": "catalog:",
     "react-icons": "catalog:"
   },

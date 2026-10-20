@@ -17,11 +17,12 @@ import {
   getSchemaValidator,
   LATEST_SCHEMA_VERSION,
   type LatestConfigVersionSchema,
-  parseLlmConfigVersion,
+  parseLlmConfigVersion as parseLlmConfigVersionStrict,
   parseRuntimeParameters,
   sortKeysDeep,
   type PromptUsageCount,
 } from "@langwatch/prompt-contract";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { CreateLlmConfigVersionParams } from "../prompt-version.repository.ts";
 import {
@@ -32,6 +33,16 @@ import {
 import { PrismaLlmConfigVersionsRepository } from "./prisma.prompt-version.repository.ts";
 
 const logger = createLogger("langwatch:prompt-config:prisma.prompt.repository");
+
+/** Parses a stored version, tolerating (and logging) legacy prompting_technique values. */
+const parseLlmConfigVersion: typeof parseLlmConfigVersionStrict = (version) =>
+  parseLlmConfigVersionStrict(version, {
+    onLegacyPromptingTechnique: (change) =>
+      logger.warn(
+        { versionId: (version as { id?: string }).id, ...change },
+        "Normalised legacy prompting_technique in stored prompt version",
+      ),
+  });
 
 /**
  * The client slice prompt persistence binds to, transaction included: a config row, its
@@ -617,6 +628,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       const createdVersion = await tx.llmPromptConfigVersion.create({
         data: {
           ...versionData,
+          id: this.versions.generateVersionId(),
           configData: configData as Prisma.InputJsonValue,
           runtimeParameters: runtimeParameters as Prisma.InputJsonValue,
         },
@@ -660,7 +672,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
     await this.prisma.llmPromptConfig.update({
       where: { id: config.id, projectId },
       data: {
-        deletedAt: new Date(),
+        deletedAt: toDate(nowInstant()),
         handle: null,
         name: archivedName,
       },
@@ -751,7 +763,7 @@ export class PrismaLlmConfigRepository extends LlmConfigRepository {
       // Update the config's updatedAt timestamp
       const updatedConfig = await tx.llmPromptConfig.update({
         where: { id: newConfig.id, projectId: configData.projectId },
-        data: { updatedAt: new Date() },
+        data: { updatedAt: toDate(nowInstant()) },
       });
 
       updatedConfig.handle =

@@ -67,6 +67,7 @@ import type {
   FacetValuesResult,
   TraceListPage,
 } from "./features/list/trace-list-view.ts";
+import type { AiActionResult, AiQueryResult } from "./features/query/trace-ai-query.ts";
 import type { LangWatchQLTraceFilter } from "./features/query/trace-langwatch-ql-filter.ts";
 import type { TraceQueryEvaluationRun } from "./features/query/trace-query-evaluation.types.ts";
 import type {
@@ -74,6 +75,7 @@ import type {
   TraceQueryClassificationInput,
   TraceQueryFieldCatalogueInput,
 } from "./features/query/trace-query.contract.ts";
+import type { RouteSearchInput, RouteSearchResult } from "./features/query/trace-search-route.ts";
 import type { LogTraceContribution } from "./features/span/trace-log-contribution.ts";
 import type {
   SpanSummaryRow,
@@ -307,6 +309,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     query?: string | null;
     evalRuns?: Readonly<Record<string, InstantEvalRunReference>>;
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<DiscoverResult>;
   /** Renames a trace after trimming; a name out of bounds refuses with `ValidationError`. */
   renameTrace(
@@ -670,6 +673,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     timeRange: { from: number; to: number };
     /** The Instant Eval runs registered for the query's `eval` chips. */
     evalRuns?: readonly ResolvedInstantEvalRun[];
+    /** The viewer's; under any content protection free text skips captured I/O. */
+    protections?: Protections;
   }): { sql: string; params: Record<string, unknown> } | null;
   /**
    * A legacy `filters` document compiled to parameterized ClickHouse conditions
@@ -681,8 +686,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): { conditions: string[]; params: Record<string, unknown>; hasUnsupportedFilters: boolean };
   /**
    * The Explorer's own filter: the query compiled, hidden origins left out
-   * unless the query (or `originNamed`) names one; `dateField` refuses a
-   * span/event clause on the `updated` axis.
+   * unless the query (or `originNamed`) names one or the project is personal;
+   * `dateField` refuses a span/event clause on the `updated` axis.
    */
   compileExplorerTraceFilter(input: {
     query: string;
@@ -691,7 +696,8 @@ export interface TraceApi extends TraceOtlpIngestApi {
     evalRuns?: readonly ResolvedInstantEvalRun[];
     originNamed?: boolean;
     dateField?: TraceDateField;
-  }): { sql: string; params: Record<string, unknown> };
+    protections?: Protections;
+  }): Promise<{ sql: string; params: Record<string, unknown> }>;
   /**
    * The filter compiled against the LangWatchQL trace view, for a statement a
    * caller runs; throws `FilterParseError` on syntax the language cannot read.
@@ -748,6 +754,7 @@ export interface TraceApi extends TraceOtlpIngestApi {
     query: string;
     evalRuns?: readonly ResolvedInstantEvalRun[];
     authorization: Authorization;
+    protections?: Protections;
   }): Promise<unknown>;
   readNewCount(params: unknown): Promise<number>;
   readSuggestions(params: unknown): Promise<string[]>;
@@ -763,6 +770,24 @@ export interface TraceApi extends TraceOtlpIngestApi {
     limit: number;
     offset: number;
   }): Promise<FacetValuesResult>;
+  /** A sentence to a trace query, on the project's `traces.ai_search` model. */
+  aiQuery(input: {
+    projectId: string;
+    authorization: Authorization;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiQueryResult>;
+  /** A sentence to an applied query or a new lens. */
+  aiAction(input: {
+    projectId: string;
+    authorization: Authorization;
+    prompt: string;
+    timeRange: { from: number; to: number };
+  }): Promise<AiActionResult>;
+  /** Enter on a sentence: a filter, a judgement, a phrase or the assistant. */
+  routeSearch(
+    input: RouteSearchInput & { authorization: Authorization },
+  ): Promise<RouteSearchResult>;
   /** The proof narrowed to the member holding the trace; an unreadable member is not found. */
   authorizationForTrace(input: {
     authorization: Authorization;
@@ -922,11 +947,6 @@ export interface TraceApi extends TraceOtlpIngestApi {
   }): boolean;
   readTopicClusteringCounts(input: { projectId: string }): Promise<TraceTopicClusteringCounts>;
   readTopicClusteringPage(input: TraceTopicClusteringPageInput): Promise<TraceTopicClusteringPage>;
-  /** This UTC billing month's distinct traces per project; refuses a foreign project. */
-  countTracesByProjects(input: {
-    organizationId: string;
-    projectIds: string[];
-  }): Promise<{ projectId: string; count: number }[]>;
   /** The project's distinct traces over the last 24 hours. */
   countTracesInLastDay(input: { projectId: string }): Promise<number>;
   /** Whether any trace carrying `attribute` landed for the project at or after `sinceMs`. */

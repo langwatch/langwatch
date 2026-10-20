@@ -24,11 +24,6 @@ export const FRONTEND_FEATURE_FLAGS = [
   // Gates the Optimize this prompt menu item alongside the UI-action channel
   // it hands off to; the server-side dispatch checks the same flag.
   "release_langy_ui_actions",
-  // The signal-focused home composition (briefing sheet leads), outranking
-  // the default Langy home composition (lit block) that otherwise rolls out
-  // ON TOP of `release_langy_enabled`. Decides layout ONLY — Langy access
-  // separately gates the sheet's hand-to-Langy affordances.
-  "release_ui_home_signal_focused_enabled",
   // Langy's minimised state as an edge peek of the panel itself (spec:
   // specs/langy/langy-peek-dock.feature). Flag off = the classic corner
   // launcher orb. Swaps only the CLOSED-state affordance; opening, the
@@ -44,14 +39,16 @@ export const FRONTEND_FEATURE_FLAGS = [
   // purely additive: the current Simulations pages and menu group are
   // untouched while it is off, and the backend it calls is unflagged.
   "release_ui_agent_testing_v2_enabled",
-  // The custom-chart-playground page and its widget routes outside local
-  // development; the full registry documents the rollout story.
-  "release_custom_chart_playground",
+  // The Dashboards area, its sidebar entry and its saved-dashboards list.
+  "release_dashboards",
+  // The Insights inbox, its sidebar entry, the topbar bell and "Save as insight" on Langy answers.
+  "release_insights",
+  // LangWatchQL; with release_dashboards, the reports page's widget drawer.
+  "release_lwql_workbench",
   // Gates the `eval:"..."` chip on the Trace Explorer search bar. Off, the
   // bar says Instant Evals are not enabled instead of starting a run
   // (specs/traces-v2/instant-eval-search.feature).
   "release_instant_evals",
-  "join_requests",
   // The guided onboarding variant, read on the welcome flow with the user's
   // id, which the percentage rollout buckets on (guided-onboarding-variant.feature).
   "experiment_onboarding_langy_guided",

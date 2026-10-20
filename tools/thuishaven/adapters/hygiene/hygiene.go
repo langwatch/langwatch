@@ -128,9 +128,9 @@ func (Hygiene) DiskUsage(ctx context.Context, path string) (int64, bool) {
 
 // LastTouched is the worktree directory's own mtime — when anything was last
 // written directly in it. Deliberately not LastActivity's committer date: a
-// diff drive checks its worktree out at whatever ref it is comparing, so the
-// committer date can be months old one second after the directory is created,
-// and reclaiming on that clock would delete a comparison while it is running.
+// scratch worktree may be checked out at any ref, so the committer date can be
+// months old one second after the directory is created, and reclaiming on that
+// clock would delete it while it is in use.
 func (Hygiene) LastTouched(worktreeDir string) (time.Time, bool) {
 	fi, err := os.Stat(worktreeDir)
 	if err != nil {

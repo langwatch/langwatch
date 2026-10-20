@@ -5,12 +5,13 @@
  */
 import { HandledError, remediation } from "@langwatch/handled-error";
 
-export const CUSTOM_CHART_PLAYGROUND_FLAG = "release_custom_chart_playground";
+const DASHBOARDS_FLAG = "release_dashboards";
+const LWQL_WORKBENCH_FLAG = "release_lwql_workbench";
 
 /**
- * The custom-chart-playground surface is off for this project. `customer`
- * fault, 403 — a product decision, not an incident. The message names the
- * flag so the CLI and Langy's skill stop retrying and reach for `chart`.
+ * The dashboard widget surface is closed for this project. `customer` fault, 403. The code keeps
+ * its playground name because clients match on it; the message names the flags so the CLI and
+ * Langy's skill stop retrying and reach for `chart`.
  */
 export class CustomChartPlaygroundNotEnabledError extends HandledError {
   declare readonly code: "custom_chart_playground_not_enabled";
@@ -18,34 +19,13 @@ export class CustomChartPlaygroundNotEnabledError extends HandledError {
   constructor() {
     super(
       "custom_chart_playground_not_enabled",
-      `The custom-chart-playground surface is not enabled for this project (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the lwql-charts skill / \`langwatch chart\` commands for a saved dashboard chart instead.`,
+      `Dashboard widgets are not enabled for this project (feature flags: ${DASHBOARDS_FLAG} and ${LWQL_WORKBENCH_FLAG}). Do not retry — use the lwql-charts skill / \`langwatch chart\` commands for a saved dashboard chart instead.`,
       {
         httpStatus: 403,
         ...remediation("custom_chart_playground_not_enabled"),
       },
     );
     this.name = "CustomChartPlaygroundNotEnabledError";
-  }
-}
-
-/**
- * Creating/editing a dashboard graph is refused while the playground is
- * enabled. `customer` fault, 403 — a product decision, not an incident. The
- * message names the flag and points an agent at `dashboard-widget` instead.
- */
-export class CustomGraphWritesDisabledForPlaygroundError extends HandledError {
-  declare readonly code: "custom_graph_writes_disabled_for_playground";
-
-  constructor() {
-    super(
-      "custom_graph_writes_disabled_for_playground",
-      `Creating or editing dashboard graphs is turned off for this project while the custom-chart-playground is enabled (feature flag: ${CUSTOM_CHART_PLAYGROUND_FLAG}). Do not retry — use the dashboard-widgets skill / \`langwatch dashboard-widget\` commands instead.`,
-      {
-        httpStatus: 403,
-        ...remediation("custom_graph_writes_disabled_for_playground"),
-      },
-    );
-    this.name = "CustomGraphWritesDisabledForPlaygroundError";
   }
 }
 

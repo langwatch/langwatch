@@ -8,12 +8,12 @@ user-invocable: true
 
 Fakes PostHog (posthog-node `/batch/`, posthog-js `/e/`, `/flags/`) and Customer.io (CDP
 `/v1/*`, Track API). Every call becomes one normalized record in memory. Keys are accepted
-and never checked: a dev shim, never expose it. Code: `services/analyticssim`, console
-`apps/analyticssim-web`.
+and never checked: a dev shim, never expose it. Code: `services/sims/analyticssim`, console
+`apps/sims/src/analytics`.
 
 ## Run it
 
-- Opt-in: `haven up +analytics` (sticky). Hosted in the `sims` lane.
+- Opt-in: `haven up +analytics` (sticky). Runs in the `go` lane by default (see `sims`).
 - Console and ingest base URL: `https://analytics.<slug>.langwatch.localhost`; `haven status`
   shows the loopback port.
 - The overlay points the PostHog host and Customer.io base at it with dummy keys where none
@@ -41,7 +41,7 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 - Post PostHog batches or Customer.io calls at the loopback port; 16 MiB body cap.
 - The store is a fixed ring: adding is O(1). `ANALYTICSSIM_MAX_RECORDS` (default 5000),
   `ANALYTICSSIM_MAX_RAW_BYTES` (default 65536; bigger raw bodies become a size marker).
-  Benchmark: `go test -bench . -benchmem ./services/analyticssim`.
+  Benchmark: `go test -bench . -benchmem ./services/sims/analyticssim`.
 
 ## From a terminal or agent
 
@@ -50,8 +50,8 @@ Newest first. Assert: trigger the action, then filter by `id` and `name`.
 ```
 haven sim analytics status        # record count + activity (last 5 min, distinct ids, last call)
 haven sim analytics list [--provider] [--kind] [--event|--name] [--id] | clear
-haven sim analytics get <id>   # one record: facts, properties, raw call
-haven sim analytics fault --error <0|4xx|5xx>   # the next capture calls fail with that status; 0 clears it
+haven sim analytics record <id>   # one record: properties, raw call (no public `get` yet: the CLI's internal spelling)
+haven sim analytics fault <4xx|5xx|off>        # the next capture calls fail with that status; off clears it
 haven sim analytics wait --event <name> [--provider] [--kind] [--id] [--timeout 30s]   # exit 66 on timeout
 ```
 

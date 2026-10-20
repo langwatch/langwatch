@@ -1,31 +1,40 @@
+import { AnalyticsApi } from "@langwatch/analytics-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { AutomationApi } from "@langwatch/automation-contract";
 import { DashboardApi, DashboardNotFoundError } from "@langwatch/dashboard-contract";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { describe, expect, it } from "vitest";
 
 import { dashboardProcessModule } from "../../dashboard.module.ts";
 import {
   createDashboardTestAnalytics,
+  createDashboardTestAuthz,
   createDashboardTestAutomation,
   createDashboardTestProjects,
 } from "./dashboard.fixture.ts";
 
 function process(role: "api" | "worker") {
-  return createApp({ role })
-    .withModules([dashboardProcessModule])
-    .withStores(memoryStores())
-    .withConfig({ dashboard: { publicBaseUrl: undefined } })
-    .provide({
-      analytics: createDashboardTestAnalytics(),
-      automation: createDashboardTestAutomation(),
-      project: createDashboardTestProjects(),
-    });
+  return bootInstalledProcess({
+    role,
+    modules: [dashboardProcessModule],
+    config: { dashboard: { publicBaseUrl: undefined } },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: AnalyticsApi, instance: createDashboardTestAnalytics() }),
+      testPeer({ token: AuthzApi, instance: createDashboardTestAuthz() }),
+      testPeer({ token: AutomationApi, instance: createDashboardTestAutomation() }),
+      testPeer({ token: ProjectApi, instance: createDashboardTestProjects() }),
+    ],
+  });
 }
 
 describe("dashboard app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process(role).boot();
+      const runtime = await process(role);
 
       try {
         const app = runtime.service(DashboardApi);

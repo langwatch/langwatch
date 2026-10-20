@@ -19,6 +19,8 @@ import {
   type User,
   type OrganizationAdmission,
   auditImpersonationMetadataSchema,
+  ORGANIZATION_KIND,
+  PricingModel,
 } from "@langwatch/organization-contract";
 import { nowInstant, Temporal, type Instant } from "@langwatch/time";
 
@@ -35,6 +37,7 @@ import type {
   AuditLogFilters,
   CreateAndAssignInput,
   CreateAndAssignResult,
+  FounderOrganizationCreated,
   CreateForProvisioningInput,
   DeleteMemberInput,
   EnrichedAuditLog,
@@ -120,7 +123,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return { primaryIntent: organization.primaryIntent ?? null };
   }
 
-  async createAndAssign(input: CreateAndAssignInput): Promise<CreateAndAssignResult> {
+  async createAndAssign(input: CreateAndAssignInput): Promise<FounderOrganizationCreated> {
     if (this.findOrganizationBySlug(input.orgSlug)) {
       throw new OrganizationSlugTakenError(input.orgSlug);
     }
@@ -168,6 +171,7 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return {
       organization: { id: input.orgId, name: input.orgName },
       team: { id: team.id, slug: team.slug, name: team.name },
+      grantsConfirmed: true,
     };
   }
 
@@ -206,8 +210,23 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     };
   }
 
+  async createSystemOrFind(
+    input: Omit<CreateForProvisioningInput, "pricingModel">,
+  ): Promise<{ id: string }> {
+    const existing = [...this.memory.organizations.values()].find(
+      (row) => row.kind === ORGANIZATION_KIND.SYSTEM,
+    );
+    if (existing) return { id: existing.id };
+    await this.createForProvisioning({ ...input, pricingModel: PricingModel.SEAT_EVENT });
+    const created = this.memory.organizations.get(input.orgId);
+    if (created)
+      this.memory.organizations.set(input.orgId, { ...created, kind: ORGANIZATION_KIND.SYSTEM });
+    return { id: input.orgId };
+  }
+
   async findAllProvisioningSummaries(): Promise<OrganizationProvisioningSummary[]> {
     return [...this.memory.organizations.values()]
+      .filter((organization) => organization.kind !== ORGANIZATION_KIND.SYSTEM)
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
       .map((organization) => ({
         id: organization.id,

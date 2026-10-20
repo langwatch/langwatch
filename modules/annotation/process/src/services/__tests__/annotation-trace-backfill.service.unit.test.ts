@@ -1,12 +1,13 @@
 /**
  * @vitest-environment node
- * Spec: modules/annotation/specs/annotation-service.feature
+ * Spec: modules/annotation/specs/annotation-service.feature,
+ * modules/organization/specs/organization-id-paging.feature
  */
 import type { AnnotationApi } from "@langwatch/annotation-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { TraceApi } from "@langwatch/trace-contract";
+import type { TraceAnnotationMarker, TraceApi } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
 import { AnnotationTraceBackfillService } from "../annotation-trace-backfill.service.ts";
@@ -100,6 +101,118 @@ describe("given the annotation trace step's backfill", () => {
 
       expect(recorded).toEqual([]);
       expect(saves).toEqual([]);
+    });
+  });
+});
+
+const annotationsByProject: Readonly<Record<string, { id: string; traceId: string }[]>> = {
+  "project-a": [
+    { id: "a1", traceId: "trace-1" },
+    { id: "a2", traceId: "trace-2" },
+    { id: "a3", traceId: "trace-1" },
+  ],
+  "project-b": [{ id: "b1", traceId: "trace-9" }],
+};
+
+/** One organization holding two annotated projects; `failingTrace` refuses its record. */
+function twoProjects({
+  recorded,
+  failingTrace,
+}: {
+  recorded: TraceAnnotationMarker[];
+  failingTrace?: string;
+}) {
+  return AnnotationTraceBackfillService.create({
+    peers: {
+      organizations: createApiFixture<OrganizationApi>({
+        listAllIds: async () => ({ ids: ["org-1"], next: null }),
+      }),
+      projects: createApiFixture<ProjectApi>({
+        listIdsByOrganization: async () => ["project-a", "project-b"],
+      }),
+      annotations: createApiFixture<AnnotationApi>({
+        list: async ({ projectId }) =>
+          (annotationsByProject[projectId] ?? []).map((annotation) =>
+            createApiFixture<Awaited<ReturnType<AnnotationApi["list"]>>[number]>(annotation),
+          ),
+      }),
+      traces: createApiFixture<TraceApi>({
+        recordAnnotation: async (marker) => {
+          if (marker.traceId === failingTrace) throw new Error("clickhouse unavailable");
+          recorded.push(marker);
+        },
+      }),
+    },
+  });
+}
+
+const runOnce = (service: AnnotationTraceBackfillService) =>
+  service.backfill({
+    after: undefined,
+    dryRun: false,
+    signal: new AbortController().signal,
+    onPage: async () => {},
+  });
+
+describe("given annotations across two projects", () => {
+  describe("when the backfill runs", () => {
+    it("records every annotation on its trace, project by project and trace by trace", async () => {
+      const recorded: TraceAnnotationMarker[] = [];
+      await runOnce(twoProjects({ recorded }));
+
+      expect(
+        recorded.map(({ tenantId, traceId, annotationId }) => [tenantId, traceId, annotationId]),
+      ).toEqual([
+        ["project-a", "trace-1", "a1"],
+        ["project-a", "trace-1", "a3"],
+        ["project-a", "trace-2", "a2"],
+        ["project-b", "trace-9", "b1"],
+      ]);
+    });
+  });
+
+  describe("when one trace fails to record", () => {
+    it("skips that trace and carries on with the rest", async () => {
+      const recorded: TraceAnnotationMarker[] = [];
+      await runOnce(twoProjects({ recorded, failingTrace: "trace-1" }));
+
+      expect(recorded.map(({ annotationId }) => annotationId)).toEqual(["a2", "b1"]);
+    });
+  });
+});
+
+describe("given an install whose organizations arrive in pages", () => {
+  describe("when the backfill runs", () => {
+    /** @scenario "A fleet scan visits every organization across pages" */
+    it("lists the projects of every organization on every page, once each", async () => {
+      const ids = ["o1", "o2", "o3", "o4", "o5"];
+      const limits: (number | undefined)[] = [];
+      const listed: string[] = [];
+      const service = AnnotationTraceBackfillService.create({
+        peers: {
+          organizations: createApiFixture<OrganizationApi>({
+            listAllIds: async ({ after, limit } = {}) => {
+              limits.push(limit);
+              const rest = ids.filter((id) => after === undefined || id > after);
+              const page = rest.slice(0, 2);
+              return { ids: page, next: rest.length > 2 ? (page.at(-1) ?? null) : null };
+            },
+          }),
+          projects: createApiFixture<ProjectApi>({
+            listIdsByOrganization: async ({ organizationId }) => {
+              listed.push(organizationId);
+              return [];
+            },
+          }),
+          annotations: createApiFixture<AnnotationApi>({}),
+          traces: createApiFixture<TraceApi>({}),
+        },
+      });
+
+      await runOnce(service);
+
+      expect(listed).toEqual(["o1", "o2", "o3", "o4", "o5"]);
+      expect(limits).toEqual([500, 500, 500]);
     });
   });
 });

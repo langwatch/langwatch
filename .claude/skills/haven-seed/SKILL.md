@@ -26,17 +26,18 @@ haven db seed --size tiny --persona startup
 haven db seed --dry-run             # counts, rows, bytes, duration; writes nothing
 haven db seed --json --reveal       # logins and credentials as one object, unmasked
 haven db seed --live                # a gentle live load into the last seed's orgs
+haven db seed --resume              # continue the last run of the same flags, keeping its anchor and run id
 ```
 
 Flags: `--size tiny|small|medium|large`, `--spans <n>` (1 to 2000000), `--days <d>`,
-`--persona startup,enterprise,gateway,agent-eval|all`, `--private <n>`, `--seed <s>`,
+`--persona startup,enterprise,gateway,agent-eval|all`, `--private <n>` (default 0 on every tier: nothing binds a private org yet, so ask for them), `--seed <s>`,
 `--anchor <rfc3339>`, `--age <n>d` (history ends n days ago, to test retention),
 `--conversations <n>`, `--turns <n>`, `--shape saas|sh-licensed|sh-free`,
 `--org name=..,plan=free|licence,users=N[,persona=..][,owner=EMAIL][,admin=no]` (repeatable),
 `--into <org-id>/<project-id>` (telemetry only, into an existing project), `--live`,
 `--dry-run`, `--json`, `--reveal`.
 
-Exit codes: 0 done, 1 a check failed, 2 refused before writing, 4 stalled.
+Exit codes: 0 done, 1 a check failed, 2 refused before writing, 4 stalled. A stall (exit 4) saves a checkpoint and prints seedgen's own line; rerun the same flags with `--resume`, in any hour. `haven down --destroy` forgets the stack's seed records and logins.
 
 ## Logins and credentials
 

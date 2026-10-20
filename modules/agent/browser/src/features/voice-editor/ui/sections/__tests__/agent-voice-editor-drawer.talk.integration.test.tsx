@@ -40,9 +40,9 @@ describe("AgentVoiceEditorDrawer Talk to it", () => {
       renderVoiceDrawer();
       const talk = await screen.findByTestId("voice-agent-talk");
       expect(talk).toBeDisabled();
-      expect(talk).toHaveAttribute("title", "Enter the agent id first");
+      expect(screen.getByLabelText("Enter the agent id first")).toBeInTheDocument();
       await user.type(screen.getByTestId("voice-agent-id-input"), "agent_1");
-      expect(talk).toBeEnabled();
+      expect(await screen.findByTestId("voice-agent-talk")).toBeEnabled();
     });
   });
 
@@ -79,7 +79,7 @@ describe("AgentVoiceEditorDrawer Talk to it", () => {
       renderVoiceDrawer({ agentId: "voice_1" });
       const talk = await screen.findByTestId("voice-agent-talk");
       expect(talk).toBeDisabled();
-      expect(talk).toHaveAttribute("title", "Add an ElevenLabs key first");
+      expect(screen.getByLabelText("Add an ElevenLabs key first")).toBeInTheDocument();
     });
   });
 });

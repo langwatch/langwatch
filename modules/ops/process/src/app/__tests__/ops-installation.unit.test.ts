@@ -23,6 +23,7 @@ import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { GithubApi } from "@langwatch/github-contract";
 import type { IdentityApi } from "@langwatch/identity-contract";
+import type { InsightApi } from "@langwatch/insight-contract";
 import type { InstantEvalApi } from "@langwatch/instant-eval-contract";
 import type { LangyApi } from "@langwatch/langy-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
@@ -38,17 +39,16 @@ import type { ScenarioApi } from "@langwatch/scenario-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import type { ShareApi } from "@langwatch/share-contract";
 import type { StoredObjectApi } from "@langwatch/stored-object-contract";
-import type { SystemMigration } from "@langwatch/system-migrations";
 import { createTestLogger } from "@langwatch/test-harness";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import type { TraceApi } from "@langwatch/trace-contract";
+import { isMigrationStep } from "@langwatch/upgrade/step";
 import type { UserApi } from "@langwatch/user-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { opsProcessModule } from "../../ops.module.ts";
 import { MemoryOpsSnapshotRepository } from "../../repositories/memory/memory.ops-snapshot.repository.ts";
-import { MemorySystemMigrationStateRepository } from "../../repositories/memory/memory.system-migration-state.repository.ts";
 import { OPS_STAFF_ADDRESS, platformOperatorAuthz } from "./ops.fixture.ts";
 
 function process(
@@ -84,6 +84,7 @@ function process(
           lokiDatasourceUid: undefined,
         },
         bugReportSlackChannel: undefined,
+        slackApiBase: "https://slack.com/api",
         cloudOps: cloud.asked ?? false,
         adminEmails: [],
         nodeEnvironment: undefined,
@@ -121,6 +122,7 @@ function process(
       prompt: createApiFixture<PromptApi>(),
       workflow: createApiFixture<WorkflowApi>(),
       automation: createApiFixture<AutomationApi>({}),
+      insight: createApiFixture<InsightApi>(),
       github: createApiFixture<GithubApi>(),
       langy: createApiFixture<LangyApi>(),
       dashboard: createApiFixture<DashboardApi>(),
@@ -244,62 +246,30 @@ describe("ops app installation", () => {
     });
   });
 
-  describe("given the api role and a peer that registers migrations", () => {
-    const migration = (name: string, title: string): SystemMigration => ({
-      name,
-      title,
-      description: `${title}, as its owner describes it.`,
-      requiresOperatorConfirmation: false,
-      runsAutomaticallyOnSelfHosted: true,
-      enrolledAutomatically: false,
-      migrateTenant: async () => ({ status: "finalized" }),
-    });
-    const identity = createApiFixture<IdentityApi>({
-      registeredMigrations: () => [migration("sso-domain-ownership", "Domain ownership")],
-      userMigrations: () => [migration("identity-identifier-backfill", "Sign-in identifiers")],
-    });
-    const authz = createApiFixture<AuthzApi>({
-      registeredMigrations: () => [migration("authz-grants-genesis-import", "Grant import")],
-    });
-
-    /** @scenario "The tenant migrations tab lists every registered migration when served by the api role" */
-    /** @scenario "A migration registered by a peer module appears on the page with its title and description" */
-    it("lists each peer's migrations, in running order, with the owner's title and description", async () => {
-      vi.spyOn(
-        MemorySystemMigrationStateRepository.prototype,
-        "findStatusCounts",
-      ).mockResolvedValue({ migrated: 0, finalized: 3, parked: 0, rolled_back: 0 });
-      vi.spyOn(
-        MemorySystemMigrationStateRepository.prototype,
-        "findRecordsByStatus",
-      ).mockResolvedValue([]);
-      const runtime = await process("api", identity, authz).boot();
+  describe("given ops declares its migration steps", () => {
+    /** @scenario "The re-copy waits for older images and for identity's reopen step" */
+    it("copies the moved migrations' state at once and re-copies after the rollout", async () => {
+      const runtime = await process("worker").boot();
 
       try {
-        const listed = await runtime.service(OpsApi).listSystemMigrations();
+        const steps = runtime.migrationSteps(isMigrationStep);
+        const copy = steps.find(({ id }) => id === "ops:copy-identity-authz-migration-state");
+        const recopy = steps.find(
+          ({ id }) => id === "ops:recopy-identity-authz-migration-state-after-rollout",
+        );
 
-        expect(
-          listed.map(({ name, title, description }) => ({ name, title, description })),
-        ).toEqual([
-          {
-            name: "authz-grants-genesis-import",
-            title: "Grant import",
-            description: "Grant import, as its owner describes it.",
-          },
-          {
-            name: "sso-domain-ownership",
-            title: "Domain ownership",
-            description: "Domain ownership, as its owner describes it.",
-          },
-          {
-            name: "identity-identifier-backfill",
-            title: "Sign-in identifiers",
-            description: "Sign-in identifiers, as its owner describes it.",
-          },
-        ]);
-        expect(listed[1]?.counts.finalized).toBe(3);
+        expect(copy).toMatchObject({ kind: "data", mode: "background" });
+        expect(copy?.needsOldWritersGone).toBeUndefined();
+        expect(recopy).toMatchObject({
+          kind: "data",
+          mode: "background",
+          needsOldWritersGone: true,
+          after: [
+            "ops:copy-identity-authz-migration-state",
+            "identity:reopen-unproven-accounts-after-rollout",
+          ],
+        });
       } finally {
-        vi.restoreAllMocks();
         await runtime.stop();
       }
     });

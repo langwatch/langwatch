@@ -12,7 +12,7 @@ export const TOOLBAR_BUTTON_PROPS = {
   paddingX: "10px",
   borderRadius: "lg",
   background: "bg.panel",
-  fontSize: "12.5px",
+  textStyle: "bodySm",
   fontWeight: "medium",
   gap: 1.5,
 } satisfies ButtonProps;

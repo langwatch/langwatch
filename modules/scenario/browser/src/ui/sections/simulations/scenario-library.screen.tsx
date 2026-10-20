@@ -6,7 +6,8 @@ import { useDrawer } from "@langwatch/browser-host/drawer";
 import { showErrorToast } from "@langwatch/browser-host/errors";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { HStack, Spacer, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { scenarioClient } from "@langwatch/scenario-client";
 import { Plus } from "lucide-react";
 import { useCallback, useMemo, useState } from "react";
@@ -155,7 +156,7 @@ function ScenarioLibraryPage() {
     <>
       <PageLayout.Header>
         <HStack justify="space-between" align="center" w="full">
-          <PageLayout.Heading>Scenario Library</PageLayout.Heading>
+          <PageLayout.Heading>Scenario library</PageLayout.Heading>
           <Spacer />
           <LabelFilterDropdown
             allLabels={allLabels}
@@ -170,11 +171,7 @@ function ScenarioLibraryPage() {
       </PageLayout.Header>
 
       <PageLayout.Container padding={0}>
-        {isLoading && (
-          <VStack gap={4} align="center" py={8}>
-            <Spinner borderWidth="3px" animationDuration="0.8s" />
-          </VStack>
-        )}
+        {isLoading && <SkeletonRows rows={6} />}
 
         {error && !scenarios?.length && (
           <VStack gap={4} align="center" py={8}>

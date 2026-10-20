@@ -1,4 +1,5 @@
-import { customGraphInputSchema } from "@langwatch/dashboard-contract";
+import { customGraphInputSchema, parseStoredTimeScale } from "@langwatch/dashboard-contract";
+import { Card } from "@langwatch/design-system/card";
 import { CodePreview } from "@langwatch/design-system/code-preview";
 import { getRawColorValue } from "@langwatch/design-system/color-mode";
 import { Dialog } from "@langwatch/design-system/dialog";
@@ -9,7 +10,6 @@ import {
   Accordion,
   Box,
   Button,
-  Card,
   Center,
   createListCollection,
   Field,
@@ -99,6 +99,7 @@ import { FilterToggle, FilterToggleButton } from "../../../ui/sections/filter-to
 import { SavedViewsScope } from "../../../ui/sections/saved-views-scope.tsx";
 import { SeriesFiltersDialog } from "../../../ui/sections/series-filters-dialog.tsx";
 import { withAggregateAnalyticsGate } from "../aggregate-analytics-gate.tsx";
+import { AnalyticsOverflowMenu } from "../analytics-overflow-menu.tsx";
 
 /** Which of the builder's two addresses this render is. */
 export type CustomGraphScreenMode = "new" | "edit";
@@ -133,7 +134,8 @@ export interface CustomGraphFormData {
   groupBy?: FlattenAnalyticsGroupsEnum | "";
   groupByKey?: string;
   includePrevious: boolean;
-  timeScale: "full" | number;
+  /** Minutes, or the native select's text: "full" or a number of minutes ("60"). */
+  timeScale: number | string;
   connected?: boolean;
   alert?: {
     enabled: boolean;
@@ -202,32 +204,32 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     icon: <AlignLeft />,
   },
   {
-    label: "Line Chart",
+    label: "Line chart",
     value: "line",
     icon: <TrendingUp />,
   },
   {
-    label: "Area Chart",
+    label: "Area chart",
     value: "area",
     icon: <Triangle />,
   },
   {
-    label: "Stacked Area Chart",
+    label: "Stacked area chart",
     value: "stacked_area",
     icon: <Triangle />,
   },
   {
-    label: "Bar Chart",
+    label: "Bar chart",
     value: "bar",
     icon: <BarChart2 />,
   },
   {
-    label: "Stacked Bar Chart",
+    label: "Stacked bar chart",
     value: "stacked_bar",
     icon: <BarChart2 />,
   },
   {
-    label: "Horizontal Bar Chart",
+    label: "Horizontal bar chart",
     value: "horizontal_bar",
     icon: (
       <BarChart2
@@ -238,22 +240,22 @@ const chartOptions: Required<CustomGraphFormData>["graphType"][] = [
     ),
   },
   {
-    label: "Scatter Chart",
+    label: "Scatter chart",
     value: "scatter",
     icon: <GitBranch />,
   },
   {
-    label: "Pie Chart",
+    label: "Pie chart",
     value: "pie",
     icon: <PieChart />,
   },
   {
-    label: "Donut Chart",
+    label: "Donut chart",
     value: "donnut",
     icon: <PieChart />,
   },
   {
-    label: "Monitor Graph",
+    label: "Monitor graph",
     value: "monitor_graph",
     icon: <LuChartArea />,
   },
@@ -359,9 +361,6 @@ function AnalyticsCustomGraphContent({
 
     const customGraphInput = customGraphFormToCustomGraphInput(parsedFormData);
     const apiJson = customAPIinput(parsedFormData, filterParams);
-    if (typeof apiJson?.timeScale === "string" && apiJson.timeScale !== "full") {
-      apiJson.timeScale = parseInt(apiJson.timeScale);
-    }
     setDebouncedCustomAPIInput(apiJson);
     setDebouncedCustomGraphInput(customGraphInput);
   }, [formData, filterParams, setDebouncedCustomAPIInput, setDebouncedCustomGraphInput]);
@@ -369,7 +368,7 @@ function AnalyticsCustomGraphContent({
   return (
     <SavedViewsScope>
       <PageLayout.Header>
-        <PageLayout.Heading>Custom Graph</PageLayout.Heading>
+        <PageLayout.Heading>Custom graph</PageLayout.Heading>
         <Spacer />
         <FilterToggle />
         <AnalyticsPeriodPicker
@@ -378,6 +377,7 @@ function AnalyticsCustomGraphContent({
           setPeriod={setPeriod}
           setRelativePeriod={setRelativePeriod}
         />
+        <AnalyticsOverflowMenu />
       </PageLayout.Header>
       <PageLayout.Container>
         <VStack width="full" align="start" gap={6}>
@@ -388,15 +388,15 @@ function AnalyticsCustomGraphContent({
               customId={customId}
               filterParams={filterParams}
             />
-            <Card.Root width="full">
-              <Card.Header paddingTop={3} paddingBottom={1} paddingX={3}>
+            <Card padding="lg">
+              <VStack align="stretch" gap={4}>
                 <HStack width="full" justify="space-between">
                   <Input
                     {...form.control.register(`title`)}
                     border="none"
                     paddingX={2}
                     fontWeight="bold"
-                    fontSize="16px"
+                    textStyle="sectionTitle"
                     data-testid="analytics-graph-title"
                   />
                   <HStack gap={2}>
@@ -419,8 +419,6 @@ function AnalyticsCustomGraphContent({
                     </Menu.Root>
                   </HStack>
                 </HStack>
-              </Card.Header>
-              <Card.Body>
                 {debouncedCustomGraphInput && (
                   <CustomGraph
                     input={debouncedCustomGraphInput}
@@ -431,45 +429,35 @@ function AnalyticsCustomGraphContent({
                     }
                   />
                 )}
-              </Card.Body>
-            </Card.Root>
+              </VStack>
+            </Card>
             {showFilters && <FilterSidebar hideTopics={true} />}
           </HStack>
         </VStack>
       </PageLayout.Container>
-      <Dialog.Root
+      <Dialog
         open={jsonModal.open}
-        onOpenChange={({ open }) => jsonModal.setOpen(open)}
+        onClose={() => jsonModal.setOpen(false)}
+        title="Graph JSON"
         size="lg"
+        cancelLabel="Close"
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>Graph JSON</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
-            <Textarea rows={16}>{JSON.stringify(debouncedCustomGraphInput, null, 2)}</Textarea>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
-      <Dialog.Root
+        <Textarea rows={16}>{JSON.stringify(debouncedCustomGraphInput, null, 2)}</Textarea>
+      </Dialog>
+      <Dialog
         open={apiModal.open}
-        onOpenChange={({ open }) => apiModal.setOpen(open)}
+        onClose={() => apiModal.setOpen(false)}
+        title="JSON API"
         size="lg"
+        cancelLabel="Close"
       >
-        <Dialog.Content>
-          <Dialog.Header>
-            <Dialog.Title>JSON API</Dialog.Title>
-            <Dialog.CloseTrigger />
-          </Dialog.Header>
-          <Dialog.Body>
-            <Text paddingBottom={8}>
-              Incorporate the following JSON payload within the body of your HTTP POST request to
-              access identical data tailored for the custom graphs.
-            </Text>
-            <Box>
-              <CodePreview
-                code={`# Set your API key and endpoint URL
+        <Text paddingBottom={8}>
+          Incorporate the following JSON payload within the body of your HTTP POST request to access
+          identical data tailored for the custom graphs.
+        </Text>
+        <Box>
+          <CodePreview
+            code={`# Set your API key and endpoint URL
 API_KEY="your_langwatch_api_key"
 ENDPOINT="${langwatchEndpoint()}/api/analytics"
 
@@ -480,12 +468,10 @@ curl -X POST "$ENDPOINT" \\
      -d @- <<EOF
 ${JSON.stringify(debouncedCustomAPIInput, null, 2)}
 EOF`}
-                language="bash"
-              />
-            </Box>
-          </Dialog.Body>
-        </Dialog.Content>
-      </Dialog.Root>
+            language="bash"
+          />
+        </Box>
+      </Dialog>
     </SavedViewsScope>
   );
 }
@@ -574,7 +560,8 @@ export const customGraphFormToCustomGraphInput = (
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
     includePrevious: formData.includePrevious,
-    timeScale: formData.timeScale,
+    // The native select hands its value back as text; the saved chart carries minutes.
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
     connected: formData.connected,
     height: 517,
   };
@@ -615,7 +602,7 @@ const customAPIinput = (
     }) as CustomAPICallData["series"],
     groupBy: formData.groupBy === "" ? undefined : formData.groupBy,
     groupByKey: formData.groupByKey,
-    timeScale: formData.timeScale,
+    timeScale: parseStoredTimeScale(formData.timeScale) ?? 60,
   };
 };
 
@@ -750,7 +737,7 @@ function CustomGraphForm({
   return (
     <VStack width="full" align="start" gap={4} maxWidth="500px">
       <Field.Root>
-        <Field.Label>Graph Type</Field.Label>
+        <Field.Label>Graph type</Field.Label>
         <GraphTypeField form={form} />
       </Field.Root>
       {showsTimeScale && (
@@ -771,7 +758,7 @@ function CustomGraphForm({
             render={({ field }) => (
               <NativeSelect.Root>
                 <NativeSelect.Field {...field}>
-                  <option value="full">Full Period</option>
+                  <option value="full">Full period</option>
                   <option value="10">10 minutes</option>
                   <option value="30">30 minutes</option>
                   <option value="60">1 hour</option>
@@ -802,7 +789,7 @@ function CustomGraphForm({
         </Field.Root>
       )}
       <Field.Root>
-        <Field.Label fontSize="16px" width="full">
+        <Field.Label textStyle="sectionTitle" width="full">
           <HStack width="full" justify="space-between">
             Series
             <Button
@@ -1069,7 +1056,7 @@ function SeriesFieldItem({
                 >
                   <VStack align="start" gap={2}>
                     <Text>{camelCaseToTitleCase(key)}</Text>
-                    <HStack gap={0} paddingLeft="12px">
+                    <HStack gap={0} paddingLeft="3">
                       {colorSet.map((color, i) => (
                         <Box
                           key={i}
@@ -1077,7 +1064,7 @@ function SeriesFieldItem({
                           height="32px"
                           borderRadius="100%"
                           backgroundColor={color.color}
-                          marginLeft="-12px"
+                          marginLeft="-3"
                         />
                       ))}
                     </HStack>
@@ -1093,7 +1080,7 @@ function SeriesFieldItem({
             onClick={(e) => {
               e.stopPropagation();
             }}
-            fontSize="14px"
+            textStyle="body"
             fontWeight="normal"
             onDoubleClick={() => {
               setExpandedSeries((prev) => {
@@ -1371,8 +1358,8 @@ function SeriesField({
                     onClick={() => setEditingSeriesFilters(true)}
                   >
                     {Object.keys(nonEmptyFilters).length > 0
-                      ? "Edit Filters"
-                      : "Add Filter for Series"}
+                      ? "Edit filters"
+                      : "Add filter for series"}
                   </FilterToggleButton>
                   <SeriesFiltersDialog
                     open={editingSeriesFilters}
@@ -1482,7 +1469,7 @@ function FilterSelectField<T extends FieldValues, U extends Path<T>>({
             <chakraComponents.Option {...props}>
               <HStack align="end">
                 <Box width="16px">{props.isSelected && <Check width="16px" />}</Box>
-                <VStack align="start" gap={"2px"}>
+                <VStack align="start" gap="0.5">
                   {details && (
                     <Text fontSize="sm" color={props.isSelected ? "fg" : "fg.muted"}>
                       {details}
@@ -1611,4 +1598,4 @@ function CustomGraphScreen({ mode }: { mode: CustomGraphScreenMode }) {
   );
 }
 
-export default withAggregateAnalyticsGate("Custom Graph", CustomGraphScreen);
+export default withAggregateAnalyticsGate("Custom graph", CustomGraphScreen);

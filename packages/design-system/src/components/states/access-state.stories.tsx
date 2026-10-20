@@ -5,6 +5,12 @@ import { AccessState } from "./access-state.tsx";
 
 const meta = {
   title: "Feedback/Access state",
+  parameters: {
+    usage: {
+      use: "A page or section the reader can't use yet: a plan that doesn't include it, a missing permission, an address that isn't there.",
+      avoid: "A failed request: Banner. An empty list: NoDataInfoBlock with a next step.",
+    },
+  },
   component: AccessState,
   tags: ["autodocs"],
   args: {

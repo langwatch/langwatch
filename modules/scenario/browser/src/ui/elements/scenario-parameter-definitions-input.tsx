@@ -145,7 +145,7 @@ function ParameterRow({
           size="sm"
           flex={NAME_FLEX}
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           disabled={disabled}
           aria-label={`Parameter ${index + 1} name`}
           data-testid={`scenario-parameter-name-${index}`}
@@ -242,7 +242,7 @@ function DefaultValueCell({
           size="sm"
           width="full"
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           disabled={disabled || isSecret}
           aria-label={`Parameter ${index + 1} default value`}
           data-testid={`scenario-parameter-default-${index}`}
@@ -300,7 +300,7 @@ function ColumnLabel({
 }) {
   return (
     <Text
-      fontSize="11px"
+      textStyle="micro"
       color="fg.subtle"
       flex={flex}
       width={width}

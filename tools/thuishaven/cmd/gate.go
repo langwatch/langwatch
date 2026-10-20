@@ -4,7 +4,6 @@ import (
 	"context"
 	"fmt"
 	"os"
-	"strconv"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/app"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
@@ -26,29 +25,17 @@ func runHeavy(ctx context.Context, d deps, inv invocation) error {
 	if class := inv.value("--class"); class != "" && class != domain.HeavySlotClass {
 		return fmt.Errorf("haven machine run has one slot class today, %q — not %q", domain.HeavySlotClass, class)
 	}
+	if domain.UnderRushGate(os.Getenv) {
+		return execUnderRush([]string{"bash", "-lc", shell}, d.worktree)
+	}
 	return d.orch.RunHeavy(ctx, app.HeavyRun{
-		Shell:   shell,
-		Dir:     d.worktree,
-		AgentID: inv.value("--agent-id"),
-		// The gate decided the width; this only applies it. A count that will not
-		// parse is treated as absent rather than fatal, because refusing to run
-		// over a malformed flag would be the gate breaking the command it rewrote.
-		Workers: positiveInt(inv.value("--workers")),
+		Shell: shell,
+		Dir:   d.worktree,
 		// A terminal on stdout means a human is watching, and a human waiting is
 		// not an idle API session — so they keep the long failsafe rather than an
 		// agent's tighter ceiling.
 		Interactive: stdoutIsTTY(),
 	})
-}
-
-// positiveInt reads a count, treating anything unparseable or non-positive as
-// unset.
-func positiveInt(s string) int {
-	n, err := strconv.Atoi(s)
-	if err != nil || n < 1 {
-		return 0
-	}
-	return n
 }
 
 // runGate answers one PreToolUse hook in the selected client protocol.

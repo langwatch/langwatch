@@ -7,54 +7,18 @@
     "tsBuildInfoFile": "dist/tsconfig.typecheck.tsbuildinfo",
     "lib": ["es2023", "dom"],
     "noUncheckedIndexedAccess": true,
-    "verbatimModuleSyntax": true
+    "verbatimModuleSyntax": true,
+    "composite": true,
+    "noEmit": false
   },
-  "include": ["src/**/*.ts"],
+  "files": [],
+  "include": [],
   "references": [
     {
-      "path": "tsconfig.build.json"
+      "path": "./tsconfig.build.json"
     },
     {
-      "path": "../../../../packages/api/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/api-key/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/auth/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/handled-error/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/model-provider/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/module/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/otlp/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../modules/project/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/secrets/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/time/tsconfig.build.json"
-    },
-    {
-      "path": "../../../../packages/vitest-config/tsconfig.build.json"
+      "path": "./tsconfig.test.json"
     }
   ]
 }

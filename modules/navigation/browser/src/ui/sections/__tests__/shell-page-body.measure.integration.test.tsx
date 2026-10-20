@@ -1,6 +1,7 @@
 /**
  * @vitest-environment jsdom
- * Settings form pages read at one narrow measure; list and table pages at the wider one.
+ * Settings page bodies read in one centred column under a full-width header, forms and
+ * tables alike.
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -38,50 +39,43 @@ function measureAt({ pathname }: { pathname: string }): string {
 }
 
 describe("given a settings page", () => {
-  describe("when it is a form page", () => {
+  describe("when it is a form, list or table page", () => {
     it.each([
       "/settings",
       "/settings/profile",
       "/settings/security",
       "/settings/checkup",
-      "/settings/data-privacy",
-      "/settings/license",
-      "/settings/connect",
       "/settings/integrations",
-    ])("frames %s at the form measure", (pathname) => {
-      expect(measureAt({ pathname })).toBe("820px");
-    });
-  });
-
-  describe("when it is your own account page", () => {
-    it.each(["/settings/profile", "/settings/security"])("aligns %s to the left", (pathname) => {
-      expect(frameAt({ pathname }).pageAlign).toBe("start");
-    });
-
-    it("centres the organization's settings", () => {
-      expect(frameAt({ pathname: "/settings" }).pageAlign).toBe("center");
-    });
-  });
-
-  describe("when it is a list or table page", () => {
-    it.each([
       "/settings/api-keys",
-      "/settings/secrets",
-      "/settings/data-retention",
       "/settings/audit-log",
-      "/settings/subscription",
       "/settings/model-providers",
-    ])("frames %s at the table measure", (pathname) => {
-      expect(measureAt({ pathname })).toBe("1280px");
+    ])("frames %s in the one centred settings column", (pathname) => {
+      expect(measureAt({ pathname })).toBe("1248px");
     });
   });
 
   describe("when it is the authentication family", () => {
     it.each(["/settings/authentication", "/settings/authentication/provider"])(
-      "leaves %s unmeasured, so its section rail fills the card",
+      "frames %s at the settings measure, its pages being header tabs now",
       (pathname) => {
-        expect(measureAt({ pathname })).toBe("");
+        expect(measureAt({ pathname })).toBe("1248px");
       },
     );
   });
+});
+
+describe("wide tool pages", () => {
+  it.each(["/ops/upgrades/runs/run_1", "/demo/analytics"])(
+    "keeps %s in a bounded scroll container",
+    (pathname) => {
+      frameAt({ pathname });
+      const body = screen.getByText("Page content").parentElement;
+      expect(body).not.toBeNull();
+      if (!body) return;
+      const style = getComputedStyle(body);
+      expect(style.overflowY).toBe("auto");
+      expect(style.minHeight).toBe("0px");
+      expect(style.display).toBe("flex");
+    },
+  );
 });

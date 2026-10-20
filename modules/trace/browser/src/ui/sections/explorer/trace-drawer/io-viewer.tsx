@@ -145,7 +145,7 @@ function IOViewerHeading({
       >
         <Text
           textStyle="2xs"
-          fontWeight="bold"
+          fontWeight="semibold"
           color="fg"
           letterSpacing="wide"
           textTransform="uppercase"

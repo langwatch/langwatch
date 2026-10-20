@@ -4,25 +4,21 @@ import (
 	"bytes"
 	"context"
 	"fmt"
+	"maps"
 	"os/exec"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
 )
-
-// queueExcluded is every completed, failed or bookkeeping key (the gq ready index and stats, known pipelines).
-var queueExcluded = regexp.MustCompile(`:completed$|:failed$|:events$|:meta$|:repeat$|:stalled|dedup|lock|known-pipelines|:gq:stats:|:gq:ready$`)
 
 const (
 	redisBatch   = 200 // commands per redis-cli call, so Redis is never held for more than a few ms
 	redisDivider = "--end--"
 )
 
-var (
-	replyIndex  = regexp.MustCompile(`^\d+\) `)
-	streamEntry = regexp.MustCompile(`^\d+\) 1\) (".*")$`) // an unindented line: a field pair is nested deeper
-)
+var replyIndex = regexp.MustCompile(`^\d+\) `)
 
 // scanKeys lists keys with SCAN through redis-cli --scan, which never blocks Redis.
 func scanKeys(ctx context.Context, port, pattern string) ([]string, error) {
@@ -104,147 +100,143 @@ func replyInt(lines []string) int {
 	return count
 }
 
-type queueKey struct{ name, kind string }
-
-type queueScan struct {
-	pattern  string
-	filtered bool
-}
-
-var (
-	allKeys   = queueScan{pattern: "*"}
-	queueOnly = queueScan{pattern: "*", filtered: true}
+// The group queue's own bookkeeping (packages/group-queue: scripts.ts, drainAudit.ts): queues
+// register in one set, and each keeps a waiting-job counter beside its ready-groups index.
+const (
+	groupQueueRegistry = "{gq-registry}:names"
+	readySuffix        = ":gq:ready"
 )
 
-// queueKeys scans pattern (queue-shaped keys only), drops the excluded keys when filtered, and types the rest in batches.
-func queueKeys(ctx context.Context, port string, scan queueScan) ([]queueKey, error) {
-	names, err := scanKeys(ctx, port, scan.pattern)
+// redisReads is the two reads the depth needs; redisCLI is the cell's, a fake stands in for tests.
+type redisReads interface {
+	scan(ctx context.Context, pattern string) ([]string, error)
+	replies(ctx context.Context, commands [][]string) ([][]string, error)
+}
+
+type redisCLI string // the port
+
+func (port redisCLI) scan(ctx context.Context, pattern string) ([]string, error) {
+	return scanKeys(ctx, string(port), pattern)
+}
+
+func (port redisCLI) replies(ctx context.Context, commands [][]string) ([][]string, error) {
+	return redisReplies(ctx, string(port), commands)
+}
+
+// QueueCount is one group queue's waiting work, read as the product's drain audit reads it.
+type QueueCount struct {
+	Name    string `json:"name"`
+	Pending int    `json:"pending"` // max(stats:total-pending, ready groups): drainAudit.countPending
+	Ready   int    `json:"readyGroups"`
+	Blocked int    `json:"blockedGroups"`
+}
+
+// groupQueueNames is the registry's queues; only an empty registry pays for a SCAN of ready indexes.
+func groupQueueNames(ctx context.Context, redis redisReads) ([]string, error) {
+	replies, err := redis.replies(ctx, [][]string{{"SMEMBERS", groupQueueRegistry}})
 	if err != nil {
 		return nil, err
 	}
-	var kept []string
-	var commands [][]string
+	names := map[string]bool{}
+	for _, line := range replies[0] {
+		if name := replyValue(line); name != "" && !strings.HasPrefix(name, "(empty") {
+			names[name] = true
+		}
+	}
+	if len(names) == 0 {
+		keys, err := redis.scan(ctx, "*"+readySuffix)
+		if err != nil {
+			return nil, err
+		}
+		for _, key := range keys {
+			names[strings.TrimSuffix(key, readySuffix)] = true
+		}
+	}
+	return slices.Sorted(maps.Keys(names)), nil
+}
+
+// queueCounts reads each group queue's counter, ready index and blocked set: four reads a queue, no SCAN.
+func queueCounts(ctx context.Context, redis redisReads) ([]QueueCount, error) {
+	names, err := groupQueueNames(ctx, redis)
+	if err != nil || len(names) == 0 {
+		return nil, err
+	}
+	commands := make([][]string, 0, 3*len(names))
 	for _, name := range names {
-		if !scan.filtered || !queueExcluded.MatchString(name) {
-			kept = append(kept, name)
-			commands = append(commands, []string{"TYPE", name})
-		}
+		prefix := name + ":gq:"
+		commands = append(commands, []string{"GET", prefix + "stats:total-pending"}, []string{"ZCARD", prefix + "ready"}, []string{"SCARD", prefix + "blocked"})
 	}
-	replies, err := redisReplies(ctx, port, commands)
+	replies, err := redis.replies(ctx, commands)
 	if err != nil {
 		return nil, err
 	}
-	var keys []queueKey
-	for i, name := range kept {
-		if kind := replyValue(strings.Join(replies[i], "")); kind == "zset" || kind == "list" || kind == "stream" {
-			keys = append(keys, queueKey{name: name, kind: kind})
-		}
+	counts := make([]QueueCount, len(names))
+	for i, name := range names {
+		ready := replyInt(replies[3*i+1])
+		counts[i] = QueueCount{Name: name, Pending: max(replyInt(replies[3*i]), ready), Ready: ready, Blocked: replyInt(replies[3*i+2])}
 	}
-	return keys, nil
+	return counts, nil
 }
 
-func lengthCommand(key queueKey) []string {
-	switch key.kind {
-	case "zset":
-		return []string{"ZCARD", key.name}
-	case "list":
-		return []string{"LLEN", key.name}
-	case "stream":
-		return []string{"XLEN", key.name}
-	}
-	return []string{"ECHO", "0"} // not a queue
+// QueueDepth is every group queue's waiting jobs, from the counters the product keeps.
+func QueueDepth(ctx context.Context, port string) (int, error) {
+	counts, err := queueCounts(ctx, redisCLI(port))
+	return totalPending(counts), err
 }
 
-// queueLengths is each key's waiting-item count, in keys' order.
-func queueLengths(ctx context.Context, port string, keys []queueKey) ([]int, error) {
-	commands := make([][]string, len(keys))
-	for i, key := range keys {
-		commands[i] = lengthCommand(key)
+func totalPending(counts []QueueCount) int {
+	total := 0
+	for _, count := range counts {
+		total += count.Pending
+	}
+	return total
+}
+
+// QueueNotDue counts group-queue jobs scheduled later than now (zset score = due ms), such as the trace
+// pipeline's five-minute deferred origin jobs: waiting by design, not a backlog the worker failed to drain.
+func QueueNotDue(ctx context.Context, port string) (int, error) {
+	names, err := scanKeys(ctx, port, "*:gq:group:*:jobs")
+	if err != nil || len(names) == 0 {
+		return 0, err
+	}
+	after := "(" + strconv.FormatInt(time.Now().UnixMilli(), 10)
+	commands := make([][]string, 0, len(names))
+	for _, name := range names {
+		commands = append(commands, []string{"ZCOUNT", name, after, "+inf"})
 	}
 	replies, err := redisReplies(ctx, port, commands)
-	lengths := make([]int, len(replies))
-	for i, reply := range replies {
-		lengths[i] = replyInt(reply)
-	}
-	return lengths, err
-}
-
-// QueueDepth reads the cell's Redis once, with SCAN and batched lengths.
-func QueueDepth(ctx context.Context, port string) (int, error) {
-	keys, err := queueKeys(ctx, port, queueOnly)
 	if err != nil {
 		return 0, err
 	}
-	lengths, err := queueLengths(ctx, port, keys)
 	total := 0
-	for _, length := range lengths {
-		total += length
+	for _, reply := range replies {
+		total += replyInt(reply)
 	}
-	return total, err
+	return total, nil
 }
 
-// QueueJobs lists every waiting job as "key member", with the same exclusions as the depth.
-func QueueJobs(ctx context.Context, port string) (map[string]struct{}, error) {
-	keys, err := queueKeys(ctx, port, queueOnly)
-	if err != nil {
-		return nil, err
+// QueueDueDepth is QueueDepth less the jobs not yet due; the not-due scan runs only above limit.
+func QueueDueDepth(ctx context.Context, port string, limit int) (depth, notDue int, err error) {
+	if depth, err = QueueDepth(ctx, port); err != nil || depth <= limit {
+		return depth, 0, err
 	}
-	commands := make([][]string, len(keys))
-	for i, key := range keys {
-		switch key.kind {
-		case "zset":
-			commands[i] = []string{"ZRANGE", key.name, "0", "-1"}
-		case "list":
-			commands[i] = []string{"LRANGE", key.name, "0", "-1"}
-		case "stream":
-			commands[i] = []string{"XRANGE", key.name, "-", "+"}
-		default:
-			commands[i] = []string{"ECHO", "0"}
-		}
+	if notDue, err = QueueNotDue(ctx, port); err != nil {
+		return depth, 0, err
 	}
-	replies, err := redisReplies(ctx, port, commands)
-	if err != nil {
-		return nil, err
-	}
-	jobs := map[string]struct{}{}
-	for i, key := range keys {
-		addJobs(jobs, key, replies[i])
-	}
-	return jobs, nil
+	return max(depth-notDue, 0), notDue, nil
 }
 
-// addJobs names a key's waiting jobs: a list's by position, a stream's by entry id, a set's by member.
-func addJobs(jobs map[string]struct{}, key queueKey, lines []string) {
-	position := 0
-	for _, line := range lines {
-		switch key.kind {
-		case "stream":
-			if match := streamEntry.FindStringSubmatch(line); match != nil {
-				jobs[key.name+" "+replyValue(match[1])] = struct{}{}
-			}
-		case "list":
-			position++
-			jobs[key.name+" #"+strconv.Itoa(position)+replyValue(line)] = struct{}{}
-		default:
-			jobs[key.name+" "+replyValue(line)] = struct{}{}
-		}
-	}
-}
-
-// TopQueueKeys names the longest keys, so a report reader can judge what the depth counted.
-func TopQueueKeys(ctx context.Context, port string) string {
-	keys, err := queueKeys(ctx, port, allKeys)
+// QueueBreakdown names each queue's counts, so a report reader can judge what the depth counted.
+func QueueBreakdown(ctx context.Context, port string) string {
+	counts, err := queueCounts(ctx, redisCLI(port))
 	if err != nil {
-		return ""
+		return "unread: " + err.Error()
 	}
-	lengths, _ := queueLengths(ctx, port, keys)
-	var rows []string
-	for i, key := range keys {
-		if i < len(lengths) && lengths[i] > 0 {
-			rows = append(rows, fmt.Sprintf("%s %s %d", key.name, key.kind, lengths[i]))
-		}
+	rows := make([]string, 0, len(counts))
+	for _, count := range counts {
+		rows = append(rows, fmt.Sprintf("%s pending %d, ready groups %d, blocked groups %d", count.Name, count.Pending, count.Ready, count.Blocked))
 	}
-	return strings.Join(rows[:min(len(rows), 25)], "\n")
+	return strings.Join(rows, "\n")
 }
 
 // QueueByKind groups the group-queue's waiting jobs by job kind (the group key without tenant and

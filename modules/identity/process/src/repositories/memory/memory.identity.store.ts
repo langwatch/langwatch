@@ -29,6 +29,8 @@ interface MemoryUserRow {
   userHashKey: string | null;
   /** `User.lastLoginAt`; absent reads as never signed into. */
   lastLoginAtMs?: number | null;
+  /** `User.passkeySignupClaimHash` is set; absent reads as none. */
+  passkeySignupPending?: boolean;
   payload: Record<string, unknown>;
 }
 
@@ -47,6 +49,8 @@ export class MemoryIdentityStore {
   readonly users = new Map<string, MemoryUserRow>();
   readonly identifiers = new Map<string, IdentifierFact>();
   readonly accounts = new Map<string, BackfillAccountRow[]>();
+  /** Legacy `Passkey` rows, counted per user. */
+  readonly passkeyCounts = new Map<string, number>();
   readonly backfillIdentifiers = new Map<string, BackfillIdentifierRow[]>();
   readonly reservations = new Map<string, IdentifierReservationHolder>();
   readonly verifications = new Map<string, IdentityVerificationRecord>();
@@ -84,6 +88,8 @@ export class MemoryIdentityStore {
   readonly organizationMembers = new Map<string, string[]>();
   readonly organizationAdmins = new Map<string, { userId: string; email: string }[]>();
   readonly finalizedUsers = new Set<string>();
+  /** Users an operator rolled back: nothing turns their sign-in switch on again. */
+  readonly pinnedUsers = new Set<string>();
   /** Users carrying `User.deactivatedAt`, which the memory user row does not hold. */
   readonly deactivatedUsers = new Set<string>();
   /** Keyed by the lowercased address, the way the legacy read matches it. */

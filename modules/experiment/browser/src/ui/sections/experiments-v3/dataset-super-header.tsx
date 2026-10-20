@@ -23,7 +23,7 @@ type DatasetSuperHeaderProps = {
 /** The dataset title, as a skeleton while loading and as plain text otherwise. */
 function DatasetLabel() {
   return (
-    <Text fontWeight="semibold" fontSize="sm" color="fg">
+    <Text textStyle="cardTitle" color="fg">
       Dataset
     </Text>
   );
@@ -68,12 +68,7 @@ export const DatasetSuperHeader = React.memo(function DatasetSuperHeader({
   isLoading,
 }: DatasetSuperHeaderProps) {
   return (
-    <SuperHeader
-      colSpan={colSpan}
-      colorPalette="blue"
-      icon={<Database size={14} />}
-      paddingLeft="52px"
-    >
+    <SuperHeader colSpan={colSpan} colorPalette="blue" icon={<Database size={14} />}>
       <DatasetSuperHeaderBody
         activeDataset={activeDataset}
         datasetHandlers={datasetHandlers}

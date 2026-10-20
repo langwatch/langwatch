@@ -3,8 +3,8 @@
 #
 # An api or worker reads the upgrade ledger once its stores are open and before its
 # application runs. It refuses to start, by name, when a blocking step its image declares is
-# not done or not-needed, or when its release is below the highest floor any upgrade run
-# recorded. Admitted, it writes its roster entry and refreshes it until a graceful stop removes it.
+# not done or not-needed. No release is a required stop (Alex, 2026-10-11). Admitted, it writes
+# its roster entry and refreshes it until a graceful stop removes it.
 # The tasks role runs `upgrade` and is never gated. Since UPGRADE-IN-WORKER (UIW-1..11) a behind
 # or first-install verdict makes the worker run `upgrade` and the api serve at once (in-app-upgrade.feature).
 
@@ -37,29 +37,6 @@ Feature: Serving processes refuse to start when the installation is behind their
     And the refusal names step "clickhouse:00042"
 
   @unit
-  Scenario: An image below the ledger's floor refuses, naming the floor
-    Given an upgrade run recorded the floor "3.22.0"
-    And every blocking step the image declares is done
-    When the serving gate checks the image
-    Then the process is refused
-    And the refusal names release "3.21.0" and floor "3.22.0"
-
-  @unit
-  Scenario: A rolled-back image at or above the floor serves
-    Given upgrade runs recorded the floors "3.20.1" and "3.21.0"
-    And every blocking step the image declares is done
-    When the serving gate checks the image
-    Then the process is admitted
-
-  @unit
-  Scenario: An unreleased cloud image is never below the floor
-    Given an image with no release, built as "git-abc1234"
-    And an upgrade run recorded the floor "3.22.0"
-    And every blocking step the image declares is done
-    When the serving gate checks the image
-    Then the process is admitted
-
-  @unit
   Scenario: An image with a malformed release is refused before it reads the ledger
     When a serving gate is made for release "3.21"
     Then making it fails, naming the release
@@ -85,6 +62,13 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given the ledger records "prisma:20261006180000_add_column" as pending and "clickhouse:00042" as pending
     When the api's serving gate checks the image
     Then the verdict is upgrading, naming both steps
+
+  @unit
+  Scenario: An api before the ledger seed leaves out the steps Prisma's history already applied
+    Given the ledger has no steps yet and Prisma's history records "prisma:20261006180000_add_column" as finished
+    And the image declares that step and "clickhouse:00042"
+    When the api's serving gate checks the image
+    Then the verdict is upgrading, naming only "clickhouse:00042"
 
   @unit
   Scenario: An api whose schema steps are done while a blocking step is outstanding is upgrading
@@ -192,3 +176,18 @@ Feature: Serving processes refuse to start when the installation is behind their
     Given the tasks process's installed modules booted over memory stores
     When `pnpm task upgrade steps --json` lists their migration steps
     Then the image's generated code step list, as the api and worker read it, names the same ids, kinds and modes in the same order
+
+  # A held private ClickHouse target catches up with no operator action (Alex, 2026-10-11, T7-F1).
+  @unit
+  Scenario: An admitted worker runs the upgrade again while a held private target is behind
+    Given an admitted worker and a private ClickHouse target the ledger records behind
+    And no upgrade run holds the lease
+    When the worker's catch-up pass comes round
+    Then it runs the upgrade once and its warning names the target
+    And while the target stays behind each later pass waits twice as long, up to five minutes
+
+  @unit
+  Scenario: An admitted worker with every ClickHouse target current runs no upgrade
+    Given an admitted worker and no ClickHouse target behind
+    When the worker's catch-up passes come round
+    Then it runs no upgrade

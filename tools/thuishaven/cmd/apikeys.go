@@ -89,12 +89,10 @@ func (k keyring) secrets() []string {
 
 // resolve answers kind (project|org|personal) for project ("" = the seeded one).
 func (k keyring) resolve(ctx context.Context, kind, project string) (resolvedKey, error) {
-	if project == domain.DefaultProjectSlug {
-		project = ""
-	}
 	switch kind {
 	case "", "project":
-		if project == "" {
+		// The seeded key is already bound to the default project; org and personal keys still name it.
+		if project == "" || project == domain.DefaultProjectSlug {
 			if k.seeded == "" {
 				return resolvedKey{}, errors.New("this stack has no seeded project key; run haven up --agent -d")
 			}

@@ -15,6 +15,16 @@ import packageJson from "./package.json";
 // against the SDK's copy.
 const noExternal = [/^@langwatch\/(langy|handled-error)(\/|$)/, /^zod(\/|$)/];
 
+// Used only under src/cli, so they are devDependencies bundled into the CLI.
+// cloudflared's postinstall would otherwise download a binary on every install.
+const cliOnlyPackages = [
+  /^(chalk|ora|prompts|commander|js-yaml|dotenv|jsonc-parser|cloudflared)(\/|$)/,
+];
+
+// tsconfig.json is a solution container (no files of its own), so the build reads the
+// package's check config, which carries the same compiler options (ADR-150, 2026-10-10).
+const tsconfig = "tsconfig.app.json";
+
 // `__CLI_VERSION__` is a bare identifier in src/cli/program.ts.
 const define = {
   __CLI_VERSION__: JSON.stringify(packageJson.version),
@@ -41,9 +51,17 @@ export default defineConfig([
     clean: false,
     format: ["cjs", "esm"],
     dts: true,
+    // ESM keeps import.meta (every ESM loader has it) while the rest stays
+    // es2017; the Node setup resolves its optional peers from that URL.
+    esbuildOptions(options, { format }) {
+      const url = format === "esm" ? "import.meta.url" : "undefined";
+      options.define = { ...options.define, __ESM_MODULE_URL__: url };
+      if (format === "esm") options.supported = { ...options.supported, "import-meta": true };
+    },
     sourcemap: true,
     noExternal,
     define,
+    tsconfig,
   },
   {
     // `langwatch/agent` -- Node only, built as a SEPARATE config: it loads
@@ -66,6 +84,7 @@ export default defineConfig([
     sourcemap: true,
     noExternal,
     define,
+    tsconfig,
   },
   {
     // CLI entry -- only ever RUN as CJS, never imported as a library, so the
@@ -101,8 +120,11 @@ export default defineConfig([
     // `pnpm build`, and use the local dist/cli/bundle.js.map -- esbuild
     // output is deterministic, so it matches what shipped.
     sourcemap: true,
-    noExternal,
+    // `@opentelemetry/api` is a peer of the library, so tsup would leave it
+    // external; `npx langwatch` has no host app to supply it.
+    noExternal: [...noExternal, ...cliOnlyPackages, /^@opentelemetry\/api(\/|$)/],
     define,
+    tsconfig,
     onSuccess: async () => {
       const { chmodSync, writeFileSync } = await import("node:fs");
       const stub = `#!/usr/bin/env node

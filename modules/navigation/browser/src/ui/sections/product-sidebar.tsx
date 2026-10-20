@@ -2,9 +2,12 @@
 
 import { RawKbd as Kbd } from "@langwatch/design-system/kbd";
 import { Badge, Box, VStack } from "@langwatch/design-system/primitives";
+import { ScrollEdgeFade, useScrollEdges } from "@langwatch/design-system/scroll-fade";
 import { ArrowLeft, ArrowUpRight, Search } from "lucide-react";
 import { useRef, useState } from "react";
 
+import { SavedDashboards, StarredDashboards } from "../../behavior/lent-saved-dashboards.tsx";
+import { useAdminMenu } from "../../behavior/use-admin-menu.ts";
 import { useLlmOpsProjectSlug } from "../../behavior/use-llm-ops-project-slug.ts";
 import { useMenuScrollPosition } from "../../behavior/use-menu-scroll-position.ts";
 import { useOpsAttentionCount } from "../../behavior/use-ops-attention-count.ts";
@@ -15,7 +18,13 @@ import { featureIcons } from "../../model/feature-icons.ts";
 import { APP_HEADER_HEIGHT } from "../../model/menu-widths.ts";
 import { useNavigationHost } from "../../model/navigation-host.ts";
 import { readLastVisitedProduct } from "../../model/product-memory.ts";
-import { isPathUnder, type ProductId } from "../../model/products.ts";
+import {
+  isAdminShellRoute,
+  isPathUnder,
+  OPERATIONS_CONSOLE,
+  type ProductId,
+} from "../../model/products.ts";
+import { dashboardsAreaAt, toProjectRoutePattern } from "../../model/project-nav-items.ts";
 import { QUIET_SIDEBAR_CHIP } from "../../model/quiet-chip-style.ts";
 import { resolveSettingsBackTarget } from "../../model/resolve-settings-back-target.ts";
 import {
@@ -23,7 +32,11 @@ import {
   governanceNavItems,
   type SectionNavItemData,
 } from "../../model/section-nav-items.ts";
-import { isSettingsMenuItemActive, OPS_ATTENTION_HREF } from "../../model/settings-menu.ts";
+import {
+  isSettingsMenuItemActive,
+  OPS_ATTENTION_HREF,
+  type SettingsMenuGroup,
+} from "../../model/settings-menu.ts";
 import {
   SHELL_SIDEBAR_WIDTH_COMPACT,
   SHELL_SIDEBAR_WIDTH_EXPANDED,
@@ -37,11 +50,16 @@ import { PersonalSidebarLinks } from "./personal-sidebar.tsx";
 import { SidebarSection } from "./sidebar-section.tsx";
 import { UsageIndicator } from "./usage-indicator.tsx";
 
-export type SidebarSurface = ProductId | "settings";
+export type SidebarSurface = ProductId | "settings" | "admin";
+
+/** The sidebar a page outside every product draws: the Admin console on /ops, else Settings. */
+export function detourSurface(pathname: string): SidebarSurface {
+  return isAdminShellRoute(pathname) ? "admin" : "settings";
+}
 
 /**
  * Quick Search as the first sidebar entry in the navigation-v2 shells,
- * opening the same command bar the header trigger and Cmd+K open
+ * opening the same command bar as Cmd+K
  * (product-sidebars.feature).
  */
 function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
@@ -56,6 +74,12 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
       cursor="pointer"
       aria-label="Quick Search"
       onClick={commandBar.open}
+      borderRadius="lg"
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "colorPalette.focusRing",
+        outlineOffset: "-2px",
+      }}
     >
       <SideMenuItem
         icon={Search}
@@ -64,7 +88,7 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
         rightElement={
           <Kbd
             variant="outline"
-            fontSize="10px"
+            textStyle="micro"
             fontWeight="normal"
             background="bg.muted"
             {...QUIET_SIDEBAR_CHIP}
@@ -80,7 +104,7 @@ function QuickSearchMenuItem({ showLabel }: { showLabel: boolean }) {
 /**
  * The pinned utility block at the bottom of every sidebar: usage, Settings,
  * Support and the theme control. The Settings sidebar drops its own entry
- * since the back entry above already frames it.
+ * since the top bar already names it.
  */
 function SidebarBottomBlock({
   showExpanded,
@@ -145,34 +169,21 @@ function SettingsBackEntry({ showLabel }: { showLabel: boolean }) {
   });
 
   return (
-    <Box
-      width="full"
-      paddingX={1}
-      borderBottomWidth="1px"
-      borderBottomColor="border"
-      height="shellHeader"
-      display="flex"
-      alignItems="center"
-    >
-      <SideMenuLink
-        icon={ArrowLeft}
-        label={target.label}
-        href={target.href}
-        showLabel={showLabel}
-      />
-    </Box>
+    <SideMenuLink icon={ArrowLeft} label={target.label} href={target.href} showLabel={showLabel} />
   );
 }
 
-/**
- * The Settings sidebar body: the regrouped, iconed settings menu with
- * the same gates the legacy settings navigation applies. Enterprise
- * entries carry the quiet grey pill.
- */
-function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
+/** A detour's grouped menu (Settings, Admin): sentence-case groups, one entry lit by prefix. */
+function DetourMenuBody({
+  groups,
+  showExpanded,
+  badgeFor,
+}: {
+  groups: SettingsMenuGroup[];
+  showExpanded: boolean;
+  badgeFor?: (href: string) => number | undefined;
+}) {
   const pathname = useNavigationHost().pathname();
-  const groups = useSettingsMenu();
-  const opsAttentionCount = useOpsAttentionCount();
 
   return (
     <>
@@ -191,27 +202,49 @@ function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
               href={item.href}
               isActive={isSettingsMenuItemActive({ item, pathname })}
               showLabel={showExpanded}
-              badgeNumber={item.href === OPS_ATTENTION_HREF ? opsAttentionCount : undefined}
-              rightElement={
-                item.isEnterprise ? (
-                  <Badge
-                    title="Enterprise plan feature"
-                    variant="outline"
-                    fontSize="8.5px"
-                    fontWeight="semibold"
-                    letterSpacing="0.06em"
-                    textTransform="uppercase"
-                    {...QUIET_SIDEBAR_CHIP}
-                  >
-                    ENT
-                  </Badge>
-                ) : undefined
-              }
+              badgeNumber={badgeFor?.(item.href)}
+              isLocked={item.isLocked}
+              rightElement={item.isEnterprise ? <EnterpriseChip /> : undefined}
             />
           ))}
         </SidebarSection>
       ))}
     </>
+  );
+}
+
+/** The Settings sidebar body, with the same gates the legacy settings navigation applies. */
+function SettingsMenuBody({ showExpanded }: { showExpanded: boolean }) {
+  const hasOpsAccess = useNavigationHost().opsAccess().hasAccess;
+  return (
+    <>
+      <DetourMenuBody groups={useSettingsMenu()} showExpanded={showExpanded} />
+      {/* The operator pages left Settings for their own console; operators get a signpost. */}
+      {hasOpsAccess && (
+        <>
+          <Box flex={1} width="full" />
+          <SideMenuLink
+            icon={OPERATIONS_CONSOLE.icon}
+            label="Ops have moved"
+            href={OPERATIONS_CONSOLE.href}
+            showLabel={showExpanded}
+            rightElement={<OutboundArrow />}
+          />
+        </>
+      )}
+    </>
+  );
+}
+
+/** The Admin console's sidebar body; the operations badge sits on its dashboard. */
+function AdminMenuBody({ showExpanded }: { showExpanded: boolean }) {
+  const opsAttentionCount = useOpsAttentionCount();
+  return (
+    <DetourMenuBody
+      groups={useAdminMenu()}
+      showExpanded={showExpanded}
+      badgeFor={(href) => (href === OPS_ATTENTION_HREF ? opsAttentionCount : void 0)}
+    />
   );
 }
 
@@ -250,9 +283,7 @@ function SectionItemsNav({
       showLabel={showExpanded}
       tourId={item.tourId}
       rightElement={
-        isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : (
-          <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />
-        )
+        isPathUnder({ pathname: item.href, base: sectionPath }) ? undefined : <OutboundArrow />
       }
     />
   );
@@ -276,6 +307,37 @@ function SectionItemsNav({
   );
 }
 
+/**
+ * The Dashboards sidebar body: only the saved-dashboards list analytics lends,
+ * with the board the address opens marked (dashboards-v1.feature).
+ */
+function DashboardsSidebarBody({ showExpanded }: { showExpanded: boolean }) {
+  const host = useNavigationHost();
+  const pattern = toProjectRoutePattern({
+    pathname: host.pathname(),
+    projectSlug: host.project()?.slug,
+  });
+  if (!showExpanded) return null;
+  return <SavedDashboards openPath={dashboardsAreaAt(pattern)?.openPath} />;
+}
+
+/**
+ * The member's starred dashboards in every other product's sidebar, for a member who can reach
+ * Dashboards; Dashboards lists its stars itself, and Settings is no product.
+ */
+function StarredDashboardsGroup({
+  surface,
+  showExpanded,
+}: {
+  surface: SidebarSurface;
+  showExpanded: boolean;
+}) {
+  const { reachableProducts } = useReachableProducts();
+  if (!showExpanded || surface === "dashboards" || surface === "settings") return null;
+  if (!reachableProducts.includes("dashboards")) return null;
+  return <StarredDashboards />;
+}
+
 function ProductSidebarBody({
   surface,
   showExpanded,
@@ -286,6 +348,9 @@ function ProductSidebarBody({
   if (surface === "settings") {
     return <SettingsMenuBody showExpanded={showExpanded} />;
   }
+  if (surface === "admin") {
+    return <AdminMenuBody showExpanded={showExpanded} />;
+  }
   if (surface === "me") {
     return <PersonalSidebarLinks showExpanded={showExpanded} />;
   }
@@ -293,6 +358,9 @@ function ProductSidebarBody({
     return (
       <SectionItemsNav items={gatewayNavItems} sectionPath="/gateway" showExpanded={showExpanded} />
     );
+  }
+  if (surface === "dashboards") {
+    return <DashboardsSidebarBody showExpanded={showExpanded} />;
   }
   if (surface === "governance") {
     return (
@@ -321,13 +389,14 @@ export function SidebarContent({
   isFullWidth?: boolean;
 }) {
   const scrollRegionRef = useRef<HTMLDivElement>(null);
+  const scrollEdges = useScrollEdges({ axis: "y" });
   // Keyed by surface: each product's menu keeps its own place, and moving
   // between products never restores the place of the menu left behind.
   useMenuScrollPosition({ regionRef: scrollRegionRef, menuKey: surface });
 
   return (
     <VStack
-      paddingTop={surface === "settings" ? 0 : 2}
+      paddingTop={2}
       paddingBottom={2}
       gap={0}
       height="100%"
@@ -335,10 +404,24 @@ export function SidebarContent({
       width={isFullWidth ? "full" : SHELL_SIDEBAR_WIDTH_EXPANDED}
       justifyContent="space-between"
     >
-      {/* The way back out of Settings sits above the scroll region, so a
-          long settings menu never scrolls it out of the column. */}
-      {surface === "settings" && (
-        <Box width="full" paddingX={2}>
+      <Box
+        data-testid="sidebar-search-row"
+        width="full"
+        paddingX={3}
+        paddingBottom={2}
+        flexShrink={0}
+      >
+        <QuickSearchMenuItem showLabel={showExpanded} />
+      </Box>
+
+      {(surface === "settings" || surface === "admin") && (
+        <Box
+          data-testid="sidebar-back-row"
+          width="full"
+          paddingX={3}
+          paddingBottom={2}
+          flexShrink={0}
+        >
           <SettingsBackEntry showLabel={showExpanded} />
         </Box>
       )}
@@ -346,39 +429,46 @@ export function SidebarContent({
       {/* Padding lives on this region, not its children, so the scrollbar
           runs against the content panel and entries are cut exactly at
           the rules above and below rather than a few pixels short. */}
-      <VStack
-        ref={scrollRegionRef}
-        data-testid="sidebar-scroll-region"
-        data-tour="sidebar"
-        width="full"
-        paddingX={3}
-        paddingTop={surface === "settings" ? 1.5 : 0}
-        paddingBottom={2}
-        gap={0.5}
-        align="start"
-        flex={1}
-        minHeight={0}
-        overflowY="auto"
-        overflowX="hidden"
-        css={{
-          // No standard scrollbar-width here: Chromium treats it as an
-          // opt out of the ::-webkit-scrollbar styling below, and the
-          // native bar it falls back to is a wide one with a track.
-          // Firefox takes its default scrollbar instead.
-          "&::-webkit-scrollbar": { width: "10px" },
-          "&::-webkit-scrollbar-thumb": {
-            background: "var(--chakra-colors-border-emphasized)",
-            backgroundClip: "padding-box",
-            border: "3px solid transparent",
-            borderRadius: "999px",
-          },
-          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
-        }}
-      >
-        <QuickSearchMenuItem showLabel={showExpanded} />
-        <Box height={2} width="full" flexShrink={0} />
-        <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
-      </VStack>
+      {/* The fades say the menu scrolls: entries hide under the rules above and below. */}
+      <Box position="relative" flex={1} minHeight={0} width="full" display="flex">
+        <VStack
+          ref={(node: HTMLDivElement | null) => {
+            scrollRegionRef.current = node;
+            scrollEdges.ref(node);
+          }}
+          data-testid="sidebar-scroll-region"
+          data-tour="sidebar"
+          width="full"
+          paddingX={3}
+          paddingTop={0}
+          paddingBottom={2}
+          gap={0.5}
+          align="start"
+          flex={1}
+          minHeight={0}
+          overflowY="auto"
+          overflowX="hidden"
+          css={{
+            // No standard scrollbar-width here: Chromium treats it as an
+            // opt out of the ::-webkit-scrollbar styling below, and the
+            // native bar it falls back to is a wide one with a track.
+            // Firefox takes its default scrollbar instead.
+            "&::-webkit-scrollbar": { width: "10px" },
+            "&::-webkit-scrollbar-thumb": {
+              background: "var(--chakra-colors-border-emphasized)",
+              backgroundClip: "padding-box",
+              border: "3px solid transparent",
+              borderRadius: "999px",
+            },
+            "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
+          }}
+        >
+          <ProductSidebarBody surface={surface} showExpanded={showExpanded} />
+          <StarredDashboardsGroup surface={surface} showExpanded={showExpanded} />
+        </VStack>
+        <ScrollEdgeFade edge="top" visible={scrollEdges.start} color="bg.page" />
+        <ScrollEdgeFade edge="bottom" visible={scrollEdges.end} color="bg.page" />
+      </Box>
 
       <Box width="full" paddingX={2}>
         <SidebarBottomBlock
@@ -430,5 +520,27 @@ export function ProductSidebar({
         </Box>
       </Box>
     </SideMenuDensityProvider>
+  );
+}
+
+/** Marks an entry that leaves the current section. */
+function OutboundArrow() {
+  return <ArrowUpRight size={12} aria-hidden color="var(--chakra-colors-fg-muted)" />;
+}
+
+/** The quiet "ENT" chip on an Enterprise entry the plan includes; a locked entry shows a lock. */
+function EnterpriseChip() {
+  return (
+    <Badge
+      title="Enterprise plan feature"
+      variant="outline"
+      textStyle="micro"
+      fontWeight="semibold"
+      letterSpacing="0.06em"
+      textTransform="uppercase"
+      {...QUIET_SIDEBAR_CHIP}
+    >
+      ENT
+    </Badge>
   );
 }

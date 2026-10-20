@@ -1,9 +1,8 @@
 import { createHash } from "node:crypto";
 
+import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
 import {
   TRACK_EVENT_SPAN_NAME,
-  type OtlpKeyValue,
-  type OtlpSpan,
   type TrackEventRESTParamsValidator,
 } from "@langwatch/trace-contract";
 import { ESpanKind } from "@opentelemetry/otlp-transformer-next/build/esm/trace/internal-types.js";

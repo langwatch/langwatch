@@ -14,6 +14,7 @@ import {
   DASHBOARD_CONTEXT_PARAMETER_PREFIX,
   type RESERVED_PARAMETERS,
 } from "@langwatch/analytics-contract/dashboard-widget-definition";
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Badge,
   Box,
@@ -46,7 +47,7 @@ const SELECT_STYLE = {
   borderWidth: "1px",
   borderColor: "border",
   borderRadius: "6px",
-  fontSize: "13px",
+  textStyle: "bodySm",
   paddingX: 2,
   height: "32px",
 } as const;
@@ -93,14 +94,14 @@ function DashboardContextRow({
       <Box flexShrink={0}>
         <VariableTypeIcon type={reserved.type} size={14} />
       </Box>
-      <Text fontSize="12px" fontFamily="mono" flex={1} minWidth={0} truncate color="fg.muted">
+      <Text textStyle="monoSm" flex={1} minWidth={0} truncate color="fg.muted">
         {reserved.name}
       </Text>
       <Text color="fg.subtle" fontSize="sm" flexShrink={0}>
         =
       </Text>
       <Text
-        fontSize="12px"
+        textStyle="caption"
         fontFamily="mono"
         color="fg.muted"
         flexShrink={0}
@@ -146,7 +147,7 @@ function ParameterValueField({ row }: { row: QueryParameterRowVM }) {
       flex={1}
       minWidth={0}
       fontFamily="mono"
-      fontSize="13px"
+      textStyle="bodySm"
     />
   );
 }
@@ -172,7 +173,7 @@ function ParameterRow({
           aria-label="Parameter name"
           placeholder="Name"
           fontFamily="mono"
-          fontSize="13px"
+          textStyle="bodySm"
           value={row.name}
           onChange={(event) => row.onNameChange(event.target.value)}
           flex={1}
@@ -193,7 +194,7 @@ function ParameterRow({
         </Button>
       </HStack>
       {row.problem && (
-        <Text fontSize="12px" color="red.fg">
+        <Text textStyle="caption" color="red.fg">
           {row.problem}
         </Text>
       )}
@@ -211,7 +212,7 @@ export function QueryParametersPanel({
   return (
     <VStack align="stretch" gap={3} width="full">
       <Box>
-        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
+        <Text textStyle="micro" fontWeight="600" color="fg.muted" marginBottom={1}>
           Dashboard context · provided by the dashboard · read-only
         </Text>
         <Stack gap={1}>
@@ -228,23 +229,27 @@ export function QueryParametersPanel({
       </Box>
 
       <Box>
-        <Text fontSize="11px" fontWeight="600" color="fg.muted" marginBottom={1}>
+        <Text textStyle="micro" fontWeight="600" color="fg.muted" marginBottom={1}>
           Parameters · declared by you
         </Text>
         <Stack gap={2}>
           {rows.length === 0 && (
-            <Text fontSize="12px" color="fg.muted">
-              No parameters declared yet.
-            </Text>
+            <NoDataInfoBlock
+              size="line"
+              title="No parameters declared yet."
+              action={{ label: "Add parameter", onClick: onAdd }}
+            />
           )}
           {rows.map((row) => (
             <ParameterRow key={row.id} row={row} typeOptions={typeOptions} />
           ))}
-          <Box>
-            <Button size="xs" variant="outline" onClick={onAdd}>
-              <Plus size={14} /> Add parameter
-            </Button>
-          </Box>
+          {rows.length > 0 && (
+            <Box>
+              <Button size="xs" variant="outline" onClick={onAdd}>
+                <Plus size={14} /> Add parameter
+              </Button>
+            </Box>
+          )}
         </Stack>
       </Box>
     </VStack>

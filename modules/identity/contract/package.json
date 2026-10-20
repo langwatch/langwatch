@@ -17,7 +17,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.json tsconfig.test.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {
@@ -25,7 +25,6 @@
     "@langwatch/config": "workspace:*",
     "@langwatch/handled-error": "workspace:*",
     "@langwatch/module": "workspace:*",
-    "@langwatch/system-migrations": "workspace:*",
     "better-auth": "catalog:",
     "zod": "catalog:"
   },

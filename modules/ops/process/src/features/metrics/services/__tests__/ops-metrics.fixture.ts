@@ -14,7 +14,7 @@ export class OpsMetricsTestAdapter {
   private scanCalls = 0;
   private driftReads = 0;
 
-  private constructor() {}
+  protected constructor() {}
 
   static create(): OpsMetricsTestAdapter {
     return new OpsMetricsTestAdapter();
@@ -105,6 +105,10 @@ export class OpsMetricsTestAdapter {
   }
 
   listSchedulerActions(): never {
+    return this.unavailable();
+  }
+
+  listInsightSchedules(): never {
     return this.unavailable();
   }
 

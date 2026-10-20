@@ -73,6 +73,8 @@ export interface PostgresDatasetOverride {
    * {@link LangWatchQLPostgresMapping.rowFilter}.
    */
   readonly rowFilter?: string;
+  /** What the filter leaves out, said after the view's description; the Langy note when absent. */
+  readonly rowFilterNote?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -501,7 +503,7 @@ function viewDescription(
   grain: string,
 ): string {
   const base = override.description ?? defaultDescription(model, grain);
-  return override.rowFilter ? `${base}${ROW_FILTER_NOTE}` : base;
+  return override.rowFilter ? `${base}${override.rowFilterNote ?? ROW_FILTER_NOTE}` : base;
 }
 
 /** The model's sanitized doc comment, else a generated line. */

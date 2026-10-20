@@ -1,4 +1,5 @@
 import { Config, ConfigParseError } from "@langwatch/config";
+import type * as Observability from "@langwatch/observability";
 import { Secret, SecretsPreflightError } from "@langwatch/secrets";
 // @vitest-environment node
 import { describe, expect, it, vi } from "vitest";
@@ -6,6 +7,17 @@ import { z } from "zod";
 
 import { processConfig } from "../config.ts";
 import { Server } from "../preamble.ts";
+import type { ServerOptions } from "../server.ts";
+
+const hostLines = vi.hoisted(() => ({ warn: vi.fn(), info: vi.fn(), error: vi.fn() }));
+const loggerNames = vi.hoisted(() => [] as string[]);
+vi.mock("@langwatch/observability", async (importOriginal) => ({
+  ...(await importOriginal<typeof Observability>()),
+  createLogger: (name: string) => {
+    loggerNames.push(name);
+    return hostLines;
+  },
+}));
 
 const owner = {
   name: "github",
@@ -89,6 +101,42 @@ describe("the §4 preamble", () => {
       expect((failure as ConfigParseError).refusals).toEqual([
         expect.stringMatching(/^billing\.formId ← PREAMBLE_FORM_ID: /),
       ]);
+    });
+  });
+});
+
+describe("given a process that composed no telemetry, as an api embedded beside the worker", () => {
+  describe("when its server writes a line", () => {
+    /** @scenario "A process that composed no telemetry still writes its server's lines" */
+    it("writes it once through the process's logger under the process's name", async () => {
+      // The package runs with isolate: false, so a file that ran earlier in this worker may have
+      // cached preamble.ts over the real logger; a fresh graph is what the mock applies to.
+      vi.resetModules();
+      const { Server: FreshServer } = await import("../preamble.ts");
+      const { Server: FreshBoundary } = await import("../server.ts");
+      const { processConfig: freshProcessConfig } = await import("../config.ts");
+      const created = vi.spyOn(FreshBoundary, "create");
+      const server = await FreshServer.create("embedded-api")
+        .withEnvironment({})
+        .withConfig(freshProcessConfig([], "api"))
+        .withProcessOwnership(false)
+        .start();
+      const options = created.mock.calls[0]![0] as ServerOptions;
+      created.mockRestore();
+      hostLines.warn.mockClear();
+
+      options.logger.warn?.(
+        { code: "HPE_CLOSED_CONNECTION" },
+        "http request refused before routing",
+      );
+      await server.close();
+
+      expect(loggerNames).toContain("langwatch:embedded-api");
+      expect(hostLines.warn).toHaveBeenCalledOnce();
+      expect(hostLines.warn).toHaveBeenCalledWith(
+        { code: "HPE_CLOSED_CONNECTION" },
+        "http request refused before routing",
+      );
     });
   });
 });

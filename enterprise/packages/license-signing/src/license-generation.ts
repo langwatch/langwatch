@@ -4,6 +4,7 @@ import {
   type GenerateLicenseInput,
   type GenerateLicenseOutput,
   type LicenseData,
+  LicenseExpiryInPastError,
 } from "@langwatch/enterprise-licensing-contract";
 import { getPlanTemplate, quotedPlanLimits, resolveMembersLite } from "@langwatch/plans";
 import { fromDate, nowInstant, toDate } from "@langwatch/time";
@@ -50,7 +51,7 @@ export class LicenseGenerationService extends LicenseGenerationCapability {
     }
 
     if (expiresAt <= now) {
-      throw new Error("Expiration date must be in the future");
+      throw new LicenseExpiryInPastError();
     }
 
     const licenseData: LicenseData = {

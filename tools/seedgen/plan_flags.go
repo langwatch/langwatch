@@ -24,9 +24,9 @@ type Tier struct {
 // Tiers are the four presets of design §4, in size order.
 var Tiers = []Tier{
 	{Name: "tiny", Orgs: 4, Projects: 6, Users: 12, Traces: 300, Spans: 1_500},
-	{Name: "small", Orgs: 6, Projects: 16, Users: 60, Traces: 10_000, Spans: 50_000, Private: 1},
-	{Name: "medium", Orgs: 12, Projects: 48, Users: 400, Traces: 60_000, Spans: 300_000, Private: 2},
-	{Name: "large", Orgs: 24, Projects: 120, Users: 1_200, Traces: 400_000, Spans: 2_000_000, Private: 2},
+	{Name: "small", Orgs: 6, Projects: 16, Users: 60, Traces: 10_000, Spans: 50_000},
+	{Name: "medium", Orgs: 12, Projects: 48, Users: 400, Traces: 60_000, Spans: 300_000},
+	{Name: "large", Orgs: 24, Projects: 120, Users: 1_200, Traces: 400_000, Spans: 2_000_000},
 }
 
 // Personas are the four personas of design §7, in plan order.
@@ -154,7 +154,8 @@ func (e *FlagError) Error() string {
 	return fmt.Sprintf("--%s: %q is not accepted; want %s", e.Flag, e.Value, e.Accepts)
 }
 
-// ParseFlags reads seed flags; --spans and --private (-1) default to the tier's, --anchor to anchor.
+// ParseFlags reads seed flags; --spans (-1) defaults to the tier's, --anchor to anchor. --private defaults
+// to 0 on every tier: nothing binds a private org's id yet, so it is planned only when asked for.
 func ParseFlags(args []string, anchor time.Time) (Flags, error) {
 	set := flag.NewFlagSet("seed", flag.ContinueOnError)
 	set.SetOutput(io.Discard)

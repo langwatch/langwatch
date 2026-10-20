@@ -5,32 +5,48 @@ import { createLogger } from "@langwatch/observability";
 import type { OrganizationApi } from "@langwatch/organization-contract";
 import type {
   AggregateRule,
-  LiveAggregate,
   ProjectApi,
   StoredAggregateProject,
 } from "@langwatch/project-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { AggregateReconcileLockRepository } from "../repositories/aggregate-reconcile-lock.repository.ts";
-import { decideAggregateMembership } from "../rules/aggregate-membership.rules.ts";
+import {
+  type AggregateReadWindow,
+  aggregateReadStart,
+  aggregateReadWindowOf,
+  decideAggregateMembership,
+  isAggregateTraceRead,
+} from "../rules/aggregate-membership.rules.ts";
 
 const logger = createLogger("langwatch:governance:aggregate-reconciler");
 
 /** The revocation reason a reconciler-revoked shared read carries. */
 export const AGGREGATE_RULE_NO_LONGER_MATCHES = "aggregate_rule_no_longer_matches";
 
+/** The revocation reason a read carries when it is attached again with its rule's window start. */
+export const AGGREGATE_READ_WINDOW_CHANGED = "aggregate_read_window_changed";
+
 /** The revocation reason every shared read of an archived aggregate carries. */
 export const AGGREGATE_ARCHIVED = "aggregate_archived";
 
-/** Member project ids, each in one list; a `failed` attach is tried again by the next reconcile. */
+/** Member project ids, each in one list; a non-empty `failed` makes the intent throw, so the outbox tries again. */
 type AggregateReconcileResult = {
   attached: string[];
+  /** Revoked and attached again because the read started at the wrong moment for the rule. */
+  reattached: string[];
   revoked: string[];
   unchanged: string[];
   failed: string[];
 };
 
-const NOTHING: AggregateReconcileResult = { attached: [], revoked: [], unchanged: [], failed: [] };
+const NOTHING: AggregateReconcileResult = {
+  attached: [],
+  reattached: [],
+  revoked: [],
+  unchanged: [],
+  failed: [],
+};
 
 const ACTOR = { type: "system", id: SYSTEM_ACTORS.aggregateReconciler } as const;
 
@@ -38,11 +54,7 @@ type AggregateReconcilerDependencies = {
   lock: AggregateReconcileLockRepository;
   projects: Pick<
     ProjectApi,
-    | "findAggregate"
-    | "findLiveAggregateIds"
-    | "findAllLiveAggregates"
-    | "findPersonalProjectIds"
-    | "findReadableProjectIds"
+    "findAggregate" | "findLiveAggregateIds" | "findPersonalProjectIds" | "findReadableProjectIds"
   >;
   organizations: Pick<OrganizationApi, "findMembersWithDepartments">;
   grants: Pick<
@@ -58,7 +70,7 @@ type AggregateReconcilerDependencies = {
 /**
  * ADR-177 decision 3 (main's AggregateReconciler): one live shared trace read per member the
  * aggregate's rule selects, and a revoke for each that stopped matching. Each run holds the
- * aggregate's lock, so a trigger and the sweep never both attach one member. Logs ids and counts.
+ * aggregate's lock, so two triggers never both attach one member. Logs ids and counts.
  */
 export class AggregateReconcilerService {
   static create(deps: AggregateReconcilerDependencies): AggregateReconcilerService {
@@ -96,11 +108,6 @@ export class AggregateReconcilerService {
     return [...live, ...retiring];
   }
 
-  /** Every live aggregate of every organisation, for the daily sweep. */
-  liveAggregates(): Promise<LiveAggregate[]> {
-    return this.deps.projects.findAllLiveAggregates();
-  }
-
   private async reconcileHoldingLock({
     aggregateProjectId,
   }: {
@@ -126,29 +133,29 @@ export class AggregateReconcilerService {
         readerProjectId: aggregateProjectId,
       }),
     ]);
+    const window = aggregateReadWindowOf(rule.kind);
     const decision = decideAggregateMembership({
       aggregateProjectId,
       desired,
-      held: live.map((row) => row.memberProjectId),
+      held: live.map((row) => ({
+        memberProjectId: row.memberProjectId,
+        from: isAggregateTraceRead(row.condition) ? (row.condition.from ?? null) : null,
+      })),
+      window,
     });
 
     // Revocations first: a member that stopped matching stops being read even when an attach fails.
-    if (decision.revoke.length > 0) {
-      await this.deps.grants.revokeSharedProjectGrants({
-        organizationId,
-        readerProjectId: aggregateProjectId,
-        memberProjectIds: decision.revoke,
-        actor: ACTOR,
-        reason: AGGREGATE_RULE_NO_LONGER_MATCHES,
-      });
-    }
+    await this.revokeOutdated({ organizationId, aggregateProjectId, decision });
     const { attached, alreadyHeld, failed } = await this.attachMissing({
       organizationId,
       aggregateProjectId,
-      missing: decision.attach,
+      missing: [...decision.attach, ...decision.reattach].toSorted(),
+      window,
     });
+    const reattaching = new Set(decision.reattach);
     const result: AggregateReconcileResult = {
-      attached,
+      attached: attached.filter((id) => !reattaching.has(id)),
+      reattached: attached.filter((id) => reattaching.has(id)),
       revoked: decision.revoke,
       unchanged: [...decision.unchanged, ...alreadyHeld].toSorted(),
       failed,
@@ -159,6 +166,7 @@ export class AggregateReconcilerService {
         aggregateProjectId,
         ruleKind: rule.kind,
         attached: result.attached.length,
+        reattached: result.reattached.length,
         revoked: result.revoked.length,
         unchanged: result.unchanged.length,
         failed: result.failed.length,
@@ -166,6 +174,32 @@ export class AggregateReconcilerService {
       "reconciled aggregate project members",
     );
     return result;
+  }
+
+  /** Dropped members, then reads on the wrong window: the ledger keeps one live read per pair. */
+  private async revokeOutdated({
+    organizationId,
+    aggregateProjectId,
+    decision,
+  }: {
+    organizationId: string;
+    aggregateProjectId: string;
+    decision: ReturnType<typeof decideAggregateMembership>;
+  }): Promise<void> {
+    const batches = [
+      { memberProjectIds: decision.revoke, reason: AGGREGATE_RULE_NO_LONGER_MATCHES },
+      { memberProjectIds: decision.reattach, reason: AGGREGATE_READ_WINDOW_CHANGED },
+    ];
+    for (const { memberProjectIds, reason } of batches) {
+      if (memberProjectIds.length === 0) continue;
+      await this.deps.grants.revokeSharedProjectGrants({
+        organizationId,
+        readerProjectId: aggregateProjectId,
+        memberProjectIds,
+        actor: ACTOR,
+        reason,
+      });
+    }
   }
 
   /** The member project ids the rule selects today; a department is its members' current one. */
@@ -214,15 +248,17 @@ export class AggregateReconcilerService {
     organizationId,
     aggregateProjectId,
     missing,
+    window,
   }: {
     organizationId: string;
     aggregateProjectId: string;
     missing: readonly string[];
+    window: AggregateReadWindow;
   }): Promise<{ attached: string[]; alreadyHeld: string[]; failed: string[] }> {
     const attached: { memberProjectId: string; grantId: string }[] = [];
     const alreadyHeld: string[] = [];
     const failed: string[] = [];
-    const from = this.deps.now().toString();
+    const from = aggregateReadStart({ window, now: this.deps.now().toString() });
     for (const memberProjectId of missing) {
       try {
         const outcome = await this.deps.grants.attachSharedProjectGrant({

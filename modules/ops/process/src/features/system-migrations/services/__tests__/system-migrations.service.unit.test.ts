@@ -1,6 +1,5 @@
 import {
   MigrationDrainProofRequiresMigratedError,
-  MigrationEnrollmentCloudOnlyError,
   MigrationEnrollmentOrganizationNotFoundError,
   MigrationPassAlreadyRunningError,
   MigrationRunRequiresEnrollmentError,
@@ -22,12 +21,14 @@ function migrationOf({
   enrolledAutomatically = false,
   requiresOperatorConfirmation = false,
   tenant,
+  migratedIsSteady,
 }: {
   name: string;
   runsAutomaticallyOnSelfHosted?: boolean;
   enrolledAutomatically?: boolean;
   requiresOperatorConfirmation?: boolean;
   tenant?: "organization" | "user";
+  migratedIsSteady?: boolean;
 }) {
   return {
     name,
@@ -37,6 +38,7 @@ function migrationOf({
     runsAutomaticallyOnSelfHosted,
     enrolledAutomatically,
     ...(tenant ? { tenant } : {}),
+    ...(migratedIsSteady === undefined ? {} : { migratedIsSteady }),
   };
 }
 
@@ -153,7 +155,7 @@ function serviceWith({
     ...(rollbackEffects ? { rollbackEffects } : {}),
     ...(rollbackGuards ? { rollbackGuards } : {}),
   });
-  return { service, upserts, enrollments, audit, runTargetedPass };
+  return { service, upserts, enrollments, audit, runTargetedPass, state };
 }
 
 describe("SystemMigrationsService.rollBack", () => {
@@ -586,45 +588,33 @@ describe("SystemMigrationsService enrollment", () => {
 
   describe("given a self-hosted installation", () => {
     describe("when an operator tries to enroll or withdraw", () => {
-      /** @scenario "Enrollment does not apply to self-hosted installations" */
-      it("refuses both with migration_enrollment_cloud_only and touches nothing", async () => {
+      /** @scenario "Enrolment acts on a self-hosted installation as it does on cloud" */
+      it("records both and audits each, as on cloud", async () => {
         const { service, enrollments, audit } = serviceWith({
           record: null,
           isSaaS: false,
         });
 
-        // Thunks, not promises: an eagerly created second promise would
-        // reject before its handler attaches, tripping the unhandled-
-        // rejection watchdog even though the test passes.
-        for (const attempt of [
-          () =>
-            service.enroll({
-              organizationId: "org_acme",
-              migrationName: MIGRATION,
-              actorUserId: "user_alex",
-            }),
-          () =>
-            service.withdraw({
-              organizationId: "org_acme",
-              migrationName: MIGRATION,
-              actorUserId: "user_alex",
-            }),
-        ]) {
-          const rejection = attempt();
-          await expect(rejection).rejects.toBeInstanceOf(MigrationEnrollmentCloudOnlyError);
-          await expect(rejection).rejects.toMatchObject({
-            code: "migration_enrollment_cloud_only",
-          });
-        }
-        expect(enrollments.create).not.toHaveBeenCalled();
-        expect(enrollments.delete).not.toHaveBeenCalled();
-        expect(audit).not.toHaveBeenCalled();
+        await service.enroll({
+          organizationId: "org_acme",
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        });
+        await service.withdraw({
+          organizationId: "org_acme",
+          migrationName: MIGRATION,
+          actorUserId: "user_alex",
+        });
+
+        expect(enrollments.create).toHaveBeenCalledTimes(1);
+        expect(enrollments.delete).toHaveBeenCalledTimes(1);
+        expect(audit).toHaveBeenCalledTimes(2);
       });
     });
   });
 
   describe("when the ops page lists enrollments", () => {
-    it("answers every migration's rows, with the installation shape alongside", async () => {
+    it("answers every migration's rows", async () => {
       const createdAt = new Date("2026-08-19T10:00:00Z");
       const enrollments = enrollmentStoreStub();
       enrollments.findAll.mockResolvedValue([
@@ -643,7 +633,6 @@ describe("SystemMigrationsService enrollment", () => {
         requestedBy: "user_ops",
       });
 
-      expect(listing.isSaaS).toBe(true);
       expect(listing.enrollments).toHaveLength(1);
       expect(listing.enrollments[0]).toMatchObject({
         organizationId: "org_acme",
@@ -712,6 +701,33 @@ describe("SystemMigrationsService enrollment", () => {
       const overview = await service.getOverview();
 
       expect(overview[0]?.availableOnThisInstallation).toBe(true);
+    });
+  });
+
+  describe("when a step's migrated is its steady state", () => {
+    /** @scenario "A step that never finalizes by design keeps its users in step, not held" */
+    it("asks only for its parked tenants as needing attention, and says so", async () => {
+      const { service, state } = serviceWith({
+        record: null,
+        migrations: [
+          migrationOf({ name: "heal", tenant: "user", migratedIsSteady: true }),
+          migrationOf({ name: "backfill", tenant: "user" }),
+        ],
+      });
+
+      const overview = await service.getOverview();
+
+      expect(state.findRecordsByStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ migrationName: "heal", statuses: ["parked"] }),
+      );
+      // A step that can genuinely hold a tenant still lists its held ones.
+      expect(state.findRecordsByStatus).toHaveBeenCalledWith(
+        expect.objectContaining({ migrationName: "backfill", statuses: ["migrated", "parked"] }),
+      );
+      expect(overview.map(({ name, migratedIsSteady }) => ({ name, migratedIsSteady }))).toEqual([
+        { name: "heal", migratedIsSteady: true },
+        { name: "backfill", migratedIsSteady: false },
+      ]);
     });
   });
 

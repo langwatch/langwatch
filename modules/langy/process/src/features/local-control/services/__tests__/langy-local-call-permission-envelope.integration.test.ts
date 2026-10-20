@@ -8,6 +8,8 @@ import { memorySessionState } from "@langwatch/process-stores";
 import type { SessionStateStore } from "@langwatch/redis-client/session-state";
 import { beforeEach, describe, expect, it } from "vitest";
 
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
+import { LangyLocalCallMemoryRepository } from "../../../../repositories/memory/memory.langy-local-call.repository.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { LocalCallDispatcherService } from "../langy-local-call-dispatcher.service.ts";
 
@@ -40,7 +42,8 @@ async function callWaitingOnACard(clock: { now: number }) {
   const presence = LangyLocalPresenceRedisRepository.create({ store, now: () => clock.now });
   await presence.register(connectedFolder(clock.now));
   const dispatcher = LocalCallDispatcherService.create({
-    store,
+    calls: LangyLocalCallMemoryRepository.create({ now: () => clock.now }),
+    workspace: MemoryLangyLocalWorkspaceChannel.create(),
     presence,
     now: () => clock.now,
     offlineWaitMs: 0,
@@ -58,7 +61,7 @@ async function callWaitingOnACard(clock: { now: number }) {
   });
   await dispatcher.ack(call.callId);
   await dispatcher.awaitPermission({ callId: call.callId, waitId: "lwait_1" });
-  return { dispatcher, store, callId: call.callId };
+  return { dispatcher, callId: call.callId };
 }
 
 type WaitingCall = Awaited<ReturnType<typeof callWaitingOnACard>>;

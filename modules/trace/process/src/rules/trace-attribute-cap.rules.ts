@@ -1,10 +1,23 @@
-import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
 /**
- * Caps oversized attribute values at ingestion to keep Redis fold state small and prevent
- * throughput collapse. Capping replaces an oversized value with a placeholder that SAYS it was
- * truncated: a silent shortening would be indistinguishable from what the customer sent.
+ * Caps oversized attribute values: at record time before event_log, and in the projection lean.
+ * A cut value becomes a placeholder that says so, and the span names every cut attribute with its
+ * original size under TRUNCATED_ATTRIBUTES_KEY.
+ * @see specs/trace-processing/oversized-attribute-value-preview.feature
  */
-import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpAnyValue, OtlpResource, OtlpSpan } from "@langwatch/otlp/trace-request";
+import { DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES } from "@langwatch/span-normalisation";
+import {
+  TRUNCATED_ATTRIBUTES_KEY,
+  truncatedAttributeSchema,
+  type TruncatedAttribute,
+} from "@langwatch/trace-contract";
+import { z } from "zod";
+
+/**
+ * The largest attribute value event_log keeps whole. Above Anthropic's ~4 MB full 1M-token context
+ * and below the 10 MiB OTLP body limit; measurements in the oversized-attribute spec.
+ */
+export const MAX_RECORDED_ATTRIBUTE_VALUE_BYTES = 8 * 1024 * 1024;
 
 type AttributeList = OtlpSpan["attributes"];
 
@@ -47,19 +60,15 @@ function truncationPlaceholder(byteSize: number, mimeType: string): string {
     : `[truncated: ${byteSize} bytes]`;
 }
 
-/**
- * Caps a single OTLP AnyValue in place. Recurses into arrays/kvlists so
- * nested blobs are caught too; returns true when something was replaced.
- */
-/** The string half: an over-large `stringValue` becomes the placeholder. */
-function capStringValue(value: OtlpAnyValue, maxBytes: number): boolean {
+/** The string half: an over-large `stringValue` becomes the placeholder; returns the bytes cut. */
+function capStringValue(value: OtlpAnyValue, maxBytes: number): number {
   if (typeof value.stringValue !== "string") {
-    return false;
+    return 0;
   }
 
   const byteSize = utf8ByteLength(value.stringValue);
   if (byteSize <= maxBytes) {
-    return false;
+    return 0;
   }
 
   const trimmedHistory = messageHistoryWithinCap(value.stringValue, maxBytes);
@@ -68,7 +77,7 @@ function capStringValue(value: OtlpAnyValue, maxBytes: number): boolean {
       ? trimmedHistory.value
       : truncationPlaceholder(byteSize, dataUrlMimeType(value.stringValue));
 
-  return true;
+  return byteSize;
 }
 
 /**
@@ -116,9 +125,9 @@ function messageHistoryWithinCap(value: string, maxBytes: number): TrimmedHistor
  * The binary half: the payload is replaced with a text placeholder, since downstream consumers
  * read this attribute as a value type and a stringValue is the safe, readable substitute.
  */
-function capBytesValue(value: OtlpAnyValue, maxBytes: number): boolean {
+function capBytesValue(value: OtlpAnyValue, maxBytes: number): number {
   if (value.bytesValue == null) {
-    return false;
+    return 0;
   }
 
   const byteSize =
@@ -127,69 +136,72 @@ function capBytesValue(value: OtlpAnyValue, maxBytes: number): boolean {
       : // JSON-serialized bytes ({"0":1,...}) or unexpected shape: best-effort size.
         utf8ByteLength(String(value.bytesValue));
   if (byteSize <= maxBytes) {
-    return false;
+    return 0;
   }
 
   value.bytesValue = null;
   value.stringValue = truncationPlaceholder(byteSize, "");
 
-  return true;
+  return byteSize;
 }
 
-/** Caps every value nested inside an `arrayValue` or a `kvlistValue`. */
-function capNestedValues(value: OtlpAnyValue, maxBytes: number): boolean {
-  let capped = false;
+/** Caps every value nested inside an `arrayValue` or a `kvlistValue`; returns the bytes cut. */
+function capNestedValues(value: OtlpAnyValue, maxBytes: number): number {
+  let cut = 0;
 
   if (value.arrayValue && Array.isArray(value.arrayValue.values)) {
     for (const item of value.arrayValue.values) {
-      if (capAnyValue(item, maxBytes)) {
-        capped = true;
-      }
+      cut += capAnyValue(item, maxBytes);
     }
   }
 
   if (value.kvlistValue && Array.isArray(value.kvlistValue.values)) {
     for (const entry of value.kvlistValue.values) {
-      if (entry?.value && capAnyValue(entry.value, maxBytes)) {
-        capped = true;
-      }
+      if (entry?.value) cut += capAnyValue(entry.value, maxBytes);
     }
   }
 
-  return capped;
+  return cut;
 }
 
 /**
- * Caps a single OTLP AnyValue in place. Returns true when something was
- * replaced (used only for bookkeeping / tests). Recurses into arrays and
- * kvlists so blobs nested inside structured params are caught too.
+ * Caps a single OTLP AnyValue in place and returns the original size of what it replaced, 0 when
+ * nothing was. Recurses into arrays and kvlists so blobs nested inside structured params are
+ * caught too.
  */
-function capAnyValue(value: OtlpAnyValue, maxBytes: number): boolean {
+function capAnyValue(value: OtlpAnyValue, maxBytes: number): number {
   if (value == null || typeof value !== "object") {
-    return false;
-  }
-
-  const cappedString = capStringValue(value, maxBytes);
-  const cappedBytes = capBytesValue(value, maxBytes);
-  const cappedNested = capNestedValues(value, maxBytes);
-
-  return cappedString || cappedBytes || cappedNested;
-}
-
-/** Caps every value in an attribute list in place. */
-function capAttributeList(attributes: AttributeList, maxBytes: number): number {
-  if (!Array.isArray(attributes)) {
     return 0;
   }
 
-  let count = 0;
-  for (const attr of attributes) {
-    if (attr?.value && capAnyValue(attr.value, maxBytes)) {
-      count++;
-    }
+  return (
+    capStringValue(value, maxBytes) +
+    capBytesValue(value, maxBytes) +
+    capNestedValues(value, maxBytes)
+  );
+}
+
+/** Caps every value in an attribute list in place; returns one entry per cut attribute. */
+function capAttributeList({
+  attributes,
+  maxBytes,
+  on,
+}: {
+  attributes: AttributeList;
+  maxBytes: number;
+  on?: TruncatedAttribute["on"];
+}): TruncatedAttribute[] {
+  if (!Array.isArray(attributes)) {
+    return [];
   }
 
-  return count;
+  const cut: TruncatedAttribute[] = [];
+  for (const attr of attributes) {
+    const bytes = attr?.value ? capAnyValue(attr.value, maxBytes) : 0;
+    if (bytes > 0) cut.push(on ? { key: attr.key, bytes, on } : { key: attr.key, bytes });
+  }
+
+  return cut;
 }
 
 /** Whether a leaf string or byte payload on this value is over `maxBytes`. */
@@ -295,34 +307,66 @@ export function hasOversizedAttribute(
 }
 
 /**
- * Walks span/events/links/resource and replaces oversized attribute values with
- * placeholders. Safe for hot ingestion: never throws, returns count for logging.
+ * Walks span/events/links/resource, replaces oversized attribute values with placeholders and
+ * names each cut attribute on the span. Safe for hot ingestion: never throws, returns the count.
  */
 export function capOversizedAttributes(
   span: OtlpSpan,
   resource: OtlpResource | null,
   maxBytes: number = DEFAULT_MAX_ATTRIBUTE_VALUE_BYTES,
 ): number {
-  let count = 0;
+  const cut: TruncatedAttribute[] = [];
   try {
-    count += capAttributeList(span.attributes, maxBytes);
+    cut.push(...capAttributeList({ attributes: span.attributes, maxBytes }));
     for (const event of span.events ?? []) {
-      count += capAttributeList(event.attributes, maxBytes);
+      cut.push(...capAttributeList({ attributes: event.attributes, maxBytes, on: "event" }));
     }
 
     for (const link of span.links ?? []) {
-      count += capAttributeList(link.attributes, maxBytes);
+      cut.push(...capAttributeList({ attributes: link.attributes, maxBytes, on: "link" }));
     }
 
     if (resource) {
-      count += capAttributeList(resource.attributes, maxBytes);
+      cut.push(...capAttributeList({ attributes: resource.attributes, maxBytes, on: "resource" }));
     }
   } catch {
     // Degraded, not broken: never block ingestion on a malformed value.
-    return count;
   }
 
-  return count;
+  markTruncatedAttributes({ span, cut });
+
+  return cut.length;
+}
+
+/**
+ * The cut attributes a marker names, from its stored JSON string or an already parsed list; empty
+ * when it names none or is malformed.
+ */
+export function readTruncatedAttributes(value: unknown): TruncatedAttribute[] {
+  if (value == null || value === "") return [];
+  try {
+    const parsed = z
+      .array(truncatedAttributeSchema)
+      .safeParse(typeof value === "string" ? JSON.parse(value) : value);
+    return parsed.success ? parsed.data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Appends `cut` to the span's truncation marker, creating it on first use. */
+function markTruncatedAttributes({ span, cut }: { span: OtlpSpan; cut: TruncatedAttribute[] }) {
+  if (cut.length === 0 || !Array.isArray(span.attributes)) return;
+  const existing = span.attributes.find((attr) => attr?.key === TRUNCATED_ATTRIBUTES_KEY);
+  const stringValue = JSON.stringify([
+    ...readTruncatedAttributes(existing?.value?.stringValue ?? undefined),
+    ...cut,
+  ]);
+  if (existing) {
+    existing.value = { stringValue };
+    return;
+  }
+  span.attributes.push({ key: TRUNCATED_ATTRIBUTES_KEY, value: { stringValue } });
 }
 
 type Message = Record<string, unknown>;

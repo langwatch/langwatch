@@ -63,6 +63,13 @@ Feature: Annotation service boundary
     Then all upserts use one database transaction
     And requeueing keeps the existing unique-key and done-state behaviour
 
+  @unit
+  Scenario: queues and queue items are stored under strict KSUIDs
+    Given a queue is created and traces are queued into it
+    When Postgres stores the queue and its items
+    Then the queue id is a fresh annotationqueue KSUID and each item id a fresh annotationqueueitem KSUID
+    And no id is left to a database default, as the memory store already does
+
   @integration
   Scenario: trace projections receive anchored annotations
     Given a project has comments about a trace and about fields within it

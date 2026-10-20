@@ -33,12 +33,14 @@ function slackAnswering(body: unknown, status = 200) {
 function notifierOver({
   send,
   tokenConfigured = true,
+  apiBase,
 }: {
   send: SlackAlertFetch;
   tokenConfigured?: boolean;
+  apiBase?: string;
 }) {
   return SlackBugReportNotifierChannel.create({
-    transport: HttpSlackAlertChannel.create({ fetch: send }),
+    transport: HttpSlackAlertChannel.create({ fetch: send, apiBase }),
     config: {
       botToken: tokenConfigured ? BOT : undefined,
       channel: "#bugs",
@@ -67,6 +69,19 @@ describe("given Slack notification credentials are configured", () => {
       expect(text).toContain("*Kind:* summary");
       expect(text).toContain("the install step exits early");
       expect(text).toContain("https://app.example.test/ops/cloud/bug-reports?report=report-1");
+    });
+  });
+
+  describe("when the deployment names its own Slack Web API address", () => {
+    /** @scenario "The Slack alert goes to the Slack address the deployment names" */
+    it("posts to that address instead of slack.com", async () => {
+      const send = slackAnswering({ ok: true });
+
+      await notifierOver({ send, apiBase: "https://outbound.dev.test/api/" }).notify({
+        report: report(),
+      });
+
+      expect(send.mock.calls[0]?.[0]).toBe("https://outbound.dev.test/api/chat.postMessage");
     });
   });
 

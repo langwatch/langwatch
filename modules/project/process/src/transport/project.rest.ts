@@ -109,8 +109,7 @@ function refuseBaseKeyToApiToken(): never {
 export const projectRest = defineRestRouter(ProjectManagementApi)
   .withNamespace("projects")
   .withVersion(MANAGEMENT_API_VERSION)
-  // No derived twin: `/api/v1/projects` belongs to the LangWatch-QL family.
-  .withAddressing("dated", { v1Twin: false })
+  .withAddressing("dated", { v1Twin: true })
   .withCredential("organization")
 
   .get("/:id", "getProject")

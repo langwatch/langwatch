@@ -200,5 +200,46 @@ describe("ModelProviderConnectionPingService", () => {
         expect(codexChannel.sent).toEqual([]);
       });
     });
+
+    describe("when the gateway says the OpenAI session expired", () => {
+      it("refuses it as a sign-in that ran out, never as an invalid API key", async () => {
+        const { pings } = setup(
+          failed({
+            status: 401,
+            responseBody: '{"error":{"type":"codex_session_expired"}}',
+          }),
+        );
+
+        const verdict = await pings.verify({
+          row: CODEX_ROW,
+          projectId: "project_1",
+          credential: VERIFIED,
+        });
+
+        expect(verdict).toMatchObject({
+          outcome: "refused",
+          domainError: { code: "codex_auth_failed", meta: { kind: "refresh_rejected" } },
+        });
+      });
+    });
+
+    describe("when the plan is over its usage limit", () => {
+      it("refuses it as the plan's usage limit", async () => {
+        const { pings } = setup(
+          failed({ status: 429, responseBody: '{"type":"usage_limit_reached"}' }),
+        );
+
+        const verdict = await pings.verify({
+          row: CODEX_ROW,
+          projectId: "project_1",
+          credential: VERIFIED,
+        });
+
+        expect(verdict).toMatchObject({
+          outcome: "refused",
+          domainError: { code: "provider_usage_limit_reached" },
+        });
+      });
+    });
   });
 });

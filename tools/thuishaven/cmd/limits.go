@@ -12,6 +12,7 @@ import (
 	"text/tabwriter"
 
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/atomicfile"
+	"github.com/langwatch/langwatch/tools/thuishaven/adapters/fileregistry"
 	"github.com/langwatch/langwatch/tools/thuishaven/adapters/system"
 	"github.com/langwatch/langwatch/tools/thuishaven/domain"
 )
@@ -64,10 +65,15 @@ func limitMachine() domain.LimitMachine {
 
 // limitsReport resolves every limit through the same layers the readers use.
 func limitsReport() domain.LimitsReport {
-	return domain.ResolveLimits(limitMachine(), envOr("HAVEN_COLIMA_PROFILE", "default"),
+	report := domain.ResolveLimits(limitMachine(), envOr("HAVEN_COLIMA_PROFILE", "default"),
 		func(key string) (string, string, bool) {
 			return resolveKnobSource(key, processKnobs())
 		})
+	settings := fileregistry.New(havenHome()).ReadMachineSettings()
+	chRuntime, _ := settings.ClickHouseRuntimeFor(devEnv("HAVEN_CH_RUNTIME"), runtime.GOOS, runtime.GOARCH)
+	_, pinned := domain.ClickHouseNativeArtifactFor(runtime.GOOS, runtime.GOARCH)
+	report.NativeClickHouse = pinned && chRuntime == domain.ClickHouseRuntimeNative
+	return report
 }
 
 func limitValue(report domain.LimitsReport, name string) domain.LimitValue {
@@ -162,4 +168,10 @@ func printLimits(asJSON bool) error {
 	}
 	fmt.Println("\nPrecedence: environment > .env > settings file > default.")
 	return nil
+}
+
+// browserMemoryMB is the shared browser's one memory limit, resolved through
+// the same layers as every catalog limit; the daemon and the governor both read it.
+func browserMemoryMB() int {
+	return limitValue(limitsReport(), domain.LimitBrowserMemory).Value
 }

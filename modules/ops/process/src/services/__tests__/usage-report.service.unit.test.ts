@@ -12,6 +12,8 @@ import { Temporal } from "@langwatch/time";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { MemoryUsageReportChannel } from "../../channels/memory/memory.usage-report.channel.ts";
+import { MemoryCloudLatestReleaseRepository } from "../../repositories/memory/memory.cloud-latest-release.repository.ts";
+import { MemoryOpsStore } from "../../repositories/memory/memory.ops.store.ts";
 import { UsageReportCollectionService } from "../usage-report-collection.service.ts";
 import {
   USAGE_REPORT_APP_HOST_URL,
@@ -76,6 +78,7 @@ let state: UsageReportWorld;
 let channel: MemoryUsageReportChannel;
 let install: InstallStandIn;
 let opsHealthReads: number;
+let latestReleases: MemoryCloudLatestReleaseRepository;
 
 const OPS_HEALTH = {
   snapshot_at: "2026-09-21T09:59:00.000Z",
@@ -109,6 +112,7 @@ function service({ disabled = false, isSaas = false } = {}) {
     },
     channel,
     install,
+    latestReleases,
     disabled,
     isSaas,
     now: () => NOW,
@@ -120,6 +124,7 @@ beforeEach(() => {
   state.projectsByOrganization.set("org_1", ["project_1"]);
   state.projectsByOrganization.set("org_2", ["project_2"]);
   channel = MemoryUsageReportChannel.create();
+  latestReleases = MemoryCloudLatestReleaseRepository.create({ store: MemoryOpsStore.create() });
   install = new InstallStandIn();
   opsHealthReads = 0;
 });
@@ -189,6 +194,31 @@ describe("given an install on an offline license", () => {
       await service().send();
 
       expect(channel.posts[0]?.endpoint).toBe(USAGE_REPORT_APP_HOST_URL);
+    });
+  });
+});
+
+describe("given cloud's reply names a latest release", () => {
+  describe("when the daily report is sent", () => {
+    /** @scenario "The usage report keeps the latest release cloud's reply names" */
+    it("keeps it for the status, and forgets it when a later reply names none", async () => {
+      channel.latestRelease = { release: "3.22.0", commit: "def5678" };
+      expect(await service().send()).toBe("sent");
+      expect(await service().findLatestRelease()).toEqual([
+        { release: "3.22.0", commit: "def5678" },
+      ]);
+
+      channel.latestRelease = null;
+      await service().send();
+      expect(await service().findLatestRelease()).toEqual([]);
+    });
+  });
+
+  describe("when usage reporting is switched off", () => {
+    /** @scenario "No latest release is named when usage reporting is off" */
+    it("names none", async () => {
+      await latestReleases.save({ release: "3.22.0", commit: null });
+      expect(await service({ disabled: true }).findLatestRelease()).toEqual([]);
     });
   });
 });

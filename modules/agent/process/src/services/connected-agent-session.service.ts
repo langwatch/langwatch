@@ -23,23 +23,16 @@ import {
   type ReplyNudge,
   type StoredCall,
   type StoredResult,
-  storedCallSchema,
 } from "@langwatch/agent-contract";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import type { InstanceMeta } from "../repositories/connected-agent-state.repository.ts";
 import { detectResultCapViolation } from "../rules/connected-agent-caps.rules.ts";
-import {
-  callAckKey,
-  callKey,
-  INSTANCE_GONE_CHANNEL,
-  replyChannel,
-  resultKey,
-} from "../rules/connected-agent-keys.rules.ts";
 import type { AgentService } from "./agent.service.ts";
 import { ConnectedAgentLastSeenService } from "./connected-agent-last-seen.service.ts";
 import { ConnectedAgentRegistrationService } from "./connected-agent-registration.service.ts";
-import type { ConnectedAgentRuntime, InstanceMeta } from "./connected-agent-runtime.service.ts";
+import type { ConnectedAgentRuntime } from "./connected-agent-runtime.service.ts";
 
 const logger = createLogger("langwatch:connected-agents:session");
 
@@ -101,7 +94,7 @@ export class AgentSessionService {
    * instance held by another.
    */
   findReplicaRefusal(): AgentRegisterRefusedError | null {
-    if (this.runtime.store.shared || this.#replicaCount <= 1) {
+    if (this.runtime.relay.shared || this.#replicaCount <= 1) {
       return null;
     }
 
@@ -167,19 +160,18 @@ export class AgentSessionService {
    */
   async findCallForSession(session: SessionInfo, callId: string): Promise<StoredCall | null> {
     await this.runtime.ownership.claim(session);
-    const raw = await this.runtime.store.tryGet(callKey(session.projectId, callId));
-    if (!raw) {
+    const lookup = await this.runtime.state.readCall({ projectId: session.projectId, callId });
+    if (lookup.kind === "miss") {
       return null;
     }
 
-    let stored: StoredCall;
-    try {
-      stored = storedCallSchema.parse(JSON.parse(raw));
-    } catch {
+    if (lookup.kind === "unreadable") {
       logger.warn({ callId }, "envelope could not be read, dropping the call");
 
       return null;
     }
+
+    const stored = lookup.value;
 
     this.#assertOwnProject(session, stored);
     if (
@@ -228,11 +220,11 @@ export class AgentSessionService {
       return;
     }
 
-    await this.runtime.store.set(
-      callAckKey(session.projectId, callId),
-      "1",
-      ttlOf(stored, this.now()),
-    );
+    await this.runtime.state.markCallAcked({
+      projectId: session.projectId,
+      callId,
+      ttlSeconds: ttlOf(stored, this.now()),
+    });
     await this.#nudgeReply(stored, { callId, kind: "ack" });
   }
 
@@ -303,13 +295,10 @@ export class AgentSessionService {
       });
     }
 
-    await this.runtime.store.publish(
-      INSTANCE_GONE_CHANNEL,
-      JSON.stringify({
-        instanceId: session.instanceId,
-        projectId: session.projectId,
-      } satisfies InstanceGone),
-    );
+    await this.runtime.relay.announceInstanceGone({
+      instanceId: session.instanceId,
+      projectId: session.projectId,
+    } satisfies InstanceGone);
     logger.info(
       { projectId: session.projectId, instanceId: session.instanceId },
       "connected agent instance gone",
@@ -345,11 +334,12 @@ export class AgentSessionService {
     stored: StoredCall;
     result: StoredResult;
   }): Promise<void> {
-    await this.runtime.store.set(
-      resultKey(stored.projectId, stored.envelope.callId),
-      JSON.stringify(result),
-      RESULT_TTL_SECONDS,
-    );
+    await this.runtime.state.saveResult({
+      projectId: stored.projectId,
+      callId: stored.envelope.callId,
+      result,
+      ttlSeconds: RESULT_TTL_SECONDS,
+    });
     await this.#nudgeReply(stored, {
       callId: stored.envelope.callId,
       kind: "result",
@@ -357,7 +347,7 @@ export class AgentSessionService {
   }
 
   async #nudgeReply(stored: StoredCall, nudge: ReplyNudge): Promise<void> {
-    await this.runtime.store.publish(replyChannel(stored.replyTo), JSON.stringify(nudge));
+    await this.runtime.relay.nudgeReply({ podId: stored.replyTo, nudge });
   }
 }
 

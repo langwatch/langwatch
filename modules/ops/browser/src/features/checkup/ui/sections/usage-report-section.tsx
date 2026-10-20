@@ -1,4 +1,5 @@
 import { Link } from "@langwatch/browser-host/link";
+import { Card } from "@langwatch/design-system/card";
 import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
@@ -66,21 +67,19 @@ export function UsageReportSection({
           </Text>
           <CopyButton value={pretty} label="Usage report" aria-label="Copy usage report" />
         </HStack>
-        <Box
-          as="pre"
-          data-testid="checkup-usage-report-payload"
-          fontFamily="mono"
-          fontSize="xs"
-          padding={3}
-          borderWidth="1px"
-          borderColor="border.muted"
-          borderRadius="10px"
-          maxHeight="480px"
-          overflow="auto"
-          whiteSpace="pre"
-        >
-          {pretty}
-        </Box>
+        <Card variant="frame" padding="sm">
+          <Box
+            as="pre"
+            data-testid="checkup-usage-report-payload"
+            fontFamily="mono"
+            fontSize="xs"
+            maxHeight="480px"
+            overflow="auto"
+            whiteSpace="pre"
+          >
+            {pretty}
+          </Box>
+        </Card>
       </VStack>
     </CheckupSection>
   );

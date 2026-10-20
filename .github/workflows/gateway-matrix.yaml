@@ -120,7 +120,14 @@ jobs:
       # The tasks and api config parses refuse a missing NODE_ENV.
       NODE_ENV: "test"
       GATEWAY_URL: http://localhost:5563
+      # The upgrade and the api both read ClickHouse through this one URL.
+      CLICKHOUSE_URL: http://default:ci_password@localhost:8123/langwatch
+      REDIS_URL: redis://localhost:6379
+      # The upgrade preflight and the api both refuse a missing api-key pepper; a fixed non-secret CI value.
+      API_KEY_PEPPER: synthetic-api-key-pepper
       LW_BASE_URL: http://localhost:5560
+      # The hosted MCP endpoint refuses to boot without a public base URL.
+      BASE_HOST: "http://localhost:5560"
       # Provider creds — set as repo/org secrets, NOT committed.
       OPENAI_API_KEY: ${{ secrets.MATRIX_OPENAI_API_KEY }}
       ANTHROPIC_API_KEY: ${{ secrets.MATRIX_ANTHROPIC_API_KEY }}
@@ -178,12 +185,17 @@ jobs:
           --health-retries 10
 
       clickhouse:
-        image: clickhouse/clickhouse-server:24.8
+        image: clickhouse/clickhouse-server:25.10.2.65
         ports: ["8123:8123", "9000:9000"]
         env:
           CLICKHOUSE_USER: default
-          CLICKHOUSE_PASSWORD: ""
+          CLICKHOUSE_PASSWORD: ci_password
           CLICKHOUSE_DB: langwatch
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 10
 
       redis:
         image: redis:7-alpine
@@ -212,16 +224,19 @@ jobs:
       # beyond the platform-api closure, hence the full install above).
       - uses: ./.github/actions/prepare-generated-files
 
-      - name: Apply DB migrations
-        working-directory: apps/tasks
-        env:
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
-        run: pnpm run task upgrade
+      - name: Install Goose migration tool
+        run: bash .github/scripts/install-goose.sh
 
       - name: Generate a throwaway CREDENTIALS_SECRET
         # The api refuses to boot without a 32-byte hex encryption key.
         # Generated per run: a committed hex literal reads as a leaked key to the scanner.
         run: echo "CREDENTIALS_SECRET=$(openssl rand -hex 32)" >> "$GITHUB_ENV"
+
+      - name: Apply DB migrations
+        working-directory: apps/tasks
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@localhost:5432/langwatch
+        run: pnpm run task upgrade
 
       - name: Start control plane (background)
         working-directory: apps/api

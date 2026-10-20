@@ -1,54 +1,68 @@
-import { Button, Text } from "@chakra-ui/react";
+import type { ReactNode } from "react";
 
 import { Dialog } from "./dialog.tsx";
 
-type ConfirmDialogProps = {
-  open: boolean;
-  onOpenChange: (open: boolean) => void;
-  title: string;
-  message: string;
-  confirmLabel?: string;
-  tone?: "danger" | "warning";
-  loading?: boolean;
-  onConfirm: () => void;
-};
+type ConfirmClose =
+  | { onClose: () => void; onOpenChange?: never }
+  /** @deprecated Pass `onClose`; `onOpenChange` goes in W-final. */
+  | { onOpenChange: (open: boolean) => void; onClose?: never };
+
+type ConfirmText =
+  | { description: ReactNode; message?: never }
+  /** @deprecated Pass `description`; `message` goes in W-final. */
+  | { message: string; description?: never };
+
+export type ConfirmDialogProps = ConfirmClose &
+  ConfirmText & {
+    open: boolean;
+    onConfirm: () => void;
+    /** "Revoke API key?", never "Are you sure?". */
+    title: string;
+    /** The verb; default "Confirm". */
+    confirmLabel?: string;
+    /** `danger` paints the confirm red. `warning` is deprecated and reads as `default`. */
+    tone?: "danger" | "default" | "warning";
+    loading?: boolean;
+    /** At most one extra field: a reason, a checkbox. */
+    children?: ReactNode;
+    /** Where focus goes when it closes, asked at that moment; omitted, back to the opener. */
+    finalFocusEl?: () => HTMLElement | null;
+    /** Runs once, after the dialog has left the screen: clean up what it was about. */
+    onExitComplete?: () => void;
+  };
 
 /** The one confirmation dialog for an action that needs a second thought. */
-export function ConfirmDialog({
-  open,
-  onOpenChange,
-  title,
-  message,
-  confirmLabel = "Confirm",
-  tone = "danger",
-  loading = false,
-  onConfirm,
-}: ConfirmDialogProps) {
+export function ConfirmDialog(props: ConfirmDialogProps) {
+  const {
+    open,
+    title,
+    confirmLabel = "Confirm",
+    tone = "danger",
+    loading = false,
+    onConfirm,
+    children,
+    finalFocusEl,
+    onExitComplete,
+  } = props;
+  const onClose = props.onClose ?? (() => props.onOpenChange?.(false));
   return (
-    <Dialog.Root open={open} onOpenChange={(details) => onOpenChange(details.open)}>
-      <Dialog.Content maxWidth="480px">
-        <Dialog.CloseTrigger disabled={loading} />
-        <Dialog.Header>
-          <Dialog.Title>{title}</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text fontSize="sm" color="fg.muted">
-            {message}
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={loading}>
-            Cancel
-          </Button>
-          <Button
-            colorPalette={tone === "danger" ? "red" : "orange"}
-            onClick={onConfirm}
-            loading={loading}
-          >
-            {confirmLabel}
-          </Button>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title={title}
+      description={props.description ?? props.message}
+      role={tone === "danger" ? "alertdialog" : "dialog"}
+      busy={loading}
+      finalFocusEl={finalFocusEl}
+      onExitComplete={onExitComplete}
+      primaryAction={{
+        label: confirmLabel,
+        onClick: onConfirm,
+        loading,
+        danger: tone === "danger",
+      }}
+    >
+      {children}
+    </Dialog>
   );
 }

@@ -1,21 +1,18 @@
 /**
  * @vitest-environment jsdom
- * Tests HomePage composition resolution order and rollout conditions.
+ * The one home: what it draws with Langy and without, and its wait on Langy's gate.
  */
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const gates = {
-  composition: "classic" as "signal-focused" | "langy" | "classic",
   langy: false,
+  langyResolving: false,
   isNewProject: false,
   activePlan: undefined as { free?: boolean | null } | undefined,
 };
 
-vi.mock("../components/use-home-composition.ts", () => ({
-  useHomeComposition: () => gates.composition,
-}));
 vi.mock("../components/use-project-reach.ts", () => ({
   useProjectReach: () => ({
     isLoading: false,
@@ -24,11 +21,6 @@ vi.mock("../components/use-project-reach.ts", () => ({
     hasEvaluations: false,
     hasExperiments: false,
   }),
-}));
-vi.mock("../components/dev/home-state-switcher.tsx", () => ({ HomeStateSwitcher: () => null }));
-vi.mock("../components/dev/home-dev-state.ts", () => ({
-  useHomeDevState: () => null,
-  chartVariantFor: () => "strip",
 }));
 vi.mock("../../../../behavior/home-api.ts", () => ({
   homeApi: {
@@ -39,32 +31,19 @@ vi.mock("../../../../behavior/home-api.ts", () => ({
 }));
 vi.mock("../../../../behavior/lent-peers.tsx", () => ({
   PendingJoinRequests: () => null,
-  GuidedOnboardingOffer: (props: { space: string; spaceInUse?: boolean | null }) => (
-    <div
-      data-testid="guided-offer"
-      data-space={props.space}
-      data-in-use={String(props.spaceInUse)}
-    />
-  ),
+  UpgradeActionNeeded: () => null,
+  GuidedOnboardingOffer: () => null,
 }));
 vi.mock("../components/langy-home-hero.tsx", () => ({
   LangyHomeHero: () => <div data-testid="lantern" />,
 }));
 
-vi.mock("../briefing/index.ts", () => ({
-  HomeBriefingSection: () => <div data-testid="briefing-sheet" />,
-  SetupHairline: () => <div data-testid="setup-hairline" />,
-  BriefingMockSwitcher: () => null,
-}));
 vi.mock("../components/docs-guides.tsx", () => ({
   DocsGuides: () => <div data-testid="docs-guides" />,
 }));
-vi.mock("../components/home-fortune.tsx", () => ({ HomeFortune: () => null }));
 vi.mock("../components/home-page-banners.tsx", () => ({
-  HomePageBanners: ({ variant, children }: { variant?: string; children?: React.ReactNode }) => (
-    <div data-testid="banners" data-variant={variant ?? "default"}>
-      {children}
-    </div>
+  HomePageBanners: ({ children }: { children?: React.ReactNode }) => (
+    <div data-testid="banners">{children}</div>
   ),
 }));
 vi.mock("../components/learning-resources.tsx", () => ({ LearningResources: () => null }));
@@ -75,13 +54,10 @@ vi.mock("../components/recent-items-section.tsx", () => ({
   RecentItemsSection: () => <div data-testid="recent-items" />,
 }));
 vi.mock("../components/traces-overview.tsx", () => ({
-  TracesOverview: ({ variant }: { variant?: string }) => (
-    <div data-testid="traces-overview" data-variant={variant ?? "full"} />
-  ),
+  TracesOverview: () => <div data-testid="traces-overview" />,
 }));
 vi.mock("../components/welcome-header.tsx", () => ({
   WelcomeHeader: () => null,
-  useTimeOfDay: () => "morning",
 }));
 
 import {
@@ -95,11 +71,7 @@ import {
 } from "../../../../model/project-home-host.ts";
 import { HomePage, HomeScreen } from "../home-screen.tsx";
 
-/**
- * The narrowest host the page can be drawn against. The composition is
- * stubbed above — this suite is about the ORDER homes resolve in, not the
- * gates — so it answers only the org for "Considering LangWatch?", nothing else.
- */
+/** The narrowest host the page can be drawn against: the org, and Langy's gate from `gates`. */
 class StubProjectHomeHost extends ProjectHomeHost {
   project(): ProjectHomeProject | undefined {
     return { id: "project-1", name: "Acme App", slug: "acme-app" };
@@ -117,7 +89,7 @@ class StubProjectHomeHost extends ProjectHomeHost {
     return false;
   }
   langyVisibility(): ProjectHomeLangyVisibility {
-    return { show: gates.langy, isResolving: false };
+    return { show: gates.langy, isResolving: gates.langyResolving };
   }
   canAskLangy(): boolean {
     return gates.langy;
@@ -131,100 +103,41 @@ class StubProjectHomeHost extends ProjectHomeHost {
   navigate(): void {}
 }
 
-const renderHome = () =>
-  render(
-    <DesignSystemProvider forcedTheme="light">
-      <ProjectHomeHostProvider value={new StubProjectHomeHost()}>
-        <HomePage />
-      </ProjectHomeHostProvider>
-    </DesignSystemProvider>,
-  );
+const homeTree = () => (
+  <DesignSystemProvider forcedTheme="light">
+    <ProjectHomeHostProvider value={new StubProjectHomeHost()}>
+      <HomePage />
+    </ProjectHomeHostProvider>
+  </DesignSystemProvider>
+);
+
+const renderHome = () => render(homeTree());
 
 afterEach(cleanup);
 
-describe("HomePage composition", () => {
+describe("HomePage", () => {
   beforeEach(() => {
-    gates.composition = "classic";
-    gates.langy = false;
+    gates.langy = true;
+    gates.langyResolving = false;
     gates.isNewProject = false;
     gates.activePlan = { free: true };
   });
 
-  describe("given the signal-focused home is enabled but Langy is not", () => {
-    /** @scenario The rollout decides the composition, not Langy */
-    it("leads with the briefing sheet and drops the classic sections", () => {
-      gates.composition = "signal-focused";
-      renderHome();
-
-      expect(screen.getByTestId("briefing-sheet")).toBeDefined();
-      expect(screen.queryByTestId("traces-overview")).toBeNull();
-      expect(screen.queryByTestId("onboarding-checklist")).toBeNull();
-      expect(screen.queryByTestId("lantern")).toBeNull();
-    });
-  });
-
-  describe("given Langy access without either home rollout", () => {
-    // Unbound on purpose: the spec scenario this pinned was removed when
-    // "having Langy is having the Langy home" landed (langy-home.feature).
-    // The test stays while the code still has this state; reconcile in #3338.
-    it("keeps the classic home, with Langy feeding only its affordances", () => {
-      gates.langy = true;
-      renderHome();
-
-      // The composition stays classic...
-      expect(screen.queryByTestId("briefing-sheet")).toBeNull();
-      expect(screen.getByTestId("banners").dataset.variant).toBe("legacy");
-      expect(screen.getByTestId("recent-items")).toBeDefined();
-      expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
-      expect(screen.queryByTestId("lantern")).toBeNull();
-    });
-  });
-
-  describe("given the classic home is the resolved composition", () => {
-    it("offers guided onboarding under the header for a project with no data", () => {
-      gates.isNewProject = true;
-      renderHome();
-
-      const offer = screen.getByTestId("guided-offer");
-      expect(offer.dataset.space).toBe("project");
-      expect(offer.dataset.inUse).toBe("false");
-    });
-
-    it("tells the offer a project with data is already in use", () => {
-      gates.isNewProject = false;
-      renderHome();
-
-      expect(screen.getByTestId("guided-offer").dataset.inUse).toBe("true");
-    });
-
-    it("leaves the offer to the hero on the Langy home", () => {
-      gates.composition = "langy";
-      renderHome();
-
-      expect(screen.queryByTestId("guided-offer")).toBeNull();
-    });
-  });
-
-  describe("given the Langy home is the resolved composition", () => {
+  describe("given a reader with Langy", () => {
     /** @scenario The Langy home renders for a reader with Langy */
     it("leads with the lit block and keeps the spine underneath", () => {
-      gates.composition = "langy";
-      gates.langy = true;
       renderHome();
 
       expect(screen.getByTestId("lantern")).toBeDefined();
-      expect(screen.queryByTestId("briefing-sheet")).toBeNull();
       expect(screen.getByTestId("recent-items")).toBeDefined();
       expect(screen.getByTestId("onboarding-checklist")).toBeDefined();
     });
 
     /** @scenario The block layers over the shared announcement canvas */
     it("sets the block inside the announcement surface, not beside it", () => {
-      gates.composition = "langy";
       renderHome();
 
       const banners = screen.getByTestId("banners");
-      expect(banners.dataset.variant).toBe("lantern");
       // One canvas on the page: the block is the banner's child, so there is
       // no second announcement surface to mount a second shader in.
       expect(screen.getAllByTestId("banners")).toHaveLength(1);
@@ -232,16 +145,16 @@ describe("HomePage composition", () => {
     });
 
     /** @scenario A project with data leads its figures with the compact strip */
-    it("renders the overview as the compact strip", () => {
-      gates.composition = "langy";
+    it("puts the figures directly beneath the block", () => {
       renderHome();
 
-      expect(screen.getByTestId("traces-overview").dataset.variant).toBe("strip");
+      expect(screen.getByTestId("banners").nextElementSibling).toBe(
+        screen.getByTestId("traces-overview"),
+      );
     });
 
     /** @scenario A project with nothing in it yet still opens with the composer */
     it("promotes setup and drops the figures on a project with no data", () => {
-      gates.composition = "langy";
       gates.isNewProject = true;
       renderHome();
 
@@ -253,7 +166,6 @@ describe("HomePage composition", () => {
 
     /** @scenario The reader can reach the guided docs from this home */
     it("keeps a route into the docs, with data and without", () => {
-      gates.composition = "langy";
       renderHome();
       expect(screen.getByTestId("docs-guides")).toBeDefined();
 
@@ -261,6 +173,42 @@ describe("HomePage composition", () => {
       gates.isNewProject = true;
       renderHome();
       expect(screen.getByTestId("docs-guides")).toBeDefined();
+    });
+  });
+
+  describe("given a reader without Langy", () => {
+    /** @scenario Without Langy the home shows the command bar and says Langy isn't enabled */
+    it("draws the same home, hero and spine included", () => {
+      gates.langy = false;
+      renderHome();
+
+      expect(screen.getByTestId("banners").contains(screen.getByTestId("lantern"))).toBe(true);
+      expect(screen.getByTestId("traces-overview")).toBeDefined();
+      expect(screen.getByTestId("recent-items")).toBeDefined();
+      expect(screen.getByTestId("docs-guides")).toBeDefined();
+    });
+  });
+
+  describe("given Langy's gate has not answered yet", () => {
+    /** @scenario The page waits rather than guessing which home it is */
+    it("draws one placeholder, announced as loading, and no hero", () => {
+      gates.langyResolving = true;
+      renderHome();
+
+      expect(screen.getByLabelText("Loading your home").getAttribute("aria-busy")).toBe("true");
+      expect(screen.queryByTestId("banners")).toBeNull();
+    });
+
+    /** @scenario The placeholder gives way to the home once Langy's gate answers */
+    it("replaces the placeholder with the home once the gate answers", () => {
+      gates.langyResolving = true;
+      const { rerender } = render(homeTree());
+
+      gates.langyResolving = false;
+      rerender(homeTree());
+
+      expect(screen.queryByLabelText("Loading your home")).toBeNull();
+      expect(screen.getByTestId("lantern")).toBeDefined();
     });
   });
 

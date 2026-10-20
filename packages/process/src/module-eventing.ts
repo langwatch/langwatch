@@ -8,6 +8,7 @@ import {
   type EventingParticipation,
   type EventStore,
   type EventUpcastReader,
+  type ListedWork,
   type FeatureEventingSetup,
   type FeatureEventing,
   type OwnEventLog,
@@ -123,7 +124,7 @@ export interface EventingHost {
   readonly participation: EventingParticipation;
   readonly processStore: unknown;
   /** Read at call time: a runtime opens its event store only once it initialises. */
-  readonly eventStore?: Pick<EventStore, "getEvents" | "storeEvents">;
+  readonly eventStore?: Pick<EventStore, "getEvents" | "findEventsOfAggregates" | "storeEvents">;
   register(definition: unknown): unknown;
   /** Lists a definition without starting it; absent on a runtime that cannot describe. */
   describe?(definition: unknown): void;
@@ -147,6 +148,8 @@ export interface EventingHost {
   replayEngine?(): ProjectionReplayEngine | undefined;
   /** The declared upcasts over the event log; absent where the role holds no log. */
   upcastReader?(): EventUpcastReader;
+  /** Runs work whose queue jobs run ahead of any backlog, and waits for them. */
+  runListedWork?<Result>(input: ListedWork<Result>): Promise<Result>;
 }
 
 /** One replay run's engine, opened by the eventing member and closed when the run ends. */
@@ -357,6 +360,9 @@ export function eventingHostFrom(pool: unknown, role: ServerRole): EventingHost 
       : {}),
     ...(typeof host.upcastReader === "function"
       ? { upcastReader: host.upcastReader.bind(candidate) }
+      : {}),
+    ...(typeof host.runListedWork === "function"
+      ? { runListedWork: host.runListedWork.bind(candidate) }
       : {}),
     ...consumerControls(host, candidate),
   };

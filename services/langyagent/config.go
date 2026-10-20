@@ -104,6 +104,11 @@ type Config struct {
 	// cross-check of the CONNECT authority. Default ON.
 	EgressSNICrossCheck bool `env:"LANGY_EGRESS_SNI_CROSSCHECK"`
 
+	// GithubHost is the GitHub host a worker's gh and git talk to. Blank is
+	// github.com (production); a dev stack names its GitHub stand-in, e.g.
+	// "github.<slug>.langwatch.localhost:1355" (see adapters/github).
+	GithubHost string `env:"LANGY_GITHUB_HOST"`
+
 	// MirrorTraceEndpoint + MirrorTraceKey address the operator-designated
 	// mirror project — the mirror lane (ADR-061): a SECONDARY EXPORTER for the
 	// turn's gen_ai trace data (the worker's model/tool spans), so the

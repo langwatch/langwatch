@@ -37,13 +37,32 @@ const registry = {
       "Send the body with the Content-Type in meta.expected; meta.received names the one that was sent",
     ],
   },
+  request_body_unreadable: {
+    tips: [
+      "This usually means the connection closed before the body finished uploading. Send the request again.",
+    ],
+  },
 
   // ---- dataset storage ----
+  private_dataplane_unavailable: {
+    tips: [
+      "Set the variable this error names (CLICKHOUSE_URL__<label>__<orgId> or DATAPLANE_S3__<label>__<orgId>) and restart the api and worker",
+      "If it is set, check its value parses: a ClickHouse URL, or S3 JSON with endpoint, bucket, accessKeyId and secretAccessKey",
+    ],
+  },
+
   storage_not_writable: {
     tips: [
       "Set S3_BUCKET_NAME (with its credentials) so datasets are stored in object storage",
       "Or point LANGWATCH_LOCAL_STORAGE_PATH at a writable, persistent directory and restart the service",
       "The server log line next to this failure names the directory that was refused",
+    ],
+  },
+
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "The message names the dataset's valid columns",
     ],
   },
 
@@ -108,6 +127,12 @@ const registry = {
       "Read only the datasets the schema endpoint lists for this key, and select fields by name rather than with `*`",
     ],
   },
+  lwql_parameter_invalid: {
+    tips: [
+      "Read `meta.parameter`; it names the placeholder whose value could not be read as its declared type",
+      "A `DateTime` or `DateTime64` placeholder takes `YYYY-MM-DD HH:MM:SS[.fff]` with no `T` or `Z`; send UTC in that form",
+    ],
+  },
   lwql_parameter_missing: {
     tips: [
       "Read `meta.parameters`; it lists every parameter the SQL declares that the request left unset",
@@ -162,14 +187,8 @@ const registry = {
   },
   custom_chart_playground_not_enabled: {
     tips: [
-      "The custom-chart-playground feature is not enabled for this project; retrying will not help",
+      "Dashboard widgets need both Dashboards and LangWatchQL enabled for this project; retrying will not help",
       "Use the lwql-charts skill / `langwatch chart` commands for a saved dashboard chart instead",
-    ],
-  },
-  custom_graph_writes_disabled_for_playground: {
-    tips: [
-      "The custom-chart-playground is enabled for this project, which turns off creating or editing dashboard graphs; retrying will not help",
-      "Use the dashboard-widgets skill / `langwatch dashboard-widget` commands instead",
     ],
   },
   saved_workbench_chart_already_exists: {
@@ -213,6 +232,12 @@ const registry = {
     tips: [
       "Check the column name against the dataset's columns; a typo is the usual cause",
       "Column existence is only known when the query runs, so a saved chart can carry this until it is run",
+    ],
+  },
+  lwql_invalid_query: {
+    tips: [
+      "Check the aggregates, types and function arguments in the SQL; the database refused it as written",
+      "Aggregate functions such as count() or any() belong in SELECT, HAVING or a subquery, not in WHERE",
     ],
   },
   lwql_unavailable: {
@@ -802,6 +827,12 @@ const registry = {
   langy_dispatch_rejected: {
     tips: [
       "The agent rejected this turn's request as invalid, it will not be retried; send a new message",
+    ],
+  },
+  langy_agent_not_configured: {
+    tips: [
+      "Self-hosted: enable the Langy agent in your deployment, then reload",
+      "Local development: run `haven up +langy` and reload the api",
     ],
   },
   langy_agent_unavailable: {

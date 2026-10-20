@@ -44,7 +44,7 @@ export const EventDrilldown: React.FC<EventDrilldownProps> = ({ item, ast, toggl
     // Same visual attachment as EvaluatorDrilldown: indented under the row
     // with a hairline guide, no card chrome.
     <Box
-      marginLeft="20px"
+      marginLeft="5"
       marginTop={0.5}
       marginBottom={1}
       paddingLeft={2}

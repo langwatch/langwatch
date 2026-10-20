@@ -130,7 +130,7 @@ func TestClassifyBifrostError_TimeoutSignals(t *testing.T) {
 			IsBifrostError: true,
 			StatusCode:     bfPtr(499),
 			Error: &bfschemas.ErrorField{
-				Type: bfPtr(bfschemas.RequestCancelled),
+				Type:    bfPtr(bfschemas.RequestCancelled),
 				Message: "Request cancelled by context: context canceled",
 			},
 		}

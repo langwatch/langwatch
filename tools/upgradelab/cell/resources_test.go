@@ -36,7 +36,7 @@ func TestBrowserFindingsCountsWalksAndHonoursTheAcceptedList(t *testing.T) {
 	saved := acceptedBrowserNoise
 	acceptedBrowserNoise = []browserNoise{{[]string{"ok-noise"}, "test"}}
 	defer func() { acceptedBrowserNoise = saved }()
-	walks, _, _, findings, err := BrowserFindings(path, -1, -1)
+	walks, _, _, findings, err := BrowserFindings(path, -1, -1, false)
 	if err != nil || walks != 1 || len(findings) != 1 || findings[0].Text != "boom" {
 		t.Errorf("walks %d findings %+v err %v", walks, findings, err)
 	}
@@ -86,10 +86,12 @@ func TestBrowserFindingsCountsThirdPartyNoiseApart(t *testing.T) {
 	path := filepath.Join(t.TempDir(), "browser.jsonl")
 	lines := `{"kind":"console","text":"Loading the script 'https://static.hotjar.com/c.js' violates the following Content Security Policy"}` + "\n" +
 		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_BLOCKED_BY_ORB"}` + "\n" +
-		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n"
+		`{"kind":"requestfailed","url":"https://static.reo.dev/reo.js","text":"net::ERR_FAILED"}` + "\n" +
+		`{"kind":"requestfailed","url":"http://x/api/trpc/traces.spanTreePaginated?input=%7B%7D","text":"net::ERR_ABORTED"}` + "\n" +
+		`{"kind":"requestfailed","url":"http://x/api/trpc/traces.spanTreePaginated?input=%7B%7D","text":"net::ERR_FAILED"}` + "\n"
 	_ = os.WriteFile(path, []byte(lines), 0o600)
-	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1)
-	if err != nil || len(findings) != 1 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 2 {
+	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1, false)
+	if err != nil || len(findings) != 2 || findings[0].Text != "net::ERR_FAILED" || len(tolerated) != 3 {
 		t.Errorf("findings %+v tolerated %v err %v", findings, tolerated, err)
 	}
 }
@@ -124,6 +126,7 @@ func TestMainPageAcrossSwitchIsWindowedAssetNotFound(t *testing.T) {
 		{Kind: "http", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Status: 404},
 		{Kind: "requestfailed", AtMs: 1_010, URL: "http://x/assets/index-Bty315CS.js", Text: "net::ERR_ABORTED"},
 		{Kind: "console", AtMs: 1_010, URL: "http://x/", Text: "Failed to load resource: the server responded with a status of 404 (Not Found)"},
+		{Kind: "console", AtMs: 1_010, URL: "http://x/settings", Text: "Refused to apply style from 'http://x/assets/zod-uBOWI0as.css' because its MIME type ('text/plain') is not a supported stylesheet MIME type, and strict MIME checking is enabled."},
 	}
 	for _, record := range cases {
 		if !mainPageAcrossSwitch(record, 1_000) {
@@ -143,5 +146,83 @@ func TestMainPageAcrossSwitchIsWindowedAssetNotFound(t *testing.T) {
 		if mainPageAcrossSwitch(record, 1_000) {
 			t.Errorf("%s tolerated", name)
 		}
+	}
+}
+
+func TestMainClientOutdatedIsWindowedEnvelopeRefusal(t *testing.T) {
+	enveloped := "http://x/api/trpc/featureFlag.isEnabled?input=%7B%22json%22%3A%7B%22flag%22%3A%22f%22%7D%7D"
+	for _, record := range []BrowserRecord{
+		{Kind: "http", AtMs: 1_010, URL: enveloped, Status: 400},
+		{Kind: "http", AtMs: 1_010, URL: "http://x/api/trpc-ws", Status: 404},
+		{Kind: "console", AtMs: 1_010, URL: "http://x/settings", Text: "Failed to load resource: the server responded with a status of 400 (Bad Request)"},
+	} {
+		if !mainClientOutdated(record, 1_000) {
+			t.Errorf("%s %s just after the switch not tolerated", record.Kind, record.URL)
+		}
+		if mainClientOutdated(record, -1) {
+			t.Errorf("%s tolerated before the switch is known", record.Kind)
+		}
+	}
+	for name, record := range map[string]BrowserRecord{
+		"head's own plain input": {Kind: "http", AtMs: 1_010, URL: "http://x/api/trpc/featureFlag.isEnabled?input=%7B%22flag%22%3A%22f%22%7D", Status: 400},
+		"a minute after":         {Kind: "http", AtMs: 61_001, URL: enveloped, Status: 400},
+		"before the switch":      {Kind: "http", AtMs: 900, URL: enveloped, Status: 400},
+		"another status":         {Kind: "http", AtMs: 1_010, URL: enveloped, Status: 500},
+	} {
+		if mainClientOutdated(record, 1_000) {
+			t.Errorf("%s tolerated", name)
+		}
+	}
+}
+
+// @scenario "A stop-start install's downtime 502s are tolerated, a rolling deploy's are findings"
+func TestStopStartDowntimeIsToleratedOnlyWhileDown(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	lines := `{"phase":"down","kind":"http","url":"http://x/ops/upgrades","status":502}` + "\n" +
+		`{"phase":"down","kind":"requestfailed","url":"http://x/assets/a.js","text":"net::ERR_ABORTED"}` + "\n" +
+		`{"phase":"ready","kind":"http","url":"http://x/ops/upgrades","status":502}` + "\n"
+	_ = os.WriteFile(path, []byte(lines), 0o600)
+	_, _, tolerated, findings, err := BrowserFindings(path, -1, -1, true)
+	if err != nil || len(findings) != 1 || findings[0].Phase != "ready" || len(tolerated) != 1 {
+		t.Errorf("stop-start: findings %+v tolerated %v err %v", findings, tolerated, err)
+	}
+	if _, _, _, findings, _ := BrowserFindings(path, -1, -1, false); len(findings) != 3 {
+		t.Errorf("rolling: %d findings, want 3", len(findings))
+	}
+}
+
+// @scenario "The console echo of an expected upgrade_in_progress 503 is counted apart, one per 503"
+func TestConsoleTwinOfAnExpected503IsCappedByThe503s(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	expected503 := `{"atMs":50,"kind":"http","status":503,"retryAfter":"10","text":"{\"error\":{\"message\":\"upgrade_in_progress\"}}"}`
+	echo := `{"atMs":51,"kind":"console","text":"Failed to load resource: the server responded with a status of 503 (Service Unavailable)"}`
+	_ = os.WriteFile(path, []byte(expected503+"\n"+echo+"\n"+echo+"\n"), 0o600)
+	_, expected, tolerated, findings, err := BrowserFindings(path, 10, 100, false)
+	if err != nil || expected != 1 || len(tolerated) != 1 || len(findings) != 1 {
+		t.Errorf("expected %d tolerated %v findings %+v err %v", expected, tolerated, findings, err)
+	}
+}
+
+func TestAnUnreadUpgrade503CountsOnlyWhereTheSamePathAnsweredUpgradeInProgress(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "browser.jsonl")
+	unread := `{"atMs":40,"kind":"http","url":"http://x/api/trpc/user.updateLastLogin","status":503,"retryAfter":"10","text":"body unread: No resource with given identifier"}`
+	readable := `{"atMs":45,"kind":"http","url":"http://x/api/trpc/user.updateLastLogin","status":503,"retryAfter":"10","text":"{\"error\":{\"message\":\"upgrade_in_progress\"}}"}`
+	other := `{"atMs":46,"kind":"http","url":"http://x/api/trpc/other","status":503,"retryAfter":"5","text":"body unread: gone"}`
+	echo := `{"atMs":60,"kind":"console","text":"Failed to load resource: the server responded with a status of 503 (Service Unavailable)"}`
+	_ = os.WriteFile(path, []byte(unread+"\n"+readable+"\n"+other+"\n"+echo+"\n"+echo+"\n"), 0o600)
+	_, expected, _, findings, err := BrowserFindings(path, 10, 100, false)
+	if err != nil || expected != 2 || len(findings) != 1 || findings[0].URL != "http://x/api/trpc/other" {
+		t.Errorf("expected %d findings %+v err %v", expected, findings, err)
+	}
+}
+
+func TestReopenedLeavesTheRetryDrillsOwnStepToD3(t *testing.T) {
+	atReady := []LedgerRow{{ID: "a:drilled", Status: "done", Attempt: 1}, {ID: "b:other", Status: "done", Attempt: 1}}
+	final := []LedgerRow{{ID: "a:drilled", Status: "done", Attempt: 2}, {ID: "b:other", Status: "done", Attempt: 1}}
+	if got := reopenedVerdict(atReady, final, "a:drilled"); got.Result != "pass" {
+		t.Errorf("drilled step counted: %+v", got)
+	}
+	if got := reopenedVerdict(atReady, final, ""); got.Result == "pass" {
+		t.Errorf("reopened step missed without a drill: %+v", got)
 	}
 }

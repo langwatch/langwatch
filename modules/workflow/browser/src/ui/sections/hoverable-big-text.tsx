@@ -1,6 +1,6 @@
 import { Markdown } from "@langwatch/browser-host/markdown";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Box, type BoxProps, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
 import { Switch } from "@langwatch/design-system/switch";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -55,29 +55,30 @@ export function ExpandedTextDialog({
   const [isFormatted, setIsFormatted] = useState(true);
 
   return (
-    <Dialog.Root open={open} onOpenChange={({ open }) => onOpenChange(open)} size="5xl">
-      <Dialog.Content>
-        <Dialog.Header
-          background="bg.muted"
-          padding={3}
-          borderRadius="12px 12px 0 0"
-          fontSize="14px"
-        >
-          <HStack>
-            <Switch
-              size="sm"
-              checked={isFormatted}
-              onCheckedChange={() => setIsFormatted(!isFormatted)}
-            />
-            <Text>Formatted</Text>
-          </HStack>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
-          <ExpandedTextBody isFormatted={isFormatted} open={open} textExpanded={textExpanded} />
-        </Dialog.Body>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title="Expanded text"
+      size="document"
+      headerAppearance="muted"
+      heightLimit="reading"
+      body="flush"
+      cancelLabel={null}
+      headerContent={
+        <HStack>
+          <Switch
+            size="sm"
+            checked={isFormatted}
+            onCheckedChange={() => setIsFormatted(!isFormatted)}
+          />
+          <Text>Formatted</Text>
+        </HStack>
+      }
+    >
+      <Box paddingY={6} paddingX={8} overflow="auto" maxHeight="calc(100vh - 200px)">
+        <ExpandedTextBody isFormatted={isFormatted} open={open} textExpanded={textExpanded} />
+      </Box>
+    </Dialog>
   );
 }
 
@@ -130,8 +131,8 @@ export function HoverableBigText({
                 textAlign="center"
                 background="yellow.subtle"
                 width="calc(100% + 16px)"
-                marginLeft="-8px"
-                marginTop="-4px"
+                marginLeft="-2"
+                marginTop="-1"
                 color="yellow.fg"
               >
                 click anywhere to expand

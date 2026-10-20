@@ -1,10 +1,11 @@
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Card } from "@langwatch/design-system/card";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Menu } from "@langwatch/design-system/menu";
 import { PageLayout } from "@langwatch/design-system/page-layout";
-import { Alert, Box, Card, Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
+import { Alert, Box, Skeleton, Spacer, VStack } from "@langwatch/design-system/primitives";
 import { monitorApiUpdateInputSchema } from "@langwatch/monitor-contract";
 import { useState } from "react";
 import { MoreVertical } from "react-feather";
@@ -130,15 +131,13 @@ export default function EditTraceCheck() {
       <PageLayout.Container>
         <VStack align="start" gap={4}>
           {check.isLoading && (
-            <Card.Root width="full">
-              <Card.Body>
-                <VStack gap={4} width="full">
-                  <Skeleton width="full" height="20px" />
-                  <Skeleton width="full" height="20px" />
-                  <Skeleton width="full" height="20px" />
-                </VStack>
-              </Card.Body>
-            </Card.Root>
+            <Card padding="lg">
+              <VStack gap={4} width="full">
+                <Skeleton width="full" height="20px" />
+                <Skeleton width="full" height="20px" />
+                <Skeleton width="full" height="20px" />
+              </VStack>
+            </Card>
           )}
           {checkFailed && (
             <Alert.Root status="error">

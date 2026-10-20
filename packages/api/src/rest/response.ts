@@ -646,6 +646,10 @@ export function createFamilyErrorHandler(options: {
           name: error.name,
           message: error.message,
           stack: error.stack,
+          // The raw reasons (a dropped socket, a host) go to the log, never the body.
+          ...(HandledError.isHandled(error)
+            ? { reasons: error.reasons.map((reason) => reason.message) }
+            : {}),
         },
       },
       `${options.label} [${status}]: ${error.message || String(error)}`,
@@ -931,7 +935,10 @@ export function createCanonicalFamilyErrorHandler(options: {
   return async (error, c) => {
     const { status, body } = mapError(error, c);
 
-    logger[body.code === "upgrade_in_progress" ? "warn" : "error"](
+    // The stores log a refused private dataplane once at error, never per request.
+    const expected =
+      body.code === "upgrade_in_progress" || body.code === "private_dataplane_unavailable";
+    logger[expected ? "warn" : "error"](
       {
         path: c.req.path,
         method: c.req.method,
@@ -941,6 +948,10 @@ export function createCanonicalFamilyErrorHandler(options: {
           name: error.name,
           message: error.message,
           stack: error.stack,
+          // The raw reasons (a dropped socket, a host) go to the log, never the body.
+          ...(HandledError.isHandled(error)
+            ? { reasons: error.reasons.map((reason) => reason.message) }
+            : {}),
         },
       },
       `${options.label} [${status}]: ${error.message || String(error)}`,

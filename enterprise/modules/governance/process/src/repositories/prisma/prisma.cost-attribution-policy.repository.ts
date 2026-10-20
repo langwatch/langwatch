@@ -12,6 +12,15 @@ type CostAttributionPrismaClient = {
       select: { config: true };
     }): Promise<{ config: unknown }[]>;
     findMany(input: {
+      where: {
+        organizationId: { in: string[] };
+        type: "coding_assistant";
+        enabled: true;
+        archivedAt: null;
+      };
+      select: { organizationId: true; config: true };
+    }): Promise<{ organizationId: string; config: unknown }[]>;
+    findMany(input: {
       where: { type: "coding_assistant"; enabled: true; archivedAt: null };
       distinct: ["organizationId"];
       select: { organizationId: true };
@@ -39,6 +48,23 @@ export class PrismaCostAttributionPolicyRepository extends CostAttributionPolicy
       select: { config: true },
     });
     return rows.map((row) => row.config);
+  }
+
+  async findEnabledCodingAssistantConfigs({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<{ organizationId: string; config: unknown }[]> {
+    if (organizationIds.length === 0) return [];
+    return this.client.aiToolEntry.findMany({
+      where: {
+        organizationId: { in: [...organizationIds] },
+        type: "coding_assistant",
+        enabled: true,
+        archivedAt: null,
+      },
+      select: { organizationId: true, config: true },
+    });
   }
 
   async organizationsWithEnabledCodingAssistants(): Promise<string[]> {

@@ -113,7 +113,7 @@ describe("BillingEventsPage", () => {
     renderPage();
     // Advance the cursor first: without this, asserting an undefined cursor
     // proves nothing about the reset.
-    await user.click(screen.getByTestId("billing-events-load-more"));
+    await user.click(screen.getByRole("button", { name: "Load more" }));
     const advanced = listQuery.mock.calls.at(-1)?.[0];
     expect(advanced.cursor).toBeDefined();
 
@@ -143,7 +143,7 @@ describe("BillingEventsPage", () => {
       isFetching: false,
     });
     renderPage();
-    expect(screen.getByTestId("billing-events-load-more")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Load more" })).toBeInTheDocument();
   });
 
   /** @scenario A spend row with no virtual key and the instant eval request type reads as Instant Evals */

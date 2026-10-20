@@ -71,7 +71,8 @@ export async function runGdprUserDataErase({
   email: string;
   execute: boolean;
 }): Promise<GdprUserDataEraseOutcome> {
-  const user = await repository.findUserByEmail(email);
+  // Addresses are stored lower-cased, so the address as typed is folded the same way.
+  const user = await repository.findUserByEmail(email.trim().toLowerCase());
   if (!user) {
     throw new Error(`No user found with email: ${email}`);
   }

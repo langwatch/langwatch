@@ -14,12 +14,14 @@ import {
   type LangWatchQLProtections,
   type LangWatchQLQueryResult,
 } from "@langwatch/analytics-contract";
+import { InstantEvalNotEnabledError } from "@langwatch/instant-eval-contract";
 import { Temporal } from "@langwatch/time";
 
 import {
   INSTANT_EVAL_TRACE_COLUMN,
   instantEvalSampleBuckets,
 } from "../rules/instant-eval-composition.rules.ts";
+import { isInstantEvalQueryIdentityRefused } from "../rules/instant-eval-query-identity.rules.ts";
 import {
   instantEvalRowText,
   type InstantEvalCursor,
@@ -43,6 +45,11 @@ export class InstantEvalResultTruncatedError extends Error {
 /** The Analytics peer, narrowed to the one operation every pass runs. */
 export interface InstantEvalStatementRunner {
   executeLangWatchQLPass(input: LangWatchQLPassInput): Promise<LangWatchQLQueryResult>;
+}
+
+/** This module's own answer to whether the project may call an eval function. */
+export interface InstantEvalGate {
+  isEnabled(input: { projectId: string }): Promise<boolean>;
 }
 
 /** What one pass reads about its selection, whoever asked for it. */
@@ -82,14 +89,20 @@ function toRowKey(row: Record<string, unknown>): InstantEvalRowKey {
 }
 
 export class InstantEvalRowSourceService {
-  private constructor(private readonly analytics: InstantEvalStatementRunner) {}
+  private constructor(
+    private readonly analytics: InstantEvalStatementRunner,
+    private readonly access: InstantEvalGate,
+  ) {}
 
   static create({
     analytics,
+    access,
   }: {
     analytics: InstantEvalStatementRunner;
+    /** Asked on every pass, because Analytics takes the eval gate from its caller. */
+    access: InstantEvalGate;
   }): InstantEvalRowSourceService {
-    return new InstantEvalRowSourceService(analytics);
+    return new InstantEvalRowSourceService(analytics, access);
   }
 
   /** What the statement projects, without reading a row or judging anything. */
@@ -195,13 +208,21 @@ export class InstantEvalRowSourceService {
     maxRows: number;
     name?: string;
   }): Promise<LangWatchQLQueryResult> {
-    const execution = await this.analytics.executeLangWatchQLPass({
-      project: caller,
-      protections,
-      sql,
-      ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
-      pass,
-    });
+    const isInstantEvalsEnabled = await this.access.isEnabled({ projectId: caller.id });
+    let execution: LangWatchQLQueryResult;
+    try {
+      execution = await this.analytics.executeLangWatchQLPass({
+        project: caller,
+        protections,
+        sql,
+        ...(parameters && Object.keys(parameters).length > 0 ? { parameters } : {}),
+        pass,
+        isInstantEvalsEnabled,
+      });
+    } catch (error) {
+      if (isInstantEvalQueryIdentityRefused(error)) throw new InstantEvalNotEnabledError();
+      throw error;
+    }
     const isTruncated = execution.rows.length > maxRows;
     if (isTruncated && name !== undefined) throw new InstantEvalResultTruncatedError(name);
 

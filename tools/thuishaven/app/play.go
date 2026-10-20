@@ -1030,6 +1030,9 @@ func newPlayPorts(free []int) playPorts {
 // proxy that serves its hostnames and the container runtime that holds its
 // dedicated databases. It returns the DOCKER_HOST addressing that runtime.
 func (o *Orchestrator) ensurePlayRuntime(ctx context.Context) (string, error) {
+	if err := o.machineSettings().RefuseVM("haven pr --throwaway"); err != nil {
+		return "", err
+	}
 	if err := o.ensurePortlessInstalled(); err != nil {
 		return "", err
 	}

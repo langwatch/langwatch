@@ -9,6 +9,8 @@ import type { OrganizationMembershipRepository } from "./organization-membership
 import type { OrganizationSeatRepository } from "./organization-seat.repository.ts";
 import type { OrganizationUserDirectoryRepository } from "./organization-user-directory.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
+import type { PrivateClickHouseRoutesRepository } from "./private-clickhouse-routes.repository.ts";
+import type { PrivateS3AccountsRepository } from "./private-s3-accounts.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
 import type { TeamRepository } from "./team.repository.ts";
 
@@ -35,4 +37,7 @@ export interface OrganizationRepositories {
   readonly seats: OrganizationSeatRepository;
   /** The organization's own reads of the people table. */
   readonly userDirectory: OrganizationUserDirectoryRepository;
+  /** The private ClickHouse routes and S3 accounts this deployment names, by variable. */
+  readonly privateClickHouseRoutes: PrivateClickHouseRoutesRepository;
+  readonly privateS3Accounts: PrivateS3AccountsRepository;
 }

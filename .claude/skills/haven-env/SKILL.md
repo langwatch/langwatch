@@ -30,6 +30,9 @@ haven help env                    # every knob and where it resolves from
 - Per-run knobs read the process environment only: `LANGWATCH_SLUG`, `HAVEN_BASELINE`,
   `LANGWATCH_SEED`, `HAVEN_AGENT`, `NO_COLOR` and the other names `haven help env` lists.
   `HAVEN_TRUSTED_REPO_ROOT` and `HAVEN_UNTRUSTED_CHECKOUT` are set by haven and never read from `.env`.
+- Browser telemetry: `RUM_ENABLED` and `RUM_COLLECTOR_ENDPOINT` exported in the shell that runs
+  `haven up` (even empty) win over the overlay, so `RUM_ENABLED=false haven up` boots with RUM off;
+  `RUM_SAMPLE_RATIO` is never set by haven and passes through.
 - Machine limits: environment, then `.env`, then the settings file `haven machine limits set` writes, then default.
 - Only `haven down` followed by `haven up` reloads a changed `.env`; `haven restart` does not.
 
@@ -54,3 +57,5 @@ Limits: `clickhouse-memory-mb`, `observability-memory-mb`, `redis-maxmemory-mb`,
 `colima-memory-gib`, `test-workers`, `instant-eval-mock-judge`. `haven machine limits` also says when each
 change applies (next `haven up`, a restart, or the next test run). Changing a machine limit
 affects every stack on the machine: ask before setting one.
+
+A stack takes its environment from the shell that ran `haven up` (the keeper replays it), never from the daemon: exporting a variable before `haven up` is enough, and what the daemon was started with reaches no stack.

@@ -6,15 +6,22 @@ import type { ScopedSecrets } from "@langwatch/secrets";
 import pg from "pg";
 import { z } from "zod";
 
-import { BackgroundStepsService, startBackgroundSteps } from "../background/index.ts";
+import {
+  type BackgroundStepsQueue,
+  BackgroundStepsService,
+  startBackgroundSteps,
+} from "../background/index.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpgradeLease, UpgradeRun } from "../ledger.ts";
 import { loadReleases } from "../manifest/manifest-loader.ts";
 import type { ReleaseTreeSteps } from "../manifest/stamp.ts";
 import type { UpgradePostgres } from "../ports.ts";
+import { writeUpgradeLine } from "../runner/image-upgrade.ts";
 import { UPGRADE_LEASE_NAME } from "../runner/runner-lease.ts";
 import { UpgradeRunnerRepository } from "../runner/runner-ledger.repository.ts";
-import { EXIT_CODES } from "../runner/upgrade-outcome.ts";
+import { isPrivateTarget, PRIVATE_TARGET_PREFIX } from "../runner/schema-applier.ts";
+import { EXIT_CODES, type UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
+import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import { credentialKeyFingerprint } from "../serving-roster/credential-key-fingerprint.ts";
 import { PreRosterRepository } from "../serving-roster/pre-roster.repository.ts";
 import {
@@ -22,9 +29,14 @@ import {
   type ServingRoster,
 } from "../serving-roster/serving-roster.service.ts";
 import { isDeclaredMigrationStep, isMigrationStep } from "../step/migration-step.ts";
-import { type FirstInstallUpgrade, spawnFirstInstallUpgrade } from "./first-install-upgrade.ts";
+import type { FirstInstallUpgrade } from "./first-install-upgrade.ts";
 import { IMAGE_CODE_STEPS_FILE, readImageCodeSteps } from "./image-code-steps.ts";
 import { imageGateSteps, imageRelease, readImageTree } from "./image-tree.ts";
+import {
+  type BootUpgradeModules,
+  inProcessUpgrade,
+  redisReadHintPublisher,
+} from "./in-process-upgrade.ts";
 import {
   type ServingRole,
   type ServingVerdict,
@@ -33,6 +45,12 @@ import {
   UPGRADE_RE_ASK_MS,
 } from "./serving-gate.ts";
 import { SERVING_ROSTER_TIMING } from "./serving-roster-timing.ts";
+import { startTargetCatchUp } from "./target-catch-up.ts";
+import {
+  redisTargetsCatchingUp,
+  type TargetsCatchingUpStore,
+  watchTargetsCatchingUp,
+} from "./targets-catching-up.ts";
 import { createUpgradeGate, type UpgradeGate } from "./upgrade-gate.service.ts";
 
 /** Roster entries dead this long are deleted when a process records its own (plan F-10). */
@@ -85,6 +103,7 @@ export function upgradeGateOver({
   processId,
   firstInstall,
   credentialKeys,
+  targetsCatchingUp = null,
   warn = emitWarning,
   wait = (ms) => sleep(ms),
 }: {
@@ -97,6 +116,8 @@ export function upgradeGateOver({
   processId: string;
   firstInstall: FirstInstallUpgrade;
   credentialKeys?: readonly string[];
+  /** The shared list of private ClickHouse targets catching up (T7-F18); null without Redis. */
+  targetsCatchingUp?: TargetsCatchingUpStore | null;
   warn?: ServingGateWarn;
   /** The worker's pause between asks; tests pass their own. */
   wait?: (ms: number) => Promise<unknown>;
@@ -128,6 +149,7 @@ export function upgradeGateOver({
     ledger: {
       findSteps: async () => ((await runner.ledgerExists()) ? ledger.findSteps() : []),
       findRuns,
+      findSeedSteps: async () => prismaSteps({ rows: await readPrismaMigrations({ postgres }) }),
     },
     roster,
     credentialKeys,
@@ -147,19 +169,21 @@ export function upgradeGateOver({
   const blocking = new Set(blockingSteps);
   const findBlockingFailures = async () =>
     (await findFailedSteps()).filter(({ id }) => blocking.has(id));
+  const findUnresolvedFailures = async () =>
+    unresolvedFailures({ failed: await findBlockingFailures(), postgres });
   const findLeaseHolder = () => liveLeaseHolder({ runner });
-  let closed: Promise<void> | null = null;
-  const closeOnce = () => (closed ??= close());
+  const connection = gateConnection({ close });
   return {
     async admit(): Promise<ServingVerdict> {
       try {
         const verdict =
-          role === "worker"
+          (await uncreatableLedger({ runner })) ??
+          (role === "worker"
             ? await admitAfterFirstInstall({
                 gate,
                 firstInstall,
                 warn,
-                findFailedSteps: findBlockingFailures,
+                findFailedSteps: findUnresolvedFailures,
                 findLeaseHolder,
                 wait,
               })
@@ -167,11 +191,11 @@ export function upgradeGateOver({
                 verdict: await gate.admit(),
                 findFailedSteps: findBlockingFailures,
                 findRuns,
-              });
-        if (closesOn(verdict)) await closeOnce();
+              }));
+        await connection.answered(verdict);
         return verdict;
       } catch (error) {
-        await closeOnce();
+        await connection.failed();
         throw error;
       }
     },
@@ -179,10 +203,17 @@ export function upgradeGateOver({
       try {
         await gate.release();
       } finally {
-        await closeOnce();
+        await connection.close();
+        await targetsCatchingUp?.close();
       }
     },
     serving: () => gate.serving(),
+    ...(targetsCatchingUp === null
+      ? {}
+      : {
+          watchTargetsCatchingUp: (onChange: (organizationIds: readonly string[]) => void) =>
+            watchTargetsCatchingUp({ store: targetsCatchingUp, onChange }),
+        }),
     ...consoleRetryFor({ role, findFailures: findBlockingFailures, runner }),
     ...(role === "worker"
       ? {
@@ -193,6 +224,7 @@ export function upgradeGateOver({
             processId,
             release,
             warn,
+            catchUp: { upgrade: firstInstall, findLeaseHolder, targetsCatchingUp },
           }),
         }
       : {}),
@@ -200,6 +232,10 @@ export function upgradeGateOver({
 }
 
 const logTailSchema = z.array(z.string()).catch([]);
+/** A failed run's report: a schema phase failure writes its error here, never on a step row. */
+const failedReportSchema = z
+  .object({ logTail: logTailSchema, error: z.string().nullable().catch(null).default(null) })
+  .catch({ logTail: [], error: null });
 
 /** The api's console Retry: each failed blocking step back to `pending` (UIW-7, Q10). */
 function consoleRetryFor({
@@ -219,10 +255,12 @@ function consoleRetryFor({
   };
 }
 
+type LedgerRun = Pick<UpgradeRun, "kind" | "outcome" | "report">;
+
 /**
- * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade (a first install, so
- * nobody can sign in to Ops > Upgrades) reads the failure from the ledger for the token console:
- * its image's failed blocking steps and the last failed run's log tail; later ones go to Upgrades.
+ * UIW-7, NO-HOLDS: an api whose installation never finished an upgrade run (the seed's run does
+ * not count) reads the failure for the token console; a failed schema phase writes no step row,
+ * so a failed last finished run opens it too, its error closing the log tail.
  */
 export async function failedFirstInstallRun({
   verdict,
@@ -231,15 +269,19 @@ export async function failedFirstInstallRun({
 }: {
   verdict: ServingVerdict;
   findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
-  findRuns: () => Promise<readonly Pick<UpgradeRun, "outcome" | "report">[]>;
+  findRuns: () => Promise<readonly LedgerRun[]>;
 }): Promise<ServingVerdict> {
   if (verdict.outcome !== "upgrading") return verdict;
   const runs = await findRuns();
-  if (runs.some((run) => run.outcome === "succeeded")) return verdict;
+  if (runs.some((run) => run.kind === "upgrade" && run.outcome === "succeeded")) return verdict;
   const failedSteps = await findFailedSteps();
-  if (failedSteps.length === 0) return verdict;
-  const report = runs.findLast((run) => run.outcome === "failed")?.report;
-  return { ...verdict, failedRun: { failedSteps, logTail: logTailSchema.parse(report?.logTail) } };
+  const lastFinished = runs.findLast((run) => run.kind === "upgrade" && run.outcome !== null);
+  if (failedSteps.length === 0 && lastFinished?.outcome !== "failed") return verdict;
+  const report = runs.findLast((run) => run.kind === "upgrade" && run.outcome === "failed")?.report;
+  const { logTail, error } = failedReportSchema.parse(report ?? {});
+  const named =
+    error === null || failedSteps.length > 0 || logTail.some((line) => line.includes(error));
+  return { ...verdict, failedRun: { failedSteps, logTail: named ? logTail : [...logTail, error] } };
 }
 
 /** Who holds the upgrade lease now, or null when it is free (a lapsed lease is free). */
@@ -248,12 +290,73 @@ export type UpgradeLeaseHolder = () => Promise<Pick<
   "owner" | "host" | "image"
 > | null>;
 
+/** Where a role that cannot create the ledger is sent (Alex, 2026-10-10, option a). */
+export const UPGRADE_DOCS = "docs/self-hosting/upgrade.mdx";
+
+/** The refusal of a role that can neither create the ledger schema nor write a pre-created one. */
+export function ledgerNotCreatableRefusal({ schema }: { schema: string }): string {
+  return (
+    `the upgrade ledger does not exist and the DATABASE_URL role cannot create it: grant the role ` +
+    `CREATE on the database, or create the schema "${schema}" owned by the role beforehand ` +
+    `(${UPGRADE_DOCS}), then start this process again.`
+  );
+}
+
+/** A missing ledger this role may create is the worker's to create; one it may not is refused. */
+async function uncreatableLedger({
+  runner,
+}: {
+  runner: Pick<UpgradeRunnerRepository, "ledgerExists" | "ledgerCreatable" | "ledgerSchema">;
+}): Promise<ServingVerdict | null> {
+  if ((await runner.ledgerExists()) || (await runner.ledgerCreatable())) return null;
+  const refusal = ledgerNotCreatableRefusal({ schema: await runner.ledgerSchema() });
+  return { admitted: false, outcome: "ledger-not-creatable", refusal };
+}
+
 /** An upgrading api keeps the connection: it asks again over it. */
 const closesOn = (verdict: ServingVerdict) => !verdict.admitted && verdict.outcome !== "upgrading";
+
+/** Closes on a refusal or an error, except once the api asks on over it, until `release`. */
+function gateConnection({ close }: { close: () => Promise<void> }) {
+  let closed: Promise<void> | null = null;
+  let askingOn = false;
+  const closeOnce = () => (closed ??= close());
+  return {
+    close: closeOnce,
+    answered: async (verdict: ServingVerdict) => {
+      askingOn ||= verdict.outcome === "upgrading";
+      if (closesOn(verdict) && !askingOn) await closeOnce();
+    },
+    failed: async () => {
+      if (!askingOn) await closeOnce();
+    },
+  };
+}
 
 async function liveLeaseHolder({ runner }: { runner: UpgradeRunnerRepository }) {
   if (!(await runner.ledgerExists())) return null;
   return runner.findLiveLease({ name: UPGRADE_LEASE_NAME });
+}
+
+/**
+ * A failed Prisma step whose `_prisma_migrations` row an operator since resolved, applied or
+ * rolled back, waits no more: the worker runs the upgrade again by itself (T9-F2).
+ */
+export async function unresolvedFailures({
+  failed,
+  postgres,
+}: {
+  failed: UpgradeFailedRun["failedSteps"];
+  postgres: UpgradePostgres;
+}): Promise<UpgradeFailedRun["failedSteps"]> {
+  if (!failed.some(({ id }) => id.startsWith("prisma:"))) return failed;
+  const history = await readPrismaMigrations({ postgres }).catch(() => null);
+  if (history === null) return failed;
+  const rows = prismaSteps({ rows: history });
+  const status = new Map(rows.map((step) => [step.id, step.status]));
+  const waiting = (id: string) =>
+    !id.startsWith("prisma:") || (status.get(id) ?? "failed") === "failed";
+  return failed.filter(({ id }) => waiting(id));
 }
 
 /** Why the worker runs nothing yet: a live lease holder, or a failed step awaiting a Retry. */
@@ -276,24 +379,32 @@ async function waitReason({
   if (failed.length === 0) return null;
   const ids = failed.map(({ id }) => id).join(", ");
   return {
-    line: `the upgrade failed on ${ids}; this worker waits for a Retry`,
+    line:
+      `the upgrade failed on ${ids}; this worker waits for a Retry in Ops > Upgrades, or for a ` +
+      `failed Prisma migration to be resolved as its message says, and then runs it by itself`,
     waitingOn: "a Retry",
   };
+}
+
+/** The line names at most five ids; `pnpm task upgrade status` lists every one (T0-F5). */
+const NAMED_STEPS = 5;
+
+function stepsNotDone(outstanding: readonly string[]): string {
+  const count = `${outstanding.length} ${outstanding.length === 1 ? "step" : "steps"} not done`;
+  const more = outstanding.length > NAMED_STEPS ? ", …" : "";
+  return `${count}: ${outstanding.slice(0, NAMED_STEPS).join(", ")}${more}`;
 }
 
 function sayRun({ verdict, warn }: { verdict: ServingVerdict; warn: ServingGateWarn }): void {
   const why =
     verdict.outcome === "first-install"
       ? "first install: the ledger and the schema are empty"
-      : `behind this image: steps not done: ${"outstanding" in verdict ? verdict.outstanding.join(", ") : ""}`;
-  warn(
-    `${why}, so this worker runs \`${UPGRADE_COMMAND}\` before it takes jobs; its lines follow`,
-    {
-      phase: verdict.outcome,
-      waitingOn: `\`${UPGRADE_COMMAND}\``,
-      next: "nothing to do: the worker takes jobs when the upgrade finishes",
-    },
-  );
+      : `behind this image: ${stepsNotDone("outstanding" in verdict ? verdict.outstanding : [])}`;
+  warn(`${why}, so this worker runs the upgrade itself before it takes jobs; its lines follow`, {
+    phase: verdict.outcome,
+    waitingOn: "the upgrade",
+    next: "nothing to do: the worker takes jobs when the upgrade finishes",
+  });
 }
 
 /** Whether the worker stops asking; one that said it was behind also says it caught up. */
@@ -308,21 +419,18 @@ function settled({
 }): boolean {
   if (verdict.outcome === "first-install" || verdict.outcome === "behind") return false;
   if (wasBehind && verdict.admitted) {
-    warn(
-      `\`${UPGRADE_COMMAND}\` finished: the installation is current, so this worker takes jobs`,
-      {
-        phase: "current",
-        next: "nothing to do",
-      },
-    );
+    warn("the upgrade finished: the installation is current, so this worker takes jobs", {
+      phase: "current",
+      next: "nothing to do",
+    });
   }
   return true;
 }
 
 /**
  * The worker runs `upgrade` while its installation is behind (UPGRADE-IN-WORKER): it waits while
- * another runner holds the lease, after a failed step for a Retry that returns it to `pending`,
- * and after a failure with no failed step retries on a backoff (STUCK-STATES).
+ * another runner holds the lease, after a failed step for a Retry, after a failure with no failed
+ * step retries on a backoff (STUCK-STATES).
  */
 export async function admitAfterFirstInstall({
   gate,
@@ -363,8 +471,8 @@ export async function admitAfterFirstInstall({
     // An exit 0 that left the ledger behind runs again only after the re-ask interval.
     if (ranClean) await wait(reAskMs);
     sayRun({ verdict, warn });
-    const { exitCode, logTail } = await firstInstall();
-    ranClean = exitCode === 0;
+    const { code, logTail } = await firstInstall();
+    ranClean = code === "done";
     if (ranClean) {
       retries = 0;
       continue;
@@ -372,7 +480,7 @@ export async function admitAfterFirstInstall({
     // After any run a failed step waits for a Retry; a lease loser's exit is not a failure.
     mayRunPastFailure = false;
     retries = await waitAfterFailedRun({
-      run: { verdict, exitCode, logTail },
+      run: { verdict, code, logTail },
       retries,
       findFailedSteps,
       warn,
@@ -387,31 +495,31 @@ export const UPGRADE_RETRY_MAX_MS = 5 * 60_000;
 
 /** Waits after a failed run; answers the count of back-to-back failures with no failed step. */
 async function waitAfterFailedRun({
-  run: { verdict, exitCode, logTail },
+  run: { verdict, code, logTail },
   retries,
   findFailedSteps,
   warn,
   wait,
   reAskMs,
 }: {
-  run: { verdict: ServingVerdict; exitCode: number; logTail: readonly string[] };
+  run: { verdict: ServingVerdict; code: UpgradeOutcomeCode; logTail: readonly string[] };
   retries: number;
   findFailedSteps: () => Promise<UpgradeFailedRun["failedSteps"]>;
   warn: ServingGateWarn;
   wait: (ms: number) => Promise<unknown>;
   reAskMs: number;
 }): Promise<number> {
-  const failed =
-    exitCode === EXIT_CODES.lease_not_acquired ? [] : await findFailedSteps().catch(() => []);
-  if (exitCode === EXIT_CODES.lease_not_acquired || failed.length > 0) {
-    if (failed.length > 0) warnFailedRun({ verdict, exitCode, warn });
+  const lost = code === "lease_not_acquired";
+  const failed = lost ? [] : await findFailedSteps().catch(() => []);
+  if (lost || failed.length > 0) {
+    if (failed.length > 0) warnFailedRun({ verdict, code, warn });
     await wait(reAskMs);
     return 0;
   }
   const retryInMs = Math.min(reAskMs * 2 ** retries, UPGRADE_RETRY_MAX_MS);
   const cause = logTail.at(-1) ?? "it printed nothing";
   warn(
-    `\`${UPGRADE_COMMAND}\` exited ${exitCode} with no failed step to retry (last line: ${cause}); this worker retries it in ${retryInMs / 1000} s`,
+    `\`${UPGRADE_COMMAND}\` ended ${code} with no failed step to retry (last line: ${cause}); this worker retries it in ${retryInMs / 1000} s`,
     {
       phase: verdict.outcome,
       waitingOn: "the retry backoff",
@@ -425,17 +533,19 @@ async function waitAfterFailedRun({
 
 function warnFailedRun({
   verdict,
-  exitCode,
+  code,
   warn,
 }: {
   verdict: ServingVerdict;
-  exitCode: number;
+  code: UpgradeOutcomeCode;
   warn: ServingGateWarn;
 }): void {
-  warn(`\`${UPGRADE_COMMAND}\` exited ${exitCode}; this worker waits for a Retry`, {
+  warn(`\`${UPGRADE_COMMAND}\` ended ${code}; this worker waits for a Retry`, {
     phase: verdict.outcome,
     waitingOn: "a Retry",
-    next: "retry the failed step from Ops > Upgrades or the upgrade console",
+    next:
+      "retry the failed step from Ops > Upgrades or the upgrade console, or resolve a failed " +
+      "Prisma migration as the run's message says; this worker then runs the upgrade by itself",
   });
 }
 
@@ -447,6 +557,7 @@ function backgroundStepsOver({
   processId,
   release,
   warn,
+  catchUp,
 }: {
   postgres: UpgradePostgres;
   roster: Pick<ServingRoster, "oldWritersGoneFor">;
@@ -454,6 +565,12 @@ function backgroundStepsOver({
   processId: string;
   release: string | null;
   warn: ServingGateWarn;
+  /** Runs the upgrade again while a held private ClickHouse target is behind (T7-F1). */
+  catchUp: {
+    upgrade: FirstInstallUpgrade;
+    findLeaseHolder: UpgradeLeaseHolder;
+    targetsCatchingUp: TargetsCatchingUpStore | null;
+  };
 }) {
   const ledger = UpgradeLedgerRepository.create({ postgres });
   const runner = UpgradeRunnerRepository.create({ postgres });
@@ -461,7 +578,7 @@ function backgroundStepsOver({
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {
     isStep: isDeclaredMigrationStep,
-    start: (steps: readonly unknown[]) => {
+    start: (steps: readonly unknown[], queue?: BackgroundStepsQueue) => {
       const service = BackgroundStepsService.create({
         ledger: {
           findSteps: () => ledger.findSteps(),
@@ -471,17 +588,53 @@ function backgroundStepsOver({
           markRunning: (input) => runner.markRunning(input),
           setStatus: (input) => runner.setStatus(input),
           saveReport: (input) => runner.saveReport(input),
+          reopen: (input) => runner.reopenDoneSteps({ ...input, from: "running" }),
         },
         steps: steps.filter(isMigrationStep),
         serving: () => gate.serving(),
         oldWritersGoneFor: (input) => roster.oldWritersGoneFor(input),
         identity: { owner: processId, image: release ?? "unreleased", host: hostname() },
         log,
+        ...(queue === undefined ? {} : { queue }),
       });
-      return startBackgroundSteps({ service, log });
+      const sweeping = startBackgroundSteps({ service, log });
+      const catchingUp = startTargetCatchUp({
+        findTargetsBehind: async () => {
+          if (!(await runner.ledgerExists())) return [];
+          const behind = (await ledger.findTargetsBehind()).map(({ target }) => target);
+          return [...new Set(behind.filter((target) => isPrivateTarget({ target })))];
+        },
+        findLeaseHolder: catchUp.findLeaseHolder,
+        upgrade: catchUp.upgrade,
+        ...(catchUp.targetsCatchingUp === null
+          ? {}
+          : { shareTargetsBehind: shareOver({ store: catchUp.targetsCatchingUp }) }),
+        warn: (message, fields) => warn(message, { processId, ...fields }),
+        maxMs: UPGRADE_RETRY_MAX_MS,
+      });
+      return {
+        stop: async () => {
+          await catchingUp.stop();
+          await sweeping.stop();
+        },
+      };
     },
   };
 }
+
+/** The ledger names a private target `private:<organizationId>`; the list holds organisations. */
+function shareOver({ store }: { store: TargetsCatchingUpStore }) {
+  return (targets: readonly string[]) =>
+    store.write({
+      organizationIds: targets.map((target) => target.slice(PRIVATE_TARGET_PREFIX.length)),
+    });
+}
+
+/** The gate's statements give up rather than hold its one connection (gate review, 2026-10-10). */
+export const GATE_STATEMENT_TIMEOUT_MS = 15_000;
+
+/** Client side, for a connection that stops answering at all: a little past the server's own. */
+export const GATE_QUERY_TIMEOUT_MS = 20_000;
 
 /** The gate's one connection, in the schema `?schema=` names, where the runner wrote the ledger. */
 export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.PoolConfig {
@@ -490,10 +643,20 @@ export function gatePoolConfig({ databaseUrl }: { databaseUrl: string }): pg.Poo
     connectionString: databaseUrl,
     max: 1,
     allowExitOnIdle: true,
+    statement_timeout: GATE_STATEMENT_TIMEOUT_MS,
+    query_timeout: GATE_QUERY_TIMEOUT_MS,
     ...(schema
       ? { options: `-c search_path="${schema}" -c TimeZone=UTC` }
       : { options: "-c TimeZone=UTC" }),
   };
+}
+
+/** An idle gate connection lost to Postgres is reported, not thrown; silent once the pool ends. */
+export function guardGatePool({ pool, warn }: { pool: pg.Pool; warn: ServingGateWarn }): pg.Pool {
+  pool.on("error", (error) => {
+    if (!pool.ending) warn("gate connection lost while idle", { error: messageOf(error) });
+  });
+  return pool;
 }
 
 /** The tree both serving roles gate on: the schema it ships and the tasks process's code steps. */
@@ -503,30 +666,54 @@ export function servingImageTree({
   return readImageTree({ codeSteps: readImageCodeSteps({ file: codeStepsFile }) });
 }
 
+/** A gate that can also run the upgrade once and answer its exit code: `pnpm task upgrade`. */
+export type ServingUpgradeGate = UpgradeGate & Readonly<{ runOnce?: () => Promise<number> }>;
+
+/** Said by a run-once upgrade with no DATABASE_URL: there is no installation to upgrade. */
+const NO_DATABASE_LINE = {
+  level: "error",
+  message: "DATABASE_URL is required to upgrade",
+  fields: { phase: "preflight", next: "set DATABASE_URL, then run `pnpm task upgrade` again" },
+} as const;
+
 /**
- * `withUpgradeGate`'s factory for the api and worker (held question "mig-serving-gate data
- * source", default (a)): one connection of its own from the stores' `DATABASE_URL`, opened only
- * when the gate first asks. Specs: specs/upgrade/serving-gate.feature and entry-points.feature.
+ * `withUpgradeGate`'s factory for the api and worker: one connection of its own from the stores'
+ * `DATABASE_URL`, opened only when the gate first asks. The worker runs the upgrade in this process
+ * over `bootModules` (Alex, 2026-10-11). Specs: serving-gate.feature and entry-points.feature.
  */
 export async function servingUpgradeGate({
   secrets,
   role,
+  environment = {},
+  bootModules,
   warn,
 }: {
   secrets: ScopedSecrets;
   role: ServingRole;
+  /** The process environment, under the resolved store URLs, for the Prisma and goose programs. */
+  environment?: Readonly<Record<string, string | undefined>>;
+  /** Boots the installed list in the tasks role; the api is handed none and never runs a step. */
+  bootModules?: BootUpgradeModules;
   warn?: ServingGateWarn;
-}): Promise<UpgradeGate> {
+}): Promise<ServingUpgradeGate> {
   const tree = servingImageTree();
   const release = imageRelease({ manifests: loadReleases().manifests, tree });
   return secrets.into(storesOwner.secrets.database, (database) =>
     secrets.into(storesOwner.secrets.clickhouse, (clickhouse) =>
       secrets.into(storesOwner.secrets.clickhouseRoutes, (routes) =>
-        withCredentialKeys(secrets, (credentialKeys) => {
-          if (!database?.trim()) return NO_LEDGER_GATE;
-          if (!clickhouse?.trim() && routes.size === 0) return NO_CLICKHOUSE_GATE;
-          const pool = new pg.Pool(gatePoolConfig({ databaseUrl: database }));
-          return upgradeGateOver({
+        withStoreUrls(secrets, ({ redis, credentialKeys }) => {
+          const databaseUrl = database?.trim();
+          if (!databaseUrl) return { ...NO_LEDGER_GATE, runOnce: refuseWithoutDatabase };
+          const stores = { bootModules, databaseUrl, clickhouse, redis, environment };
+          const upgrade = upgradeIn({ ...stores, admitAtBlockingDone: true });
+          const runOnce = async () =>
+            EXIT_CODES[(await upgradeIn({ ...stores, admitAtBlockingDone: false })()).code];
+          if (!clickhouse?.trim() && routes.size === 0) return { ...NO_CLICKHOUSE_GATE, runOnce };
+          const pool = guardGatePool({
+            pool: new pg.Pool(gatePoolConfig({ databaseUrl })),
+            warn: warn ?? emitWarning,
+          });
+          const gate = upgradeGateOver({
             role,
             postgres: pool,
             close: () => pool.end(),
@@ -534,15 +721,74 @@ export async function servingUpgradeGate({
             release,
             withClickHouse: true,
             processId: `${hostname()}:${process.pid}:${role}`,
-            firstInstall: spawnFirstInstallUpgrade(),
+            firstInstall: upgrade,
             credentialKeys,
+            targetsCatchingUp: redisTargetsCatchingUp({
+              url: redis?.trim() || undefined,
+              environment,
+            }),
             warn,
           });
+          return { ...gate, runOnce };
         }),
       ),
     ),
   );
 }
+
+/** The upgrade this process runs: in-process over its modules, or a refusal where it has none. */
+function upgradeIn({
+  bootModules,
+  databaseUrl,
+  clickhouse,
+  redis,
+  environment,
+  admitAtBlockingDone,
+}: {
+  bootModules: BootUpgradeModules | undefined;
+  databaseUrl: string;
+  clickhouse: string | undefined;
+  redis: string | undefined;
+  environment: Readonly<Record<string, string | undefined>>;
+  /** True for the serving worker, which takes jobs while the run's reconcilers finish. */
+  admitAtBlockingDone: boolean;
+}): FirstInstallUpgrade {
+  if (!bootModules) return refuseWithoutModules;
+  const sharedUrl = clickhouse?.trim();
+  return inProcessUpgrade({
+    boot: bootModules,
+    databaseUrl,
+    environment: {
+      ...environment,
+      DATABASE_URL: databaseUrl,
+      ...(sharedUrl ? { CLICKHOUSE_URL: sharedUrl } : {}),
+    },
+    development: environment.NODE_ENV === "development",
+    admitAtBlockingDone,
+    openPublisher: redisReadHintPublisher({ url: redis?.trim() || undefined, environment }),
+  });
+}
+
+/** The worker's Redis URL, for the run's read hints, beside the credential key fingerprints. */
+function withStoreUrls<T>(
+  secrets: ScopedSecrets,
+  build: (urls: { redis: string | undefined; credentialKeys: string[] }) => T | Promise<T>,
+): Promise<T> {
+  return secrets.into(storesOwner.secrets.redis, (redis) =>
+    withCredentialKeys(secrets, (credentialKeys) => build({ redis, credentialKeys })),
+  );
+}
+
+async function refuseWithoutDatabase(): Promise<number> {
+  writeUpgradeLine(NO_DATABASE_LINE);
+  return EXIT_CODES.failed;
+}
+
+/** A process composed without its modules cannot run the upgrade; only the worker is given them. */
+const refuseWithoutModules: FirstInstallUpgrade = async () => ({
+  code: "failed",
+  logTail: ["this process was not handed its installed modules, so it cannot run the upgrade"],
+});
 
 /** Fingerprints of the keys this process seals and opens credentials with (Alex, 2026-10-09). */
 function withCredentialKeys<T>(

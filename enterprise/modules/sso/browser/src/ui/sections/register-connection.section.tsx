@@ -9,6 +9,7 @@
  * form arrives one act at a time — pick who, give their console our
  * addresses, bring back what it hands you.
  */
+import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Button,
   Field,
@@ -52,6 +53,10 @@ const ACKNOWLEDGEMENTS = {
     title: "Replacement registered",
     description: "Your current sign-in keeps working until you switch everyone over.",
   },
+  operator: {
+    title: "Replacement imported",
+    description: "The organization's current sign-in keeps working until it is switched over.",
+  },
 } as const;
 
 export function RegisterConnectionSection({
@@ -59,14 +64,18 @@ export function RegisterConnectionSection({
   serviceProvider,
   canManage,
   replacesConnectionId,
+  mode = "customer",
   onRegistered,
 }: {
   organizationId: string;
-  serviceProvider: ServiceProviderAddresses;
+  /** Our addresses for their console; an operator importing a supplied configuration needs none. */
+  serviceProvider?: ServiceProviderAddresses;
   canManage: boolean;
   /** The grandfathered connection this registration replaces, when it is one:
    *  the domains it proved carry over, and sign-in stays where it is. */
   replacesConnectionId?: string;
+  /** `operator`: the back office imports the customer's configuration as the replacement. */
+  mode?: "customer" | "operator";
   /**
    * Awaited: firing the read and forgetting it left a window where the
    * command had settled, the form showed exactly what it showed before, and
@@ -81,6 +90,9 @@ export function RegisterConnectionSection({
   const [form, setForm] = useState<RegisterForm>(EMPTY_REGISTER_FORM);
   const register = ssoApi.ssoSetup.register.useMutation();
   const migrate = ssoApi.ssoSetup.startLegacyMigration.useMutation();
+  const operatorMigrate = ssoApi.ssoConnections.startLegacyMigration.useMutation();
+  const utils = ssoApi.useUtils();
+  const operatorImport = mode === "operator";
 
   const update: UpdateField = (key) => (value) =>
     setForm((current) => ({ ...current, [key]: value }));
@@ -105,15 +117,16 @@ export function RegisterConnectionSection({
       // and the acknowledgement is of the ACT, which a screen changing
       // underneath the reader is not.
       onSuccess: async () => {
+        if (operatorImport) await utils.ssoConnections.invalidate();
         await onRegistered?.();
         host.succeeded(
-          ACKNOWLEDGEMENTS[replacesConnectionId === undefined ? "first" : "replacement"],
+          ACKNOWLEDGEMENTS[acknowledgementFor({ operatorImport, replacesConnectionId })],
         );
       },
     };
 
     if (replacesConnectionId !== undefined) {
-      migrate.mutate(
+      (operatorImport ? operatorMigrate : migrate).mutate(
         {
           organizationId,
           legacyConnectionId: replacesConnectionId,
@@ -131,10 +144,11 @@ export function RegisterConnectionSection({
 
   if (!canManage) {
     return (
-      <Text color="fg.muted" fontSize="sm" data-testid="sso-register-unavailable">
-        No identity provider is registered for this organization yet. An organization administrator
-        can set one up here.
-      </Text>
+      <NoDataInfoBlock
+        size="line"
+        title="No identity provider is registered for this organization yet. An organization administrator can set one up here."
+        testId="sso-register-unavailable"
+      />
     );
   }
 
@@ -143,26 +157,52 @@ export function RegisterConnectionSection({
       <ProviderPicker selected={preset} onPick={pick} />
       {preset && (
         <>
-          <ProviderConsoleAct
-            preset={preset}
-            serviceProvider={serviceProvider}
-            protocol={protocol}
-          />
+          {serviceProvider && !operatorImport && (
+            <ProviderConsoleAct
+              preset={preset}
+              serviceProvider={serviceProvider}
+              protocol={protocol}
+            />
+          )}
           <CredentialsAct
             preset={preset}
             protocol={protocol}
             onProtocolChange={setProtocol}
             form={form}
             update={update}
-            pending={register.isPending || migrate.isPending}
+            pending={register.isPending || migrate.isPending || operatorMigrate.isPending}
             onSubmit={submit}
-            submitLabel={replacesConnectionId === undefined ? "Register" : "Register replacement"}
-            refusal={register.error ?? migrate.error}
+            submitLabel={submitLabelFor({ operatorImport, replacesConnectionId })}
+            refusal={register.error ?? migrate.error ?? operatorMigrate.error}
           />
         </>
       )}
     </VStack>
   );
+}
+
+/** Which acknowledgement a settled registration earns. */
+function acknowledgementFor({
+  operatorImport,
+  replacesConnectionId,
+}: {
+  operatorImport: boolean;
+  replacesConnectionId: string | undefined;
+}): keyof typeof ACKNOWLEDGEMENTS {
+  if (operatorImport) return "operator";
+  return replacesConnectionId === undefined ? "first" : "replacement";
+}
+
+/** The button's words: main's "Import replacement" is the operator's. */
+function submitLabelFor({
+  operatorImport,
+  replacesConnectionId,
+}: {
+  operatorImport: boolean;
+  replacesConnectionId: string | undefined;
+}): string {
+  if (operatorImport) return "Import replacement";
+  return replacesConnectionId === undefined ? "Register" : "Register replacement";
 }
 
 /**
@@ -198,7 +238,7 @@ function ProviderPicker({
   return (
     <VStack align="stretch" gap={4}>
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">Who signs your team in?</Heading>
+        <Heading textStyle="cardTitle">Who signs your team in?</Heading>
         <Text color="fg.muted" fontSize="sm">
           Pick your identity provider and we&apos;ll walk you through its side of the setup.
         </Text>
@@ -243,7 +283,7 @@ function ProviderConsoleAct({
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-console">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">
+        <Heading textStyle="cardTitle">
           {preset.group === "protocol" ? "Give it our addresses" : `Set it up in ${preset.name}`}
         </Heading>
         <Text color="fg.muted" fontSize="sm">
@@ -284,7 +324,7 @@ function CredentialsAct({
   return (
     <VStack align="stretch" gap={3} data-testid="sso-register-credentials">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">
+        <Heading textStyle="cardTitle">
           {preset.group === "protocol"
             ? "Then bring back what it gives you"
             : `Then bring back what ${preset.name} gives you`}

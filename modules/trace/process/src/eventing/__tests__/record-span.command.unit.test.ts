@@ -1,10 +1,10 @@
 import { createTenantId, type Command } from "@langwatch/eventing";
 import { applyOtlpReceiverPolicy } from "@langwatch/otlp";
+import { type OtlpSpan } from "@langwatch/otlp/trace-request";
 import {
   RECORD_SPAN_COMMAND_TYPE,
   SPAN_RECEIVED_EVENT_TYPE,
   spanReceivedEventSchema,
-  type OtlpSpan,
   type RecordSpanCommandData,
 } from "@langwatch/trace-contract";
 import { describe, expect, it, vi } from "vitest";
@@ -192,6 +192,38 @@ describe("EventingRecordSpanAdapter", () => {
       projectId: "project-1",
       traceId: "trace-1",
       spanId: "span-1",
+    });
+  });
+
+  describe("when the spool object a command names is gone", () => {
+    /** @scenario "A spooled command whose spool object is gone completes without retrying" */
+    it.each(["StoredObjectNotFoundError", "ObjectNotFoundError", "NoSuchKey"])(
+      "records nothing and completes on %s",
+      async (errorName) => {
+        const spool = new SpoolFake();
+        const missing = Object.assign(new Error("not found"), { name: errorName });
+        spool.read.mockRejectedValueOnce(missing);
+        const test = harness(spool);
+
+        const events = await test.handler.handle(command(commandData({ spoolRef: "spool:v2" })));
+
+        expect(events).toEqual([]);
+        expect(test.piiRedaction.redact).not.toHaveBeenCalled();
+      },
+    );
+  });
+
+  describe("when reading the spool object fails for another reason", () => {
+    /** @scenario "A spool read that fails for another reason is retried" */
+    it("rethrows so the queue retries the command", async () => {
+      const spool = new SpoolFake();
+      const reset = Object.assign(new Error("connection reset"), { code: "ECONNRESET" });
+      spool.read.mockRejectedValueOnce(reset);
+      const test = harness(spool);
+
+      await expect(
+        test.handler.handle(command(commandData({ spoolRef: "spool:v2" }))),
+      ).rejects.toMatchObject({ code: "ECONNRESET" });
     });
   });
 

@@ -20,7 +20,7 @@ export class HttpOpsChannels {
   }): Promise<OpsChannels> {
     const bugReportNotifier = await secrets.into(opsSecrets.slackBugReportsBotToken, (botToken) =>
       SlackBugReportNotifierChannel.create({
-        transport: HttpSlackAlertChannel.create(),
+        transport: HttpSlackAlertChannel.create({ apiBase: config.slackApiBase }),
         config: {
           botToken,
           channel: config.bugReportSlackChannel,

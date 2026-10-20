@@ -38,8 +38,9 @@ import type {
   CreatedCredentialUser,
   CreatePasskeyUserRow,
   SetFirstUserPasswordRow,
-  UserCreatedRow,
-  UserStandingRow,
+  UserAddressReplacement,
+  UserAddressRow,
+  UserBackfillRow,
   UserDeactivationOutcome,
   UserRepository,
   StoredProfileChange,
@@ -192,39 +193,66 @@ export class PrismaUserRepository
     return row !== null;
   }
 
-  async findCreatedPage({
+  async findBackfillPage({
     afterId,
     limit,
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<UserCreatedRow[]> {
+  }): Promise<UserBackfillRow[]> {
     const rows = await this.prisma.user.findMany({
       where: afterId === null ? {} : { id: { gt: afterId } },
       orderBy: { id: "asc" },
       take: limit,
-      select: { id: true, createdAt: true },
-    });
-    return rows.map((row) => ({ id: row.id, createdAt: fromDate(row.createdAt) }));
-  }
-
-  async findStandingPage({
-    afterId,
-    limit,
-  }: {
-    afterId: string | null;
-    limit: number;
-  }): Promise<UserStandingRow[]> {
-    const rows = await this.prisma.user.findMany({
-      where: afterId === null ? {} : { id: { gt: afterId } },
-      orderBy: { id: "asc" },
-      take: limit,
-      select: { id: true, deactivatedAt: true },
+      select: { id: true, createdAt: true, deactivatedAt: true },
     });
     return rows.map((row) => ({
       id: row.id,
+      createdAt: fromDate(row.createdAt),
       deactivatedAt: row.deactivatedAt ? fromDate(row.deactivatedAt) : null,
     }));
+  }
+
+  /** Postgres `lower()` decides, so the step reads only the rows it has to rewrite. */
+  async findMixedCaseAddressPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<UserAddressRow[]> {
+    return this.#database.$queryRaw<UserAddressRow[]>`
+      ${skipTenantCheck({
+        // Accounts are install-wide: the address step reads every account, as countUsage does.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT "id", "email" FROM "User"
+      WHERE "email" <> lower("email") AND (${afterId}::text IS NULL OR "id" > ${afterId})
+      ORDER BY "id" ASC
+      LIMIT ${limit}
+    `;
+  }
+
+  /** Compare-and-set on the address itself; the store's unique email answers "taken". */
+  async replaceAddress({
+    id,
+    from,
+    to,
+  }: {
+    id: string;
+    from: string;
+    to: string;
+  }): Promise<UserAddressReplacement> {
+    try {
+      const { count } = await this.prisma.user.updateMany({
+        where: { id, email: from },
+        data: { email: to },
+      });
+      return count === 1 ? "replaced" : "changed";
+    } catch (error) {
+      if (isUniqueConstraintError(error)) return "taken";
+      throw error;
+    }
   }
 
   async findProfiles(userIds: string[]): Promise<UserFullProfile[]> {
@@ -244,11 +272,20 @@ export class PrismaUserRepository
     return row ? userProfileSchema.parse(row) : null;
   }
 
-  async findByEmail(email: string): Promise<UserProfile[]> {
+  async findByEmailAnyCase(email: string): Promise<UserProfile[]> {
     const rows = await this.prisma.user.findMany({
       where: { email: { equals: email, mode: "insensitive" } },
       select: userProfileSelect,
       orderBy: { createdAt: "asc" },
+    });
+
+    return rows.map((row) => userProfileSchema.parse(row));
+  }
+
+  async findByEmail(email: string): Promise<UserProfile[]> {
+    const rows = await this.prisma.user.findMany({
+      where: { email },
+      select: userProfileSelect,
     });
 
     return rows.map((row) => userProfileSchema.parse(row));
@@ -435,9 +472,10 @@ export class PrismaUserRepository
   }
 
   async updateProfile(input: StoredProfileChange): Promise<UserProfile> {
-    const data: { name?: string; email?: string } = {};
+    const data: { name?: string; email?: string; emailVerified?: boolean } = {};
     if (input.name !== undefined) data.name = input.name;
     if (input.email !== undefined) data.email = input.email;
+    if (input.emailVerified !== undefined) data.emailVerified = input.emailVerified;
 
     return userProfileSchema.parse(
       await this.prisma.user.update({

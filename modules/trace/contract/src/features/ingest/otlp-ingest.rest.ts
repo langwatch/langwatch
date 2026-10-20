@@ -1,44 +1,14 @@
-import type { Named } from "@langwatch/module";
 /**
  * The OTLP receiver's own errors and small pure helpers. Ports live in the
  * server transport file instead, keeping this contract free of the DOM-lib
  * `Request` dependency neither the browser SDK nor another module needs.
  */
-import { otlpSourcePolicySchema } from "@langwatch/otlp/door";
+import type {
+  OtlpIngestCredential,
+  OtlpIngestCredentialInput,
+  OtlpIngestProject,
+} from "@langwatch/otlp/door";
 import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer";
-import { z } from "zod";
-
-export type OtlpIngestCredentialInput = Readonly<{
-  authorization: string | null;
-  xAuthToken: string | null;
-  xProjectId: string | null;
-}>;
-
-const otlpIngestProjectSchema = z.object({
-  id: z.string(),
-  teamId: z.string(),
-  organizationId: z.string(),
-});
-export type OtlpIngestProject = Readonly<z.infer<typeof otlpIngestProjectSchema>>;
-
-/** A resolved receiver credential, handed by the OTLP ingest door as the route's session. */
-const otlpIngestCredentialSchemaDefinition = z.object({
-  project: otlpIngestProjectSchema,
-  identity: z.object({
-    apiKeyId: z.string().nullable(),
-    organizationId: z.string(),
-    ingestSourceType: z.string().nullable(),
-    ingestionTemplateId: z.string().nullable(),
-    sourcePolicy: otlpSourcePolicySchema.optional(),
-  }),
-});
-export interface OtlpIngestCredentialSchema extends Named<
-  typeof otlpIngestCredentialSchemaDefinition
-> {}
-export const otlpIngestCredentialSchema: OtlpIngestCredentialSchema =
-  otlpIngestCredentialSchemaDefinition;
-/** A refusal is thrown, and the receiver renders it. */
-export type OtlpIngestCredential = Readonly<z.infer<typeof otlpIngestCredentialSchema>>;
 
 export type OtlpTraceCollectionResult = Readonly<{
   rejectedSpans?: number;

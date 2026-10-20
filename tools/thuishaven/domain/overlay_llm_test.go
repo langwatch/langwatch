@@ -7,6 +7,7 @@ import (
 )
 
 // @scenario "haven +llm points the OpenAI and Anthropic providers at llmsim"
+// @scenario "haven seeds Gemini and Vertex providers at llmsim"
 func TestLLMProviderEnvPointsProvidersAtLlmsim(t *testing.T) {
 	if DefaultSelection().LLM {
 		t.Fatal("llm is on in a fresh worktree's selection; it must be opt-in")
@@ -18,7 +19,7 @@ func TestLLMProviderEnvPointsProvidersAtLlmsim(t *testing.T) {
 		"DEEPSEEK_BASE_URL=http://127.0.0.1:45595/v1", "XAI_BASE_URL=http://127.0.0.1:45595/v1",
 		"CEREBRAS_BASE_URL=http://127.0.0.1:45595/v1", "GROQ_BASE_URL=http://127.0.0.1:45595/v1",
 		"GEMINI_BASE_URL=http://127.0.0.1:45595/v1", "ALLOWED_PROXY_HOSTS=127.0.0.1",
-		"HAVEN_SEED_LLMSIM_MODELS=1",
+		"HAVEN_SEED_LLMSIM_MODELS=1", "HAVEN_SEED_LLMSIM_BASE_URL=http://127.0.0.1:45595",
 	} {
 		if !slices.Contains(env, want) {
 			t.Errorf("overlay %v lacks %q", env, want)

@@ -107,10 +107,9 @@ function mountShell({
     apis: [],
     capabilities: {},
     transport,
-    session: ({ transport: mounted, feedback }) => {
+    session: ({ transport: mounted }) => {
       const isPublicRoute = root.scope.isUiPublicRoute(path);
       const sessionReading = root.session.useUiSessionReading({
-        feedback,
         isPublicRoute,
         authClient,
       });

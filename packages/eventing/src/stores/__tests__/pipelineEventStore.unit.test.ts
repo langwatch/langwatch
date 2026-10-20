@@ -3,7 +3,7 @@
  *
  * Spec: packages/eventing/specs/own-event-store.feature
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { defineAggregate } from "../../domain/definitions.ts";
@@ -43,15 +43,19 @@ function eventOf({
   type,
   aggregateType = "own_connection",
   note,
+  tenantId = TENANT,
+  aggregateId = AGGREGATE_ID,
 }: {
   type: ConnectionEvent["type"];
   aggregateType?: string;
   note: string;
+  tenantId?: string;
+  aggregateId?: string;
 }): Event {
   return EventUtils.createEvent({
     aggregateType,
-    aggregateId: AGGREGATE_ID,
-    tenantId: createTenantId(TENANT),
+    aggregateId,
+    tenantId: createTenantId(tenantId),
     type,
     version: "2026-10-05",
     data: { note },
@@ -148,6 +152,104 @@ describe("PipelineEventStore", () => {
         aggregateType: "own_connection",
       });
       expect(written).toEqual([]);
+    });
+  });
+
+  describe("given many of the pipeline's own aggregates read at once", () => {
+    const OTHER_TENANT = "organization-2";
+    const SECOND_ID = "connection-2";
+    const EMPTY_ID = "connection-3";
+
+    /** @scenario "One read answers many of a pipeline's own aggregates, each oldest first" */
+    it("answers each asked aggregate's accepted events, oldest first, from one log read", async () => {
+      const { store, log } = boundStore();
+      const firstOpened = eventOf({ type: "own.connection.opened", note: "1a" });
+      const secondOpened = eventOf({
+        type: "own.connection.opened",
+        note: "2a",
+        tenantId: OTHER_TENANT,
+        aggregateId: SECOND_ID,
+      });
+      const firstRenamed = eventOf({ type: "own.connection.renamed", note: "1b" });
+      const secondRenamed = eventOf({
+        type: "own.connection.renamed",
+        note: "2b",
+        tenantId: OTHER_TENANT,
+        aggregateId: SECOND_ID,
+      });
+      await store.append({ tenantId: TENANT, events: [firstOpened, firstRenamed] });
+      await store.append({ tenantId: OTHER_TENANT, events: [secondOpened, secondRenamed] });
+      const getEvents = vi.spyOn(log, "getEvents");
+      const findEventsOfAggregates = vi.spyOn(log, "findEventsOfAggregates");
+
+      const found = await store.findAggregates({
+        aggregates: [
+          { tenantId: OTHER_TENANT, aggregateId: SECOND_ID },
+          { tenantId: TENANT, aggregateId: EMPTY_ID },
+          { tenantId: TENANT, aggregateId: AGGREGATE_ID },
+        ],
+        accepts: isConnectionEvent,
+      });
+
+      expect(findEventsOfAggregates).toHaveBeenCalledTimes(1);
+      expect(getEvents).not.toHaveBeenCalled();
+      expect(
+        found.map(({ tenantId, aggregateId, events }) => ({
+          tenantId,
+          aggregateId,
+          ids: events.map((event) => event.id),
+        })),
+      ).toEqual([
+        {
+          tenantId: OTHER_TENANT,
+          aggregateId: SECOND_ID,
+          ids: [secondOpened.id, secondRenamed.id],
+        },
+        { tenantId: TENANT, aggregateId: EMPTY_ID, ids: [] },
+        { tenantId: TENANT, aggregateId: AGGREGATE_ID, ids: [firstOpened.id, firstRenamed.id] },
+      ]);
+    });
+
+    /** @scenario "A read of many aggregates answers no stream it was not asked for" */
+    it("answers none of another aggregate type's or another tenant's stream", async () => {
+      const log = EventStoreMemory.createForTesting();
+      const foreignType = eventOf({
+        type: "own.connection.opened",
+        aggregateType: "other_aggregate",
+        note: "not ours",
+      });
+      await log.storeEvents([foreignType], { tenantId: createTenantId(TENANT) }, "other_aggregate");
+      const { store } = boundStore(log);
+      const otherTenant = eventOf({
+        type: "own.connection.opened",
+        note: "not asked",
+        tenantId: OTHER_TENANT,
+      });
+      await store.append({ tenantId: OTHER_TENANT, events: [otherTenant] });
+
+      const found = await store.findAggregates({
+        aggregates: [{ tenantId: TENANT, aggregateId: AGGREGATE_ID }],
+        accepts: isConnectionEvent,
+      });
+
+      expect(found).toEqual([{ tenantId: TENANT, aggregateId: AGGREGATE_ID, events: [] }]);
+    });
+
+    it("refuses before its definition is built, naming the read", async () => {
+      const store = PipelineEventStore.create({
+        pipeline: "own_connections",
+        log: () => EventStoreMemory.createForTesting(),
+      });
+
+      await expect(
+        store.findAggregates({
+          aggregates: [{ tenantId: TENANT, aggregateId: AGGREGATE_ID }],
+          accepts: isConnectionEvent,
+        }),
+      ).rejects.toMatchObject({
+        name: "ConfigurationError",
+        context: { pipeline: "own_connections", operation: "read" },
+      });
     });
   });
 

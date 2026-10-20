@@ -40,6 +40,40 @@ describe("ClickHouseAnalyticsRecencyRepository", () => {
     });
   });
 
+  describe("given a trace-sourced recency read that leaves origins out", () => {
+    it("leaves those origins out of the newest versions, bound as a parameter", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "trace",
+        since: SINCE,
+        excludeOrigins: ["langy"],
+      });
+
+      expect(queries[0]?.sql).toContain("Origin NOT IN ({excludeOrigins:Array(String)})");
+      expect(queries[0]?.params).toEqual({
+        tenantId: "project-1",
+        startMs: SINCE.epochMilliseconds,
+        excludeOrigins: ["langy"],
+      });
+    });
+
+    it("leaves no origin out of an evaluation read", async () => {
+      const { queries, repository } = createRepository([{ lastMs: null }]);
+
+      await repository.findLastOccurredAt({
+        projectId: "project-1",
+        source: "evaluation",
+        since: SINCE,
+        excludeOrigins: ["langy"],
+      });
+
+      expect(queries[0]?.sql).not.toContain("Origin");
+      expect(queries[0]?.params).not.toHaveProperty("excludeOrigins");
+    });
+  });
+
   describe("given an evaluation-sourced recency read", () => {
     it("reads evaluation_analytics keyed by EvaluationId", async () => {
       const { queries, repository } = createRepository([{ lastMs: null }]);

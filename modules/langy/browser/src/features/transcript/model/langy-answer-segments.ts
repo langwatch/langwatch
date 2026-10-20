@@ -6,6 +6,8 @@ import {
   LANGY_CARD_PART_TYPE,
   type LangyCardFailedPart,
   type LangyCardPart,
+  type LangyDerivedInsightsCard,
+  langyInsightsCardPartsOf,
   mightContainLangyCardFence,
   parseLangyCardFailedPart,
   parseLangyCardPart,
@@ -119,6 +121,27 @@ export function langyAnswerSegmentsFromText(text: string): LangyAnswerSegment[] 
   });
 }
 
+/**
+ * The answer's first insights card: off the stamped parts of a recorded message, or off the
+ * fences of a copy this browser streamed. Absent when the answer carries none.
+ */
+export function langyAnswerInsightsCard({
+  parts,
+  text,
+  isRecorded,
+}: {
+  parts: readonly unknown[];
+  text: string;
+  isRecorded: boolean;
+}): LangyDerivedInsightsCard | undefined {
+  const [stamped] = langyInsightsCardPartsOf(parts);
+  if (stamped || isRecorded) return stamped?.card;
+  const streamed = (langyAnswerSegmentsFromText(text) ?? []).flatMap((segment) =>
+    segment.type === "card" ? [segment.part] : [],
+  );
+  return langyInsightsCardPartsOf(streamed)[0]?.card;
+}
+
 /** One fence's verdict, by the same salvage the relay stamps with. */
 function fenceSegment({ raw, ordinal }: { raw: string; ordinal: number }): LangyAnswerSegment {
   const parsed = salvageLangyDerivedCard(raw);
@@ -141,6 +164,7 @@ function fenceSegment({ raw, ordinal }: { raw: string; ordinal: number }): Langy
       provenance: "derived",
       card: parsed.card,
       ...(parsed.card.hints !== undefined ? { hints: parsed.card.hints } : {}),
+      ...(parsed.repaired ? { repaired: true as const } : {}),
     },
   };
 }

@@ -1,3 +1,4 @@
+import { LLMIcon } from "@langwatch/design-system/icons";
 import { Box, type BoxProps } from "@langwatch/design-system/primitives";
 import type { ComponentType, SourceType } from "@langwatch/workflow-contract";
 import {
@@ -161,10 +162,12 @@ export const ComponentIcon = ({
   return <ColorfulBlockIcon colorPalette={kind.palette} size={size} icon={icon} />;
 };
 
-/** A variable source's icon, for the prompt kit's `renderSourceIcon` prop. */
 export function renderSourceTypeIcon(type: SourceType): React.ReactNode {
   if (type === "dataset") {
     return <ColorfulBlockIcon colorPalette="blue" size="xs" icon={<Database />} />;
+  }
+  if (type === "signature") {
+    return <ColorfulBlockIcon colorPalette="green" size="xs" icon={<LLMIcon />} />;
   }
   return <ComponentIcon type={type} size="xs" />;
 }

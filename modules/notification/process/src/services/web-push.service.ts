@@ -71,6 +71,8 @@ interface WebPushServiceDeps {
   vapidKeys: WebPushVapidKeyRepository;
   gateway: WebPushGateway;
   settings: VapidSettings;
+  /** The one push service accepted beside the browsers' own (a dev stand-in), when configured. */
+  pushServiceBase?: string | undefined;
   /** Absent in a process that does not run notification's pipeline. */
   queue: () => WebPushQueue | undefined;
 }
@@ -112,7 +114,10 @@ export class WebPushService {
 
   async subscribe(input: SubscribeWebPushCommand): Promise<void> {
     const command = subscribeWebPushCommandSchema.parse(input);
-    if (!isKnownPushServiceEndpoint(command.subscription.endpoint)) {
+    const known = isKnownPushServiceEndpoint(command.subscription.endpoint, {
+      configuredBase: this.deps.pushServiceBase,
+    });
+    if (!known) {
       throw new WebPushEndpointRefusedError();
     }
     await this.deps.subscriptions.upsert({

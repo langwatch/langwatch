@@ -20,26 +20,33 @@
     "**/*.bench.*",
     "**/__bench__/**",
     "**/testing.ts",
-    "**/testing.tsx"
+    "**/testing.tsx",
+    "src/catalog/model-catalog.json"
   ],
   "references": [
     {
-      "path": "../../agent/contract/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/authorization/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/config/tsconfig.build.json"
-    },
-    {
-      "path": "../../../packages/handled-error/tsconfig.build.json"
+      "path": "../../../packages/time/tsconfig.build.json"
     },
     {
       "path": "../../../packages/module/tsconfig.build.json"
     },
     {
-      "path": "../../../packages/time/tsconfig.build.json"
+      "path": "../../../packages/config/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/authorization/tsconfig.build.json"
+    },
+    {
+      "path": "../../agent/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../packages/handled-error/tsconfig.build.json"
     }
-  ]
+  ],
+  // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
+  "nx": {
+    "sync": {
+      "ignoredDependencies": ["@langwatch/vitest-config"]
+    }
+  }
 }

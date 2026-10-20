@@ -1,3 +1,4 @@
+import { loadReleaseBaseline } from "../manifest/baseline.ts";
 import { describeStepStatus } from "./labels.ts";
 import type { LedgerRosterRow, LedgerStepRow } from "./reader.repository.ts";
 import {
@@ -22,6 +23,18 @@ export function progressOf({
 }
 
 const SETTLED = new Set(["done", "not-needed"]);
+
+let baseline: { release: string; steps: ReadonlySet<string> } | undefined;
+
+/** An imported row names no release; one the baseline lists shipped in it (UPGRADE-UI-2). */
+function recordedRelease(row: LedgerStepRow): string | null {
+  if (row.release !== null || !row.inferred) return row.release;
+  if (!baseline) {
+    const loaded = loadReleaseBaseline();
+    baseline = { release: loaded.release, steps: new Set(loaded.steps) };
+  }
+  return baseline.steps.has(row.id) ? baseline.release : null;
+}
 
 /** The name every caller hands the reader for an image no release manifest names. */
 export const UNRELEASED_IMAGE = "unreleased";
@@ -76,7 +89,7 @@ function viewRecorded({
   return {
     id: row.id,
     kind: row.kind,
-    release: row.release,
+    release: recordedRelease(row),
     mode: row.mode,
     status: row.status,
     statusLabel: describeStepStatus({ status: row.status }),

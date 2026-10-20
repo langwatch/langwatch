@@ -100,7 +100,7 @@ export function ScenarioCriteriaInput({
       {value.map((criterion, index) =>
         editingIndex === index ? (
           <HStack key={index} gap={2} align="start">
-            <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="6px">
+            <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="1.5">
               {index + 1}.
             </Text>
             <VStack align="stretch" gap={1} flex={1}>
@@ -176,7 +176,7 @@ export function ScenarioCriteriaInput({
       {isAddingNew && (
         <VStack align="stretch" gap={1}>
           <HStack gap={2} align="start">
-            <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="6px">
+            <Text fontSize="sm" color="fg.muted" flexShrink={0} mt="1.5">
               {value.length + 1}.
             </Text>
             <Textarea

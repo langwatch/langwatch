@@ -105,3 +105,40 @@ describe("finishBy", () => {
     });
   });
 });
+
+describe("viewRecordedStep for an imported row", () => {
+  const imported = {
+    id: "prisma:20240726092458_add_custom_llm_model_costs",
+    kind: "postgres-schema",
+    release: null,
+    mode: "blocking",
+    status: "done",
+    owner: null,
+    description: null,
+    finish_by: null,
+    inferred: true,
+    attempt: 1,
+    last_error: null,
+    report: null,
+    run_id: "run_seed",
+    started_at: null,
+    finished_at: null,
+    updated_at: null,
+  };
+
+  describe("when the 3.18.1 baseline lists it", () => {
+    /** @scenario "A step imported from before upgrade tracking carries the baseline release" */
+    it("carries the baseline release", () => {
+      expect(viewRecordedStep({ row: imported, declared: undefined, roster: [] }).release).toBe(
+        "3.18.1",
+      );
+    });
+  });
+
+  describe("when the baseline does not list it", () => {
+    it("names no release", () => {
+      const row = { ...imported, id: "prisma:29990101000000_later" };
+      expect(viewRecordedStep({ row, declared: undefined, roster: [] }).release).toBeNull();
+    });
+  });
+});

@@ -43,21 +43,14 @@ export function LicenseDetailDrawer({
   const license = query.data;
 
   return (
-    <Drawer.Root
+    <Drawer
       open={licenseId !== null}
-      onOpenChange={({ open }) => !open && onClose()}
+      onClose={onClose}
+      title={license ? license.organizationName : "License"}
       size="lg"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>{license ? license.organizationName : "License"}</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          <DrawerContent isLoading={query.isLoading} license={license} onRevoke={onRevoke} />
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+      <DrawerContent isLoading={query.isLoading} license={license} onRevoke={onRevoke} />
+    </Drawer>
   );
 }
 
@@ -156,7 +149,7 @@ function LicenseDetails({ license }: { license: License }) {
       <Detail label="License id">{license.licenseId}</Detail>
       <Detail label="Plan">{license.planType}</Detail>
       <Detail label="Seats">
-        {license.maxMembers} full, {license.maxMembersLite} lite
+        {license.maxMembers} full, {liteSeatsText(license)}
       </Detail>
       <Detail label="Issued">{formatDate(license.issuedAt)}</Detail>
       <Detail label="Term ends">{formatDate(license.expiresAt)}</Detail>
@@ -419,4 +412,9 @@ function DrawerActions({
       ) : null}
     </HStack>
   );
+}
+
+function liteSeatsText(license: License): string {
+  if (license.liteSeatsUnlimited) return "unlimited lite";
+  return license.maxMembersLite === null ? "lite not stated" : `${license.maxMembersLite} lite`;
 }

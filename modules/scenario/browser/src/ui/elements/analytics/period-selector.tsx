@@ -1,22 +1,12 @@
-import { Popover, type PopoverRootProps } from "@langwatch/design-system/popover";
+import { DateRangePicker } from "@langwatch/design-system/date-range-picker";
+import type { PopoverRootProps } from "@langwatch/design-system/popover";
 import type { ButtonProps } from "@langwatch/design-system/primitives";
-import {
-  Box,
-  Button,
-  Field,
-  HStack,
-  Input,
-  Text,
-  useDisclosure,
-  VStack,
-} from "@langwatch/design-system/primitives";
 import { format, nowInstant, type Instant } from "@langwatch/time";
-import { ChevronDown } from "react-feather";
-import { LuCalendar } from "react-icons/lu";
 
 import {
   describePeriod,
   instantFromText,
+  matchPeriodPreset,
   type Period,
   type PeriodMode,
   RELATIVE_PRESETS,
@@ -28,8 +18,10 @@ export type PeriodSelectorPlacement = NonNullable<
   NonNullable<PopoverRootProps["positioning"]>["placement"]
 >;
 
+const INPUT_FORMAT = "yyyy-MM-dd'T'HH:mm";
+
 export function PeriodSelector({
-  period: { startDate, endDate },
+  period,
   mode,
   label,
   setPeriod,
@@ -68,88 +60,23 @@ export function PeriodSelector({
    */
   triggerProps?: ButtonProps & { "data-testid"?: string };
 }) {
-  const { open, onOpen, onClose, setOpen } = useDisclosure();
-
-  const handleQuickSelect = (presetKey: RelativePresetKey) => {
-    setRelativePeriod(presetKey);
-    onClose();
-  };
-
-  const getDateRangeLabel = () => describePeriod({ period: { startDate, endDate }, mode });
+  const { startDate, endDate } = period;
 
   return (
-    <Popover.Root
-      open={open}
-      onOpenChange={({ open }) => setOpen(open)}
-      positioning={{ placement }}
-      size="sm"
-    >
-      <Popover.Trigger asChild>
-        <Button
-          variant={triggerVariant}
-          size={size}
-          minWidth="fit-content"
-          onClick={onOpen}
-          {...triggerProps}
-        >
-          <LuCalendar />
-          <Text>{label ?? getDateRangeLabel()}</Text>
-          <Box>
-            <ChevronDown />
-          </Box>
-        </Button>
-      </Popover.Trigger>
-      <Popover.Content width="fit-content">
-        <Popover.Arrow />
-        <Popover.CloseTrigger />
-        <Popover.Header>
-          <Popover.Title>Select Date Range</Popover.Title>
-        </Popover.Header>
-        <Popover.Body>
-          <HStack align="start" gap={6}>
-            <VStack gap={4}>
-              <Field.Root>
-                <Field.Label>Start Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(startDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setPeriod(instantFromText(e.target.value, nowInstant()), endDate)
-                  }
-                />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>End Date</Field.Label>
-                <Input
-                  type="datetime-local"
-                  value={format(endDate.epochMilliseconds, "yyyy-MM-dd'T'HH:mm")}
-                  onChange={(e) =>
-                    setPeriod(startDate, instantFromText(e.target.value, nowInstant()))
-                  }
-                />
-              </Field.Root>
-            </VStack>
-            <VStack>
-              {clearPeriod && (
-                <Button
-                  width="full"
-                  onClick={() => {
-                    clearPeriod();
-                    onClose();
-                  }}
-                >
-                  All time
-                </Button>
-              )}
-              {RELATIVE_PRESETS.map((preset) => (
-                <Button width="full" key={preset.key} onClick={() => handleQuickSelect(preset.key)}>
-                  {preset.label}
-                </Button>
-              ))}
-            </VStack>
-          </HStack>
-        </Popover.Body>
-      </Popover.Content>
-    </Popover.Root>
+    <DateRangePicker
+      presets={RELATIVE_PRESETS}
+      activePresetKey={matchPeriodPreset({ period, mode })?.key}
+      startValue={format(startDate.epochMilliseconds, INPUT_FORMAT)}
+      endValue={format(endDate.epochMilliseconds, INPUT_FORMAT)}
+      triggerLabel={label ?? describePeriod({ period, mode })}
+      onStartChange={(text) => setPeriod(instantFromText(text, nowInstant()), endDate)}
+      onEndChange={(text) => setPeriod(startDate, instantFromText(text, nowInstant()))}
+      onPresetSelect={setRelativePeriod}
+      onClear={clearPeriod}
+      size={size}
+      triggerVariant={triggerVariant}
+      placement={placement}
+      triggerProps={triggerProps}
+    />
   );
 }

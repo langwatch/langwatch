@@ -1,9 +1,5 @@
 import type { OrganizationRole } from "@langwatch/authorization";
-import type {
-  AuthzAccessUser,
-  MigrationTenantStatus,
-  TeamUserRole,
-} from "@langwatch/authz-contract";
+import type { AuthzAccessUser, TeamUserRole } from "@langwatch/authz-contract";
 import type { Instant } from "@langwatch/time";
 
 import type { AuthzAuditRow } from "../authz-audit-trail.repository.ts";
@@ -116,8 +112,10 @@ type AuthzMemoryGrantUsageRow = {
 
 type AuthzMemoryCutoverRow = {
   organizationId: string;
-  status: MigrationTenantStatus;
-  occurredAt: Instant | null;
+  onEngine: boolean;
+  switchedAt: Instant;
+  pinned?: boolean;
+  lastAppliedEventId?: string;
 };
 
 /**

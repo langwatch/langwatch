@@ -1,4 +1,5 @@
-import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, IconButton, VStack } from "@langwatch/design-system/primitives";
 import { ChevronDown, ChevronRight, ExternalLink } from "lucide-react";
 import { useState } from "react";
 
@@ -17,22 +18,25 @@ export function ExternalToolTile({ displayName, config, iconAsset, iconKey }: Pr
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <Box borderWidth="1px" borderColor="border.muted" borderRadius="md" padding={4} width="full">
-      <HStack cursor="pointer" onClick={() => setExpanded(!expanded)} gap={3}>
-        <TileIcon iconAsset={iconAsset} iconKey={iconKey} type="external_tool" />
-        <VStack align="start" gap={0} flex={1}>
-          <Text fontSize="sm" fontWeight="semibold">
-            {displayName}
-          </Text>
-          <Text fontSize="xs" color="fg.muted">
-            Internal tool
-          </Text>
-        </VStack>
-        {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-      </HStack>
-
-      {expanded && (
-        <VStack align="stretch" gap={3} marginTop={4}>
+    <Card
+      titleLevel={3}
+      icon={<TileIcon iconAsset={iconAsset} iconKey={iconKey} type="external_tool" />}
+      title={displayName}
+      description="Internal tool"
+      actions={
+        <IconButton
+          size="xs"
+          variant="ghost"
+          aria-expanded={expanded}
+          aria-label={`${expanded ? "Hide" : "Show"} details for ${displayName}`}
+          onClick={() => setExpanded(!expanded)}
+        >
+          {expanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+        </IconButton>
+      }
+    >
+      {expanded ? (
+        <VStack align="stretch" gap={3}>
           <Box fontSize="sm" color="fg.default" css={{ "& p": { marginBottom: "0.5rem" } }}>
             <ToolMarkdown>{config.descriptionMarkdown}</ToolMarkdown>
           </Box>
@@ -42,7 +46,7 @@ export function ExternalToolTile({ displayName, config, iconAsset, iconKey }: Pr
             </a>
           </Button>
         </VStack>
-      )}
-    </Box>
+      ) : null}
+    </Card>
   );
 }

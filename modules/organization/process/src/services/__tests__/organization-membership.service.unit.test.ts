@@ -47,6 +47,7 @@ describe("OrganizationMembershipService", () => {
     findInvitedMemberIds: vi.fn(),
     createAndAssign: mockCreateAndAssign,
     createForProvisioning: vi.fn(),
+    createSystemOrFind: vi.fn(),
     findAllProvisioningSummaries: vi.fn(),
     getProvisioningSummaryById: mockGetProvisioningSummaryById,
     deleteProvisionedOrganization: vi.fn(),

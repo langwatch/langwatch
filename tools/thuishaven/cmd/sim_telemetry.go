@@ -9,7 +9,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/langwatch/langwatch/services/telemetrysim"
+	"github.com/langwatch/langwatch/services/sims/telemetrysim"
 	"github.com/langwatch/langwatch/tools/thuishaven/cmd/viewer/sources"
 )
 

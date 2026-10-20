@@ -68,7 +68,7 @@ workers:
     - { name: ADMIN_EMAILS, value: "you@yourcompany.com" }
 ```
 
-Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Custom LangWatchQL charts on dashboards need both `release_lwql_workbench` and `release_custom_chart_playground`. The Query API (`POST /api/v1/query`) works without either.
+Experimental features stay off until an operator turns them on in **Ops > Feature flags** (`/ops/feature-flags`), for all projects or for chosen ones. Dashboard widgets need both `release_dashboards` and `release_lwql_workbench`. The Query API (`POST /api/v1/query`) works without either.
 
 ### License
 

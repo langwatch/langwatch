@@ -4,11 +4,16 @@
  * @see dev/docs/best_practices/drawers.md
  */
 
-import { Drawer } from "@langwatch/design-system/studio-drawer";
+import { Drawer } from "@langwatch/design-system/drawer";
+import { useState } from "react";
 
-import { CASE_EDITOR_DRAWER_SIZE } from "../../../../model/agent-testing/cases/drawer-keys.ts";
 import type { TestSuiteEntry } from "../../../../model/agent-testing/cases/test-cases.ts";
-import { CaseModalFields, CaseModalFooter, CaseModalHeader } from "./case-modal-parts.tsx";
+import {
+  CASE_MODAL_SUBTITLE,
+  CaseModalFields,
+  CaseModalHeaderTools,
+  caseModalFooter,
+} from "./case-modal-parts.tsx";
 import type { CaseEditorState } from "./use-case-editor.ts";
 
 export type CaseModalProps = {
@@ -30,27 +35,40 @@ export function CaseModal({
   onClose,
   openHistoryOnOpen,
 }: CaseModalProps) {
+  const [attempted, setAttempted] = useState(false);
+  // A closed editor forgets a refused save, so a reopened one starts clean.
+  if (!open && attempted) setAttempted(false);
+
+  const save = (options: { shouldRunAfterSave: boolean }) => {
+    if (editor.isSaving || editor.isLoading) return;
+    if (!editor.problem) return editor.save(options);
+    setAttempted(true);
+    const invalid = editor.draft.title.trim() ? "Criteria" : "Title";
+    document
+      .querySelector<HTMLElement>(`[data-testid="case-modal"] [aria-label="${invalid}"]`)
+      ?.focus();
+  };
+
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      onOpenChange={({ open: nextOpen }) => !nextOpen && onClose()}
-      placement="end"
-      size={CASE_EDITOR_DRAWER_SIZE}
+      onClose={onClose}
+      size="detail"
+      title={scenarioId ? "Edit scenario" : "New scenario"}
+      subtitle={CASE_MODAL_SUBTITLE}
+      headerTools={
+        scenarioId ? (
+          <CaseModalHeaderTools
+            scenarioId={scenarioId}
+            version={editor.version}
+            openHistoryOnOpen={openHistoryOnOpen}
+          />
+        ) : null
+      }
+      footer={caseModalFooter({ editor, onSave: save })}
+      data-testid="case-modal"
     >
-      <Drawer.Content bg="bg.panel" data-testid="case-modal">
-        <CaseModalHeader
-          isEditing={!!scenarioId}
-          scenarioId={scenarioId}
-          version={editor.version}
-          openHistoryOnOpen={openHistoryOnOpen}
-        />
-
-        <Drawer.Body>
-          <CaseModalFields editor={editor} suites={suites} />
-        </Drawer.Body>
-
-        <CaseModalFooter editor={editor} />
-      </Drawer.Content>
-    </Drawer.Root>
+      <CaseModalFields editor={editor} suites={suites} attempted={attempted} />
+    </Drawer>
   );
 }

@@ -43,6 +43,12 @@ const stats = {
   items: [{ label: "p95 latency", value: 812, unit: "ms" }],
 };
 
+const insights = {
+  kind: "insights",
+  blockId: "b5",
+  findings: [{ title: "Checkout cost doubled", body: "Cost rose from 41 to 96.", tone: "bad" }],
+};
+
 const choices = {
   kind: "choices",
   blockId: "b4",
@@ -69,6 +75,7 @@ const SAMPLE_BY_KIND: Record<RenderedCardKind, unknown> = {
   timeseries,
   table,
   stats,
+  insights,
   choices,
 };
 
@@ -78,6 +85,7 @@ describe("langyDerivedCardSchema", () => {
       ["timeseries", timeseries],
       ["table", table],
       ["stats", stats],
+      ["insights", insights],
       ["choices", choices],
     ])("validates a %s card", (_kind, block) => {
       const parsed = langyDerivedCardSchema.safeParse(block);
@@ -170,6 +178,7 @@ describe("langyDerivedCardSchema", () => {
       ["timeseries", timeseries],
       ["table", table],
       ["stats", stats],
+      ["insights", insights],
       ["choices", choices],
     ])("refuses the %s card", (_kind, block) => {
       const { blockId: _dropped, ...withoutId } = block as Record<string, unknown>;

@@ -160,7 +160,7 @@ const listedTitles = () =>
 
 /** The heading cell a sortable column announces its state on. */
 const headingFor = (label: string) =>
-  screen.getByRole("button", { name: `Sort by ${label}` }).closest("th") as HTMLElement;
+  screen.getByRole("button", { name: label }).closest("th") as HTMLElement;
 
 /** One stored turn, as the conversation lookup hands it over. */
 const turn = (over: Record<string, unknown> = {}) => ({
@@ -203,7 +203,7 @@ describe("the personal Sessions table", () => {
 
       // Everything the session consumed across its life, over the context it
       // was carrying at its heaviest.
-      expect(screen.getByText("Total 10.0K")).toBeInTheDocument();
+      expect(screen.getByText("Total 10K")).toBeInTheDocument();
       expect(screen.getByText("Peak 156.8K")).toBeInTheDocument();
 
       expect(screen.getByText("3 compactions")).toBeInTheDocument();
@@ -235,8 +235,8 @@ describe("the personal Sessions table", () => {
 
       await user.hover(screen.getByText("3 compactions"));
 
-      expect(await screen.findByText("Compacted from 180.0K to 42.0K tokens")).toBeInTheDocument();
-      expect(await screen.findByText("Largest cache rebuild 90.0K tokens")).toBeInTheDocument();
+      expect(await screen.findByText("Compacted from 180K to 42K tokens")).toBeInTheDocument();
+      expect(await screen.findByText("Largest cache rebuild 90K tokens")).toBeInTheDocument();
     });
 
     it("reads a session that never compacted or rebuilt as having neither", () => {
@@ -479,16 +479,16 @@ describe("the personal Sessions table", () => {
       const opening = listedTitles();
       expect(opening).toEqual(["Middling session", "Heavy session", "Light session"]);
 
-      await user.click(screen.getByRole("button", { name: "Sort by Context" }));
+      await user.click(screen.getByRole("button", { name: "Context" }));
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "descending");
       expect(headingFor("Last update")).toHaveAttribute("aria-sort", "none");
       expect(listedTitles()).toEqual(["Heavy session", "Middling session", "Light session"]);
 
-      await user.click(screen.getByRole("button", { name: "Sort by Context" }));
+      await user.click(screen.getByRole("button", { name: "Context" }));
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "ascending");
       expect(listedTitles()).toEqual(["Light session", "Middling session", "Heavy session"]);
 
-      await user.click(screen.getByRole("button", { name: "Sort by Context" }));
+      await user.click(screen.getByRole("button", { name: "Context" }));
       expect(headingFor("Context")).toHaveAttribute("aria-sort", "none");
       expect(headingFor("Last update")).toHaveAttribute("aria-sort", "descending");
       expect(listedTitles()).toEqual(opening);
@@ -685,7 +685,7 @@ describe("the personal Sessions table", () => {
       renderTable();
 
       await user.type(screen.getByRole("searchbox"), "Queue");
-      await user.click(screen.getByRole("button", { name: "Sort by Context" }));
+      await user.click(screen.getByRole("button", { name: "Context" }));
       const narrowed = listedTitles();
       expect(narrowed).toEqual(["Queue heavy session", "Queue light session"]);
 

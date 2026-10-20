@@ -21,6 +21,66 @@ Feature: Analytics timeseries service
       Then both reads succeed instead of refusing the extra fields
       And the repository receives only the project, date range and filters
 
+  Rule: Read the feedback history one bounded page at a time
+
+    @unit
+    Scenario: The first page is the newest feedbacks and says whether the history goes on
+      Given a project with more feedbacks than one page holds
+      When the Analytics service reads the first page
+      Then it returns the newest feedbacks up to the page size
+      And it returns a cursor for the next page
+
+    @unit
+    Scenario: Following the cursors reads every feedback once, newest first
+      Given a project whose feedbacks include several with the same timestamp
+      When the pages are read by following each cursor to the end
+      Then every feedback appears exactly once in the order of the unpaged read
+      And the last page carries no cursor
+
+    @unit
+    Scenario: A history that fits one page, or is empty, has no next page
+      Given a project with fewer feedbacks than one page, or none
+      When the Analytics service reads the first page
+      Then it returns those feedbacks and no cursor
+
+    @unit
+    Scenario: A feedback added or removed between pages neither repeats nor skips another
+      Given the first page of a project's feedbacks has been read
+      When a newer feedback is added and the feedback the cursor stopped after is removed
+      Then the next page continues after the same place without a repeat or a gap
+
+    @unit @regression
+    Scenario: A cursor from another project or another filter set is refused
+      Given a cursor issued for one project and filter set
+      When it is used for a different project or different filters
+      Then the Analytics service refuses with validation_error naming the cursor
+      And the repository is never asked for feedbacks
+
+    @unit
+    Scenario: A malformed cursor or an out-of-range page size is refused
+      Given a feedbacks page request with an incomplete cursor or a page size outside the bounds
+      When the request is checked
+      Then it is refused before any read
+
+    @unit
+    Scenario: The feedback page read needs the same permission as the feedback read
+      Given the analytics tRPC contract and its server half
+      When the feedback and feedback page procedures are read
+      Then both are queries guarded by cost:view
+
+    @unit
+    Scenario: The paged query orders by a persisted identity and resumes strictly after the cursor
+      Given a feedbacks page query with and without a cursor
+      Then it orders by timestamp, trace, span and event position, all descending
+      And it asks for one row more than the page size
+      And the cursor position and the tenant are bound parameters, never interpolated
+
+    @unit
+    Scenario: The existing feedback read keeps its query and result
+      Given the existing feedbacks read
+      When the page read is added
+      Then the existing query still takes the newest 100 by timestamp and returns only events
+
   Rule: Refuse a series its metric cannot aggregate, before any read (#8013)
 
     @unit @regression
@@ -140,3 +200,9 @@ Feature: Analytics timeseries service
       When the Analytics page reads for a window
       Then every read excludes the origin "langy"
       And the Traces total equals the Trace Explorer count for the same window
+
+    @integration
+    Scenario: A personal project's Analytics reads keep Langy's turns
+      Given a personal project, where Langy's conversations are the member's own data
+      When the Analytics page reads for a window
+      Then no read excludes any origin

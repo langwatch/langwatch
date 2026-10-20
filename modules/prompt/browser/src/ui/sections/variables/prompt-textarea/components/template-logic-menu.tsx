@@ -224,7 +224,7 @@ function ConstructOption({
       onClick={onSelect}
       data-testid={`logic-construct-${construct.keyword}`}
     >
-      <Text fontSize="13px" fontFamily="mono" fontWeight="600" minWidth="60px">
+      <Text textStyle="mono" fontWeight="600" minWidth="60px">
         {construct.keyword}
       </Text>
       <Text fontSize="xs" color="fg.muted">

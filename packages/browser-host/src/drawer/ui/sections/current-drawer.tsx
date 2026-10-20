@@ -4,7 +4,7 @@
  * `true`, never the address's drawer name. Restriction is one `restriction` prop.
  */
 
-import { DrawerOffsetProvider } from "@langwatch/design-system/drawer";
+import { DrawerOffsetProvider, useReserveDrawerFocus } from "@langwatch/design-system/drawer";
 import { Center, Spinner } from "@langwatch/design-system/primitives";
 import { createLogger } from "@langwatch/observability/browser";
 import qs from "qs";
@@ -182,6 +182,7 @@ export function CurrentDrawer({
 }
 
 function DrawerLoadingFallback() {
+  useReserveDrawerFocus();
   // CurrentDrawer is mounted in the page's normal flow; the real drawers
   // render through a portal, so this fallback is the only piece that
   // would take layout space. Keep it position-fixed (where the drawer

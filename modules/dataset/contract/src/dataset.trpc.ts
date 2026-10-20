@@ -22,12 +22,14 @@ import {
 import {
   DATASET_NORMALIZATION_SETTLED_EVENT_TYPE,
   appendStoredObjectToDatasetInputSchema,
+  countDatasetRecordsInputSchema,
   createDatasetAttachmentUploadInputSchema,
   datasetAttachmentUploadSchema,
   createDatasetFromStoredObjectInputSchema,
   datasetImportAppendedSchema,
   datasetImportStartedSchema,
   datasetNameResultSchema,
+  datasetRecordCountSchema,
   datasetSummaryWireSchema,
   datasetWireSchema,
   retryNormalizeInputSchema,
@@ -59,6 +61,11 @@ export const datasetTrpc = defineTrpcContract("dataset")
   .query("getAll", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
   .withInput(datasetApiProjectInputSchema)
   .withOutput(z.array(datasetSummaryWireSchema))
+
+  /** The entry count of each listed dataset, asked once the list has arrived. */
+  .query("recordCounts", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })
+  .withInput(countDatasetRecordsInputSchema)
+  .withOutput(z.array(datasetRecordCountSchema))
 
   /** One dataset by id or slug; an archived or missing one reads as null. */
   .query("getById", { invalidatedBy: [DATASET_NORMALIZATION_SETTLED_EVENT_TYPE] })

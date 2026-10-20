@@ -104,6 +104,10 @@ export const getColorPaletteForString = (str: string): RotatingPalette => {
   return ROTATING_PALETTES[sum % ROTATING_PALETTES.length]!;
 };
 
+/** An avatar's solid fill for a string: same hue as `getColorForString`, dark enough for white. */
+export const getAvatarFillForString = (str: string): string =>
+  `avatar.${getColorPaletteForString(str)}`;
+
 export const getColorForString = (
   set: RotatingColorSet,
   str: string,

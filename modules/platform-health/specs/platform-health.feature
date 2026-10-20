@@ -130,6 +130,18 @@ Feature: One platform health answer for an external monitor
 
   Rule: /api/health/scenarios launches one run of a named run plan and waits for its judge, as main did
 
+    @integration @unit
+    Scenario: The scenario canary starts its run as the probe's own API key
+      Given an API key a member owns that resolves to a project
+      When an orchestrator asks /api/health/scenarios with that key
+      Then the run is started by that member through that key
+      And the run's own key may send traces, holding no more than the member and the key
+
+    @integration
+    Scenario: A project key's scenario canary starts its run as nobody, as main ran it with the project key
+      When an orchestrator asks /api/health/scenarios with the project's own key
+      Then the run records no starter and its run key acts as the system
+
     @unit
     Scenario: The scenario canary reports healthy when the judged run succeeds
       Given a run plan naming exactly one scenario and one target

@@ -1,25 +1,27 @@
 import { isHandledByGlobalHandler } from "@langwatch/browser-host/errors";
-import { Link } from "@langwatch/browser-host/link";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
+import { EmptyValue } from "@langwatch/design-system/empty-value";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { OverflownTextWithTooltip } from "@langwatch/design-system/overflown-text";
 import { PageLayout } from "@langwatch/design-system/page-layout";
+import { Pagination } from "@langwatch/design-system/pagination";
 import {
   Badge,
   Box,
   HStack,
-  Skeleton,
-  Spacer,
   Spinner,
   Table,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import type { LEGACY_EXPERIMENT_TASK_TYPES } from "@langwatch/experiment-contract";
 import { nowInstant, readableDate } from "@langwatch/time";
 import type { TimeInput } from "@langwatch/time";
@@ -39,12 +41,13 @@ import { experimentApi } from "../../../behavior/experiment-api.ts";
 import { useCopyExperiment } from "../../../behavior/experiments/use-copy-experiment.ts";
 import { useCreateExperiment } from "../../../behavior/experiments/use-create-experiment.ts";
 import { experimentContextChip } from "../../../behavior/langy/langy-context-chips.ts";
+import { SetupWithAgentButton } from "../../../behavior/lent-setup-with-agent-button.tsx";
 import type { ExperimentType } from "../../../model/prisma-types.ts";
 import { useWorkflowHost } from "../../../model/workflow/workflow-host.ts";
 import { formatEvaluationSummary } from "../../../ui/elements/experiments/BatchEvaluationV2/batch-evaluation-summary.tsx";
 import { CopyExperimentDialog } from "../../../ui/elements/experiments/copy-experiment-dialog.tsx";
 import { CreateExperimentButton } from "../../../ui/elements/experiments/create-experiment-button.tsx";
-import { NavigationFooter, useNavigationFooter } from "../../../ui/elements/navigation-footer.tsx";
+import { PAGE_SIZE_OPTIONS, useNavigationFooter } from "../../../ui/elements/navigation-footer.tsx";
 import { FullWidthListPageContent } from "../../../ui/elements/ui/layouts/full-width-list-page-content.tsx";
 import { LangyContextTarget } from "../langy/langy-context-target.tsx";
 
@@ -98,7 +101,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
     return (
       <>
         <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
-        <Text fontSize="sm">Completed</Text>
+        <Text textStyle="bodySm">Completed</Text>
       </>
     );
   }
@@ -106,7 +109,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
     return (
       <>
         <LuCircleX size={14} color="var(--chakra-colors-red-fg)" />
-        <Text fontSize="sm">Stopped</Text>
+        <Text textStyle="bodySm">Stopped</Text>
       </>
     );
   }
@@ -115,7 +118,7 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
     return (
       <>
         <Spinner size="xs" />
-        <Text fontSize="sm">Running</Text>
+        <Text textStyle="bodySm">Running</Text>
       </>
     );
   }
@@ -123,30 +126,26 @@ function ExperimentRunStatus({ runsSummary }: { runsSummary: ExperimentListRow["
     return (
       <>
         <LuCircleCheckBig size={14} color="var(--chakra-colors-green-fg)" />
-        <Text fontSize="sm">Completed</Text>
+        <Text textStyle="bodySm">Completed</Text>
       </>
     );
   }
-  return (
-    <Text fontSize="sm" color="fg.muted">
-      -
-    </Text>
-  );
+  return <EmptyValue label="Never run" />;
 }
 
 const TASK_TYPE_LABELS: Record<keyof typeof LEGACY_EXPERIMENT_TASK_TYPES, string> = {
   real_time: "Legacy live workflow",
-  llm_app: "LLM App Experiment",
-  prompt_creation: "Prompt Experiment",
-  custom_evaluator: "Evaluator Experiment",
-  scan: "Vulnerability Scan",
+  llm_app: "LLM app experiment",
+  prompt_creation: "Prompt experiment",
+  custom_evaluator: "Evaluator experiment",
+  scan: "Vulnerability scan",
 };
 
 const EXPERIMENT_TYPE_LABELS: Record<ExperimentType, string> = {
-  BATCH_EVALUATION_V2: "Experiment (SDK)",
-  BATCH_EVALUATION: "Batch Experiment",
-  DSPY: "DSPy Optimization",
-  EVALUATIONS_V3: "Experiment (UI)",
+  BATCH_EVALUATION_V2: "SDK",
+  BATCH_EVALUATION: "Batch experiment",
+  DSPY: "DSPy optimization",
+  EVALUATIONS_V3: "Workbench",
 };
 
 const workbenchPathOf = (projectSlug: string, experiment: ExperimentListRow) =>
@@ -209,7 +208,7 @@ const ExperimentActionsMenu = ({
         }}
       >
         <LuEye size={16} />
-        View Results
+        View results
       </Menu.Item>
       {permissions.canReplicate && (
         <Menu.Item
@@ -247,7 +246,7 @@ const PrimaryMetric = ({
 }) =>
   metric ? (
     <>
-      <Text as="span" fontSize="xs" color="fg.muted">
+      <Text as="span" textStyle="caption" color="fg.muted">
         {metric.name}: &nbsp;
       </Text>
       <Text as="span" fontWeight="semibold">
@@ -255,7 +254,7 @@ const PrimaryMetric = ({
       </Text>
     </>
   ) : (
-    "-"
+    <EmptyValue label="No primary metric" />
   );
 
 /**
@@ -304,34 +303,36 @@ const ExperimentRow = ({
         </Badge>
       </Table.Cell>
       <Table.Cell>
-        <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
-          {experiment.dataset?.name ?? "-"}
-        </OverflownTextWithTooltip>
+        {experiment.dataset?.name ? (
+          <OverflownTextWithTooltip lineClamp={1} wordBreak="break-word">
+            {experiment.dataset.name}
+          </OverflownTextWithTooltip>
+        ) : (
+          <EmptyValue label="No dataset" />
+        )}
       </Table.Cell>
       <Table.Cell>
         <PrimaryMetric metric={experiment.runsSummary.primaryMetric} />
       </Table.Cell>
-      <Table.Cell>{experiment.runsSummary.count ?? "-"}</Table.Cell>
+      <Table.Cell>{experiment.runsSummary.count ?? <EmptyValue label="No runs" />}</Table.Cell>
       <Table.Cell>
         <HStack gap={1}>
           <ExperimentRunStatus runsSummary={experiment.runsSummary} />
         </HStack>
       </Table.Cell>
       <Table.Cell whiteSpace="nowrap">
-        {readableDate(experiment.updatedAt).toLocaleString()}
+        <FormattedDate value={readableDate(experiment.updatedAt).getTime()} />
       </Table.Cell>
-      <Table.Cell>
-        <Box width="full" height="full" display="flex" justifyContent="end">
-          <ExperimentActionsMenu
-            experiment={experiment}
-            projectSlug={projectSlug}
-            permissions={permissions}
-            onOpen={onOpen}
-            onReplicate={onReplicate}
-            onDelete={onDelete}
-          />
-        </Box>
-      </Table.Cell>
+      <ListTable.ActionCell>
+        <ExperimentActionsMenu
+          experiment={experiment}
+          projectSlug={projectSlug}
+          permissions={permissions}
+          onOpen={onOpen}
+          onReplicate={onReplicate}
+          onDelete={onDelete}
+        />
+      </ListTable.ActionCell>
     </Table.Row>
   </LangyContextTarget>
 );
@@ -403,53 +404,39 @@ export function ExperimentsPage() {
 
   return (
     <Box width="full">
-      <PageLayout.Header>
+      <PageLayout.Header
+        actions={<CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />}
+      >
         <PageLayout.Heading>Experiments</PageLayout.Heading>
-        <Spacer />
-        <HStack gap={2}>
-          <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
-        </HStack>
       </PageLayout.Header>
-      {pageState === "loading" && (
-        <PageLayout.Container>
-          <Skeleton height="200px" />
-        </PageLayout.Container>
-      )}
-      {pageState === "error" && (
-        <PageLayout.Container>
-          <Text color="red.fg">Error loading experiments</Text>
-        </PageLayout.Container>
-      )}
-      {pageState === "empty" && (
-        <NoDataInfoBlock
-          title="No experiments yet"
-          description="Test prompts, models, and agents against a dataset before shipping changes."
-          icon={<LuSquareCheckBig size={24} />}
-          color="green.fg"
-          docsInfo={
-            <Text>
-              To learn more about experiments, visit the{" "}
-              <Link
-                color="inherit"
-                textDecoration="underline"
-                href="https://langwatch.ai/docs/evaluations/experiments/overview"
-                isExternal
-              >
-                experiments documentation
-              </Link>
-              .
-            </Text>
-          }
-        >
-          <HStack gap={2}>
-            <CreateExperimentButton isCreating={isCreating} onCreate={createNewExperiment} />
-          </HStack>
-        </NoDataInfoBlock>
-      )}
-      {pageState === "list" && (
-        <FullWidthListPageContent>
-          <VStack width="full" gap={4} align="stretch">
-            <Text color="fg.muted">Compare configurations and analyze batch test results</Text>
+      <FullWidthListPageContent>
+        <VStack width="full" gap={4} align="stretch">
+          <Text color="fg.muted">
+            Compare prompts, models and agents against a dataset, and analyse the results.
+          </Text>
+          {pageState === "loading" && <SkeletonRows rows={5} label="Loading experiments" />}
+          {pageState === "error" && (
+            <Banner
+              status="error"
+              placement="inline"
+              title="Couldn't load experiments"
+              action={
+                <BannerAction onClick={() => void experiments.refetch()}>Try again</BannerAction>
+              }
+            >
+              Check your connection and try again. If it keeps failing, contact support.
+            </Banner>
+          )}
+          {pageState === "empty" && (
+            <NoDataInfoBlock
+              title="No experiments yet"
+              description="Test prompts, models and agents against a dataset before shipping changes."
+              icon={<LuSquareCheckBig size={24} />}
+              docsHref="https://langwatch.ai/docs/evaluations/experiments/overview"
+              secondaryAction={<SetupWithAgentButton surface="experiments" />}
+            />
+          )}
+          {pageState === "list" && (
             <>
               <ListTable width="full">
                 <Table.Header>
@@ -457,60 +444,59 @@ export function ExperimentsPage() {
                     <Table.ColumnHeader width="20%">Experiment</Table.ColumnHeader>
                     <Table.ColumnHeader width="15%">Type</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Dataset</Table.ColumnHeader>
-                    <Table.ColumnHeader width="20%">Primary Metric</Table.ColumnHeader>
+                    <Table.ColumnHeader width="20%">Primary metric</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Runs</Table.ColumnHeader>
                     <Table.ColumnHeader width="10%">Status</Table.ColumnHeader>
-                    <Table.ColumnHeader width="10%">Last Updated</Table.ColumnHeader>
-                    <Table.ColumnHeader width="5%"></Table.ColumnHeader>
+                    <Table.ColumnHeader width="10%">Last updated</Table.ColumnHeader>
+                    <ListTable.ActionHeader />
                   </Table.Row>
                 </Table.Header>
                 <Table.Body>
-                  {experiments.isLoading || experiments.isFetching
-                    ? Array.from({ length: 3 }).map((_, i) => (
-                        <Table.Row key={i}>
-                          {Array.from({ length: 8 }).map((_, cell) => (
-                            <Table.Cell key={cell}>
-                              <Skeleton height="20px" />
-                            </Table.Cell>
-                          ))}
-                        </Table.Row>
-                      ))
-                    : experiments.data?.experiments.map((experiment) => (
-                        <ExperimentRow
-                          key={experiment.id}
-                          experiment={experiment}
-                          projectSlug={project.slug}
-                          permissions={{
-                            canEdit: workflowHost.hasPermission("workflows:create"),
-                            canReplicate: workflowHost.hasPermission("evaluations:manage"),
-                            canDelete: workflowHost.hasPermission("workflows:delete"),
-                          }}
-                          onOpen={(path) => void router.push(path)}
-                          onReplicate={() =>
-                            setCopyDialogState({
-                              open: true,
-                              experimentId: experiment.id,
-                              experimentName: experiment.name ?? experiment.slug,
-                              experimentType: experiment.type,
-                            })
-                          }
-                          onDelete={() =>
-                            handleDeleteExperiment(
-                              experiment.id,
-                              experiment.name ?? experiment.slug,
-                            )
-                          }
-                        />
-                      ))}
+                  {experiments.isFetching ? (
+                    <ListTable.LoadingRows rows={3} columns={8} />
+                  ) : (
+                    experiments.data?.experiments.map((experiment) => (
+                      <ExperimentRow
+                        key={experiment.id}
+                        experiment={experiment}
+                        projectSlug={project.slug}
+                        permissions={{
+                          canEdit: workflowHost.hasPermission("workflows:create"),
+                          canReplicate: workflowHost.hasPermission("evaluations:manage"),
+                          canDelete: workflowHost.hasPermission("workflows:delete"),
+                        }}
+                        onOpen={(path) => void router.push(path)}
+                        onReplicate={() =>
+                          setCopyDialogState({
+                            open: true,
+                            experimentId: experiment.id,
+                            experimentName: experiment.name ?? experiment.slug,
+                            experimentType: experiment.type,
+                          })
+                        }
+                        onDelete={() =>
+                          handleDeleteExperiment(experiment.id, experiment.name ?? experiment.slug)
+                        }
+                      />
+                    ))
+                  )}
                 </Table.Body>
               </ListTable>
-              {experiments.data && experiments.data.experiments.length > 0 && (
-                <NavigationFooter {...navigationFooter} />
-              )}
+              <Pagination
+                page={Math.floor(navigationFooter.pageOffset / navigationFooter.pageSize) + 1}
+                pageSize={navigationFooter.pageSize}
+                totalCount={navigationFooter.totalHits}
+                visibleCount={experiments.data?.experiments.length}
+                unitLabel="experiments"
+                pageSizeOptions={PAGE_SIZE_OPTIONS}
+                isLoading={experiments.isFetching}
+                onPageChange={(page) => navigationFooter.goToPage(page)}
+                onPageSizeChange={navigationFooter.changePageSize}
+              />
             </>
-          </VStack>
-        </FullWidthListPageContent>
-      )}
+          )}
+        </VStack>
+      </FullWidthListPageContent>
       {copyDialogState && (
         <CopyExperimentDialog
           open={copyDialogState.open}

@@ -154,7 +154,7 @@ export function TurnAnnotationBadges({
           gap={1}
         >
           <Icon as={MessageSquare} boxSize={3} />
-          <Text textStyle="2xs" fontWeight="600">
+          <Text textStyle="2xs" fontWeight="semibold">
             {annotationCount}
           </Text>
           {hasCorrection && <Icon as={Lightbulb} boxSize={3} color="yellow.fg" />}
@@ -250,7 +250,7 @@ function AnnotationListRowSummary({ annotation }: { annotation: AnnotationItem }
       />
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         <HStack gap={1.5} width="full">
-          <Text textStyle="2xs" fontWeight="600">
+          <Text textStyle="2xs" fontWeight="semibold">
             {annotation.user?.name ?? annotation.email ?? "anonymous"}
           </Text>
           {annotation.expectedOutput && <Icon as={Lightbulb} boxSize={2.5} color="yellow.fg" />}

@@ -1,6 +1,6 @@
 /** The scenario canary, ported from main's `health-probes/scenario-canary.service.ts`. */
 import { createLogger } from "@langwatch/observability";
-import { isTerminalStatus, type ScenarioApi } from "@langwatch/scenario-contract";
+import { isTerminalStatus, type RunActor, type ScenarioApi } from "@langwatch/scenario-contract";
 import type { SuiteApi } from "@langwatch/suite-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -19,6 +19,8 @@ import {
 } from "../rules/scenario-canary.rules.ts";
 
 const logger = createLogger("langwatch:scenario-canary");
+
+type LaunchConfig = CanaryConfig & Readonly<{ actor: RunActor | undefined }>;
 
 type ScenarioCanaryPeers = Readonly<{
   scenarios: Pick<ScenarioApi, "launchRun" | "findScenarioRunData">;
@@ -69,12 +71,15 @@ export class ScenarioCanaryService {
     return new ScenarioCanaryService(options.peers, options.clock ?? REAL_CLOCK);
   }
 
+  /** `actor` is the probe's own key: the run starts as it, and nobody when it names no person. */
   async run({
     projectId,
     runPlanId,
+    actor,
   }: {
     projectId: string;
     runPlanId: string;
+    actor: RunActor | undefined;
   }): Promise<CanaryResult> {
     logger.info({ projectId, runPlanId }, "Running scenario canary health check");
     const hardDeadline = this.clock.now() + SCENARIO_CANARY_TOTAL_BUDGET_MS;
@@ -83,7 +88,7 @@ export class ScenarioCanaryService {
 
     const key = `${projectId}/${resolved.runPlanId}`;
     if (this.#inFlight.has(key)) return { busy: true };
-    const attempt = this.#runWithRetry(resolved, hardDeadline).finally(() => {
+    const attempt = this.#runWithRetry({ ...resolved, actor }, hardDeadline).finally(() => {
       this.#inFlight.delete(key);
     });
     this.#inFlight.set(key, attempt);
@@ -128,7 +133,7 @@ export class ScenarioCanaryService {
     return all.find((suite) => isNamedLivePlan({ suite, runPlanId, by: "slug" }));
   }
 
-  async #runWithRetry(config: CanaryConfig, hardDeadline: number): Promise<CanaryOutcome> {
+  async #runWithRetry(config: LaunchConfig, hardDeadline: number): Promise<CanaryOutcome> {
     const startedAt = this.clock.now();
     const first = await this.#attempt(config, hardDeadline);
     const settled =
@@ -143,7 +148,7 @@ export class ScenarioCanaryService {
   }
 
   async #attempt(
-    config: CanaryConfig,
+    config: LaunchConfig,
     hardDeadline: number,
   ): Promise<{ scenarioRunId?: string; verdict: CanaryVerdict }> {
     const deadline = Math.min(this.clock.now() + SCENARIO_CANARY_ATTEMPT_BUDGET_MS, hardDeadline);
@@ -187,13 +192,13 @@ export class ScenarioCanaryService {
     }
   }
 
-  async #launch({ projectId, scenarioId, target }: CanaryConfig): Promise<string> {
+  async #launch({ projectId, scenarioId, target, actor }: LaunchConfig): Promise<string> {
     const { scenarioRunId } = await this.peers.scenarios.launchRun({
       projectId,
       scenarioId,
       target: { type: target.type, referenceId: target.referenceId },
       note: "scenario canary health check",
-      actor: { id: "scenario-canary", label: "api" },
+      actor,
     });
     return scenarioRunId;
   }

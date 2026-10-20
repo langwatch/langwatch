@@ -22,7 +22,7 @@ export function LearningResources() {
       {/* The colophon: a whisper of mono right under the rule — part
           wayfinding, part typography. Docs and videos live in the Odyssey
           card now, so this row is the footer entire. */}
-      <HStack gap={2} flexWrap="wrap" fontFamily="mono" fontSize="10.5px">
+      <HStack gap={2} flexWrap="wrap" textStyle="micro">
         <ColophonText>LangWatch © {toDate(nowInstant()).getFullYear()}</ColophonText>
         <ColophonDot />
         <ColophonLink href="https://docs.langwatch.ai/integration/python/guide">
@@ -55,7 +55,7 @@ export function LearningResources() {
 
 function ColophonText({ children }: { children: ReactNode }) {
   return (
-    <Text as="span" fontFamily="mono" fontSize="10.5px" color="fg.subtle">
+    <Text as="span" textStyle="micro" color="fg.subtle">
       {children}
     </Text>
   );
@@ -74,8 +74,7 @@ function ColophonLink({ href, children }: { href: string; children: ReactNode })
     <Link
       href={href}
       isExternal
-      fontFamily="mono"
-      fontSize="10.5px"
+      textStyle="micro"
       color="fg.subtle"
       _hover={{ color: "orange.fg" }}
     >

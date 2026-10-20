@@ -61,14 +61,14 @@ Feature: LangWatch Cloud receives the daily usage report
     Then the report is counted against that address's limit
 
   @unit
-  Scenario: Cloud's answer names the latest release with its commit, and the floor
-    Given Cloud is configured with a latest release, the commit it was built from and a floor
+  Scenario: Cloud's answer names the latest release with its commit
+    Given Cloud is configured with a latest release and the commit it was built from
     When it accepts a report
-    Then the answer names the latest release with its commit, and the floor
+    Then the answer names the latest release with its commit
     And a build of the same release from another commit can tell it is not the latest
 
   @unit
   Scenario: Cloud names no release when none is configured
-    Given Cloud is configured with no latest release and no floor
+    Given Cloud is configured with no latest release
     When it accepts a report
     Then the answer is only "Event captured", as before

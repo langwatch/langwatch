@@ -379,4 +379,19 @@ describe("namedPageChips", () => {
       ).toEqual([]);
     });
   });
+
+  describe("when a board registers itself with the period on screen", () => {
+    /** @scenario "The board chip carries the period the user is viewing" */
+    it("goes ahead of the route's chip, so the merged chip carries the period", () => {
+      const routed = dashboardContextChip({ dashboardId: "board-9" });
+      const named = {
+        id: "dashboard:board-9",
+        kind: "dashboard" as const,
+        label: "dashboard: Costs · 30d · 1d",
+        ref: 'dashboard "Costs" (id board-9); period: 2026-09-01T00:00:00Z to 2026-09-08T00:00:00Z',
+      };
+
+      expect(mergeContextChips([...namedPageChips([named]), routed])).toEqual([named]);
+    });
+  });
 });

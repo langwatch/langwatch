@@ -1,4 +1,5 @@
 import { Link as RoutedLink } from "@langwatch/browser-host/link";
+import { Dialog } from "@langwatch/design-system/dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
@@ -11,7 +12,6 @@ import {
   HStack,
   Input,
   Spacer,
-  Table,
   Text,
   VStack,
   Wrap,
@@ -25,10 +25,9 @@ import { useDebounce } from "use-debounce";
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
 import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
-import { Dialog } from "../../../../ui/elements/ops-dialog.tsx";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
-import { EmptyCell, formatDate, formatDateTime } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 interface OrgRef {
   id: string;
@@ -78,6 +77,9 @@ export default function UsersView() {
   // there's exactly one Dialog instance at a time — avoids the "mount a
   // Dialog per row" smell from the previous ImpersonateButton component.
   const [impersonating, setImpersonating] = useState<AdminUser | null>(null);
+  // The row menu closes and its item unmounts, so focus returns to the row's own trigger.
+  const menuTriggers = useRef(new Map<string, HTMLElement>());
+  const returnFocusTo = useRef<HTMLElement | null>(null);
 
   const list = useAdminList<AdminUser>("user", {
     pagination: { page, perPage: PAGE_SIZE },
@@ -105,70 +107,59 @@ export default function UsersView() {
           onPageChange: setPage,
         }}
       >
-        <ListTable
-          density="compact"
-          columnRules={false}
-          containerProps={{ overflowX: "auto" }}
-          variant="line"
-          size="sm"
-          width="full"
-        >
-          <Table.Header>
-            <Table.Row>
-              <Table.ColumnHeader>ID</Table.ColumnHeader>
-              <Table.ColumnHeader>Name</Table.ColumnHeader>
-              <Table.ColumnHeader>Email</Table.ColumnHeader>
-              <Table.ColumnHeader>Organizations</Table.ColumnHeader>
-              <Table.ColumnHeader>Projects</Table.ColumnHeader>
-              <Table.ColumnHeader>Created</Table.ColumnHeader>
-              <Table.ColumnHeader>Last login</Table.ColumnHeader>
-              <Table.ColumnHeader>Status</Table.ColumnHeader>
-              <Table.ColumnHeader width="60px" textAlign="right" />
-            </Table.Row>
-          </Table.Header>
-          <Table.Body>
+        <ListTable density="compact" scroll="x" scrollLabel="Users table">
+          <ListTable.Header>
+            <ListTable.Row>
+              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Email</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Organizations</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Projects</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Last login</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              <ListTable.ColumnHeader width={60} align="end" label="Actions" />
+            </ListTable.Row>
+          </ListTable.Header>
+          <ListTable.Body>
             {list.data?.data.length === 0 && (
-              <Table.Row>
-                <Table.Cell colSpan={9}>
-                  <NoDataInfoBlock
-                    icon={<SearchX />}
-                    title="No users match your search."
-                    description="Try a different search or clear the filter to see all records."
-                  />
-                </Table.Cell>
-              </Table.Row>
+              <ListTable.SpanRow columns={9}>
+                <NoDataInfoBlock
+                  icon={<SearchX />}
+                  title="No users match your search."
+                  description="Try a different search or clear the filter to see all records."
+                />
+              </ListTable.SpanRow>
             )}
             {list.data?.data.map((user) => (
-              <Table.Row key={user.id}>
-                <Table.Cell
-                  fontFamily="mono"
-                  fontSize="xs"
-                  color="fg.muted"
-                  maxW="110px"
-                  overflow="hidden"
-                  textOverflow="ellipsis"
-                  whiteSpace="nowrap"
-                  title={user.id}
-                >
-                  {user.id}
-                </Table.Cell>
-                <Table.Cell>{user.name ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>{user.email ?? <EmptyCell />}</Table.Cell>
-                <Table.Cell>
+              <ListTable.Row key={user.id}>
+                <ListTable.IdCell value={user.id} label="user ID" />
+                <ListTable.Cell>{user.name ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>{user.email ?? <EmptyCell />}</ListTable.Cell>
+                <ListTable.Cell>
                   <RefChipList refs={user.organizations} resource="organizations" />
-                </Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <RefChipList refs={user.projects} resource="projects" />
-                </Table.Cell>
-                <Table.Cell>{formatDate(user.createdAt)}</Table.Cell>
-                <Table.Cell>{formatDateTime(user.lastLoginAt)}</Table.Cell>
-                <Table.Cell>
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <AdminDate value={user.createdAt} display="date" />
+                </ListTable.Cell>
+                <ListTable.Cell>
+                  <AdminDate value={user.lastLoginAt} display="datetime" />
+                </ListTable.Cell>
+                <ListTable.Cell>
                   <UserStatusBadge user={user} />
-                </Table.Cell>
-                <Table.Cell textAlign="right">
+                </ListTable.Cell>
+                <ListTable.Cell align="end">
                   <Box width="full" height="full" display="flex" justifyContent="end">
                     <Menu.Root>
-                      <Menu.Trigger>
+                      <Menu.Trigger
+                        ref={(element) => {
+                          if (element) menuTriggers.current.set(user.id, element);
+                          else menuTriggers.current.delete(user.id);
+                        }}
+                      >
                         <MoreVertical size={16} />
                       </Menu.Trigger>
                       <Menu.Content>
@@ -177,7 +168,13 @@ export default function UsersView() {
                           Edit
                         </Menu.Item>
                         {!user.deactivatedAt && (
-                          <Menu.Item value="impersonate" onClick={() => setImpersonating(user)}>
+                          <Menu.Item
+                            value="impersonate"
+                            onClick={() => {
+                              returnFocusTo.current = menuTriggers.current.get(user.id) ?? null;
+                              setImpersonating(user);
+                            }}
+                          >
                             <UserCheck size={16} />
                             Impersonate
                           </Menu.Item>
@@ -185,15 +182,19 @@ export default function UsersView() {
                       </Menu.Content>
                     </Menu.Root>
                   </Box>
-                </Table.Cell>
-              </Table.Row>
+                </ListTable.Cell>
+              </ListTable.Row>
             ))}
-          </Table.Body>
+          </ListTable.Body>
         </ListTable>
       </AdminTable>
 
       <UserEditDrawer user={editing} onClose={() => setEditing(null)} />
-      <ImpersonateDialog user={impersonating} onClose={() => setImpersonating(null)} />
+      <ImpersonateDialog
+        user={impersonating}
+        onClose={() => setImpersonating(null)}
+        finalFocusEl={() => returnFocusTo.current}
+      />
     </>
   );
 }
@@ -231,9 +232,12 @@ function UserStatusBadge({ user }: { user: AdminUser }) {
 export function ImpersonateDialog({
   user,
   onClose,
+  finalFocusEl,
 }: {
   user: AdminUser | null;
   onClose: () => void;
+  /** Where focus lands on close; the opener's menu item has gone by then. */
+  finalFocusEl?: () => HTMLElement | null;
 }) {
   const showErrorToast = useShowErrorToast();
   const toaster = useOpsToaster();
@@ -280,58 +284,41 @@ export function ImpersonateDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!user}
+      onClose={onClose}
+      title="Impersonate user"
+      busy={loading}
       initialFocusEl={() => reasonRef.current}
-      onOpenChange={({ open }) => {
-        if (!open && !loading) onClose();
-      }}
+      finalFocusEl={finalFocusEl}
+      primaryAction={{ label: "Impersonate", onClick: submit, loading }}
     >
-      <Dialog.Content>
-        <Dialog.Header>
-          <Dialog.Title>Impersonate user</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger disabled={loading} />
-        <Dialog.Body>
-          <VStack gap={3} align="stretch">
-            <Text fontSize="sm" color="fg.muted">
-              You will sign in as{" "}
-              <Text as="span" fontWeight="semibold" color="fg">
-                {user?.name ?? user?.email ?? user?.id}
-              </Text>
-              . The reason below is saved to the audit log.
-            </Text>
-            <Field.Root required>
-              <Field.Label>Reason</Field.Label>
-              <Input
-                ref={reasonRef}
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter") {
-                    e.preventDefault();
-                    void submit();
-                  }
-                }}
-                placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
-                disabled={loading}
-              />
-            </Field.Root>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="outline" onClick={onClose} disabled={loading}>
-              Cancel
-            </Button>
-            <Button onClick={submit} loading={loading} colorPalette="orange">
-              Impersonate
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <VStack gap={3} align="stretch">
+        <Text fontSize="sm" color="fg.muted">
+          You will sign in as{" "}
+          <Text as="span" fontWeight="semibold" color="fg">
+            {user?.name ?? user?.email ?? user?.id}
+          </Text>
+          . The reason below is saved to the audit log.
+        </Text>
+        <Field.Root required>
+          <Field.Label>Reason</Field.Label>
+          <Input
+            ref={reasonRef}
+            value={reason}
+            onChange={(e) => setReason(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter") {
+                e.preventDefault();
+                void submit();
+              }
+            }}
+            placeholder="e.g. Debugging a stuck trace reported by support ticket #…"
+            disabled={loading}
+          />
+        </Field.Root>
+      </VStack>
+    </Dialog>
   );
 }
 
@@ -342,7 +329,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [image, setImage] = useState("");
-  const [emailVerified, setEmailVerified] = useState(false);
   const [pendingSsoSetup, setPendingSsoSetup] = useState(false);
   const [deactivate, setDeactivate] = useState(false);
 
@@ -352,7 +338,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     setName(user.name ?? "");
     setEmail(user.email ?? "");
     setImage(user.image ?? "");
-    setEmailVerified(!!user.emailVerified);
     setPendingSsoSetup(!!user.pendingSsoSetup);
     setDeactivate(!!user.deactivatedAt);
   }, [user]);
@@ -363,9 +348,6 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
     if (name !== (user.name ?? "")) data.name = name;
     if (email !== (user.email ?? "")) data.email = email;
     if (image !== (user.image ?? "")) data.image = image || null;
-    if (emailVerified !== !!user.emailVerified) {
-      data.emailVerified = emailVerified;
-    }
     if (pendingSsoSetup !== !!user.pendingSsoSetup) {
       data.pendingSsoSetup = pendingSsoSetup;
     }
@@ -398,83 +380,60 @@ function UserEditDrawer({ user, onClose }: { user: AdminUser | null; onClose: ()
   };
 
   return (
-    <Drawer.Root
+    <Drawer
       open={!!user}
-      onOpenChange={({ open }) => {
-        if (!open) onClose();
+      onClose={onClose}
+      title="Edit user"
+      footer={{
+        primaryAction: { label: "Save", onClick: handleSave, loading: update.isPending },
+        cancel: { onClick: onClose },
       }}
-      size="md"
     >
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Edit user</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.CloseTrigger />
-        <Drawer.Body>
-          {user && (
-            <VStack gap={4} align="stretch">
-              <Field.Root>
-                <Field.Label>Name</Field.Label>
-                <Input value={name} onChange={(e) => setName(e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Email</Field.Label>
-                <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
-              </Field.Root>
-              <Field.Root>
-                <Field.Label>Avatar URL</Field.Label>
-                <Input
-                  type="url"
-                  value={image}
-                  onChange={(e) => setImage(e.target.value)}
-                  placeholder="https://…"
-                />
-              </Field.Root>
-              <ToggleRow
-                label="Email verified"
-                hint="Flip manually after an out-of-band verification."
-                checked={emailVerified}
-                onChange={setEmailVerified}
-              />
-              <ToggleRow
-                label="Pending SSO setup"
-                hint="Allows first-time SSO provider linking."
-                checked={pendingSsoSetup}
-                onChange={setPendingSsoSetup}
-              />
-              <ToggleRow
-                label="Deactivated"
-                hint="Revokes sessions + blocks new logins until reactivated."
-                checked={deactivate}
-                onChange={setDeactivate}
-              />
-              <VStack align="start" gap={0} pt={2}>
-                <Text fontSize="xs" color="fg.muted">
-                  User ID: {user.id}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Created: {formatDateTime(user.createdAt)}
-                </Text>
-                <Text fontSize="xs" color="fg.muted">
-                  Last login: {formatDateTime(user.lastLoginAt)}
-                </Text>
-              </VStack>
-            </VStack>
-          )}
-        </Drawer.Body>
-        <Drawer.Footer>
-          <HStack width="full">
-            <Spacer />
-            <Button variant="ghost" onClick={onClose}>
-              Cancel
-            </Button>
-            <Button loading={update.isPending} onClick={handleSave}>
-              Save
-            </Button>
-          </HStack>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+      {user && (
+        <VStack gap={4} align="stretch">
+          <Field.Root>
+            <Field.Label>Name</Field.Label>
+            <Input value={name} onChange={(e) => setName(e.target.value)} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Email</Field.Label>
+            <Input type="email" value={email} onChange={(e) => setEmail(e.target.value)} />
+          </Field.Root>
+          <Field.Root>
+            <Field.Label>Avatar URL</Field.Label>
+            <Input
+              type="url"
+              value={image}
+              onChange={(e) => setImage(e.target.value)}
+              placeholder="https://…"
+            />
+          </Field.Root>
+          <ToggleRow
+            label="Pending SSO setup"
+            hint="Allows first-time SSO provider linking."
+            checked={pendingSsoSetup}
+            onChange={setPendingSsoSetup}
+          />
+          <ToggleRow
+            label="Deactivated"
+            hint="Revokes sessions + blocks new logins until reactivated."
+            checked={deactivate}
+            onChange={setDeactivate}
+          />
+          <VStack align="start" gap={0} pt={2}>
+            <Text fontSize="xs" color="fg.muted">
+              User ID: {user.id}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Created: {formatDateTime(user.createdAt)}
+            </Text>
+            <Text fontSize="xs" color="fg.muted">
+              Last login: {formatDateTime(user.lastLoginAt)}
+            </Text>
+          </VStack>
+        </VStack>
+      )}
+    </Drawer>
   );
 }
 
@@ -499,7 +458,7 @@ function RefChipList({
   }
   if (!Array.isArray(refs) || refs.length === 0) return <EmptyCell />;
   return (
-    <Wrap gap={1} minWidth="44" maxWidth="60">
+    <Wrap gap={1} minWidth={0} maxWidth="60">
       {refs.slice(0, 2).map((ref) => (
         <Badge key={ref.id} variant="outline" asChild maxWidth="full">
           <RoutedLink href={`/ops/${resource}?q=${encodeURIComponent(ref.id)}`}>

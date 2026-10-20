@@ -181,6 +181,23 @@ export const LANGY_TITLE_SOURCE = {
 export type LangyTitleSource = (typeof LANGY_TITLE_SOURCE)[keyof typeof LANGY_TITLE_SOURCE];
 
 /**
+ * Who started a conversation: the person in the panel (`interactive`), or a module on their
+ * behalf with nobody at the keyboard (`run`). A run conversation only reads and never notifies.
+ */
+export const LANGY_CONVERSATION_ORIGIN = {
+  INTERACTIVE: "interactive",
+  RUN: "run",
+} as const;
+
+export type LangyConversationOrigin =
+  (typeof LANGY_CONVERSATION_ORIGIN)[keyof typeof LANGY_CONVERSATION_ORIGIN];
+
+export const LANGY_CONVERSATION_ORIGINS = [
+  LANGY_CONVERSATION_ORIGIN.INTERACTIVE,
+  LANGY_CONVERSATION_ORIGIN.RUN,
+] as const;
+
+/**
  * Lifecycle status of one turn (langyConversationTurn fold): `pending` (init
  * default), `running`, then exactly one terminal of `completed`/`failed`/
  * `stopped`. `stopped` (ADR-078) keeps the partial answer and anchors Continue.

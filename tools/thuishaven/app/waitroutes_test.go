@@ -72,6 +72,16 @@ func TestWaitRoutesGiveTheRouteBackOnceUp(t *testing.T) {
 	}
 }
 
+// @scenario "a live service whose route went missing gets it back"
+func TestWaitRoutesRestoreAMissingRoute(t *testing.T) {
+	o, proxy := waitOrch(waitAppPort, true, true)
+	delete(proxy.routes, appHost)
+	o.reconcileWaitRoutes(waitDaemonPort, false)
+	if got := proxy.routes[appHost]; got != waitAppPort {
+		t.Errorf("app route = %d, want the app's %d restored", got, waitAppPort)
+	}
+}
+
 // @scenario "a route haven did not set is left alone"
 func TestWaitRoutesLeaveAForeignRouteAlone(t *testing.T) {
 	o, proxy := waitOrch(9999, true, false)

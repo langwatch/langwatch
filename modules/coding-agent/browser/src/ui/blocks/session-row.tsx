@@ -1,4 +1,4 @@
-import { Table } from "@langwatch/design-system/primitives";
+import { ListTable } from "@langwatch/design-system/list-table";
 import type React from "react";
 
 import type { SessionListRow, SessionPullRequest } from "../../behavior/session-list-row.ts";
@@ -37,44 +37,42 @@ export const SessionRow: React.FC<{
   onOpenPullRequest,
   onPrefetch,
 }) => (
-  <Table.Row
+  <ListTable.Row
     data-testid="coding-agent-session-row"
-    onClick={onOpenReplay}
-    onMouseEnter={onPrefetch}
+    onActivate={onOpenReplay}
+    onPrefetch={onPrefetch}
     aria-busy={isOpening}
-    cursor="pointer"
-    _hover={{ bg: "bg.subtle" }}
   >
-    <Table.Cell maxWidth="320px">
+    <ListTable.Cell maxWidth="320px">
       <SessionNameCell row={row} isOpening={isOpening} onOpenReplay={onOpenReplay} />
-    </Table.Cell>
-    <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+    </ListTable.Cell>
+    <ListTable.Cell tone="muted" nowrap>
       {row.agent ? <AgentLabel agent={row.agent} /> : MISSING_VALUE}
-    </Table.Cell>
-    <Table.Cell fontSize="sm" color="fg.muted" whiteSpace="nowrap">
+    </ListTable.Cell>
+    <ListTable.Cell tone="muted" nowrap>
       {formatLastUpdate({ timestampMs: row.lastUpdateAtMs })}
-    </Table.Cell>
-    <Table.Cell textAlign="end">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       <ContextCell row={row} largestTotal={largestTotal} />
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <CompactionsCell row={row} />
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <ActiveAndWaitingCell row={row} />
-    </Table.Cell>
-    <Table.Cell textAlign="end">
+    </ListTable.Cell>
+    <ListTable.Cell align="end">
       <TokenCostCell row={row} largestCost={largestCost} />
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <PullRequestsCell pullRequests={row.pullRequests} onOpenDetail={onOpenPullRequest} />
-    </Table.Cell>
-    <Table.Cell>
+    </ListTable.Cell>
+    <ListTable.Cell>
       <SessionRowActions
         row={row}
         onOpenReplay={onOpenReplay}
         onOpenInExplorer={onOpenInExplorer}
       />
-    </Table.Cell>
-  </Table.Row>
+    </ListTable.Cell>
+  </ListTable.Row>
 );

@@ -21,12 +21,9 @@ import {
   readCorrectedPath,
   type OtlpDoorAnswer,
 } from "@langwatch/otlp";
+import { otlpIngestCredentialSchema, type OtlpIngestCredential } from "@langwatch/otlp/door";
 import { resolveRequestBound } from "@langwatch/plans";
-import {
-  otlpIngestCredentialSchema,
-  type OtlpIngestCredential,
-  TraceApi,
-} from "@langwatch/trace-contract";
+import { TraceApi } from "@langwatch/trace-contract";
 
 import { otlpLogAnswer } from "../rules/otlp-log-answer.rules.ts";
 

@@ -1,4 +1,6 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import type { ExhaustedOutcome, ListedRun } from "@langwatch/group-queue";
+
+export type { ListedRun };
 import type { SemConvAttributes } from "langwatch/observability";
 
 export interface EventSourcedQueueProcessorOptions {
@@ -171,4 +173,14 @@ export interface EventSourcedQueueProcessor<Payload extends Record<string, unkno
   registerPreflightGroups?: (
     resolveGroupIds: () => readonly (string | undefined)[],
   ) => Promise<void>;
+  /** Runs `work` with its jobs on a list of its own, ahead of any backlog, and waits for them. */
+  runListedWork?: <Result>(input: ListedWork<Result>) => Promise<Result>;
 }
+
+/** Work whose queue jobs run ahead of any backlog, and how long to wait for them. */
+export type ListedWork<Result> = Readonly<{
+  name: string;
+  timeoutMs: number;
+  /** `list` is absent where no queue runs the work: nothing then paces it. */
+  work: (list?: ListedRun) => Promise<Result>;
+}>;

@@ -113,6 +113,7 @@ export class ExperimentSavedStateExecutionService {
   }): CarriedOverCell[] {
     return planBoardCarryOver({
       targets: prepared.state.targets,
+      evaluators: prepared.state.evaluators,
       scope,
       datasetRows: prepared.datasetRows,
       results: prepared.workbenchState.results as Partial<BoardResults>,

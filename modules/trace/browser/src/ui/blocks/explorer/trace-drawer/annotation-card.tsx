@@ -249,7 +249,7 @@ function Author({
       })}
       <VStack align="start" gap={0} flex={1} minWidth={0}>
         {annotation.user?.name ? (
-          <Text textStyle="xs" fontWeight="600">
+          <Text textStyle="xs" fontWeight="semibold">
             {annotation.user.name}
           </Text>
         ) : (
@@ -321,7 +321,7 @@ function ScoreBadges({ scores }: { scores: ScoreEntry[] }) {
           borderColor="border.muted"
           bg="bg.panel"
         >
-          <Text textStyle="2xs" color="fg.muted" fontWeight="600">
+          <Text textStyle="2xs" color="fg.muted" fontWeight="semibold">
             {score.name}
           </Text>
           <Text textStyle="2xs">{score.value}</Text>

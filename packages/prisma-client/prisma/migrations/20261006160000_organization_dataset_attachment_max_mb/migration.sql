@@ -7,4 +7,4 @@
 --
 --   ALTER TABLE "Organization" DROP COLUMN "datasetAttachmentMaxMb";
 
-ALTER TABLE "Organization" ADD COLUMN "datasetAttachmentMaxMb" INTEGER;
+ALTER TABLE "Organization" ADD COLUMN IF NOT EXISTS "datasetAttachmentMaxMb" INTEGER;

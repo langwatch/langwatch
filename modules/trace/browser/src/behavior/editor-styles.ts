@@ -70,7 +70,7 @@ export const editorStyles: SystemStyleObject = {
   // Label collapse: render label as ::after, collapse id to zero width.
   // Tooltip surfaces id without layout changes or hover-induced resize.
   "& .filter-token[data-filter-chip-label]": {
-    fontSize: "0px",
+    fontSize: "0",
   },
   "& .filter-token[data-filter-chip-label]::after": {
     content: "attr(data-filter-chip-label)",

@@ -26,6 +26,7 @@ export class SlackBillingAlertChannel extends BillingAlertChannel {
     webhookUrl: string;
     message: BillingAlertMessage;
   }): Promise<void> {
-    await this.createWebhook(webhookUrl).send(message);
+    // The client sends its constructor options as payload; an undefined timeout drops out.
+    await this.createWebhook(webhookUrl).send({ ...message, timeout: undefined });
   }
 }

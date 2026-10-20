@@ -3,6 +3,8 @@
  * @see specs/features/agent-testing/page-structure.feature
  */
 
+import { LoadingScreen } from "@langwatch/design-system/loading-screen";
+
 import {
   AGENT_TESTING_PERMISSION,
   useAgentTestingGate,
@@ -16,7 +18,7 @@ import { AgentTestingPage } from "../agent-testing/agent-testing-page.tsx";
 function AgentTestingRoutePage() {
   switch (useAgentTestingGate()) {
     case "deciding":
-      return null;
+      return <LoadingScreen />;
     case "absent":
       return <PageAbsentNotice />;
     case "refused":

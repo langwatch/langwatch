@@ -8,7 +8,7 @@ import {
   type SpanContentDropResult,
 } from "@langwatch/data-privacy-contract";
 import { createLogger } from "@langwatch/observability";
-import type { OtlpSpan } from "@langwatch/trace-contract";
+import type { OtlpSpan } from "@langwatch/otlp/trace-request";
 
 import { ContentDropPolicyService } from "./content-drop-policy.service.ts";
 import type { DataPrivacyResolutionService } from "./data-privacy-resolution.service.ts";

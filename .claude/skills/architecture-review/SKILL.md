@@ -7,8 +7,10 @@ user-invocable: true
 # Architecture review: what lint cannot see
 
 The linters are the authority (record §17) and run first. This skill is the reading that is
-left: every checklist item below is something no `langwatch/*` rule or enforcer policy catches
-today, and each names the record section that holds it. When an item gains a rule, delete it here.
+left: judgement items no `langwatch/*` rule or enforcer policy fully decides, each naming the record
+section that holds it. Where a policy now covers part of an item (the deleted-spelling policies in
+E, the table-ownership policies in B), the instrument runs first and the review reads what it cannot.
+When an item gains a rule, delete it here.
 
 A review reports. It does not fix, rule or design. A finding that needs a decision is a question
 with options for the coordinator, who takes it to Alex when no ruling covers it.
@@ -39,7 +41,8 @@ pnpm --filter @langwatch/architecture-enforcer check:feature-parity
 
 `--list-policies` names all of them. Read each finding with the `linting` skill and report it
 as the tool wrote it; a lint finding is not re-argued in review. `peer-cycles` stays red until the
-last cycle is cut (§5): report only edges the diff adds, compared with the base. Read the parity
+last cycle is cut (§5), bar the one ruled organization and identity pair (`PEER_CYCLE_EXCEPTIONS`):
+report only edges the diff adds, compared with the base. Read the parity
 verdict banner before and after, never a per-file tick.
 
 ## 2. The checklist
@@ -51,8 +54,7 @@ an operation that adds behaviour or a new shape is asked for (Alex, 2026-09-24).
 
 - Find: added members of `interface <X>Api`, changed return types and new exported schemas in
   `git diff -U0 <range> -- 'modules/*/contract/src/*' 'enterprise/modules/*/contract/src/*'`.
-- Each needs a ruling: a dated line in `dev/docs/ARCHITECTURE.md` or in
-  `.claude/coordinator/rulings-*.md` citing Alex. A changed return type counts (merge L8's
+- Each needs a ruling: a dated line in `dev/docs/ARCHITECTURE.md` or an ADR citing Alex. A changed return type counts (merge L8's
   `OrganizationApi.createMembership` returning `{ outcome, seat }`).
 - No ruling: finding. Fix: keep the one-to-one port, or move the proposal to the handoff's Risks
   with options. `WorkflowApi.relayExecuteSync` and `hasPerProjectEngines` went that way on
@@ -72,7 +74,9 @@ cycles are refused, and no peer-cycle edge is cut or listed without asking Alex 
   still read gateway's deleted subscriber (fixed in 8a48fdbe40; five more stale tests in d752cad06a).
 - The `module-dependencies` skill teaches the shape of a cut.
 - Compare the diff's touched paths with the "What <id> owns" tables on the module pages
-  (`modules/<id>/README.md`): a write to a table another module owns is a finding (`ownership`).
+  (`modules/<id>/README.md`): a write to a table another module owns is a finding (`ownership`). A
+  read of another owner's table passes only where the owner declares your module a reader in the
+  share policy (`SHARED_PRISMA_TABLES`, the ClickHouse table-ownership policy; §7).
 
 ### C. Authorization or audit beside the door (§8; CLAUDE.md rule 6)
 
@@ -107,9 +111,12 @@ check after `.withAccess(anyAuthenticated(...))` is a bypass.
 
 ### E. Deleted spellings and new patterns (§15, §16)
 
-`dev/docs/deleted-spellings.json` holds §15 as data: each entry has `spelling`, `section`,
-`replacement`, and a `pattern` unless it is prose only. Scan the added lines, code and prose
-alike (skills, `CLAUDE.md`, `.claude/rules`, `dev/docs` outside `adr/` and `plans/`):
+`dev/docs/deleted-spellings.json` holds §15 as data, and the policies `deleted-spellings-in-code`
+and `deleted-spellings-in-teaching` read it (run them in section 1). Each entry has `spelling`,
+`section`, `replacement`, and a `pattern` unless it is prose only. The policies cannot read the
+prose-only entries, so scan the added lines by eye for those, and for a sentence that teaches a
+spelling beyond what a pattern matches (skills, `CLAUDE.md`, `.claude/rules`, `dev/docs` outside
+`adr/` and `plans/`):
 
 ```bash
 git diff -U0 <range> -- <paths> | grep '^+[^+]' > "$TMPDIR/added.txt"
@@ -130,7 +137,7 @@ Every added `/** @scenario */` annotation and every added level tag goes through
 Correctness no section governs belongs to the built-in `code-review` skill, not this one. Report it as "not a record
 finding", name the invariant, and ask for a test that fails when the invariant breaks. Example:
 the enforcer's `serverSourceReach` filter is sound only while every module-graph resolution is
-lexical (`.claude/handoffs/perf-enforcer-2.md` §11). Never cite a section that does not hold the
+lexical. Never cite a section that does not hold the
 rule; a "must" with no record line and no dated ruling is not a ruling (`architecture-guide`).
 
 ## 4. Report
@@ -167,6 +174,5 @@ Example: a `@scenario` annotation the checker cannot read was fixed twice on 202
 ## Links
 
 `dev/docs/ARCHITECTURE.md` §3.1, §3.3, §5, §8, §12, §13, §15, §16, §17 ·
-`dev/docs/deleted-spellings.json` · `.claude/coordinator/rulings-2026-10-05.md` ·
-skills `linting`, `lint-rule`, `spec-binding-review`, `module-dependencies`, `api-transports`,
+`dev/docs/deleted-spellings.json` · skills `linting`, `lint-rule`, `spec-binding-review`, `module-dependencies`, `api-transports`,
 `architecture-guide`.

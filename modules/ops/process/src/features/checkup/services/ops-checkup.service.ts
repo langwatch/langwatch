@@ -8,6 +8,7 @@ import { nowInstant } from "@langwatch/time";
 
 import type { CheckupProbeChannel } from "../../../channels/checkup-probe.channel.ts";
 import type { UsageReportChannel } from "../../../channels/usage-report.channel.ts";
+import type { CloudLatestReleaseRepository } from "../../../repositories/cloud-latest-release.repository.ts";
 import type {
   ClickHouseHealthRepository,
   PostgresHealthRepository,
@@ -54,6 +55,8 @@ interface OpsCheckupDependencies {
     readonly redis: RedisHealthRepository;
     /** The upgrade ledger both migration rows read, as the Upgrades page reads it. */
     readonly upgradeLedger: Pick<UpgradeLedgerRepository, "findStatus" | "findSteps">;
+    /** Where the usage report keeps the latest release cloud's reply named. */
+    readonly cloudLatestRelease: CloudLatestReleaseRepository;
   };
   readonly channels: { usageReport: UsageReportChannel; probes: CheckupProbeChannel };
   /** The ops health the usage report carries; left out where the process composes none. */
@@ -130,6 +133,7 @@ export class OpsCheckupService {
       organizations: peers.organizationDirectory,
       channel: channels.usageReport,
       install: peers.licensing,
+      latestReleases: repositories.cloudLatestRelease,
       disabled: config.usageStats.disabled,
       isSaas: facts.isSaas,
       now: nowInstant,

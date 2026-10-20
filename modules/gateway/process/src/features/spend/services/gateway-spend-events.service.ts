@@ -104,6 +104,8 @@ export class GatewaySpendEventsService {
       cursor,
       limit,
       filters: { requestTypes: [requestType], status: "confirmed" },
+      // The judge spend catch-up copies every confirmed row ever written: no OccurredAt bound.
+      SKIP_COLD_SCAN_CHECK: true,
     });
     return {
       rows: page.rows.map((row) => ({

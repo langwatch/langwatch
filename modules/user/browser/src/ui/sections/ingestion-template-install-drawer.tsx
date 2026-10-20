@@ -1,9 +1,9 @@
+import { SnippetPreview } from "@langwatch/design-system/code-preview";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { InlineCode } from "@langwatch/design-system/inline-code";
 import {
   Alert,
   Badge,
-  Box,
   Button,
   HStack,
   Spacer,
@@ -151,153 +151,145 @@ export function IngestionTemplateInstallDrawer({
   const [showSecret, setShowSecret] = useState(false);
   const toaster = usePersonalToaster();
 
-  const copy = (value: string, label: string) => {
-    void navigator.clipboard.writeText(value);
-    toaster.create({ title: `${label} copied to clipboard`, type: "success" });
+  const copy = async ({ text, what }: { text: string; what: string }): Promise<boolean> => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      toaster.create({
+        title: `Couldn't copy the ${what.toLowerCase()} to the clipboard`,
+        description: "Select it and copy it by hand, or try again.",
+        type: "error",
+      });
+      return false;
+    }
+    toaster.create({ title: `${what} copied to clipboard`, type: "success" });
+    return true;
   };
-
-  const renderedToken = showSecret ? (installResult?.token ?? "") : SECRET_MASK;
-  const copyToken = installResult?.token ?? "";
 
   // Claude Code requires CLAUDE_CODE_ENABLE_TELEMETRY + OTEL_LOGS_EXPORTER +
   // OTEL_METRICS_EXPORTER + OTEL_EXPORTER_OTLP_PROTOCOL. Other sources need
   // only endpoint + bearer token.
-  const envVarsSnippet = installResult
-    ? buildEnvSnippet(template.slug, installResult.endpoint, renderedToken)
-    : "";
-  const envVarsCopy = installResult
-    ? buildEnvSnippet(template.slug, installResult.endpoint, copyToken)
+  const envVars = installResult
+    ? buildEnvSnippet(template.slug, installResult.endpoint, installResult.token)
     : "";
 
   return (
-    <Drawer.Root open={open} onOpenChange={(d) => onOpenChange(d.open)} placement="end" size="md">
-      <Drawer.Content>
-        <Drawer.Header>
-          <Drawer.Title>Connect {template.displayName}, auto-shaped</Drawer.Title>
-          <Drawer.CloseTrigger />
-        </Drawer.Header>
-        <Drawer.Body>
-          <VStack align="stretch" gap={4}>
-            <Text fontSize="sm" color="fg.muted">
-              Cost, tokens, and model are picked up automatically on every request, no change to how
-              you call the API.
+    <Drawer
+      open={open}
+      onClose={() => onOpenChange(false)}
+      title={`Connect ${template.displayName}, auto-shaped`}
+      size="md"
+    >
+      <VStack align="stretch" gap={4}>
+        <Text fontSize="sm" color="fg.muted">
+          Cost, tokens, and model are picked up automatically on every request, no change to how you
+          call the API.
+        </Text>
+
+        {!!installError && (
+          <HandledErrorAlert
+            error={installError}
+            fallbackTitle="Couldn't set up this integration"
+          />
+        )}
+
+        {!installResult &&
+          !isInstalling &&
+          template.credentialSchema === null &&
+          (hasExistingKey ? (
+            <VStack align="stretch" gap={2}>
+              <Alert.Root status="warning" variant="surface">
+                <Alert.Indicator />
+                <Alert.Content>
+                  <Text fontSize="sm">
+                    An ingestion key already exists for this source. Rotating will invalidate the
+                    existing token immediately.
+                  </Text>
+                </Alert.Content>
+              </Alert.Root>
+              <Button onClick={onRotate} colorPalette="orange">
+                Rotate token
+              </Button>
+            </VStack>
+          ) : (
+            <Button onClick={onInstall} colorPalette="orange">
+              Use this template
+            </Button>
+          ))}
+
+        {isInstalling && (
+          <Text fontSize="sm" color="fg.muted">
+            {hasExistingKey ? "Rotating token…" : "Installing template…"}
+          </Text>
+        )}
+
+        {installResult && (
+          <>
+            <Alert.Root status="info" variant="surface">
+              <Alert.Indicator>
+                <Check size={16} />
+              </Alert.Indicator>
+              <Alert.Content>
+                <Text fontSize="sm" fontWeight="medium">
+                  Ingestion key issued. Copy the token now, it won't be shown again.
+                </Text>
+              </Alert.Content>
+            </Alert.Root>
+
+            <Field
+              label="Endpoint"
+              value={installResult.endpoint}
+              onCopy={() => void copy({ text: installResult.endpoint, what: "Endpoint" })}
+            />
+            <Field
+              label="Token"
+              value={showSecret ? installResult.token : SECRET_MASK}
+              onCopy={() => void copy({ text: installResult.token, what: "Token" })}
+              trailing={
+                <Button size="xs" variant="ghost" onClick={() => setShowSecret((v) => !v)}>
+                  {showSecret ? <EyeOff size={12} /> : <Eye size={12} />}
+                  {showSecret ? "Hide" : "Show"}
+                </Button>
+              }
+            />
+
+            <SnippetPreview
+              code={envVars}
+              filename=".env"
+              codeLanguage="bash"
+              sensitiveValue={installResult.token}
+              enableVisibilityToggle
+              isVisible={showSecret}
+              onToggleVisibility={() => setShowSecret((v) => !v)}
+              copyText={envVars}
+              copy={copy}
+            />
+
+            <Text fontSize="xs" color="fg.muted">
+              Paste into your{" "}
+              <Badge variant="surface" size="sm">
+                {template.displayName}
+              </Badge>{" "}
+              environment, fire a request, and traces will land at{" "}
+              <InlineCode>/me/traces</InlineCode> filtered by source={template.slug}.
             </Text>
 
-            {!!installError && (
-              <HandledErrorAlert
-                error={installError}
-                fallbackTitle="Couldn't set up this integration"
-              />
-            )}
+            <Text fontSize="xs" color="fg.muted">
+              To keep this across new terminals, add these lines to your{" "}
+              <InlineCode>~/.zshrc</InlineCode> (or <InlineCode>~/.bashrc</InlineCode>), then open a
+              new shell.
+            </Text>
 
-            {!installResult &&
-              !isInstalling &&
-              template.credentialSchema === null &&
-              (hasExistingKey ? (
-                <VStack align="stretch" gap={2}>
-                  <Alert.Root status="warning" variant="surface">
-                    <Alert.Indicator />
-                    <Alert.Content>
-                      <Text fontSize="sm">
-                        An ingestion key already exists for this source. Rotating will invalidate
-                        the existing token immediately.
-                      </Text>
-                    </Alert.Content>
-                  </Alert.Root>
-                  <Button onClick={onRotate} colorPalette="orange">
-                    Rotate token
-                  </Button>
-                </VStack>
-              ) : (
-                <Button onClick={onInstall} colorPalette="orange">
-                  Use this template
-                </Button>
-              ))}
-
-            {isInstalling && (
-              <Text fontSize="sm" color="fg.muted">
-                {hasExistingKey ? "Rotating token…" : "Installing template…"}
-              </Text>
-            )}
-
-            {installResult && (
-              <>
-                <Alert.Root status="info" variant="surface">
-                  <Alert.Indicator>
-                    <Check size={16} />
-                  </Alert.Indicator>
-                  <Alert.Content>
-                    <Text fontSize="sm" fontWeight="medium">
-                      Ingestion key issued. Copy the token now, it won't be shown again.
-                    </Text>
-                  </Alert.Content>
-                </Alert.Root>
-
-                <Field
-                  label="Endpoint"
-                  value={installResult.endpoint}
-                  onCopy={() => copy(installResult.endpoint, "Endpoint")}
-                />
-                <Field
-                  label="Token"
-                  value={showSecret ? installResult.token : SECRET_MASK}
-                  onCopy={() => copy(installResult.token, "Token")}
-                  trailing={
-                    <Button size="xs" variant="ghost" onClick={() => setShowSecret((v) => !v)}>
-                      {showSecret ? <EyeOff size={12} /> : <Eye size={12} />}
-                      {showSecret ? "Hide" : "Show"}
-                    </Button>
-                  }
-                />
-
-                <Box
-                  borderWidth="1px"
-                  borderColor="border.muted"
-                  borderRadius="sm"
-                  padding={3}
-                  backgroundColor="bg.subtle"
-                >
-                  <HStack alignItems="start" marginBottom={2}>
-                    <Text fontSize="xs" color="fg.muted" fontWeight="semibold">
-                      .env (bash)
-                    </Text>
-                    <Spacer />
-                    <Button size="xs" variant="ghost" onClick={() => copy(envVarsCopy, "Env vars")}>
-                      <Copy size={12} /> Copy
-                    </Button>
-                  </HStack>
-                  <Box as="pre" fontSize="xs" fontFamily="mono" whiteSpace="pre-wrap">
-                    {envVarsSnippet}
-                  </Box>
-                </Box>
-
-                <Text fontSize="xs" color="fg.muted">
-                  Paste into your{" "}
-                  <Badge variant="surface" size="sm">
-                    {template.displayName}
-                  </Badge>{" "}
-                  environment, fire a request, and traces will land at{" "}
-                  <InlineCode>/me/traces</InlineCode> filtered by source={template.slug}.
-                </Text>
-
-                <Text fontSize="xs" color="fg.muted">
-                  To keep this across new terminals, add these lines to your{" "}
-                  <InlineCode>~/.zshrc</InlineCode> (or <InlineCode>~/.bashrc</InlineCode>), then
-                  open a new shell.
-                </Text>
-
-                <HStack>
-                  <Spacer />
-                  <Button onClick={onMarkInstalled} colorPalette="green" variant="solid">
-                    <Check size={14} /> Mark as installed
-                  </Button>
-                </HStack>
-              </>
-            )}
-          </VStack>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+            <HStack>
+              <Spacer />
+              <Button onClick={onMarkInstalled} colorPalette="green" variant="solid">
+                <Check size={14} /> Mark as installed
+              </Button>
+            </HStack>
+          </>
+        )}
+      </VStack>
+    </Drawer>
   );
 }
 

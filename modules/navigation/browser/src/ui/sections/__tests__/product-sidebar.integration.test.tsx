@@ -61,7 +61,7 @@ function renderSidebar({
   isCompact = false,
   billedCostEnabled = true,
 }: {
-  surface: "me" | "llm-ops" | "gateway" | "governance";
+  surface: "me" | "llm-ops" | "gateway" | "governance" | "settings";
   pathname?: string;
   isCompact?: boolean;
   billedCostEnabled?: boolean;
@@ -259,11 +259,11 @@ describe("the product sidebar", () => {
     it("lists the gateway pages from the shared registry", () => {
       renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
 
-      expect(screen.getByText("Virtual Keys")).toBeInTheDocument();
-      expect(screen.getByText("Model Providers")).toBeInTheDocument();
+      expect(screen.getByText("Virtual keys")).toBeInTheDocument();
+      expect(screen.getByText("Model providers")).toBeInTheDocument();
       expect(screen.getByText("Budgets")).toBeInTheDocument();
-      expect(screen.getByText("Cache Rules")).toBeInTheDocument();
-      expect(screen.getByText("Routing Policies")).toBeInTheDocument();
+      expect(screen.getByText("Cache rules")).toBeInTheDocument();
+      expect(screen.getByText("Routing policies")).toBeInTheDocument();
     });
 
     /** @scenario "Every gateway entry opens in the tab the reader is in" */
@@ -365,7 +365,7 @@ describe("the product sidebar", () => {
       renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
 
       await waitFor(() => {
-        expect(scrolls.some((scroll) => scroll.element.textContent?.includes("Virtual Keys"))).toBe(
+        expect(scrolls.some((scroll) => scroll.element.textContent?.includes("Virtual keys"))).toBe(
           true,
         );
       });
@@ -376,7 +376,7 @@ describe("the product sidebar", () => {
     it("scrolls the menu so that entry sits at the top of the column", async () => {
       // jsdom lays nothing out, so the entry is placed by hand: 300px
       // down a menu 200px tall, which puts it below the fold.
-      stubMenuLayout({ entryOffsets: { "Virtual Keys": 300 }, menuHeight: 200 });
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 300 }, menuHeight: 200 });
 
       renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
 
@@ -389,13 +389,13 @@ describe("the product sidebar", () => {
     it("leaves the menu at its start when the entry is already in view", async () => {
       // Where the first entries of a menu sit: below Quick Search and the
       // heading of the first group, and well inside a menu this tall.
-      stubMenuLayout({ entryOffsets: { "Virtual Keys": 71 }, menuHeight: 690 });
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 71 }, menuHeight: 690 });
 
       renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
 
       const region = screen.getByTestId("sidebar-scroll-region");
       await waitFor(() => {
-        expect(screen.getByRole("link", { name: "Virtual Keys" })).toHaveAttribute(
+        expect(screen.getByRole("link", { name: "Virtual keys" })).toHaveAttribute(
           "aria-current",
           "page",
         );
@@ -406,10 +406,10 @@ describe("the product sidebar", () => {
 
     /** @scenario "Moving inside the menu leaves the scroll where it is" */
     it("does not move the menu when another page in it is opened", async () => {
-      // Budgets sits further down than Virtual Keys, so a menu that
+      // Budgets sits further down than Virtual keys, so a menu that
       // revealed the newly opened page would land on a different number.
       stubMenuLayout({
-        entryOffsets: { "Virtual Keys": 300, Budgets: 520 },
+        entryOffsets: { "Virtual keys": 300, Budgets: 520 },
         menuHeight: 200,
       });
 
@@ -456,7 +456,7 @@ describe("the product sidebar", () => {
       // Opening a page rebuilds the column from nothing, so the menu the
       // reader scrolled is not the menu that comes back.
       stubMenuLayout({
-        entryOffsets: { "Virtual Keys": 300, Budgets: 380 },
+        entryOffsets: { "Virtual keys": 300, Budgets: 380 },
         menuHeight: 400,
       });
 
@@ -492,7 +492,7 @@ describe("the product sidebar", () => {
 
     /** @scenario "A reader who scrolls the menu keeps the position they chose" */
     it("leaves the scroll alone once the reader takes over", async () => {
-      stubMenuLayout({ entryOffsets: { "Virtual Keys": 300 }, menuHeight: 200 });
+      stubMenuLayout({ entryOffsets: { "Virtual keys": 300 }, menuHeight: 200 });
 
       renderSidebar({ surface: "gateway", pathname: "/gateway/virtual-keys" });
 
@@ -593,7 +593,7 @@ describe("the product sidebar", () => {
       // The hairline border is pinned on the shared chip style itself,
       // which jsdom can read where a CSS variable it cannot resolve is
       // out of reach: quiet-chip-style.unit.test.ts.
-      expect(cap).toHaveStyle({ color: "var(--chakra-colors-gray-400)" });
+      expect(cap).toHaveStyle({ color: "var(--chakra-colors-fg-muted)" });
     });
   });
 
@@ -615,4 +615,17 @@ describe("the product sidebar", () => {
       expect(menuColumn).not.toHaveStyle({ position: "absolute" });
     });
   });
+});
+
+describe("the shared first sidebar row", () => {
+  it.each(["llm-ops", "gateway", "governance", "me", "settings"] as const)(
+    "puts Quick Search first on %s and opens the same command bar",
+    async (surface) => {
+      renderSidebar({ surface });
+      const search = screen.getByRole("button", { name: "Quick Search" });
+      expect(screen.getByTestId("sidebar-search-row").firstElementChild).toBe(search);
+      await userEvent.click(search);
+      expect(commandBarOpenMock).toHaveBeenCalledTimes(1);
+    },
+  );
 });

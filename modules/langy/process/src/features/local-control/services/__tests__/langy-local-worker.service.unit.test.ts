@@ -1,8 +1,10 @@
 /** @see specs/langy/langy-local-permissions.feature */
 import type { LangyConversationDetail, LangyKeyCaller } from "@langwatch/langy-contract";
+import { memorySessionState } from "@langwatch/process-stores";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { MemoryLangyLocalWorkspaceChannel } from "../../../../channels/memory/memory.langy-local-workspace.channel.ts";
 import { MemoryLangyRepositories } from "../../../../repositories/memory/memory.langy.repositories.ts";
 import { LangyLocalPresenceRedisRepository } from "../../../../repositories/redis/redis.langy-local-presence.repository.ts";
 import { LangyLocalControlRuntimeService } from "../langy-local-control-runtime.service.ts";
@@ -18,8 +20,11 @@ function buildWorker(options: { own: boolean }) {
   const repositories = MemoryLangyRepositories.create();
   const recorded: string[] = [];
   const runtime = LangyLocalControlRuntimeService.create({
-    store: repositories.sessionState,
-    presence: LangyLocalPresenceRedisRepository.create({ store: repositories.sessionState }),
+    calls: repositories.localCalls,
+    userWaits: repositories.localUserWaits,
+    controlRequests: repositories.localControlRequests,
+    presence: LangyLocalPresenceRedisRepository.create({ store: memorySessionState() }),
+    workspace: MemoryLangyLocalWorkspaceChannel.create(),
     projects: { getOrganizationId: async () => "organization-1", getSlug: async () => "project" },
     mintSessionKey: async () => ({ token: "sk-lw-test", apiKeyId: "key-2" }),
     events: {
@@ -40,6 +45,7 @@ function buildWorker(options: { own: boolean }) {
     lastError: null,
     lastModel: "gpt-5-mini",
     eventCursor: null,
+    origin: "interactive",
   };
   const worker = LangyLocalWorkerService.create({
     runtime,

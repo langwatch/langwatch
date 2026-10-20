@@ -1,3 +1,5 @@
+import type { HandledErrorShape } from "@langwatch/handled-error/read-handled-error";
+
 export type LLMErrorType =
   | "not_found"
   | "bad_request"
@@ -9,6 +11,8 @@ export type LLMErrorType =
 export interface ParsedLLMError {
   type: LLMErrorType;
   message: string;
+  /** The coded refusal behind the failure, when our server refused the run itself. */
+  handled?: HandledErrorShape;
 }
 
 const LLM_ERROR_TYPES: ReadonlySet<string> = new Set<LLMErrorType>([

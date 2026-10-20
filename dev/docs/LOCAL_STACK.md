@@ -116,8 +116,7 @@ hold a few GiB. `haven up +langevals` (sticky) runs `services/langevals` with
 `LANGEVALS_ENDPOINT` at it for every lane. Without it, `.env`'s
 `LANGEVALS_ENDPOINT` stands, and nothing listens there unless you run
 `make -C services/langevals start` yourself. The first start syncs the Python
-dependencies, which takes a few minutes. diffsuite's `-langevals` does the same
-for a branch stack it starts with `-up`.
+dependencies, which takes a few minutes.
 
 The six simulators (`mail`, `idp`, `storage`, `llm`, `voice`, `analytics`) each serve a
 console at `<name>.<slug>.langwatch.localhost`, appear as rows in the hub and the stack
@@ -140,7 +139,7 @@ Uploads need S3, which `storagesim` stands in for. It runs by default as the
 home in `storage/<slug>/`, and answers only the calls the product makes:
 path-style PUT, GET, HEAD and DELETE of an object, plus HEAD bucket. It checks
 SigV4 (header and presigned) against haven's dev key and refuses as S3 does
-(services/storagesim/README.md). haven sets `STORED_OBJECTS_BACKEND=s3`,
+(services/sims/storagesim/README.md). haven sets `STORED_OBJECTS_BACKEND=s3`,
 `S3_BUCKET_NAME=langwatch`, `S3_ENDPOINT=http://127.0.0.1:<port>` and dummy
 `S3_ACCESS_KEY_ID`/`S3_SECRET_ACCESS_KEY` for every lane. It sets none of them
 when `.env` or your shell already names `STORED_OBJECTS_BACKEND`,
@@ -159,7 +158,7 @@ haven sets `OPENAI_BASE_URL=http://127.0.0.1:<port>/v1` and
 values, so the playground, evaluators, scenario runs and Langy reach llmsim
 through the gateway, the nlp service and LiteLLM alike. A model name
 containing `langy-echo` switches to Langy's echo mode, and one containing
-`error-429` or `error-500` forces that error; `services/llmsim/README.md` has
+`error-429` or `error-500` forces that error; `services/sims/llmsim/README.md` has
 the rest. Gemini, Vertex, Azure, xAI and Groq still reach the real provider
 when `.env` holds their key.
 
@@ -270,7 +269,7 @@ switching needs no `--force` (ADR-064 amendment 2026-10-10 b). `haven status` na
 | ------------------ | ----------------------------------------------------------------- | ------------------------------------------------------------------------------------ |
 | `haven up` (still) | the api serves `apps/ui/dist/client`, no Vite, built once at `up` | nothing reloads; `haven reload [app\|api\|worker\|ui]` applies changes on demand     |
 | `haven up --watch` | the same, plus a `ui` lane, `haven ui-watch`                      | one UI build that exits, swapped in, open pages reload once idle; Node and Go reload |
-| `haven up --hmr`   | a `ui` lane: Vite 8 `bundledDev`, bundles rebuilt in memory       | HMR updates the page in place; Node and Go reload                                    |
+| `haven up --hmr`   | a `ui` lane: the plain Vite dev server                            | HMR updates the page in place; Node and Go reload                                    |
 
 Commits and cherry-picks would reload the backend under anyone using the stack, so the default
 is still: `LANGWATCH_DEV_WATCH=0` in the Node lane and no Go rebuilds. `haven reload
@@ -377,3 +376,5 @@ Locally built binaries land only in `.bin/<name>/<name>` (git- and
 Docker-ignored). Release pipelines pass their own `--outfile`.
 
 haven starts the Colima VM only when a selected lane runs in a container (container ClickHouse or observability, sandboxed Langy, `haven pr --throwaway`). When it starts the VM it records that in its home (`colima-<profile>.json`), and `haven down` or the daemon stops it once no stack needs a container and none is running; `haven status` then adds "stopped by haven". A VM you started yourself is never stopped.
+
+`haven machine settings set vm off` keeps haven off the VM entirely: ClickHouse and observability always run natively, sandboxed Langy and `haven pr --throwaway` refuse with a line naming the setting, and a VM haven started is stopped once nothing runs on it.

@@ -3,12 +3,13 @@
  * The feature installs: a memory-tier process gets a working `WebhookApi` over installer-built
  * repositories, with no repository class or tier named here.
  */
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EntitlementApi, Plan } from "@langwatch/entitlement-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import { createApp } from "@langwatch/process";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EntitlementApi, type Plan } from "@langwatch/entitlement-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores } from "@langwatch/process-stores";
-import type { ProjectApi } from "@langwatch/project-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { WebhookApi } from "@langwatch/webhook-contract";
 import { describe, expect, it } from "vitest";
@@ -35,9 +36,10 @@ function process(
   plan: Plan = entitledPlan,
   { allowInsecureLocalUrls = false }: { allowInsecureLocalUrls?: boolean } = {},
 ) {
-  return createApp({ role })
-    .withModules([webhookProcessModule])
-    .withConfig({
+  return bootInstalledProcess({
+    role,
+    modules: [webhookProcessModule],
+    config: {
       webhook: {
         allowInsecureLocalUrls,
         allowAmbientAwsCredentials: false,
@@ -51,23 +53,30 @@ function process(
           no_proxy: undefined,
         },
       },
-    })
-    .withStores(memoryStores())
-    .provide({
-      "data-retention": createApiFixture<DataRetentionApi>({}),
-      entitlement: createApiFixture<EntitlementApi>({
-        getActivePlan: async () => plan,
-        requestBound: async () => 10,
+    },
+    stores: memoryStores(),
+    peers: [
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>({}) }),
+      testPeer({
+        token: EntitlementApi,
+        instance: createApiFixture<EntitlementApi>({
+          getActivePlan: async () => plan,
+          requestBound: async () => 10,
+        }),
       }),
-      gateway: createApiFixture<GatewayApi>({}),
-      project: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
-    });
+      testPeer({ token: GatewayApi, instance: createApiFixture<GatewayApi>({}) }),
+      testPeer({
+        token: ProjectApi,
+        instance: createApiFixture<ProjectApi>({ listIdsByOrganization: async () => [] }),
+      }),
+    ],
+  });
 }
 
 describe("webhook app installation", () => {
   describe("given a process that boots the feature over memory", () => {
     it.each(["api", "worker"] as const)("installs a working app in the %s role", async (role) => {
-      const runtime = await process(role).boot();
+      const runtime = await process(role);
 
       try {
         const app = runtime.service(WebhookApi);
@@ -97,7 +106,7 @@ describe("webhook app installation", () => {
       const runtime = await process("api", {
         ...entitledPlan,
         webhookEndpointsEnabled: false,
-      }).boot();
+      });
 
       try {
         const error = await runtime
@@ -131,7 +140,7 @@ describe("webhook app installation", () => {
       "https://192.168.1.20/hooks/spend",
       "https://example.com:1355/hooks/spend",
     ])("refuses %s with the escape hatch off", async (url) => {
-      const runtime = await process("api").boot();
+      const runtime = await process("api");
 
       try {
         const app = runtime.service(WebhookApi);
@@ -146,7 +155,7 @@ describe("webhook app installation", () => {
 
     /** @scenario "An endpoint save is judged by the rule its delivery is judged by" */
     it("saves an https endpoint on a local non-default port with the escape hatch on", async () => {
-      const runtime = await process("api", entitledPlan, { allowInsecureLocalUrls: true }).boot();
+      const runtime = await process("api", entitledPlan, { allowInsecureLocalUrls: true });
 
       try {
         const app = runtime.service(WebhookApi);
@@ -163,7 +172,7 @@ describe("webhook app installation", () => {
   describe("when the API process is asked for a test fire", () => {
     /** @scenario "A test fire from the API process dispatches through the delivery egress" */
     it("dispatches it through the delivery egress rather than refusing", async () => {
-      const runtime = await process("api").boot();
+      const runtime = await process("api");
 
       try {
         const app = runtime.service(WebhookApi);
@@ -193,7 +202,7 @@ describe("webhook app installation", () => {
   });
   describe("when an SQS endpoint is test-fired over memory stores", () => {
     it("sends through the memory SQS channel, never real AWS", async () => {
-      const runtime = await process("api").boot();
+      const runtime = await process("api");
 
       try {
         const app = runtime.service(WebhookApi);

@@ -29,6 +29,16 @@ export const CostCell = createCostCell<ConversationGroup>();
 
 export const TokensCell = createTokensCell<ConversationGroup>();
 
+export const SessionIdCell: CellDef<ConversationGroup> = {
+  id: "sessionId",
+  label: "Session ID",
+  render: ({ row }) => (
+    <MonoCell color="fg.subtle" truncate title={row.conversationId} userSelect="all">
+      {row.conversationId}
+    </MonoCell>
+  ),
+};
+
 export const ModelCell: CellDef<ConversationGroup> = {
   id: "model",
   label: "Model",

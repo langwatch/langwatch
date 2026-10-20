@@ -1,18 +1,14 @@
 import { useOptionalUiHostServices } from "@langwatch/browser-host/capabilities";
+import { PageLayout, type PageTab } from "@langwatch/design-system/page-layout";
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 /**
  * An organization's own single sign-on setup: one read, and the steps that
  * move it. A step whose command identity does not answer yet is not mounted —
  * a control that cannot do anything reads as a broken one (handoff §10).
  */
-import { Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import {
-  SectionNavigationFrame,
-  type SectionNavigationLink,
-} from "@langwatch/design-system/section-navigation-frame";
+import { Box, Heading, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { ProvisioningSetupDrawerToken } from "@langwatch/enterprise-scim-contract";
 import type { SsoSetupPageView } from "@langwatch/enterprise-sso-contract";
-import { KeyRound, Plug, ShieldCheck } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { ssoApi } from "../../behavior/sso-api.ts";
@@ -33,6 +29,7 @@ import {
 import { useSsoHost } from "../../model/sso-host.ts";
 import { ConnectionNameRow } from "../elements/connection-name-row.tsx";
 import { IssuerRow } from "../elements/issuer-row.tsx";
+import { LegacyDomainToMoveNotice } from "../elements/legacy-domain-to-move-notice.tsx";
 import { LegacyRouteNotice } from "../elements/legacy-route-notice.tsx";
 import {
   AvailabilityRefusalNotice,
@@ -57,15 +54,11 @@ import { TestSignInSection } from "./test-sign-in.section.tsx";
 
 type SetupConnection = NonNullable<SsoSetupPageView["connection"]>;
 
-/** Main's rail across the three Authentication pages (ARCHITECTURE.md §10). */
-const AUTHENTICATION_LINKS: readonly SectionNavigationLink[] = [
-  { label: "Overview", href: "/settings/authentication", icon: <ShieldCheck size={14} /> },
-  {
-    label: "Identity provider",
-    href: "/settings/authentication/provider",
-    icon: <KeyRound size={14} />,
-  },
-  { label: "Connectors", href: "/settings/authentication/connectors", icon: <Plug size={14} /> },
+/** The three Authentication pages, as header tabs (ARCHITECTURE.md §10). */
+const AUTHENTICATION_TABS: readonly PageTab[] = [
+  { label: "Overview", href: "/settings/authentication" },
+  { label: "Identity provider", href: "/settings/authentication/provider" },
+  { label: "Connectors", href: "/settings/authentication/connectors" },
 ];
 
 export default function SsoSetupScreen() {
@@ -76,20 +69,23 @@ export default function SsoSetupScreen() {
 
   return (
     <>
-      <SectionNavigationFrame
-        label="Authentication"
-        pageTitle="Identity provider"
-        links={AUTHENTICATION_LINKS}
-        activeHref="/settings/authentication/provider"
-        onNavigate={(href) => navigation?.navigate(href)}
-      >
-        <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+      <PageLayout.Header>
+        <PageLayout.Heading>Authentication</PageLayout.Heading>
+        <PageLayout.Tabs
+          label="Authentication pages"
+          tabs={AUTHENTICATION_TABS}
+          activeHref="/settings/authentication/provider"
+          onNavigate={(href) => navigation?.navigate(href)}
+        />
+      </PageLayout.Header>
+      <Box paddingTop={4}>
+        <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             Where your people sign in, and everything it takes to put it in front of them.
           </Text>
           <SsoSetupPage organizationId={organizationId} />
         </VStack>
-      </SectionNavigationFrame>
+      </Box>
     </>
   );
 }
@@ -165,7 +161,7 @@ function LegacyUpdateStart({
   return (
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       <VStack align="stretch" gap={1}>
-        <Heading size="sm">Single sign-on is active</Heading>
+        <Heading textStyle="cardTitle">Single sign-on is active</Heading>
         <Text fontSize="sm">
           {name
             ? `Your people sign in through ${name} today. Connect your organization's own identity provider to take that over.`
@@ -313,6 +309,9 @@ function ConnectedJourney({
   return (
     <VStack align="stretch" gap={6} width="full" data-testid="sso-setup">
       {view.legacyRoute && <LegacyRouteNotice legacyRoute={view.legacyRoute} />}
+      {canManage && view.legacyDomainsToMove.length > 0 && (
+        <LegacyDomainToMoveNotice domains={view.legacyDomainsToMove} />
+      )}
 
       {/* Above the journey: while a pair stands, where sign-in goes is the
           fact that decides what every step below it means. */}
@@ -490,9 +489,10 @@ function SetupJourneySteps({
               onRename={renameConnection}
             />
           </HStack>
-          {connection.issuer && (
+          {/* A SAML connection registered from metadata alone has no issuer, and still edits. */}
+          {(connection.issuer || canEditIdp) && (
             <IssuerRow
-              issuer={connection.issuer}
+              issuer={connection.issuer || null}
               onEdit={canEditIdp && !editingIdp ? () => setEditingIdp(true) : null}
             />
           )}

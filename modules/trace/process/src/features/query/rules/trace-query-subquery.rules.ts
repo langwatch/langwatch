@@ -26,6 +26,21 @@ export function boundedSubquery(table: string, timeCol: string, innerWhere: stri
 }
 
 /**
+ * A membership built here, `NOT IN` when negated: the tenant guard refuses a `NOT` over a bracket
+ * naming TenantId, and `(TenantId, key) NOT IN (...)` matches the rows `NOT (... IN ...)` does.
+ */
+export function wrapMembership(membership: string, negated: boolean): string {
+  if (!negated) return membership;
+  const at = membership.indexOf(") IN (");
+  if (!membership.startsWith("((TenantId, ") || at < 0) {
+    throw new Error(
+      "wrapMembership takes only a membership built in trace-query-subquery.rules.ts",
+    );
+  }
+  return `${membership.slice(0, at)}) NOT IN (${membership.slice(at + ") IN (".length)}`;
+}
+
+/**
  * Match the rows an Instant Eval run judged as passed. Dedup is eventual, so
  * the verdict is `argMax(Passed, UpdatedAt)` per key; the partition key is
  * bounded to when the run wrote its judgements, not to the trace window.

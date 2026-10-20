@@ -32,7 +32,7 @@ One `Agent` row per (project, name, environment, scope). `environment` is resolv
 
 Environment is not a target dimension: every downstream surface works on agent ids, so `support-agent` in `production` against `support-agent` in `development` is two targets in the comparison mode that already exists. Target labels read `support-agent · production` and `support-agent · development (owner)`. The agents page shows one card per row, next to the HTTP and code agent cards, with the environment as a label beside the name and the presence as a mark on the card.
 
-A personal agent can be targeted only by its owner: `SuiteService.prepareRun` receives the actor (the session user in tRPC, `apiKeyUserId` on REST and MCP) and refuses with `agent_owner_only` (403) when it differs from `ownerUserId`. A legacy project key names nobody and can never target a personal agent. Host-scoped development agents are visible and runnable by the team. The run dialog hides teammates' personal agents behind a toggle and renders them disabled.
+A personal agent can be targeted only by its owner: `SuiteService.prepareRun` receives the actor (the session user in tRPC, `apiKeyUserId` on REST and MCP) and refuses with `agent_owner_only` (403) when it differs from `ownerUserId`. A legacy project key names nobody and can never target a personal agent. Host-scoped development agents are visible and runnable by the team. The run dialog lists teammates' personal agents, with presence, but disabled, with the owner-only tooltip (amended 2026-10-10: no hiding toggle, matching main).
 
 Production with N pods is one row and N instances; the dispatcher picks one per call.
 

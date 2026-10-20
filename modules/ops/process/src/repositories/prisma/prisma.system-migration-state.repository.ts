@@ -3,6 +3,7 @@ import { skipTenantCheck } from "@langwatch/prisma-client";
 import { Prisma, type PrismaClient } from "@langwatch/prisma-client/generated";
 import { SystemMigrationRecordNotFoundError } from "@langwatch/system-migrations";
 import type { TenantMigrationRecord, TenantMigrationStatus } from "@langwatch/system-migrations";
+import { nowInstant, toDate } from "@langwatch/time";
 
 import type { SystemMigrationStateRepository } from "../system-migration.repository.ts";
 
@@ -49,6 +50,25 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     };
   }
 
+  async findRecords({
+    migrationName,
+    tenantIds,
+  }: {
+    migrationName: string;
+    tenantIds: readonly string[];
+  }): Promise<TenantMigrationRecord[]> {
+    if (tenantIds.length === 0) return [];
+    const rows = await this.prisma.systemMigrationTenantState.findMany({
+      where: { migrationName, tenantId: { in: [...tenantIds] } },
+    });
+    return rows.map((row) => ({
+      migrationName: row.migrationName,
+      tenantId: row.tenantId,
+      status: parseStatus(row.status),
+      report: row.report,
+    }));
+  }
+
   async upsertRecord(record: TenantMigrationRecord): Promise<void> {
     // `undefined` would OMIT the column, leaving a previous parked tenant's
     // error report attached to the finalized row that replaced it. The
@@ -60,7 +80,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     // written here too: a direct write that left the column alone would let a
     // replayed fact from last year overwrite the latch this call just set.
     // `updatedAt` cannot serve - it moves for reasons that are not transitions.
-    const occurredAt = new Date();
+    const occurredAt = toDate(nowInstant());
     await this.prisma.systemMigrationTenantState.upsert({
       where: {
         migrationName_tenantId: {
@@ -84,7 +104,7 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
   async upsertRecordUnlessRolledBack(record: TenantMigrationRecord): Promise<boolean> {
     const report = record.report == null ? Prisma.DbNull : (record.report as Prisma.InputJsonValue);
     const reportJson = record.report == null ? null : JSON.stringify(record.report);
-    const occurredAt = new Date();
+    const occurredAt = toDate(nowInstant());
     // SQL, because a write parked on the pin's row lock must re-check the
     // guard against the row the pin committed; `updateMany` does not.
     const updated = await this.prisma.$executeRaw`
@@ -188,8 +208,10 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
     limit: number;
     offset?: number;
   }): Promise<OpsMigrationOverview["attention"]> {
+    const migrationNames = migrationName ? [migrationName] : await this.findMigrationNames();
+    if (migrationNames.length === 0) return [];
     const rows = await this.prisma.systemMigrationTenantState.findMany({
-      where: { ...(migrationName ? { migrationName } : {}), status: { in: statuses } },
+      where: { migrationName: { in: migrationNames }, status: { in: statuses } },
       orderBy: [{ updatedAt: "desc" }, { migrationName: "asc" }, { tenantId: "asc" }],
       skip: offset,
       take: limit,
@@ -201,5 +223,17 @@ export class PrismaSystemMigrationStateRepository implements SystemMigrationStat
       report: row.report,
       updatedAt: row.updatedAt,
     }));
+  }
+
+  /** Every migration with tenant rows: the bounded set the tenant guard lets a listing span. */
+  private async findMigrationNames(): Promise<string[]> {
+    const rows = await this.prisma.$queryRaw<{ migrationName: string }[]>`
+      ${skipTenantCheck({
+        // Reads only the migration names, never a tenant's row; the listing then names them.
+        SKIP_TENANT_CHECK: true,
+      })}
+      SELECT DISTINCT "migrationName" FROM "SystemMigrationTenantState"
+    `;
+    return rows.map((row) => row.migrationName);
   }
 }

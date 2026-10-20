@@ -1,35 +1,79 @@
 import {
   RUN_KEY_LIFETIME_MS,
   RUN_KEY_MAX_REMAINING_MS,
-  type ApiKeyApi,
+  type CreateApiKeyInput,
 } from "@langwatch/api-key-contract";
-import { type AuthzApi, authzEffectivePermissionsOutputSchema } from "@langwatch/authz-contract";
+import {
+  AuthzGrantNotConfirmedError,
+  type AuthzApi,
+  authzEffectivePermissionsOutputSchema,
+} from "@langwatch/authz-contract";
 /**
  * The one run-key mint: the starter's own key, as narrow as the run, never wider than what they
  * hold, and reused only while it covers the caller's floor.
  *
  * @see modules/workflow/specs/workflow-service.feature
+ * @see modules/api-key/specs/api-key.feature
  */
+import {
+  MemorySharedCredentialStore,
+  type SharedCredentialStore,
+} from "@langwatch/secrets/shared-credential";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ZodError } from "zod";
 
 import { RUN_KEY_REUSE_MARGIN_MS } from "../../rules/run-key.rules.ts";
+import type { DisabledApiKey } from "../api-key-lifecycle.service.ts";
 import { RunKeyMintService } from "../run-key-mint.service.ts";
 
 const projectId = "project-1";
 const starter = "user-1";
 
-function createService(initiallyHeld: readonly string[], keyHeld: readonly string[] = []) {
-  let held = [...initiallyHeld];
-  const created: Parameters<ApiKeyApi["create"]>[0][] = [];
-  const create = vi.fn();
-  create.mockImplementation(async (input: Parameters<ApiKeyApi["create"]>[0]) => {
-    created.push(input);
+type Grant = "lands" | "pending" | "refused";
+type RunKeyWriter = Parameters<typeof RunKeyMintService.create>[0]["apiKeys"];
 
-    return { token: `token-${created.length}`, apiKey: { id: `key-${created.length}` } };
+function createService(
+  initiallyHeld: readonly string[],
+  keyHeld: readonly string[] = [],
+  shared: SharedCredentialStore = MemorySharedCredentialStore.create(),
+) {
+  let held = [...initiallyHeld];
+  let grant: Grant = "lands";
+  const created: CreateApiKeyInput[] = [];
+  const granted: string[] = [];
+  const disabledKey = ({
+    id,
+    token,
+    input,
+  }: {
+    id: string;
+    token: string;
+    input: CreateApiKeyInput;
+  }) =>
+    ({
+      id,
+      token,
+      organizationId: input.organizationId,
+      bindings: input.bindings,
+      permissions: input.permissions,
+      actor: { type: "user", id: input.userId ?? null },
+      caller: { type: "system" },
+    }) satisfies DisabledApiKey;
+  const writeDisabled: RunKeyWriter["writeDisabled"] = vi.fn(async (input) => {
+    created.push(input);
+    return disabledKey({ id: `key-${created.length}`, token: `token-${created.length}`, input });
   });
-  const apiKeys = createApiFixture<ApiKeyApi>({ create });
+  const reopenDisabled: RunKeyWriter["reopenDisabled"] = vi.fn(async (reopened) =>
+    disabledKey(reopened),
+  );
+  const grantAndActivate: RunKeyWriter["grantAndActivate"] = vi.fn(async (key) => {
+    granted.push(key.id);
+    if (grant === "pending") throw new AuthzGrantNotConfirmedError();
+    if (grant === "refused") throw new Error("the ledger refused the write");
+
+    return { token: key.token };
+  });
   const effectivePermissions: AuthzApi["effectivePermissions"] = vi.fn(
     async ({ principal }: Parameters<AuthzApi["effectivePermissions"]>[0]) =>
       authzEffectivePermissionsOutputSchema.parse(principal.type === "apiKey" ? keyHeld : held),
@@ -43,10 +87,15 @@ function createService(initiallyHeld: readonly string[], keyHeld: readonly strin
     }),
     effectivePermissions,
   });
+  const apiKeys: RunKeyWriter = { writeDisabled, reopenDisabled, grantAndActivate };
 
   return {
-    service: RunKeyMintService.create({ apiKeys, authz }),
+    service: RunKeyMintService.create({ apiKeys, authz, held: shared }),
     created,
+    granted,
+    grantWill: (next: Grant) => {
+      grant = next;
+    },
     revoke: (permission: string) => {
       held = held.filter((candidate) => candidate !== permission);
     },
@@ -121,6 +170,38 @@ describe("RunKeyMintService", () => {
     ).rejects.toMatchObject({
       code: "api_key_permission_denied",
       meta: { permission: "workflows:manage" },
+    });
+    expect(created).toHaveLength(0);
+  });
+
+  /** @scenario "The scenario canary starts its run as the probe's own API key" */
+  it("mints traces:create for a run a member's key started, as a child of that key", async () => {
+    const { service, created } = createService(["traces:create"], ["traces:create"]);
+
+    await service.mintRunKey({
+      userId: starter,
+      callerApiKeyId: "probe-key-1",
+      projectId,
+      permissions: ["traces:create"],
+    });
+
+    expect(created).toHaveLength(1);
+    expect(created[0]).toMatchObject({
+      userId: starter,
+      parentApiKeyId: "probe-key-1",
+      permissions: ["traces:create"],
+    });
+  });
+
+  /** @scenario "A run whose starter is no user on the project is refused its key" */
+  it("refuses traces:create, and mints nothing, for a made-up starter that holds no permission", async () => {
+    const { service, created } = createService([]);
+
+    await expect(
+      service.mintRunKey({ userId: "scenario-canary", projectId, permissions: ["traces:create"] }),
+    ).rejects.toMatchObject({
+      code: "api_key_permission_denied",
+      meta: { permission: "traces:create" },
     });
     expect(created).toHaveLength(0);
   });
@@ -335,5 +416,79 @@ describe("RunKeyMintService", () => {
       new Date("2026-10-01T10:00:00.000Z").getTime() + lambdaFloorMs + RUN_KEY_REUSE_MARGIN_MS,
     );
     expect(await service.mintRunKey({ ...input, minRemainingMs: lambdaFloorMs })).toBe(bounded);
+  });
+
+  describe("given the grants projection is behind the run's first mint", () => {
+    const input = { userId: starter, projectId, permissions: ["traces:create"] };
+
+    /** @scenario "A run key whose grants have not landed answers that access is still processing" */
+    it("answers the retryable 503 authz_grant_not_confirmed and hands out no token", async () => {
+      const { service, grantWill } = createService(["traces:create"]);
+      grantWill("pending");
+
+      await expect(service.mintRunKey(input)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+        httpStatus: 503,
+        retryable: true,
+      });
+    });
+
+    /** @scenario "A retried run key mint waits on the key the first attempt wrote" */
+    it("grants the first attempt's key again rather than writing another", async () => {
+      const { service, created, granted, grantWill } = createService(["traces:create"]);
+      grantWill("pending");
+
+      await expect(service.mintRunKey(input)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+      });
+      await expect(service.mintRunKey(input)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+      });
+
+      expect(created).toHaveLength(1);
+      expect(granted).toEqual(["key-1", "key-1"]);
+    });
+
+    /** @scenario "A retried run key mint succeeds with the first attempt's key once its grants land" */
+    it("hands out the first attempt's token once the grants land, and keeps serving it", async () => {
+      const { service, created, grantWill } = createService(["traces:create"]);
+      grantWill("pending");
+      await expect(service.mintRunKey(input)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+      });
+
+      grantWill("lands");
+
+      expect(await service.mintRunKey(input)).toBe("token-1");
+      expect(await service.mintRunKey(input)).toBe("token-1");
+      expect(created).toHaveLength(1);
+    });
+
+    /** @scenario "A pending run key past its usefulness is replaced, never activated" */
+    it("writes a fresh key once the pending one no longer has the life the run needs", async () => {
+      const { service, created, granted, grantWill } = createService(["traces:create"]);
+      grantWill("pending");
+      await expect(service.mintRunKey(input)).rejects.toMatchObject({
+        code: "authz_grant_not_confirmed",
+      });
+
+      vi.advanceTimersByTime(RUN_KEY_LIFETIME_MS);
+      grantWill("lands");
+
+      expect(await service.mintRunKey(input)).toBe("token-2");
+      expect(created).toHaveLength(2);
+      expect(granted).toEqual(["key-1", "key-2"]);
+    });
+
+    it("passes a refused grant through unchanged, and its retry still writes no second key", async () => {
+      const { service, created, grantWill } = createService(["traces:create"]);
+      grantWill("refused");
+      await expect(service.mintRunKey(input)).rejects.toThrow("the ledger refused the write");
+
+      grantWill("lands");
+
+      expect(await service.mintRunKey(input)).toBe("token-1");
+      expect(created).toHaveLength(1);
+    });
   });
 });

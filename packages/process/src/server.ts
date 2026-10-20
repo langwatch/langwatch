@@ -2,7 +2,14 @@ import http, { type IncomingMessage, type ServerResponse } from "node:http";
 import type { AddressInfo } from "node:net";
 import process from "node:process";
 import type { Duplex } from "node:stream";
+import { setTimeout as delay } from "node:timers/promises";
 
+import {
+  answerClientError,
+  isLoggedClientError,
+  redactedRequestHead,
+  REFUSED_BEFORE_ROUTING,
+} from "./lifecycle/client-error.ts";
 import { GracefulShutdown } from "./lifecycle/graceful-shutdown.ts";
 import { drainHttpServer } from "./lifecycle/http-drain.ts";
 import {
@@ -18,12 +25,17 @@ import {
 import { HTTP_CLOSE_PHASE_MS, HTTP_DRAIN_GRACE_MS } from "./lifecycle/shutdown-deadline.ts";
 import { ResourceScope } from "./resource-scope.ts";
 
+/** A parse failure as Node reports it on `clientError`. */
+type ClientError = Error & { code?: string; rawPacket?: Buffer };
+
 /** What this package needs of a logger, so it depends on no logging implementation. */
 export interface ServerLogger {
   info: (obj: object, msg: string) => void;
   /** Absent, a warn line prints at info (the upgrade console's token line, CONSOLE-FOLLOWUPS). */
   warn?: (obj: object, msg: string) => void;
   error: (obj: object, msg: string) => void;
+  /** The level the process-ending lines go out at (the "Fatal Errors" alert); absent, error. */
+  fatal?: (obj: object, msg: string) => void;
 }
 
 export type ServerOptions = Readonly<{
@@ -92,6 +104,8 @@ export type ServerComponent = Readonly<{
    * Spec: specs/server/process-readiness.feature.
    */
   ready?: () => Promise<void>;
+  /** Called once in-flight requests drained, before any component stops; must not throw or wait. */
+  stopping?: () => void;
 }>;
 
 /** Owns process signals, listeners and teardown order. */
@@ -140,6 +154,11 @@ export class Server {
   private heartbeat: Heartbeat | undefined;
   private upgrades: UpgradeDoor | undefined;
   private draining = false;
+  /** Application responses not yet closed; shutdown waits on them before anything stops. */
+  private readonly inFlight = new Set<ServerResponse>();
+  /** Event streams: they end only when closed, so the drain closes them rather than waits. */
+  private readonly streams = new Set<ServerResponse>();
+  private onIdle: (() => void) | undefined;
   /** 1 once every component started and answered ready; shared with the liveness thread. */
   private readonly readiness = new Int32Array(new SharedArrayBuffer(4));
   private started = false;
@@ -233,6 +252,20 @@ export class Server {
     await this.livenessThread?.liftConsole();
   }
 
+  /** Node's own answer to a request it could not parse, with one line saying what it was. */
+  private refuseUnparsed(error: ClientError, socket: Duplex): void {
+    if (isLoggedClientError(error.code)) {
+      const fields = {
+        code: error.code,
+        head: redactedRequestHead(error.rawPacket?.toString("latin1") ?? ""),
+        door: "main",
+      };
+      if (this.logger.warn) this.logger.warn(fields, REFUSED_BEFORE_ROUTING);
+      else this.logger.info(fields, REFUSED_BEFORE_ROUTING);
+    }
+    answerClientError({ code: error.code, socket });
+  }
+
   private openHealth(): Promise<void> {
     this.healthOpening ??= Promise.resolve(this.health?.start?.());
     return this.healthOpening;
@@ -248,6 +281,12 @@ export class Server {
         listener.on("upgrade", (request: IncomingMessage, socket: Duplex, head: Buffer) =>
           this.handleUpgrade(request, socket, head),
         );
+        listener.on("clientError", (error: ClientError, socket: Duplex) =>
+          this.refuseUnparsed(error, socket),
+        );
+        // Outlives any proxy's idle reuse, as the liveness thread's public listener does.
+        listener.keepAliveTimeout = PUBLIC_KEEP_ALIVE_MS;
+        listener.headersTimeout = PUBLIC_KEEP_ALIVE_MS + 1_000;
         if (this.livenessOffLoop) {
           this.livenessThread = await this.startOffLoop(listener, port ?? 0);
         }
@@ -260,15 +299,10 @@ export class Server {
         this.healthListener = undefined;
         this.livenessThread = undefined;
         if (active === undefined) return;
-        const upgrades = this.upgrades;
+        // The application already drained (drainApplication); only probes and idle sockets remain.
         await Promise.all([
           thread?.close({ graceMs: HTTP_DRAIN_GRACE_MS }),
-          drainHttpServer({
-            server: active,
-            graceMs: HTTP_DRAIN_GRACE_MS,
-            logger: this.logger,
-            ...(upgrades === undefined ? {} : { closeSessions: () => upgrades.close() }),
-          }),
+          drainHttpServer({ server: active, graceMs: HTTP_DRAIN_GRACE_MS, logger: this.logger }),
         ]);
         this.heartbeat?.stop();
         this.heartbeat = undefined;
@@ -331,7 +365,7 @@ export class Server {
     // door stops last — but it takes no new work, and says so by name.
     if (this.draining) {
       response
-        .writeHead(503, { "Content-Type": "text/plain" })
+        .writeHead(503, { "Content-Type": "text/plain", [NOT_HANDLED_HEADER]: "draining" })
         .end(`${this.name} is shutting down`);
       return;
     }
@@ -341,7 +375,11 @@ export class Server {
       if (response.headersSent) return;
       if (this.applicationExpected) {
         response
-          .writeHead(503, { "Content-Type": "text/plain", "Retry-After": "5" })
+          .writeHead(503, {
+            "Content-Type": "text/plain",
+            "Retry-After": "5",
+            [NOT_HANDLED_HEADER]: "starting",
+          })
           .end(`${this.name} is starting`);
         return;
       }
@@ -349,11 +387,56 @@ export class Server {
       return;
     }
 
+    this.track(request, response);
     void this.answer(
       "application",
       () => this.whenStarted(application, request, response),
       response,
     );
+  }
+
+  private track(request: IncomingMessage, response: ServerResponse): void {
+    if (request.headers.accept?.includes("text/event-stream")) {
+      this.streams.add(response);
+      response.once("close", () => this.streams.delete(response));
+      return;
+    }
+    this.inFlight.add(response);
+    response.once("close", () => {
+      this.inFlight.delete(response);
+      if (this.inFlight.size === 0) this.onIdle?.();
+    });
+  }
+
+  private whenIdle(): Promise<void> {
+    if (this.inFlight.size === 0) return Promise.resolve();
+    return new Promise((resolve) => {
+      this.onIdle = resolve;
+    });
+  }
+
+  /**
+   * Lets the application's in-flight requests and upgrade sessions finish while every store they
+   * call into is still open; a request still running after the grace is cut, so none outlives
+   * the stores. The listener stays up for the probes. Spec: specs/setup/server-health-door.feature
+   */
+  private async drainApplication(): Promise<void> {
+    const upgrades = this.upgrades;
+    const sessions = upgrades?.close().catch((error: unknown) => {
+      this.logger.error({ error }, `${this.name}: upgrade session teardown failed during shutdown`);
+    });
+    // An event stream never finishes on its own; its client reconnects to a pod still serving.
+    for (const stream of this.streams) stream.destroy();
+    const graceExpired = delay(HTTP_DRAIN_GRACE_MS, false as const, { ref: false });
+    const drained = await Promise.race([this.whenIdle().then(() => true as const), graceExpired]);
+    if (!drained) {
+      this.logger.info(
+        { graceMs: HTTP_DRAIN_GRACE_MS, requests: this.inFlight.size },
+        `${this.name}: requests outlived the drain grace, cutting them before the stores close`,
+      );
+      for (const response of this.inFlight) response.destroy();
+    }
+    await sessions;
   }
 
   /**
@@ -506,9 +589,20 @@ export class Server {
 
     // Before every teardown phase, so a signal makes the door refuse new work
     // by name while the graph behind it is still whole.
+    this.graceful.phase({ name: `${this.name} door`, run: () => this.refuseNewWork() });
+    // The health door stops last, but the requests it carried for the application must finish
+    // before any component closes what they call into (the stores): drained here, first.
     this.graceful.phase({
-      name: `${this.name} door`,
-      run: () => this.refuseNewWork(),
+      name: `${this.name} application requests`,
+      run: () => this.drainApplication(),
+      timeoutMs: HTTP_CLOSE_PHASE_MS,
+    });
+    // After the drain, so a store that stops reconnecting does so once no request still needs it.
+    this.graceful.phase({
+      name: `${this.name} shutdown begins`,
+      run: () => {
+        for (const component of this.components) component.stopping?.();
+      },
     });
     for (const component of [...this.components].reverse()) {
       this.graceful.phase({
@@ -596,7 +690,9 @@ function installFatalHandlers(options: {
 }): () => void {
   const report = (event: string, error: unknown): void => {
     try {
-      options.logger.error({ error, event }, `${options.service}: ${event}`);
+      // At fatal: the alert on a process that died matches that level, not error.
+      const fatal = options.logger.fatal ?? options.logger.error;
+      fatal.call(options.logger, { error, event }, `${options.service}: ${event}`);
     } catch {
       process.stderr.write(
         `${JSON.stringify({ level: "fatal", service: options.service, msg: event })}\n`,
@@ -624,7 +720,11 @@ function installFatalHandlers(options: {
  * handover: the outgoing process drains in-flight work before it lets go.
  */
 const BIND_HANDOVER_MS = 10_000;
+/** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
+const PUBLIC_KEEP_ALIVE_MS = 65_000;
 const BIND_RETRY_MS = 250;
+/** Marks a 503 answered before any handler ran, so a client may resend it (browser wire). */
+const NOT_HANDLED_HEADER = "x-langwatch-not-handled";
 
 function isAddressInUse(error: unknown): boolean {
   return (error as { code?: unknown } | null)?.code === "EADDRINUSE";

@@ -54,19 +54,6 @@ export function newSsoCredentialId(): string {
 }
 
 /**
- * The connection the grandfather migration creates for an organization,
- * derived from it so every pass names the same aggregate — letting the
- * guard answer "this already exists" rather than minting a second one.
- */
-export function grandfatheredSsoConnectionId({
-  organizationId,
-}: {
-  organizationId: string;
-}): string {
-  return `ssoc_gf_${organizationId}`;
-}
-
-/**
  * The grandfather pass's command id (ADR-117 §5). Facts key off
  * `<commandId>:<index>`, so a second pass derives byte-identical keys and
  * the event store dedupes them.

@@ -142,7 +142,7 @@ export function SectionOverview({ section, colorMode }: { section: string; color
   return (
     <Stack gap={6} padding={8} maxWidth="72rem" marginX="auto">
       <Stack gap={1.5} maxWidth="44rem">
-        <Heading size="2xl">{section}</Heading>
+        <Heading size="xl">{section}</Heading>
         <Text color="fg.muted" textStyle="md">
           {intro}
         </Text>

@@ -250,3 +250,20 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     When a scenario run is prefetched for a workflow, code, or HTTP target
     Then the prefetch succeeds
     Because those target types never resolve the FAST-role coding default for the agent under test
+
+  # ── Where Codex is reached ─────────────────────────────────────────────────
+
+  Rule: Codex is reached at a configured base, the real vendor unless the deployment names another
+
+    @unit
+    Scenario: A Codex base that is unset or blank reaches OpenAI
+      Given CODEX_OAUTH_ISSUER and the gateway's CODEX_API_BASE are unset or exported blank
+      When a device sign-in, a token refresh or a codex model call is made
+      Then it goes to auth.openai.com and chatgpt.com/backend-api/codex
+
+    @unit
+    Scenario: Codex is reached at the bases the deployment configures
+      Given CODEX_OAUTH_ISSUER and the gateway's CODEX_API_BASE name URLs
+      When a device sign-in, a token refresh or a codex model call is made
+      Then it goes to those bases, the verification page included
+      And a value that is not a URL is refused at boot

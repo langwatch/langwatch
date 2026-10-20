@@ -13,14 +13,27 @@ export interface MonitorRestIdParamsSchema extends Named<
 export const monitorRestIdParamsSchema: MonitorRestIdParamsSchema =
   monitorRestIdParamsSchemaDefinition;
 
-/** Optional and nullable as on main; a legacy `{}` reads as an empty mapping. */
-const monitorRestMappingsSchemaDefinition = z
-  .object({
-    mapping: monitorMappingStateSchema.shape.mapping.optional(),
-    expansions: monitorMappingStateSchema.shape.expansions.optional(),
-  })
-  .nullable()
-  .optional();
+/**
+ * Nullable and optional as on main; a legacy `{}` reads as an empty mapping and
+ * a mapping sent without `expansions` has none. Checked here, at the door, so a
+ * malformed mapping is refused with the field named, not deep in the service.
+ */
+const monitorRestMappingsSchemaDefinition = z.preprocess(
+  (value) => {
+    if (value === null || value === undefined) return value;
+    if (typeof value !== "object" || Array.isArray(value) || !("mapping" in value)) {
+      return { mapping: {}, expansions: [] };
+    }
+    return "expansions" in value ? value : { ...value, expansions: [] };
+  },
+  z
+    .object({
+      mapping: monitorMappingStateSchema.shape.mapping,
+      expansions: monitorMappingStateSchema.shape.expansions,
+    })
+    .nullable()
+    .optional(),
+);
 export interface MonitorRestMappingsSchema extends Named<
   typeof monitorRestMappingsSchemaDefinition
 > {}

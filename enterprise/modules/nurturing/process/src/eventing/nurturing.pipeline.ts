@@ -22,17 +22,22 @@ import {
   usageReportReceivedEventDataSchema,
 } from "@langwatch/enterprise-saas-contract";
 import {
+  EVALUATION_COMPLETED_EVENT_TYPE,
+  EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
   EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
   EVALUATION_RAN_EVENT_TYPE,
+  EVALUATION_REPORTED_EVENT_TYPE,
   type EvaluationLifecycleCompletedEventData,
   evaluationLifecycleCompletedEventDataSchema,
   evaluationRanEventDataSchema,
+  evaluationRunDataSchema,
 } from "@langwatch/evaluation-contract";
 import {
   defineAggregate,
   defineEventingModule,
   definePipeline,
   type EventingSetup,
+  type LaneAlias,
   type StaticPipelineDefinition,
 } from "@langwatch/eventing";
 import {
@@ -47,6 +52,8 @@ import {
 import {
   GUIDED_ONBOARDING_RECORDED_EVENT_TYPE,
   guidedOnboardingRecordedEventDataSchema,
+  ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+  onboardingVariantAssignedEventDataSchema,
   onboardingVariantSchema,
 } from "@langwatch/onboarding-contract";
 import {
@@ -91,6 +98,7 @@ import {
   WORKFLOW_CREATED_EVENT_TYPE,
   workflowCreatedEventDataSchema,
 } from "@langwatch/workflow-contract";
+import { z } from "zod";
 
 import type { NurturingModule } from "../app/nurturing.app.ts";
 import {
@@ -102,6 +110,7 @@ import {
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
   membersInvitedSignal,
+  onboardingVariantAssignedSignal,
   projectActiveDaySignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -126,6 +135,68 @@ import {
   nurturingSignalRecordedEventSchema,
   type RecordNurturingSignalCommandData,
 } from "./nurturing-signal.events.ts";
+
+/** Main's Customer.io evaluation job: the settled evaluation's event and its run's fold state. */
+const mainEvaluationSyncJobSchema = z.object({
+  event: z.record(z.string(), z.unknown()),
+  foldState: evaluationRunDataSchema.pick({
+    evaluationId: true,
+    evaluatorType: true,
+    score: true,
+    passed: true,
+  }),
+});
+const mainEvaluationEventSchema = z.object({
+  tenantId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+});
+
+/** Main's job as the settled-evaluation fact evaluation records now, keyed by its project. */
+export function mainEvaluationSyncAsLifecycleCompleted(stored: unknown): Record<string, unknown> {
+  const { event, foldState } = mainEvaluationSyncJobSchema.parse(stored);
+  const { tenantId, occurredAt } = mainEvaluationEventSchema.parse(event);
+  const data: EvaluationLifecycleCompletedEventData = {
+    tenantId,
+    occurredAt,
+    projectId: tenantId,
+    ...foldState,
+  };
+  return {
+    ...event,
+    aggregateType: EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
+    aggregateId: tenantId,
+    type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+    data,
+  };
+}
+
+/**
+ * Main's lanes whose work is nurturing's now, for one release. Main's Customer.io syncs (SaaS only)
+ * reach the lanes that count the same milestones, each claimed before it is counted; trace's sync
+ * is tombstoned, as trace's `projectMetadata` job, queued beside it, records its facts.
+ */
+export const MAIN_NURTURING_LANE_ALIASES: readonly LaneAlias[] = [
+  {
+    from: "simulation_processing:subscriber:scenarioRunMilestones",
+    to: { jobType: "subscriber", lane: "scenarioRunSucceeded" },
+  },
+  {
+    from: "simulation_processing:reactor:customerIoSimulationSync",
+    to: { jobType: "subscriber", lane: "simulationRunFinished" },
+    eventTypes: [SIMULATION_RUN_EVENT_TYPES.FINISHED],
+  },
+  {
+    from: "evaluation_processing:reactor:customerIoEvaluationSync",
+    to: { jobType: "subscriber", lane: "evaluationCompleted" },
+    eventTypes: [EVALUATION_COMPLETED_EVENT_TYPE, EVALUATION_REPORTED_EVENT_TYPE],
+    data: mainEvaluationSyncAsLifecycleCompleted,
+  },
+  {
+    from: "trace_processing:reactor:customerIoTraceSync",
+    tombstone:
+      "trace's projectMetadata job, queued beside it, records the first-trace and trace-received facts nurturing sends",
+  },
+];
 
 export type NurturingPipeline = StaticPipelineDefinition<
   NurturingSignalRecordedEvent,
@@ -185,6 +256,14 @@ export function buildNurturingPipeline(deps: {
         data: guidedOnboardingRecordedEventDataSchema,
         handle: (data, { aggregateId }) => {
           const signal = guidedOnboardingSignal({ data, aggregateId });
+          return deps.deliver({ key: nurturingSignalKey(signal), signal });
+        },
+      })
+      .withPeerSubscriber("onboardingVariantAssigned", {
+        eventType: ONBOARDING_VARIANT_ASSIGNED_EVENT_TYPE,
+        data: onboardingVariantAssignedEventDataSchema,
+        handle: (data, { aggregateId }) => {
+          const signal = onboardingVariantAssignedSignal({ data, aggregateId });
           return deps.deliver({ key: nurturingSignalKey(signal), signal });
         },
       })
@@ -390,14 +469,7 @@ export function buildNurturingPipeline(deps: {
         },
       })
       .withCommand("recordSignal", RecordNurturingSignalCommand)
-      // Main's run milestones (succeeded run, active day) were a subscriber on the simulation pipeline.
-      .withLaneAliases([
-        {
-          from: "simulation_processing:subscriber:scenarioRunMilestones",
-          to: { jobType: "subscriber", lane: "scenarioRunSucceeded" },
-          removeAfter: "3.21.0",
-        },
-      ])
+      .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)
       .build()
   );
 }

@@ -17,8 +17,9 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b tsconfig.test.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run --exclude \"**/*.integration.test.ts\"",
+    "test:repo": "vitest run --config vitest.repo.config.ts",
     "test:integration": "vitest run .integration.test.ts"
   },
   "dependencies": {
@@ -53,7 +54,6 @@
     "@slack/webhook": "catalog:",
     "better-auth": "catalog:",
     "nanoid": "catalog:",
-    "prom-client": "catalog:",
     "samlify": "2.13.1",
     "zod": "catalog:"
   },

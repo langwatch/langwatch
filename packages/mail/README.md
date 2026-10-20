@@ -43,7 +43,7 @@ Five things, all in one file under `src/templates/`:
 
 A `sendXEmail` wrapper goes underneath if this package owns the whole send; a
 message whose envelope belongs to a process exports a render function instead and
-gains a method on `MailRenderPort`.
+gains a method on `MailRender`.
 
 Forgetting step 5 fails `src/templates/__tests__/mail-templates.unit.test.tsx` —
 the registry is checked against the folder, so a template cannot go missing.

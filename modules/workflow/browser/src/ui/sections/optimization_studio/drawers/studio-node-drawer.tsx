@@ -14,14 +14,13 @@ import { useShallow } from "zustand/react/shallow";
 
 import { useHttpTest } from "../../../../behavior/agents/http/index.ts";
 import { HttpConfigEditor } from "../../../../behavior/lent-agent.tsx";
-import { OutputsSection } from "../../../../behavior/lent-prompt.tsx";
+import { OutputsSection, VariablesSection } from "../../../../behavior/lent-prompt.tsx";
 import { useGetDatasetData } from "../../../../behavior/optimization_studio/use-get-dataset-data.ts";
 import { useWorkflowStore } from "../../../../behavior/use-workflow-store.ts";
 import { LiquidConditionEditor } from "../../../elements/code/liquid-condition-editor.tsx";
 import { InsideDrawerProvider } from "../../../elements/studio-drawer-footer.tsx";
 import { renderSourceTypeIcon } from "../../../elements/workflow-icons.tsx";
 import { CodeBlockEditor } from "../../blocks/code-block-editor.tsx";
-import { VariablesSection } from "../../prompt/variables/variables-section.tsx";
 import { CodePropertiesPanel as WorkflowCodePropertiesPanel } from "../../properties/workflow-code-properties-panel.tsx";
 import { EndPropertiesPanel as WorkflowEndPropertiesPanel } from "../../properties/workflow-end-properties-panel.tsx";
 import { EntryPointPropertiesPanel as WorkflowEntryPointPropertiesPanel } from "../../properties/workflow-entry-point-properties-panel.tsx";
@@ -47,7 +46,7 @@ import { StudioDrawerWrapper } from "./studio-drawer-wrapper.tsx";
  * editor) on every store change.
  */
 function StudioVariablesSection(props: WorkflowVariablesProps) {
-  return <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} />;
+  return <VariablesSection {...props} renderSourceIcon={renderSourceTypeIcon} valueRows={2} />;
 }
 
 function CodePropertiesPanel({ node }: { node: Node<Component> }) {

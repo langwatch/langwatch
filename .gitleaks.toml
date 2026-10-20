@@ -38,36 +38,6 @@ paths = ['''enterprise/modules/billing/contract/src/stripe-catalog\.json''']
 # get its own entry naming its own file, which is what an allowlist scoped by
 # path is for.
 
-# WebAuthn AAGUIDs are public model identifiers assigned to authenticators.
-# They identify products such as iCloud Keychain and YubiKey, not a device,
-# account or credential. The UI maps these registry values to readable labels.
-#
-# Scoped by VALUE, path and rule with AND. Every UUID is anchored, so a real
-# token that merely contains one of these public identifiers is still caught,
-# as is any other high-entropy value added to the source file.
-[[allowlists]]
-description = "Public WebAuthn authenticator model AAGUIDs, not credentials"
-targetRules = ["generic-api-key"]
-condition = "AND"
-paths = ['''modules/coding-agent/browser/src/passkeyAuthenticators\.ts''']
-regexes = [
-  '''^fbfc3007-154e-4ecc-8c0b-6e020557d7bd$''',
-  '''^dd4ec289-e01d-41c9-bb89-70fa845d4bf2$''',
-  '''^adce0002-35bc-c60a-648b-0b25f1f05503$''',
-  '''^ea9b8d66-4d01-1d21-3ce4-b6b48cb575d4$''',
-  '''^b93fd961-f2e6-462f-b122-82002247de78$''',
-  '''^bada5566-a7aa-401f-bd96-45619a55120d$''',
-  '''^d548826e-79b4-db40-a3d8-11116f7e8349$''',
-  '''^cb69481e-8ff7-4039-93ec-0a2729a154a8$''',
-  '''^ee882879-721c-4913-9775-3dfcce97072a$''',
-  '''^fa2b99dc-9e39-4257-8f92-4a30d23c4118$''',
-  '''^2fc0579f-8113-47ea-b116-bb5a8db9202a$''',
-  '''^73bb0cd4-e502-49b8-9c6f-b59445bf720b$''',
-  '''^c1f9a0bc-1dd2-404a-b27f-8e29047a43fd$''',
-  '''^d8522d9f-575b-4866-88a9-ba99fa02f35b$''',
-  '''^39a5647e-1853-446c-a1f6-a79bae9f5bc7$''',
-]
-
 # The self-hosted license fixtures are base64 payloads signed with the TEST
 # keypair that sits beside them in `__tests__/fixtures/license-keys.fixture.ts`, checked in
 # on purpose: license validation is signature verification, so a test that does not
@@ -83,7 +53,7 @@ regexes = [
 [[allowlists]]
 description = "Signed license test fixtures, verifiable only against the checked-in test keypair"
 targetRules = ["generic-api-key"]
-paths = ['''enterprise/modules/licensing/process/src/testing\.ts''']
+paths = ['''enterprise/modules/licensing/process/src/__tests__/testing\.ts''']
 
 # The keypair itself, which the extraction re-added at a new path. It is the
 # RSA pair the fixtures above are signed with and the verifier tests verify
@@ -100,20 +70,6 @@ paths = [
   '''enterprise/modules/licensing/process/src/__tests__/fixtures/license-keys\.fixture\.ts''',
 ]
 
-# The offline license compatibility fixture (ADR-139): one license minted with
-# the licensing code of main before connected self-hosted landed, so a test can
-# pin that it still verifies and enforces the same way. It was signed with a
-# keypair generated for that one mint whose private half was discarded, and the
-# file holds only public keys beside it. No deployment accepts it, because the
-# production verifier reads its key from `LANGWATCH_LICENSE_PUBLIC_KEY`.
-#
-# Scoped to `generic-api-key` and to this one file, so a real credential pasted
-# into it is still caught by every provider-specific rule.
-[[allowlists]]
-description = "Offline license compatibility fixture, signed by a discarded one-off keypair"
-targetRules = ["generic-api-key"]
-paths = ['''platform/app/ee/licensing/__tests__/fixtures/offline-license-from-main\.json''']
-
 # The stand-in license key in the audit redaction test. It is the base64 of
 # `{"data":{}}`, so it holds no signature and no license, and it cannot be a
 # credential. The test needs a value shaped like a license key to
@@ -125,7 +81,7 @@ paths = ['''platform/app/ee/licensing/__tests__/fixtures/offline-license-from-ma
 description = "Base64 of an empty license payload, used to prove audit redaction"
 targetRules = ["generic-api-key"]
 condition = "AND"
-paths = ['''platform/app/src/server/api/__tests__/redactAuditArgs\.unit\.test\.ts''']
+paths = ['''packages/api/src/trpc/__tests__/audit\.unit\.test\.ts''']
 regexes = ['''^eyJkYXRhIjp7fX0=$''']
 
 # gitleaks scans the branch's whole commit range, not just its tip, so a value
@@ -422,10 +378,10 @@ regexes = [
 # cover.
 #
 # Anchored at BOTH ends, because an unanchored pattern here is a substring match
-# and exempts more than it names. Without `$` it also swallows `toolCards.tsx`,
-# `toolCards.ts.bak` and `toolCards.ts.orig`; without `^` it also swallows any
+# and exempts more than it names. Without `$` it also swallows `tool-cards.tsx`,
+# `tool-cards.ts.bak` and `tool-cards.ts.orig`; without `^` it also swallows any
 # prefixed path, so a vendored or submoduled copy at
-# `vendor/platform/app/.../toolCards.ts` is silently exempt too. Both were
+# `vendor/enterprise/modules/.../tool-cards.ts` is silently exempt too. Both were
 # confirmed by scanning a repo containing those files, not by reading the docs.
 #
 # gitleaks reports a path relative to the scan root it was given. CI passes `.`
@@ -440,7 +396,9 @@ regexes = [
 [[allowlists]]
 description = "Governance tool-card row identifiers are UI keys, not credentials"
 targetRules = ["generic-api-key"]
-paths = ['''^platform/app/ee/governance/dashboard/components/toolCatalog/toolCards\.ts$''']
+paths = [
+  '''^enterprise/modules/governance/browser/src/features/ingestion-sources/toolCatalog/tool-cards\.ts$''',
+]
 
 # `dGhlIHNhbXBsZSBub25jZQ==`, the `Sec-WebSocket-Key` in the raw upgrade
 # requests the voice listener tests write onto a socket. A `Sec-WebSocket-Key`
@@ -508,21 +466,6 @@ regexes = [
   '''^bc1qqv9pzxqlyckngw6zf9g9whn9d3eh4qvg8d8phl$''',
 ]
 
-# One row of the self-hosted instance drawer's usage list, as it stood in commit
-# dece2163. The property was named `key` there and held the name of a field in a
-# usage report, which is the `key: "<value>"` shape `generic-api-key` fires on.
-# The property is called `field` now, so nothing in the tree matches, but the
-# commit stays in the branch's history and a range scan still reads it.
-#
-# Scoped by VALUE and ANCHORED as well as by path, matched with AND, so any
-# other high-entropy string in that file is still reported.
-[[allowlists]]
-description = "A usage-report field name in an instance drawer row list, before the property was renamed"
-targetRules = ["generic-api-key"]
-condition = "AND"
-paths = ['''platform/app/ee/admin/backoffice/resources/instances/types\.ts''']
-regexes = ['''^scenario_runs_28d$''']
-
 # The ElevenLabs model id a token type bills under by default, in a map keyed by
 # a constant whose name contains `Token`: the `token: "<value>"` shape
 # `generic-api-key` fires on. A public model id, not a credential.
@@ -544,57 +487,36 @@ regexes = ['''^eleven_v3_conversational$''']
 description = "Test literals and public handles in current-tree fixture files"
 targetRules = ["generic-api-key"]
 paths = [
-  '''^apps/api/src/app/__tests__/api-trpc-collaborators\.agent-group\.integration\.test\.ts$''',
   '''^apps/haven-web/src/home/__tests__/stack-home\.integration\.test\.tsx$''',
   '''^apps/tasks/src/storage-seed/seed-license\.ts$''',
+  '''^enterprise/modules/billing/process/src/services/subscription-item-calculator\.service\.ts$''',
   '''^enterprise/modules/governance/process/src/services/__tests__/governance-mcp-tools\.service\.unit\.test\.ts$''',
   '''^enterprise/modules/governance/process/src/services/__tests__/personal-ingestion-key\.service\.unit\.test\.ts$''',
-  '''^enterprise/modules/governance/server/src/transport/__tests__/governance-ingest\.rest\.unit\.test\.ts$''',
+  '''^enterprise/modules/governance/process/src/transport/__tests__/governance-ingest\.rest\.unit\.test\.ts$''',
   '''^modules/auth/process/src/app/__tests__/password-reset-sender\.unit\.test\.ts$''',
+  '''^modules/automation/browser/src/model/__tests__/graph-series\.unit\.test\.ts$''',
   '''^modules/gateway/process/src/app/__tests__/gateway-installation\.unit\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-config-route\.integration\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-spend-ingest\.integration\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-virtual-key-expiry\.integration\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/gateway-internal-virtual-key-lifecycle\.integration\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/gateway-platform\.rest\.integration\.test\.ts$''',
-  '''^modules/gateway/server/src/transport/__tests__/support/gateway-internal-rest\.harness\.ts$''',
+  '''^modules/gateway/process/src/services/__tests__/jwt\.gateway-token\.unit\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/gateway-internal-config-route\.integration\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/gateway-internal-spend-ingest\.integration\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/gateway-internal-virtual-key-expiry\.integration\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/gateway-internal-virtual-key-lifecycle\.integration\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/gateway-platform\.rest\.integration\.test\.ts$''',
+  '''^modules/gateway/process/src/transport/__tests__/support/gateway-internal-rest\.harness\.ts$''',
+  '''^modules/model-provider/browser/src/model/__tests__/connection-verdict-copy\.unit\.test\.ts$''',
   '''^modules/ops/process/src/app/__tests__/ops\.app\.checkup-audience\.unit\.test\.ts$''',
   '''^modules/ops/process/src/features/checkup/services/__tests__/ops-checkup\.service\.unit\.test\.ts$''',
   '''^modules/ops/process/src/services/__tests__/usage-report-collection\.service\.unit\.test\.ts$''',
   '''^modules/ops/process/src/services/__tests__/usage-report\.service\.unit\.test\.ts$''',
+  '''^modules/stored-object/contract/src/__tests__/storage-uri\.unit\.test\.ts$''',
+  '''^modules/stored-object/process/src/repositories/azure/__tests__/azure\.stored-object-blob\.repository\.unit\.test\.ts$''',
   '''^modules/trace/process/src/transport/__tests__/otlp-ingest\.rest\.declaration\.unit\.test\.ts$''',
+  '''^packages/eventing/src/server/adapters/postgres/__tests__/prisma-process-store\.integration\.test\.ts$''',
   '''^packages/mail/src/templates/__tests__/__snapshots__/mail-templates\.unit\.test\.tsx\.snap$''',
   '''^packages/mail/src/templates/__tests__/growth-hooks\.unit\.test\.tsx$''',
+  '''^packages/mail/src/templates/__tests__/reset-password-email\.unit\.test\.tsx$''',
   '''^packages/mail/src/templates/reset-password-email\.tsx$''',
   '''^specs/langy/langy-frame-auth\.vectors\.gen\.mjs$''',
-  '''^tools/visualdiff/publish_test\.go$''',
-  '''^tools/visualdiff/runner/src/__tests__/totp\.unit\.test\.ts$''',
-]
-
-# The same kind of literal in paths the branch history carried before the tree
-# was restructured. gitleaks scans every commit in the range, so the old paths
-# still need naming. The billing files hold public Stripe `lookupKey` handles.
-# Scoped to this rule and to each exact file, as above.
-[[allowlists]]
-description = "Test literals and public handles in fixture files at their pre-restructure paths"
-targetRules = ["generic-api-key"]
-paths = [
-  '''^dev/docs/plans/core-application-feature-extraction-plan\.md$''',
-  '''^packages/enterprise/features/billing/contract/src/stripe-catalog\.json$''',
-  '''^packages/enterprise/features/billing/server/src/services/subscription-item-calculator\.service\.ts$''',
-  '''^packages/eventing/src/server/adapters/postgres/__tests__/prisma-process-store\.integration\.test\.ts$''',
-  '''^packages/features/automation/web/tests/graph-series\.unit\.test\.ts$''',
-  '''^packages/features/gateway/server/src/adapters/__tests__/jwt\.gateway-token\.adapter\.unit\.test\.ts$''',
-  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-config-route\.integration\.test\.ts$''',
-  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-spend-ingest\.integration\.test\.ts$''',
-  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-virtual-key-expiry\.integration\.test\.ts$''',
-  '''^packages/features/gateway/server/src/transport/api-rest/__tests__/gateway-internal-virtual-key-lifecycle\.integration\.test\.ts$''',
-  '''^packages/features/model-provider/web/src/model/__tests__/connection-verdict-copy\.unit\.test\.ts$''',
-  '''^packages/features/stored-object/contract/src/__tests__/storage-uri\.unit\.test\.ts$''',
-  '''^packages/features/stored-object/contract/tests/storage-uri\.unit\.test\.ts$''',
-  '''^packages/features/stored-object/server/src/adapters/__tests__/azure-blob\.stored-object-driver\.unit\.test\.ts$''',
-  '''^platform/app/src/server/event-sourcing/adapters/postgres/__tests__/prismaProcessStore\.integration\.test\.ts$''',
-  '''^platform/app/src/server/mailer/__tests__/resetPasswordEmail\.unit\.test\.tsx$''',
 ]
 
 # Placeholder JWTs with an invented `.signature` or `abcDEF123456` tail: the
@@ -608,18 +530,6 @@ paths = [
   '''^packages/redaction/src/__tests__/secrets\.unit\.test\.ts$''',
 ]
 
-# `sk_test_composition`, a placeholder Stripe key the billing adapter tests pass
-# to a stubbed client. Never issued by Stripe. Scoped to `stripe-access-token`
-# and to the two exact test files, so a real `sk_live_` here is still caught by
-# every other rule.
-[[allowlists]]
-description = "Placeholder Stripe keys handed to stubbed clients in billing tests"
-targetRules = ["stripe-access-token"]
-paths = [
-  '''^apps/api/src/app/__tests__/api-billing-webhook\.composition\.unit\.test\.ts$''',
-  '''^packages/enterprise/features/billing/server/src/adapters/__tests__/stripe\.usage-reporting\.adapter\.unit\.test\.ts$''',
-]
-
 # Fixture keys for the local payment simulator (paymentsim). Not issued by
 # Stripe. Scoped to `stripe-access-token` and to the exact files that carry them.
 [[allowlists]]
@@ -629,6 +539,56 @@ paths = [
   '''^\.claude/skills/paymentsim/SKILL\.md$''',
   '''^tools/thuishaven/README\.md$''',
   '''^tools/thuishaven/domain/overlay\.go$''',
-  '''^services/paymentsim/paymentsim_test\.go$''',
+  '''^services/(sims/)?paymentsim/paymentsim_test\.go$''',
   '''^enterprise/modules/billing/process/src/__tests__/billing-paymentsim\.integration\.test\.ts$''',
+]
+
+# Values that are not credentials at all: the pinned SHA-256 digests of the
+# tiktoken encoding files, and a doc comment in the web-push simulator.
+# Scoped to `generic-api-key` and to each exact file.
+[[allowlists]]
+description = "Pinned file digests and a doc comment that generic-api-key reads as keys"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^dev/scripts/download-tiktoken-encodings\.mjs$''',
+  '''^services/sims/outboundsim/webpush\.go$''',
+]
+
+# The GitHub App overlay test asserts that a generated key starts with the PEM
+# header; the header string literal is all the file carries, no key material.
+[[allowlists]]
+description = "PEM header literal in a single-line PEM assertion, no key material"
+targetRules = ["private-key"]
+paths = ['''^tools/thuishaven/domain/overlay_github_test\.go$''']
+
+# Invented test values issued by nobody: `tok_live_*` and `tok-*` HTTP-agent
+# secrets, an `lw-revoked-*` key, a sequential `sk-proj-` redaction sample, an
+# `sk-lw-` prefix with no secret half in a design-system story, the haven API
+# test key, and an e2e licence signed by the checked-in test keypair.
+[[allowlists]]
+description = "Invented credentials in test fixtures and stories, issued by nobody"
+targetRules = ["generic-api-key"]
+paths = [
+  '''^dev/tests/agentic-e2e/tests/license\.fixture\.ts$''',
+  '''^modules/agent/process/src/services/__tests__/agent-http-secrets\.integration\.test\.ts$''',
+  '''^modules/api-key/process/src/services/__tests__/api-key-token-resolution-cache\.unit\.test\.ts$''',
+  '''^modules/data-privacy/process/src/services/__tests__/otlp-span-pii-redaction\.native-scoped-policy\.unit\.test\.ts$''',
+  '''^modules/workflow/process/src/channels/__tests__/staged-run-body-seal\.unit\.test\.ts$''',
+  '''^modules/workflow/process/src/services/__tests__/workflow-http-secrets\.service\.unit\.test\.ts$''',
+  '''^packages/design-system/src/components/display/code-preview\.stories\.tsx$''',
+  '''^services/scenariorunner/runner_test\.go$''',
+  '''^services/scenariorunner/targets/targets_test\.go$''',
+  '''^tools/thuishaven/cmd/api_test\.go$''',
+]
+
+# A pre-2025 legacy API key is an opaque `eyJ` value; these suites prove it is
+# never verified as a JWT. The fixture is {"projectId":"project-1"} with the
+# word "signature" as its signature. Both rules read the same literal, so the
+# entry names both; scoped to the two files.
+[[allowlists]]
+description = "Legacy eyJ API-key fixture whose signature is a plain word"
+targetRules = ["jwt", "generic-api-key"]
+paths = [
+  '''^modules/api-key/process/src/services/__tests__/api-key-token-resolution\.service\.unit\.test\.ts$''',
+  '''^modules/auth/process/src/services/__tests__/api-rest-credentials\.service\.unit\.test\.ts$''',
 ]

@@ -131,7 +131,7 @@ vi.mock("../../use-simulation-update-listener.ts", () => ({
 }));
 
 vi.mock("../../../ui/sections/suites/run-history-panel.tsx", () => ({
-  RunHistoryPanel: () => <div data-testid="all-runs-panel">All Runs Panel</div>,
+  RunHistoryPanel: () => <div data-testid="all-runs-panel">All runs Panel</div>,
 }));
 
 vi.mock("../../scenario-api.ts", () => ({

@@ -53,7 +53,7 @@
   },
   "scripts": {
     "generate:vega-validator": "node --experimental-transform-types scripts/generate-vega-lite-validator.ts",
-    "typecheck": "tsc -b tsconfig.json tsconfig.test.json",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

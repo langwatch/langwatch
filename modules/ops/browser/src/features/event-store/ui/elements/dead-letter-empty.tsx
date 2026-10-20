@@ -1,4 +1,5 @@
-import { Box, Card, HStack, Text } from "@langwatch/design-system/primitives";
+import { Card } from "@langwatch/design-system/card";
+import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Skull } from "lucide-react";
 
 /**
@@ -8,20 +9,18 @@ import { Skull } from "lucide-react";
  */
 export function DeadLettersEmpty() {
   return (
-    <Card.Root>
-      <Card.Body padding={6}>
-        <HStack gap={3}>
-          <Skull size={16} />
-          <Box>
-            <Text textStyle="sm" fontWeight="medium">
-              No dead messages
-            </Text>
-            <Text textStyle="xs" color="fg.muted">
-              Every intent the substrate has emitted either dispatched or is still being retried.
-            </Text>
-          </Box>
-        </HStack>
-      </Card.Body>
-    </Card.Root>
+    <Card padding="lg">
+      <HStack gap={3}>
+        <Skull size={16} />
+        <Box>
+          <Text textStyle="sm" fontWeight="medium">
+            No dead messages
+          </Text>
+          <Text textStyle="xs" color="fg.muted">
+            Every intent the substrate has emitted either dispatched or is still being retried.
+          </Text>
+        </Box>
+      </HStack>
+    </Card>
   );
 }

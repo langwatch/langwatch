@@ -15,8 +15,8 @@ import {
   sortableKeyboardCoordinates,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Kbd } from "@langwatch/design-system/kbd";
 import { Box, Button, HStack, IconButton, Text, VStack } from "@langwatch/design-system/primitives";
+import { shortcutAriaKeys } from "@langwatch/design-system/shortcut-hint";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import {
   ChevronsDownUp,
@@ -37,6 +37,7 @@ import { useUIStore } from "../../../../behavior/ui.store.ts";
 import { FilterSidebarSkeleton } from "../../../elements/explorer/filter-sidebar/filter-sidebar-skeleton.tsx";
 import { SortableSection } from "../../../elements/explorer/filter-sidebar/sortable-section.tsx";
 import { IsolatedErrorBoundary } from "../../isolated-error-boundary.tsx";
+import { PAGE_SHORTCUTS } from "../traces-page/page-keyboard-shortcuts.tsx";
 import { ExplorerTotal } from "./explorer-total.tsx";
 import { FacetManagerPopover } from "./facet-manager-popover.tsx";
 import { useFilterSidebarData } from "./hooks/use-filter-sidebar-data.ts";
@@ -340,7 +341,7 @@ export const FilterSidebar: React.FC = () => {
             border: "3px solid transparent",
             borderRadius: "999px",
           },
-          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "6px" },
+          "&::-webkit-scrollbar-track": { background: "transparent", marginBlock: "1.5" },
           scrollbarWidth: "thin",
         }}
       >
@@ -404,7 +405,7 @@ export const FilterSidebar: React.FC = () => {
             justifyContent="center"
             gap={1.5}
             color="fg.subtle"
-            fontWeight="500"
+            fontWeight="medium"
             marginTop={1}
             marginBottom={2}
             onClick={() => setFacetManagerOpen(true)}
@@ -449,15 +450,12 @@ function SidebarHeader({
     >
       <Tooltip
         positioning={{ placement: "bottom" }}
-        content={
-          <HStack gap={1.5}>
-            <Text>Hide filters sidebar</Text>
-            <Kbd>{"["}</Kbd>
-          </HStack>
-        }
+        content="Hide filters sidebar"
+        shortcut={PAGE_SHORTCUTS.sidebar}
       >
         <IconButton
           aria-label="Hide filters sidebar"
+          aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.sidebar)}
           size="2xs"
           variant="ghost"
           color="fg.subtle"
@@ -472,15 +470,12 @@ function SidebarHeader({
         {onClearAll && (
           <Tooltip
             positioning={{ placement: "bottom" }}
-            content={
-              <HStack gap={1.5}>
-                <Text>Clear all filters</Text>
-                <Kbd>X</Kbd>
-              </HStack>
-            }
+            content="Clear all filters"
+            shortcut={PAGE_SHORTCUTS.clearFilters}
           >
             <IconButton
               aria-label="Clear all filters"
+              aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.clearFilters)}
               size="2xs"
               variant="ghost"
               color="blue.fg"
@@ -499,15 +494,12 @@ function SidebarHeader({
         {facetManager}
         <Tooltip
           positioning={{ placement: "bottom" }}
-          content={
-            <HStack gap={1.5}>
-              <Text>{allExpanded ? "Collapse all sections" : "Expand all sections"}</Text>
-              <Kbd>E</Kbd>
-            </HStack>
-          }
+          content={allExpanded ? "Collapse all sections" : "Expand all sections"}
+          shortcut={PAGE_SHORTCUTS.expandAll}
         >
           <IconButton
             aria-label={allExpanded ? "Collapse all sections" : "Expand all sections"}
+            aria-keyshortcuts={shortcutAriaKeys(PAGE_SHORTCUTS.expandAll)}
             size="2xs"
             variant="ghost"
             color="fg.subtle"
@@ -600,7 +592,7 @@ const DragGhostHeader: React.FC<{
       )}
       <Text
         textStyle="2xs"
-        fontWeight="500"
+        fontWeight="medium"
         color="fg.subtle"
         textTransform="uppercase"
         letterSpacing="0.08em"

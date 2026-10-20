@@ -27,7 +27,21 @@ profiles (cloud, hybrid) start head's api (`-head-dir`) beside the old release, 
 `-switch-on` (default `/readyz`), then stop the old release; stop-start profiles (self-hosted) stop
 it first. A head api that exits before ready is restarted, as an orchestrator would, and counted (N7). A poller records head's phases, Playwright screenshots them and Ops > Upgrades
 (`shots/`), and after settle the cell judges I0, I2, I2b, I3, I4, I6, I8, I9, N1 to N7, O1 and, for
-hybrid, H1 to H3 into `report.md` and `report.json`. Exit 0 all pass, 1 an invariant failed, 2 a
+hybrid, H1 to H6 and H9 into `report.md` and `report.json`. Hybrid drills: `-drills private-down` puts a TCP gate in
+front of each private ClickHouse target and closes it while head's worker upgrades (H8); `route-broken` boots a
+second head api with the private route missing, then malformed, after settle (H7). `-overlays retention` also
+plants aged rows on the private target under the private organization's own rule. `-overlays tenant-oddities`
+(SSO deployments; it also runs the cell's own object storage) plants a held organization (its legacy `ssoDomain` is a
+domain another organization's connection proved), plaintext provider keys, a Postgres-layout dataset and an organization
+with a prompt and no tags, and judges them as A1 to A4. `-overlays operator-damage` plants, by SQL on main, a
+`_prisma_migrations` row an interrupted deploy left failed (a folder below head's re-runnable marker) and a hand-built
+`AuditLog_idempotencyKey_key` on another column; on each refusal the cell records `/readyz`, `pnpm task upgrade status` and
+head's page, does the fix the refusal names as the operator (restarting head's worker when no upgrade run starts within
+2 min of a resolved row or 6 min of a fixed index, and reporting the time from fix to rerun), and judges D1 to D3; pass
+`-ready-within 20m`. `-via-dir <checkout>` (UM-21, an install below the floor) adds a middle release: after the cut the
+old release stops, the via release runs its own startup (`start:prepare:db`, `task system-migrations`) and serves for
+`-at-cut`, then head deploys as usual; the report notes `_prisma_migrations` rows and ledger schemas at the cut, around
+the via release and at ready, and keeps head's `upgrade status` at ready. Exit 0 all pass, 1 an invariant failed, 2 a
 step stopped the cell (its databases are kept for inspection).
 
 Built code only, both sides: main runs `pnpm build` in `platform/app`, then `runtime:app` and

@@ -6,9 +6,9 @@ import { getComplexProps, useDrawer } from "@langwatch/browser-host/drawer";
 import { datasetClient } from "@langwatch/dataset-client";
 import type { UiSelectDatasetDrawerProps } from "@langwatch/dataset-client";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Text } from "@langwatch/design-system/primitives";
 import { Database } from "lucide-react";
 
+import { useDatasetRecordCounts } from "../../behavior/use-dataset-record-counts.ts";
 import { useDatasetHost } from "../../model/dataset-host.ts";
 import { DatasetPickerList } from "../blocks/dataset-picker-list.tsx";
 
@@ -32,43 +32,33 @@ export function SelectDatasetDrawer(props: SelectDatasetDrawerProps) {
     { projectId: projectId ?? "" },
     { enabled: isOpen && !!projectId },
   );
+  const { recordCounts, countsFailed } = useDatasetRecordCounts({
+    projectId,
+    datasets: datasets.data,
+  });
 
   return (
-    <Drawer.Root open={isOpen} onOpenChange={({ open }) => !open && onClose()} size="md">
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2}>
-            <Database size={20} />
-            <Drawer.Title>Choose Dataset</Drawer.Title>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body
-          display="flex"
-          flexDirection="column"
-          overflow="hidden"
-          paddingX={6}
-          paddingTop={4}
-        >
-          <Text color="fg.muted" fontSize="sm" paddingBottom={4}>
-            Select an existing dataset to use for this evaluation.
-          </Text>
-          <DatasetPickerList
-            datasets={datasets.data}
-            isLoading={datasets.isLoading}
-            isError={datasets.isError}
-            onSelect={(dataset) => {
-              onSelect?.(dataset);
-              onClose();
-            }}
-          />
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
-    </Drawer.Root>
+    <Drawer
+      open={isOpen}
+      onClose={onClose}
+      size="md"
+      title="Choose Dataset"
+      icon={<Database size={20} />}
+      subtitle="Select an existing dataset to use for this evaluation."
+      bodyScroll="content"
+      footer={{ cancel: { onClick: onClose } }}
+    >
+      <DatasetPickerList
+        datasets={datasets.data}
+        recordCounts={recordCounts}
+        countsFailed={countsFailed}
+        isLoading={datasets.isLoading}
+        isError={datasets.isError}
+        onSelect={(dataset) => {
+          onSelect?.(dataset);
+          onClose();
+        }}
+      />
+    </Drawer>
   );
 }

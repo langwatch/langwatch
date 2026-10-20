@@ -73,6 +73,7 @@ export function projectEntryPath({
 export const NEVER_LANDED_ON_PROJECT_KINDS: readonly string[] = [
   PROJECT_KIND.AGGREGATE,
   PROJECT_KIND.INTERNAL_GOVERNANCE,
+  PROJECT_KIND.INTERNAL_CHECKUP,
 ];
 
 /** The projects whose kind is not in {@link NEVER_LANDED_ON_PROJECT_KINDS}, in order. */
@@ -130,8 +131,8 @@ export function isAggregateProjectRouteRefused({
 /** The kinds hidden from every project list for this organisation role. */
 export function projectKindsHiddenFrom(organizationRole: string | null | undefined): ProjectKind[] {
   return organizationRole === "ADMIN"
-    ? [PROJECT_KIND.INTERNAL_GOVERNANCE]
-    : [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.AGGREGATE];
+    ? [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.INTERNAL_CHECKUP]
+    : [PROJECT_KIND.INTERNAL_GOVERNANCE, PROJECT_KIND.INTERNAL_CHECKUP, PROJECT_KIND.AGGREGATE];
 }
 
 /** The refusal any trace destination gives when it resolves to an aggregate. */

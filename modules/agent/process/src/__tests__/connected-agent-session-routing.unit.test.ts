@@ -1,13 +1,13 @@
 import type { StoredCall } from "@langwatch/agent-contract";
-import { memorySessionState } from "@langwatch/process-stores";
 /**
  * The instance-agent fence a session reads a call through: an instance only
  * ever sees calls for the agents it registered itself (ADR-128, "No inbound access").
  * @see specs/agents/connected-agents.feature
  */
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { callKey, callAckKey, resultKey } from "../rules/connected-agent-keys.rules.ts";
+import { MemoryConnectedAgentRelayChannel } from "../channels/memory/memory.connected-agent-relay.channel.ts";
+import { MemoryConnectedAgentStateRepository } from "../repositories/memory/memory.connected-agent-state.repository.ts";
 import { ConnectedAgentRuntimeService } from "../services/connected-agent-runtime.service.ts";
 import {
   AgentSessionService,
@@ -21,15 +21,19 @@ const callId = "call_1";
 
 const fakeAgents = createConnectedAgentFixture();
 function build() {
-  const store = memorySessionState();
-  const runtime = ConnectedAgentRuntimeService.create({ podId: "pod_solo", store });
+  const state = MemoryConnectedAgentStateRepository.create();
+  const runtime = ConnectedAgentRuntimeService.create({
+    podId: "pod_solo",
+    state,
+    relay: MemoryConnectedAgentRelayChannel.create(),
+  });
   const core = AgentSessionService.create({
     runtime,
     agents: fakeAgents,
     publicBaseUrl: "https://example.test",
     replicaCount: 1,
   });
-  return { store, core };
+  return { state, core };
 }
 
 function sessionRegisteredFor(agentId: string): SessionInfo {
@@ -76,34 +80,35 @@ function storedCallFor(agentId: string): StoredCall {
 
 describe("AgentSessionService.findCallForSession", () => {
   describe("when a call is routed at an instance that did not register the agent", () => {
+    const stored = storedCallFor("agent_real");
+    const session = sessionRegisteredFor("agent_stranger");
+    let state: MemoryConnectedAgentStateRepository;
+    let core: AgentSessionService;
+
+    beforeEach(async () => {
+      ({ state, core } = build());
+      await state.saveCall({ call: stored, ttlSeconds: 60 });
+    });
+
     /** @scenario "An instance never receives a call for an agent it did not register" */
     it("does not send the call or alter its delivery result", async () => {
-      const { store, core } = build();
-      const stored = storedCallFor("agent_real");
-      await store.set(callKey(projectId, callId), JSON.stringify(stored), 60);
-      const session = sessionRegisteredFor("agent_stranger");
-
       const call = await core.findCallForSession(session, callId);
 
       expect(call).toBeNull();
-      expect(await store.tryGet(resultKey(projectId, callId))).toBeNull();
+      expect(await state.readResult({ projectId, callId })).toEqual({ kind: "miss" });
     });
 
     /** @scenario "A session cannot alter calls for agents it did not register" */
     it("cannot acknowledge, answer or mark another agent's call undelivered", async () => {
-      const { store, core } = build();
-      const stored = storedCallFor("agent_real");
-      const original = JSON.stringify(stored);
-      await store.set(callKey(projectId, callId), original, 60);
-      const session = sessionRegisteredFor("agent_stranger");
+      const acked = vi.spyOn(state, "markCallAcked");
 
       await core.ack(session, callId);
       await core.result(session, { type: "result", protocol: 1, callId, output: "forged" });
       await core.undeliver(session, callId);
 
-      expect(await store.tryGet(callAckKey(projectId, callId))).toBeNull();
-      expect(await store.tryGet(resultKey(projectId, callId))).toBeNull();
-      expect(await store.tryGet(callKey(projectId, callId))).toBe(original);
+      expect(acked).not.toHaveBeenCalled();
+      expect(await state.readResult({ projectId, callId })).toEqual({ kind: "miss" });
+      expect(await state.readCall({ projectId, callId })).toEqual({ kind: "hit", value: stored });
     });
   });
 });

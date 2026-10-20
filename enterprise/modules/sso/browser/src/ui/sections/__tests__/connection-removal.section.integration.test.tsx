@@ -133,3 +133,19 @@ describe("while a removal is settling", () => {
     expect(screen.getByTestId("sso-remove-open")).toHaveProperty("disabled", true);
   });
 });
+
+describe("the danger zone surface", () => {
+  it("is a red well headed Danger zone", () => {
+    renderSection({ state: "DRAFT" });
+
+    const well = screen.getByTestId("sso-remove");
+    expect(well.dataset).toMatchObject({ cardVariant: "nested", cardTone: "red" });
+    expect(well.textContent).toContain("Danger zone");
+  });
+
+  it("holds the open button while a removal is pending", () => {
+    renderSection({ state: "ACTIVE", pending: true });
+
+    expect(screen.getByTestId("sso-remove-open")).toHaveProperty("disabled", true);
+  });
+});

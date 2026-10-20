@@ -1,5 +1,5 @@
-import { Box, Button, HStack, Icon, Text, VStack } from "@langwatch/design-system/primitives";
-import { Dialog } from "@langwatch/design-system/studio-dialog";
+import { Dialog } from "@langwatch/design-system/dialog";
+import { Box, Icon, Text, VStack } from "@langwatch/design-system/primitives";
 import { AlertTriangle } from "lucide-react";
 
 export interface ModelProviderRequiredModalProps {
@@ -14,41 +14,28 @@ export function ModelProviderRequiredModal({
   onProceedAnyway,
 }: ModelProviderRequiredModalProps) {
   return (
-    <Dialog.Root open={open} onOpenChange={(d) => !d.open && onClose()}>
-      <Dialog.Content>
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title>Model provider not ready</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <VStack gap={4} py={4} align="center" justify="center">
-            <Box p={3} borderRadius="full" bg="orange.subtle" color="orange.fg">
-              <Icon as={AlertTriangle} boxSize={6} />
-            </Box>
-            <Text color="fg.muted" fontSize="sm" textAlign="center">
-              Scenarios need an enabled provider with a default model to run. Configure default
-              model provider to get started, or proceed to create a new scenario anyway.
-            </Text>
-          </VStack>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={2} justify="flex-end">
-            <Button variant="outline" onClick={onProceedAnyway}>
-              Proceed anyway
-            </Button>
-            <Button colorPalette="orange" asChild>
-              <a
-                data-testid="model-provider-required-modal-configure-button"
-                href="/settings/model-providers"
-                target="_blank"
-                rel="noopener noreferrer"
-              >
-                Configure model provider
-              </a>
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={open}
+      onClose={onClose}
+      title="Model provider not ready"
+      secondaryAction={{ label: "Proceed anyway", onClick: onProceedAnyway }}
+      primaryAction={{
+        label: "Configure model provider",
+        href: "/settings/model-providers",
+        target: "_blank",
+        rel: "noopener noreferrer",
+        "data-testid": "model-provider-required-modal-configure-button",
+      }}
+    >
+      <VStack gap={4} py={4} align="center" justify="center">
+        <Box p={3} borderRadius="full" bg="orange.subtle" color="orange.fg">
+          <Icon as={AlertTriangle} boxSize={6} />
+        </Box>
+        <Text color="fg.muted" fontSize="sm" textAlign="center">
+          Scenarios need an enabled provider with a default model to run. Configure default model
+          provider to get started, or proceed to create a new scenario anyway.
+        </Text>
+      </VStack>
+    </Dialog>
   );
 }

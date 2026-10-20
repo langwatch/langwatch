@@ -2,18 +2,15 @@
 
 import { Drawer } from "@langwatch/design-system/drawer";
 import {
-  Button,
   createListCollection,
   Field,
-  HStack,
   Input,
-  Spacer,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
 import { Select } from "@langwatch/design-system/select";
 import type { UiEditProjectDrawerProps } from "@langwatch/organization-contract";
-import { useCallback, useMemo } from "react";
+import { useCallback, useId, useMemo } from "react";
 import { Controller, type SubmitHandler, useForm } from "react-hook-form";
 
 import { applyHandledErrorToForm, FormServerError } from "../../behavior/handled-error-form.tsx";
@@ -39,6 +36,7 @@ export function EditProjectDrawer({
   const showErrorToast = useShowErrorToast();
   const { closeDrawer } = useDrawer();
   const queryClient = api.useUtils();
+  const formId = useId();
 
   const teams = useOrganizationTeams({ organizationId: organization?.id });
 
@@ -72,6 +70,10 @@ export function EditProjectDrawer({
   const onSubmit: SubmitHandler<EditProjectFormData> = useCallback(
     (data: EditProjectFormData) => {
       if (!projectId) return;
+      if (!isDirty) {
+        closeDrawer();
+        return;
+      }
 
       updateProject.mutate(
         {
@@ -104,6 +106,7 @@ export function EditProjectDrawer({
     [
       updateProject,
       projectId,
+      isDirty,
       projectName,
       currentTeamId,
       queryClient,
@@ -115,93 +118,79 @@ export function EditProjectDrawer({
   );
 
   return (
-    <Drawer.Root
+    <Drawer
       open={open}
-      placement="end"
+      onClose={closeDrawer}
+      title="Edit Project"
       size="lg"
-      onOpenChange={({ open: isOpen }) => {
-        if (!isOpen) closeDrawer();
+      footer={{
+        primaryAction: {
+          label: "Save",
+          type: "submit",
+          form: formId,
+          loading: updateProject.isPending,
+        },
       }}
     >
-      <Drawer.Content bg="bg">
-        <Drawer.Header>
-          <Drawer.CloseTrigger onClick={closeDrawer} />
-          <Drawer.Title>Edit Project</Drawer.Title>
-        </Drawer.Header>
-        <Drawer.Body>
-          <form onSubmit={handleSubmit(onSubmit)}>
-            <VStack align="stretch" gap={6}>
-              <FormServerError form={form} />
+      <form id={formId} onSubmit={handleSubmit(onSubmit)}>
+        <VStack align="stretch" gap={6}>
+          <FormServerError form={form} />
 
-              <Text fontSize="sm" color="fg.muted">
-                Update the project name or move it to a different team. Moving a project changes
-                which team members inherit access.
-              </Text>
+          <Text fontSize="sm" color="fg.muted">
+            Update the project name or move it to a different team. Moving a project changes which
+            team members inherit access.
+          </Text>
 
-              <Field.Root invalid={!!errors.name}>
-                <Field.Label>Project Name</Field.Label>
-                <Input
-                  {...register("name", {
-                    required: "Project name is required",
-                    minLength: { value: 1, message: "Name is required" },
-                  })}
-                  placeholder="AI Project"
-                />
-                {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
-              </Field.Root>
+          <Field.Root invalid={!!errors.name}>
+            <Field.Label>Project Name</Field.Label>
+            <Input
+              {...register("name", {
+                required: "Project name is required",
+                minLength: { value: 1, message: "Name is required" },
+              })}
+              placeholder="AI Project"
+            />
+            {errors.name && <Field.ErrorText>{errors.name.message}</Field.ErrorText>}
+          </Field.Root>
 
-              <Field.Root invalid={!!errors.teamId}>
-                <Field.Label>Team</Field.Label>
-                <Controller
-                  control={control}
-                  name="teamId"
-                  rules={{ required: "Team is required" }}
-                  render={({ field }) => (
-                    <Select.Root
-                      collection={teamCollection}
-                      value={[field.value]}
-                      onValueChange={(details) => {
-                        const selectedValue = details.value[0];
-                        if (selectedValue) {
-                          field.onChange(selectedValue);
-                        }
-                      }}
-                    >
-                      <Select.Trigger>
-                        <Select.ValueText placeholder="Select team">
-                          {() =>
-                            teamOptions.find((o) => o.value === field.value)?.label ?? "Select team"
-                          }
-                        </Select.ValueText>
-                      </Select.Trigger>
-                      <Select.Content paddingY={2}>
-                        {teamOptions.map((option) => (
-                          <Select.Item key={option.value} item={option}>
-                            {option.label}
-                          </Select.Item>
-                        ))}
-                      </Select.Content>
-                    </Select.Root>
-                  )}
-                />
-                {errors.teamId && <Field.ErrorText>{errors.teamId.message}</Field.ErrorText>}
-              </Field.Root>
-
-              <HStack width="full">
-                <Spacer />
-                <Button
-                  colorPalette="orange"
-                  type="submit"
-                  loading={updateProject.isPending}
-                  disabled={!isDirty || updateProject.isPending}
+          <Field.Root invalid={!!errors.teamId}>
+            <Field.Label>Team</Field.Label>
+            <Controller
+              control={control}
+              name="teamId"
+              rules={{ required: "Team is required" }}
+              render={({ field }) => (
+                <Select.Root
+                  collection={teamCollection}
+                  value={[field.value]}
+                  onValueChange={(details) => {
+                    const selectedValue = details.value[0];
+                    if (selectedValue) {
+                      field.onChange(selectedValue);
+                    }
+                  }}
                 >
-                  Save
-                </Button>
-              </HStack>
-            </VStack>
-          </form>
-        </Drawer.Body>
-      </Drawer.Content>
-    </Drawer.Root>
+                  <Select.Trigger>
+                    <Select.ValueText placeholder="Select team">
+                      {() =>
+                        teamOptions.find((o) => o.value === field.value)?.label ?? "Select team"
+                      }
+                    </Select.ValueText>
+                  </Select.Trigger>
+                  <Select.Content paddingY={2}>
+                    {teamOptions.map((option) => (
+                      <Select.Item key={option.value} item={option}>
+                        {option.label}
+                      </Select.Item>
+                    ))}
+                  </Select.Content>
+                </Select.Root>
+              )}
+            />
+            {errors.teamId && <Field.ErrorText>{errors.teamId.message}</Field.ErrorText>}
+          </Field.Root>
+        </VStack>
+      </form>
+    </Drawer>
   );
 }

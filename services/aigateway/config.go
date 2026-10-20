@@ -3,6 +3,7 @@ package aigateway
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"os"
 	"strings"
 	"time"
@@ -31,6 +32,10 @@ type Config struct {
 	OTel                          config.OTel               `env:"OTEL"`
 	Voice                         VoiceConfig               `env:"LW_GATEWAY_VOICE"`
 	CORS                          CORSConfig                `env:"LW_GATEWAY_CORS"`
+	// CodexAPIBase is where codex model calls go (CODEX_API_BASE, the root
+	// that `/responses` hangs off); unset is OpenAI's own codex backend.
+	// haven's +outbound names outboundsim.
+	CodexAPIBase string `env:"CODEX_API_BASE"`
 	// NonStreamingHeartbeatIntervalSeconds sets how often (in seconds) a
 	// non-streaming response writes a keep-alive byte while dispatch is
 	// still in flight. 0 falls back to config.DefaultNonStreamingHeartbeatInterval;
@@ -259,6 +264,9 @@ func LoadConfig(ctx context.Context) (Config, error) {
 	if err := validateSecondsFields(cfg); err != nil {
 		return Config{}, err
 	}
+	if err := validateCodexAPIBase(cfg.CodexAPIBase); err != nil {
+		return Config{}, err
+	}
 	if _, err := httpapi.ParseCORSAllowedOrigins(cfg.CORS.AllowedOrigins); err != nil {
 		return Config{}, err
 	}
@@ -272,6 +280,28 @@ func LoadConfig(ctx context.Context) (Config, error) {
 		return Config{}, err
 	}
 	return cfg, nil
+}
+
+// validateCodexAPIBase refuses a CODEX_API_BASE that is set but is not an
+// absolute http(s) URL, so a typo fails at boot instead of on the first turn.
+func validateCodexAPIBase(base string) error {
+	if strings.TrimSpace(base) == "" {
+		return nil
+	}
+	parsed, err := url.Parse(base)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" {
+		return fmt.Errorf("CODEX_API_BASE must be an absolute http(s) URL, got %q", base)
+	}
+	return nil
+}
+
+// codexBackendURL is the codex Responses endpoint under the configured base;
+// empty leaves the router on OpenAI's own backend.
+func codexBackendURL(base string) string {
+	if strings.TrimSpace(base) == "" {
+		return ""
+	}
+	return strings.TrimRight(strings.TrimSpace(base), "/") + "/responses"
 }
 
 // MaxConfigurableSeconds bounds every seconds-valued time span in the

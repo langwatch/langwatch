@@ -5,32 +5,33 @@
  */
 import { EventEmitter } from "node:events";
 
-import { type AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
-import type { ApiKeyApi } from "@langwatch/api-key-contract";
-import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import type { AuthzApi } from "@langwatch/authz-contract";
-import type { DataRetentionApi } from "@langwatch/data-retention-contract";
-import type { EntitlementApi } from "@langwatch/entitlement-contract";
-import type { EvaluationApi } from "@langwatch/evaluation-contract";
-import type { EvaluatorApi } from "@langwatch/evaluator-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
-import type { GatewayApi } from "@langwatch/gateway-contract";
-import type { ModelProviderApi } from "@langwatch/model-provider-contract";
-import type { PresenceApi } from "@langwatch/presence-contract";
+import { AgentApi, AgentNotFoundError } from "@langwatch/agent-contract";
+import { ApiKeyApi } from "@langwatch/api-key-contract";
+import { AuditLogApi } from "@langwatch/audit-log-contract";
+import { AuthzApi } from "@langwatch/authz-contract";
+import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { EntitlementApi } from "@langwatch/entitlement-contract";
+import { EvaluationApi } from "@langwatch/evaluation-contract";
+import { EvaluatorApi } from "@langwatch/evaluator-contract";
+import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { GatewayApi } from "@langwatch/gateway-contract";
+import { ModelProviderApi } from "@langwatch/model-provider-contract";
+import { PresenceApi } from "@langwatch/presence-contract";
 import type { PrismaClient } from "@langwatch/prisma-client/generated";
-import { createApp } from "@langwatch/process";
+import { bootInstalledProcess } from "@langwatch/process";
 import { memoryStores, openStores, PipelineParticipation } from "@langwatch/process-stores";
 import { storesOwner, type StoresConfig } from "@langwatch/process-stores/config";
-import type { ProjectApi } from "@langwatch/project-contract";
-import type { PromptApi } from "@langwatch/prompt-contract";
+import { testPeer } from "@langwatch/process/testing";
+import { ProjectApi } from "@langwatch/project-contract";
+import { PromptApi } from "@langwatch/prompt-contract";
 import { ScenarioApi, type SimulationService } from "@langwatch/scenario-contract";
-import type { SecretApi } from "@langwatch/secret-contract";
+import { SecretApi } from "@langwatch/secret-contract";
 import { SecretsChain, SecretsResolver } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { nowInstant } from "@langwatch/time";
-import type { TraceApi } from "@langwatch/trace-contract";
-import type { UserApi } from "@langwatch/user-contract";
-import type { WorkflowApi } from "@langwatch/workflow-contract";
+import { TraceApi } from "@langwatch/trace-contract";
+import { UserApi } from "@langwatch/user-contract";
+import { WorkflowApi } from "@langwatch/workflow-contract";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -47,6 +48,9 @@ const projectId = "project-1";
 const storesConfig: StoresConfig = {
   defaultRetentionDays: 30,
   shutdownDrainTimeoutMs: undefined,
+  queueConcurrency: undefined,
+  queueTenantCap: undefined,
+  queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
   clickhousePool: {
     override: undefined,
@@ -97,42 +101,60 @@ function liveScenarioRepository() {
 }
 
 function process(role: "api" | "worker", emitter: EventEmitter) {
-  return createApp({ role, secrets: scenarioInstallationSecrets() })
-    .withModules([scenarioProcessModule])
-    .withConfig({
+  return bootInstalledProcess({
+    role,
+    modules: [scenarioProcessModule],
+    config: {
       scenario: { ...scenarioTestConfig, publicBaseUrl: "https://app.langwatch.test" },
-    })
-    .withStores(memoryStores())
-    .provide({
-      agent: createApiFixture<AgentApi>({
-        getById: async ({ id }) => {
-          throw new AgentNotFoundError(id, projectId);
-        },
+    },
+    stores: memoryStores(),
+    secrets: scenarioInstallationSecrets(),
+    peers: [
+      testPeer({
+        token: AgentApi,
+        instance: createApiFixture<AgentApi>({
+          getById: async ({ id }) => {
+            throw new AgentNotFoundError(id, projectId);
+          },
+        }),
       }),
-      user: createApiFixture<UserApi>(),
-      project: createApiFixture<ProjectApi>({
-        findById: async () => null,
-        getOrganizationId: async () => "organization-1",
+      testPeer({ token: UserApi, instance: createApiFixture<UserApi>() }),
+      testPeer({
+        token: ProjectApi,
+        instance: createApiFixture<ProjectApi>({
+          findById: async () => null,
+          getOrganizationId: async () => "organization-1",
+        }),
       }),
-      entitlement: createApiFixture<EntitlementApi>({ assertWithinUsageLimit: async () => {} }),
-      "model-provider": createApiFixture<ModelProviderApi>(),
-      presence: createApiFixture<PresenceApi>({
-        getTenantEmitter: () => emitter,
-        cleanupTenantEmitter: () => {},
+      testPeer({
+        token: EntitlementApi,
+        instance: createApiFixture<EntitlementApi>({ assertWithinUsageLimit: async () => {} }),
       }),
-      "audit-log": createApiFixture<AuditLogApi>(),
-      trace: createApiFixture<TraceApi>(),
-      "data-retention": createApiFixture<DataRetentionApi>(),
-      evaluator: createApiFixture<EvaluatorApi>(),
-      evaluation: createApiFixture<EvaluationApi>(),
-      prompt: createApiFixture<PromptApi>(),
-      secret: createApiFixture<SecretApi>(),
-      workflow: createApiFixture<WorkflowApi>(),
-      "feature-flag": createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
-      authz: createApiFixture<AuthzApi>(),
-      gateway: createApiFixture<GatewayApi>(),
-      "api-key": createApiFixture<ApiKeyApi>(),
-    });
+      testPeer({ token: ModelProviderApi, instance: createApiFixture<ModelProviderApi>() }),
+      testPeer({
+        token: PresenceApi,
+        instance: createApiFixture<PresenceApi>({
+          getTenantEmitter: () => emitter,
+          cleanupTenantEmitter: () => {},
+        }),
+      }),
+      testPeer({ token: AuditLogApi, instance: createApiFixture<AuditLogApi>() }),
+      testPeer({ token: TraceApi, instance: createApiFixture<TraceApi>() }),
+      testPeer({ token: DataRetentionApi, instance: createApiFixture<DataRetentionApi>() }),
+      testPeer({ token: EvaluatorApi, instance: createApiFixture<EvaluatorApi>() }),
+      testPeer({ token: EvaluationApi, instance: createApiFixture<EvaluationApi>() }),
+      testPeer({ token: PromptApi, instance: createApiFixture<PromptApi>() }),
+      testPeer({ token: SecretApi, instance: createApiFixture<SecretApi>() }),
+      testPeer({ token: WorkflowApi, instance: createApiFixture<WorkflowApi>() }),
+      testPeer({
+        token: FeatureFlagApi,
+        instance: createApiFixture<FeatureFlagApi>({ isEnabled: async () => false }),
+      }),
+      testPeer({ token: AuthzApi, instance: createApiFixture<AuthzApi>() }),
+      testPeer({ token: GatewayApi, instance: createApiFixture<GatewayApi>() }),
+      testPeer({ token: ApiKeyApi, instance: createApiFixture<ApiKeyApi>() }),
+    ],
+  });
 }
 
 describe("given a deployment that configured no stored-secret encryption key", () => {
@@ -141,7 +163,7 @@ describe("given a deployment that configured no stored-secret encryption key", (
    * @scenario "The scenario surfaces still answer"
    */
   it("boots and lists the project's scenarios", async () => {
-    const runtime = await process("api", new EventEmitter()).boot();
+    const runtime = await process("api", new EventEmitter());
 
     try {
       await expect(runtime.service(ScenarioApi).list({ projectId })).resolves.toEqual([]);
@@ -152,7 +174,7 @@ describe("given a deployment that configured no stored-secret encryption key", (
 
   /** @scenario "The surfaces that never read the cipher are untouched" */
   it("lists the project's suites", async () => {
-    const runtime = await process("api", new EventEmitter()).boot();
+    const runtime = await process("api", new EventEmitter());
 
     try {
       await expect(runtime.service(ScenarioApi).listTestSuites({ projectId })).resolves.toEqual([]);

@@ -68,7 +68,11 @@ export function createTraceMetricsSyncSubscriber(
 export const TRACE_SPAN_METRICS_SETTLE_MS = 60_000;
 
 export interface TraceSpanMetricsSyncDeps {
-  findSummary: (input: { projectId: string; traceId: string }) => Promise<TraceSummaryData | null>;
+  findSummary: (input: {
+    projectId: string;
+    traceId: string;
+    occurredAtMs?: number;
+  }) => Promise<TraceSummaryData | null>;
   computeRunMetrics: (data: ComputeRunMetricsCommandData) => Promise<void>;
 }
 
@@ -83,7 +87,11 @@ export function createTraceSpanMetricsSyncHandler(
   deps: TraceSpanMetricsSyncDeps,
 ): (input: { tenantId: string; traceId: string; occurredAt: number }) => Promise<void> {
   return async ({ tenantId, traceId, occurredAt }) => {
-    const summary = await deps.findSummary({ projectId: tenantId, traceId });
+    const summary = await deps.findSummary({
+      projectId: tenantId,
+      traceId,
+      occurredAtMs: occurredAt,
+    });
     if (!summary || !hasSimulationMetrics(summary)) return;
     const scenarioRunId = summary.attributes["scenario.run_id"];
     if (!scenarioRunId) return;

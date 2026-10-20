@@ -10,12 +10,15 @@ import {
   ClickHouseClientFactory,
   ClickHouseConfigService,
   ClickHouseConnection,
+  ClickHouseQueryClient,
   createTenantRouter,
   DEFAULT_CLICKHOUSE_SETTINGS,
   parseRoutingTable,
   PRIVATE_ROUTE_ENV_PREFIX,
+  routingDriver,
   type ClickHouseClientCreationInput,
   type TenantDirectory,
+  TenantGuard,
 } from "@langwatch/clickhouse-client";
 import {
   migrateTestClickHouseOnce,
@@ -31,6 +34,7 @@ import type { SpanInsertData } from "@langwatch/trace-contract";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { MemberTraceClickHouseClientRepository } from "../clickhouse.trace-member-client.repository.ts";
 import { SpanStorageClickHouseRepository } from "../span-storage.repository.ts";
 
 const PRIVATE_ORGANIZATION = privateRouteOrgId("isolation-private");
@@ -161,7 +165,6 @@ describe("given one organization on a private ClickHouse instance and one on the
             await ClickHouseMigrateTask.createFromConfig({
               config: {
                 buildTime: false,
-                skipped: false,
                 sharedUrl: endpoint.url,
                 privateEndpoints: [],
                 settings: {
@@ -196,7 +199,15 @@ describe("given one organization on a private ClickHouse instance and one on the
     });
 
     const resolveClient = (tenantId: string) => connection.resolve(tenantId);
-    spans = new SpanStorageClickHouseRepository(resolveClient as never);
+    // The routed member, composed as the process composes it for Trace's repositories.
+    const member = new ClickHouseQueryClient({
+      tenantGuard: new TenantGuard(),
+      driver: routingDriver(connection),
+    });
+    spans = SpanStorageClickHouseRepository.create({
+      resolveClient: MemberTraceClickHouseClientRepository.resolverFor(member),
+      clickhouse: MemberTraceClickHouseClientRepository.authorizedFor(member),
+    });
     events = EventingClickHouseEventRepository.create({
       resolveClient: resolveClient as never,
       retention: createEventingRetentionConfiguration({ defaultRetentionDays: 30 }),

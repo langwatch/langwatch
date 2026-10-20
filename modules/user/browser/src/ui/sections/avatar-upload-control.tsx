@@ -1,7 +1,8 @@
 import { UserAvatar } from "@langwatch/design-system/avatar";
 import { Dialog } from "@langwatch/design-system/dialog";
-import { chakra, Box, Button, Center, HStack, Text } from "@langwatch/design-system/primitives";
+import { chakra, Box, Center, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
+import { useProductAccent } from "@langwatch/design-system/use-product-accent";
 import { Info, Pencil } from "lucide-react";
 import { useRef, useState } from "react";
 
@@ -36,6 +37,7 @@ function AvatarEditButton({
   onOpen: () => void;
 }) {
   const src = useUserAvatarUrl(image);
+  const accent = useProductAccent();
   return (
     <chakra.button
       position="relative"
@@ -55,8 +57,8 @@ function AvatarEditButton({
         right="0"
         width="18px"
         height="18px"
-        bg="orange.solid"
-        color="orange.contrast"
+        bg={accent.roles.solid}
+        color={accent.roles.contrast}
         borderRadius="full"
         borderWidth="2px"
         borderColor="bg.surface"
@@ -103,66 +105,45 @@ function AvatarPhotoDialog({
   onCancel: () => void;
 }) {
   const src = useUserAvatarUrl(image);
+  const removeAction = hasImage
+    ? ({ label: "Remove", tone: "danger", onClick: onRemove, loading: isRemoving } as const)
+    : void 0;
+  const secondaryAction = hasPreview ? { label: "Cancel", onClick: onCancel } : removeAction;
   return (
-    <Dialog.Root open={isOpen} onOpenChange={(e) => onOpenChange(e.open)} size="sm">
-      <Dialog.Content bg="bg">
-        <Dialog.Header>
-          <Dialog.Title>Profile photo</Dialog.Title>
-        </Dialog.Header>
-        <Dialog.CloseTrigger />
-        <Dialog.Body>
-          <Center py={2}>
-            <UserAvatar
-              name={name}
-              src={src}
-              width="180px"
-              height="180px"
-              borderWidth="1px"
-              borderColor="border.muted"
-            />
-          </Center>
-          {waiting && (
-            <Text fontSize="xs" color="fg.muted" textAlign="center" as="output" display="block">
-              {PERSONAL_WORKSPACE_WAIT_HINT}
-            </Text>
-          )}
-        </Dialog.Body>
-        <Dialog.Footer>
-          {hasPreview ? (
-            <HStack gap={2}>
-              <Button variant="ghost" onClick={onCancel} disabled={isBusy}>
-                Cancel
-              </Button>
-              <Button
-                colorPalette="orange"
-                onClick={onSave}
-                loading={isSaving}
-                disabled={isBusy || waiting}
-              >
-                Save photo
-              </Button>
-            </HStack>
-          ) : (
-            <HStack gap={2}>
-              {hasImage && (
-                <Button
-                  variant="ghost"
-                  colorPalette="red"
-                  onClick={onRemove}
-                  loading={isRemoving}
-                  disabled={isBusy}
-                >
-                  Remove
-                </Button>
-              )}
-              <Button colorPalette="orange" onClick={onChange} disabled={isBusy}>
-                {hasImage ? "Change photo" : "Upload photo"}
-              </Button>
-            </HStack>
-          )}
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+    <Dialog
+      open={isOpen}
+      onClose={() => onOpenChange(false)}
+      title="Profile photo"
+      busy={isBusy}
+      cancelLabel={null}
+      secondaryAction={secondaryAction}
+      primaryAction={
+        hasPreview
+          ? {
+              label: "Save photo",
+              onClick: onSave,
+              loading: isSaving,
+              disabledReason: waiting ? PERSONAL_WORKSPACE_WAIT_HINT : void 0,
+            }
+          : { label: hasImage ? "Change photo" : "Upload photo", onClick: onChange }
+      }
+    >
+      <Center py={2}>
+        <UserAvatar
+          name={name}
+          src={src}
+          width="180px"
+          height="180px"
+          borderWidth="1px"
+          borderColor="border.muted"
+        />
+      </Center>
+      {waiting && (
+        <Text fontSize="xs" color="fg.muted" textAlign="center" as="output" display="block">
+          {PERSONAL_WORKSPACE_WAIT_HINT}
+        </Text>
+      )}
+    </Dialog>
   );
 }
 

@@ -1,6 +1,7 @@
 import { Link } from "@langwatch/browser-host/link";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
+import { ContentTabs } from "@langwatch/design-system/content-tabs";
 import {
   Alert,
   Badge,
@@ -9,7 +10,6 @@ import {
   GridItem,
   Heading,
   HStack,
-  Tabs,
   Tag,
   Text,
   VStack,
@@ -160,27 +160,20 @@ export function EvaluatorSelection({
           </Box>
         </Alert.Root>
       )}
-      <Tabs.Root
-        colorPalette="orange"
-        defaultValue={tab}
+      <ContentTabs
+        label="Evaluator categories"
         value={tab}
-        onValueChange={(change) => {
+        onValueChange={({ value }) => {
           void router.replace({
             pathname: router.pathname,
-            query: { ...router.query, tab: change.value },
+            query: { ...router.query, tab: value },
           });
         }}
-      >
-        <Tabs.List>
-          {Object.keys(availableEvaluatorsPerCategory).map((category) => (
-            <Tabs.Trigger key={category} value={category}>
-              {titleCase(category)}
-            </Tabs.Trigger>
-          ))}
-        </Tabs.List>
-
-        {Object.entries(availableEvaluatorsPerCategory).map(([category, evaluators]) => (
-          <Tabs.Content key={category} value={category} paddingX={0}>
+        mount="all"
+        items={Object.entries(availableEvaluatorsPerCategory).map(([category, evaluators]) => ({
+          value: category,
+          label: titleCase(category),
+          content: (
             <Grid templateColumns="repeat(3, 1fr)" gap={6}>
               {evaluators.map(([key, evaluator]) => (
                 <EvaluatorChoiceCard
@@ -224,9 +217,9 @@ export function EvaluatorSelection({
                 </GridItem>
               )}
             </Grid>
-          </Tabs.Content>
-        ))}
-      </Tabs.Root>
+          ),
+        }))}
+      />
     </VStack>
   );
 }
@@ -285,7 +278,7 @@ function EvaluatorChoiceCard({
                 top="-12px"
                 background="blue.subtle"
                 borderRadius="100%"
-                padding="4px"
+                padding="1"
               >
                 <Shield />
               </Box>
@@ -293,17 +286,11 @@ function EvaluatorChoiceCard({
           )}
           <HStack>
             {evaluator.beta && (
-              <Tag.Root
-                size="sm"
-                colorPalette="pink"
-                paddingX={2}
-                fontSize="14px"
-                marginLeft="-4px"
-              >
+              <Tag.Root size="sm" colorPalette="pink" paddingX={2} textStyle="body" marginLeft="-1">
                 <Tag.Label>Beta</Tag.Label>
               </Tag.Root>
             )}
-            <Heading as="h2" size="sm">
+            <Heading as="h2" textStyle="cardTitle">
               {evaluatorDisplayName(evaluator.name)}
             </Heading>
           </HStack>

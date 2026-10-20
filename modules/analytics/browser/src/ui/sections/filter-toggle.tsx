@@ -13,10 +13,9 @@ import { countFilters, type FilterParam } from "../../model/analytics-filter-par
 import { FilterIconWithBadge } from "./filter-icon-with-badge.tsx";
 
 export function FilterToggle({ defaultShowFilters = false }: { defaultShowFilters?: boolean }) {
-  const { showFilters, setShowFilters, filterParams, clearFilters, setNegateFilters } =
-    useFilterToggle({
-      defaultShowFilters,
-    });
+  const { showFilters, setShowFilters, filterParams, clearFilters } = useFilterToggle({
+    defaultShowFilters,
+  });
 
   return (
     <FilterToggleButton
@@ -24,8 +23,6 @@ export function FilterToggle({ defaultShowFilters = false }: { defaultShowFilter
       onClick={() => setShowFilters(!showFilters)}
       filters={filterParams.filters}
       onClear={clearFilters}
-      negateFiltersToggled={filterParams.negateFilters}
-      setNegateFilters={setNegateFilters}
     >
       Filters
     </FilterToggleButton>
@@ -38,16 +35,12 @@ export function FilterToggleButton({
   filters,
   onClear,
   children,
-  negateFiltersToggled,
-  setNegateFilters,
 }: {
   toggled: boolean;
   onClick?: () => void;
   filters: Partial<Record<FilterField, FilterParam>>;
   onClear?: () => void;
   children: React.ReactNode;
-  negateFiltersToggled?: boolean;
-  setNegateFilters?: (negateFilters: boolean) => void;
 }) {
   const { filterCount, hasAnyFilters } = countFilters(filters);
 
@@ -77,22 +70,6 @@ export function FilterToggleButton({
             onClick={onClear}
           >
             <X width={12} style={{ minWidth: "12px" }} />
-          </Button>
-        </Tooltip>
-      )}
-      {setNegateFilters && (
-        <Tooltip content="Negate filters" positioning={{ gutter: 0 }}>
-          <Button
-            variant="plain"
-            width="fit-content"
-            minWidth={0}
-            backgroundColor={negateFiltersToggled ? "bg.muted" : undefined}
-            onClick={(e) => {
-              e.stopPropagation();
-              setNegateFilters(!negateFiltersToggled);
-            }}
-          >
-            <span style={{ fontSize: "20px", marginTop: "-4px" }}>¬</span> Negate Filters
           </Button>
         </Tooltip>
       )}

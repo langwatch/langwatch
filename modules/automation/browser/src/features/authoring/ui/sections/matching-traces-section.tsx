@@ -1,3 +1,4 @@
+import { Card } from "@langwatch/design-system/card";
 import { formatMilliseconds } from "@langwatch/design-system/format-milliseconds";
 import { Box, Button, HStack, Spinner, Text, VStack } from "@langwatch/design-system/primitives";
 import { nowInstant } from "@langwatch/time";
@@ -103,19 +104,11 @@ function MatchResults({ data }: { data: MatchList }) {
           ? "1 trace matched in the last 7 days"
           : `${data.totalHits.toLocaleString()} traces matched in the last 7 days`}
       </Text>
-      <VStack
-        align="stretch"
-        gap={0}
-        width="full"
-        borderWidth="1px"
-        borderColor="border"
-        borderRadius="md"
-        overflow="hidden"
-      >
+      <Card variant="frame" padding="none" bodyLayout="stack">
         {data.items.map((trace) => (
           <MatchedTraceRow key={trace.traceId} trace={trace} />
         ))}
-      </VStack>
+      </Card>
     </VStack>
   );
 }

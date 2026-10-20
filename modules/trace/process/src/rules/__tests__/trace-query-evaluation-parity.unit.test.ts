@@ -920,6 +920,12 @@ describe("free text compiled to ClickHouse", () => {
 
   it("negates the whole clause, not just the IO columns", () => {
     const compiled = compile("NOT codex");
-    expect(compiled!.sql.trim()).toMatch(/^NOT \(/);
+    const sql = compiled!.sql.trim();
+    expect(sql).toMatch(
+      /^\(NOT \(ComputedInput ILIKE .* OR ifNull\(TraceName, ''\) ILIKE [^)]*\) AND /,
+    );
+    expect(sql).toContain(
+      "(TenantId, TraceId) NOT IN (SELECT DISTINCT TenantId, TraceId FROM stored_spans",
+    );
   });
 });

@@ -6,8 +6,6 @@ from typing import TYPE_CHECKING, Any, TypeVar, cast
 from attrs import define as _attrs_define
 from attrs import field as _attrs_field
 
-from ..types import UNSET, Unset
-
 if TYPE_CHECKING:
     from ..models.patch_api_monitors_by_id_body_mappings_type_0_mapping import (
         PatchApiMonitorsByIdBodyMappingsType0Mapping,
@@ -21,30 +19,27 @@ T = TypeVar("T", bound="PatchApiMonitorsByIdBodyMappingsType0")
 class PatchApiMonitorsByIdBodyMappingsType0:
     """
     Attributes:
-        mapping (PatchApiMonitorsByIdBodyMappingsType0Mapping | Unset):
-        expansions (list[str] | Unset):
+        mapping (PatchApiMonitorsByIdBodyMappingsType0Mapping):
+        expansions (list[str]):
     """
 
-    mapping: PatchApiMonitorsByIdBodyMappingsType0Mapping | Unset = UNSET
-    expansions: list[str] | Unset = UNSET
+    mapping: PatchApiMonitorsByIdBodyMappingsType0Mapping
+    expansions: list[str]
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
-        mapping: dict[str, Any] | Unset = UNSET
-        if not isinstance(self.mapping, Unset):
-            mapping = self.mapping.to_dict()
+        mapping = self.mapping.to_dict()
 
-        expansions: list[str] | Unset = UNSET
-        if not isinstance(self.expansions, Unset):
-            expansions = self.expansions
+        expansions = self.expansions
 
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
-        field_dict.update({})
-        if mapping is not UNSET:
-            field_dict["mapping"] = mapping
-        if expansions is not UNSET:
-            field_dict["expansions"] = expansions
+        field_dict.update(
+            {
+                "mapping": mapping,
+                "expansions": expansions,
+            }
+        )
 
         return field_dict
 
@@ -55,14 +50,9 @@ class PatchApiMonitorsByIdBodyMappingsType0:
         )
 
         d = dict(src_dict)
-        _mapping = d.pop("mapping", UNSET)
-        mapping: PatchApiMonitorsByIdBodyMappingsType0Mapping | Unset
-        if isinstance(_mapping, Unset):
-            mapping = UNSET
-        else:
-            mapping = PatchApiMonitorsByIdBodyMappingsType0Mapping.from_dict(_mapping)
+        mapping = PatchApiMonitorsByIdBodyMappingsType0Mapping.from_dict(d.pop("mapping"))
 
-        expansions = cast(list[str], d.pop("expansions", UNSET))
+        expansions = cast(list[str], d.pop("expansions"))
 
         patch_api_monitors_by_id_body_mappings_type_0 = cls(
             mapping=mapping,

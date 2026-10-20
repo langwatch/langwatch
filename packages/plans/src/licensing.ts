@@ -15,6 +15,19 @@ export const licenseSeatsShape = {
   maxMembersLite: z.number().optional(),
 } as const;
 
+/** The most lite seats an operator may state: the 32-bit seat column. Unlimited is a plan's. */
+export const MAX_STATED_LITE_SEATS = 2_147_483_647;
+
+/** Lite seats as an operator states them when issuing or reissuing; empty is the plan default. */
+export const statedLiteSeatsSchema = z
+  .number()
+  .int()
+  .min(0)
+  .max(
+    MAX_STATED_LITE_SEATS,
+    `Lite seats can be at most ${MAX_STATED_LITE_SEATS}; leave them empty for the plan's default`,
+  );
+
 /** Whether the plan may publish. Named here so no payload restates it. */
 export const planPublishingShape = {
   canPublish: z.boolean(),

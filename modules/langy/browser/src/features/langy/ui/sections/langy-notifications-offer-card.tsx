@@ -47,7 +47,7 @@ export function LangyNotificationsOfferCard() {
     <CardShell>
       <VStack align="stretch" gap={3}>
         <HStack align="start" gap={2}>
-          <Box color="fg.muted" paddingTop="2px">
+          <Box color="fg.muted" paddingTop="0.5">
             <Bell size={14} />
           </Box>
           <Text textStyle="sm" color="fg">
@@ -81,7 +81,7 @@ function SettledLine({ icon, line }: { icon: ReactNode; line: string }) {
   return (
     <CardShell>
       <HStack align="start" gap={2}>
-        <Box color="fg.muted" paddingTop="2px">
+        <Box color="fg.muted" paddingTop="0.5">
           {icon}
         </Box>
         <Text textStyle="sm" color="fg.muted">

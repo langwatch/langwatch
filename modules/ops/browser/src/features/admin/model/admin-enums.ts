@@ -34,3 +34,8 @@ export type Currency = (typeof Currency)[keyof typeof Currency];
 export const PricingModel = { TIERED: "TIERED", SEAT_EVENT: "SEAT_EVENT" } as const;
 
 export type PricingModel = (typeof PricingModel)[keyof typeof PricingModel];
+
+export const PRICING_MODEL_LABELS: Record<PricingModel, string> = {
+  TIERED: "Tiered",
+  SEAT_EVENT: "Seat and event",
+};

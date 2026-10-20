@@ -40,8 +40,8 @@ func tabRows(orch *app.Orchestrator, slug, name string) (any, error) {
 // browserStatus is `haven browser status --json`: never starts a browser.
 func browserStatus(slug string) map[string]any {
 	reply := map[string]any{"running": false}
-	if daemon, ok := readBrowserDaemon(browserDir(slug)); ok {
-		if daemon.call(context.Background(), "status", map[string]any{}, &reply) != nil {
+	if daemon, ok := runningBrowser(slug); ok {
+		if daemon.call(context.Background(), "status", stackBody(slug), &reply) != nil {
 			reply = map[string]any{"running": false}
 		}
 	}
@@ -51,11 +51,11 @@ func browserStatus(slug string) map[string]any {
 // openLane answers the running daemon when lane is one it holds open; the
 // console only looks at lanes, so it never opens one or names a file path.
 func openLane(slug, lane string) (browserDaemon, error) {
-	daemon, ok := readBrowserDaemon(browserDir(slug))
+	daemon, ok := runningBrowser(slug)
 	var status struct {
 		Lanes []string `json:"lanes"`
 	}
-	if ok && daemon.call(context.Background(), "status", map[string]any{}, &status) == nil && slices.Contains(status.Lanes, lane) {
+	if ok && daemon.call(context.Background(), "status", stackBody(slug), &status) == nil && slices.Contains(status.Lanes, lane) {
 		return daemon, nil
 	}
 	return browserDaemon{}, fmt.Errorf("no open browser lane %q on %s", lane, slug)
@@ -70,7 +70,7 @@ func dashboardBrowser() dashboard.Browser {
 				return nil, err
 			}
 			var reply map[string]any
-			err = daemon.call(ctx, "snapshot", map[string]any{"lane": lane, "timeoutMs": 10_000}, &reply)
+			err = daemon.call(ctx, "snapshot", map[string]any{"stack": stackBody(slug)["stack"], "lane": lane, "timeoutMs": 10_000, "full": true}, &reply)
 			return reply, err
 		},
 		Screenshot: func(ctx context.Context, slug, lane string) ([]byte, error) {
@@ -79,7 +79,7 @@ func dashboardBrowser() dashboard.Browser {
 				return nil, err
 			}
 			out := filepath.Join(browserDir(slug), "console", lane+".png")
-			if err := daemon.call(ctx, "screenshot", map[string]any{"lane": lane, "out": out, "timeoutMs": 10_000}, nil); err != nil {
+			if err := daemon.call(ctx, "screenshot", map[string]any{"stack": stackBody(slug)["stack"], "lane": lane, "out": out, "timeoutMs": 10_000}, nil); err != nil {
 				return nil, err
 			}
 			return os.ReadFile(out)

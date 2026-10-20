@@ -94,6 +94,10 @@
       "types": "./dist/query/query-retry.d.ts",
       "default": "./src/query/query-retry.ts"
     },
+    "./read-timeout": {
+      "types": "./dist/query/read-timeout.d.ts",
+      "default": "./src/query/read-timeout.ts"
+    },
     "./testing": {
       "types": "./dist/testing.d.ts",
       "default": "./src/testing.ts"
@@ -184,7 +188,7 @@
     }
   },
   "scripts": {
-    "typecheck": "tsc -b",
+    "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run"
   },
   "dependencies": {

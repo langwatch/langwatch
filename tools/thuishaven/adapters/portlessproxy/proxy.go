@@ -79,6 +79,7 @@ func (p *Proxy) run(args ...string) error {
 	argv := append(p.argv(), args...)
 	cmd := exec.Command(argv[0], argv[1:]...)
 	cmd.Env = append(os.Environ(), "PORTLESS_TLD="+p.naming.TLD)
+	detach(cmd) // portless may start the proxy itself; it must never join the caller's session
 	return cmd.Run()
 }
 
@@ -103,7 +104,7 @@ func (p *Proxy) EnsureReady() error {
 		// root launchd service — already holds the port). The persistent root
 		// service stays opt-in via `haven self setup`, which needs sudo and so
 		// must not be triggered from a possibly-non-interactive `pnpm dev`.
-		if err := p.runVerbose("proxy", "start"); err != nil {
+		if err := p.startDetached(); err != nil {
 			return fmt.Errorf("could not start the portless proxy: %w", err)
 		}
 		if !p.waitRunning(5 * time.Second) {
@@ -112,6 +113,19 @@ func (p *Proxy) EnsureReady() error {
 	}
 	p.ensureTrusted()
 	return nil
+}
+
+// startDetached runs `portless proxy start` in its own session. The proxy is
+// machine-wide; started inside a stack launcher's process group it would die
+// with that group when `haven down` (or -f) signals it, taking every other
+// stack's routes with it.
+func (p *Proxy) startDetached() error {
+	argv := append(p.argv(), "proxy", "start")
+	cmd := exec.Command(argv[0], argv[1:]...)
+	cmd.Env = append(os.Environ(), "PORTLESS_TLD="+p.naming.TLD)
+	cmd.Stdin, cmd.Stdout, cmd.Stderr = os.Stdin, os.Stdout, os.Stderr
+	detach(cmd)
+	return cmd.Run()
 }
 
 // waitRunning polls until the proxy daemon reports alive or the deadline passes.

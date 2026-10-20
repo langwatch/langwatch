@@ -182,6 +182,42 @@ export function clickHouseErrorSummary(error: unknown): ClickHouseErrorSummary {
   };
 }
 
+/** The code name ClickHouse appends to a message: `(NAMED_COLLECTION_DOESNT_EXIST) (version`. */
+const CODE_NAME_SUFFIX = /\(((?=[A-Z0-9_]*[A-Z]{3})[A-Z0-9_]+)\)\s*\(version\b/;
+const CODE_NAME = /^(?=[A-Z0-9_]*[A-Z]{3})[A-Z0-9_]+$/;
+const KNOWN_CODE_NAMES: ReadonlyMap<number, string> = new Map(
+  Object.entries(CLICKHOUSE_CONFIG_STORE_ERROR_CODE).map(([name, code]) => [code, name]),
+);
+
+/** The server's error code and its name for a log line; null when the server raised neither. */
+export function clickHouseErrorCodeFields(error: unknown): {
+  clickhouseCode: number | null;
+  clickhouseCodeName: string | null;
+} {
+  const failure = readClickHouseFailure(error);
+  if (failure.from === "client") return { clickhouseCode: null, clickhouseCodeName: null };
+  const type = (error as { type?: unknown } | null)?.type;
+  const message = error instanceof Error ? error.message : "";
+  const name =
+    (typeof type === "string" && CODE_NAME.test(type) ? type : undefined) ??
+    CODE_NAME_SUFFIX.exec(message)?.[1] ??
+    KNOWN_CODE_NAMES.get(failure.code) ??
+    null;
+  return { clickhouseCode: failure.code, clickhouseCodeName: name };
+}
+
+/** Prisma's error code and the PostgreSQL server's SQLSTATE for a log line; null where absent. */
+export function postgresErrorCodeFields(error: unknown): {
+  code: string | null;
+  sqlState: string | null;
+} {
+  const failure = error as { code?: unknown; meta?: { code?: unknown } } | null;
+  return {
+    code: typeof failure?.code === "string" ? failure.code : null,
+    sqlState: typeof failure?.meta?.code === "string" ? failure.meta.code : null,
+  };
+}
+
 function statementTokens(statement: string): string[] {
   return statement
     .replace(/\bOR\s+REPLACE\b/gi, " ")

@@ -2,17 +2,16 @@
  * Passkeys section: create, view, and manage passkeys in account settings.
  */
 
+import { Banner } from "@langwatch/design-system/banner";
 import { Dialog } from "@langwatch/design-system/dialog";
+import { FormattedDate } from "@langwatch/design-system/formatted-date";
 import { Menu } from "@langwatch/design-system/menu";
 import {
-  Alert,
   Box,
   Button,
   Field,
-  HStack,
   Input,
   Spacer,
-  Spinner,
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
@@ -21,7 +20,8 @@ import {
   SettingsSection,
   SettingsSectionRow,
 } from "@langwatch/design-system/settings-section";
-import { readableDate } from "@langwatch/time";
+import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { toEpochMs } from "@langwatch/time";
 import { Fingerprint, MoreVertical, Usb } from "lucide-react";
 import { useCallback, useEffect, useState } from "react";
 
@@ -46,6 +46,7 @@ function RenamePasskeyDialog({
 }) {
   const [name, setName] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+  const [nameMissing, setNameMissing] = useState(false);
 
   // Seeded from the passkey being renamed rather than held in sync with it: the
   // dialog opens once per passkey, and re-seeding on every render would fight
@@ -54,61 +55,58 @@ function RenamePasskeyDialog({
     if (passkey) setName(passkey.name ?? "");
   }, [passkey]);
 
+  const close = () => {
+    setNameMissing(false);
+    onClose();
+  };
+
   const save = async () => {
     if (!passkey) return;
     setIsSaving(true);
     try {
       await onRename({ id: passkey.id, name: name.trim() });
-      onClose();
+      close();
     } finally {
       setIsSaving(false);
     }
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!passkey}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={close}
+      title="Rename passkey"
       placement="center"
+      busy={isSaving}
+      onSubmit={() => {
+        if (!name.trim()) {
+          setNameMissing(true);
+          return;
+        }
+        void save();
+      }}
+      primaryAction={{
+        label: "Save",
+        type: "submit",
+        loading: isSaving,
+        "data-testid": "save-passkey-name",
+      }}
     >
-      <Dialog.Content bg="bg">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Rename passkey
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Field.Root>
-            <Field.Label>Name</Field.Label>
-            <Input
-              value={name}
-              onChange={(event) => setName(event.target.value)}
-              placeholder="Work laptop"
-              data-testid="passkey-name"
-            />
-          </Field.Root>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button variant="outline" onClick={onClose} disabled={isSaving}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="orange"
-              loading={isSaving}
-              disabled={!name.trim()}
-              onClick={() => void save()}
-              data-testid="save-passkey-name"
-            >
-              Save
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Field.Root invalid={nameMissing}>
+        <Field.Label>Name</Field.Label>
+        <Input
+          value={name}
+          onChange={(event) => {
+            setName(event.target.value);
+            setNameMissing(false);
+          }}
+          aria-invalid={nameMissing || undefined}
+          placeholder="Work laptop"
+          data-testid="passkey-name"
+        />
+        <Field.ErrorText>Enter a name for this passkey.</Field.ErrorText>
+      </Field.Root>
+    </Dialog>
   );
 }
 
@@ -139,43 +137,25 @@ function RemovePasskeyDialog({
   };
 
   return (
-    <Dialog.Root
+    <Dialog
       open={!!passkey}
-      onOpenChange={(details) => {
-        if (!details.open) onClose();
-      }}
+      onClose={onClose}
+      title={`Remove ${passkey ? passkeyLabel(passkey) : "passkey"}?`}
       placement="center"
+      busy={isRemoving}
+      primaryAction={{
+        label: "Remove",
+        danger: true,
+        loading: isRemoving,
+        onClick: () => void remove(),
+        "data-testid": "confirm-remove-passkey",
+      }}
     >
-      <Dialog.Content bg="bg">
-        <Dialog.CloseTrigger />
-        <Dialog.Header>
-          <Dialog.Title fontSize="md" fontWeight="500">
-            Remove {passkey ? passkeyLabel(passkey) : "passkey"}?
-          </Dialog.Title>
-        </Dialog.Header>
-        <Dialog.Body>
-          <Text fontSize="sm" color="fg.muted">
-            You will not be able to sign in with it again. The passkey stays on your device until
-            you delete it there too.
-          </Text>
-        </Dialog.Body>
-        <Dialog.Footer>
-          <HStack gap={3} justify="end" width="full">
-            <Button variant="outline" onClick={onClose} disabled={isRemoving}>
-              Cancel
-            </Button>
-            <Button
-              colorPalette="red"
-              loading={isRemoving}
-              onClick={() => void remove()}
-              data-testid="confirm-remove-passkey"
-            >
-              Remove
-            </Button>
-          </HStack>
-        </Dialog.Footer>
-      </Dialog.Content>
-    </Dialog.Root>
+      <Text fontSize="sm" color="fg.muted">
+        You will not be able to sign in with it again. The passkey stays on your device until you
+        delete it there too.
+      </Text>
+    </Dialog>
   );
 }
 
@@ -214,7 +194,7 @@ function PasskeyGroup({
               {passkeyLabel(passkey)}
             </Text>
             <Text fontSize="xs" color="fg.muted">
-              Added {readableDate(passkey.createdAt).toLocaleDateString()}
+              Added <FormattedDate value={toEpochMs(passkey.createdAt)} display="date" />
             </Text>
           </VStack>
           <Spacer />
@@ -247,18 +227,15 @@ function LastWayInNotice({ passkeys }: { passkeys: number | undefined }) {
   if (!warning) return null;
 
   return (
-    <Alert.Root status="warning" variant="surface" data-testid="last-way-in-notice">
-      <Alert.Indicator />
-      <Alert.Content>
-        <Alert.Description>{warning.message}</Alert.Description>
-      </Alert.Content>
-    </Alert.Root>
+    <Banner status="warning" data-testid="last-way-in-notice">
+      {warning.message}
+    </Banner>
   );
 }
 
 function SsoGovernedLine() {
   return (
-    <Text fontSize="sm" color="fg.muted" data-testid="passkeys-sso-governed">
+    <Text textStyle="body" color="fg.muted" data-testid="passkeys-sso-governed">
       {SSO_HANDLES_SIGN_IN}
     </Text>
   );
@@ -360,7 +337,7 @@ export function PasskeysSection() {
       <VStack width="full" align="start" gap={4} data-testid="passkeys-section">
         <LastWayInNotice passkeys={isPending ? undefined : held.length} />
 
-        {isPending ? <Spinner size="sm" /> : null}
+        {isPending ? <SkeletonRows rows={2} /> : null}
 
         {!isPending && held.length === 0 ? (
           <SettingsEmptyState
@@ -418,20 +395,18 @@ export function PasskeysSection() {
         ) : null}
 
         {/* The waiting state sits over the list the ceremony was started from. */}
-        <Dialog.Root open={isCreating} placement="center">
-          <Dialog.Content bg="bg" data-testid="passkey-ceremony-dialog">
-            <Dialog.Header>
-              <Dialog.Title fontSize="md" fontWeight="500">
-                Create your passkey
-              </Dialog.Title>
-            </Dialog.Header>
-            <Dialog.Body paddingBottom={6}>
-              <Text fontSize="sm" color="fg.muted">
-                Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
-              </Text>
-            </Dialog.Body>
-          </Dialog.Content>
-        </Dialog.Root>
+        <Dialog
+          open={isCreating}
+          onClose={() => {}}
+          title="Create your passkey"
+          placement="center"
+          dismissible={false}
+          data-testid="passkey-ceremony-dialog"
+        >
+          <Text textStyle="body" color="fg.muted">
+            Follow your device&apos;s prompt to finish. Closing it keeps things as they were.
+          </Text>
+        </Dialog>
 
         <RenamePasskeyDialog
           passkey={renaming}

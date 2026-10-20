@@ -103,7 +103,7 @@ function AnnotationBadge({ annotation }: { annotation: NonNullable<BubbleProps["
       }`}
     >
       <Icon as={MessageSquare} boxSize="10px" />
-      <Text textStyle="2xs" fontWeight="600" lineHeight="1">
+      <Text textStyle="2xs" fontWeight="semibold" lineHeight="1">
         {count}
       </Text>
       {hasCorrection && <Icon as={Lightbulb} boxSize="10px" color="yellow.fg" />}
@@ -137,7 +137,7 @@ function BubbleMarkdown({ compact, text }: { compact: boolean; text: string }) {
   return (
     <Box
       css={{
-        "& > div": { fontSize: compact ? "13.5px" : "14px", lineHeight: "1.55" },
+        "& > div": { textStyle: compact ? "bodySm" : "body", lineHeight: "1.55" },
         "& > div > *:first-child": { marginTop: "0 !important" },
         "& > div > *:last-child": { marginBottom: "0 !important" },
         "& h1": { fontSize: "1.15em !important" },
@@ -233,7 +233,7 @@ export const Bubble: React.FC<BubbleProps> = ({
         }}
       >
         <HStack gap={1.5} marginBottom={1} align="center">
-          <Text textStyle="2xs" fontWeight="600" color={palette.accent} letterSpacing="0.02em">
+          <Text textStyle="2xs" fontWeight="semibold" color={palette.accent} letterSpacing="0.02em">
             {label}
           </Text>
           {annotation && hasAnnotation && <AnnotationBadge annotation={annotation} />}

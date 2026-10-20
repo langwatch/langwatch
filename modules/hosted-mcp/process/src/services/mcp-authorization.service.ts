@@ -5,6 +5,7 @@
  */
 import { randomBytes } from "node:crypto";
 
+import { AggregateProjectHasNoCredentialError } from "@langwatch/api-key-contract";
 import { isAggregateProjectKind, NON_DESTINATION_PROJECT_KINDS } from "@langwatch/project-contract";
 import { nowInstant, type TimeInput } from "@langwatch/time";
 
@@ -20,14 +21,20 @@ import {
 
 const AUTH_CODE_TTL_SECONDS = 600;
 
+function aggregateRefusalOutcome(): McpApprovalOutcome {
+  const { message, code } = new AggregateProjectHasNoCredentialError();
+  return { kind: "aggregate-project-has-no-credential", message, code };
+}
+
 /** 256 bits, the length every other one-time OAuth credential here is minted at. */
 const AUTH_CODE_BYTES = 32;
 
 /**
  * The permission a caller must hold to mint an authorization code here. The code becomes a
- * session as the approving person capped at this project, so approving one confers the project.
+ * session that acts as the approving person, asked their own permission on every call, so
+ * seeing the project is enough: a viewer's client can do only what the viewer can.
  */
-export const MCP_AUTHORIZE_PERMISSION = "project:update" as const;
+export const MCP_AUTHORIZE_PERMISSION = "project:view" as const;
 
 /** The signed-in person an authorization code is minted for. */
 export type McpApprover = Readonly<{ user: Readonly<{ id: string }> }>;
@@ -159,11 +166,9 @@ export class McpAuthorizationService {
 
     if (!project) return { kind: "denied" };
 
-    // ADR-177 decision 7: the code carries the project's base key, and these kinds hold none.
+    // ADR-177 decision 7: these kinds are not a destination an MCP session can act in.
     if (NON_DESTINATION_PROJECT_KINDS.includes(project.kind)) {
-      return isAggregateProjectKind(project.kind)
-        ? { kind: "aggregate-project-has-no-credential" }
-        : { kind: "denied" };
+      return isAggregateProjectKind(project.kind) ? aggregateRefusalOutcome() : { kind: "denied" };
     }
 
     if (!this.#collaborators.codes.isAvailable()) return { kind: "unavailable" };

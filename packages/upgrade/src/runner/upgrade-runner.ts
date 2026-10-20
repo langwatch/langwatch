@@ -2,47 +2,48 @@ import { setTimeout as sleep } from "node:timers/promises";
 
 import { generate } from "@langwatch/ksuid";
 
-import { BackgroundStepsService } from "../background/background-steps.service.ts";
-import { imageContractArchives, imageContractSteps } from "../gate/image-tree.ts";
-import { UpgradeLedgerSeedService } from "../ledger-seed.service.ts";
+import { BLOCKING_STEP_DEADLINE_MS, stepDeadline } from "../background/step-deadline.ts";
+import { imageContractArchives, imagePrismaSql } from "../gate/image-tree.ts";
+import { UpgradeLedgerSeedService, withReinferred } from "../ledger-seed.service.ts";
 import { LEDGER_LOCK_TIMEOUT_MS } from "../ledger-tables.ts";
 import { UpgradeLedgerRepository } from "../ledger.repository.ts";
 import type { UpcastStepInput, UpgradeRun, UpgradeStep, UpgradeStepStatus } from "../ledger.ts";
 import { compareReleases } from "../manifest/manifest.ts";
-import type { LtsFloor, ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
+import type { ManifestStep, ReleaseManifest } from "../manifest/manifest.ts";
 import { planInstallation } from "../plan/plan-installation.ts";
-import {
-  inlineBeforeContracts,
-  type PlannedRelease,
-  type UpgradePlan,
-} from "../plan/plan-upgrade.ts";
+import { orderAfter, type PlannedRelease, type UpgradePlan } from "../plan/plan-upgrade.ts";
 import type { UpgradeClickHouse, UpgradePostgres } from "../ports.ts";
 import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
-import {
-  gooseSteps,
-  prismaSteps,
-  readGooseVersions,
-  readPrismaMigrations,
-} from "../seed-sources.ts";
+import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
-import { isRerunnablePrismaMigration } from "../stepping/rerunnable-migrations.ts";
+import { type DifferingIndex, differingPrebuiltIndexes } from "../stepping/prebuilt-indexes.ts";
+import {
+  findHandAppliedSql,
+  isRerunnablePrismaMigration,
+} from "../stepping/rerunnable-migrations.ts";
 import { ContractArchiveRepository } from "./contract-archive/contract-archive.repository.ts";
 import {
   ContractArchiveError,
   type ContractArchiveEntry,
   ContractArchiveService,
 } from "./contract-archive/contract-archive.service.ts";
+import { blocksRelease, type HeldTargets, newlyHeld, withHeldReports } from "./held-targets.ts";
 import { UPGRADE_READ_HINT_PATH, type UpgradeReadHintPublish } from "./run-hint.ts";
-import { redactSecrets, resolveCommand, UpgradeRunLog } from "./run-log.ts";
+import { redactSecrets, resolveCommand, UPGRADE_RUN_COMMAND, UpgradeRunLog } from "./run-log.ts";
 import { RunPhases, type UpgradePhaseChange, type UpgradePhaseOutcome } from "./run-phases.ts";
 import { DEFAULT_LEASE_TIMING, holdUpgradeLease, type UpgradeLeaseTiming } from "./runner-lease.ts";
-import { type RegisteredStep, UpgradeRunnerRepository } from "./runner-ledger.repository.ts";
-import type {
-  SchemaTargetReport,
-  UpgradeReconciler,
-  UpgradeRunnerLog,
-  UpgradeSchemaApplier,
+import {
+  OPERATOR_RETRY_KEY,
+  type RegisteredStep,
+  UpgradeRunnerRepository,
+} from "./runner-ledger.repository.ts";
+import {
+  isPrivateTarget,
+  type SchemaTargetReport,
+  type UpgradeReconciler,
+  type UpgradeRunnerLog,
+  type UpgradeSchemaApplier,
 } from "./schema-applier.ts";
 import { type UpgradeOutcome, upgradeOutcome, UpgradeRunFailure } from "./upgrade-outcome.ts";
 
@@ -54,16 +55,23 @@ export interface UpgradeRunnerOptions {
   postgres: UpgradePostgres;
   /** The shared ClickHouse, read only to seed an empty ledger from `goose_db_version`. */
   clickhouse?: UpgradeClickHouse;
-  /** The image's release (its newest manifest) and every step its tree declares. */
-  image: { release: string | null; steps: readonly ManifestStep[] };
-  releases: { manifests: readonly ReleaseManifest[]; floor: LtsFloor };
+  /** The image's release (its newest manifest), every step its tree declares and, to re-run a
+   *  failed one, every Prisma folder it contains (`0_init` too; UD-F2). */
+  image: {
+    release: string | null;
+    steps: readonly ManifestStep[];
+    prismaFolders?: readonly string[];
+  };
+  releases: { manifests: readonly ReleaseManifest[] };
   applier: UpgradeSchemaApplier;
   codeSteps?: readonly MigrationStep[];
-  /** Contract ids, each with the steps its SQL names `after`; read from the image if not given. */
-  contracts?: ReadonlyMap<string, readonly string[]>;
+  /** A Prisma folder's SQL, for the pre-built index check; else read from the image. */
+  prismaSql?: (args: { folder: string }) => string | null;
   /** Contract ids, each with the tables its `-- archive:` notes name; else read from the image. */
   archives?: ReadonlyMap<string, readonly string[]>;
   reconcilers?: readonly UpgradeReconciler[];
+  /** Called once the schema and blocking steps are done, before the reconcilers (T0-F11). */
+  onBlockingDone?: () => void;
   /** The image's declared event upcasts and the stored events each covers (record §9). */
   upcasts?: () => Promise<readonly UpcastStepInput[]>;
   identity: { image: string; host: string };
@@ -120,12 +128,64 @@ function targetStatus({
   return "pending";
 }
 
+/**
+ * A schema apply that reported success but left open steps unapplied (a skipped engine, no
+ * ClickHouse target, an unreadable goose history): the run fails rather than succeed behind.
+ * Spec: packages/upgrade/specs/unfinished-steps.feature.
+ */
+function unfinishedSchemaFailure({
+  unfinished,
+  reports,
+}: {
+  unfinished: readonly string[];
+  reports: readonly SchemaTargetReport[];
+}): UpgradeRunFailure {
+  const noClickHouse =
+    unfinished.some(isGoose) && !reports.some((report) => report.engine === "clickhouse");
+  const why = noClickHouse ? "; no ClickHouse target was configured" : "";
+  return new UpgradeRunFailure(
+    "schema_failed",
+    `schema steps did not end done after the apply: ${unfinished.join(", ")}${why}`,
+    { steps: [...unfinished] },
+  );
+}
+
+/** Once no Prisma migration failed: a failing target fails the run, else an unfinished step. */
+function schemaFailure({
+  reports,
+  unfinished,
+}: {
+  reports: readonly SchemaTargetReport[];
+  unfinished: readonly string[];
+}): UpgradeRunFailure | null {
+  const failing = reports.filter((report) => !report.ok);
+  if (failing.length === 0) {
+    return unfinished.length > 0 ? unfinishedSchemaFailure({ unfinished, reports }) : null;
+  }
+  const named = failing.map(
+    (report) => `${report.target} (${redactSecrets(report.error ?? "no error given")})`,
+  );
+  return new UpgradeRunFailure("schema_failed", `schema failed on ${named.join(", ")}`, {
+    targets: failing.map(({ target, error }) => ({
+      target,
+      error: error === null ? null : redactSecrets(error),
+    })),
+  });
+}
+
 /** Why the runner did not resolve a failed migration itself; null when it was never asked to. */
-type NotResolvedReason = "below-marker" | "not-shipped" | "no-resolver" | { resolveError: string };
+type NotResolvedReason =
+  | "below-marker"
+  | "not-shipped"
+  | "no-resolver"
+  | { resolveError: string }
+  | { handApplied: string };
 
 const NOT_RESOLVED: Record<Exclude<NotResolvedReason, object>, string> = {
   "below-marker":
-    "It is not newer than the re-runnable marker, so the upgrade does not re-run it. ",
+    "It is not newer than the re-runnable marker, so the upgrade does not re-run it unasked. " +
+    "If nothing of it remains, press Retry on its step in Ops > Upgrades and the next upgrade " +
+    "marks it rolled back and applies it again. ",
   "not-shipped": "This image does not ship it, so the upgrade cannot re-run it. ",
   "no-resolver": "",
 };
@@ -137,6 +197,8 @@ function prismaFailure({
   names: readonly string[];
   reason: NotResolvedReason;
 }): UpgradeRunFailure {
+  if (typeof reason === "object" && "handApplied" in reason)
+    return handAppliedFailure({ name: reason.handApplied });
   const command = resolveCommand(names[0]!);
   const why =
     typeof reason === "object"
@@ -146,35 +208,101 @@ function prismaFailure({
     "failed_prisma_migration",
     `Prisma migration ${names.join(", ")} failed and is recorded as failed in _prisma_migrations. ` +
       why +
-      `Check what it left behind, then run "${command}" if nothing of it remains, or ` +
-      `"prisma migrate resolve --applied ${names[0]}" if you completed it by hand; then upgrade again.`,
+      `Check what it left behind. Then, in packages/prisma-client with DATABASE_URL set, run ` +
+      `"${command}" if nothing of it remains, or "prisma migrate resolve --applied ${names[0]}" ` +
+      `if you completed it by hand. A waiting worker sees the row resolved and runs the upgrade ` +
+      `again by itself within 10 s; or run \`${UPGRADE_RUN_COMMAND}\`.`,
     { migrations: names, command },
   );
 }
 
-/** A re-runnable migration that failed on every attempt; the next upgrade resolves it itself. */
+/** Pending folders whose `IF NOT EXISTS` index another index of that name would skip (T9-F3). */
+function prebuiltIndexFailure({ differing }: { differing: readonly DifferingIndex[] }) {
+  const each = differing.map(
+    ({ migration, name, table, should, is }) =>
+      `Prisma migration ${migration} creates index "${name}" on "${table}" if it does not exist, ` +
+      `but an index of that name already exists and differs. It should be: ${should}. It is: ${is}.`,
+  );
+  const names = differing.map(({ name }) => `"${name}"`).join(", ");
+  return new UpgradeRunFailure(
+    "prebuilt_index_differs",
+    `${each.join(" ")} The migration would skip it and leave the table without the index it ` +
+      `expects, so nothing was applied. Drop or rename ${names} (for example ALTER INDEX ` +
+      `"${differing[0]!.name}" RENAME TO "${differing[0]!.name}_prebuilt"); nothing drops it for ` +
+      `you. Then this worker runs the upgrade again by itself within 5 minutes, or run ` +
+      `\`${UPGRADE_RUN_COMMAND}\` now.`,
+    { indexes: differing.map((index) => ({ ...index })) },
+  );
+}
+
+/** A two-statement main folder that may be half applied: the SQL a person runs, then upgrade. */
+function handAppliedFailure({ name }: { name: string }): UpgradeRunFailure {
+  const sql = findHandAppliedSql({ name });
+  return new UpgradeRunFailure(
+    "failed_prisma_migration",
+    `Prisma migration ${name} failed and is recorded as failed in _prisma_migrations. It runs ` +
+      `two statements and may have stopped between them, so the upgrade never re-runs it. Run ` +
+      `this SQL on the database; it completes the migration whatever it left behind and records ` +
+      `it applied. Then upgrade again: ${sql.join(" ")}`,
+    { migrations: [name], sql },
+  );
+}
+
+/** A resolved migration that failed on every attempt; `again` when the next upgrade re-runs it. */
 function rerunnableFailure({
   names,
   attempts,
   error,
+  again,
 }: {
   names: readonly string[];
   attempts: number;
   error: string | null;
+  again: boolean;
 }): UpgradeRunFailure {
   const detail = redactSecrets(error ?? "no error given");
+  const next = again
+    ? `It is re-runnable, so the next upgrade marks it rolled back and applies it again; no ` +
+      `prisma migrate resolve is needed. Fix the cause first.`
+    : `It was re-run on an operator's Retry, which this run spent. Fix the cause, then press ` +
+      `Retry on its step in Ops > Upgrades again.`;
   return new UpgradeRunFailure(
     "rerunnable_migration_failed",
-    `Prisma migration ${names.join(", ")} failed on all ${attempts} attempts: ${detail}. It is ` +
-      `re-runnable, so the next upgrade marks it rolled back and applies it again; no ` +
-      `prisma migrate resolve is needed. Fix the cause first.`,
+    `Prisma migration ${names.join(", ")} failed on all ${attempts} attempts: ${detail}. ${next}`,
     { migrations: names, attempts, error: detail },
   );
 }
 
+/** What lets a run re-run a migration below the marker: a first install, or an operator Retry. */
+type RerunPermit = { firstInstall: boolean; retried: ReadonlySet<string> };
+
+/**
+ * A first install is a run planned fresh while no upgrade ever succeeded: every Prisma row is this
+ * installation's own, so a failed folder re-runs whatever the marker. A Retry is read from the
+ * step's report (`OPERATOR_RETRY_KEY`). specs/upgrade/rerunnable-migrations.feature.
+ */
+function permitOf({
+  plan,
+  steps,
+  runs,
+}: {
+  plan: UpgradePlan;
+  steps: readonly UpgradeStep[];
+  runs: readonly UpgradeRun[];
+}): RerunPermit {
+  const succeeded = runs.some((run) => run.kind === "upgrade" && run.outcome === "succeeded");
+  const retried = steps.filter(
+    (step) => isPrisma(step.id) && step.report?.[OPERATOR_RETRY_KEY] !== undefined,
+  );
+  return {
+    firstInstall: plan.outcome === "planned" && plan.fresh && !succeeded,
+    retried: new Set(retried.map((step) => step.id.slice("prisma:".length))),
+  };
+}
+
 /**
  * `pnpm task upgrade` (rethink 6.4, 6.7, 6.11; blitz 3.2, D4): under the runner lease, seeds an
- * empty ledger, plans, refuses below the floor, applies release by release, records each target,
+ * empty ledger, plans, applies release by release from wherever it is, records each target,
  * runs blocking steps, then the reconcilers. specs/upgrade/upgrade-command.feature.
  */
 export class UpgradeRunnerService {
@@ -185,8 +313,11 @@ export class UpgradeRunnerService {
   private readonly shipped: RegisteredStep[];
   private readonly narrate: UpgradeRunLog;
   private readonly shippedIds: ReadonlySet<string>;
+  private readonly shippedFolders: ReadonlySet<string>;
   private readonly archiver: ContractArchiveService;
   private resolved: { migration: string; attempt: number }[] = [];
+  private permit: RerunPermit = { firstInstall: false, retried: new Set() };
+  private held: HeldTargets = new Map();
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
     this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
@@ -196,6 +327,7 @@ export class UpgradeRunnerService {
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
     this.narrate = new UpgradeRunLog(options.log);
     this.shippedIds = new Set(this.shipped.map((step) => step.id));
+    this.shippedFolders = new Set(options.image.prismaFolders ?? []);
     const store = ContractArchiveRepository.create({ postgres: options.postgres });
     this.archiver = ContractArchiveService.create({ store });
   }
@@ -282,7 +414,6 @@ export class UpgradeRunnerService {
     return createUpgradeReader({
       postgres: this.options.postgres,
       image: { release: this.options.image.release ?? "unreleased", steps: this.shipped },
-      floor: this.options.releases.floor,
     }).status();
   }
 
@@ -303,21 +434,37 @@ export class UpgradeRunnerService {
     });
   }
 
-  /** The ledger as the planner reads it; an empty or absent one is read from the tools' records. */
+  /**
+   * The ledger as the planner reads it, inferred rows re-read as a run re-infers them; an empty or
+   * absent one is read from the tools' records.
+   */
   private async readLedger(): Promise<{ steps: LedgerFacts; runs: UpgradeRun[] }> {
-    if ((await this.runner.ledgerExists()) && (await this.seeded())) {
-      return { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
-    }
     const { postgres, clickhouse } = this.options;
-    const prisma = prismaSteps({ rows: await readPrismaMigrations({ postgres }) });
-    const goose = clickhouse ? gooseSteps({ rows: await readGooseVersions({ clickhouse }) }) : [];
-    return { steps: [...prisma, ...goose], runs: [] };
+    const history = await UpgradeLedgerSeedService.create({ postgres, clickhouse }).readHistory();
+    if ((await this.runner.ledgerExists()) && (await this.succeededSeed())) {
+      const steps = withReinferred({ steps: await this.ledger.findSteps(), history });
+      return { steps, runs: await this.ledger.findRuns() };
+    }
+    return { steps: history, runs: [] };
   }
 
   /** A seed that failed or was cut after its run row seeds again, never reads as fresh. */
-  private async seeded(): Promise<boolean> {
+  private async succeededSeed(): Promise<UpgradeRun | undefined> {
     const runs = await this.ledger.findRuns();
-    return runs.some((run) => run.kind === "seed" && run.outcome === "succeeded");
+    return runs.find((run) => run.kind === "seed" && run.outcome === "succeeded");
+  }
+
+  /**
+   * Seeds the ledger once, then re-infers its seeded rows every run, so a refused install that
+   * upgraded with an image older than the ledger is planned from where it is now.
+   * Spec: packages/upgrade/specs/ledger-seed.feature.
+   */
+  private async seedOrReinfer(): Promise<void> {
+    const { postgres, clickhouse } = this.options;
+    const seeder = UpgradeLedgerSeedService.create({ postgres, clickhouse });
+    const seed = await this.succeededSeed();
+    if (seed) await seeder.reinfer({ seedRunId: seed.id });
+    else await seeder.seed();
   }
 
   /** `fresh`: this runner found no Prisma history, so what the ledger holds it applied itself. */
@@ -341,16 +488,11 @@ export class UpgradeRunnerService {
     signal: AbortSignal;
     fresh: boolean;
   }): Promise<UpgradeOutcome> {
-    if (!(await this.seeded())) {
-      const { postgres, clickhouse } = this.options;
-      await UpgradeLedgerSeedService.create({ postgres, clickhouse }).seed();
-    }
+    await this.seedOrReinfer();
     const before = { steps: await this.ledger.findSteps(), runs: await this.ledger.findRuns() };
     const { installed, plan } = this.planFrom({ ...before, fresh });
-    if (plan.outcome === "refused") return this.refuse({ plan });
-
-    const floor = this.options.releases.floor.release;
-    const run = await this.ledger.startRun({ kind: "upgrade", floor });
+    this.permit = permitOf({ plan, ...before });
+    const run = await this.ledger.startRun({ kind: "upgrade" });
     await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
     this.narrate.planned({ runId: run.id, installed, plan });
     const phases = this.phasesOf({ runId: run.id });
@@ -430,28 +572,6 @@ export class UpgradeRunnerService {
     }
   }
 
-  private async refuse({ plan }: { plan: Extract<UpgradePlan, { outcome: "refused" }> }) {
-    const run = await this.ledger.startRun({ kind: "upgrade" });
-    await this.runner.recordRunPlan({ runId: run.id, release: this.options.image.release, plan });
-    const phases = this.phasesOf({ runId: run.id });
-    await phases.start({ name: "preflight" });
-    await phases.finish({ outcome: "failed" });
-    await this.finishRun({
-      runId: run.id,
-      outcome: "failed",
-      report: { refused: plan.code },
-      phases,
-    });
-    const code =
-      plan.code === "below_lts_floor" ? "refused_below_floor" : "refused_image_below_floor";
-    return upgradeOutcome({
-      code,
-      message: plan.message,
-      runId: run.id,
-      detail: { stopAt: plan.stopAt },
-    });
-  }
-
   private async applyPlan({
     plan,
     before,
@@ -459,7 +579,7 @@ export class UpgradeRunnerService {
     signal,
     phases,
   }: {
-    plan: Extract<UpgradePlan, { outcome: "planned" }>;
+    plan: UpgradePlan;
     before: { steps: UpgradeStep[]; runs: UpgradeRun[] };
     runId: string;
     signal: AbortSignal;
@@ -467,23 +587,23 @@ export class UpgradeRunnerService {
   }): Promise<Record<string, unknown>> {
     await phases.start({ name: "preflight" });
     this.resolved = [];
-    await this.resolveLeftFailures({ signal });
+    this.held = new Map();
+    const retried = [...this.permit.retried].map((name) => `prisma:${name}`);
+    await this.runner.clearOperatorRetry({ ids: retried });
     await this.runner.registerSteps({ steps: this.shipped });
+    await this.resolveLeftFailures({ signal, runId });
     await this.retryFailedBackgroundSteps({ runId });
     const reopened = await this.reopenAfterRollback({ ...before });
     await this.runner.setStatus({ ids: plan.notNeeded, status: "not-needed", runId });
     await phases.end({ name: "preflight", outcome: "succeeded" });
     const recorded = new Map(before.steps.map((step) => [step.id, step]));
     const applied: string[] = [];
-    const inline = await this.inlineBeforeContracts({ plan });
+    await this.refuseMisorderedSteps();
+    await this.refuseDifferingIndexes({ plan });
     const declared = this.options.archives ?? imageContractArchives();
     const archived: ContractArchiveEntry[] = [];
     for (const [index, release] of plan.releases.entries()) {
       signal.throwIfAborted();
-      for (const id of inline[index] ?? []) {
-        await this.runBeforeContract({ id, signal, runId });
-        applied.push(id);
-      }
       if (release.schema.length > 0) {
         const ahead = plan.releases.slice(index);
         archived.push(...(await this.archiveContracts({ releases: ahead, runId, declared })));
@@ -495,6 +615,8 @@ export class UpgradeRunnerService {
         applied.push(id);
       }
     }
+    await this.catchUpTargets({ signal });
+    this.options.onBlockingDone?.();
     await phases.start({ name: "reconcile" });
     await this.runReconcilers({ signal });
     await phases.end({ name: "reconcile", outcome: "succeeded" });
@@ -505,6 +627,7 @@ export class UpgradeRunnerService {
       reopened,
       resolved: this.resolved,
       archived: kept,
+      ...(this.held.size > 0 ? { heldTargets: [...this.held.keys()] } : {}),
     };
   }
 
@@ -548,10 +671,42 @@ export class UpgradeRunnerService {
 
   /** Round 21, S3-RETRY: the failed rows the runner may resolve, or why it may not. */
   private resolvable({ names }: { names: readonly string[] }): NotResolvedReason | null {
-    if (!names.every((name) => isRerunnablePrismaMigration({ name }))) return "below-marker";
-    if (!names.every((name) => this.shippedIds.has(`prisma:${name}`))) return "not-shipped";
+    const handApplied = names.find((name) => findHandAppliedSql({ name }).length > 0);
+    if (handApplied !== undefined) return { handApplied };
+    if (!names.every((name) => this.mayRerun({ name }))) return "below-marker";
+    if (!names.every((name) => this.ships({ name }))) return "not-shipped";
     if (!this.options.applier.resolveRolledBack) return "no-resolver";
     return null;
+  }
+
+  /** Named by a release file or the image's step list, or a folder the image contains (UD-F2). */
+  private ships({ name }: { name: string }): boolean {
+    return this.shippedIds.has(`prisma:${name}`) || this.shippedFolders.has(name);
+  }
+
+  /** Re-runnable, a first install (UD12-F2) or an operator's Retry (Alex, 2026-10-11). */
+  private mayRerun({ name }: { name: string }): boolean {
+    const { firstInstall, retried } = this.permit;
+    return isRerunnablePrismaMigration({ name }) || firstInstall || retried.has(name);
+  }
+
+  private whyRerun({ name }: { name: string }): string {
+    if (isRerunnablePrismaMigration({ name })) return "is re-runnable";
+    return this.permit.firstInstall ? "this is a first install" : "an operator pressed Retry on it";
+  }
+
+  /** Before any folder applies, so a refusal leaves nothing half done; reads every pending one. */
+  private async refuseDifferingIndexes({ plan }: { plan: UpgradePlan }): Promise<void> {
+    const read = this.options.prismaSql ?? imagePrismaSql;
+    const folders = plan.releases.flatMap((release) =>
+      release.schema.filter(isPrisma).flatMap((id) => {
+        const folder = id.slice("prisma:".length);
+        const sql = read({ folder });
+        return sql === null ? [] : [{ name: folder, sql }];
+      }),
+    );
+    const differing = await differingPrebuiltIndexes({ postgres: this.options.postgres, folders });
+    if (differing.length > 0) throw prebuiltIndexFailure({ differing });
   }
 
   /** Marks each failed migration rolled back; refuses by name when one cannot be. */
@@ -578,14 +733,31 @@ export class UpgradeRunnerService {
     return elapsed;
   }
 
-  /** A failed row an earlier run left: resolved when re-runnable, else the run stops naming it. */
-  private async resolveLeftFailures({ signal }: { signal: AbortSignal }): Promise<void> {
+  /**
+   * A failed row an earlier run left: resolved when it may re-run, else the run stops naming it
+   * and its step reads failed again, so Ops > Upgrades shows it and the worker does not spin.
+   */
+  private async resolveLeftFailures({
+    signal,
+    runId,
+  }: {
+    signal: AbortSignal;
+    runId: string;
+  }): Promise<void> {
     const failed = await this.failedPrismaMigrations();
     if (failed.length === 0) return;
-    const elapsed = await this.resolveRolledBack({ names: failed, signal });
-    for (const [migration, resolveMs] of elapsed) {
-      this.resolved.push({ migration, attempt: 0 });
-      this.narrate.resolvedBeforeApply({ migration, resolveMs });
+    try {
+      const elapsed = await this.resolveRolledBack({ names: failed, signal });
+      for (const [migration, resolveMs] of elapsed) {
+        this.resolved.push({ migration, attempt: 0 });
+        const because = this.whyRerun({ name: migration });
+        this.narrate.resolvedBeforeApply({ migration, resolveMs, because });
+      }
+    } catch (error) {
+      if (!(error instanceof UpgradeRunFailure)) throw error;
+      const ids = failed.map((name) => `prisma:${name}`).filter((id) => this.shippedIds.has(id));
+      await this.runner.setStatus({ ids, status: "failed", runId, lastError: error.message });
+      throw error;
     }
   }
 
@@ -615,32 +787,50 @@ export class UpgradeRunnerService {
       if (open.length > 0) await phases.start({ name, release: release.release });
     }
     const { reports, attempts } = await this.applyWithRetry({ release, signal });
-    await this.recordPrisma({ open: engines[0].open, runId });
-    await this.recordClickHouse({ open: engines[1].open, reports, runId });
+    const prismaDone = await this.recordPrisma({ open: engines[0].open, runId });
+    const gooseDone = await this.recordClickHouse({ open: engines[1].open, reports, runId });
+    const done = new Set([...prismaDone, ...gooseDone]);
+    const unfinished = release.schema.filter((id) => !done.has(id));
     const failedPrisma = await this.failedPrismaMigrations();
+    const held = this.held;
     const failedOn = (engine: SchemaTargetReport["engine"]) =>
-      reports.some((report) => report.engine === engine && !report.ok);
-    const postgresFailed = failedPrisma.length > 0 || failedOn("postgres");
+      reports.some((report) => report.engine === engine && blocksRelease({ report, held }));
+    const postgresFailed =
+      failedPrisma.length > 0 || failedOn("postgres") || unfinished.some(isPrisma);
+    const clickhouseFailed = failedOn("clickhouse") || unfinished.some(isGoose);
     const outcome = (failed: boolean) => (failed ? "failed" : "succeeded");
     await phases.end({ name: "postgres-schema", outcome: outcome(postgresFailed) });
-    await phases.end({ name: "clickhouse-schema", outcome: outcome(failedOn("clickhouse")) });
+    await phases.end({ name: "clickhouse-schema", outcome: outcome(clickhouseFailed) });
+    await this.stampPhaseTiming({ phases, name: "postgres-schema", ids: prismaDone });
+    await this.stampPhaseTiming({ phases, name: "clickhouse-schema", ids: gooseDone });
     if (failedPrisma.length > 0) {
       const reason = this.resolvable({ names: failedPrisma });
       if (reason !== null) throw prismaFailure({ names: failedPrisma, reason });
       const error = reports.find((report) => report.engine === "postgres" && !report.ok)?.error;
-      throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null });
+      const again = failedPrisma.every(
+        (name) => isRerunnablePrismaMigration({ name }) || this.permit.firstInstall,
+      );
+      throw rerunnableFailure({ names: failedPrisma, attempts, error: error ?? null, again });
     }
-    const failing = reports.filter((report) => !report.ok);
-    if (failing.length === 0) return;
-    const named = failing.map(
-      (report) => `${report.target} (${redactSecrets(report.error ?? "no error given")})`,
-    );
-    throw new UpgradeRunFailure("schema_failed", `schema failed on ${named.join(", ")}`, {
-      targets: failing.map(({ target, error }) => ({
-        target,
-        error: error === null ? null : redactSecrets(error),
-      })),
-    });
+    const blocking = reports.filter((report) => report.ok || blocksRelease({ report, held }));
+    const failure = schemaFailure({ reports: blocking, unfinished });
+    if (failure) throw failure;
+  }
+
+  /** A schema step's row carries the start and finish of the phase that applied it (T0-F4). */
+  private async stampPhaseTiming({
+    phases,
+    name,
+    ids,
+  }: {
+    phases: RunPhases;
+    name: "postgres-schema" | "clickhouse-schema";
+    ids: readonly string[];
+  }): Promise<void> {
+    const phase = phases.list().findLast((each) => each.name === name);
+    if (ids.length === 0 || !phase?.finishedAt) return;
+    const { startedAt, finishedAt } = phase;
+    await this.runner.stampTiming({ ids, startedAt, finishedAt });
   }
 
   /**
@@ -660,8 +850,17 @@ export class UpgradeRunnerService {
     const retry = this.options.retry ?? DEFAULT_RETRY;
     let resolvedLastAttempt: string[] = [];
     for (let attempt = 1; ; attempt++) {
-      const reports = await applier.apply({ release: release.release, lockTimeoutMs, signal });
-      if (reports.every((report) => report.ok)) {
+      const skipTargets = new Set(this.held.keys());
+      const applied = await applier.apply({
+        release: release.release,
+        lockTimeoutMs,
+        signal,
+        skipTargets,
+      });
+      this.hold({ reports: applied });
+      const held = this.held;
+      const reports = withHeldReports({ reports: applied, held });
+      if (reports.every((report) => !blocksRelease({ report, held }))) {
         if (resolvedLastAttempt.length > 0)
           log.appliedAfterResolve({ migrations: resolvedLastAttempt, attempt });
         return { reports, attempts: attempt };
@@ -705,7 +904,14 @@ export class UpgradeRunnerService {
     const elapsed = await this.resolveRolledBack({ names: failed, signal });
     for (const [migration, resolveMs] of elapsed) {
       this.resolved.push({ migration, attempt: retrying.attempt });
-      this.narrate.resolvedForRetry({ migration, ...retrying, resolveMs, error: error ?? null });
+      const because = this.whyRerun({ name: migration });
+      this.narrate.resolvedForRetry({
+        migration,
+        ...retrying,
+        resolveMs,
+        error: error ?? null,
+        because,
+      });
     }
   }
 
@@ -718,9 +924,60 @@ export class UpgradeRunnerService {
       const lastError = prisma.get(id)?.lastError ?? null;
       await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
     }
+    return done;
   }
 
-  /** D4: one target row per step and endpoint; the step is the aggregate, failed if any is. */
+  /** Holds each newly failed private target and says so once (T7-F1). */
+  private hold({ reports }: { reports: readonly SchemaTargetReport[] }): void {
+    for (const [target, error] of newlyHeld({ reports, held: this.held }))
+      this.holdTarget({ target, error });
+  }
+
+  private holdTarget({ target, error }: { target: string; error: string | null }): void {
+    this.held.set(target, error);
+    this.narrate.warn(
+      `ClickHouse target ${target} failed and is held: only its organizations wait, the rest of the release goes on`,
+      {
+        phase: "schema",
+        target,
+        error: redactSecrets(error ?? "no error given"),
+        waitingOn: "the target",
+        next: "nothing to do once the target answers: a later pass catches it up; otherwise fix what the error names",
+      },
+    );
+  }
+
+  /** One target row per open step; only the target's first missing step is blamed. */
+  private async writeTargetRows({
+    target,
+    open,
+  }: {
+    target: Extract<SchemaTargetReport, { engine: "clickhouse" }>;
+    open: readonly string[];
+  }): Promise<Map<string, TargetStatus>> {
+    const statuses = new Map<string, TargetStatus>();
+    let blamed = false;
+    for (const id of open.toSorted()) {
+      const status = targetStatus({ target, id, blamed });
+      blamed ||= status === "failed";
+      const lastError = status === "failed" ? target.error : null;
+      const version = id.slice("clickhouse:".length);
+      await this.ledger.upsertTarget({
+        stepId: id,
+        target: target.target,
+        status,
+        version,
+        lastError,
+      });
+      statuses.set(id, status);
+    }
+    return statuses;
+  }
+
+  /**
+   * D4: one target row per step and endpoint. The step is the aggregate of every target the run
+   * did not hold, failed if any is; a held private target keeps its own rows (T7-F1).
+   */
   private async recordClickHouse({
     open,
     reports,
@@ -729,37 +986,29 @@ export class UpgradeRunnerService {
     open: readonly string[];
     reports: readonly SchemaTargetReport[];
     runId: string;
-  }): Promise<void> {
+  }): Promise<string[]> {
     const targets = reports.flatMap((report) => (report.engine === "clickhouse" ? [report] : []));
-    if (targets.length === 0 || open.length === 0) return;
+    if (targets.length === 0 || open.length === 0) return [];
     const statuses = new Map<string, TargetStatus[]>();
     for (const target of targets) {
-      let blamed = false;
-      for (const id of open.toSorted()) {
-        const status = targetStatus({ target, id, blamed });
-        blamed ||= status === "failed";
-        const lastError = status === "failed" ? target.error : null;
-        const version = id.slice("clickhouse:".length);
-        const stepId = id;
-        await this.ledger.upsertTarget({
-          stepId,
-          target: target.target,
-          status,
-          version,
-          lastError,
-        });
-        statuses.set(id, [...(statuses.get(id) ?? []), status]);
-      }
+      const rows = await this.writeTargetRows({ target, open });
+      if (this.held.has(target.target)) continue;
+      for (const [id, status] of rows) statuses.set(id, [...(statuses.get(id) ?? []), status]);
     }
-    const failedOn = targets.filter((target) => !target.ok).map((target) => target.target);
+    const failedOn = targets
+      .filter((target) => !target.ok && !this.held.has(target.target))
+      .map((target) => target.target);
+    const done: string[] = [];
     for (const [id, perTarget] of statuses) {
       if (perTarget.includes("failed")) {
         const lastError = `failed on ${failedOn.join(", ")}`;
         await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
       } else if (perTarget.every((status) => status === "done")) {
         await this.runner.setStatus({ ids: [id], status: "done", runId });
+        done.push(id);
       }
     }
+    return done;
   }
 
   private async runBlockingStep({
@@ -785,15 +1034,20 @@ export class UpgradeRunnerService {
     await this.runner.markRunning({ id, runId });
     const resuming = (recorded?.report ?? null) !== null;
     this.narrate.stepStarted({ id, description: step.description, resuming });
+    const minutes = BLOCKING_STEP_DEADLINE_MS / 60_000;
+    const reason = `blocking step ${id} passed its ${minutes}-minute deadline`;
+    const deadline = stepDeadline({ signal, deadlineMs: BLOCKING_STEP_DEADLINE_MS, reason });
     try {
-      const report = await step.run({
-        checkpoint: {
-          resumeFrom: recorded?.report ?? null,
-          save: ({ report: saved }) => this.runner.saveReport({ id, report: saved }),
-        },
-        dryRun: false,
-        signal,
-      });
+      const report = await deadline.race(
+        step.run({
+          checkpoint: {
+            resumeFrom: recorded?.report ?? null,
+            save: ({ report: saved }) => this.runner.saveReport({ id, report: saved }),
+          },
+          dryRun: false,
+          signal: deadline.signal,
+        }),
+      );
       // A run that returns aborted stopped early: it stays running with its checkpoint (F-2).
       signal.throwIfAborted();
       await this.runner.setStatus({ ids: [id], status: "done", runId, report });
@@ -806,81 +1060,25 @@ export class UpgradeRunnerService {
       throw new UpgradeRunFailure("step_failed", `blocking step ${id} failed: ${lastError}`, {
         step: id,
       });
+    } finally {
+      deadline.stop();
     }
-  }
-
-  /** Per planned release, the unfinished background steps its contract steps wait for. */
-  private async inlineBeforeContracts({
-    plan,
-  }: {
-    plan: Extract<UpgradePlan, { outcome: "planned" }>;
-  }): Promise<string[][]> {
-    const settled = (await this.ledger.findSteps())
-      .filter((step) => step.status === "done" || step.status === "not-needed")
-      .map((step) => step.id);
-    return inlineBeforeContracts({
-      releases: plan.releases,
-      contracts: this.options.contracts ?? imageContractSteps(),
-      background: this.shipped
-        .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
-        .map((step) => ({ ...step, after: this.codeSteps.get(step.id)?.after })),
-      settled: new Set(settled),
-    });
   }
 
   /**
-   * Runs one background step to its end before a contract step (Alex, 2026-10-09): forced and
-   * blocking, under the step's own lease, waiting while a worker holds it; a failure fails the run.
+   * Refuses a background step that runs after an unknown step or in a cycle (STEP-AFTER). The
+   * upgrade runs none of them: every background step runs on the worker once old writers are gone.
    */
-  private async runBeforeContract({
-    id,
-    signal,
-    runId,
-  }: {
-    id: string;
-    signal: AbortSignal;
-    runId: string;
-  }): Promise<void> {
-    const steps = BackgroundStepsService.create({
-      ledger: {
-        findSteps: () => this.ledger.findSteps(),
-        acquireLease: (input) => this.ledger.acquireLease(input),
-        renewLease: (input) => this.ledger.renewLease(input),
-        releaseLease: (input) => this.ledger.releaseLease(input),
-        markRunning: (input) => this.runner.markRunning(input),
-        setStatus: (input) => this.runner.setStatus(input),
-        saveReport: (input) => this.runner.saveReport(input),
-      },
-      steps: [...this.codeSteps.values()],
-      serving: () => true,
-      oldWritersGoneFor: async () => true,
-      identity: { ...this.options.identity, owner: `upgrade:${runId}` },
-      log: (level, message, fields) =>
-        level === "warn" ? this.narrate.warn(message, fields) : undefined,
-      retry: { attempts: 1, firstBackoffMs: 0, maxBackoffMs: 0 },
+  private async refuseMisorderedSteps(): Promise<void> {
+    const settled = (await this.ledger.findSteps())
+      .filter((step) => step.status === "done" || step.status === "not-needed")
+      .map((step) => step.id);
+    orderAfter({
+      steps: this.shipped
+        .filter((step) => step.mode === "background" && this.codeSteps.has(step.id))
+        .map((step) => ({ id: step.id, after: this.codeSteps.get(step.id)?.after })),
+      settled: new Set(settled),
     });
-    const description = this.codeSteps.get(id)?.description ?? id;
-    this.narrate.stepStarted({ id, description, resuming: false });
-    for (;;) {
-      const outcome = await steps.runNow({ id, signal });
-      signal.throwIfAborted();
-      if (outcome === "held") {
-        await sleep(this.timing.pollMs, undefined, { signal });
-        continue;
-      }
-      const row = (await this.ledger.findSteps()).find((step) => step.id === id);
-      if (row?.status === "done" || row?.status === "not-needed") {
-        this.narrate.stepEnded({ id, error: null });
-        return;
-      }
-      const lastError = row?.lastError ?? `it is ${row?.status ?? "unrecorded"}`;
-      this.narrate.stepEnded({ id, error: lastError });
-      throw new UpgradeRunFailure(
-        "step_failed",
-        `background step ${id} must finish before a contract step: ${lastError}`,
-        { step: id },
-      );
-    }
   }
 
   /** Plan 2026-10-08 F-3: each run gives failed background steps another try on the worker. */
@@ -914,10 +1112,54 @@ export class UpgradeRunnerService {
     return this.runner.reopenDoneSteps({ ids: reopened, reason });
   }
 
+  /**
+   * A target an earlier run held catches up here, once the plan is applied: one apply of every
+   * step the image ships, recorded only on that target's rows. Still failing, it stays held and the
+   * run goes on (Alex, 2026-10-11, T7-F1); the worker asks for another pass later.
+   */
+  private async catchUpTargets({ signal }: { signal: AbortSignal }): Promise<void> {
+    const behind = (await this.ledger.findTargetsBehind()).filter(
+      ({ stepId, target }) =>
+        isPrivateTarget({ target }) && !this.held.has(target) && this.shippedIds.has(stepId),
+    );
+    if (behind.length === 0) return;
+    const lockTimeoutMs = this.options.lockTimeoutMs ?? DEFAULT_LOCK_TIMEOUT_MS;
+    const skipTargets = new Set(this.held.keys());
+    const reports = await this.options.applier.apply({
+      release: null,
+      lockTimeoutMs,
+      signal,
+      skipTargets,
+    });
+    const targets = [...new Set(behind.map(({ target }) => target))];
+    const caughtUp: string[] = [];
+    for (const name of targets) {
+      const report = reports.find((each) => each.engine === "clickhouse" && each.target === name);
+      if (report?.engine !== "clickhouse") continue;
+      const open = behind.filter(({ target }) => target === name).map(({ stepId }) => stepId);
+      const rows = await this.writeTargetRows({ target: report, open });
+      if ([...rows.values()].every((status) => status === "done")) caughtUp.push(name);
+      else this.holdTarget({ target: name, error: report.error });
+    }
+    if (caughtUp.length > 0)
+      this.narrate.info(`ClickHouse target ${caughtUp.join(", ")} caught up`, {
+        phase: "schema",
+        targets: caughtUp,
+      });
+  }
+
   private async runReconcilers({ signal }: { signal: AbortSignal }): Promise<void> {
     const failed: string[] = [];
     for (const reconciler of this.options.reconcilers ?? []) {
       signal.throwIfAborted();
+      if (reconciler.target !== undefined && this.held.has(reconciler.target)) {
+        this.narrate.warn(`reconciler ${reconciler.name} skipped: its target is held`, {
+          phase: "reconcile",
+          reconciler: reconciler.name,
+          next: "nothing to do: it runs on the pass that catches the target up",
+        });
+        continue;
+      }
       try {
         await reconciler.run({ signal });
       } catch (error) {

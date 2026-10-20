@@ -86,7 +86,7 @@ export function ComparisonScoreboard({
   return (
     <Tooltip content={tally.join(" · ")} positioning={{ placement: "top" }} openDelay={200}>
       <Text
-        fontSize="11px"
+        textStyle="micro"
         color="fg.muted"
         whiteSpace="nowrap"
         cursor="help"

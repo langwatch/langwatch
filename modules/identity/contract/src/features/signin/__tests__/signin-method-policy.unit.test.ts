@@ -5,7 +5,6 @@
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-import { AUTH0_BRIDGE_METHODS } from "../../../auth0-bridge.ts";
 import {
   LOCAL_METHOD_SET,
   PASSKEY_METHOD,
@@ -257,44 +256,79 @@ describe("the instance sign-in method policy", () => {
   });
 
   describe("given a deployment whose provider is the Auth0 broker", () => {
-    const offeredIds = async () =>
-      (await SignInMethodPolicyService.create(inputs).resolvePolicy()).defaultMethods.map(
-        ({ id }) => id,
-      );
+    const resolve = () => SignInMethodPolicyService.create(inputs).resolvePolicy();
+    const offeredIds = async () => (await resolve()).defaultMethods.map(({ id }) => id);
 
     beforeEach(() => {
       licensedStore(true);
     });
 
-    /** @scenario "SaaS shows the broker's social connections as their own buttons" */
-    it("offers the brokered connections as branded methods ahead of the generic one on SaaS only", async () => {
+    /** @scenario "Cloud never offers the Auth0 broker on the sign-in screen" */
+    it("offers the native social methods and the password on cloud, and no Auth0 method", async () => {
       selfHosted = false;
+      issuesOwnPasswords = true;
+      mountedSocial = ["google", "github"];
 
-      expect(await offeredIds()).toEqual([
-        "auth0-google",
-        "auth0-github",
-        "auth0-microsoft",
-        "auth0",
-      ]);
-      expect(
-        AUTH0_BRIDGE_METHODS.map(({ methodId, connection }) => [methodId, connection]),
-      ).toEqual([
-        ["auth0-google", "google-oauth2"],
-        ["auth0-github", "github"],
-        ["auth0-microsoft", "windowslive"],
-      ]);
+      const offered = await offeredIds();
 
-      selfHosted = true;
+      expect(offered).toEqual(["google", "github", "password"]);
+      expect(offered.filter((id) => id.startsWith("auth0"))).toEqual([]);
 
-      expect(await offeredIds()).toEqual(["auth0"]);
+      mountedSocial = [];
+
+      expect(await offeredIds()).toEqual(["password"]);
     });
 
-    /** @scenario "A natively mounted provider takes over its own bridge button" */
-    it("puts a natively mounted provider in its bridge slot and keeps the other branded methods", async () => {
+    /** @scenario "An organization still on legacy Auth0 SSO is routed to the broker by its domain" */
+    it("still redirects a legacy SSO organization's address to the broker on cloud", async () => {
       selfHosted = false;
+      issuesOwnPasswords = true;
+      mountedSocial = ["google"];
+      const connectionId = "org:acme";
+
+      const decision = routeSignIn({
+        identifier: routingIdentifierOf("sam@acme.com"),
+        breakGlass: false,
+        policy: await resolve(),
+        domainConnection: {
+          connectionId,
+          method: { id: "auth0", kind: "federated", connectionId },
+          state: "ACTIVE",
+          configured: true,
+          allowsJit: true,
+        },
+        activeConnections: [],
+      });
+
+      expect(decision).toMatchObject({
+        outcome: "redirect_to_connection",
+        connectionId,
+        methodSet: [{ id: "auth0", kind: "federated", connectionId }],
+        reasonCode: "domain_routed",
+      });
+    });
+
+    /** @scenario "A deployment whose door is its named provider keeps offering it" */
+    it("keeps the broker on a self-hosted install, and never on cloud", async () => {
+      selfHosted = true;
+      issuesOwnPasswords = true;
       mountedSocial = ["google"];
 
-      expect(await offeredIds()).toEqual(["google", "auth0-github", "auth0-microsoft", "auth0"]);
+      expect(await offeredIds()).toEqual(["auth0", "google", "password"]);
+
+      selfHosted = false;
+      issuesOwnPasswords = false;
+
+      expect(await offeredIds()).toEqual(["google"]);
+    });
+
+    /** @scenario "A deployment whose door is its named provider keeps offering it" */
+    it("offers no password on cloud when it issues none of its own and no social provider is set up", async () => {
+      selfHosted = false;
+      issuesOwnPasswords = false;
+      mountedSocial = [];
+
+      expect(await offeredIds()).toEqual([]);
     });
   });
 });

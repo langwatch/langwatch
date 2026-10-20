@@ -105,7 +105,7 @@ only object store.
 
 ### 3. Identity and purpose
 
-- **Every stored object's id is a fresh KSUID**: `generate("so")` from `@langwatch/ksuid`, precedent
+- **Every stored object's id is a fresh KSUID**: `generate(KSUID_RESOURCES.STORED_OBJECT)` (`storedobject_`; ids minted before carry `so_`), precedent
   `agent.app.ts:460`. An id is never derived from `projectId`, purpose, digest or any content. This
   covers uploads and in-process writes (`storeFromBytes`) alike.
 - **Purpose is a field on the record**, set once at create and never changed.
@@ -280,7 +280,7 @@ to the no-bytes rule**.
 - Amended 2026-09-24 (Alex: "skip 410, just remove if they were web only"): only main's in-app upload
   drove the `/direct-upload*` routes, so all five are removed rather than refused. Nothing answers
   `dataset_upload_route_retired`, and the code goes.
-- Amended 2026-09-25 (Alex, apidiff parity): scenario events keep main's server-side extraction of
+- Amended 2026-09-25 (Alex, parity with main): scenario events keep main's server-side extraction of
   inline media into stored objects before dispatch — an explicit exception to "no module parses upload
   bytes", scoped to `/api/scenario-events`; every other upload stays presigned.
 

@@ -54,7 +54,7 @@ function TargetSummaryTooltipContent({
   evaluatorNames: Map<string, string>;
 }) {
   return (
-    <VStack align="stretch" gap={0} fontSize="12px" minWidth="230px" color="fg">
+    <VStack align="stretch" gap={0} textStyle="caption" minWidth="230px" color="fg">
       <VStack align="stretch" gap={2} padding={2}>
         {/* Progress */}
         <HStack justify="space-between">
@@ -175,18 +175,18 @@ function TargetSummaryTooltipContent({
                   {evaluator.passRate !== null && (
                     <HStack gap={1}>
                       <PassRateCircle passRate={evaluator.passRate} size="8px" />
-                      <Text fontSize="11px" color={getPassRateGradientColor(evaluator.passRate)}>
+                      <Text textStyle="micro" color={getPassRateGradientColor(evaluator.passRate)}>
                         {formatPassRate(evaluator.passRate)}
                       </Text>
                     </HStack>
                   )}
                   {evaluator.averageScore !== null && (
-                    <Text fontSize="11px" color="fg.muted">
+                    <Text textStyle="micro" color="fg.muted">
                       {formatScore(evaluator.averageScore)}
                     </Text>
                   )}
                   {evaluator.errors > 0 && (
-                    <Text fontSize="11px" color="red.fg">
+                    <Text textStyle="micro" color="red.fg">
                       {evaluator.errors} {evaluator.errors === 1 ? "error" : "errors"}
                     </Text>
                   )}
@@ -240,7 +240,7 @@ export const TargetSummary = memo(function TargetSummary({
     >
       <HStack
         gap={2}
-        fontSize="12px"
+        textStyle="caption"
         color="fg.muted"
         paddingX={2}
         paddingY={1}

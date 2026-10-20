@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import { UserAvatar } from "@langwatch/design-system/avatar";
+import { MoreVerticalIcon } from "@langwatch/design-system/icons";
 import { ListTable } from "@langwatch/design-system/list-table";
 import { Menu } from "@langwatch/design-system/menu";
-import { Badge, Button, HStack, Table, Text, VStack } from "@langwatch/design-system/primitives";
-import { MoreVertical } from "lucide-react";
+import { Pagination } from "@langwatch/design-system/pagination";
+import { Badge, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import numeral from "numeral";
+import { useState } from "react";
 
 import type { GovernanceIngestionSourceView } from "../../../behavior/governance-api.ts";
 import { useGovernanceRouter } from "../../../behavior/governance-router.ts";
@@ -71,7 +73,7 @@ function MeasuredHeading({ children }: { children: string }) {
       <Text as="span">{children}</Text>
       <Text
         as="span"
-        fontSize="10px"
+        textStyle="micro"
         fontWeight="normal"
         color="fg.subtle"
         textTransform="none"
@@ -83,6 +85,9 @@ function MeasuredHeading({ children }: { children: string }) {
     </VStack>
   );
 }
+
+/** People show fifty to a page, within the set the screen fetched. */
+const PEOPLE_PAGE_SIZE = 50;
 
 const notMeasured = (
   <Text color="fg.muted" aria-label="not measured">
@@ -106,51 +111,67 @@ export function UnifiedPeopleTable({
       ? onAssignDepartment
       : undefined;
 
+  const [requestedPage, setRequestedPage] = useState(1);
+  const lastPage = Math.max(1, Math.ceil(rows.length / PEOPLE_PAGE_SIZE));
+  const page = Math.min(requestedPage, lastPage);
+  const pageRows = rows.slice((page - 1) * PEOPLE_PAGE_SIZE, page * PEOPLE_PAGE_SIZE);
+
   return (
-    // Fixed layout: a machine login's opaque identifier would otherwise set
-    // the width of the whole Person column.
-    <ListTable
-      size="sm"
-      tableLayout="fixed"
-      width="full"
-      minWidth="92rem"
-      containerProps={{ overflowX: "auto" }}
-    >
-      <Table.Header>
-        <Table.Row>
-          <Table.ColumnHeader>Person</Table.ColumnHeader>
-          <Table.ColumnHeader width="11rem">Provider</Table.ColumnHeader>
-          <Table.ColumnHeader width="8rem">Kind</Table.ColumnHeader>
-          <Table.ColumnHeader width="9.5rem">Department</Table.ColumnHeader>
-          <Table.ColumnHeader width="7.5rem" textAlign="end">
-            <MeasuredHeading>Spend</MeasuredHeading>
-          </Table.ColumnHeader>
-          <Table.ColumnHeader width="7.5rem" textAlign="end">
-            <MeasuredHeading>Requests</MeasuredHeading>
-          </Table.ColumnHeader>
-          <Table.ColumnHeader width="7.25rem">Last active</Table.ColumnHeader>
-          <Table.ColumnHeader width="7.25rem">First seen</Table.ColumnHeader>
-          <Table.ColumnHeader width="7.25rem">Last seen</Table.ColumnHeader>
-          <Table.ColumnHeader width="10rem">Status</Table.ColumnHeader>
-          <Table.ColumnHeader width="11rem">Link proof</Table.ColumnHeader>
-          {assignable && (
-            <Table.ColumnHeader width="4rem" textAlign="end">
-              Actions
-            </Table.ColumnHeader>
-          )}
-        </Table.Row>
-      </Table.Header>
-      <Table.Body>
-        {rows.map((row) => (
-          <PersonRow
-            key={row.key}
-            row={row}
-            source={sourceFor(row.mostUsedTarget)}
-            onAssignDepartment={assignable}
-          />
-        ))}
-      </Table.Body>
-    </ListTable>
+    <>
+      {/* Fixed layout: a machine login's opaque identifier would otherwise set
+          the width of the whole Person column. */}
+      <ListTable
+        size="sm"
+        tableLayout="fixed"
+        width="full"
+        minWidth="104rem"
+        containerProps={{ overflowX: "auto" }}
+      >
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader width="16rem">Person</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="11rem">Provider</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="8rem">Kind</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="9.5rem">Department</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="7.5rem" align="end">
+              <MeasuredHeading>Spend</MeasuredHeading>
+            </ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="7.5rem" align="end">
+              <MeasuredHeading>Requests</MeasuredHeading>
+            </ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="7.25rem">Last active</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="7.25rem">First seen</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="7.25rem">Last seen</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="10rem">Status</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader width="11rem">Link proof</ListTable.ColumnHeader>
+            {assignable && (
+              <ListTable.ColumnHeader width="4rem" align="end">
+                Actions
+              </ListTable.ColumnHeader>
+            )}
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
+          {pageRows.map((row) => (
+            <PersonRow
+              key={row.key}
+              row={row}
+              source={sourceFor(row.mostUsedTarget)}
+              onAssignDepartment={assignable}
+            />
+          ))}
+        </ListTable.Body>
+      </ListTable>
+      {rows.length > PEOPLE_PAGE_SIZE && (
+        <Pagination
+          page={page}
+          pageSize={PEOPLE_PAGE_SIZE}
+          totalCount={rows.length}
+          unitLabel="people"
+          onPageChange={setRequestedPage}
+        />
+      )}
+    </>
   );
 }
 
@@ -182,18 +203,18 @@ function kindLabel(kind: string): string {
 /** A moment a provider named someone, relative with the exact time on hover. */
 function SeenCell({ iso }: { iso: string | null }) {
   return (
-    <Table.Cell color="fg.muted" whiteSpace="nowrap" title={iso ?? undefined}>
+    <ListTable.Cell tone="muted" nowrap title={iso ?? undefined}>
       {iso === null ? notMeasured : formatRelativeTime(iso)}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
 /** The provider that named the person, or a dash for someone only the gateway saw. */
 function PersonProviderCell({ row }: { row: PeopleRow }) {
   return (
-    <Table.Cell color="fg.muted" truncate title={row.provider ?? undefined}>
+    <ListTable.Cell tone="muted" truncate title={row.provider ?? undefined}>
       {row.provider === null ? notMeasured : providerLabel(row.provider)}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
@@ -214,11 +235,7 @@ function PersonRow({
   const proof = proofLabel(row);
 
   return (
-    <Table.Row
-      cursor={href ? "pointer" : undefined}
-      onClick={href ? () => router.push(href) : undefined}
-      _hover={href ? { backgroundColor: "bg.subtle" } : undefined}
-    >
+    <ListTable.Row onActivate={href ? () => router.push(href) : undefined}>
       <PersonNameCell
         row={row}
         href={href}
@@ -229,37 +246,43 @@ function PersonRow({
 
       <PersonProviderCell row={row} />
 
-      <Table.Cell color="fg.muted" truncate title={row.kind ?? undefined}>
+      <ListTable.Cell tone="muted" truncate title={row.kind ?? undefined}>
         {row.kind === null ? notMeasured : kindLabel(row.kind)}
-      </Table.Cell>
+      </ListTable.Cell>
 
       <PersonDepartmentCell row={row} />
 
-      <Table.Cell textAlign="end" fontWeight="semibold" whiteSpace="nowrap">
-        {row.spendUsd === null ? notMeasured : formatUsd(row.spendUsd)}
-      </Table.Cell>
+      <ListTable.Cell align="end" nowrap>
+        {row.spendUsd === null ? (
+          notMeasured
+        ) : (
+          <Text as="span" fontWeight="semibold">
+            {formatUsd(row.spendUsd)}
+          </Text>
+        )}
+      </ListTable.Cell>
 
-      <Table.Cell textAlign="end" whiteSpace="nowrap">
+      <ListTable.Cell align="end" nowrap>
         {row.requests === null ? notMeasured : numeral(row.requests).format("0,0")}
-      </Table.Cell>
+      </ListTable.Cell>
 
-      <Table.Cell color="fg.muted" whiteSpace="nowrap">
+      <ListTable.Cell tone="muted" nowrap>
         {row.lastActiveIso === null ? notMeasured : formatRelativeTime(row.lastActiveIso)}
-      </Table.Cell>
+      </ListTable.Cell>
 
       <SeenCell iso={row.firstSeenIso} />
       <SeenCell iso={row.lastSeenIso} />
 
       <PersonStatusCell row={row} matchDetail={matchDetail} />
 
-      <Table.Cell color="fg.muted" truncate title={proof ?? undefined}>
+      <ListTable.Cell tone="muted" truncate title={proof ?? undefined}>
         {proof ?? notMeasured}
-      </Table.Cell>
+      </ListTable.Cell>
 
       {onAssignDepartment && (
         <PersonActionsCell row={row} primary={primary} onAssignDepartment={onAssignDepartment} />
       )}
-    </Table.Row>
+    </ListTable.Row>
   );
 }
 
@@ -279,7 +302,7 @@ function PersonNameCell({
   source: GovernanceIngestionSourceView | null;
 }) {
   return (
-    <Table.Cell overflow="hidden">
+    <ListTable.Cell truncate>
       <HStack gap={3} align="start" minWidth={0}>
         <UserAvatar name={avatarName} size="xs" flexShrink={0} />
         {/* Two lines' worth of box whether or not there is a second line, so
@@ -322,20 +345,20 @@ function PersonNameCell({
           <PersonIdentityLine row={row} primary={primary} source={source} />
         </VStack>
       </HStack>
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
 /** The department the person belongs to, or a muted dash while nobody has said. */
 function PersonDepartmentCell({ row }: { row: PeopleRow }) {
   return (
-    <Table.Cell
-      color={row.department ? "fg" : "fg.muted"}
+    <ListTable.Cell
+      tone={row.department ? "default" : "muted"}
       truncate
       title={row.department ?? undefined}
     >
       {row.department ?? "—"}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
@@ -349,7 +372,7 @@ function PersonStatusCell({
   matchDetail: string | null;
 }) {
   return (
-    <Table.Cell>
+    <ListTable.Cell>
       <VStack align="start" gap={0}>
         <Badge size="sm" colorPalette={STATUS_PALETTE[row.status]}>
           {STATUS_LABEL[row.status]}
@@ -360,7 +383,7 @@ function PersonStatusCell({
           </Text>
         )}
       </VStack>
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 
@@ -379,7 +402,7 @@ function PersonActionsCell({
   onAssignDepartment: (row: PeopleRow) => void;
 }) {
   return (
-    <Table.Cell textAlign="end">
+    <ListTable.Cell align="end" stopRowActivation>
       {row.linkedUserId && (
         <Menu.Root>
           <Menu.Trigger asChild>
@@ -389,7 +412,7 @@ function PersonActionsCell({
               aria-label={`Actions for ${primary}`}
               onClick={(event) => event.stopPropagation()}
             >
-              <MoreVertical size={14} />
+              <MoreVerticalIcon size={14} />
             </Button>
           </Menu.Trigger>
           <Menu.Content>
@@ -405,7 +428,7 @@ function PersonActionsCell({
           </Menu.Content>
         </Menu.Root>
       )}
-    </Table.Cell>
+    </ListTable.Cell>
   );
 }
 

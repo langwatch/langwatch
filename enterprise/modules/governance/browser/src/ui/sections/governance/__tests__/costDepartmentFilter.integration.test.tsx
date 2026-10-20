@@ -178,7 +178,7 @@ describe("the department filter", () => {
       await pickFilter("Department", "Engineering");
       await waitFor(() => expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0));
 
-      await pickFilter("Time Frame", "Last 3 months");
+      await pickFilter("Time frame", "Last 3 months");
 
       // Whatever the fix does, these two have to agree. Today the chip says
       // "All departments" and the panel shows no department at all, because
@@ -202,7 +202,7 @@ describe("the department filter", () => {
       renderScreen();
 
       await pickFilter("Department", "Engineering");
-      await pickFilter("Time Frame", "Last 3 months");
+      await pickFilter("Time frame", "Last 3 months");
 
       await waitFor(() => expect(screen.getAllByText("Engineering").length).toBeGreaterThan(0));
       // The selection survives a window that still contains it: the panel is
@@ -221,7 +221,7 @@ describe("the department filter", () => {
       renderScreen();
 
       await pickFilter("Department", "Engineering");
-      await pickFilter("Time Frame", "Last 3 months");
+      await pickFilter("Time frame", "Last 3 months");
 
       // An unanswered read is not evidence the department disappeared, so
       // resetting here would throw away the reader's choice on every refetch.

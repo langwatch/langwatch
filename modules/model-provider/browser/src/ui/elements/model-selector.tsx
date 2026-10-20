@@ -178,7 +178,7 @@ function UpdateNeededMark({ size }: { size: SelectorSize }) {
     <HStack gap={1} color="red.fg" flexShrink={0}>
       <AlertTriangle size={isSmall ? 12 : 14} aria-hidden />
       <Text
-        fontSize={isSmall ? "2xs" : "xs"}
+        textStyle={isSmall ? "micro" : "caption"}
         fontWeight="medium"
         textTransform="uppercase"
         letterSpacing="wide"
@@ -218,8 +218,7 @@ function SelectedModelValue({
         />
       )}
       <Box
-        fontSize={isSmall ? 12 : 14}
-        fontFamily="mono"
+        textStyle={isSmall ? "monoSm" : "mono"}
         lineClamp={1}
         wordBreak="break-all"
         color={selectedModelColor({ isProviderMissing, isUnknown })}
@@ -260,7 +259,7 @@ function ModelOptionItem({
           {isProviderKey(provider) && (
             <ProviderIconGlyph provider={provider} size={MODEL_ICON_SIZE} />
           )}
-          <Box fontSize={isSmall ? 12 : 14} fontFamily="mono" paddingY={isSmall ? 0 : "2px"}>
+          <Box textStyle={isSmall ? "monoSm" : "mono"} paddingY={isSmall ? 0 : "2px"}>
             {item.label}
           </Box>
         </HStack>
@@ -330,7 +329,7 @@ function ConfigureModelsAction({ size }: { size: SelectorSize }) {
           onClick={(e) => e.stopPropagation()}
         >
           <LuSettings2 />
-          <Text fontSize={size === "sm" ? 12 : 14}>Configure available models</Text>
+          <Text textStyle={size === "sm" ? "caption" : "body"}>Configure available models</Text>
         </Link>
       </Button>
     </Box>

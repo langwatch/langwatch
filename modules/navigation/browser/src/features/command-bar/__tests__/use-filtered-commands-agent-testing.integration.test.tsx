@@ -5,10 +5,16 @@
 
 import { renderHook } from "@testing-library/react";
 import type { ReactNode } from "react";
-import { beforeEach, describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { WithStubNavigationHost } from "../../../testing.tsx";
 import { useFilteredCommands } from "../behavior/use-filtered-commands.ts";
+
+vi.mock("../../../behavior/navigation-api.ts", () => ({
+  navigationApi: {
+    personalWorkspaceFeatures: { get: { useQuery: () => ({ data: undefined }) } },
+  },
+}));
 
 function navigationIdsFor({
   query,

@@ -44,11 +44,7 @@ function buildService() {
     },
   } as never;
   const codeExecution: EvaluatorCodeExecution = {
-    execute: async () => ({
-      ok: true,
-      statusText: "OK",
-      body: { status: "success", result: { passed: true } },
-    }),
+    execute: async () => ({ status: "success", result: { passed: true } }),
   };
 
   return {

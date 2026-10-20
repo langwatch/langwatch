@@ -14,10 +14,6 @@ import (
 // SpecPath is where the API serves its OpenAPI document.
 const SpecPath = "/api/openapi.json"
 
-// Copied from tools/apidiff/spec.go so the fuzzer parses the same way; switch
-// apidiff onto diffkit later. Trimmed to what a single-stack fuzzer needs
-// (no main-vs-branch alias/side bookkeeping).
-
 // Param is one resolved operation parameter.
 type Param struct {
 	Name     string         `json:"name"`

@@ -11,13 +11,18 @@ export const PROJECT_FEATURE_ID = "project" as const;
 export const PROJECT_KIND = {
   APPLICATION: "application",
   INTERNAL_GOVERNANCE: "internal_governance",
+  /** The hidden system organization's project the Ops checkup canaries run in. */
+  INTERNAL_CHECKUP: "internal_checkup",
   AGGREGATE: "aggregate",
 } as const;
 
 export const projectKindSchema = z.enum(PROJECT_KIND);
 export type ProjectKind = z.infer<typeof projectKindSchema>;
 
-export const internalProjectKindSchema = z.literal(PROJECT_KIND.INTERNAL_GOVERNANCE);
+export const internalProjectKindSchema = z.enum([
+  PROJECT_KIND.INTERNAL_GOVERNANCE,
+  PROJECT_KIND.INTERNAL_CHECKUP,
+]);
 export type InternalProjectKind = z.infer<typeof internalProjectKindSchema>;
 
 const internalProjectSchemaDefinition = z

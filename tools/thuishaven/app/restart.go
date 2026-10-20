@@ -217,7 +217,7 @@ func restartTargets(st domain.Stack, name string) []restartTarget {
 	inGo := map[string]bool{"gateway": !mono, "nlp": !mono}
 	inSims := map[string]bool{}
 	if !mono && goLaneHostsSimulators(st.WorktreeDir) {
-		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService, domain.LambdaService} {
+		for _, sim := range []string{domain.IdPService, domain.MailService, domain.StorageService, domain.VoiceService, domain.LLMService, domain.AnalyticsService, domain.OutboundService, domain.PaymentService, domain.TelemetryService, domain.LambdaService, domain.GithubService, domain.McpService} {
 			inSims[sim] = true
 		}
 	}
@@ -332,6 +332,9 @@ func (o *Orchestrator) ResolveMode(worktreeDir string, sel domain.Selection, req
 func (o *Orchestrator) restartObservability(ctx context.Context) error {
 	if o.obs == nil {
 		return fmt.Errorf("observability is not managed here")
+	}
+	if o.isObservabilityOff() {
+		return fmt.Errorf("observability is switched off: haven machine settings set %s on", domain.SettingObservability)
 	}
 	_ = o.obs.Stop(ctx)
 	endpoints, err := o.obs.Ensure(ctx)

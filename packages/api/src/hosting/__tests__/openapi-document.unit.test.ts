@@ -6,7 +6,8 @@ import { z } from "zod";
 import { openapiDocumentRoute } from "../openapi-document.ts";
 
 describe("given a REST app with one documented route", () => {
-  const restApp = new Hono().get(
+  const restApp = new Hono();
+  restApp.get(
     "/api/agents",
     describeRoute({
       summary: "List agents",
@@ -45,7 +46,8 @@ describe("given a REST app with one documented route", () => {
 });
 
 describe("given a route whose schema carries a recursive definition", () => {
-  const restApp = new Hono().get(
+  const restApp = new Hono();
+  restApp.get(
     "/api/prompts/:id",
     describeRoute({
       operationId: "getPrompt",

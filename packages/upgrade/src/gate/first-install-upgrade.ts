@@ -1,46 +1,14 @@
-import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
-import { UPGRADE_LOG_TAIL_LINES } from "../runner/run-log.ts";
+import type { UpgradeOutcomeCode } from "../runner/upgrade-outcome.ts";
 
-/** The image's tasks app, where `pnpm task upgrade` runs (rethink 6.9). */
+/** The image's tasks app: the Prisma config and the LangWatchQL program the upgrade runs. */
 export const TASKS_APP_DIRECTORY = fileURLToPath(
   new URL("../../../../apps/tasks/", import.meta.url),
 );
 
-/** Runs one `upgrade`: its exit code (a launch failure answers 1) and its last lines of output. */
-export type FirstInstallUpgrade = () => Promise<
-  Readonly<{ exitCode: number; logTail: readonly string[] }>
->;
+/** One upgrade run as the worker's gate sees it: the runner's outcome and its last lines. */
+export type UpgradeRunResult = Readonly<{ code: UpgradeOutcomeCode; logTail: readonly string[] }>;
 
-/**
- * Q10: on a Helm first install the api's first boot runs `upgrade` once, as the pre-roll Job would,
- * in its own process with this process's environment and output (held question S3-FIRST-INSTALL),
- * keeping the last lines for the upgrade console.
- */
-export function spawnFirstInstallUpgrade({
-  cwd = TASKS_APP_DIRECTORY,
-  command = "pnpm",
-  args = ["--silent", "task", "upgrade"],
-}: { cwd?: string; command?: string; args?: readonly string[] } = {}): FirstInstallUpgrade {
-  return () =>
-    new Promise((resolve) => {
-      const logTail: string[] = [];
-      const tee = (out: NodeJS.WritableStream) => (chunk: Buffer) => {
-        out.write(chunk);
-        // ponytail: a line split across two chunks shows as two lines in the console.
-        logTail.push(
-          ...chunk
-            .toString("utf8")
-            .split("\n")
-            .filter((line) => line !== ""),
-        );
-        logTail.splice(0, Math.max(0, logTail.length - UPGRADE_LOG_TAIL_LINES));
-      };
-      const child = spawn(command, [...args], { cwd, stdio: ["inherit", "pipe", "pipe"] });
-      child.stdout.on("data", tee(process.stdout));
-      child.stderr.on("data", tee(process.stderr));
-      child.once("error", () => resolve({ exitCode: 1, logTail }));
-      child.once("close", (code) => resolve({ exitCode: code ?? 1, logTail }));
-    });
-}
+/** Runs one upgrade in this process (Alex, 2026-10-11, slice 2). */
+export type FirstInstallUpgrade = () => Promise<UpgradeRunResult>;

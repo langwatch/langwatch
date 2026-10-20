@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { getCapability, reconcileColumns } from "../lens-capabilities.ts";
+import { columnsForGrouping, getCapability, reconcileColumns } from "../lens-capabilities.ts";
 
 const flat = getCapability("flat");
 
@@ -48,6 +48,38 @@ describe("reconcileColumns", () => {
         });
         expect(result).not.toContain("eval:score:e1");
       });
+    });
+  });
+});
+
+describe("columnsForGrouping", () => {
+  describe("given the flat lens's columns", () => {
+    /** @scenario "Selecting a grouping transforms the table" */
+    it("starts a grouped lens from its defaults, so the group label and count show", () => {
+      const result = columnsForGrouping({
+        ids: ["time", "trace", "origin", "duration", "cost", "tokens"],
+        capability: getCapability("by-model"),
+      });
+      expect(result).toEqual(["group", "count", "duration", "cost", "tokens", "errors"]);
+    });
+  });
+
+  describe("given a grouped lens's columns", () => {
+    /** @scenario "Selecting flat restores the ungrouped table" */
+    it("starts the flat lens from its defaults, so time and trace show", () => {
+      const result = columnsForGrouping({
+        ids: ["group", "count", "duration", "cost", "tokens", "errors"],
+        capability: flat,
+      });
+      expect(result.slice(0, 2)).toEqual(["time", "trace"]);
+    });
+
+    it("keeps the user's columns when the identity column survives", () => {
+      const result = columnsForGrouping({
+        ids: ["group", "cost"],
+        capability: getCapability("by-service"),
+      });
+      expect(result).toEqual(["group", "cost"]);
     });
   });
 });

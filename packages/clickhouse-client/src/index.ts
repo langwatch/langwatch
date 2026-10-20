@@ -28,7 +28,7 @@ export {
   CLICKHOUSE_COLUMNS_REFRESH_MS,
   ClickHouseColumns,
 } from "./present-columns.ts";
-export { ClickHouseQueryClient } from "./client.ts";
+export { ClickHouseQueryClient, ClickHouseUnavailableErrorFactory } from "./client.ts";
 export {
   ClickHouseConfigService,
   DuplicatePrivateClickHouseRouteError,
@@ -37,6 +37,7 @@ export {
 export type {
   ClickHouseConfiguration,
   ClickHouseConfigurationInput,
+  ClickHouseMalformedRouteConfiguration,
   ClickHousePrivateRouteConfiguration,
   ClickHouseSharedConfiguration,
 } from "./config.ts";
@@ -87,7 +88,7 @@ export type {
   ClickHouseVendorClientOptions,
 } from "./managed-client.ts";
 export type { RoutableStatementClient } from "./routingDriver.ts";
-export { routingDriver } from "./routingDriver.ts";
+export { PrivateTargetSchemaError, routingDriver } from "./routingDriver.ts";
 export type { PoolSizeSource, PoolSizingDecision, PoolSizingInput } from "./pool.ts";
 export {
   DEFAULT_CLIENTS_PER_PROCESS,
@@ -119,6 +120,10 @@ export type {
 } from "./retry.ts";
 export { RetryPolicy, runWithRetry } from "./retry.ts";
 export type {
+  PrivateRouteProblem,
+  PrivateRouteRefusal,
+  PrivateRouteVariable,
+  RecordedPrivateDataplane,
   RoutingTable,
   TenantDirectory,
   TenantRoute,
@@ -131,6 +136,10 @@ export {
   PLATFORM_TENANT,
   PRIVATE_ROUTE_ENV_PREFIX,
   parseRoutingTable,
+  PrivateRouteRefusalFactory,
+  PrivateRouteUnavailableError,
+  privateRouteNameOf,
+  privateRouteVariableOf,
   UnknownTenantError,
 } from "./tenancy.ts";
 export type {

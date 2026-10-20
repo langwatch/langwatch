@@ -1,19 +1,21 @@
 /**
- * Compact SSE streaming event codec: single-letter keys under 100 bytes per delta.
- * Keys: e(type), r(runId), b(batchId), m(msgId), d(delta), c(content), l(role), i(index).
+ * Compact SSE streaming events, under 100 bytes per delta. e: S(start) C(content) E(end)
+ * R(snapshot stored: drop the run's previews and refetch; older clients ignore it).
+ * Keys: r(runId), b(batchId), m(msgId, not on R), d(delta), c(content), l(role), i(index).
  */
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-export type CompactEventType = "S" | "C" | "E";
+export type CompactEventType = "S" | "C" | "E" | "R";
 
 export interface CompactStreamingEvent {
   e: CompactEventType;
   r: string;
   b: string;
-  m: string;
+  /** Absent on R, which names a run rather than a message. */
+  m?: string;
   d?: string;
   c?: string;
   l?: string;
@@ -73,6 +75,15 @@ export function encodeEnd(fields: {
   return JSON.stringify(obj);
 }
 
+/** A message snapshot was stored: it, not the streamed previews, is the run's truth. */
+export function encodeReset(fields: { scenarioRunId: string; batchRunId: string }): string {
+  return JSON.stringify({
+    e: "R",
+    r: fields.scenarioRunId,
+    b: fields.batchRunId,
+  } satisfies CompactStreamingEvent);
+}
+
 // ---------------------------------------------------------------------------
 // Decode (SSE → client)
 // ---------------------------------------------------------------------------
@@ -80,5 +91,5 @@ export function encodeEnd(fields: {
 export function isCompactStreamingEvent(parsed: unknown): parsed is CompactStreamingEvent {
   if (typeof parsed !== "object" || parsed === null) return false;
   const p = parsed as Record<string, unknown>;
-  return p.e === "S" || p.e === "C" || p.e === "E";
+  return p.e === "S" || p.e === "C" || p.e === "E" || p.e === "R";
 }

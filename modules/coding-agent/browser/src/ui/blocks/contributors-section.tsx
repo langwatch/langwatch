@@ -1,7 +1,7 @@
 import { formatCost, formatTokens } from "@langwatch/design-system/display-formatters";
 import { FormattedNumber } from "@langwatch/design-system/formatted-number";
 import { ListTable } from "@langwatch/design-system/list-table";
-import { Table } from "@langwatch/design-system/primitives";
+import { type EmptyNext, NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import numeral from "numeral";
 import type React from "react";
 
@@ -9,7 +9,15 @@ import { type DetailPayload } from "../../model/pull-request-detail.ts";
 import { AgentLabel } from "../elements/agent-label.tsx";
 import { MISSING_VALUE } from "../elements/cells/missing-value.tsx";
 import { ContributorName } from "../elements/contributor-name.tsx";
-import { EmptySection, Section } from "../elements/detail-section.tsx";
+import { Section } from "../elements/detail-section.tsx";
+
+const SESSIONS_NEXT: EmptyNext = [
+  {
+    kind: "docs",
+    label: "How pull requests are attributed",
+    href: "https://docs.langwatch.ai/coding-agents/repository-and-pr-attribution",
+  },
+];
 
 /** Who worked on the pull request, and what each of them consumed. */
 export const ContributorsSection: React.FC<{
@@ -17,34 +25,38 @@ export const ContributorsSection: React.FC<{
 }> = ({ contributors }) => (
   <Section title="Contributors">
     {contributors.length === 0 ? (
-      <EmptySection>No sessions ran on this pull request yet</EmptySection>
+      <NoDataInfoBlock
+        size="line"
+        title="No sessions ran on this pull request yet"
+        next={SESSIONS_NEXT}
+      />
     ) : (
       <ListTable size="sm" containerProps={{ overflowX: "auto" }}>
-        <Table.Header>
-          <Table.Row>
-            <Table.ColumnHeader>Contributor</Table.ColumnHeader>
-            <Table.ColumnHeader>Agent</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Sessions</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Tokens</Table.ColumnHeader>
-            <Table.ColumnHeader textAlign="end">Token cost</Table.ColumnHeader>
-          </Table.Row>
-        </Table.Header>
-        <Table.Body>
+        <ListTable.Header>
+          <ListTable.Row>
+            <ListTable.ColumnHeader>Contributor</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader>Agent</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Sessions</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Tokens</ListTable.ColumnHeader>
+            <ListTable.ColumnHeader align="end">Token cost</ListTable.ColumnHeader>
+          </ListTable.Row>
+        </ListTable.Header>
+        <ListTable.Body>
           {contributors.map((contributor) => (
-            <Table.Row key={`${contributor.projectId} ${contributor.agent}`}>
+            <ListTable.Row key={`${contributor.projectId} ${contributor.agent}`}>
               <ContributorName contributor={contributor} />
-              <Table.Cell fontSize="sm" color="fg.muted">
+              <ListTable.Cell tone="muted">
                 {contributor.agent ? <AgentLabel agent={contributor.agent} /> : MISSING_VALUE}
-              </Table.Cell>
-              <Table.Cell textAlign="end" fontSize="sm">
+              </ListTable.Cell>
+              <ListTable.Cell align="end">
                 {numeral(contributor.sessionsCount).format("0,0")}
-              </Table.Cell>
-              <Table.Cell textAlign="end" fontSize="sm">
+              </ListTable.Cell>
+              <ListTable.Cell align="end">
                 <FormattedNumber value={contributor.totalTokens} unit="tokens">
                   {formatTokens(contributor.totalTokens)}
                 </FormattedNumber>
-              </Table.Cell>
-              <Table.Cell textAlign="end" fontSize="sm">
+              </ListTable.Cell>
+              <ListTable.Cell align="end">
                 {contributor.costUsd === null ? (
                   MISSING_VALUE
                 ) : (
@@ -52,10 +64,10 @@ export const ContributorsSection: React.FC<{
                     {formatCost(contributor.costUsd)}
                   </FormattedNumber>
                 )}
-              </Table.Cell>
-            </Table.Row>
+              </ListTable.Cell>
+            </ListTable.Row>
           ))}
-        </Table.Body>
+        </ListTable.Body>
       </ListTable>
     )}
   </Section>

@@ -62,6 +62,10 @@ const traceSummaryLookupInputSchemaDefinition = z
   .object({
     projectId: z.string().min(1),
     traceId: z.string().min(1),
+    /** When the caller's event happened (ms); anchors a bounded read, never wall-clock now. */
+    occurredAtMs: z.number().int().nonnegative().optional(),
+    /** With an anchor, false reads only the first window: one read per retry of a live trace. */
+    widen: z.boolean().optional(),
   })
   .strict();
 export interface TraceSummaryLookupInputSchema extends Named<

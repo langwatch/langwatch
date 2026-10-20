@@ -7,7 +7,7 @@ import type { WireOf } from "@langwatch/api/web";
 import { getComplexProps, getFlowCallbacks, useDrawer } from "@langwatch/browser-host/drawer";
 import { ConfirmDialog } from "@langwatch/design-system/confirm-dialog";
 import { Drawer } from "@langwatch/design-system/drawer";
-import { Button, HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
+import { HStack, Spinner, VStack } from "@langwatch/design-system/primitives";
 import { evaluatorClient } from "@langwatch/evaluator-client";
 import type { Evaluator, EvaluatorWithFields } from "@langwatch/evaluator-contract";
 import {
@@ -116,73 +116,49 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
   const showEvaluators = !evaluatorsQuery.isLoading && evaluators?.length !== 0;
 
   return (
-    <Drawer.Root
-      open={isOpen}
-      onOpenChange={({ open }) => !open && onClose()}
-      size="md"
-      modal={false}
-    >
-      <Drawer.Content bg="bg">
-        <Drawer.CloseTrigger />
-        <Drawer.Header>
-          <HStack gap={2} justify="space-between" width="full">
-            <Drawer.Title>{title}</Drawer.Title>
-            <Button
-              size="sm"
-              colorScheme="blue"
-              onClick={onCreateNew}
-              data-testid="new-evaluator-button"
-            >
-              <Plus size={16} />
-              {createLabel}
-            </Button>
-          </HStack>
-        </Drawer.Header>
-        <Drawer.Body display="flex" flexDirection="column" overflow="hidden" padding={0}>
-          <VStack gap={4} align="stretch" flex={1} overflow="hidden">
-            <VStack
-              gap={2}
-              align="stretch"
-              flex={1}
-              overflowY="auto"
-              paddingX={6}
-              paddingBottom={4}
-            >
-              {evaluatorsQuery.isLoading && (
-                <HStack justify="center" paddingY={8}>
-                  <Spinner size="md" />
-                </HStack>
-              )}
-              {showEmptyState && (
-                <EvaluatorListEmptyState
-                  onCreateNew={onCreateNew}
-                  itemLabel={itemLabel}
-                  hasHiddenAll={hasHiddenAll}
-                />
-              )}
-              {showEvaluators &&
-                evaluators?.map((evaluator) => (
-                  <EvaluatorListItem
-                    key={evaluator.id}
-                    evaluator={evaluator}
-                    updatedAtLabel={formatDistanceToNow(evaluator.updatedAt, {
-                      addSuffix: true,
-                    })}
-                    onClick={() => onSelect?.(evaluator)}
-                    onEdit={() => handleEditEvaluator(evaluator)}
-                    onDelete={() => setEvaluatorToDelete(evaluator)}
-                    onUseFromApi={() => setApiDialogEvaluator(evaluator)}
-                  />
-                ))}
-            </VStack>
-          </VStack>
-        </Drawer.Body>
-        <Drawer.Footer>
-          <Button variant="outline" onClick={onClose}>
-            Cancel
-          </Button>
-        </Drawer.Footer>
-      </Drawer.Content>
+    <>
+      <Drawer
+        open={isOpen}
+        onClose={onClose}
+        size="md"
+        title={title}
+        headerAction={{
+          label: createLabel,
+          icon: <Plus size={14} />,
+          onClick: onCreateNew,
+          "data-testid": "new-evaluator-button",
+        }}
+        footer={{ cancel: { onClick: onClose } }}
+      >
+        <VStack gap={2} align="stretch">
+          {evaluatorsQuery.isLoading && (
+            <HStack justify="center" paddingY={8}>
+              <Spinner size="md" />
+            </HStack>
+          )}
+          {showEmptyState && (
+            <EvaluatorListEmptyState
+              onCreateNew={onCreateNew}
+              itemLabel={itemLabel}
+              hasHiddenAll={hasHiddenAll}
+            />
+          )}
+          {showEvaluators &&
+            evaluators?.map((evaluator) => (
+              <EvaluatorListItem
+                key={evaluator.id}
+                evaluator={evaluator}
+                updatedAtLabel={formatDistanceToNow(evaluator.updatedAt, {
+                  addSuffix: true,
+                })}
+                onClick={() => onSelect?.(evaluator)}
+                onEdit={() => handleEditEvaluator(evaluator)}
+                onDelete={() => setEvaluatorToDelete(evaluator)}
+                onUseFromApi={() => setApiDialogEvaluator(evaluator)}
+              />
+            ))}
+        </VStack>
+      </Drawer>
 
       <EvaluatorApiUsageDialog
         evaluator={apiDialogEvaluator}
@@ -208,6 +184,6 @@ export function EvaluatorListDrawer(props: EvaluatorListDrawerProps) {
           );
         }}
       />
-    </Drawer.Root>
+    </>
   );
 }

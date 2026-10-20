@@ -5,14 +5,27 @@
  */
 import { Box, chakra, HStack, Link, Stack, Text, useRecipe } from "@chakra-ui/react";
 import { Plus } from "lucide-react";
-import type { MouseEvent, ReactNode } from "react";
+import { type MouseEvent, type ReactNode, useEffect, useRef } from "react";
 
 import { isBrowserClick } from "./back-link.tsx";
-import { PageLayout } from "./page-layout.tsx";
-import { useSectionNavigationIndicator } from "./use-section-navigation-indicator.ts";
+import { PageHeaderSizeProvider, PageLayout, type PageHeaderSize } from "./page-layout.tsx";
+import { ScrollEdgeFade, useScrollEdges } from "./scroll-fade.tsx";
+
+/** Below the `md` breakpoint the rail lays its entries out as a sideways strip. */
+const STRIP_QUERY = "(max-width: 47.99rem)";
+
+/** Scrolls the strip, not the page, so the current entry is in view when the page opens. */
+function revealActiveEntry(scroller: HTMLElement) {
+  const active = scroller.querySelector('[aria-current="page"]');
+  if (!active || !window.matchMedia?.(STRIP_QUERY).matches) return;
+  const item = active.getBoundingClientRect();
+  const view = scroller.getBoundingClientRect();
+  if (item.left >= view.left && item.right <= view.right) return;
+  scroller.scrollLeft += item.left - view.left - (view.width - item.width) / 2;
+}
 
 /** How wide the rail is, open and folded to its icons. */
-export const SECTION_RAIL_WIDTH = 176;
+export const SECTION_RAIL_WIDTH = 196;
 export const SECTION_RAIL_COLLAPSED_WIDTH = 56;
 
 /** One entry on the rail: where it goes and how it reads. */
@@ -47,11 +60,14 @@ export function SectionNavigationItem({
   link,
   activeHref,
   collapsed = false,
+  showIcon = false,
   onNavigate,
 }: {
   link: SectionNavigationLink;
   activeHref: string;
   collapsed?: boolean;
+  /** Leads the open entry with its icon too; a folded entry always shows it. */
+  showIcon?: boolean;
   onNavigate: (href: string) => void;
 }) {
   const active = link.href === activeHref;
@@ -73,31 +89,41 @@ export function SectionNavigationItem({
         display="flex"
         width="full"
         paddingX={2}
-        height="32px"
-        paddingY={1.5}
-        borderRadius="sm"
-        color={active ? "fg" : "nav.fgMuted"}
-        background="transparent"
-        transition="color 0.15s ease-out"
-        fontWeight={active ? "semibold" : void 0}
-        _hover={{ color: "fg", textDecoration: "none" }}
+        height="28px"
+        alignItems="center"
+        borderRadius="lg"
+        color={active ? "fg" : "nav.fg"}
+        background={active ? "nav.bgActive" : "transparent"}
+        transition="background-color 0.15s ease-out, color 0.15s ease-out"
+        fontWeight={active ? "medium" : "normal"}
+        _hover={{
+          color: "fg",
+          background: active ? "nav.bgActive" : "nav.bgHover",
+          textDecoration: "none",
+        }}
+        _focusVisible={{
+          outline: "2px solid",
+          outlineColor: "colorPalette.focusRing",
+          outlineOffset: "-2px",
+        }}
       >
         <HStack gap={2} minWidth={0} flex={1}>
-          {collapsed && link.icon ? (
+          {(collapsed || showIcon) && link.icon ? (
             <Box as="span" display="flex" flexShrink={0} color="inherit">
               {link.icon}
             </Box>
           ) : null}
           {collapsed ? null : (
-            <Text fontSize="sm" truncate title={link.label} flex={1}>
+            <Text fontSize="13px" lineHeight="20px" truncate title={link.label} flex={1}>
               {link.label}
             </Text>
           )}
           {collapsed || link.badge === void 0 ? null : (
             <Text
               as="span"
-              fontSize="xs"
+              fontSize="12px"
               color="fg.muted"
+              fontVariantNumeric="tabular-nums"
               _groupHover={actions ? { opacity: 0 } : void 0}
             >
               {link.badge}
@@ -137,18 +163,22 @@ export function SectionNavigationAddRow({ add }: { add: SectionNavigationAdd }) 
       gap={2}
       flexShrink={0}
       paddingX={2}
-      height="32px"
-      paddingY={1.5}
-      borderRadius="sm"
+      height="28px"
+      borderRadius="lg"
       textAlign="left"
       cursor="pointer"
       color="fg.muted"
       background="transparent"
-      transition="color 0.15s ease-out"
-      _hover={{ color: "fg" }}
+      transition="background-color 0.15s ease-out, color 0.15s ease-out"
+      _hover={{ color: "fg", background: "nav.bgHover" }}
+      _focusVisible={{
+        outline: "2px solid",
+        outlineColor: "colorPalette.focusRing",
+        outlineOffset: "-2px",
+      }}
     >
       <Plus size={14} />
-      <Text fontSize="sm" truncate>
+      <Text fontSize="13px" lineHeight="20px" truncate>
         {add.label}
       </Text>
     </chakra.button>
@@ -167,12 +197,20 @@ export function SectionNavigationRail({
   onNavigate,
   collapsed = false,
   footer,
+  showTitle = true,
+  showIcons = false,
 }: SectionNavigationRailProps) {
   const runs: readonly SectionNavigationGroup[] = [{ links }, ...groups].filter(
     (run) => run.links.length > 0 || (!collapsed && (run.extra !== void 0 || run.add !== void 0)),
   );
   const railStyle = useRecipe({ key: "sectionNavigationRail" });
   const width = collapsed ? SECTION_RAIL_COLLAPSED_WIDTH : SECTION_RAIL_WIDTH;
+  const strip = useScrollEdges();
+  const stripBox = useRef<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const scroller = stripBox.current?.querySelector<HTMLElement>("[data-section-strip]");
+    if (scroller) revealActiveEntry(scroller);
+  }, [activeHref]);
   return (
     <Box
       as="nav"
@@ -189,94 +227,94 @@ export function SectionNavigationRail({
       paddingTop={0}
       paddingBottom={2}
     >
-      <Text
-        data-testid="section-navigation-title"
-        display="flex"
-        alignItems="center"
-        height={SECTION_HEADER_HEIGHT}
-        minHeight={SECTION_HEADER_HEIGHT}
-        flexShrink={0}
-        paddingX={5}
-        fontSize="sm"
-        lineHeight="20px"
-        fontWeight="semibold"
-        title={label}
-        overflow="hidden"
-        whiteSpace="nowrap"
-      >
-        {label}
-      </Text>
-      <Box flex={1} minHeight={0} overflow="auto">
-        <Stack
-          data-testid="section-navigation-list"
-          position="relative"
-          direction={{ base: "row", md: "column" }}
-          alignItems="stretch"
-          gap={{ base: 1, md: 4 }}
-          paddingX={3}
-          paddingTop={2}
-          paddingBottom={2}
-          minWidth="full"
-          width={{ base: "max-content", md: "full" }}
+      {/* An eyebrow, not a second page title: the content's header owns the one 20px title. */}
+      {showTitle ? (
+        <Text
+          data-testid="section-navigation-title"
+          display="flex"
+          alignItems="center"
+          height={SECTION_HEADER_HEIGHT}
+          minHeight={SECTION_HEADER_HEIGHT}
+          flexShrink={0}
+          paddingX={5}
+          fontSize="13px"
+          lineHeight="20px"
+          fontWeight="semibold"
+          color="fg.muted"
+          title={label}
+          overflow="hidden"
+          whiteSpace="nowrap"
         >
-          <SectionNavigationIndicator />
-          {runs.map((run, index) => (
-            <Stack
-              key={run.label ?? index}
-              direction={{ base: "row", md: "column" }}
-              alignItems="stretch"
-              gap={0.5}
-            >
-              {run.label && !collapsed ? (
-                <Text
-                  display={{ base: "none", md: "block" }}
-                  fontSize="11px"
-                  lineHeight="16px"
-                  fontWeight="medium"
-                  color="nav.fgMuted"
-                  paddingX={2}
-                  paddingBottom={1}
-                >
-                  {run.label}
-                </Text>
-              ) : null}
-              {run.links.map((link) => (
-                <SectionNavigationItem
-                  key={link.href}
-                  link={link}
-                  activeHref={activeHref}
-                  collapsed={collapsed}
-                  onNavigate={onNavigate}
-                />
-              ))}
-              {collapsed ? null : run.extra}
-              {collapsed || !run.add ? null : <SectionNavigationAddRow add={run.add} />}
-            </Stack>
-          ))}
-        </Stack>
+          {label}
+        </Text>
+      ) : (
+        <Box height={4} flexShrink={0} />
+      )}
+      {/* On a phone the rail is a strip that scrolls sideways; the fades mark hidden entries. */}
+      <Box
+        ref={stripBox}
+        position="relative"
+        flex={1}
+        minHeight={0}
+        display="flex"
+        flexDirection="column"
+      >
+        <Box ref={strip.ref} data-section-strip flex={1} minHeight={0} overflow="auto">
+          <Stack
+            data-testid="section-navigation-list"
+            position="relative"
+            direction={{ base: "row", md: "column" }}
+            alignItems="stretch"
+            gap={{ base: 1, md: 4 }}
+            paddingX={3}
+            paddingTop={0}
+            paddingBottom={2}
+            minWidth="full"
+            width={{ base: "max-content", md: "full" }}
+          >
+            {runs.map((run, index) => (
+              <Stack
+                key={run.label ?? index}
+                direction={{ base: "row", md: "column" }}
+                alignItems="stretch"
+                gap={0.5}
+              >
+                {run.label && !collapsed ? (
+                  <Text
+                    display={{ base: "none", md: "block" }}
+                    fontSize="10px"
+                    lineHeight="16px"
+                    fontWeight="semibold"
+                    textTransform="uppercase"
+                    letterSpacing="0.025em"
+                    color="fg.muted"
+                    paddingX={2}
+                    paddingBottom="6px"
+                  >
+                    {run.label}
+                  </Text>
+                ) : null}
+                {run.links.map((link) => (
+                  <SectionNavigationItem
+                    key={link.href}
+                    link={link}
+                    activeHref={activeHref}
+                    collapsed={collapsed}
+                    showIcon={showIcons}
+                    onNavigate={onNavigate}
+                  />
+                ))}
+                {collapsed ? null : run.extra}
+                {collapsed || !run.add ? null : <SectionNavigationAddRow add={run.add} />}
+              </Stack>
+            ))}
+          </Stack>
+        </Box>
+        <ScrollEdgeFade edge="start" visible={strip.start} color="bg.surface" />
+        <ScrollEdgeFade edge="end" visible={strip.end} color="bg.surface" />
       </Box>
       {footer ? <Box flexShrink={0}>{footer}</Box> : null}
     </Box>
-  );
-}
-
-function SectionNavigationIndicator() {
-  const markerRef = useSectionNavigationIndicator();
-  return (
-    <Box
-      ref={markerRef}
-      data-testid="section-navigation-indicator"
-      aria-hidden="true"
-      position="absolute"
-      top={0}
-      left={0}
-      width="3px"
-      background="fg.subtle"
-      borderStartEndRadius="2px"
-      borderEndEndRadius="2px"
-      pointerEvents="none"
-      style={{ visibility: "hidden" }}
-    />
   );
 }
 
@@ -294,52 +332,61 @@ type SectionNavigationRailProps = {
   collapsed?: boolean;
   /** Pinned under the entries (a period picker, the fold toggle); the entries scroll above it. */
   footer?: ReactNode;
+  /** False when a page header above the rail already names the section. */
+  showTitle?: boolean;
+  /** Leads every open entry with its icon, for a list whose entries differ by kind. */
+  showIcons?: boolean;
 };
 
-const SECTION_HEADER_HEIGHT = "shellHeader";
+const SECTION_HEADER_HEIGHT = "pageHeader.lg";
 
 /** Both section title and sub-page header share this row geometry. */
-export function SectionNavigationHeader({ children }: { children: ReactNode }) {
+export function SectionNavigationHeader({
+  children,
+  size = "lg",
+  actions,
+}: {
+  children: ReactNode;
+  size?: PageHeaderSize;
+  actions?: ReactNode;
+}) {
   return (
     <PageLayout.Header
-      paddingY={0}
-      height={SECTION_HEADER_HEIGHT}
-      minHeight={SECTION_HEADER_HEIGHT}
+      size={size}
+      withBorder={false}
+      actions={actions}
       css={{
-        // The hairline stops short of the rail's line by the gap that line leaves under
-        // the header (56px less 48px), so the two meet at the corner with equal space.
         borderBottomColor: "transparent",
         _after: {
           content: '""',
           position: "absolute",
           left: "8px",
           right: 0,
-          bottom: "-1px",
+          bottom: 0,
           height: "1px",
-          background: "border.card",
+          background: "border.muted",
           opacity: 0,
-          transition: "opacity 160ms ease",
+          pointerEvents: "none",
         },
         "&[data-scrolled=true]::after": { opacity: 1 },
-        "& h1": {
-          fontSize: "sm",
-          lineHeight: "20px",
-          fontWeight: "semibold",
-          whiteSpace: "nowrap",
-        },
-        "& .chakra-button": {
-          height: "28px",
-          minHeight: "28px",
-          paddingX: 2,
-          gap: 1.5,
-          fontSize: "xs",
-          "& p": { fontSize: "inherit" },
-          "& svg": { width: "14px", height: "14px" },
-        },
       }}
     >
       {children}
     </PageLayout.Header>
+  );
+}
+
+/** The sticky header row; narrower than its controls, it scrolls sideways behind edge fades. */
+function SectionHeaderStrip({ children }: { children: ReactNode }) {
+  const strip = useScrollEdges();
+  return (
+    <Box position="sticky" top={0} zIndex={10}>
+      <Box ref={strip.ref} overflowX="auto" overscrollBehaviorX="contain">
+        {children}
+      </Box>
+      <ScrollEdgeFade edge="start" visible={strip.start} color="bg.surface" />
+      <ScrollEdgeFade edge="end" visible={strip.end} color="bg.surface" />
+    </Box>
   );
 }
 
@@ -358,45 +405,46 @@ export function SectionNavigationFrame({
   children: ReactNode;
 }) {
   return (
-    <Stack
-      data-section-frame
-      background="bg.surface"
-      overflow="hidden"
-      data-testid="section-navigation-layout"
-      direction={{ base: "column", md: "row" }}
-      alignItems="stretch"
-      gap={0}
-      width="full"
-      flex="1"
-      minWidth={0}
-      minHeight={0}
-    >
-      <SectionNavigationRail {...rail} />
-      <Box
-        position="relative"
-        flex={1}
+    <PageHeaderSizeProvider size="lg">
+      <Stack
+        data-section-frame
+        background="bg.surface"
+        overflow="hidden"
+        data-testid="section-navigation-layout"
+        direction={{ base: "column", md: "row" }}
+        alignItems="stretch"
+        gap={0}
+        width="full"
+        flex="1"
         minWidth={0}
         minHeight={0}
-        overflowY="auto"
-        overflowX="hidden"
       >
-        <Box position="sticky" top={0} zIndex={10} overflowX="auto" overscrollBehaviorX="contain">
-          {header ?? (
-            <SectionNavigationHeader>
-              <PageLayout.Heading>{pageTitle ?? "Overview"}</PageLayout.Heading>
-              {headerActions ? <Box marginLeft="auto">{headerActions}</Box> : null}
-            </SectionNavigationHeader>
-          )}
-        </Box>
+        <SectionNavigationRail {...rail} />
         <Box
-          data-testid="section-navigation-content"
-          paddingX={6}
-          paddingTop={4}
-          paddingBottom={16}
+          position="relative"
+          flex={1}
+          minWidth={0}
+          minHeight={0}
+          overflowY="auto"
+          overflowX="hidden"
         >
-          {children}
+          <SectionHeaderStrip>
+            {header ?? (
+              <SectionNavigationHeader actions={headerActions}>
+                <PageLayout.Heading>{pageTitle ?? "Overview"}</PageLayout.Heading>
+              </SectionNavigationHeader>
+            )}
+          </SectionHeaderStrip>
+          <Box
+            data-testid="section-navigation-content"
+            paddingX={6}
+            paddingTop={4}
+            paddingBottom={16}
+          >
+            {children}
+          </Box>
         </Box>
-      </Box>
-    </Stack>
+      </Stack>
+    </PageHeaderSizeProvider>
   );
 }

@@ -1,4 +1,4 @@
-import type { EmailSuppression } from "@langwatch/automation-contract";
+import type { EmailSuppression, EmailSuppressionCursor } from "@langwatch/automation-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant, toDate } from "@langwatch/time";
 
@@ -17,6 +17,30 @@ export class MemoryEmailSuppressionRepository extends EmailSuppressionRepository
   findAll(input: { projectId: string }): Promise<EmailSuppression[]> {
     return Promise.resolve(
       this.memory.suppressions.filter((row) => row.projectId === input.projectId),
+    );
+  }
+
+  findPage(input: {
+    projectId: string;
+    limit: number;
+    cursor: EmailSuppressionCursor | null;
+  }): Promise<EmailSuppression[]> {
+    const { cursor } = input;
+    const newestFirst = (left: EmailSuppression, right: EmailSuppression): number => {
+      const byTime = right.createdAt.getTime() - left.createdAt.getTime();
+      if (byTime !== 0) return byTime;
+      if (left.id === right.id) return 0;
+      return left.id < right.id ? 1 : -1;
+    };
+    const afterCursor = (row: EmailSuppression): boolean =>
+      cursor === null ||
+      row.createdAt.getTime() < cursor.createdAt.getTime() ||
+      (row.createdAt.getTime() === cursor.createdAt.getTime() && row.id < cursor.id);
+    return Promise.resolve(
+      this.memory.suppressions
+        .filter((row) => row.projectId === input.projectId && afterCursor(row))
+        .toSorted(newestFirst)
+        .slice(0, input.limit),
     );
   }
 

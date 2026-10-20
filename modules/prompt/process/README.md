@@ -362,8 +362,8 @@ Permission `prompts:view`. Hidden from the OpenAPI document. Declared at `src/tr
 Answers at `/api/prompt-playground/2026-08-20/prompt.execute`.
 
 ```typescript
-type Body = z.infer<typeof executeRequestSchema>; // ../contract/src/prompt.playground-execute.ts:29
-// Response: inline, src/transport/prompt-execute.rest.ts:21
+type Body = z.infer<typeof executeRequestSchema>; // ../contract/src/prompt.playground-execute.ts:43
+// Response: inline, src/transport/prompt-execute.rest.ts:22
 type Response = unknown;
 ```
 
@@ -397,16 +397,16 @@ Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:104`.
 Answers at `/api/prompts/:id{.+?}/tags/:tag`, `/api/v1/prompts/:id{.+?}/tags/:tag`.
 
 ```typescript
-// Params: idTagParamsSchema, ../contract/src/prompt-rest.schemas.ts:143
+// Params: idTagParamsSchema, ../contract/src/prompt-rest.schemas.ts:191
 interface Params {
   id: string;
   tag: string;
 }
-// Body: assignTagInputSchema, ../contract/src/prompt-rest.schemas.ts:115
+// Body: assignTagInputSchema, ../contract/src/prompt-rest.schemas.ts:143
 interface Body {
   versionId: string;
 }
-// Response: assignTagResponseSchema, ../contract/src/prompt-rest.schemas.ts:109
+// Response: assignTagResponseSchema, ../contract/src/prompt-rest.schemas.ts:140
 interface Response {
   configId: string;
   versionId: string;
@@ -419,12 +419,12 @@ interface Response {
 
 List all prompt tag definitions for the organization
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:141`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:142`.
 
 Answers at `/api/prompts/tags`, `/api/v1/prompts/tags`.
 
 ```typescript
-// Response: inline, src/transport/prompt.rest.ts:143
+// Response: inline, src/transport/prompt.rest.ts:144
 type Response = {
   id: string;
   name: string;
@@ -436,16 +436,16 @@ type Response = {
 
 Create a custom prompt tag definition for the organization
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:158`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:159`.
 
 Answers at `/api/prompts/tags`, `/api/v1/prompts/tags`.
 
 ```typescript
-// Body: createTagInputSchema, ../contract/src/prompt-rest.schemas.ts:121
+// Body: createTagInputSchema, ../contract/src/prompt-rest.schemas.ts:153
 interface Body {
   name: string;
 }
-// Response: tagDefinitionSchema, ../contract/src/prompt-rest.schemas.ts:116
+// Response: tagDefinitionSchema, ../contract/src/prompt-rest.schemas.ts:150
 interface Response {
   id: string;
   name: string;
@@ -457,33 +457,33 @@ interface Response {
 
 Rename a prompt tag definition
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:180`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:182`.
 
 Answers at `/api/prompts/tags/:tag`, `/api/v1/prompts/tags/:tag`.
 
 ```typescript
-// Params: tagParamsSchema, ../contract/src/prompt-rest.schemas.ts:147
+// Params: tagParamsSchema, ../contract/src/prompt-rest.schemas.ts:194
 interface Params {
   tag: string;
 }
-// Body: renameTagInputSchema, ../contract/src/prompt-rest.schemas.ts:122
+// Body: renameTagInputSchema, ../contract/src/prompt-rest.schemas.ts:156
 interface Body {
   name: string;
 }
-type Response = z.infer<typeof tagDefinitionSchema>; // ../contract/src/prompt-rest.schemas.ts:116
+type Response = z.infer<typeof tagDefinitionSchema>; // ../contract/src/prompt-rest.schemas.ts:150
 ```
 
 #### `DELETE /api/prompts/tags/:tag` · `deleteApiPromptsTagsByTag`
 
 Delete a prompt tag definition and cascade to assignments
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:203`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:206`.
 
 Answers at `/api/prompts/tags/:tag`, `/api/v1/prompts/tags/:tag`.
 
 ```typescript
-type Params = z.infer<typeof tagParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:147
-// Response: inline, src/transport/prompt.rest.ts:206
+type Params = z.infer<typeof tagParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:194
+// Response: inline, src/transport/prompt.rest.ts:210
 type Response = unknown;
 ```
 
@@ -491,106 +491,106 @@ type Response = unknown;
 
 Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:216`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:220`.
 
 Answers at `/api/prompts/:id{.+?}/versions`, `/api/v1/prompts/:id{.+?}/versions`.
 
 ```typescript
-// Params: idParamsSchema, ../contract/src/prompt-rest.schemas.ts:142
+// Params: idParamsSchema, ../contract/src/prompt-rest.schemas.ts:185
 interface Params {
   id: string;
 }
-// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:219)
+// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:223)
 ```
 
 #### `POST /api/prompts/:id{.+?}/versions/:versionId/restore` · `postApiPromptsByIdVersionsByVersionIdRestore`
 
 Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:252`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:256`.
 
 Answers at `/api/prompts/:id{.+?}/versions/:versionId/restore`, `/api/v1/prompts/:id{.+?}/versions/:versionId/restore`.
 
 ```typescript
-// Params: idVersionParamsSchema, ../contract/src/prompt-rest.schemas.ts:148
+// Params: idVersionParamsSchema, ../contract/src/prompt-rest.schemas.ts:200
 interface Params {
   id: string;
   versionId: string;
 }
-// Body: restorePromptVersionBodySchema, ../contract/src/prompt-rest.schemas.ts:154
+// Body: restorePromptVersionBodySchema, ../contract/src/prompt-rest.schemas.ts:208
 type Body = Record<string, unknown>;
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:104
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
 ```
 
 #### `GET /api/prompts/:id{.+}` · `getApiPromptsById`
 
 Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like "pizza-prompt" to get the latest version, "pizza-prompt:production" to resolve a tagged version, or "pizza-prompt:2" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:299`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:304`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:142
-// Query: promptWindowQuerySchema, ../contract/src/prompt-rest.schemas.ts:155
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
+// Query: promptWindowQuerySchema, ../contract/src/prompt-rest.schemas.ts:214
 interface Query {
   version?: number;
   tag?: string;
 }
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:104
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
 ```
 
 #### `POST /api/prompts` · `postApiPrompts`
 
 Create a new prompt with default initial version
 
-Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:338`.
+Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:343`.
 
 Answers at `/api/prompts`, `/api/v1/prompts`.
 
 ```typescript
-type Body = z.infer<typeof createPromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:18
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:104
+type Body = z.infer<typeof createPromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:48
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
 ```
 
 #### `POST /api/prompts/:id{.+?}/sync` · `postApiPromptsByIdSync`
 
 Sync/upsert a prompt with local content
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:364`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:370`.
 
 Answers at `/api/prompts/:id{.+?}/sync`, `/api/v1/prompts/:id{.+?}/sync`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:142
-type Body = z.infer<typeof syncInputSchema>; // ../contract/src/prompt-rest.schemas.ts:123
-type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/prompt.ts:187
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
+type Body = z.infer<typeof syncInputSchema>; // ../contract/src/prompt-rest.schemas.ts:164
+type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/prompt.ts:241
 ```
 
 #### `PUT /api/prompts/:id{.+}` · `putApiPromptsById`
 
 Update a prompt
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:392`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:399`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:142
-type Body = z.infer<typeof updatePromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:47
-type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:104
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
+type Body = z.infer<typeof updatePromptInputSchema>; // ../contract/src/prompt-rest.schemas.ts:57
+type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest.schemas.ts:131
 ```
 
 #### `DELETE /api/prompts/:id{.+}` · `deleteApiPromptsById`
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:427`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:435`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
 ```typescript
-type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:142
+type Params = z.infer<typeof idParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:185
 // Response: successSchema, ../../../packages/api/src/rest/response.ts:249
 interface Response {
   success: boolean;
@@ -601,7 +601,7 @@ interface Response {
 
 ### `promptTags`
 
-Contract `../contract/src/prompt-tag.trpc.ts:27`, router `src/transport/prompt-tag.trpc.ts:8`.
+Contract `../contract/src/prompt-tag.trpc.ts:42`, router `src/transport/prompt-tag.trpc.ts:8`.
 
 | Procedure           | Kind     | Gate                        | Input                             | Output                     |
 | ------------------- | -------- | --------------------------- | --------------------------------- | -------------------------- |
@@ -612,11 +612,11 @@ Contract `../contract/src/prompt-tag.trpc.ts:27`, router `src/transport/prompt-t
 
 ```typescript
 // promptTags.getAll
-// Input: promptTagProjectTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:12
+// Input: promptTagProjectTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:17
 interface Input {
   projectId: string;
 }
-// Output: inline, ../contract/src/prompt-tag.trpc.ts:30
+// Output: inline, ../contract/src/prompt-tag.trpc.ts:45
 type Output = {
   id: string;
   organizationId: string;
@@ -628,12 +628,12 @@ type Output = {
 }[];
 
 // promptTags.create
-// Input: promptTagNameTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:15
+// Input: promptTagNameTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:28
 interface Input {
   projectId: string;
   name: string;
 }
-// Output: promptTagSchema, ../contract/src/prompt.ts:89
+// Output: promptTagSchema, ../contract/src/prompt.ts:115
 interface Output {
   id: string;
   organizationId: string;
@@ -645,17 +645,17 @@ interface Output {
 }
 
 // promptTags.rename
-// Input: promptTagRenameTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:21
+// Input: promptTagRenameTrpcInputSchema, ../contract/src/prompt-tag.trpc.ts:40
 interface Input {
   projectId: string;
   oldName: string;
   newName: string;
 }
-type Output = z.infer<typeof promptTagSchema>; // ../contract/src/prompt.ts:89
+type Output = z.infer<typeof promptTagSchema>; // ../contract/src/prompt.ts:115
 
 // promptTags.delete
-type Input = z.infer<typeof promptTagNameTrpcInputSchema>; // ../contract/src/prompt-tag.trpc.ts:15
-// Output: promptDeleteResultSchema, ../contract/src/prompt.ts:152
+type Input = z.infer<typeof promptTagNameTrpcInputSchema>; // ../contract/src/prompt-tag.trpc.ts:28
+// Output: promptDeleteResultSchema, ../contract/src/prompt.ts:175
 interface Output {
   success: boolean;
 }
@@ -663,7 +663,7 @@ interface Output {
 
 ### `prompts`
 
-Contract `../contract/src/prompt.trpc.ts:48`, router `src/transport/prompt.trpc.ts:15`.
+Contract `../contract/src/prompt.trpc.ts:58`, router `src/transport/prompt.trpc.ts:15`.
 
 | Procedure                         | Kind     | Gate                        | Input                                   | Output                           |
 | --------------------------------- | -------- | --------------------------- | --------------------------------------- | -------------------------------- |
@@ -687,19 +687,19 @@ Contract `../contract/src/prompt.trpc.ts:48`, router `src/transport/prompt.trpc.
 
 ```typescript
 // prompts.getAllPromptsForProject
-// Input: promptProjectTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:17
+// Input: promptProjectTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:23
 interface Input {
   projectId: string;
 }
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:55)
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:65)
 
 // prompts.getCopies
-// Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:24
+// Input: promptIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:38
 interface Input {
   projectId: string;
   idOrHandle: string;
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:60
+// Output: inline, ../contract/src/prompt.trpc.ts:70
 type Output = {
   id: string;
   handle: string;
@@ -712,23 +712,23 @@ type Output = {
 }[];
 
 // prompts.restoreVersion
-// Input: promptRestoreVersionTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:29
+// Input: promptRestoreVersionTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:48
 interface Input {
   versionId: string;
   projectId: string;
 }
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.create
-type Input = z.infer<typeof promptCreateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:36
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Input = z.infer<typeof promptCreateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:43
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.update
-type Input = z.infer<typeof promptUpdateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:41
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Input = z.infer<typeof promptUpdateTrpcInputSchema>; // ../contract/src/prompt.trpc.ts:53
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.updateHandle
-// Input: promptUpdateHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:168
+// Input: promptUpdateHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:196
 interface Input {
   projectId: string;
   id: string;
@@ -737,10 +737,10 @@ interface Input {
     scope: "PROJECT" | "ORGANIZATION";
   };
 }
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.getByIdOrHandle
-// Input: promptGetByIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:177
+// Input: promptGetByIdOrHandleTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:212
 interface Input {
   idOrHandle: string;
   projectId: string;
@@ -748,77 +748,77 @@ interface Input {
   version?: number;
   tag?: string;
 }
-// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:84)
+// Output: versionedPromptSchema.nullable() (inline, ../contract/src/prompt.trpc.ts:94)
 
 // prompts.checkHandleUniqueness
-// Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:188
+// Input: promptHandleUniquenessTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:223
 interface Input {
   handle: string;
   projectId: string;
   scope: "PROJECT" | "ORGANIZATION";
 }
-// Output: inline, ../contract/src/prompt.trpc.ts:88
+// Output: inline, ../contract/src/prompt.trpc.ts:98
 type Output = boolean;
 
 // prompts.checkModifyPermission
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-// Output: promptModifyPermissionSchema, ../contract/src/prompt.ts:155
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
+// Output: promptModifyPermissionSchema, ../contract/src/prompt.ts:185
 interface Output {
   hasPermission: boolean;
   reason?: string;
 }
 
 // prompts.getAllVersionsForPrompt
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:96)
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
+// Output: versionedPromptSchema.array() (inline, ../contract/src/prompt.trpc.ts:106)
 
 // prompts.delete
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-type Output = z.infer<typeof promptDeleteResultSchema>; // ../contract/src/prompt.ts:152
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
+type Output = z.infer<typeof promptDeleteResultSchema>; // ../contract/src/prompt.ts:175
 
 // prompts.copy
-// Input: promptCopyTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:194
+// Input: promptCopyTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:234
 interface Input {
   idOrHandle: string;
   projectId: string;
   sourceProjectId: string;
 }
-type Output = z.infer<typeof copiedPromptSchema>; // ../contract/src/prompt.ts:233
+type Output = z.infer<typeof copiedPromptSchema>; // ../contract/src/prompt.ts:280
 
 // prompts.duplicate
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.syncFromSource
-type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:24
-type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:102
+type Input = z.infer<typeof promptIdOrHandleTrpcInputSchema>; // ../contract/src/prompt.trpc-schemas.ts:38
+type Output = z.infer<typeof versionedPromptSchema>; // ../contract/src/prompt.ts:167
 
 // prompts.pushToCopies
-// Input: promptPushToCopiesTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:200
+// Input: promptPushToCopiesTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:245
 interface Input {
   projectId: string;
   idOrHandle: string;
   copyIds?: string[];
 }
-type Output = z.infer<typeof promptPushToCopiesResultSchema>; // ../contract/src/prompt.ts:243
+type Output = z.infer<typeof promptPushToCopiesResultSchema>; // ../contract/src/prompt.ts:308
 
 // prompts.getTagsForConfig
-// Input: promptConfigTagsTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:206
+// Input: promptConfigTagsTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:255
 interface Input {
   projectId: string;
   configId: string;
 }
-// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:122)
+// Output: promptTagAssignmentSchema.array() (inline, ../contract/src/prompt.trpc.ts:132)
 
 // prompts.assignTag
-// Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:211
+// Input: promptAssignTagTrpcInputSchema, ../contract/src/prompt.trpc-schemas.ts:267
 interface Input {
   projectId: string;
   configId: string;
   versionId: string;
   tag: string;
 }
-type Output = z.infer<typeof promptTagAssignmentSchema>; // ../contract/src/prompt.ts:160
+type Output = z.infer<typeof promptTagAssignmentSchema>; // ../contract/src/prompt.ts:200
 ```
 
 ## Sockets

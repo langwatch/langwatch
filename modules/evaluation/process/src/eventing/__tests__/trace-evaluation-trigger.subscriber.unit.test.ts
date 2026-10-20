@@ -2,6 +2,7 @@ import type { ExecuteEvaluationCommandData } from "@langwatch/evaluation-contrac
 import { createTenantId } from "@langwatch/eventing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { MonitorSummary } from "@langwatch/monitor-contract";
+import { type OtlpKeyValue, type OtlpSpan } from "@langwatch/otlp/trace-request";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import {
   MAX_PROCESSED_SPANS,
@@ -13,8 +14,6 @@ import {
   TOPIC_ASSIGNED_EVENT_VERSION_LATEST,
   TRACK_EVENT_SPAN_NAME,
   isSpanReceivedEvent,
-  type OtlpKeyValue,
-  type OtlpSpan,
   type TraceProcessingEvent,
   type TraceSummaryData,
 } from "@langwatch/trace-contract";
@@ -29,6 +28,7 @@ import {
   detectCausalityLoop,
   detectFoldedCausalityLoop,
   isDispatchableTraceSpan,
+  TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS,
 } from "../trace-evaluation-trigger.subscriber.ts";
 
 /**
@@ -196,8 +196,12 @@ function subscriber(options: {
   const isEnabled = vi.fn(async () => options.guardDisabled ?? false);
   const listMonitors = vi.fn(async (_projectId: string) => options.monitors ?? [monitor()]);
   const folded: { state: TraceSummaryData | null } = { state: null };
+  const lookups: { occurredAtMs?: number; widen?: boolean }[] = [];
   const trigger = createTraceEvaluationTrigger({
-    findSummary: async () => folded.state,
+    findSummary: async (input) => {
+      lookups.push(input);
+      return folded.state;
+    },
     featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled }),
     monitors: {
       getEnabledOnMessageMonitors: (projectId) =>
@@ -206,7 +210,7 @@ function subscriber(options: {
     queueTraceEvaluation: (data) => dispatch.send(data),
     metrics,
   });
-  return { built: { trigger, folded }, dispatch, metrics, isEnabled, listMonitors };
+  return { built: { trigger, folded }, dispatch, metrics, isEnabled, listMonitors, lookups };
 }
 
 /** Delivers one trace event to the trigger over the given folded summary. */
@@ -228,6 +232,125 @@ async function run(
 }
 
 describe("createTraceEvaluationTrigger", () => {
+  describe("given a span event", () => {
+    describe("when the trigger reads the trace's summary", () => {
+      it("anchors the lookup on the span's own time, never on now", async () => {
+        const { built, lookups } = subscriber({});
+        const event = spanEvent();
+
+        await run(built, event, foldState());
+
+        expect(lookups).toEqual([expect.objectContaining({ occurredAtMs: event.occurredAt })]);
+      });
+    });
+
+    describe("when the trace's summary has not folded by the end of the settle", () => {
+      /** @scenario "The evaluation trigger's lookup is anchored on the span and widens" */
+      it("anchors on the span without narrowing the lookup", async () => {
+        const { built, lookups } = subscriber({});
+        const event = spanEvent();
+        built.folded.state = null;
+
+        await expect(
+          built.trigger({
+            tenantId: "tenant-1",
+            traceId: "trace-1",
+            event: { type: event.type, occurredAt: event.occurredAt },
+          }),
+        ).rejects.toBeInstanceOf(Error);
+
+        expect(lookups).toEqual([
+          {
+            projectId: "tenant-1",
+            traceId: "trace-1",
+            occurredAtMs: event.occurredAt,
+          },
+        ]);
+      });
+    });
+  });
+
+  describe("given a trace whose summary has not folded", () => {
+    describe.each([
+      ["a span event", SPAN_RECEIVED_EVENT_TYPE],
+      ["an origin resolution", ORIGIN_RESOLVED_EVENT_TYPE],
+    ])("when the trigger handles %s", (_label, type) => {
+      const deliver = (built: ReturnType<typeof subscriber>["built"], deliveryAttempt?: number) =>
+        built.trigger({
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          event: { type, occurredAt: 1 },
+          ...(deliveryAttempt !== undefined && { deliveryAttempt }),
+        });
+
+      /** @scenario "A trace whose summary has not folded retries the trigger a bounded number of times" */
+      it("throws to be retried on every attempt below the bound", async () => {
+        const { built, dispatch } = subscriber({});
+        built.folded.state = null;
+
+        for (let attempt = 1; attempt < TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS; attempt++) {
+          await expect(deliver(built, attempt)).rejects.toBeInstanceOf(Error);
+        }
+        expect(dispatch.sent).toEqual([]);
+      });
+
+      /** @scenario "A trace whose summary never folds completes at the retry bound" */
+      it("completes without throwing at the bound and dispatches nothing", async () => {
+        const { built, dispatch, listMonitors } = subscriber({});
+        built.folded.state = null;
+
+        await expect(
+          deliver(built, TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS),
+        ).resolves.toBeUndefined();
+
+        expect(dispatch.sent).toEqual([]);
+        expect(listMonitors).not.toHaveBeenCalled();
+      });
+
+      /** @scenario "A trace whose summary has not folded retries the trigger a bounded number of times" */
+      it("throws to be retried when the delivery carries no attempt", async () => {
+        const { built, dispatch } = subscriber({});
+        built.folded.state = null;
+
+        await expect(deliver(built)).rejects.toBeInstanceOf(Error);
+        expect(dispatch.sent).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a trace whose summary folded", () => {
+    describe("when the trigger handles its span", () => {
+      /** @scenario "A trace whose summary has folded is evaluated on any attempt" */
+      it("dispatches the evaluation", async () => {
+        const { built, dispatch } = subscriber({});
+
+        await run(built, spanEvent(), foldState());
+
+        expect(dispatch.sent).toHaveLength(1);
+      });
+
+      /** @scenario "A trace whose summary has folded is evaluated on any attempt" */
+      it("dispatches the evaluation on the bounding attempt", async () => {
+        const { built, dispatch } = subscriber({});
+        const event = spanEvent();
+        built.folded.state = foldState();
+
+        await built.trigger({
+          tenantId: "tenant-1",
+          traceId: "trace-1",
+          event: {
+            type: event.type,
+            occurredAt: event.occurredAt,
+            spanAttributes: isSpanReceivedEvent(event) ? event.data.span.attributes : undefined,
+          },
+          deliveryAttempt: TRACE_EVALUATION_TRIGGER_SUMMARY_ATTEMPTS,
+        });
+
+        expect(dispatch.sent).toHaveLength(1);
+      });
+    });
+  });
+
   describe("given an evaluator's own span", () => {
     describe("when the causality depth says the span came from an evaluation", () => {
       /**

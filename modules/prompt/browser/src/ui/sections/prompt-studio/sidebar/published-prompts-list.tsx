@@ -1,4 +1,4 @@
-import { Skeleton, Text } from "@langwatch/design-system/primitives";
+import { Skeleton } from "@langwatch/design-system/primitives";
 import { inferProvider, ProviderIconGlyph } from "@langwatch/design-system/provider-icons";
 import groupBy from "lodash-es/groupBy";
 import { useMemo } from "react";
@@ -9,14 +9,6 @@ import { useDraggableTabsBrowserStore } from "../../../../features/tabs/behavior
 import { computeInitialFormValuesForPrompt } from "../../../../prompt-form.ts";
 import { Sidebar } from "../studio-internals.ts";
 import { PublishedPromptContent } from "./published-prompt-content.tsx";
-
-function SidebarEmptyState() {
-  return (
-    <Text fontSize="sm" color="fg.muted" textAlign="center" paddingY={6} paddingX={4}>
-      No prompts yet
-    </Text>
-  );
-}
 
 /** Displays a list of published prompts grouped by folder. */
 export function PublishedPromptsList() {
@@ -61,7 +53,7 @@ export function PublishedPromptsList() {
   }
 
   if (publishedPrompts?.length === 0) {
-    return <SidebarEmptyState />;
+    return null;
   }
 
   return (

@@ -14,12 +14,12 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits Cloud admin staff through OpsApi, then forwards to the owner's Api.
 
-Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:22`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:25`; nothing else in this package is public.
 
 #### `listIssuedLicenses`
 
 ```typescript
-listIssuedLicenses(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; }): Promise<IssuedLicensePage>;
+listIssuedLicenses(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; } & IssuedLicenseFilters): Promise<IssuedLicensePage>;
 ```
 
 #### `getIssuedLicense`
@@ -97,13 +97,19 @@ revokeActivationCode(input: { id: string; operator: OpsOperator | null; }): Prom
 #### `listSelfHostedInstances`
 
 ```typescript
-listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; }): Promise<SelfHostedInstancePage>;
+listSelfHostedInstances(input: { page: number; pageSize: number; search?: string; operator: OpsOperator | null; } & SelfHostedInstanceFilters): Promise<SelfHostedInstancePage>;
 ```
 
 #### `getSelfHostedInstance`
 
 ```typescript
 getSelfHostedInstance(input: { id: string; operator: OpsOperator | null; }): Promise<SelfHostedInstanceDetail>;
+```
+
+#### `summarizeSelfHostedInstances`
+
+```typescript
+summarizeSelfHostedInstances(input: { operator: OpsOperator | null; }): Promise<SelfHostedInstanceSummary>;
 ```
 
 ## REST transport
@@ -114,7 +120,7 @@ None: this module declares no REST family.
 
 ### `licenseRegistry`
 
-Contract `../contract/src/license-registry.trpc.ts:34`, router `src/transport/license-registry.trpc.ts:23`.
+Contract `../contract/src/license-registry.trpc.ts:36`, router `src/transport/license-registry.trpc.ts:23`.
 
 | Procedure                              | Kind     | Gate                             | Input                                  | Output                       |
 | -------------------------------------- | -------- | -------------------------------- | -------------------------------------- | ---------------------------- |
@@ -134,43 +140,45 @@ Contract `../contract/src/license-registry.trpc.ts:34`, router `src/transport/li
 
 ```typescript
 // licenseRegistry.getAll
-// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:7
+// Input: listIssuedLicensesInputSchema, ../../licensing/contract/src/license-registry.ts:28
 interface Input {
+  status?: "active" | "inactive";
+  audience?: "customer" | "internal";
   page?: number;
   pageSize?: number;
   search?: string;
 }
-type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:79
+type Output = z.infer<typeof issuedLicensePageSchema>; // ../../licensing/contract/src/issued-license.ts:100
 
 // licenseRegistry.getById
-// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:13
+// Input: licenseIdInputSchema, ../../licensing/contract/src/license-registry.ts:32
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.issue
-type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:16
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:104
+type Input = z.infer<typeof issueLicenseInputSchema>; // ../../licensing/contract/src/license-registry.ts:47
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
 
 // licenseRegistry.registerLegacy
-// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:29
+// Input: registerLegacyLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:58
 interface Input {
   licenseKey: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.revoke
-// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:34
+// Input: revokeIssuedLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:68
 interface Input {
   id: string;
   reason: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.reissue
-// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:39
+// Input: reissueLicenseInputSchema, ../../licensing/contract/src/license-registry.ts:82
 interface Input {
   id: string;
   maxMembers?: number;
@@ -178,22 +186,22 @@ interface Input {
   maxMessagesPerMonth?: number;
   expiresAt: string;
 }
-type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:104
+type Output = z.infer<typeof signedIssuedLicenseSchema>; // ../../licensing/contract/src/issued-license.ts:134
 
 // licenseRegistry.changeSeats
-// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:48
+// Input: changeLicenseSeatsInputSchema, ../../licensing/contract/src/license-registry.ts:92
 interface Input {
   id: string;
   maxMembers: number;
 }
-type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:118
+type Output = z.infer<typeof seatChangeResultSchema>; // ../../licensing/contract/src/issued-license.ts:151
 
 // licenseRegistry.resetInstanceBinding
-type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:13
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Input = z.infer<typeof licenseIdInputSchema>; // ../../licensing/contract/src/license-registry.ts:32
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.updateTerms
-// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:53
+// Input: updateLicenseTermsInputSchema, ../../licensing/contract/src/license-registry.ts:102
 interface Input {
   id: string;
   services?: ("instant_evals" | "managed_models")[];
@@ -203,27 +211,27 @@ interface Input {
   overageEnabled?: boolean;
   overageMaxUsdCents?: number | null;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.linkToOrganization
-// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:58
+// Input: linkLicenseToOrganizationInputSchema, ../../licensing/contract/src/license-registry.ts:112
 interface Input {
   id: string;
   organizationId: string;
 }
-type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:39
+type Output = z.infer<typeof issuedLicenseViewSchema>; // ../../licensing/contract/src/issued-license.ts:80
 
 // licenseRegistry.activationCodes
-// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:46
+// Input: listActivationCodesInputSchema, ../../licensing/contract/src/activation-code.ts:68
 interface Input {
   page?: number;
   pageSize?: number;
   organizationId?: string;
 }
-type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:40
+type Output = z.infer<typeof activationCodePageSchema>; // ../../licensing/contract/src/activation-code.ts:56
 
 // licenseRegistry.issueActivationCode
-// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:53
+// Input: issueActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:88
 interface Input {
   organizationId: string;
   organizationName: string;
@@ -236,41 +244,42 @@ interface Input {
   expiresAt: string;
   reusable?: boolean;
 }
-type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:73
+type Output = z.infer<typeof issuedActivationCodeSchema>; // ../../licensing/contract/src/activation-code.ts:109
 
 // licenseRegistry.revokeActivationCode
-// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:70
+// Input: revokeActivationCodeInputSchema, ../../licensing/contract/src/activation-code.ts:98
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:13
+type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contract/src/activation-code.ts:45
 ```
 
 ### `selfHostedInstances`
 
-Contract `../contract/src/license-registry.trpc.ts:91`, router `src/transport/self-hosted-instance.trpc.ts:14`.
+Contract `../contract/src/license-registry.trpc.ts:93`, router `src/transport/self-hosted-instance.trpc.ts:14`.
 
-| Procedure                     | Kind  | Gate                           | Input                                | Output                           |
-| ----------------------------- | ----- | ------------------------------ | ------------------------------------ | -------------------------------- |
-| `selfHostedInstances.getAll`  | query | Platform permission `ops:view` | `listSelfHostedInstancesInputSchema` | `selfHostedInstancePageSchema`   |
-| `selfHostedInstances.getById` | query | Platform permission `ops:view` | `selfHostedInstanceIdInputSchema`    | `selfHostedInstanceDetailSchema` |
+| Procedure                     | Kind  | Gate                           | Input                                | Output                            |
+| ----------------------------- | ----- | ------------------------------ | ------------------------------------ | --------------------------------- |
+| `selfHostedInstances.getAll`  | query | Platform permission `ops:view` | `listSelfHostedInstancesInputSchema` | `selfHostedInstancePageSchema`    |
+| `selfHostedInstances.getById` | query | Platform permission `ops:view` | `selfHostedInstanceIdInputSchema`    | `selfHostedInstanceDetailSchema`  |
+| `selfHostedInstances.summary` | query | Platform permission `ops:view` | inline                               | `selfHostedInstanceSummarySchema` |
 
 ```typescript
 // selfHostedInstances.getAll
-// Input: listSelfHostedInstancesInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:64
-interface Input {
-  page?: number;
-  pageSize?: number;
-  search?: string;
-}
-type Output = z.infer<typeof selfHostedInstancePageSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:58
+type Input = z.infer<typeof listSelfHostedInstancesInputSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:105
+type Output = z.infer<typeof selfHostedInstancePageSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:72
 
 // selfHostedInstances.getById
-// Input: selfHostedInstanceIdInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:70
+// Input: selfHostedInstanceIdInputSchema, ../../licensing/contract/src/self-hosted-instance.ts:112
 interface Input {
   id: string;
 }
-type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:81
+type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:136
+
+// selfHostedInstances.summary
+// Input: inline, ../contract/src/license-registry.trpc.ts:103
+type Input = unknown;
+type Output = z.infer<typeof selfHostedInstanceSummarySchema>; // ../../licensing/contract/src/self-hosted-instance.ts:162
 ```
 
 ## Sockets

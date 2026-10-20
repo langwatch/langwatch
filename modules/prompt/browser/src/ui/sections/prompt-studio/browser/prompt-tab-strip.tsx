@@ -38,12 +38,12 @@ export function PromptTabStrip({
         paddingX={2}
         // Tabs shrink to share this row before it ever scrolls, so `flex` lets
         // the strip claim the width the toolbar is not using.
-        flex="1 1 0"
+        flex="0 1 auto"
         minWidth={0}
       >
         {tabs.map((tab) => (
           <TabIdProvider key={tab.id} tabId={tab.id}>
-            <DraggableTabsBrowser.Tab id={tab.id} height="full">
+            <DraggableTabsBrowser.Tab id={tab.id} height="32px">
               <DraggableTabsBrowser.Trigger value={tab.id}>
                 <PromptBrowserTab
                   dimmed={!isActiveWindow}

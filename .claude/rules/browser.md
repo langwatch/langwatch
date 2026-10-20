@@ -7,6 +7,9 @@ paths:
   - "apps/ui/**"
   - "packages/design-system/**"
   - "packages/browser-host/**"
+  - "packages/browser/**"
+  - "packages/error-views/**"
+  - "packages/react-rum/**"
 ---
 
 # Browser halves and UI
@@ -20,21 +23,31 @@ component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
   `useCallback` or `React.memo`; delete them when you touch a file. A component it
   skips (reads a ref during render, an `eslint-disable` of a hooks rule) is
   logged by the dev server: fix the cause rather than memoising by hand.
-- **Design system first.** Before building a component, look in
-  `packages/design-system/src/components/` (or `/design-system` on the dev
-  server). Use what is there; a piece two modules would reuse is built there, not
-  in a module.
+- **The design system is the source of truth for components.** Every banner or
+  alert, dialog, drawer, empty state, menu, picker and table comes from
+  `@langwatch/design-system`; never hand-roll one in a module (a tinted, bordered
+  box with an icon is a hand-rolled alert). A missing need is added to the design
+  system first, with a story. Look in `packages/design-system/src/components/<concern>/`
+  (or `/design-system` on the dev server). `Drawer`, `Dialog` and `Card` are callable
+  shapes with closed props (ADR-002, `packages/design-system/adrs/002-overlay-and-card-shapes.md`;
+  props and scales in `.claude/skills/design-system/references/component-apis.md`): write
+  `<Drawer title onClose footer>`, never new `Drawer.Root`/`Dialog.Root`/`Card.Root` part
+  assembly in a module. Those parts are legacy, being removed. Internal consoles
+  (`packages/design-system-internal`) and mail (`packages/mail`) are separate design languages
+  with their own boundaries, not product Chakra.
 - **Layer order:** flat public entries → `model/` (pure) → `behavior/` (hooks,
   API bindings, stores) → `ui/elements|blocks|sections`. Elements and blocks
   can't fetch. A package that outgrows this nests `features/<name>/` repeating
   `model/behavior/ui`; a feature that is one component is a section.
-- **Exports:** the target `exports` map is `./declaration` only. `surfaces/` and
-  `screens/` are deleted spellings (§15) even where some still exist; don't add
-  new ones. A capability the composition root needs goes through the
+- **Exports:** every browser package exports `./declaration` only (landed and
+  enforced). `surfaces/` and `screens/` are deleted spellings (§15); don't add them. A capability the composition root needs goes through the
   declaration's `withCapabilities` slot.
 - **Host access:** screens read session and navigation through a declared
   `*HostApi` implemented from `@langwatch/browser-host`, never the router
-  directly. The tRPC client is derived from the contract, never hand-written.
+  directly. A service the owner provides comes through `.provides(Service, { load })`
+  and `useHostService` (§10.1, `modules/feature-flag/browser`). The tRPC client is derived
+  from the contract, never hand-written; existing `BorrowedProcedures` or large handwritten
+  maps are debt, so add the procedure to the owner's contract and client instead.
 - **Drawers** are URL-routed singletons with a navigation stack. A sub-flow
   navigates (`openDrawer(Token, { onSuccess, onClose: goBack })`, the owner's
   drawer token, §10.1); never
@@ -58,6 +71,8 @@ component choice (`chakra-ui-*` only for raw Chakra v3). Authority:
 - In a child component that receives `form`, use
   `useWatch({ control: form.control, name })`; `form.watch()` doesn't re-render
   children.
+- Reusable error views are `@langwatch/error-views`; browser errors and navigation spans are
+  `@langwatch/react-rum` (§10.2).
 - Render server errors from the handled payload (`readHandledError`) and the
   presentation registry, never `error.message`: since #5984 the tRPC wire message
   is the code slug. Map `meta.fieldErrors` onto form fields, not a toast.

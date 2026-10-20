@@ -1,7 +1,7 @@
-import { register } from "prom-client";
+import { createRecordingMeterProvider } from "@langwatch/observability/metrics/testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-// Import to trigger metric registration
+import { GroupQueueError, NonRetryableGroupQueueError } from "../errors.ts";
 import {
   gqBlockedGroups,
   gqGroupsBlockedTotal,
@@ -13,10 +13,12 @@ import {
   gqJobsNonRetryableTotal,
   gqJobsRetriedTotal,
   gqJobsUnroutableTotal,
+  gqOldestBacklogAgeMilliseconds,
   gqOldestPendingAgeMilliseconds,
   gqRetryAttempt,
   gqRetryBackoffMilliseconds,
   recordDroppedJob,
+  recordNonRetryableJob,
 } from "../metrics.ts";
 
 const routingLabels = {
@@ -26,213 +28,173 @@ const routingLabels = {
   job_name: "traceSummary",
 };
 
+let meter = createRecordingMeterProvider();
+
 describe("GroupQueue metrics", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
   });
-
-  describe("when metrics module is loaded", () => {
-    it("registers gq_jobs_delayed_total counter", () => {
-      const metric = register.getSingleMetric("gq_jobs_delayed_total");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_job_delay_milliseconds histogram", () => {
-      const metric = register.getSingleMetric("gq_job_delay_milliseconds");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_retry_attempt histogram", () => {
-      const metric = register.getSingleMetric("gq_retry_attempt");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_retry_backoff_milliseconds histogram", () => {
-      const metric = register.getSingleMetric("gq_retry_backoff_milliseconds");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_job_duration_milliseconds histogram", () => {
-      const metric = register.getSingleMetric("gq_job_duration_milliseconds");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_oldest_pending_age_milliseconds gauge", () => {
-      const metric = register.getSingleMetric("gq_oldest_pending_age_milliseconds");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_oldest_backlog_age_milliseconds gauge", () => {
-      const metric = register.getSingleMetric("gq_oldest_backlog_age_milliseconds");
-      expect(metric).toBeDefined();
-    });
-
-    it("registers gq_blocked_groups gauge", () => {
-      const metric = register.getSingleMetric("gq_blocked_groups");
-      expect(metric).toBeDefined();
-    });
-  });
+  afterEach(() => meter.uninstall());
 
   describe("when delayed job metrics are recorded", () => {
-    it("records delayed total with routing labels", async () => {
+    it("records delayed total with routing labels", () => {
       gqJobsDelayedTotal.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_jobs_delayed_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_type="fold"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valueOf("gq_jobs_delayed_total", routingLabels)).toBe(1);
     });
 
-    it("records delay duration with routing labels", async () => {
-      gqJobDelayMilliseconds.observe(routingLabels, 5000);
+    it("records delay duration with routing labels", () => {
+      gqJobDelayMilliseconds.observe(5000, routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_job_delay_milliseconds");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_type="fold"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valuesOf("gq_job_delay_milliseconds", routingLabels)).toEqual([5000]);
     });
   });
 
   describe("when retry metrics are recorded", () => {
-    it("records retry attempt with routing labels", async () => {
-      gqRetryAttempt.observe(routingLabels, 3);
+    it("records retry attempt with routing labels", () => {
+      gqRetryAttempt.observe(3, routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_retry_attempt");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valuesOf("gq_retry_attempt", routingLabels)).toEqual([3]);
     });
 
-    it("records retry backoff with routing labels", async () => {
-      gqRetryBackoffMilliseconds.observe(routingLabels, 2000);
+    it("records retry backoff with routing labels", () => {
+      gqRetryBackoffMilliseconds.observe(2000, routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_retry_backoff_milliseconds");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valuesOf("gq_retry_backoff_milliseconds", routingLabels)).toEqual([2000]);
     });
   });
 
   describe("when job duration metrics are recorded", () => {
-    it("records duration with all routing labels", async () => {
-      gqJobDurationMilliseconds.observe(routingLabels, 150.5);
+    it("records duration with all routing labels", () => {
+      gqJobDurationMilliseconds.observe(150.5, routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_job_duration_milliseconds");
-      expect(lines).toContain('queue_name="test-queue"');
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_type="fold"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valuesOf("gq_job_duration_milliseconds", routingLabels)).toEqual([150.5]);
     });
   });
 
   describe("when processing counters are recorded with routing labels", () => {
-    it("records completed total with routing labels", async () => {
-      gqJobsCompletedTotal.inc(routingLabels);
+    /** @scenario "Group Queue series are recorded through the metrics facade" */
+    it.each([
+      ["completed total", "gq_jobs_completed_total", gqJobsCompletedTotal],
+      ["retried total", "gq_jobs_retried_total", gqJobsRetriedTotal],
+      ["exhausted total", "gq_jobs_exhausted_total", gqJobsExhaustedTotal],
+      ["non-retryable total", "gq_jobs_non_retryable_total", gqJobsNonRetryableTotal],
+      ["groups blocked total", "gq_groups_blocked_total", gqGroupsBlockedTotal],
+    ])("records %s with routing labels", (_label, name, handle) => {
+      handle.inc(routingLabels);
 
-      const lines = await register.getSingleMetricAsString("gq_jobs_completed_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_type="fold"');
-      expect(lines).toContain('job_name="traceSummary"');
-    });
-
-    it("records retried total with routing labels", async () => {
-      gqJobsRetriedTotal.inc(routingLabels);
-
-      const lines = await register.getSingleMetricAsString("gq_jobs_retried_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
-    });
-
-    it("records exhausted total with routing labels", async () => {
-      gqJobsExhaustedTotal.inc(routingLabels);
-
-      const lines = await register.getSingleMetricAsString("gq_jobs_exhausted_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
-    });
-
-    it("records non-retryable total with routing labels", async () => {
-      gqJobsNonRetryableTotal.inc(routingLabels);
-
-      const lines = await register.getSingleMetricAsString("gq_jobs_non_retryable_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
-    });
-
-    it("records groups blocked total with routing labels", async () => {
-      gqGroupsBlockedTotal.inc(routingLabels);
-
-      const lines = await register.getSingleMetricAsString("gq_groups_blocked_total");
-      expect(lines).toContain('pipeline_name="test-pipeline"');
-      expect(lines).toContain('job_name="traceSummary"');
+      expect(meter.valueOf(name, routingLabels)).toBe(1);
     });
   });
 
   describe("when oldest pending age is set", () => {
-    it("sets gauge value without throwing", () => {
-      expect(() =>
-        gqOldestPendingAgeMilliseconds.set({ queue_name: "test-queue" }, 1500),
-      ).not.toThrow();
+    it("records the gauge value for the queue", () => {
+      gqOldestPendingAgeMilliseconds.set(1500, { queue_name: "test-queue" });
+
+      expect(
+        meter.valuesOf("gq_oldest_pending_age_milliseconds", { queue_name: "test-queue" }),
+      ).toEqual([1500]);
     });
 
-    it("sets gauge to zero when no pending jobs", () => {
-      expect(() =>
-        gqOldestPendingAgeMilliseconds.set({ queue_name: "test-queue" }, 0),
-      ).not.toThrow();
+    it("records zero when no pending jobs", () => {
+      gqOldestPendingAgeMilliseconds.set(0, { queue_name: "test-queue" });
+
+      expect(
+        meter.valuesOf("gq_oldest_pending_age_milliseconds", { queue_name: "test-queue" }),
+      ).toEqual([0]);
+    });
+
+    it("records the oldest backlog age for the queue", () => {
+      gqOldestBacklogAgeMilliseconds.set(900, { queue_name: "test-queue" });
+
+      expect(
+        meter.valuesOf("gq_oldest_backlog_age_milliseconds", { queue_name: "test-queue" }),
+      ).toEqual([900]);
     });
   });
 
   describe("when blocked groups gauge is set", () => {
-    it("exposes the value with the queue_name label", async () => {
-      gqBlockedGroups.set({ queue_name: "test-queue" }, 3);
+    it("exposes the value with the queue_name label", () => {
+      gqBlockedGroups.set(3, { queue_name: "test-queue" });
 
-      const lines = await register.getSingleMetricAsString("gq_blocked_groups");
-      expect(lines).toContain('queue_name="test-queue"');
-      expect(lines).toContain("3");
+      expect(meter.valuesOf("gq_blocked_groups", { queue_name: "test-queue" })).toEqual([3]);
     });
 
     it("can be reset to zero when no groups are blocked", () => {
-      expect(() => gqBlockedGroups.set({ queue_name: "test-queue" }, 0)).not.toThrow();
+      gqBlockedGroups.set(3, { queue_name: "test-queue" });
+      gqBlockedGroups.set(0, { queue_name: "test-queue" });
+
+      expect(meter.valuesOf("gq_blocked_groups", { queue_name: "test-queue" })).toEqual([3, 0]);
     });
+  });
+});
+
+describe("non-retryable job reason", () => {
+  beforeEach(() => {
+    meter = createRecordingMeterProvider();
+    meter.install();
+  });
+  afterEach(() => meter.uninstall());
+
+  const groupQueueError = new GroupQueueError({
+    queueName: "test-queue",
+    operation: "process",
+    message: "boom",
+    retryable: false,
+  });
+
+  it.each([
+    [
+      "a NonRetryableGroupQueueError",
+      new NonRetryableGroupQueueError("stop"),
+      "non_retryable_error",
+    ],
+    ["a non-retryable GroupQueueError", groupQueueError, "group_queue_error"],
+    ["a plain Error", new Error("bad input"), "classified"],
+  ])("labels %s with its bounded reason", (_label, error, reason) => {
+    recordNonRetryableJob({ labels: routingLabels, error });
+
+    expect(meter.valueOf("gq_jobs_non_retryable_total", { ...routingLabels, reason })).toBe(1);
   });
 });
 
 describe("first discarded job visibility", () => {
   beforeEach(() => {
-    register.resetMetrics();
+    meter = createRecordingMeterProvider();
+    meter.install();
     vi.useFakeTimers();
     vi.setSystemTime(new Date("2026-09-07T10:00:00Z"));
   });
 
   afterEach(() => {
     vi.useRealTimers();
+    meter.uninstall();
   });
 
   describe("given a worker with no previous discard series", () => {
-    describe("when a job is discarded before and after a counter reset", () => {
+    describe("when a job is discarded twice, twenty seconds apart", () => {
       /** @scenario "The first discarded queue job is visible without a counter baseline" */
-      it("exposes the first discard on the first scrape and again after a counter reset", async () => {
+      it("writes the first discard's timestamp and counter, then a later timestamp", () => {
         const labels = {
           ...routingLabels,
           job_type: "subscriber",
           reason: "missing_blob",
         };
         recordDroppedJob(labels);
-        const first = await register.getSingleMetricAsString(
-          "gq_jobs_last_dropped_timestamp_seconds",
-        );
-        expect(first).toContain('pipeline_name="test-pipeline"');
-        expect(first).toContain('job_type="subscriber"');
-        expect(first).toContain('reason="missing_blob"');
-        expect(first).toContain("1788775200");
-        const counter = await register.getSingleMetricAsString("gq_jobs_dropped_total");
-        expect(counter).toMatch(/reason="missing_blob"} 1/);
 
-        register.resetMetrics();
+        expect(meter.valuesOf("gq_jobs_last_dropped_timestamp_seconds", labels)).toEqual([
+          1788775200,
+        ]);
+        expect(meter.valueOf("gq_jobs_dropped_total", labels)).toBe(1);
+
         vi.advanceTimersByTime(20_000);
         recordDroppedJob(labels);
-        const restarted = await register.getSingleMetricAsString(
-          "gq_jobs_last_dropped_timestamp_seconds",
-        );
-        expect(restarted).toContain("1788775220");
+
+        expect(meter.valuesOf("gq_jobs_last_dropped_timestamp_seconds", labels)).toEqual([
+          1788775200, 1788775220,
+        ]);
+        expect(meter.valueOf("gq_jobs_dropped_total", labels)).toBe(2);
       });
     });
   });
@@ -240,14 +202,12 @@ describe("first discarded job visibility", () => {
   describe("given unroutable work that will be reoffered", () => {
     describe("when its routing failure is recorded", () => {
       /** @scenario "The first discarded queue job is visible without a counter baseline" */
-      it("does not record reoffered unroutable work as a discard", async () => {
+      it("does not record reoffered unroutable work as a discard", () => {
         gqJobsUnroutableTotal.inc(routingLabels);
-        const dropped = await register.getSingleMetricAsString(
-          "gq_jobs_last_dropped_timestamp_seconds",
-        );
-        expect(dropped).not.toContain('queue_name="test-queue"');
-        const unroutable = await register.getSingleMetricAsString("gq_jobs_unroutable_total");
-        expect(unroutable).toMatch(/job_name="traceSummary"} 1/);
+
+        expect(meter.valuesOf("gq_jobs_last_dropped_timestamp_seconds")).toEqual([]);
+        expect(meter.valueOf("gq_jobs_dropped_total")).toBe(0);
+        expect(meter.valueOf("gq_jobs_unroutable_total", { job_name: "traceSummary" })).toBe(1);
       });
     });
   });

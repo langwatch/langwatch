@@ -2,13 +2,10 @@ import { Link } from "@langwatch/browser-host/link";
 /**
  * Current Plan Block - displays the active subscription
  */
-import { Alert, Box, Button, HStack, SimpleGrid, Text } from "@langwatch/design-system/primitives";
-import {
-  SettingList,
-  SettingRow,
-  SettingsCard,
-  StatusChip,
-} from "@langwatch/design-system/settings-card";
+import { Banner } from "@langwatch/design-system/banner";
+import { Card } from "@langwatch/design-system/card";
+import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
 import { Check } from "lucide-react";
 
 import { PricingSummary } from "../../ui/elements/pricing-summary.tsx";
@@ -44,11 +41,11 @@ export function CurrentPlanBlock({
 }) {
   const hasActions = onManageSubscription || contactSalesUrl;
   return (
-    <SettingsCard
+    <Card
       data-testid="current-plan-block"
       title={planName}
-      tone="ok"
-      hint={
+      status="ok"
+      description={
         pricing && (
           <PricingSummary
             totalPrice={pricing.totalPrice}
@@ -63,7 +60,7 @@ export function CurrentPlanBlock({
           {upgradeRequired && <StatusChip label="Upgrade required" tone="warning" />}
         </HStack>
       }
-      actions={
+      footer={
         hasActions ? (
           <>
             {onManageSubscription && (
@@ -95,53 +92,50 @@ export function CurrentPlanBlock({
         ) : undefined
       }
     >
-      <SettingList>
-        <SettingRow label="Members / seats">
-          <Text fontSize="13px" fontWeight={600} fontVariantNumeric="tabular-nums">
-            {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
-          </Text>
-          {onUserCountClick && (
-            <Button
-              data-testid="user-count-link"
-              variant="outline"
-              size="xs"
-              onClick={onUserCountClick}
-            >
-              Manage seats
-            </Button>
-          )}
-        </SettingRow>
-      </SettingList>
-      {features && (
-        <SimpleGrid
-          data-testid="current-plan-features-grid"
-          templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-          gap={2}
-        >
-          {features.map((feature) => (
-            <HStack key={feature} gap={2} alignItems="start">
-              <Box color="green.fg" flexShrink={0} paddingTop="2px">
-                <Check size={16} />
-              </Box>
-              <Text fontSize="sm">{feature}</Text>
-            </HStack>
-          ))}
-        </SimpleGrid>
-      )}
-      {deprecatedNotice && (
-        <Alert.Root status="info" data-testid="tiered-deprecated-notice">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description>
-              You are on a legacy tiered pricing model.{" "}
-              <Link href="/settings/plans" color="orange.fg">
-                Update your plan →
-              </Link>{" "}
-              to move to seat and usage billing.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert.Root>
-      )}
-    </SettingsCard>
+      <VStack align="stretch" gap={2}>
+        <SettingList>
+          <SettingRow label="Members / seats">
+            <Text textStyle="bodySm" fontWeight={600} fontVariantNumeric="tabular-nums">
+              {maxSeats != null ? `${userCount} / ${maxSeats}` : userCount}
+            </Text>
+            {onUserCountClick && (
+              <Button
+                data-testid="user-count-link"
+                variant="outline"
+                size="xs"
+                onClick={onUserCountClick}
+              >
+                Manage seats
+              </Button>
+            )}
+          </SettingRow>
+        </SettingList>
+        {features && (
+          <SimpleGrid
+            data-testid="current-plan-features-grid"
+            templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
+            gap={2}
+          >
+            {features.map((feature) => (
+              <HStack key={feature} gap={2} alignItems="start">
+                <Box color="green.fg" flexShrink={0} paddingTop="0.5">
+                  <Check size={16} />
+                </Box>
+                <Text fontSize="sm">{feature}</Text>
+              </HStack>
+            ))}
+          </SimpleGrid>
+        )}
+        {deprecatedNotice && (
+          <Banner status="info" data-testid="tiered-deprecated-notice">
+            You are on a legacy tiered pricing model.{" "}
+            <Link href="/settings/plans" color="orange.fg">
+              Update your plan →
+            </Link>{" "}
+            to move to seat and usage billing.
+          </Banner>
+        )}
+      </VStack>
+    </Card>
   );
 }

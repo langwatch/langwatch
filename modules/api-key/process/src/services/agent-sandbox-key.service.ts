@@ -8,12 +8,9 @@ import {
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { createLogger } from "@langwatch/observability";
 import type { ProjectApi } from "@langwatch/project-contract";
+import { mintOnce, type SharedCredentialStore } from "@langwatch/secrets/shared-credential";
 import { nowInstant, toDate } from "@langwatch/time";
 
-import {
-  AgentSandboxKeyUnreadableError,
-  type AgentSandboxKeyRepository,
-} from "../repositories/agent-sandbox-key.repository.ts";
 import {
   AGENT_SANDBOX_KEY_REUSE_MS,
   AGENT_SANDBOX_KEY_TTL_MS,
@@ -24,7 +21,7 @@ const logger = createLogger("langwatch:api-key:agent-sandbox");
 /**
  * The key a project's code agent runs put in their sandbox (specs/agent-cache/agent-cache.feature):
  * one per project, held sealed and shared for eight hours, minted afresh when none can be read.
- * Two runs on an empty hold may both mint; both keys are valid, the later one is shared.
+ * Minted once across every server (`mintOnce`): runs starting together share the one key.
  */
 export class AgentSandboxKeyService {
   static create(options: AgentSandboxKeyServiceOptions): AgentSandboxKeyService {
@@ -34,25 +31,16 @@ export class AgentSandboxKeyService {
   private constructor(private readonly options: AgentSandboxKeyServiceOptions) {}
 
   async mintAgentSandboxKey({ projectId }: MintAgentSandboxKeyInput): Promise<string> {
-    const [held] = await this.findHeld(projectId);
-    if (held !== undefined) return held;
-
-    const token = await this.mint(projectId);
-    await this.options.held.hold({ projectId, token, ttlMs: AGENT_SANDBOX_KEY_REUSE_MS });
-    return token;
-  }
-
-  private async findHeld(projectId: string): Promise<string[]> {
-    try {
-      return await this.options.held.findTokens({ projectId });
-    } catch (error) {
-      if (!(error instanceof AgentSandboxKeyUnreadableError)) throw error;
-      logger.warn(
-        { projectId },
-        "the shared agent sandbox key could not be read; minting a new one",
-      );
-      return [];
-    }
+    return mintOnce({
+      store: this.options.held,
+      address: { tenantId: projectId },
+      onUnreadable: () =>
+        logger.warn(
+          { projectId },
+          "the shared agent sandbox key could not be read; minting a new one",
+        ),
+      mint: async () => ({ value: await this.mint(projectId), ttlMs: AGENT_SANDBOX_KEY_REUSE_MS }),
+    });
   }
 
   // Nobody's key in a shared project; the owner's in a personal workspace, which admits no other
@@ -97,5 +85,5 @@ type AgentSandboxKeyServiceOptions = Readonly<{
   apiKeys: Pick<ApiKeyApi, "create">;
   authz: Pick<AuthzApi, "getScope">;
   projects: Pick<ProjectApi, "findPersonalWorkspaceOwner">;
-  held: AgentSandboxKeyRepository;
+  held: SharedCredentialStore;
 }>;
