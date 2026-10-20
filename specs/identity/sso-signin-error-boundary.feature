@@ -102,3 +102,15 @@ Feature: What a failed single sign-on is allowed to say
     Given an auth request that is not a sign-in callback fails with a server error
     When the caller receives the answer
     Then it is the server error itself, not a redirect
+
+  # better-auth answers `state_mismatch` when the sign-in's state cookie does
+  # not match the state the provider returned: the attempt expired, or it was
+  # started in another tab or browser. The cause is known and the person can
+  # act on it, so it is not an unknown failure to log as one.
+  @unit
+  Scenario: A sign-in that expired or started elsewhere crosses with its own code
+    Given a provider sign-in whose state no longer matches this browser
+    When the person is sent to the sign-in error screen
+    Then the code crosses as itself, and the cause is not logged as an unknown failure
+    And the screen says the sign-in expired or was started in another tab or browser
+    And it offers to start again from the sign-in page
