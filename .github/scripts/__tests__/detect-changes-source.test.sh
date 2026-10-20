@@ -36,12 +36,13 @@ source_for() {
   EVENT_NAME="$1" PUSH_STRATEGY="$2" CHANGED_FILES="$3" bash "$SCRIPT"
 }
 
-# @scenario "A pull request's changed paths come from git, not the files API"
+# @scenario "A pull request's changed paths are its own commits, diffed from the merge base"
 test_a_pull_request_reads_git() {
-  check "a small pull_request reads git" "source=git" "$(source_for pull_request force 12)"
-  check "a pull_request past the API cap reads git" "source=git" \
+  check "a small pull_request diffs by SHA" "source=git-sha" "$(source_for pull_request force 12)"
+  check "a pull_request past the API cap diffs by SHA" "source=git-sha" \
     "$(source_for pull_request force 42596)"
-  check "a pull_request with no count reads git" "source=git" "$(source_for pull_request force "")"
+  check "a pull_request with no count diffs by SHA" "source=git-sha" \
+    "$(source_for pull_request force "")"
 }
 
 # @scenario "A pull_request_target run diffs the head commit by SHA with git"
