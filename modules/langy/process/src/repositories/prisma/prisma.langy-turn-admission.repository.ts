@@ -193,16 +193,21 @@ async function leaseActiveTurn({
   return true;
 }
 
+/** The members admission touches: transactions, and the active-turn release. */
+export type TurnAdmissionDatabase =Pick<LangyDatabase, "$transaction"> & {
+  langyActiveTurn: Pick<LangyDatabase["langyActiveTurn"], "deleteMany">;
+};
+
 /**
  * Postgres is the authority for both logical-send replay and one-active-turn
  * admission. The event projection remains a cheap rejection hint only.
  */
 export class PrismaLangyTurnAdmissionRepository extends LangyTurnAdmissionRepository {
-  constructor(private readonly prisma: LangyDatabase) {
+  constructor(private readonly prisma: TurnAdmissionDatabase) {
     super();
   }
 
-  static create(database: LangyDatabase): PrismaLangyTurnAdmissionRepository {
+  static create(database: TurnAdmissionDatabase): PrismaLangyTurnAdmissionRepository {
     return new PrismaLangyTurnAdmissionRepository(database);
   }
 

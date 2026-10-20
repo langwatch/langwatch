@@ -1,7 +1,9 @@
 import { describe, expect, it } from "vitest";
 
-import type { LangyDatabase } from "../prisma/langy-database.mapper.ts";
-import { PrismaLangyTurnAdmissionRepository } from "../prisma/prisma.langy-turn-admission.repository.ts";
+import {
+  PrismaLangyTurnAdmissionRepository,
+  type TurnAdmissionDatabase,
+} from "../prisma/prisma.langy-turn-admission.repository.ts";
 
 const CLAIM = { outcome: "claimed" } as never;
 const CLAIM_INPUT = {
@@ -21,7 +23,7 @@ function driverAdapterWriteConflict(): Error {
 }
 
 /** A fake database whose transactions fail with the given errors, then resolve. */
-function fakeDatabase(failures: unknown[]): { database: LangyDatabase; calls: () => number } {
+function fakeDatabase(failures: unknown[]): { database: TurnAdmissionDatabase; calls: () => number } {
   let calls = 0;
   const database = {
     $transaction: async () => {
@@ -29,7 +31,8 @@ function fakeDatabase(failures: unknown[]): { database: LangyDatabase; calls: ()
       if (calls <= failures.length) throw failures[calls - 1];
       return CLAIM;
     },
-  } as unknown as LangyDatabase;
+    langyActiveTurn: { deleteMany: async () => ({ count: 0 }) },
+  } satisfies TurnAdmissionDatabase;
   return { database, calls: () => calls };
 }
 
