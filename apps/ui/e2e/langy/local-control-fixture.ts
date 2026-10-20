@@ -1387,22 +1387,42 @@ function commandTokens(command: string): string[] {
   );
 }
 
+const OPEN_GROUP = /^(\$\(|\(|`)+/;
+const CLOSE_GROUP = /[)`]+$/;
+
+/** Splits tokens into command segments at chain operators and `(`/`)`/`$(`/backtick groups. */
+function commandSegments(tokens: string[]): string[][] {
+  const segments: string[][] = [[]];
+  for (const token of tokens) {
+    if (["&&", "||", ";", "|"].includes(token)) segments.push([]);
+    else {
+      if (OPEN_GROUP.test(token)) segments.push([]);
+      const bare = token.replace(OPEN_GROUP, "").replace(CLOSE_GROUP, "");
+      if (bare) segments[segments.length - 1]?.push(bare);
+      if (CLOSE_GROUP.test(token)) segments.push([]);
+    }
+  }
+  return segments;
+}
+
 /**
- * True for `langwatch <resource> delete|archive ...`, parsed by token so an item
- * NAMED `delete-me` in a `get` is not one. Global flags and chains are handled.
+ * True for `langwatch <resource> delete|remove|archive ...`, matched by token, so
+ * an item named `delete-me` is not one. Handles chains, groups, path-invoked
+ * binaries and quoted commands. Global flags before the resource are not: the CLI rejects them.
  */
 export function isDeleteCommand(command: string | null | undefined): boolean {
-  const segments: string[][] = [[]];
-  for (const token of commandTokens(command ?? "")) {
-    if (["&&", "||", ";", "|"].includes(token)) segments.push([]);
-    else segments[segments.length - 1]?.push(token);
-  }
-  return segments.some((tokens) => {
-    const start = tokens.indexOf("langwatch");
-    if (start === -1) return false;
-    const positional = tokens.slice(start + 1).filter((token) => !token.startsWith("-"));
-    return positional[1] === "delete" || positional[1] === "archive";
-  });
+  const tokens = commandTokens(command ?? "");
+  const quoted = tokens.filter((token) => /\s/.test(token));
+  if (quoted.some(isDeleteCommand)) return true;
+  const plain = tokens.filter((token) => !quoted.includes(token));
+  return commandSegments(plain).some(segmentDeletes);
+}
+
+function segmentDeletes(segment: string[]): boolean {
+  const start = segment.findIndex((token) => token.split("/").pop() === "langwatch");
+  if (start === -1) return false;
+  const positional = segment.slice(start + 1).filter((token) => !token.startsWith("-"));
+  return ["delete", "remove", "archive"].includes(positional[1] ?? "");
 }
 
 /**

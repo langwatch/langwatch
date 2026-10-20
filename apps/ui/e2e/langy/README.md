@@ -830,7 +830,8 @@ login --device` does, as the test's own user, and writes the config file
   Their frames are missing, so `deleteOrderFailure` fails on any of them
   rather than reading the gap as "no delete there".
   A delete is found by parsing the command into tokens (`langwatch <resource>
-delete|archive`), never by matching the word, so an item named `delete-me`
+  delete|remove|archive`, also by path, in `(...)`/`$(...)`, or inside a quoted
+  `bash -lc "..."`), never by matching the word, so an item named `delete-me`
   in a `get` is not one. Order is frame order: stream tool entries carry no
   server timestamp, so the answer and the delete cannot be compared by time.
 - **`.cardAnsweredInsideTurn`**: the question tool returns inside the
