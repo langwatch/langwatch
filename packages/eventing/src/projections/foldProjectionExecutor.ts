@@ -130,6 +130,32 @@ function withAppliedEventIds(
   return { ...context, appliedEventIds };
 }
 
+/**
+ * An event's applied-set token: its idempotency key, else its id. The log reads one event per
+ * key, so a set of ids could hold one no history read returns, and every re-fold would report
+ * an incomplete history forever. Older sets hold ids; `appliedTokensOf` matches both.
+ */
+function appliedTokenOf(event: Event): string {
+  return event.idempotencyKey || event.id;
+}
+
+/** The events with one kept per applied token: two ids under one key are one event. */
+function uniqueByAppliedToken<E extends Event>(events: readonly E[]): E[] {
+  const seen = new Set<string>();
+  return events.filter((event) => {
+    const token = appliedTokenOf(event);
+    if (seen.has(token)) return false;
+    seen.add(token);
+    return true;
+  });
+}
+
+/** Every token an applied set may hold for an event: its id and its key. */
+function appliedTokensOf(event: Event): string[] {
+  const token = appliedTokenOf(event);
+  return token === event.id ? [event.id] : [event.id, token];
+}
+
 function applyUnseenEvents<State, E extends Event>({
   projection,
   events,
@@ -144,7 +170,7 @@ function applyUnseenEvents<State, E extends Event>({
   let next = state;
   let appliedCount = 0;
   for (const event of events) {
-    const dedupKey = event.idempotencyKey || event.id;
+    const dedupKey = appliedTokenOf(event);
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     next = projection.apply(next, event as E);
@@ -380,7 +406,9 @@ export class FoldProjectionExecutor {
     }
 
     const applied = new Set(appliedEventIds);
-    const fresh = events.filter((event) => !applied.has(event.id));
+    const fresh = events.filter(
+      (event) => !appliedTokensOf(event).some((token) => applied.has(token)),
+    );
     const skipped = events.length - fresh.length;
 
     if (skipped > 0) {
@@ -475,7 +503,7 @@ export class FoldProjectionExecutor {
         this.appliedIdsForCommit({
           context,
           loadedAppliedIds: appliedEventIds,
-          deliveredIds: [event.id],
+          deliveredIds: [appliedTokenOf(event)],
         }),
       ),
     );
@@ -521,7 +549,7 @@ export class FoldProjectionExecutor {
           this.appliedIdsForCommit({
             context,
             loadedAppliedIds: appliedEventIds,
-            deliveredIds: [event.id],
+            deliveredIds: [appliedTokenOf(event)],
           }),
         ),
       );
@@ -619,7 +647,7 @@ export class FoldProjectionExecutor {
             this.appliedIdsForCommit({
               context,
               loadedAppliedIds: appliedEventIds,
-              deliveredIds: ordered.map((event) => event.id),
+              deliveredIds: ordered.map(appliedTokenOf),
             }),
           ),
         );
@@ -649,14 +677,17 @@ export class FoldProjectionExecutor {
 
     // Most folds follow business time. Lifecycle folds may instead select the
     // canonical accepted cursor so a backdated transition cannot jump ahead of
-    // an event the log accepted first.
-    const ordered = [...matching].toSorted((a, b) => compareFoldEvents(projection, a, b));
+    // an event the log accepted first. Duplicates under one key collapse in
+    // arrival order first, so the batch keeps the copy the event log kept.
+    const ordered = uniqueByAppliedToken(matching.toSorted(compareArrival)).toSorted((a, b) =>
+      compareFoldEvents(projection, a, b),
+    );
 
     const key = context.key ?? context.aggregateId;
     // Anchor the read to the batch's earliest event (any event in the batch is
     // for the same aggregate, so it anchors the same partition window; the
     // unwindowed retry covers a batch that somehow spans wider than widthMs).
-    // The empty/single-event batches returned above, so ordered has at least two events.
+    // The empty batch returned above, so ordered has at least one event.
     const loadContext = withReadHints({
       context,
       event: ordered[0]!,
@@ -749,7 +780,7 @@ export class FoldProjectionExecutor {
           // vouching for it. Recording only the freshly-folded ids EVICTS a
           // redelivered id that rode along, and whoever sees it next folds it
           // a second time (#6578).
-          deliveredIds: ordered.map((event) => event.id),
+          deliveredIds: ordered.map(appliedTokenOf),
         }),
       ),
     );
@@ -776,9 +807,15 @@ export class FoldProjectionExecutor {
       typeof loaded === "object" && loaded !== null
         ? Reflect.get(loaded, projection.LastEventOccurredAtKey)
         : 0;
+    // A missed event whose key the stored set already holds is a redelivery of
+    // the copy that arrived first. It must not vouch for that key, or a history
+    // read lagging behind the log would fold it in the first copy's place: only
+    // the log can account for the key, and the rebuild retries until it does.
+    const missedToken = appliedTokenOf(missed);
+    const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
     const { history, gap } = await this.readHistoryUntilComplete({
       projection,
-      delivered: [missed],
+      delivered: redeliversAppliedKey ? [] : [missed],
       context,
       occurredAtMs: missed.occurredAt,
       loadedAppliedIds: appliedEventIds,
@@ -790,11 +827,13 @@ export class FoldProjectionExecutor {
       );
     }
     const consumes = projectionConsumes<E, Event>(projection);
-    const seen = new Set(history.map((event) => event.id));
-    const combined = [
-      ...history.filter(consumes),
-      ...(seen.has(missed.id) || !consumes(missed) ? [] : [missed]),
-    ].toSorted((a, b) => compareFoldEvents(projection, a, b));
+    // By applied token: a redelivery under a new id is the event the log kept.
+    const seen = new Set(history.map(appliedTokenOf));
+    const alreadyInHistory = seen.has(missedToken);
+    const replaysMissed = !alreadyInHistory && consumes(missed);
+    const combined = [...history.filter(consumes), ...(replaysMissed ? [missed] : [])].toSorted(
+      (a, b) => compareFoldEvents(projection, a, b),
+    );
     let state = projection.init();
     for (const event of combined) {
       state = projection.apply(state, event);
@@ -803,7 +842,7 @@ export class FoldProjectionExecutor {
       state,
       withAppliedEventIds(
         context,
-        mergeAppliedEventIds({ previous: [], applied: combined.map((event) => event.id) }),
+        mergeAppliedEventIds({ previous: [], applied: combined.map(appliedTokenOf) }),
       ),
     );
     logger.info(
@@ -855,6 +894,10 @@ export class FoldProjectionExecutor {
     });
     if (gap) {
       incrementEsFoldRefoldTotal(projection.name, "incomplete");
+      // An error: no later retry re-folds this delivery, so the state may stay
+      // out of order. Applied sets now record idempotency keys, so a set from
+      // before that, naming an id the log collapsed into its twin, is the
+      // expected residual; it ages out as the aggregate commits again.
       logger.error(
         {
           projection: projection.name,
@@ -871,8 +914,11 @@ export class FoldProjectionExecutor {
       return null;
     }
 
-    const seen = new Set(history.map((e) => e.id));
-    const missing = delivered.filter((e) => !seen.has(e.id));
+    // By applied token, so a redelivery under a new id defers to the log's copy.
+    const seen = new Set(history.map(appliedTokenOf));
+    const missing = uniqueByAppliedToken(delivered.toSorted(compareArrival)).filter(
+      (e) => !seen.has(appliedTokenOf(e)),
+    );
     const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
@@ -971,8 +1017,13 @@ export class FoldProjectionExecutor {
     loadedAppliedIds: readonly string[];
     stateFrontierOccurredAtMs: number;
   }): HistoryReadGap | null {
-    const accounted = new Set<string>(history.map((e) => e.id));
-    for (const e of delivered) accounted.add(e.id);
+    // An applied token is accounted for by an event carrying it as its id or
+    // as its idempotency key: the read returns one event per key, which need
+    // not be the one this fold applied.
+    const accounted = new Set<string>();
+    for (const e of [...history, ...delivered]) {
+      for (const token of appliedTokensOf(e)) accounted.add(token);
+    }
     const missingAppliedIds = loadedAppliedIds.filter((id) => !accounted.has(id));
 
     let maxOccurredAt = 0;
@@ -1094,8 +1145,11 @@ export class FoldProjectionExecutor {
     // Merge delivered events the history read missed back into the fold's
     // declared order before folding — a tail append could let an event that
     // belongs in the middle overwrite last-write-wins fields.
-    const seen = new Set(history.map((e) => e.id));
-    const missing = delivered.filter((e) => !seen.has(e.id));
+    // By applied token, so a redelivery under a new id defers to the log's copy.
+    const seen = new Set(history.map(appliedTokenOf));
+    const missing = uniqueByAppliedToken(delivered.toSorted(compareArrival)).filter(
+      (e) => !seen.has(appliedTokenOf(e)),
+    );
     const combined = [...(history as E[]), ...missing].toSorted((a, b) =>
       compareFoldEvents(projection, a, b),
     );
@@ -1175,7 +1229,7 @@ export class FoldProjectionExecutor {
     );
 
     for (const event of delivered) {
-      const dedupKey = event.idempotencyKey || event.id;
+      const dedupKey = appliedTokenOf(event);
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       state = projection.apply(state, event);
