@@ -517,7 +517,7 @@ func PlayVolumeName(number int, engine string) string {
 // valkey-cli.
 const (
 	playPostgresImage = "postgres:16"
-	playRedisImage    = "valkey/valkey:9.2"
+	playRedisImage    = "valkey/valkey:9.1"
 )
 
 // playPostgresShell starts the sandbox's dedicated Postgres and waits for it

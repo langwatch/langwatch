@@ -314,7 +314,7 @@ func TestPlayNamesAreDisjointFromSharedData(t *testing.T) {
 // Valkey image ships rather than one it might not carry.
 func TestPlayRedisRunsValkey(t *testing.T) {
 	rd := playRedisShell(77, 56379)
-	for _, want := range []string{" valkey/valkey:9.2\n", "valkey-cli ping"} {
+	for _, want := range []string{" valkey/valkey:9.1\n", "valkey-cli ping"} {
 		if !strings.Contains(rd, want) {
 			t.Errorf("play redis shell missing %q:\n%s", want, rd)
 		}

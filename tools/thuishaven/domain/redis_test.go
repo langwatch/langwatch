@@ -3,6 +3,7 @@ package domain
 import "testing"
 
 // Which formula `haven up` starts when nothing answers on the Redis port.
+// @scenario "Valkey is offered first for the shared Redis, and an installed Redis still counts"
 func TestChooseRedisFormula(t *testing.T) {
 	cases := []struct {
 		name      string
@@ -64,6 +65,7 @@ func TestValkeyServerCountsAsTheSharedRedisInTheFootprint(t *testing.T) {
 
 // The prerequisite offers valkey first, so a non-interactive run on a fresh
 // machine installs it, and an installed redis still satisfies the entry.
+// @scenario "Valkey is offered first for the shared Redis, and an installed Redis still counts"
 func TestRedisPrereqPrefersValkeyAndKeepsAnInstalledRedis(t *testing.T) {
 	p, ok := LookupPrereq("redis")
 	if !ok {

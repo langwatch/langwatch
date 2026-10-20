@@ -61,6 +61,12 @@ Feature: haven self install checks the machine's prerequisites
 
   Rule: A choice is offered once, not as two separate demands
 
+    Scenario: Valkey is offered first for the shared Redis, and an installed Redis still counts
+      Given a macOS machine with neither valkey nor redis installed
+      When haven self install runs non-interactively
+      Then it installs valkey
+      And on a machine with only redis installed the Redis entry is already satisfied
+
     Scenario: Either container runtime satisfies the group
       Given colima and the docker CLI are installed
       When the prerequisites are planned
