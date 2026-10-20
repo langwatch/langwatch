@@ -482,6 +482,14 @@ const parkAndHandOff = (target: string | undefined): string | undefined => {
 };
 
 /**
+ * The callbackURL for a link started by a signed-in reader: the same-origin
+ * guard, then the same hand-off as a provider sign-in, so better-auth is never
+ * sent an address it refuses with "Invalid callbackURL".
+ */
+export const linkCallbackUrl = (callbackUrl: string | undefined): string =>
+  parkAndHandOff(safeRedirectTarget(callbackUrl)) ?? "/";
+
+/**
  * Reads and clears the target parked by `parkReturnTo`, "/" when there is
  * none. Re-guarded because storage is writable by any script on the origin.
  */
@@ -535,7 +543,7 @@ export const linkAccount = async (
   provider: string,
   options?: { callbackUrl?: string },
 ): Promise<{ error?: string; ok?: boolean }> => {
-  const callbackURL = safeRedirectTarget(options?.callbackUrl) || "/";
+  const callbackURL = linkCallbackUrl(options?.callbackUrl);
   const mapped = provider === "azure-ad" ? "microsoft" : provider;
 
   const res = await fetch("/api/auth/link-social", {

@@ -457,6 +457,21 @@ describe("AuthorizedClickHouse", () => {
           }),
         ).rejects.toBeInstanceOf(TenantReaderClientUnavailableError);
       });
+
+      it("wraps a resolver that throws before returning a promise", async () => {
+        const clickhouse = new AuthorizedClickHouse({
+          resolveClient: () => {
+            throw new Error("no ClickHouse configured");
+          },
+          now: () => NOW,
+        });
+
+        await expect(
+          clickhouse.as(proof(), { reads: "traces" }).query({
+            query: `SELECT 1 FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          }),
+        ).rejects.toBeInstanceOf(TenantReaderClientUnavailableError);
+      });
     });
   });
 

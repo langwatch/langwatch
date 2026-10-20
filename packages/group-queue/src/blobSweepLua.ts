@@ -40,10 +40,6 @@ local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 if not dryRun then redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs) end
 if redis.call("ZCOUNT", KEYS[1], "(" .. nowMs, "+inf") > 0 then return "leased" end
 
--- The release grace window's own rule: a holder other than the sentinel may be
--- a reader no lease measures, so nothing is shortened or deleted under it.
-if ${realHolderCountLua({ holderKey: "KEYS[2]" })} > 0 then return "leased" end
-
 local ttl = redis.call("TTL", KEYS[3])
 
 -- -2 is "no such key": the bytes already expired and only bookkeeping is left.
@@ -54,6 +50,10 @@ if ttl == -2 then
   end
   return "bookkeeping"
 end
+
+-- The release grace window's own rule: a holder other than the sentinel may be
+-- a reader no lease measures, so nothing is shortened or deleted under it.
+if ${realHolderCountLua({ holderKey: "KEYS[2]" })} > 0 then return "leased" end
 
 if ttl >= 0 and ttl <= ${BLOB_RECLAIM_TTL_THRESHOLD_SECONDS} then
   if not dryRun then

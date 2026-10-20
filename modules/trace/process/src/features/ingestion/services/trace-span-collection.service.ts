@@ -36,8 +36,14 @@ export type NormalizedSpanInput = {
 /** A span's command, and the usage record it claimed, released if the span fails. */
 type PreparedSpan = { data: RecordSpanCommandData; usageRecord: UsageRecordRef | null };
 
+/** A claimed span ready to hand off, at its input position. */
+type ReadySpan = { index: number; input: NormalizedSpanInput } & PreparedSpan;
+
 /** Spans claimed per dedup round trip: few enough that each is recorded well inside its claim. */
 const DEDUP_BATCH_SIZE = 100;
+
+/** Spans prepared at once: each may claim usage in Redis or upload a payload blob. */
+const PREPARE_CONCURRENCY = 16;
 
 /** The store gave no answer for this span: ingest it, as an unreachable store would. */
 const UNANSWERED_CLAIM: SpanDedupClaim = { outcome: "unknown" };
@@ -114,7 +120,7 @@ export class TraceSpanCollectionService {
   }
 
   /**
-   * One claim round trip, the claimed spans prepared one by one and handed off together, one
+   * One claim round trip, the claimed spans prepared 16 at a time and handed off together, one
    * confirmation for those the pipeline took. A failed span releases its claim, so a resend
    * reaches the pipeline under the same identity (specs/span-admission-batch-hand-off.feature).
    */
@@ -123,21 +129,8 @@ export class TraceSpanCollectionService {
   ): Promise<SpanIngestionResult[]> {
     const claims = await this.options.dedup.claimProcessing(inputs.map(spanDedupRefOf));
     const results: SpanIngestionResult[] = [];
-    const ready: ({ index: number; input: NormalizedSpanInput } & PreparedSpan)[] = [];
     const failures: Promise<void>[] = [];
-    for (const [index, input] of inputs.entries()) {
-      const claim = claims[index] ?? UNANSWERED_CLAIM;
-      if (claim.outcome === "held") {
-        results[index] = { status: "deduped" };
-        continue;
-      }
-      try {
-        ready.push({ index, input, ...(await this.prepareCommand(input)) });
-      } catch (error) {
-        results[index] = this.failedSpan({ input, error });
-        if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
-      }
-    }
+    const ready = await this.prepareClaimed({ inputs, claims, results, failures });
 
     const outcomes = await this.handOff(ready.map(({ data }) => data));
     const recorded: SpanDedupRef[] = [];
@@ -166,6 +159,59 @@ export class TraceSpanCollectionService {
       return await this.options.commands.recordSpans(data);
     } catch (error) {
       return data.map(() => ({ status: "failed", error }));
+    }
+  }
+
+  /** The claimed spans prepared {@link PREPARE_CONCURRENCY} at a time, in input order. */
+  private async prepareClaimed({
+    inputs,
+    claims,
+    results,
+    failures,
+  }: {
+    inputs: readonly NormalizedSpanInput[];
+    claims: readonly SpanDedupClaim[];
+    results: SpanIngestionResult[];
+    failures: Promise<void>[];
+  }): Promise<ReadySpan[]> {
+    const prepared: (ReadySpan | null)[] = [];
+    for (let start = 0; start < inputs.length; start += PREPARE_CONCURRENCY) {
+      const slice = inputs.slice(start, start + PREPARE_CONCURRENCY);
+      const answers = await Promise.all(
+        slice.map((input, offset) =>
+          this.prepareClaimedSpan({ index: start + offset, input, claims, results, failures }),
+        ),
+      );
+      prepared.push(...answers);
+    }
+    return prepared.filter((span) => span !== null);
+  }
+
+  /** One span: held elsewhere is deduped; a failed prepare answers it and releases its claim. */
+  private async prepareClaimedSpan({
+    index,
+    input,
+    claims,
+    results,
+    failures,
+  }: {
+    index: number;
+    input: NormalizedSpanInput;
+    claims: readonly SpanDedupClaim[];
+    results: SpanIngestionResult[];
+    failures: Promise<void>[];
+  }): Promise<ReadySpan | null> {
+    const claim = claims[index] ?? UNANSWERED_CLAIM;
+    if (claim.outcome === "held") {
+      results[index] = { status: "deduped" };
+      return null;
+    }
+    try {
+      return { index, input, ...(await this.prepareCommand(input)) };
+    } catch (error) {
+      results[index] = this.failedSpan({ input, error });
+      if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
+      return null;
     }
   }
 

@@ -1184,13 +1184,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
   }
 
-  /** The fastq worker: each slot's work, timed so the slot count can follow throughput. */
+  /**
+   * The fastq worker: each slot's work, timed so the slot count can follow throughput.
+   * A cross-group batch finishes once per group, the unit failures are counted in.
+   */
   private async processMeasured(work: DispatchedWork): Promise<void> {
     const started = performance.now();
+    const units = "groups" in work ? Math.max(work.groups.length, 1) : 1;
     try {
       await this.processWithRetries(work);
     } finally {
-      this.adaptiveSlots.jobFinished({ durationMs: performance.now() - started });
+      const durationMs = performance.now() - started;
+      for (let unit = 0; unit < units; unit += 1) this.adaptiveSlots.jobFinished({ durationMs });
     }
   }
 

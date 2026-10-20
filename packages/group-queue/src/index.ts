@@ -24,7 +24,7 @@ export type {
 export { sendPreparedInOrder } from "./boundedStaging.ts";
 export { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "./deadLetter.ts";
 export { defineGroupQueue } from "./definition.ts";
-export { GroupQueueProcessor } from "./groupQueue.ts";
+export { GROUP_QUEUE_CONFIG, GroupQueueProcessor } from "./groupQueue.ts";
 export {
   GroupQueueDependenciesAdapter,
   type GroupQueueDependenciesAdapterOptions,
