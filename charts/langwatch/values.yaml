@@ -2239,7 +2239,7 @@ redis:
   image:
     ## @param redis.image.repository [string, default: redis] Image repository (valkey/valkey for Valkey).
     repository: redis
-    ## @param redis.image.tag [string, default: "8.0"] Image tag ("9.2" with valkey/valkey).
+    ## @param redis.image.tag [string, default: "8.0"] Image tag ("9.1" with valkey/valkey).
     tag: "8.0"
     ## @param redis.image.pullPolicy [string, default: IfNotPresent] Image pull policy.
     pullPolicy: IfNotPresent

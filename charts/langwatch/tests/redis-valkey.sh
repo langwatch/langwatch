@@ -45,8 +45,8 @@ behaviour_of() {
 test_overlay_renders_valkey_image() {
   local image
   image=$(image_of "$(render_redis "$VALKEY")")
-  if [ "$image" != "valkey/valkey:9.2" ]; then
-    fail "valkey image" "image is '$image', expected valkey/valkey:9.2"
+  if [ "$image" != "valkey/valkey:9.1" ]; then
+    fail "valkey image" "image is '$image', expected valkey/valkey:9.1"
     return
   fi
   echo "ok   [valkey image] $image"

@@ -67,7 +67,7 @@ All overlays live in `examples/overlays/`:
 | `clickhouse-replicated`        | Upgrade chart-managed ClickHouse to 3-node                                      |
 | `postgres-external`            | External PostgreSQL (RDS, Cloud SQL)                                            |
 | `redis-external`               | External Redis (ElastiCache, Memorystore)                                       |
-| `redis-valkey`                 | Run the chart-managed Redis as Valkey 9.2 (Redis stays the default)             |
+| `redis-valkey`                 | Run the chart-managed Redis as Valkey 9.1 (Redis stays the default)             |
 | `cold-storage-s3`              | S3 cold storage tiering + backups                                               |
 | `strict-admission`             | Toggles for Pod Security Admission `restricted` / Gatekeeper / Kyverno clusters |
 
