@@ -529,23 +529,22 @@ const storeDurationMs = histogram({
   labelNames: ["pipeline_name"],
 });
 
-export type EventSourcingStoreMetrics = {
-  eventsStored(pipelineName: string, count: number): void;
-  storeDuration(pipelineName: string, durationMs: number): void;
-};
-
-/** Publishes the two store-side series through the process's metrics facade. */
-export const PROMETHEUS_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: (pipelineName, count) => eventsStoredTotal.labels(pipelineName).inc(count),
-  storeDuration: (pipelineName, durationMs) =>
-    storeDurationMs.labels(pipelineName).observe(durationMs),
-};
-
-/** Records nothing. The default for a process that publishes no registry. */
-export const NOOP_EVENT_SOURCING_METRICS: EventSourcingStoreMetrics = {
-  eventsStored: () => undefined,
-  storeDuration: () => undefined,
-};
+/** Counts the events a pipeline stored, on `event_sourcing_events_stored_total`. */
+export const incrementEventSourcingEventsStored = ({
+  pipelineName,
+  count,
+}: {
+  pipelineName: string;
+  count: number;
+}) => eventsStoredTotal.labels(pipelineName).inc(count);
+/** Times one `storeEvents` call on `event_sourcing_store_duration_milliseconds`. */
+export const observeEventSourcingStoreDuration = ({
+  pipelineName,
+  durationMs,
+}: {
+  pipelineName: string;
+  durationMs: number;
+}) => storeDurationMs.labels(pipelineName).observe(durationMs);
 
 export async function withMetrics<T>({
   fn,
