@@ -416,7 +416,6 @@ var hardLimitReasonCodes = map[herr.Code]bool{
 	"insufficient_quota":         true,
 	"billing_hard_limit_reached": true,
 	ErrProviderOutOfCredit:       true,
-	ErrProviderKeyRejected:       true,
 }
 
 // hasHardLimitReason walks a captured LLM error's code and reason chain for a

@@ -73,12 +73,15 @@ func TestApplyGovernanceMessage_RewritesAccountError(t *testing.T) {
 	}
 }
 
-// A provider's own code survives the rewrite.
-func TestRewriteErrorMessage_KeepsProviderCode(t *testing.T) {
+// A provider's own code survives, and the message rewrite alone sets no code.
+func TestMarkAccountExhausted_KeepsProviderCode(t *testing.T) {
 	body := []byte(`{"error":{"message":"quota","type":"insufficient_quota","code":"insufficient_quota"}}`)
-	out := rewriteErrorMessage(body, accountExhaustionMessage)
-	if c := gjson.GetBytes(out, "error.code").String(); c != "insufficient_quota" {
+	if c := gjson.GetBytes(markAccountExhausted(body), "error.code").String(); c != "insufficient_quota" {
 		t.Fatalf("provider code must be kept, got %q", c)
+	}
+	plain := []byte(`{"error":{"message":"quota"}}`)
+	if gjson.GetBytes(rewriteErrorMessage(plain, "x"), "error.code").Exists() {
+		t.Fatal("rewriteErrorMessage must not set a code")
 	}
 }
 

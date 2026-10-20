@@ -32,13 +32,13 @@ const accountExhaustionMessage = providererr.GatewayAccountExhaustedMessage
 // all pass through unchanged.
 func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response, error) {
 	if resp != nil && providererr.AccountExhausted(resp.StatusCode, resp.Body) {
-		resp.Body = rewriteErrorMessage(resp.Body, accountExhaustionMessage)
+		resp.Body = markAccountExhausted(rewriteErrorMessage(resp.Body, accountExhaustionMessage))
 		return resp, err
 	}
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) && isAccountExhaustionError(ue) {
 		ue.Message = accountExhaustionMessage
-		ue.Body = rewriteErrorMessage(ue.Body, accountExhaustionMessage)
+		ue.Body = markAccountExhausted(rewriteErrorMessage(ue.Body, accountExhaustionMessage))
 		if ue.ErrorCode == "" {
 			ue.ErrorCode = providererr.GatewayAccountExhaustedCode
 		}
@@ -61,9 +61,9 @@ func isAccountExhaustionError(ue *domain.UpstreamError) bool {
 	return providererr.AccountExhausted(ue.StatusCode, ue.Body)
 }
 
-// rewriteErrorMessage replaces the error.message field of a provider error
-// body and sets error.code when the provider gave none, preserving the rest of
-// the envelope (error.type, request_id, ...). Dropping the provider's original credit/billing phrasing is
+// rewriteErrorMessage replaces only the error.message field of a provider
+// error body, preserving the rest of the envelope (error.type, request_id,
+// ...). Dropping the provider's original credit/billing phrasing is
 // intentional: it stops a wrapper like Claude Code from pattern-matching the
 // credit signal and overlaying its own billing link (wrong for a governed user
 // who does not own the provider account), so the client renders the org's
@@ -76,12 +76,19 @@ func rewriteErrorMessage(body []byte, msg string) []byte {
 	if err != nil {
 		return body
 	}
-	// Readers past the gateway classify on this code, never on the sentence.
-	// A provider's own code (OpenAI's insufficient_quota) is kept.
-	if gjson.GetBytes(out, "error.code").String() == "" {
-		if coded, err := sjson.SetBytes(out, "error.code", providererr.GatewayAccountExhaustedCode); err == nil {
-			out = coded
-		}
+	return out
+}
+
+// markAccountExhausted sets error.code to provider_account_exhausted, which
+// readers past the gateway classify on instead of the sentence. A provider's
+// own code (OpenAI's insufficient_quota) is kept, as is a body with no error.
+func markAccountExhausted(body []byte) []byte {
+	if !gjson.GetBytes(body, "error").Exists() || gjson.GetBytes(body, "error.code").String() != "" {
+		return body
+	}
+	out, err := sjson.SetBytes(body, "error.code", providererr.GatewayAccountExhaustedCode)
+	if err != nil {
+		return body
 	}
 	return out
 }
