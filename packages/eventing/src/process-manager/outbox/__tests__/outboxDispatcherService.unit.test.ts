@@ -368,6 +368,58 @@ describe("OutboxDispatcherService", () => {
         expect(attempts[0]?.errorMessage).not.toContain("sk-secret");
       });
 
+      /** @scenario "A redacted delivery failure keeps its real cause in the server log" */
+      it("logs the original error at error level while the attempt log stays redacted", async () => {
+        const { logger: testLogger, lines } = createTestLogger();
+        const logger = testLogger.child(
+          {},
+          { serializers: { error: (e: Error) => ({ message: e.message, stack: e.stack }) } },
+        );
+        const cause = new TypeError("Cannot read properties of null (reading 'organizationId')");
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(cause) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+          logger,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        const attempts = store.findFailedAttempts({
+          processName: pilotRef.processName,
+          projectId: pilotRef.projectId,
+          messageKey: "dispatch:turn_1:1",
+        });
+        expect(attempts[0]?.errorMessage).not.toContain("organizationId");
+        const line = lines.findLine("error", "redacted cause");
+        expect(line).toMatchObject({
+          messageKey: "dispatch:turn_1:1",
+          attempt: 1,
+          error: { message: cause.message, stack: cause.stack },
+        });
+        expect(line).not.toHaveProperty("payload");
+      });
+
+      it("logs no extra cause for an error whose message we wrote", async () => {
+        const { logger, lines } = createTestLogger();
+        const dispatchError = Object.assign(new Error("receiver returned 503"), {
+          name: "DispatchError",
+          retryable: true,
+        });
+        const dispatcher = new OutboxDispatcherService({
+          store,
+          handlers: { "worker-dispatch": vi.fn().mockRejectedValue(dispatchError) },
+          retryDelayMs: () => 1_000,
+          maxAttempts: 2,
+          logger,
+        });
+
+        await dispatcher.runOnce({ now: T0 + 1 });
+
+        expect(lines.findLine("error", "redacted cause")).toBeUndefined();
+      });
+
       /** @scenario A recording failure never fails the delivery accounting */
       it("retries and retires exactly as it would have when the attempt log write throws", async () => {
         const failingStore = new Proxy(store, {

@@ -23,7 +23,7 @@ import {
   ErrorCategory,
   isProjectGone,
 } from "../../services/errorHandling.ts";
-import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
+import { diagnosticIsRedacted, toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {
   FailedOutboxAttempt,
@@ -832,7 +832,39 @@ export class OutboxDispatcherService {
     });
     if (dead || attempt === 1) {
       this.logDispatchFailure({ message, attempt, dead, errorType, errorMessage });
+      if (diagnosticIsRedacted(error)) this.logRedactedCause({ message, attempt, error });
     }
+  }
+
+  /**
+   * The span, the attempt log and the failure line above carry only the redacted
+   * sentence, so this is the one place the real cause (message and stack) is kept.
+   * Server-side log only; it names the message by its ids and never by its payload.
+   */
+  private logRedactedCause({
+    message,
+    attempt,
+    error,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    attempt: number;
+    error: unknown;
+  }): void {
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    this.logger.error(
+      {
+        processName: message.processName,
+        processKey: message.processKey,
+        projectId: message.projectId,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        sourceEventId: message.sourceEventId,
+        intentType: message.intentType,
+        attempt,
+        error,
+      },
+      "Process-manager outbox delivery failed with a redacted cause; original error attached",
+    );
   }
 
   private logDispatchFailure({

@@ -176,6 +176,13 @@ Feature: Process outbox lease hardening
     When the dispatcher delivers it
     Then it is dead on its first attempt instead of retrying ten times
 
+  @unit
+  Scenario: A redacted delivery failure keeps its real cause in the server log
+    Given an outbox message whose handler throws an error we did not write
+    When the dispatcher delivers it and the delivery fails
+    Then the attempt log records only the redacted sentence
+    And the server log records the original message and stack once, at error level, without the message payload
+
   @unit @unimplemented
   Scenario: A wake scheduled for a process that no longer exists is discarded
     Given a wake for a completed process instance
