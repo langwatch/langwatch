@@ -69,7 +69,11 @@ import {
   type HttpMethod,
   type VersionStatus,
 } from "./addressing.ts";
-import { confirmMarkedRequest, type RestConfirmationGate } from "./confirmation.ts";
+import {
+  confirmMarkedRequest,
+  type RestConfirmationGate,
+  type RestConfirmationReceipt,
+} from "./confirmation.ts";
 import {
   admittedOwnerlessProjectKeyFor,
   OWNERLESS_PROJECT_KEY_PROOF_CODE_PATH,
@@ -197,6 +201,24 @@ export type RestRuntimeMembers = Readonly<{
    */
   servedDoors?: true;
 }>;
+
+/** Runs the handler; a fault on our side leaves the record in place, so the click is given back. */
+async function refundingOnFault<Result>(
+  receipt: RestConfirmationReceipt | void,
+  run: () => Promise<Result>,
+): Promise<Result> {
+  try {
+    return await run();
+  } catch (error) {
+    if (receipt && !isCustomerFault(error)) await receipt.refund().catch(() => {});
+    throw error;
+  }
+}
+
+/** A refusal the caller caused, which a retry of the same request meets again. */
+function isCustomerFault(error: unknown): boolean {
+  return HandledError.isHandled(error) && error.httpStatus < 500;
+}
 
 /**
  * Told once per process the first time a deprecated route is called, so an
@@ -1465,7 +1487,7 @@ function handlerMiddleware<Api>({
         context,
         run: async () => {
           // After every permission check and inside the trail, so a refusal is recorded too.
-          await confirmMarkedRequest({
+          const receipt = await confirmMarkedRequest({
             mark: route.confirmation,
             gate: ports.confirmations,
             servedDoors: ports.servedDoors === true,
@@ -1476,20 +1498,22 @@ function handlerMiddleware<Api>({
             app: options.app,
           });
 
-          return route.handler(
-            handlerArguments({
-              context,
-              route,
-              options,
-              input,
-              actor,
-              scope: handlerScopeOf({ route, credential, caller }),
-              target,
-              authorization,
-              session: sessionOf({ route, credential, caller }),
-              key: keyOf({ route, credential, request: context.req.raw }),
-            }),
-            ...(await resolveContexts({ route, contexts, context, input })),
+          return refundingOnFault(receipt, async () =>
+            route.handler(
+              handlerArguments({
+                context,
+                route,
+                options,
+                input,
+                actor,
+                scope: handlerScopeOf({ route, credential, caller }),
+                target,
+                authorization,
+                session: sessionOf({ route, credential, caller }),
+                key: keyOf({ route, credential, request: context.req.raw }),
+              }),
+              ...(await resolveContexts({ route, contexts, context, input })),
+            ),
           );
         },
       });

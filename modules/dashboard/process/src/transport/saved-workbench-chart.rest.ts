@@ -15,6 +15,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
   type RouteResponse,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import {
   createSavedWorkbenchChartSchema,
@@ -136,6 +137,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts",
     "postApiV1ProjectsByProjectIdAnalyticsCharts",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartProjectParamsSchema)
@@ -207,6 +209,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId",
     "patchApiV1ProjectsByProjectIdAnalyticsChartsByChartId",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
@@ -255,13 +258,11 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     action: "delete",
     idParam: "chartId",
     name: ({ app, projectId, id }) =>
-      app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
-        (chart) => chart.name,
-        (error: unknown) => {
-          if (error instanceof SavedWorkbenchChartNotFoundError) return undefined;
-          throw error;
-        },
-      ),
+      nameUnlessMissing({
+        read: app.getSavedWorkbenchChart({ projectId, chartId: id }),
+        missing: SavedWorkbenchChartNotFoundError,
+        nameOf: (chart) => chart.name,
+      }),
   })
   .withOutput(z.void())
   .withDocs({
@@ -289,6 +290,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/charts/:chartId/placement",
     "putApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacement",
   )
+  .keepsRecords()
   .withAudit("analytics.savedWorkbenchCharts.place")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(savedWorkbenchChartParamsSchema)
@@ -336,13 +338,11 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
     action: "remove",
     idParam: "chartId",
     name: ({ app, projectId, id }) =>
-      app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
-        (chart) => chart.name,
-        (error: unknown) => {
-          if (error instanceof SavedWorkbenchChartNotFoundError) return undefined;
-          throw error;
-        },
-      ),
+      nameUnlessMissing({
+        read: app.getSavedWorkbenchChart({ projectId, chartId: id }),
+        missing: SavedWorkbenchChartNotFoundError,
+        nameOf: (chart) => chart.name,
+      }),
   })
   .withOutput(z.void())
   .withDocs({

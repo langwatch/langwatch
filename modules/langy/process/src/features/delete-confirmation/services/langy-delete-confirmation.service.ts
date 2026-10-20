@@ -1,5 +1,9 @@
 import { ConfirmationRequiredError } from "@langwatch/api";
-import type { RestConfirmationGate, RestConfirmationRequest } from "@langwatch/api/rest";
+import type {
+  RestConfirmationGate,
+  RestConfirmationReceipt,
+  RestConfirmationRequest,
+} from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
 import { parseLangyChoiceSelectionPart } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
@@ -11,6 +15,7 @@ import type {
 import type { LangyLocalControlRequestRepository } from "../../../repositories/langy-local-control-request.repository.ts";
 import {
   CONFIRM_CARD_TTL_SECONDS,
+  CONFIRM_GRANT_TTL_SECONDS,
   confirmBlockWait,
   confirmationCard,
   cardUnavailableRefusalMessage,
@@ -64,7 +69,7 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
    * @throws {ConfirmationRequiredError} when any record has no unspent click, or the key belongs
    * to no conversation
    */
-  async confirm(request: RestConfirmationRequest): Promise<void> {
+  async confirm(request: RestConfirmationRequest): Promise<RestConfirmationReceipt | void> {
     const binding = await this.bindingOf(request.apiKeyId);
     if (!binding || binding.projectId !== request.projectId) {
       throw new ConfirmationRequiredError({
@@ -81,23 +86,17 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
       action: request.action,
       id,
     }));
-    if (await this.members.confirmations.consumeGrants(targets)) return;
+    if (await this.members.confirmations.consumeGrants(targets)) return this.receiptFor(targets);
 
-    const unclicked: { target: ConfirmTarget; name: string | null }[] = [];
-    const gone = new Set<ConfirmTarget>();
-    for (const [index, target] of targets.entries()) {
-      if (await this.members.confirmations.hasGrant(target)) continue;
-      const name = await request.targets[index]?.name();
-      if (name === undefined) gone.add(target);
-      else unclicked.push({ target, name });
-    }
+    const { unclicked, gone } = await this.sortUnclicked({ request, targets });
 
     // No record still lacks a click: spend the clicks of those that exist, and the handler
     // answers for any that do not.
     if (unclicked.length === 0) {
       const existing = targets.filter((target) => !gone.has(target));
-      if (existing.length === 0 || (await this.members.confirmations.consumeGrants(existing))) {
-        return;
+      if (existing.length === 0) return;
+      if (await this.members.confirmations.consumeGrants(existing)) {
+        return this.receiptFor(existing);
       }
       throw new ConfirmationRequiredError({
         message: retryRefusalMessage(request.action),
@@ -198,6 +197,41 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
    * The card for one record, unless one is already waiting for it or another request is raising
    * it right now. True when a card is waiting.
    */
+  /** The records still lacking a click, with their names, and those that no longer exist. */
+  private async sortUnclicked({
+    request,
+    targets,
+  }: {
+    request: RestConfirmationRequest;
+    targets: readonly ConfirmTarget[];
+  }): Promise<{
+    unclicked: { target: ConfirmTarget; name: string | null }[];
+    gone: Set<ConfirmTarget>;
+  }> {
+    const unclicked: { target: ConfirmTarget; name: string | null }[] = [];
+    const gone = new Set<ConfirmTarget>();
+    for (const [index, target] of targets.entries()) {
+      if (await this.members.confirmations.hasGrant(target)) continue;
+      const name = await request.targets[index]?.name();
+      if (name === undefined) gone.add(target);
+      else unclicked.push({ target, name });
+    }
+    return { unclicked, gone };
+  }
+
+  /** Gives the spent clicks back, for a route that failed on our side after spending them. */
+  private receiptFor(targets: readonly ConfirmTarget[]): RestConfirmationReceipt {
+    return {
+      refund: async () => {
+        await Promise.all(
+          targets.map((target) =>
+            this.members.confirmations.saveGrant({ target, ttlSeconds: CONFIRM_GRANT_TTL_SECONDS }),
+          ),
+        );
+      },
+    };
+  }
+
   private async showCard(card: {
     target: ConfirmTarget;
     name: string | null;
@@ -210,7 +244,8 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
       target,
       ttlSeconds: CARD_RAISE_TTL_SECONDS,
     });
-    if (!raising) return true;
+    // Another request is raising it: say a card is shown only once it is, never on its word.
+    if (!raising) return this.isWaiting(target);
 
     try {
       // Checked again under the claim: a request that raised the card just before it let go.

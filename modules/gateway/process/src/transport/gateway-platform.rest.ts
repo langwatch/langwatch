@@ -75,14 +75,41 @@ const canonicalGoneResponses = {
  * The click a virtual key route asks a Langy key for, named from the key itself in the
  * organization the route acts in.
  */
-function virtualKeyConfirmation(action: "disable" | "revoke"): RestConfirmation<GatewayApi> {
+function virtualKeyConfirmation(
+  action: "disable" | "revoke",
+  when?: RestConfirmation<GatewayApi>["when"],
+): RestConfirmation<GatewayApi> {
   return {
     resource: "virtual key",
     action,
     idParam: "id",
+    ...(when ? { when } : {}),
     name: async ({ app, projectId, id }) =>
       (await app.findVirtualKeyById(id, await app.organizationIdForProject(projectId)))?.name,
   };
+}
+
+/** Fields that only describe the key; any other change can stop the key from working. */
+const DESCRIPTIVE_VIRTUAL_KEY_FIELDS = new Set([
+  "id",
+  "name",
+  "description",
+  "external_id",
+  "metadata",
+  "trace_project_id",
+]);
+
+/**
+ * An update that can stop a virtual key from working: an expiry, narrower scopes, other routing,
+ * a budget or config. Only a change to how the key is described goes without a click.
+ */
+function canSwitchVirtualKeyOff(input: Readonly<Record<string, unknown>>): boolean {
+  return Object.entries(input).some(
+    ([field, value]) =>
+      value !== undefined &&
+      !DESCRIPTIVE_VIRTUAL_KEY_FIELDS.has(field) &&
+      !(field === "expires_at" && value === null),
+  );
 }
 
 /**
@@ -316,6 +343,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys", "postApiGatewayV1VirtualKeys")
+  .keepsRecords()
   .withAudit("virtualKeys.create")
   .withCredential("api_key")
   .withInput(gatewayCreateVirtualKeySchema)
@@ -437,6 +465,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .patch("/virtual-keys/:id", "patchApiGatewayV1VirtualKeysById")
+  .withConfirmation(virtualKeyConfirmation("disable", canSwitchVirtualKeyOff))
   .withAudit("virtualKeys.update")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
@@ -482,6 +511,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/rotate", "postApiGatewayV1VirtualKeysByIdRotate")
+  .keepsRecords()
   .withAudit("virtualKeys.rotate")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
@@ -545,6 +575,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/virtual-keys/:id/enable", "postApiGatewayV1VirtualKeysByIdEnable")
+  .keepsRecords()
   .withAudit("virtualKeys.enable")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
@@ -659,6 +690,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/budgets", "postApiGatewayV1Budgets")
+  .keepsRecords()
   .withAudit("gatewayBudgets.create")
   .withCredential("api_key")
   .withInput(gatewayCreateBudgetSchema)
@@ -705,6 +737,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .patch("/budgets/:id", "patchApiGatewayV1BudgetsById")
+  .withoutConfirmation("asked at the organization, where a Langy key holds no grant")
   .withAudit("gatewayBudgets.update")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
@@ -757,6 +790,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/budgets/:id/reset", "postApiGatewayV1BudgetsByIdReset")
+  .keepsRecords()
   .withAudit("gatewayBudgets.reset")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
@@ -839,6 +873,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/cache-rules", "postApiGatewayV1CacheRules")
+  .keepsRecords()
   .withAudit("gatewayCacheRules.create")
   .withInput(gatewayCreateCacheRuleSchema)
   .withPermission("gatewayCacheRules:create")
@@ -953,6 +988,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .post("/providers", "postApiGatewayV1Providers")
+  .keepsRecords()
   .withAudit("gatewayProviders.create")
   .withInput(gatewayRetiredProviderBindingBodySchema)
   .withPermission("gatewayProviders:manage")
@@ -970,6 +1006,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   })
 
   .patch("/providers/:id", "patchApiGatewayV1ProvidersById")
+  .keepsRecords()
   .withAudit("gatewayProviders.update")
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRetiredProviderBindingBodySchema)

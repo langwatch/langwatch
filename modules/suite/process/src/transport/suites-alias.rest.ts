@@ -6,6 +6,7 @@ import {
   projectRequestContext,
   type RestDoorCredential,
   type RestTransportDeclaration,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import { ValidationError } from "@langwatch/handled-error";
 /**
@@ -455,6 +456,7 @@ export function createSuitesAliasRest(): Readonly<{
       // for `scenarios:create`, not `scenarios:manage`. `:manage` still implies `:create`,
       // so every role and key that could create a suite yesterday still can.
       .post("/", "postApiSuites")
+      .keepsRecords()
       .withInput(createSuiteInputSchema)
       .withPermission("scenarios:create")
       .withAudit("suites.create")
@@ -474,6 +476,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ── Update Suite ─────────────────────────────────────────── `:update` for the same
       // reason as `:create` above.
       .patch("/:id", "patchApiSuitesById")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(updateSuiteInputSchema)
       .withPermission("scenarios:update")
@@ -493,6 +496,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ── Duplicate Suite ──────────────────────────────────────── A duplicate is a create:
       // it leaves the source suite untouched and produces a new one.
       .post("/:id/duplicate", "postApiSuitesByIdDuplicate")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(duplicateSuiteBodySchema)
       .withPermission("scenarios:create")
@@ -514,6 +518,7 @@ export function createSuitesAliasRest(): Readonly<{
       // ADMINISTERING IT. The run creates scenario runs; the suite definition, its scenarios
       // and its targets are left exactly as they were.
       .post("/:id/run", "postApiSuitesByIdRun")
+      .keepsRecords()
       .withParams(suiteAliasIdParamsSchema)
       .withInput(runSuiteInputSchema)
       .withPermission("scenarios:create")
@@ -547,13 +552,11 @@ export function createSuitesAliasRest(): Readonly<{
         action: "delete",
         idParam: "id",
         name: ({ app, projectId, id }) =>
-          app.getByIdOrTestSuite({ id, projectId }).then(
-            (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
-            (error: unknown) => {
-              if (error instanceof SuiteNotFoundError) return undefined;
-              throw error;
-            },
-          ),
+          nameUnlessMissing({
+            read: app.getByIdOrTestSuite({ id, projectId }),
+            missing: SuiteNotFoundError,
+            nameOf: (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+          }),
       })
       .withOutput(archivedSuiteSchema)
       .withDocs({

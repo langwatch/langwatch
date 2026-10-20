@@ -51,9 +51,11 @@ export {
 export { RestHost, type RestIdentities, type RestFamilyBearers } from "./host.ts";
 export {
   bindConfirmationGate,
+  nameUnlessMissing,
   openConfirmationGate,
   type RestConfirmation,
   type RestConfirmationGate,
+  type RestConfirmationReceipt,
   type RestConfirmationRequest,
 } from "./confirmation.ts";
 export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts";

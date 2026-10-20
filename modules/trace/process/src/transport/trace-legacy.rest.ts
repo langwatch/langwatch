@@ -405,6 +405,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   // Neither names a successor, so neither carries the deprecation headers the
   // read and the search do.
   .post("/api/trace/:id/share", "shareLegacyTrace")
+  .keepsRecords()
   .withAudit("share.createShare")
   .withParams(traceLegacyIdParamsSchema)
   .withPermission("traces:share")
@@ -449,6 +450,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
   //
   // The framework reads the body; the family's own schema then parses it.
   .post("/api/trace/search", "searchLegacyTraces")
+  .keepsRecords()
   .withoutAudit("read sent as a POST")
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withBodyLimit({ maxBytes: BODY_LIMIT_BULK_BYTES })

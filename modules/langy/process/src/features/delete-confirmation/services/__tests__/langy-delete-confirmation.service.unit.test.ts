@@ -13,13 +13,15 @@ import { deleteConfirmationFixture } from "./delete-confirmation.fixture.ts";
 
 let now: number;
 let langy: ReturnType<typeof deleteConfirmationFixture>;
+let confirmations: LangyDeleteConfirmationMemoryRepository;
 
 beforeEach(async () => {
   now = 1_760_000_000_000;
   const clock = () => now;
+  confirmations = LangyDeleteConfirmationMemoryRepository.create({ now: clock });
   langy = deleteConfirmationFixture({
     store: memorySessionState({ now: clock }),
-    confirmations: LangyDeleteConfirmationMemoryRepository.create({ now: clock }),
+    confirmations,
     projectId: "proj_unit",
     now: clock,
   });
@@ -125,6 +127,26 @@ describe("the confirmation gate", () => {
         expect(answer.body.message).toContain("no confirmation card could be shown");
         expect(answer.body.message).not.toContain("is now shown");
         expect(langy.started).toEqual([]);
+      });
+    });
+
+    describe("when another request is raising the card for the same evaluator", () => {
+      it("does not say a card is shown before one is", async () => {
+        await confirmations.claimCardRaise({
+          target: {
+            projectId: "proj_unit",
+            conversationId: langy.conversationId,
+            resource: "evaluator",
+            action: "delete",
+            id: "ev_toxicity",
+          },
+          ttlSeconds: 30,
+        });
+
+        const answer = await langy.deleteEvaluator("ev_toxicity", "turn2");
+
+        expect(answer.status).toBe(409);
+        expect(answer.body.message).not.toContain("is now shown");
       });
     });
   });

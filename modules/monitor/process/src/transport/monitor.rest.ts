@@ -126,6 +126,7 @@ export function createMonitorsRest(): Readonly<{
       // hierarchy, so no existing caller loses access. Deletion stays on
       // `:manage` below, where the destructive line sits.
       .post("/", "postApiMonitors")
+      .keepsRecords()
       .withAudit("monitors.create")
       .withInput(monitorRestCreateInputSchema)
       .withPermission("evaluations:create")

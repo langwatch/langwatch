@@ -7,6 +7,7 @@ import {
   badRequestSchema,
   defineRestRouter,
   MANAGEMENT_API_VERSION,
+  nameUnlessMissing,
   projectRequestContext,
   type RestConfirmation,
   type RestDoorCredential,
@@ -33,8 +34,8 @@ import {
   type AutomationRestResponse,
   type Trigger,
   type TriggerFirePage,
+  TriggerNotFoundError,
 } from "@langwatch/automation-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { z } from "zod";
 
@@ -112,23 +113,24 @@ function firePageWire(page: TriggerFirePage): AutomationRestFirePage {
 }
 
 /** The click an automation route asks a Langy key for, named from the automation itself. */
-function automationConfirmation(
-  action: "delete" | "disable",
-  when?: RestConfirmation<AutomationApi>["when"],
-): RestConfirmation<AutomationApi> {
+function automationConfirmation({
+  action,
+  when,
+}: {
+  action: "delete" | "disable";
+  when?: RestConfirmation<AutomationApi>["when"];
+}): RestConfirmation<AutomationApi> {
   return {
     resource: "automation",
     action,
     idParam: "triggerId",
     ...(when ? { when } : {}),
     name: ({ app, projectId, id }) =>
-      app.getPublicTrigger({ triggerId: id, projectId }).then(
-        (trigger) => trigger.name,
-        (error: unknown) => {
-          if (HandledError.isHandled(error) && error.httpStatus === 404) return undefined;
-          throw error;
-        },
-      ),
+      nameUnlessMissing({
+        read: app.getPublicTrigger({ triggerId: id, projectId }),
+        missing: TriggerNotFoundError,
+        nameOf: (trigger) => trigger.name,
+      }),
   };
 }
 
@@ -208,6 +210,7 @@ export function createAutomationRest(): Readonly<{
       // Creating asks for `triggers:create`; `:manage` still implies it, so no
       // existing caller changes and a viewer is declined as before.
       .post("/", "postApiTriggers")
+      .keepsRecords()
       .withAudit("automation.create")
       .withInput(automationRestCreateInputSchema)
       .withPermission("triggers:create")
@@ -238,7 +241,9 @@ export function createAutomationRest(): Readonly<{
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
       // An update that pauses the automation is a disable, and the disable route's click covers it.
-      .withConfirmation(automationConfirmation("disable", (input) => input.active === false))
+      .withConfirmation(
+        automationConfirmation({ action: "disable", when: (input) => input.active === false }),
+      )
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -266,6 +271,7 @@ export function createAutomationRest(): Readonly<{
 
       // Both verbs answer with the automation, so a caller sees the state it is in.
       .post("/:triggerId/enable", "postApiTriggersByIdEnable")
+      .keepsRecords()
       .withAudit("automation.toggleTrigger")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
@@ -295,7 +301,7 @@ export function createAutomationRest(): Readonly<{
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
-      .withConfirmation(automationConfirmation("disable"))
+      .withConfirmation(automationConfirmation({ action: "disable" }))
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -318,6 +324,7 @@ export function createAutomationRest(): Readonly<{
       // The destination is the automation's own saved one: a test fire proves
       // a configured automation delivers; it is no way to send anywhere.
       .post("/:triggerId/test-fire", "postApiTriggersByIdTestFire")
+      .keepsRecords()
       .withAudit("automation.testFireTemplate")
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
@@ -345,7 +352,7 @@ export function createAutomationRest(): Readonly<{
       .withAudit("automation.deleteById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:manage")
-      .withConfirmation(automationConfirmation("delete"))
+      .withConfirmation(automationConfirmation({ action: "delete" }))
       .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
       .withDocs({ tags: ["Triggers"], description: "Delete (soft-delete) a trigger" })
       .handle(async ({ app, input, scope }) => {

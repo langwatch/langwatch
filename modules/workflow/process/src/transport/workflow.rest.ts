@@ -9,6 +9,7 @@ import {
   projectRequestContext,
   type RestDoorCredential,
   type RestTransportDeclaration,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import { createLogger } from "@langwatch/observability";
 import {
@@ -104,6 +105,7 @@ export function createWorkflowRest(): Readonly<{
       // Editing metadata on a workflow that already exists is an `:update`.
       // `:manage` still implies it, so no existing caller changes.
       .patch("/:id", "patchApiWorkflowsById")
+      .keepsRecords()
       .withAudit("workflow.update")
       .withParams(workflowRestParamsSchema)
       .withInput(workflowRestUpdateSchema)
@@ -133,13 +135,11 @@ export function createWorkflowRest(): Readonly<{
         action: "delete",
         idParam: "id",
         name: ({ app, projectId, id }) =>
-          app.getById({ id, projectId }).then(
-            (workflow) => workflow.name,
-            (error: unknown) => {
-              if (error instanceof WorkflowNotFoundError) return undefined;
-              throw error;
-            },
-          ),
+          nameUnlessMissing({
+            read: app.getById({ id, projectId }),
+            missing: WorkflowNotFoundError,
+            nameOf: (workflow) => workflow.name,
+          }),
       })
       .withOutput(workflowRestArchivedSchema)
       .withDocs({

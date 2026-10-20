@@ -143,5 +143,8 @@ Feature: Removing something with Langy needs a confirmation click
   @unit
   Scenario: Every route that removes or disables something asks for the click
     When the registered routes are listed
-    Then every route that deletes, archives, removes, disables, revokes, purges or clears declares the confirmation mark or says why it asks for none
+    Then every write route declares the confirmation mark, says why it asks for none, or says it keeps every record
+    And a write route that declares none of these stops the build, whatever its audit is named
+    And a DELETE route cannot say it keeps every record
+    And an update that can switch a record off asks for the click when its body would do so
     And every route that says it asks for none is one a Langy key cannot reach

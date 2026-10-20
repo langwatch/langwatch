@@ -71,6 +71,7 @@ export const experimentBatchLogRest = defineRestRouter(ExperimentApi)
   .withAddressing("literal", { v1Twin: true })
 
   .post("/api/evaluations/batch/log_results", "postApiEvaluationsBatchLogResults")
+  .keepsRecords()
   .withInput(z.looseObject({}), { mediaType: PRODUCES_JSON, mismatch: "malformed_request" })
   .withPermission("evaluations:manage")
   .withoutAudit("ingestion")

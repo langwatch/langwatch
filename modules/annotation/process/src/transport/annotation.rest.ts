@@ -1,5 +1,6 @@
 import {
   AnnotationApi,
+  AnnotationNotFoundError,
   annotationRestDeletedSchema,
   annotationRestListResponseSchema,
   annotationRestParamsSchema,
@@ -7,8 +8,7 @@ import {
   annotationRestResponseSchema,
   annotationRestWriteSchema,
 } from "@langwatch/annotation-contract";
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
-import { HandledError } from "@langwatch/handled-error";
+import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 
 export const annotationRest = defineRestRouter(AnnotationApi)
   .withNamespace("annotations")
@@ -49,6 +49,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .patch("/:id", "updateAnnotation")
+  .keepsRecords()
   .withAudit("annotation.update")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)
@@ -75,14 +76,12 @@ export const annotationRest = defineRestRouter(AnnotationApi)
     resource: "annotation",
     action: "delete",
     idParam: "id",
-    name: async ({ app, projectId, id }) => {
-      const annotation = await app.getById({ id, projectId }).catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.httpStatus === 404) return undefined;
-        throw error;
-      });
-      if (!annotation) return undefined;
-      return annotation.comment ? annotation.comment.slice(0, 60) : null;
-    },
+    name: ({ app, projectId, id }) =>
+      nameUnlessMissing({
+        read: app.getById({ id, projectId }),
+        missing: AnnotationNotFoundError,
+        nameOf: (annotation) => (annotation.comment ? annotation.comment.slice(0, 60) : null),
+      }),
   })
   .withOutput(annotationRestDeletedSchema)
   .withDocs({
@@ -115,6 +114,7 @@ export const annotationRest = defineRestRouter(AnnotationApi)
   })
 
   .post("/trace/:id", "createTraceAnnotation")
+  .keepsRecords()
   .withAudit("annotation.create")
   .withParams(annotationRestParamsSchema)
   .withInput(annotationRestWriteSchema)

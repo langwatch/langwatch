@@ -41,6 +41,7 @@ const transportDeclaration = defineRestRouter(AnnotationApi)
   .withOutput(z.object({ id: z.string() }))
   .handle(async ({ app, input }) => app.getAnnotation({ id: input.id }))
   .patch("/:id", "updateAnnotation")
+  .keepsRecords()
   .withParams(z.object({ id: z.string() }))
   .withInput(z.object({ title: z.string() }))
   .withPermission("annotations:update")
@@ -159,6 +160,7 @@ const payload = z.discriminatedUnion("kind", [
 ]);
 const unionRoute = () => defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .post("/:id", "write").withParams(z.object({ id: z.string() }))
+  .keepsRecords()
   .withInput(payload).withPermission("annotations:view").withOutput(z.object({ id: z.string() }));
 unionRoute().withoutAudit("test route").handle(({ input }) => ({ id: input.kind === "text" ? input.text : String(input.count) }));
 unionRoute().handle(({ input }) => ({ id: input.text }));
@@ -167,7 +169,8 @@ const conflict = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("count"), count: z.number() }),
 ]);
 defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
-  .post("/:id", "conflict").withParams(z.object({ id: z.string() })).withInput(conflict);
+  .post("/:id", "conflict").withParams(z.object({ id: z.string() })).withInput(conflict)
+  .keepsRecords();
 defineRestRouter(api).withNamespace("annotations").withVersion("2026-09-08")
   .get("/", "shapes").withPermission("annotations:view")
   .withOutput(z.union([z.object({ a: z.string() }), z.object({ b: z.string() })]));

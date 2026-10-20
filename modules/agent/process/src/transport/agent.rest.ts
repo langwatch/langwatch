@@ -122,6 +122,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       })
 
       .post("/", "createAgent")
+      .keepsRecords()
       .withAudit("agents.create")
       .withInput(createAgentRequestSchema)
       .withPermission("project:update")
@@ -157,6 +158,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       })
 
       .patch("/:id", "updateAgent")
+      .keepsRecords()
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
@@ -176,6 +178,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       })
 
       .put("/:id", "replaceAgent")
+      .keepsRecords()
       .withAudit("agents.update")
       .withParams(agentRestParamsSchema)
       .withInput(updateAgentRequestSchema)
@@ -208,6 +211,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
       })
 
       .post("/:id/call", "callConnectedAgent")
+      .keepsRecords()
       .withoutAudit("run, not a change")
       .withParams(agentRestParamsSchema)
       .withInput(relayCallBodySchema)

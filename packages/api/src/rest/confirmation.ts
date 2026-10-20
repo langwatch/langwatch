@@ -53,8 +53,11 @@ export type RestConfirmationGate = Readonly<{
    * Spends one click per target, all of them or none of them.
    * @throws {ConfirmationRequiredError} when any target has no unspent click
    */
-  confirm(request: RestConfirmationRequest): Promise<void>;
+  confirm(request: RestConfirmationRequest): Promise<RestConfirmationReceipt | void>;
 }>;
+
+/** The clicks one request spent, to give back if the route then fails on our side. */
+export type RestConfirmationReceipt = Readonly<{ refund(): Promise<void> }>;
 
 type ConfirmationGateBinding = Readonly<{ confirmationGate: RestConfirmationGate }>;
 
@@ -87,6 +90,26 @@ export function openConfirmationGate(
 
 function isConfirmationGateBinding(binding: MiddlewareBinding): binding is ConfirmationGateBinding {
   return "confirmationGate" in binding;
+}
+
+/**
+ * The name a mark's card shows, or `undefined` when the record is gone: then no card is raised
+ * and the route answers its own not-found. Only the module's own not-found error means gone;
+ * every other failure is thrown, so a broken lookup never skips the click.
+ */
+export function nameUnlessMissing<Found>({
+  read,
+  missing,
+  nameOf,
+}: {
+  read: Promise<Found>;
+  missing: abstract new (...args: never[]) => Error;
+  nameOf: (found: Found) => string | null;
+}): Promise<string | null | undefined> {
+  return read.then(nameOf, (error: unknown) => {
+    if (error instanceof missing) return undefined;
+    throw error;
+  });
 }
 
 /** Refuses a mark that could never name the record it guards. */
@@ -132,7 +155,7 @@ export async function confirmMarkedRequest<Api>({
   input: unknown;
   scope: AuthzDeclaredScopeId | null;
   app: () => Api;
-}): Promise<void> {
+}): Promise<RestConfirmationReceipt | void> {
   if (!mark || !isKeyDoor(credential)) return;
   const recorded = recordedKeyCredentialOf({ door: credential, request });
   // Every served key door records the key it let in; one that did not is never trusted to be no
@@ -168,7 +191,7 @@ export async function confirmMarkedRequest<Api>({
     });
   }
 
-  await gate.confirm({
+  return gate.confirm({
     apiKeyId: key.apiKeyId,
     ownerUserId: key.ownerUserId,
     projectId,

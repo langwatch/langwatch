@@ -3,7 +3,7 @@
  * The two timestamps leave as ISO strings, as this family has always sent them.
  * A graph posted without a size is 1 by 1 here, as on main; tRPC's default is 4 by 3.
  */
-import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
+import { defineRestRouter, MANAGEMENT_API_VERSION, nameUnlessMissing } from "@langwatch/api/rest";
 import {
   DashboardApi,
   GraphNotFoundError,
@@ -68,6 +68,7 @@ export const graphRest = defineRestRouter(DashboardApi)
 
   // Creating asks for `analytics:create`; `:manage` still implies it.
   .post("/", "postApiGraphs")
+  .keepsRecords()
   .withAudit("graphs.create")
   .withInput(graphRestCreateSchema)
   .withPermission("analytics:create")
@@ -94,6 +95,7 @@ export const graphRest = defineRestRouter(DashboardApi)
   )
 
   .patch("/:id", "patchApiGraphsById")
+  .keepsRecords()
   .withAudit("graphs.updateById")
   .withParams(graphRestParamsSchema)
   .withInput(graphRestUpdateSchema)
@@ -126,13 +128,11 @@ export const graphRest = defineRestRouter(DashboardApi)
     action: "delete",
     idParam: "id",
     name: ({ app, projectId, id }) =>
-      app.getGraph({ projectId, graphId: id }).then(
-        (graph) => graph.name,
-        (error: unknown) => {
-          if (error instanceof GraphNotFoundError) return undefined;
-          throw error;
-        },
-      ),
+      nameUnlessMissing({
+        read: app.getGraph({ projectId, graphId: id }),
+        missing: GraphNotFoundError,
+        nameOf: (graph) => graph.name,
+      }),
   })
   .withOutput(graphDeletedResponseSchema)
   .withDocs({ tags: ["Graphs"], description: "Delete a custom graph" })

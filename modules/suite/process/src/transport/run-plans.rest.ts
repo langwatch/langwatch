@@ -6,6 +6,7 @@ import {
   projectRequestContext,
   type RestDoorCredential,
   type RestTransportDeclaration,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 /**
  * The `/api/v1/run-plans` REST family: the plans a project runs, and the runs
@@ -176,6 +177,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .post("/run", "runRunPlan")
+    .keepsRecords()
     .withInput(runPlanRunInputSchema)
     .withPermission("scenarios:create")
     .withoutAudit("run, not a change")
@@ -213,6 +215,7 @@ export function createRunPlansRest(): Readonly<{
     )
 
     .post("/:id/run", "rerunRunPlan")
+    .keepsRecords()
     .withParams(runPlanIdParamsSchema)
     .withInput(rerunInputSchema)
     .withPermission("scenarios:create")
@@ -246,13 +249,11 @@ export function createRunPlansRest(): Readonly<{
       action: "delete",
       idParam: "id",
       name: ({ app, projectId, id }) =>
-        app.getByIdOrTestSuite({ id, projectId }).then(
-          (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
-          (error: unknown) => {
-            if (error instanceof SuiteNotFoundError) return undefined;
-            throw error;
-          },
-        ),
+        nameUnlessMissing({
+          read: app.getByIdOrTestSuite({ id, projectId }),
+          missing: SuiteNotFoundError,
+          nameOf: (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
+        }),
     })
     .withOutput(runPlanArchiveResultSchema)
     .withDocs({

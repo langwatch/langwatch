@@ -10,6 +10,7 @@ import type {
   RestResolvedOrganizationCredential,
   RestResolvedProjectCredential,
 } from "@langwatch/authorization";
+import { HandledError } from "@langwatch/handled-error";
 import { moduleApi } from "@langwatch/module";
 import { beforeEach, describe, expect, it } from "vitest";
 import { z } from "zod";
@@ -207,10 +208,15 @@ const router = defineRestRouter(RecordsApi)
   .router();
 
 let ran: string[];
+let refunded: number;
+let failWith: Error | undefined;
 let asked: { request: RestConfirmationRequest; names: (string | null | undefined)[] }[];
 
 const app: RecordsApi = {
-  remove: async () => void ran.push("remove"),
+  remove: async () => {
+    if (failWith) throw failWith;
+    ran.push("remove");
+  },
   removeMany: async () => void ran.push("removeMany"),
   toggle: async () => void ran.push("toggle"),
   nameOf: async (id) => `Record ${id}`,
@@ -222,7 +228,9 @@ function gateFor(confirmed: readonly string[]): RestConfirmationGate {
     confirm: async (request) => {
       const names = await Promise.all(request.targets.map((target) => target.name()));
       asked.push({ request, names });
-      if (request.targets.every((target) => confirmed.includes(target.id))) return;
+      if (request.targets.every((target) => confirmed.includes(target.id))) {
+        return { refund: async () => void (refunded += 1) };
+      }
       throw new ConfirmationRequiredError({
         message: "Deleting needs a confirmation click.",
         resource: request.resource,
@@ -273,6 +281,8 @@ async function call({
 
 beforeEach(() => {
   ran = [];
+  refunded = 0;
+  failWith = undefined;
   asked = [];
 });
 
@@ -507,39 +517,86 @@ describe("a route marked as removing something", () => {
   });
 });
 
+describe("when the route fails after the click was spent", () => {
+  it("gives the click back for a fault on our side", async () => {
+    failWith = new Error("database went away");
+
+    const answer = await call({
+      gate: gateFor(["ev-1"]),
+      token: "langy",
+      method: "DELETE",
+      path: "/ev-1",
+    });
+
+    expect(answer.status).toBe(500);
+    expect(refunded).toBe(1);
+  });
+
+  it("keeps the click spent for a refusal the caller caused", async () => {
+    failWith = new HandledError("evaluator_in_use", "in use", { httpStatus: 409 });
+
+    const answer = await call({
+      gate: gateFor(["ev-1"]),
+      token: "langy",
+      method: "DELETE",
+      path: "/ev-1",
+    });
+
+    expect(answer.status).toBe(409);
+    expect(refunded).toBe(0);
+  });
+});
+
 describe("declaring the mark", () => {
   /** @scenario "Every route that removes or disables something asks for the click" */
-  it("refuses a DELETE route, or one whose audit names a removal, that says nothing", () => {
+  it("refuses any write route that says nothing, whatever its audit is named", () => {
     const family = () => defineRestRouter(RecordsApi).withNamespace("bad").withVersion(VERSION);
 
     expect(() =>
       family()
-        .delete("/:id", "remove")
-        .withAudit("records.delete")
+        .patch("/:id", "toggle")
+        .withAudit("records.update")
         .withParams(z.object({ id: z.string() }))
+        .withInput(z.object({ enabled: z.boolean() }))
         .withPermission("evaluations:manage")
-        .withOutput(z.object({ removed: z.string() }))
-        .handle(async ({ input }) => ({ removed: input.id })),
-    ).toThrow(/removes or disables a record/);
+        .withOutput(z.object({ enabled: z.boolean() }))
+        .handle(async ({ input }) => ({ enabled: input.enabled })),
+    ).toThrow(/is a write route: declare withConfirmation/);
     expect(() =>
       family()
         .post("/purge", "removeMany")
-        .withAudit("records.purge")
+        .withoutAudit("the test records nothing")
         .withInput(z.object({ ids: z.array(z.string()) }))
         .withPermission("evaluations:manage")
         .withOutput(z.object({ removed: z.number() }))
         .handle(async ({ input }) => ({ removed: input.ids.length })),
-    ).toThrow(/removes or disables a record/);
+    ).toThrow(/is a write route: declare withConfirmation/);
     expect(() =>
       family()
+        .patch("/:id", "toggle")
+        .keepsRecords()
+        .withAudit("records.update")
+        .withParams(z.object({ id: z.string() }))
+        .withInput(z.object({ enabled: z.boolean() }))
+        .withPermission("evaluations:manage")
+        .withOutput(z.object({ enabled: z.boolean() }))
+        .handle(async ({ input }) => ({ enabled: input.enabled })),
+    ).not.toThrow();
+  });
+
+  it("refuses a DELETE that claims it keeps records", () => {
+    expect(() =>
+      defineRestRouter(RecordsApi)
+        .withNamespace("bad")
+        .withVersion(VERSION)
         .delete("/:id", "remove")
+        .keepsRecords()
         .withAudit("records.delete")
-        .withoutConfirmation("a Langy key cannot pass this door")
         .withParams(z.object({ id: z.string() }))
         .withPermission("evaluations:manage")
         .withOutput(z.object({ removed: z.string() }))
         .handle(async ({ input }) => ({ removed: input.id })),
-    ).not.toThrow();
+    ).toThrow(/cannot declare keepsRecords/);
   });
 
   it("refuses a mark that names no id, or both", () => {

@@ -26,20 +26,23 @@ type DeclaredRoute = Readonly<{
   credential?: string;
   confirmation?: unknown;
   confirmationExempt?: string;
+  keepsRecords?: true;
 }>;
 
 type Declaration = Readonly<{ namespace: string; credential: string; routes: DeclaredRoute[] }>;
 
 type Listed = Readonly<{ module: string; declaration: Declaration; route: DeclaredRoute }>;
 
-const REMOVES = /delete|archive|disable|remove|revoke|purge|clear/i;
+const WRITES = new Set(["post", "put", "patch", "delete"]);
+
+/** A name that says the route removes something; such a route cannot say it keeps records. */
+const NAMES_A_REMOVAL = /delete|archive|disable|remove|revoke|purge|clear/i;
 
 /** The doors that resolve an API key, and so the only ones a Langy session key can pass. */
 const KEY_DOORS = new Set(["project", "organization", "api_key"]);
 
-function removes(route: DeclaredRoute): boolean {
-  const methods = route.methods ?? [route.method];
-  return methods.includes("delete") || REMOVES.test(route.audit ?? "");
+function writes(route: DeclaredRoute): boolean {
+  return (route.methods ?? [route.method]).some((method) => WRITES.has(method));
 }
 
 /**
@@ -73,28 +76,40 @@ function declaredRestRoutes(): Listed[] {
 const named = ({ module, declaration, route }: Listed): string =>
   `${module} ${route.method.toUpperCase()} /api/${declaration.namespace}${route.path} (${route.credential ?? declaration.credential}) ${JSON.stringify([route.permission ?? route.access?.kind, route.permissionTarget?.at, route.permissionReach])}`;
 
-describe("the routes that remove or disable something", () => {
-  const removing = declaredRestRoutes().filter(({ route }) => removes(route));
+describe("the write routes", () => {
+  const writing = declaredRestRoutes().filter(({ route }) => writes(route));
 
-  describe("when any route removes or disables something, on any door", () => {
+  describe("when any route writes, on any door", () => {
     /** @scenario "Every route that removes or disables something asks for the click" */
-    it("declares the confirmation mark or says why it asks for none", () => {
-      const undeclared = removing
-        .filter(({ route }) => route.confirmation === undefined && !route.confirmationExempt)
+    it("says whether it removes: the mark, a reason for none, or that it keeps records", () => {
+      const undeclared = writing
+        .filter(
+          ({ route }) =>
+            route.confirmation === undefined && !route.confirmationExempt && !route.keepsRecords,
+        )
         .map(named);
 
-      expect(removing.length).toBeGreaterThan(40);
+      expect(writing.length).toBeGreaterThan(200);
       expect(undeclared).toEqual([]);
+    });
+
+    /** @scenario "Every route that removes or disables something asks for the click" */
+    it("never says it keeps records when its audit names a removal", () => {
+      const misnamed = writing
+        .filter(({ route }) => route.keepsRecords && NAMES_A_REMOVAL.test(route.audit ?? ""))
+        .map(named);
+
+      expect(misnamed).toEqual([]);
     });
   });
 
   describe("when a Langy key can reach it", () => {
     /** @scenario "Every route that removes or disables something asks for the click" */
     it("asks for the click rather than opting out", () => {
-      const reachable = removing.filter(langyCanReach);
-      const optedOut = reachable.filter(({ route }) => route.confirmation === undefined).map(named);
+      const reachable = writing.filter(langyCanReach);
+      const optedOut = reachable.filter(({ route }) => route.confirmationExempt).map(named);
 
-      expect(reachable.length).toBeGreaterThan(20);
+      expect(reachable.length).toBeGreaterThan(50);
       expect(optedOut).toEqual([]);
     });
   });

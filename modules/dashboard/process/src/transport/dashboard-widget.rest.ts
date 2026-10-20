@@ -13,6 +13,7 @@ import {
   MANAGEMENT_API_VERSION,
   resolver,
   type RouteResponse,
+  nameUnlessMissing,
 } from "@langwatch/api/rest";
 import {
   assignDashboardWidgetToDashboardSchema,
@@ -117,6 +118,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgets",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.create")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetProjectParamsSchema)
@@ -185,6 +187,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId",
     "patchApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetId",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.update")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
@@ -224,6 +227,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     "/api/v1/projects/:projectId/analytics/dashboard-widgets/:widgetId/dashboard",
     "postApiV1ProjectsByProjectIdAnalyticsDashboardWidgetsByWidgetIdDashboard",
   )
+  .keepsRecords()
   .withAudit("dashboardWidgets.assignDashboard")
   .withSharedPath(PROJECT_ANALYTICS)
   .withParams(dashboardWidgetParamsSchema)
@@ -267,13 +271,11 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
     action: "delete",
     idParam: "widgetId",
     name: ({ app, projectId, id }) =>
-      app.getDashboardWidget({ projectId, id }).then(
-        (widget) => widget.name,
-        (error: unknown) => {
-          if (error instanceof DashboardWidgetNotFoundError) return undefined;
-          throw error;
-        },
-      ),
+      nameUnlessMissing({
+        read: app.getDashboardWidget({ projectId, id }),
+        missing: DashboardWidgetNotFoundError,
+        nameOf: (widget) => widget.name,
+      }),
   })
   .withOutput(z.void())
   .withDocs({

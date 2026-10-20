@@ -58,6 +58,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
   }))
 
   .post("/", "createScimToken")
+  .keepsRecords()
   .withAudit("scimToken.generate")
   .withInput(scimTokenCreateRestInputSchema)
   .withPermission("organization:manage")

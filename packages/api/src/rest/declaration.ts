@@ -613,6 +613,8 @@ export type RestTransportRoute<Api> = Readonly<{
   readonly confirmation?: RestConfirmation<Api>;
   /** Present exactly when a route that removes something says why it asks for no click. */
   readonly confirmationExempt?: string;
+  /** Present exactly when a write route declared it never removes or disables a record. */
+  readonly keepsRecords?: true;
   readonly handler: StoredHandler<Api>;
 }>;
 
@@ -694,6 +696,7 @@ type RouteState = Readonly<{
   auditExempt?: string;
   confirmation?: RestConfirmation<never>;
   confirmationExempt?: string;
+  keepsRecords?: true;
 }>;
 
 type RouteReady<
@@ -1689,6 +1692,22 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
   }
 
   /**
+   * The write route never removes or disables a record, whatever its body says, so no click is
+   * asked. A route that can switch something off declares withConfirmation with a `when` instead.
+   */
+  keepsRecords(): RouteBuilder<Api, S> {
+    assertConfirmationUndeclared(this.state);
+
+    return new RouteBuilder<Api, S>({
+      router: this.router,
+      method: this.method,
+      path: this.path,
+      operation: this.operation,
+      state: { ...this.state, keepsRecords: true },
+    });
+  }
+
+  /**
    * The route leaves no audit row, and the reason says why: ingestion, a read sent as a POST,
    * a run, or another service's webhook. A write route declares this or `withAudit`.
    */
@@ -1727,12 +1746,9 @@ function assertAuditDeclared({
 }
 
 /** What an audit action names when the route removes or disables a record. */
-const REMOVING_AUDIT = /delete|archive|disable|remove|revoke|purge|clear/i;
-
 /**
- * A route that removes or disables something says whether a Langy key needs the person's click
- * first: `withConfirmation` or `withoutConfirmation`. A DELETE always counts, and so does any
- * route whose audit action names a removal. Spec: specs/langy/langy-delete-confirmation.feature
+ * Every write route declares withConfirmation, withoutConfirmation or keepsRecords; nothing is
+ * guessed from names. A DELETE always removes. Spec: specs/langy/langy-delete-confirmation.feature
  */
 function assertConfirmationDeclared({
   method,
@@ -1743,20 +1759,30 @@ function assertConfirmationDeclared({
   operation: string;
   state: RouteState;
 }): void {
-  const removes =
-    (state.methods ?? [method]).includes("delete") || REMOVING_AUDIT.test(state.audit ?? "");
-  if (!removes || state.confirmation !== void 0 || state.confirmationExempt !== void 0) return;
+  const methods = state.methods ?? [method];
+  if (state.keepsRecords && methods.includes("delete")) {
+    throw new Error(`REST ${operation} is a DELETE, so it cannot declare keepsRecords()`);
+  }
+  if (!methods.some((each) => WRITE_METHODS.has(each))) return;
+  if (state.confirmation !== void 0 || state.confirmationExempt !== void 0) return;
+  if (state.keepsRecords) return;
 
   throw new Error(
-    `REST ${operation} removes or disables a record: declare withConfirmation({...}) or ` +
-      'withoutConfirmation("<why a Langy key never reaches it>")',
+    `REST ${operation} is a write route: declare withConfirmation({...}), ` +
+      'withoutConfirmation("<why a Langy key never reaches it>") or keepsRecords()',
   );
 }
 
 /** A route says once whether it asks for a click. */
 function assertConfirmationUndeclared(state: RouteState): void {
-  if (state.confirmation !== void 0 || state.confirmationExempt !== void 0) {
-    throw new Error("REST route already declared withConfirmation() or withoutConfirmation()");
+  if (
+    state.confirmation !== void 0 ||
+    state.confirmationExempt !== void 0 ||
+    state.keepsRecords !== void 0
+  ) {
+    throw new Error(
+      "REST route already declared withConfirmation(), withoutConfirmation() or keepsRecords()",
+    );
   }
 }
 
@@ -1848,6 +1874,7 @@ function doorParts(state: RouteState): Partial<RestTransportRoute<unknown>> {
       ? { confirmation: state.confirmation as RestConfirmation<unknown> }
       : {}),
     ...(state.confirmationExempt ? { confirmationExempt: state.confirmationExempt } : {}),
+    ...(state.keepsRecords ? { keepsRecords: true as const } : {}),
   };
 }
 
