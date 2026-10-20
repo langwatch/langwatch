@@ -11,6 +11,10 @@ import { ScenarioModule } from "./app/scenario.app.ts";
 import { scenarioChannels } from "./channels/scenario-channels.registry.ts";
 import { scenarioLifecycleEventing } from "./eventing/scenario-lifecycle.pipeline.ts";
 import { simulationProcessingEventing } from "./eventing/simulation-processing.pipeline.ts";
+import {
+  SCENARIO_ID_INDEXES,
+  SCENARIO_SECOND_ID_INDEXES,
+} from "./repositories/clickhouse/clickhouse.scenario-id-indexes.database.ts";
 import { scenarioRepositories } from "./repositories/scenario-repositories.registry.ts";
 import { StalledRunsBackfillService } from "./services/stalled-runs-backfill.service.ts";
 import { scenarioAgentTestRest } from "./transport/scenario-agent-test.rest.ts";
@@ -68,4 +72,15 @@ export const scenarioProcessModule: PublishedProcessModule<
           execution: app,
         }).backfill({ dryRun }),
     }),
-  ]);
+  ])
+  .withIdIndexes(SCENARIO_ID_INDEXES, {
+    after: ["experiment:fill-second-id-indexes"],
+    description:
+      "Fills the id index of simulation runs from older rows, then marks them ready on each ClickHouse target.",
+  })
+  .withIdIndexes(SCENARIO_SECOND_ID_INDEXES, {
+    step: "fill-second-id-indexes",
+    after: ["scenario:fill-id-indexes"],
+    description:
+      "Fills the second id indexes of simulation runs (by batch run id, by scenario set id) from older rows, then marks them ready on each ClickHouse target.",
+  });
