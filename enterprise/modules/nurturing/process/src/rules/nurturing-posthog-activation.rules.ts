@@ -54,14 +54,3 @@ export function activationTrackInput(signal: ActivationSignal): ActivationTrackI
       };
   }
 }
-
-/** One PostHog event for a batch of settled evaluations, carrying how many it counted. */
-export function evaluationsCompletedEvent(
-  signal: NurturingSignalOf<"evaluation_completed">,
-): ActivationTrackInput {
-  return {
-    userId: signal.userId,
-    event: "evaluations_completed",
-    properties: { count: signal.evaluationsCounted ?? 1 },
-  };
-}

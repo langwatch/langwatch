@@ -100,7 +100,7 @@ Feature: Nurturing sends the signals its owners record
     When nurturing takes them as one batch
     Then the organization's evaluation count rises by three in one step
     And Customer.io is told the new count once
-    And PostHog receives evaluations_completed once, with a count of three and the project
+    And PostHog receives nothing for it
 
   @unit
   Scenario: The batch that counts an organization's first evaluations sends its milestone once

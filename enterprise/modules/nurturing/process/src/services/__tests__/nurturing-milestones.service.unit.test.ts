@@ -17,6 +17,7 @@ import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
 const COUNT_FAILED = "nurturing could not count every project in the batch";
 const CLAIM_FAILED = "nurturing could not claim every item in the batch";
+const DELIVERY_FAILED = "nurturing could not deliver every signal in the batch";
 
 /** `placed` and `created` stand in for project's and organization's tables (R40). */
 function serviceOver({
@@ -324,7 +325,7 @@ describe("NurturingMilestonesService", () => {
     });
 
     describe("when giving the failed project's claims back fails too", () => {
-      it("still reports the count failure and goes on to the next project", async () => {
+      it("reports the count failure and the failed release, and goes on to the next project", async () => {
         const memory = MemoryNurturingMilestonesRepository.create();
         const claimed = new Set<string>();
         const service = NurturingMilestonesService.create({
@@ -368,9 +369,15 @@ describe("NurturingMilestonesService", () => {
         const delivered: NurturingSignal[] = [];
         const deliver = async (signal: NurturingSignal) => void delivered.push(signal);
 
-        await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
-          COUNT_FAILED,
-        );
+        await expect(
+          service.evaluationsCompleted({ evaluations: batch, deliver }),
+        ).rejects.toMatchObject({
+          message: COUNT_FAILED,
+          errors: [
+            expect.objectContaining({ message: "database unavailable" }),
+            expect.objectContaining({ message: "redis unavailable" }),
+          ],
+        });
         expect(delivered).toMatchObject([
           { projectId: "project-2", organizationEvaluationCount: 1 },
         ]);
@@ -444,7 +451,7 @@ describe("NurturingMilestonesService", () => {
       };
 
       await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
-        COUNT_FAILED,
+        DELIVERY_FAILED,
       );
       expect(delivered).toMatchObject([{ projectId: "project-2", organizationEvaluationCount: 1 }]);
 

@@ -60,11 +60,20 @@ async function claimedOnly<Item>({
   );
   const rejected = results.flatMap((result) => (result.status === "rejected" ? [result] : []));
   if (rejected.length === 0) return taken;
-  await Promise.allSettled(taken.map((item) => claims.release(keyOf(item))));
+  const released = await releasedAll({ keys: taken.map(keyOf), claims });
   throw new AggregateError(
-    rejected.map((result) => result.reason),
+    [...rejected.map((result) => result.reason), ...released],
     "nurturing could not claim every item in the batch",
   );
+}
+
+/** Gives every claim back; the reasons a release failed, so the batch error carries them. */
+async function releasedAll({
+  keys,
+  claims,
+}: Readonly<{ keys: readonly string[]; claims: NurturingClaimRepository }>): Promise<unknown[]> {
+  const results = await Promise.allSettled(keys.map((key) => claims.release(key)));
+  return results.flatMap((result) => (result.status === "rejected" ? [result.reason] : []));
 }
 
 /** Items grouped by a key, the groups in order of their first item. */
@@ -194,28 +203,37 @@ export class NurturingMilestonesService {
       keyOf: claimKeyOf,
       claims: this.dependencies.claims,
     });
-    const failures: unknown[] = [];
+    const countFailures: unknown[] = [];
+    const deliveryFailures: unknown[] = [];
     for (const project of groupedBy(claimed, projectOf)) {
       let signals: NurturingSignal[];
       try {
         signals = await signalsFor(project);
       } catch (error) {
-        await Promise.allSettled(
-          project.map((item) => this.dependencies.claims.release(claimKeyOf(item))),
-        );
-        failures.push(error);
+        const released = await releasedAll({
+          keys: project.map(claimKeyOf),
+          claims: this.dependencies.claims,
+        });
+        countFailures.push(error, ...released);
         continue;
       }
       for (const signal of signals) {
         try {
           await deliver(signal);
         } catch (error) {
-          failures.push(error);
+          deliveryFailures.push(error);
         }
       }
     }
-    if (failures.length > 0) {
-      throw new AggregateError(failures, "nurturing could not count every project in the batch");
+    const steps = [
+      ...(countFailures.length > 0 ? ["count every project"] : []),
+      ...(deliveryFailures.length > 0 ? ["deliver every signal"] : []),
+    ];
+    if (steps.length > 0) {
+      throw new AggregateError(
+        [...countFailures, ...deliveryFailures],
+        `nurturing could not ${steps.join(" or ")} in the batch`,
+      );
     }
   }
 
