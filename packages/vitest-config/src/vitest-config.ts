@@ -25,14 +25,14 @@ export interface ModuleVitestConfigOptions {
   exclude?: string[];
   /**
    * Overrides the default of `false`. `true` isolates only the files that mock
-   * modules when built with `defineModuleVitestConfig` (see testing-speed.md);
-   * `"all"` isolates every file, for a suite that leaks state some other way.
+   * modules (see testing-speed.md), and none when no file does; `"all"`
+   * isolates every file, for a suite that leaks state some other way.
    */
   isolate?: boolean | "all";
   /**
    * Globs, relative to the package, for a leak the mock scan cannot see, like a
-   * module that patches the DOM on import. Read by `defineModuleVitestConfig`
-   * only; `moduleVitestTestOptions` alone ignores it. Say what leaks.
+   * module that patches the DOM on import. A file matching one, or importing
+   * one by relative path, runs isolated. Say what leaks.
    */
   alsoIsolate?: string[];
   /** Overrides fast-mode default; set `true` for suites needing CSS processing. */
@@ -63,10 +63,12 @@ export const BROWSER_TEST_GLOB = "**/*.browser.test.{ts,tsx}";
 // Read per config, not at import, so a test can turn it off.
 const fastMode = () => process.env.LANGWATCH_VITEST_FAST !== "0";
 
+type TestOptions = NonNullable<ViteUserConfig["test"]>;
+
 export function moduleVitestTestOptions(
   options: ModuleVitestConfigOptions,
 ): ViteUserConfig["test"] {
-  const { kind, include, exclude, isolate, css, setupFiles, testTimeout, dir, test } = options;
+  const { kind, include, exclude, isolate, css, setupFiles, testTimeout, dir, root, test } = options;
   // A fresh worker per file is the single largest cost in a suite whose
   // files share a module graph. Off, the graph is evaluated once per worker.
   const resolvedIsolate = isolate === undefined ? false : isolate !== false;
@@ -77,7 +79,7 @@ export function moduleVitestTestOptions(
     ...(kind === "unit" ? [CONSOLE_GUARD_SETUP] : []),
     ...(setupFiles ?? []),
   ];
-  return {
+  const resolved: TestOptions = {
     environment: kind === "jsdom" ? "jsdom" : "node",
     isolate: resolvedIsolate,
     pool: "forks",
@@ -107,19 +109,24 @@ export function moduleVitestTestOptions(
     ...(dir === undefined ? {} : { dir }),
     ...test,
   };
+  // Every way of asking for isolation, the `test` override included, isolates
+  // only the files that need it. `"all"` and fast mode off keep the whole suite.
+  return fast && isolate !== "all" && resolved.isolate === true
+    ? splitIsolationByMocking({
+        test: resolved,
+        // vitest runs a package script from the package directory, its default root.
+        root: root ?? process.cwd(),
+        alsoIsolate: options.alsoIsolate,
+      })
+    : resolved;
 }
 
 export function defineModuleVitestConfig(options: ModuleVitestConfigOptions): ViteUserConfig {
   const test = moduleVitestTestOptions(options) ?? {};
-  // vitest runs a package script from the package directory, where its globs are rooted.
-  const root = options.root ?? process.cwd();
   return defineConfig({
-    ...(options.root === undefined ? {} : { root }),
+    ...(options.root === undefined ? {} : { root: options.root }),
     // The UI ships through the React Compiler (apps/ui/vite.config.ts); jsdom tests match it.
     plugins: options.kind === "jsdom" ? [react({ compiler: true })] : [],
-    test:
-      fastMode() && options.isolate === true
-        ? splitIsolationByMocking({ test, root, alsoIsolate: options.alsoIsolate })
-        : test,
+    test,
   });
 }

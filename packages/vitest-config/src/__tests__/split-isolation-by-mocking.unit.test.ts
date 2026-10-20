@@ -5,7 +5,7 @@ import { dirname, join } from "node:path";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { splitIsolationByMocking } from "../split-isolation-by-mocking.ts";
-import { defineModuleVitestConfig } from "../vitest-config.ts";
+import { defineModuleVitestConfig, moduleVitestTestOptions } from "../vitest-config.ts";
 
 const MOCKING = 'import { vi } from "vitest";\nvi.mock("../store.ts");\n';
 const PLAIN = 'import { it } from "vitest";\nit("works", () => {});\n';
@@ -188,17 +188,24 @@ describe("splitIsolationByMocking", () => {
     });
   });
 
-  describe("when every file mocks, or none does", () => {
-    /** @scenario "A suite where every file mocks, or none does, is left as it is" */
+  describe("when every file mocks", () => {
+    /** @scenario "A suite where every file mocks is left as it is" */
     it("returns the options untouched", () => {
       write({ "src/a.test.ts": MOCKING });
       const allMock = { isolate: true };
-      expect(splitIsolationByMocking({ test: allMock, root })).toBe(allMock);
 
-      rmSync(join(root, "src"), { recursive: true });
+      expect(splitIsolationByMocking({ test: allMock, root })).toBe(allMock);
+    });
+  });
+
+  describe("when no file mocks", () => {
+    /** @scenario "A suite where no file mocks runs with isolation off" */
+    it("turns isolation off and builds no projects", () => {
       write({ "src/b.test.ts": PLAIN });
-      const noneMock = { isolate: true };
-      expect(splitIsolationByMocking({ test: noneMock, root })).toBe(noneMock);
+
+      const split = splitIsolationByMocking({ test: { isolate: true }, root });
+
+      expect(split).toEqual({ isolate: false });
     });
   });
 
@@ -209,6 +216,17 @@ describe("splitIsolationByMocking", () => {
 
       expect(test?.isolate).toBe(true);
       expect(test?.projects).toBeUndefined();
+    });
+  });
+
+  describe("given a suite that sets isolate: true in its test block", () => {
+    /** @scenario "A suite that asks for isolation in its test block is split too" */
+    it("splits it the same way", () => {
+      write({ "src/a.test.ts": MOCKING, "src/b.test.ts": PLAIN });
+
+      const test = moduleVitestTestOptions({ kind: "node", root, test: { isolate: true } });
+
+      expect(test?.projects?.[1]).toMatchObject({ test: { include: ["src/a.test.ts"] } });
     });
   });
 

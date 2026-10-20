@@ -146,8 +146,9 @@ test that renders inside a fake of the host port it needs, rather than
 `vi.mock`ing the port, moves to `shared-modules` the moment its last mock goes,
 with no list to edit. `isolate: "all"` restores the old whole-suite isolation
 for a suite whose files leak state some other way (module-level state, DOM left
-behind); say why next to it. The split happens in fast mode only, and only for
-configs built with `defineModuleVitestConfig`.
+behind); say why next to it. The split happens in fast mode only, for every
+config built with either helper, whether `isolate` is a top-level option or
+set in the `test` block. A suite where no file mocks runs with isolation off.
 
 Two vitest projects mean two labels in the output, `shared-modules` and
 `isolated`, and `--project <name>` runs one of them. A project with

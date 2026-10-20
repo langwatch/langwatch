@@ -39,7 +39,9 @@ export function splitIsolationByMocking({
     alsoIsolate.some((pattern) => matchesGlob(relative(root, file), pattern));
   const needsIsolation = reachesIsolation(named);
   const isolated = files.filter((file) => needsIsolation(join(base, file)));
-  if (isolated.length === 0 || isolated.length === files.length) return test;
+  if (files.length === 0 || isolated.length === files.length) return test;
+  // Nothing in the suite needs a fresh registry, so nothing gets one.
+  if (isolated.length === 0) return { ...test, isolate: false };
 
   const asGlobs = isolated.map((file) => file.replace(GLOB_SPECIAL, "\\$&"));
   // `extends: true` concatenates arrays, so `include` stays off the root: left
