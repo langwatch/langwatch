@@ -1402,11 +1402,13 @@ jobs:
   # added under dev/scripts therefore merged green and turned every branch that
   # merged main red.
   #
-  # No `if:` gate, on purpose. The guard reads every tree `files` in the root
+  # No path gate, on purpose. The guard reads every tree `files` in the root
   # package.json names, and a path filter listing them would be a second copy of
   # that list, stale the day someone edits it. A minute on an unrelated pull
-  # request is the cheaper mistake.
+  # request is the cheaper mistake. A label event is not a change at all, so it
+  # skips like `changes` does.
   pack-filters:
+    if: github.event_name != 'pull_request' || github.event.action != 'labeled' || github.event.label.name == 'ci:full'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
