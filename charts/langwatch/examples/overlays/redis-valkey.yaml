@@ -1,0 +1,10 @@
+# redis-valkey.yaml — Run the chart-managed Redis as Valkey (7.2+); Redis stays the default.
+# The valkey/valkey image ships redis-server and redis-cli, so command and probes are unchanged.
+#
+# Usage:
+#   helm install lw . -f examples/overlays/size-prod.yaml -f examples/overlays/redis-valkey.yaml
+
+redis:
+  image:
+    repository: valkey/valkey
+    tag: "9.2"
