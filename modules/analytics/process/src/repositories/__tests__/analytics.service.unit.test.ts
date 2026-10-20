@@ -594,6 +594,7 @@ describe("AnalyticsService under a proof (ADR-177)", () => {
   });
 
   describe("given a series already cached and a repeat under a proof that has expired", () => {
+    /** @scenario "A cached series is not served under an expired proof" */
     it("refuses the repeat instead of answering it from the cache", async () => {
       const repository = new RecordingRepository();
       const service = createService(repository);

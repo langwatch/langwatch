@@ -176,6 +176,12 @@ Feature: Analytics timeseries service
       When a series for a different project is read under it
       Then nothing is read and the read is refused
 
+    @unit
+    Scenario: A cached series is not served under an expired proof
+      Given a series already cached for a project
+      When the same series is asked again under a proof that has expired
+      Then the repeat is refused and the cache does not answer it
+
   Rule: Keep feature ownership narrow
 
     @unit
