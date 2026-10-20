@@ -95,9 +95,8 @@ export interface GroupQueueGroupBatching<Payload> {
 }
 
 export interface GroupQueuePolicy {
+  /** Slots a consumer starts at and never goes below; they grow while throughput rises. */
   globalConcurrency?: number;
-  /** Most slots a consumer adapts up to; absent or at most `globalConcurrency`, slots are fixed. */
-  adaptiveSlotsCeiling?: number;
   drainTimeoutMs?: number;
   tenantConcurrencyCap?: number;
   globalConcurrencyBudget?: number;

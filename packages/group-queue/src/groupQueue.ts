@@ -249,7 +249,7 @@ export const GROUP_QUEUE_CONFIG = {
   /**
    * Max parallel groups per consumer: the previous release's 100 (Alex, 2026-10-13).
    * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
-   * GLOBAL_QUEUE_CONCURRENCY_CEILING lets slots adapt above it (Alex, 2026-10-20).
+   * Slots grow above it while that raises throughput, to at most 1,000 (Alex, 2026-10-20).
    */
   defaultGlobalConcurrency: 100,
   /** TTL for the active key (safety net for crashes), in seconds */
@@ -628,12 +628,11 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
 
     // fastq promise-based queue: bounds concurrency on this node
     this.processingQueue = fastq.promise(
-      this.processWithRetries.bind(this),
+      (work: DispatchedWork) => this.processMeasured(work),
       this.globalConcurrency,
     );
     this.adaptiveSlots = new AdaptiveSlots({
       floor: this.globalConcurrency,
-      ceiling: Math.max(this.globalConcurrency, options?.policy?.adaptiveSlotsCeiling ?? 0),
       busy: () => this.processingQueue.running() + this.processingQueue.length(),
       onChange: (slots) => {
         this.processingQueue.concurrency = slots;
@@ -1185,8 +1184,18 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
     }
   }
 
+  /** The fastq worker: each slot's work, timed so the slot count can follow throughput. */
+  private async processMeasured(work: DispatchedWork): Promise<void> {
+    const started = performance.now();
+    try {
+      await this.processWithRetries(work);
+    } finally {
+      this.adaptiveSlots.jobFinished({ durationMs: performance.now() - started });
+    }
+  }
+
   /**
-   * fastq worker: poison guard, then real processing. A job that seizes the
+   * Poison guard, then real processing. A job that seizes the
    * event loop never releases its claim, so the liveness probe kills it and
    * the next claimant finds a provably dead owner (poison-group-park-guard.feature).
    */
@@ -2121,6 +2130,7 @@ export class GroupQueueProcessor<Payload extends Record<string, unknown>, Destin
         "No worker has run this job since it was first handed back; spending its attempts so it surfaces",
       );
     }
+    this.adaptiveSlots.jobFailed();
 
     span.recordException(error);
     span.setStatus({ code: SpanStatusCode.ERROR });

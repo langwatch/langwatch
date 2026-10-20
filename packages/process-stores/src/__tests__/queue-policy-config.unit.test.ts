@@ -1,7 +1,6 @@
 /**
  * Main's GLOBAL_QUEUE_CONCURRENCY, LANGWATCH_DISPATCH_TENANT_CAP and
- * LANGWATCH_DISPATCH_GLOBAL_BUDGET, and GLOBAL_QUEUE_CONCURRENCY_CEILING
- * (packages/group-queue/specs/adaptive-slots.feature), reach the queue policy of both roles.
+ * LANGWATCH_DISPATCH_GLOBAL_BUDGET reach the queue policy of both roles.
  */
 import { parseProcessConfig } from "@langwatch/config";
 import { describe, expect, it } from "vitest";
@@ -17,7 +16,6 @@ const settingsFor = (environment: Record<string, string | undefined>) => {
   return {
     defaultRetentionDays: config.defaultRetentionDays,
     queueConcurrency: config.queueConcurrency,
-    queueConcurrencyCeiling: config.queueConcurrencyCeiling,
     queueTenantCap: config.queueTenantCap,
     queueGlobalBudget: config.queueGlobalBudget,
   };
@@ -62,43 +60,6 @@ describe("queue policy settings", () => {
       expect(policyFor({ LANGWATCH_DISPATCH_TENANT_CAP: "0" })).toEqual({
         tenantConcurrencyCap: 0,
       });
-    });
-  });
-
-  describe("given GLOBAL_QUEUE_CONCURRENCY_CEILING", () => {
-    /** @scenario "With GLOBAL_QUEUE_CONCURRENCY_CEILING unset the worker keeps its configured concurrency" */
-    it("names no ceiling when unset or blank, so slots stay at the configured concurrency", () => {
-      for (const ceiling of [undefined, " "]) {
-        expect(
-          policyFor({ GLOBAL_QUEUE_CONCURRENCY: "250", GLOBAL_QUEUE_CONCURRENCY_CEILING: ceiling }),
-        ).toEqual({ globalConcurrency: 250 });
-      }
-    });
-
-    /** @scenario "GLOBAL_QUEUE_CONCURRENCY_CEILING raises the ceiling slots adapt up to" */
-    it("hands the queue the ceiling, with or without a configured concurrency", () => {
-      expect(policyFor({ GLOBAL_QUEUE_CONCURRENCY_CEILING: "1000" })).toEqual({
-        adaptiveSlotsCeiling: 1000,
-      });
-      expect(
-        policyFor({ GLOBAL_QUEUE_CONCURRENCY: "250", GLOBAL_QUEUE_CONCURRENCY_CEILING: "250" }),
-      ).toEqual({ globalConcurrency: 250, adaptiveSlotsCeiling: 250 });
-    });
-
-    /** @scenario "An invalid GLOBAL_QUEUE_CONCURRENCY_CEILING is refused by name" */
-    it.each([
-      { GLOBAL_QUEUE_CONCURRENCY_CEILING: "abc" },
-      { GLOBAL_QUEUE_CONCURRENCY_CEILING: "0" },
-      { GLOBAL_QUEUE_CONCURRENCY_CEILING: "12.5" },
-      { GLOBAL_QUEUE_CONCURRENCY: "250", GLOBAL_QUEUE_CONCURRENCY_CEILING: "200" },
-      { GLOBAL_QUEUE_CONCURRENCY_CEILING: "50" },
-    ])("refuses %o, naming the setting", (environment) => {
-      expect(() => policyFor(environment)).toThrow(
-        expect.objectContaining({
-          code: "config_refused",
-          message: expect.stringContaining("GLOBAL_QUEUE_CONCURRENCY_CEILING"),
-        }),
-      );
     });
   });
 
