@@ -395,7 +395,7 @@ describe("OutboxDispatcherService", () => {
           attempt: 1,
           causeType: "TypeError",
         });
-        const frames = Reflect.get(line ?? {}, "causeStackFrames");
+        const frames = line?.causeStackFrames;
         expect(frames).toEqual(expect.arrayContaining([expect.stringMatching(/^at /)]));
         expect(JSON.stringify(line)).not.toContain("sk-secret");
         expect(line).not.toHaveProperty("payload");
@@ -420,7 +420,7 @@ describe("OutboxDispatcherService", () => {
           await dispatcher.runOnce({ now: T0 + 1 });
 
           const line = lines.findLine("warn", "redacted cause");
-          expect(Reflect.get(line ?? {}, "causeStackFrames")).not.toHaveLength(0);
+          expect(line?.causeStackFrames).not.toHaveLength(0);
           expect(JSON.stringify(line)).not.toContain("sk-secret");
         });
       });
@@ -428,16 +428,23 @@ describe("OutboxDispatcherService", () => {
       describe("when a redacted cause is logged", () => {
         /** @scenario "A redacted cause is logged at the level of the delivery outcome" */
         it.each([
-          ["a scheduled retry", 2, {}, "warn"],
+          ["a scheduled retry", 2, {}, "warn", "error"],
           [
             "a customer-fault dead-letter",
             1,
             { code: "invalid_action", fault: "customer" },
             "warn",
+            "error",
           ],
-          ["a platform dead-letter", 1, { code: "internal_failure", fault: "platform" }, "error"],
-          ["an unattributed dead-letter", 1, {}, "error"],
-        ] as const)("logs %s at %s", async (_outcome, maxAttempts, fields, level) => {
+          [
+            "a platform dead-letter",
+            1,
+            { code: "internal_failure", fault: "platform" },
+            "error",
+            "warn",
+          ],
+          ["an unattributed dead-letter", 1, {}, "error", "warn"],
+        ] as const)("logs %s at %s", async (_outcome, maxAttempts, fields, level, other) => {
           const { logger, lines } = createTestLogger();
           const dispatcher = new OutboxDispatcherService({
             store,
@@ -453,7 +460,6 @@ describe("OutboxDispatcherService", () => {
 
           await dispatcher.runOnce({ now: T0 + 1 });
 
-          const other = level === "warn" ? "error" : "warn";
           expect(lines.findLine(level, "redacted cause")).toBeDefined();
           expect(lines.findLine(other, "redacted cause")).toBeUndefined();
         });
