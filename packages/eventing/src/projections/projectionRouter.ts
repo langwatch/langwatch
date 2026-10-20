@@ -437,8 +437,16 @@ export class ProjectionRouter<
               const tenantId = payload.event.tenantId;
               const aggregateId = String(payload.event.aggregateId);
               if (!("foldState" in payload)) {
-                // The lane's parse refuses a compact body for a subscriber that reads none.
-                await subscriber.compactJob?.handle(payload.job, { tenantId, aggregateId });
+                // The lane's parse refuses a compact body for a subscriber that reads none,
+                // so reaching here without a reader fails the job rather than dropping it.
+                if (!subscriber.compactJob) {
+                  throw new ConfigurationError(
+                    "ProjectionRouter",
+                    `Event subscriber "${subscriber.name}" received a compact job but reads none`,
+                    { subscriberName: subscriber.name },
+                  );
+                }
+                await subscriber.compactJob.handle(payload.job, { tenantId, aggregateId });
                 return;
               }
               await subscriber.handle(payload.event, {
