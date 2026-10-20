@@ -49,10 +49,11 @@ export async function runEndCall({
   // derives the run's cut-at-limit marker from the call span (#8028).
   isCutAtLimit: boolean;
 }): Promise<void> {
+  // Single-flight: hangUp fires onDisconnect, which re-enters here. The first
+  // end instant is the one the server's cutoff (endedAt - startedAt) must see,
+  // so a re-entry after slow cleanup neither moves it nor finishes twice (#8028).
+  if (refs.endedAt.current !== 0) return;
   stopTick(refs);
-  // Freeze the end instant now, before disconnect cleanup and any name-save
-  // retry: the server derives the cutoff from endedAt - startedAt, so a
-  // below-limit hang-up must not inflate into a cutoff by a slow finish (#8028).
   refs.endedAt.current = nowInstant().epochMilliseconds;
   dispatch(isCutAtLimit ? { type: "LIMIT_REACHED" } : { type: "HANG_UP" });
   try {
