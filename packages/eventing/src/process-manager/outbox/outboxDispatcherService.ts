@@ -1,5 +1,6 @@
 import { performance } from "node:perf_hooks";
 
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import {
   propagation,
@@ -12,11 +13,16 @@ import {
 } from "@opentelemetry/api";
 
 import {
+  incrementEsJobsProjectGone,
   incrementEsProcessOutboxTotal,
   observeEsProcessOutboxDispatchLag,
   observeEsProcessOutboxDuration,
 } from "../../metrics.ts";
-import { classifyClickHouseError, ErrorCategory } from "../../services/errorHandling.ts";
+import {
+  classifyClickHouseError,
+  ErrorCategory,
+  isProjectGone,
+} from "../../services/errorHandling.ts";
 import { toSafeFailureDiagnostic } from "../failureDiagnostic.ts";
 import type { JsonValue } from "../json.ts";
 import type {
@@ -150,9 +156,9 @@ function retryAfterMsOf(error: unknown): number | undefined {
  */
 function isTerminalError(error: unknown): boolean {
   if (typeof error !== "object" || error === null) return false;
-  // A handled refusal defaults to `retryable: false`; a transient ClickHouse cause still retries.
+  // A transient ClickHouse cause still retries; otherwise the group queue's refusal rule decides.
   if (classifyClickHouseError(error) === ErrorCategory.RECOVERABLE) return false;
-  return Reflect.get(error, "retryable") === false;
+  return refusesRetry(error);
 }
 
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
@@ -578,6 +584,10 @@ export class OutboxDispatcherService {
         status: "dispatched",
       });
     } catch (error) {
+      if (isProjectGone(error)) {
+        await this.completeProjectGone({ message, now, report, attempt, identity, startedAt });
+        return;
+      }
       await this.handleDispatchFailure({
         message,
         now,
@@ -591,6 +601,62 @@ export class OutboxDispatcherService {
     } finally {
       this.finishDispatchSpan({ message, attempt, span, startedAt });
     }
+  }
+
+  /**
+   * A message whose project was deleted after it was written can never be delivered: it is
+   * retired as dispatched with a warning, not retried and not dead-lettered
+   * (specs/eventing/deleted-project-jobs.feature).
+   */
+  private async completeProjectGone({
+    message,
+    now,
+    report,
+    attempt,
+    identity,
+    startedAt,
+  }: {
+    message: LeasedOutboxMessageRecord;
+    now: number;
+    report: DispatchReport;
+    attempt: number;
+    identity: OutboxMessageIdentity;
+    startedAt: number;
+  }): Promise<void> {
+    const { applied } = await this.store.markDispatched({
+      identity,
+      leaseToken: message.leaseToken,
+      now,
+    });
+    if (!applied) {
+      this.countFenced({
+        message,
+        report,
+        phase: "dispatched",
+        durationMs: performance.now() - startedAt,
+      });
+      return;
+    }
+    report.dispatched.push(message.messageKey);
+    incrementEsProcessOutboxTotal({
+      processName: message.processName,
+      intentType: message.intentType,
+      status: "dispatched",
+    });
+    incrementEsJobsProjectGone({ queue: "process_outbox", jobType: message.intentType, count: 1 });
+    // Intentionally retain this opaque operational ID for delivery diagnostics.
+    this.logger.warn(
+      {
+        processName: message.processName,
+        processKey: message.processKey,
+        projectId: message.projectId,
+        tenantId: message.tenantId,
+        messageKey: message.messageKey,
+        intentType: message.intentType,
+        attempt,
+      },
+      "Outbox message's project no longer exists; retiring it as completed",
+    );
   }
 
   /**
