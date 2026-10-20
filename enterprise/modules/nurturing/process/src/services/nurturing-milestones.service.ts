@@ -155,7 +155,8 @@ export class NurturingMilestonesService {
   /**
    * Claims each item, then counts and delivers project by project. A project whose count fails
    * gives its claims back, so the queue's retry of the batch counts it; the projects already
-   * counted keep theirs and are skipped. The batch throws once every project has been tried.
+   * counted keep theirs and are skipped. `signalsFor` must fail only before its count commits:
+   * after it, signal building is pure. The batch throws once every project has been tried.
    */
   private async countByProject<Item>({
     items,
@@ -194,7 +195,11 @@ export class NurturingMilestonesService {
     }
   }
 
-  /** Empty when the owners hold no such project or nurturing never learned its organization. */
+  /**
+   * Empty when the owners hold no such project or nurturing never learned its organization. The
+   * count is the last fallible step: a failure before it has written nothing, so the caller can
+   * give its claims back without the retry counting twice.
+   */
   private async countFor({
     projectId,
     count,
@@ -204,14 +209,11 @@ export class NurturingMilestonesService {
   }>): Promise<NurturingOrganizationState[]> {
     const placement = await this.dependencies.projects.getPlacement({ projectId });
     if (placement.outcome === "unknown") return [];
-    const counted = await count({ organizationId: placement.organizationId });
-    return Promise.all(
-      counted.map(async (organization) => ({
-        ...organization,
-        ...(await this.dependencies.projects.getFirstProjectCreatedAt({
-          organizationId: organization.organizationId,
-        })),
-      })),
-    );
+    const { organizationId } = placement;
+    const firstProject = await this.dependencies.projects.getFirstProjectCreatedAt({
+      organizationId,
+    });
+    const counted = await count({ organizationId });
+    return counted.map((organization) => ({ ...organization, ...firstProject }));
   }
 }

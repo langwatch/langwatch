@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
 import type { NurturingMilestonesRepository } from "../../repositories/nurturing-milestones.repository.ts";
+import type { NurturingProjectDirectoryRepository } from "../../repositories/nurturing-project-directory.repository.ts";
 import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
@@ -19,15 +20,17 @@ function serviceOver({
   placed = new Map([["project-1", "org-1"]]),
   created,
   milestones = MemoryNurturingMilestonesRepository.create(),
+  projects = MemoryNurturingProjectDirectoryRepository.create({ placed, created }),
 }: {
   placed?: ReadonlyMap<string, string>;
   created?: ReadonlyMap<string, number>;
   milestones?: NurturingMilestonesRepository;
+  projects?: NurturingProjectDirectoryRepository;
 } = {}) {
   const claimed = new Set<string>();
   return NurturingMilestonesService.create({
     milestones,
-    projects: MemoryNurturingProjectDirectoryRepository.create({ placed, created }),
+    projects,
     claims: {
       claim: async (key) => {
         if (claimed.has(key)) return false;
@@ -290,6 +293,28 @@ describe("NurturingMilestonesService", () => {
       expect(delivered).toMatchObject([
         { projectId: "project-2", organizationEvaluationCount: 1 },
         { projectId: "project-1", organizationEvaluationCount: 1 },
+      ]);
+    });
+
+    it("never counts twice when the read before the count fails", async () => {
+      const milestones = MemoryNurturingMilestonesRepository.create();
+      const directory = MemoryNurturingProjectDirectoryRepository.create({
+        placed: new Map([["project-1", "org-1"]]),
+      });
+      let failuresLeft = 1;
+      const projects: NurturingProjectDirectoryRepository = {
+        getPlacement: (input) => directory.getPlacement(input),
+        getFirstProjectCreatedAt: async (input) => {
+          if (failuresLeft-- > 0) throw new Error("database unavailable");
+          return directory.getFirstProjectCreatedAt(input);
+        },
+      };
+      const service = serviceOver({ milestones, projects });
+      await service.projectCreated(projectCreatedFact());
+
+      await expect(settleAndCount(service, settled("eval-1"))).rejects.toThrow();
+      expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([
+        { organizationEvaluationCount: 1 },
       ]);
     });
   });
