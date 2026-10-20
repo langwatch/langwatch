@@ -258,6 +258,8 @@ jobs:
         shard: [1, 2, 3, 4, 5, 6, 7, 8]
         run: [1, 2, 3]
     env:
+      # langwatch-app-ci.yml sets this at workflow level; the tasks refuse to boot without it.
+      NODE_ENV: "test"
       BUILD_TIME: "true"
       BASE_HOST: "localhost:3000"
       NEXTAUTH_SECRET: "nextauth-secret-for-ci-testing"
