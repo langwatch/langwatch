@@ -5,6 +5,7 @@ import {
   confirmClaimKey,
   confirmGrantKey,
   confirmKeyBindingKey,
+  confirmRaiseKey,
   type ConfirmTarget,
 } from "../../rules/langy-local-control-keys.rules.ts";
 import {
@@ -15,7 +16,7 @@ import {
 import type { LocalRecordLookup } from "../langy-local-call.repository.ts";
 
 /** The Redis surface the confirmation records need. */
-export type LangyDeleteConfirmationRedis = Pick<Redis, "get" | "set" | "exists" | "eval">;
+export type LangyDeleteConfirmationRedis = Pick<Redis, "get" | "set" | "del" | "exists" | "eval">;
 
 /**
  * Every key must still hold a click before any is spent: a bulk request missing one click spends
@@ -93,6 +94,20 @@ export class LangyDeleteConfirmationRedisRepository extends LangyDeleteConfirmat
     ttlSeconds: number;
   }): Promise<void> {
     await this.redis.set(confirmCardKey(target), waitId, "EX", ttlSeconds);
+  }
+
+  async claimCardRaise({
+    target,
+    ttlSeconds,
+  }: {
+    target: ConfirmTarget;
+    ttlSeconds: number;
+  }): Promise<boolean> {
+    return (await this.redis.set(confirmRaiseKey(target), "1", "EX", ttlSeconds, "NX")) === "OK";
+  }
+
+  async releaseCardRaise(target: ConfirmTarget): Promise<void> {
+    await this.redis.del(confirmRaiseKey(target));
   }
 
   async lookupPendingCard(target: ConfirmTarget): Promise<LocalRecordLookup<string>> {

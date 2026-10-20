@@ -196,6 +196,7 @@ export function createAgentRest(relayMaxPayloadMb?: number): Readonly<{
 
       .delete("/:id", "archiveAgent")
       .withAudit("agents.delete")
+      .withoutConfirmation("Langy keys cannot hold project:delete")
       .withParams(agentRestParamsSchema)
       .withPermission("project:delete")
       .withOutput(archiveResultSchema)

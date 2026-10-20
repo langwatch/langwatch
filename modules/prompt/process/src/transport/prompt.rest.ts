@@ -448,7 +448,7 @@ export const promptRest = defineRestRouter(PromptApi)
     idParam: "id",
     name: async ({ app, projectId, id }) => {
       const prompt = await app.findByIdOrHandle({ idOrHandle: id, projectId });
-      return prompt ? (prompt.handle ?? prompt.name) : null;
+      return prompt ? (prompt.handle ?? prompt.name) : undefined;
     },
   })
   .withOutput(successSchema)

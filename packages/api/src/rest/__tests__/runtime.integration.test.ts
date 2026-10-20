@@ -94,6 +94,7 @@ const annotations = defineRestRouter(AnnotationApi)
 
   .delete("/:id", "deleteAnnotation")
   .withParams(z.object({ id: z.string() }))
+  .withoutConfirmation("test route")
   .withPermission("annotations:manage")
   .withDocs({ summary: "Delete an annotation in the caller’s project" })
   .withoutAudit("test route")

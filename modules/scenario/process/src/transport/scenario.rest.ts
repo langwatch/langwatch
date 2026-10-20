@@ -299,7 +299,7 @@ export function createScenarioRest(): Readonly<{
         idParam: "id",
         name: async ({ app, projectId, id }) => {
           const lookup = await app.readByIdIncludingArchived({ id, projectId });
-          return lookup.found ? lookup.scenario.name : null;
+          return lookup.found ? lookup.scenario.name : undefined;
         },
       })
       .withOutput(scenarioRestArchivedSchema)

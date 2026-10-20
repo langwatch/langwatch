@@ -15,7 +15,7 @@ Feature: Removing something with Langy needs a confirmation click
     When Langy deletes the evaluator
     Then the request is refused with langy_confirmation_required
     And the message tells Langy a confirmation card for evaluator "Toxicity check" is shown
-    And a card asks the person "Delete evaluator "Toxicity check"?" with the options Yes and No
+    And a card asks the person "Delete evaluator "Toxicity check" (…city)?" with the options Yes and No
     And the evaluator still exists
 
   @integration
@@ -70,6 +70,51 @@ Feature: Removing something with Langy needs a confirmation click
     Then the request is refused with langy_confirmation_required
 
   @unit
+  Scenario: A request naming more than ten items is refused with no card
+    When Langy deletes eleven rows in one request
+    Then the request is refused with langy_confirmation_required
+    And the message asks Langy to do it in batches of ten
+    And no card is shown
+
+  @unit
+  Scenario: A delete of an item that does not exist shows no card
+    When Langy deletes an evaluator that does not exist
+    Then the request reaches the route's own answer for a missing item
+    And no card is shown
+
+  @unit
+  Scenario: The card names the item on one short line
+    Given an evaluator whose name runs over many lines and characters
+    When Langy deletes it
+    Then the card shows the name on one line, cut to 80 characters, with the end of its id
+
+  @integration
+  Scenario: Two requests at once show one card
+    When Langy deletes the evaluator twice at the same moment
+    Then both are refused with langy_confirmation_required
+    And only one card is shown
+
+  @unit
+  Scenario: A click that another request spent first asks Langy to run again
+    Given the person clicked Yes on the card for the evaluator
+    And another request spends that click first
+    When Langy deletes the evaluator
+    Then the request is refused with langy_confirmation_required
+    And the message tells Langy to run the same command again
+
+  @unit
+  Scenario: A Langy key needs the click on every door that lets a key in
+    When Langy deletes a virtual key through the gateway's key door
+    Then the request is refused with langy_confirmation_required
+    And a card is asked for in the project the Langy key belongs to
+
+  @unit
+  Scenario: Rotating stays withheld from Langy
+    When Langy rotates a virtual key
+    Then the request is refused because Langy is never given that permission
+    And no card is shown
+
+  @unit
   Scenario: Other keys are not asked for a click
     When a person's own API key deletes the evaluator
     Then the evaluator is deleted
@@ -98,4 +143,5 @@ Feature: Removing something with Langy needs a confirmation click
   @unit
   Scenario: Every route that removes or disables something asks for the click
     When the registered routes are listed
-    Then every route a Langy key can reach that deletes, archives, removes or disables declares the confirmation mark or says why it does not
+    Then every route that deletes, archives, removes, disables, revokes, purges or clears declares the confirmation mark or says why it asks for none
+    And every route that says it asks for none is one a Langy key cannot reach

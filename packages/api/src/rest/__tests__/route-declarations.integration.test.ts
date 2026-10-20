@@ -75,6 +75,7 @@ const keys = defineRestRouter(KeyApi)
 
   .delete("/:id", "deleteApiKey")
   .withParams(z.object({ id: z.string() }))
+  .withoutConfirmation("test route")
   .withAudit("api-key.deleted")
   .withPermission("organization:manage")
   .withOutput(z.object({ id: z.string() }))

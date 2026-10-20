@@ -455,7 +455,7 @@ export function createDatasetRest(): Readonly<{
         action: "delete",
         idParam: "slugOrId",
         name: async ({ app, projectId, id }) =>
-          (await app.findBySlugOrId({ slugOrId: id, projectId }))?.name ?? null,
+          (await app.findBySlugOrId({ slugOrId: id, projectId }))?.name,
       })
       .withOutput(datasetRestArchivedSchema)
       .withDocs({ description: "Archive a dataset (soft-delete)" })

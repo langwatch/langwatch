@@ -118,6 +118,7 @@ export const authzGrantRest = defineRestRouter(AuthzApi)
 
   .delete("/:grantId", "revokeGrant")
   .withAudit("authz.revokeGrant")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .withParams(grantParamsSchema)
   .withPermission("organization:manage")
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })

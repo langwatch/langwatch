@@ -1674,7 +1674,7 @@ class RouteBuilder<in out Api, in out S extends RouteShape> {
     });
   }
 
-  /** The route removes something yet asks a Langy key for no click; the reason says why. */
+  /** The route removes something, yet a Langy key never reaches it; the reason says why. */
   withoutConfirmation(reason: string): RouteBuilder<Api, S> {
     if (reason.trim().length === 0) throw new Error("REST withoutConfirmation needs a reason");
     assertConfirmationUndeclared(this.state);
@@ -1723,6 +1723,33 @@ function assertAuditDeclared({
 
   throw new Error(
     `REST ${operation} is a write route: declare withAudit("<action>") or withoutAudit("<reason>")`,
+  );
+}
+
+/** What an audit action names when the route removes or disables a record. */
+const REMOVING_AUDIT = /delete|archive|disable|remove|revoke|purge|clear/i;
+
+/**
+ * A route that removes or disables something says whether a Langy key needs the person's click
+ * first: `withConfirmation` or `withoutConfirmation`. A DELETE always counts, and so does any
+ * route whose audit action names a removal. Spec: specs/langy/langy-delete-confirmation.feature
+ */
+function assertConfirmationDeclared({
+  method,
+  operation,
+  state,
+}: {
+  method: HttpMethod;
+  operation: string;
+  state: RouteState;
+}): void {
+  const removes =
+    (state.methods ?? [method]).includes("delete") || REMOVING_AUDIT.test(state.audit ?? "");
+  if (!removes || state.confirmation !== void 0 || state.confirmationExempt !== void 0) return;
+
+  throw new Error(
+    `REST ${operation} removes or disables a record: declare withConfirmation({...}) or ` +
+      'withoutConfirmation("<why a Langy key never reaches it>")',
   );
 }
 
@@ -2337,6 +2364,7 @@ function assertRouteReady({
 
   assertPublicRouteConstraints({ operation, state });
   assertAuditDeclared({ method, operation, state });
+  assertConfirmationDeclared({ method, operation, state });
 
   if (state.answers && state.status !== void 0) {
     throw new Error(`REST ${operation} declares responds(), so its status is the answer's own`);

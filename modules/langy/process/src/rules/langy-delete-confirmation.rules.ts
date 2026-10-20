@@ -27,9 +27,39 @@ function gerund(action: string): string {
   return `${capitalized(action.replace(/e$/, ""))}ing`;
 }
 
-/** One record as the card and the refusal name it: `evaluator "Toxicity check"`. */
-export function namedRecord({ resource, name }: { resource: string; name: string }): string {
-  return `${resource} "${name}"`;
+/** The longest a record's name runs on a card before it is cut short. */
+const MAX_NAME_LENGTH = 80;
+
+/** How many trailing characters of the id tell two records of the same name apart. */
+const ID_TAIL_LENGTH = 4;
+
+/** Text a record's owner wrote, made safe for one line: no control characters, at most 80. */
+function oneLine(text: string): string {
+  const flat = text
+    .replace(/\p{Cc}+/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+  return flat.length > MAX_NAME_LENGTH ? `${flat.slice(0, MAX_NAME_LENGTH - 1)}…` : flat;
+}
+
+/**
+ * One record as the card and the refusal name it: `evaluator "Toxicity check" (…a1b2)`. The tail
+ * of the id tells apart two records that share a name; a record with no name is named by its id.
+ */
+export function namedRecord({
+  resource,
+  name,
+  id,
+}: {
+  resource: string;
+  name: string | null;
+  id: string;
+}): string {
+  const shownId = oneLine(id);
+  const title = name === null ? "" : oneLine(name);
+  if (title === "") return `${resource} "${shownId}"`;
+
+  return `${resource} "${title}" (…${shownId.slice(-ID_TAIL_LENGTH)})`;
 }
 
 /** The card the platform asks, written from the record's own name, with fixed options. */
@@ -42,13 +72,13 @@ export function confirmationCard({
   resource: string;
   action: string;
   id: string;
-  name: string;
+  name: string | null;
 }): { question: UserWaitQuestion; confirm: UserWaitConfirm } {
   const options = [
     { id: YES_OPTION_ID, label: `Yes, ${action}` },
     { id: NO_OPTION_ID, label: "No, keep it" },
   ];
-  const question = `${capitalized(action)} ${namedRecord({ resource, name })}?`;
+  const question = `${capitalized(action)} ${namedRecord({ resource, name, id })}?`;
 
   return {
     question: {
@@ -125,6 +155,14 @@ export function confirmationRefusalMessage({
     `A confirmation card for ${records.join(", ")} is now shown to the user. ` +
     "Wait for their answer; after they choose Yes, run the same command again."
   );
+}
+
+/**
+ * What Langy reads when every record had its click, yet another request spent one of them first.
+ * Nothing new is asked of the person, so it simply runs again.
+ */
+export function retryRefusalMessage(action: string): string {
+  return `${gerund(action)} did not run this time. Run the same command again.`;
 }
 
 /** What Langy reads when a click is needed but no card could be put in front of the person. */

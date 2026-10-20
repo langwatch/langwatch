@@ -50,6 +50,7 @@ describe("defineRestRouter", () => {
 
       .delete("/:id", "deleteAnnotation")
       .withParams(z.object({ id: z.string() }))
+      .withoutConfirmation("test route")
       .withPermission("annotations:view")
       .withoutAudit("test route")
       .handle(async () => {})

@@ -171,6 +171,7 @@ export const authzRoleBindingRest = defineRestRouter(AuthzApi)
 
   .delete("/:id", "deleteRoleBinding")
   .withAudit("roleBindings.delete")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .withParams(roleBindingRestParamsSchema)
   .withPermission("organization:manage")
   .withEntitlement("enterprise", { feature: "MANAGEMENT_API" })

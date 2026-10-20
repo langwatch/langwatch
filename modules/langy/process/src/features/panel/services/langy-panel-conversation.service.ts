@@ -422,7 +422,9 @@ export class LangyPanelConversationService {
       | LangyPanelCall<typeof langyPanelCreateConversationInputSchema>,
   ): Promise<void> {
     const { confirmations } = this.members;
-    const parts = input.messages.at(-1)?.parts;
+    // Only the person's own latest message can carry their click.
+    const last = input.messages.at(-1);
+    const parts = last?.role === "user" ? last.parts : undefined;
     if (!confirmations || !input.conversationId || !Array.isArray(parts)) return;
     const conversation = await this.members.langy.findByIdVisible({
       id: input.conversationId,

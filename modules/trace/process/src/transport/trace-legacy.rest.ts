@@ -426,6 +426,7 @@ export const traceLegacyRest = defineRestRouter(TraceLegacyApi)
 
   .post("/api/trace/:id/unshare", "unshareLegacyTrace")
   .withAudit("share.revoke")
+  .withoutConfirmation("Langy keys cannot hold traces:share")
   .withParams(traceLegacyIdParamsSchema)
   .withPermission("traces:share")
   .withResponse("protocol", { produces: PRODUCES_JSON, because: LEGACY_PROTOCOL_REASON })

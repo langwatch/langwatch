@@ -30,6 +30,7 @@ export const langyInternalRest = defineRestRouter(LangyApi)
 
   .post("/api/internal/langy/credentials/revoke", "revokeWorkerSessionKey")
   .withAudit("langy.revokeWorkerSessionKey")
+  .withoutConfirmation("answers only the platform's internal secret, never an API key")
   .withCredential("internal_secret")
   .withAccess(anyAuthenticated({ reason: LANGY_SERVICE_REASON }))
   .withInput(langyRevokeCredentialsSchema)

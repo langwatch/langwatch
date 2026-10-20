@@ -5,6 +5,7 @@ import {
   confirmClaimKey,
   confirmGrantKey,
   confirmKeyBindingKey,
+  confirmRaiseKey,
   type ConfirmTarget,
 } from "../../rules/langy-local-control-keys.rules.ts";
 import {
@@ -79,6 +80,23 @@ export class LangyDeleteConfirmationMemoryRepository extends LangyDeleteConfirma
     ttlSeconds: number;
   }): Promise<void> {
     this.#set(confirmCardKey(target), waitId, ttlSeconds);
+  }
+
+  async claimCardRaise({
+    target,
+    ttlSeconds,
+  }: {
+    target: ConfirmTarget;
+    ttlSeconds: number;
+  }): Promise<boolean> {
+    const key = confirmRaiseKey(target);
+    if (this.#get(key) !== undefined) return false;
+    this.#set(key, "1", ttlSeconds);
+    return true;
+  }
+
+  async releaseCardRaise(target: ConfirmTarget): Promise<void> {
+    this.#values.delete(confirmRaiseKey(target));
   }
 
   async lookupPendingCard(target: ConfirmTarget): Promise<LocalRecordLookup<string>> {

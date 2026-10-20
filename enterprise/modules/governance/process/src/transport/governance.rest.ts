@@ -237,6 +237,7 @@ export const governanceRest = defineRestRouter(GovernanceRestApi)
 
   .delete("/ingestion-templates/:ingestionTemplateId", "archiveIngestionTemplate")
   .withAudit("ingestionTemplates.archive")
+  .withoutConfirmation("Langy keys cannot hold aiTools:manage")
   .withParams(governanceRestTemplateParamsSchema)
   .withPermission("aiTools:manage")
   .withOutput(governanceRestTemplateArchivedSchema)

@@ -138,7 +138,7 @@ export const dashboardRest = defineRestRouter(DashboardApi)
       app.getById({ projectId, dashboardId: id }).then(
         (dashboard) => dashboard.name,
         (error: unknown) => {
-          if (error instanceof DashboardNotFoundError) return null;
+          if (error instanceof DashboardNotFoundError) return undefined;
           throw error;
         },
       ),

@@ -158,6 +158,7 @@ export const modelDefaultsRest = defineRestRouter(ModelProviderApi)
 
   .delete("/:id", "deleteApiModelDefaultsById")
   .withAudit("modelProvider.deleteDefaultModelsConfig")
+  .withoutConfirmation("Langy keys cannot hold project:manage")
   .withParams(modelDefaultsRestParamsSchema)
   .withOutput(z.void())
   .withPermission(MODEL_DEFAULTS_WRITE_PERMISSION)

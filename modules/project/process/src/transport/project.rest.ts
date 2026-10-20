@@ -180,6 +180,7 @@ export const projectRest = defineRestRouter(ProjectManagementApi)
   })
   .withMiddlewareContext(projectRestCaller)
   .withAudit("management.project.archive-by-id")
+  .withoutConfirmation("Langy keys cannot hold project:delete")
   .handle(async ({ app, input, scope }, caller) => {
     await assertAggregateWritable({ app, id: input.id, organizationId: scope.id, caller });
     const project = await archiveProject({ app, id: input.id, organizationId: scope.id });

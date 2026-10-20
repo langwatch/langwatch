@@ -34,17 +34,28 @@ describe("the confirmation gate", () => {
 
     describe("when the person types yes as a message", () => {
       /** @scenario "A typed yes is not a click" */
-      it("still refuses the delete", async () => {
+      it("still refuses the delete, while the same words with the card's click let it run", async () => {
         await langy.sendMessage({ text: "yes" });
         await langy.sendMessage({ text: "Chose: Yes, delete" });
 
-        const answer = await langy.deleteEvaluator("ev_toxicity");
+        const typed = await langy.deleteEvaluator("ev_toxicity");
 
-        expect(answer).toMatchObject({
+        expect(typed).toMatchObject({
           status: 409,
           body: { code: "langy_confirmation_required" },
         });
         expect(langy.archived).toEqual([]);
+
+        const { waitId } = await langy.cardFor("ev_toxicity");
+        await langy.sendMessage({
+          text: "Chose: Yes, delete",
+          selection: { waitId, optionId: "opt-1" },
+        });
+
+        const clicked = await langy.deleteEvaluator("ev_toxicity");
+
+        expect(clicked.status).toBe(200);
+        expect(langy.archived).toEqual(["ev_toxicity"]);
       });
     });
 
@@ -119,11 +130,81 @@ describe("the confirmation gate", () => {
   });
 
   describe("given a person's own API key", () => {
+    /** @scenario "Other keys are not asked for a click" */
     it("deletes without a card", async () => {
       const answer = await langy.deleteEvaluator("ev_toxicity", "personal");
 
       expect(answer.status).toBe(200);
       expect(langy.started).toEqual([]);
+    });
+  });
+
+  describe("given an evaluator that does not exist", () => {
+    /** @scenario "A delete of an item that does not exist shows no card" */
+    it("lets the request through to the route's own answer and shows no card", async () => {
+      const answer = await langy.deleteEvaluator("ev_missing");
+
+      expect(answer.status).toBe(200);
+      expect(langy.archived).toEqual(["ev_missing"]);
+      expect(langy.started).toEqual([]);
+    });
+  });
+
+  describe("given a bulk delete where the only record without a click does not exist", () => {
+    it("spends the click of the one that does and lets the request through", async () => {
+      await langy.deleteEvaluator("ev_toxicity");
+      await langy.click({ id: "ev_toxicity", choice: "yes" });
+
+      const bulk = await langy.deleteMany(["ev_toxicity", "ev_missing"]);
+      const again = await langy.deleteEvaluator("ev_toxicity");
+
+      expect([bulk.status, again.status]).toEqual([200, 409]);
+      expect(langy.archived).toEqual(["ev_toxicity", "ev_missing"]);
+      expect(langy.started).toHaveLength(2);
+    });
+  });
+
+  describe("given an evaluator whose name runs over many lines and characters", () => {
+    /** @scenario "The card names the item on one short line" */
+    it("shows the name on one line, cut to 80 characters, with the end of its id", async () => {
+      await langy.deleteEvaluator("ev_sprawling_a1b2");
+
+      const { question } = await langy.cardFor("ev_sprawling_a1b2");
+      const shown = /^Delete evaluator "(.*)" \(…a1b2\)\?$/.exec(question)?.[1];
+
+      expect(shown).toBeDefined();
+      expect(shown).toMatch(/^scratch copy x+…$/);
+      expect(shown).toHaveLength(80);
+    });
+  });
+
+  describe("given the person clicked Yes, and another request spends that click first", () => {
+    /** @scenario "A click that another request spent first asks Langy to run again" */
+    it("refuses with a plain ask to run the same command again, and shows no new card", async () => {
+      const confirmations = LangyDeleteConfirmationMemoryRepository.create({ now: () => now });
+      // Every spend loses the race, while the click itself is still there when it looks again.
+      const losingEverySpend = new Proxy(confirmations, {
+        get: (target, property) => {
+          if (property === "consumeGrants") return async () => false;
+          const value: unknown = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const racing = deleteConfirmationFixture({
+        store: memorySessionState({ now: () => now }),
+        confirmations: losingEverySpend,
+        projectId: "proj_race",
+        now: () => now,
+      });
+      await racing.bindKey("turn1", "turn_1");
+      await racing.deleteEvaluator("ev_toxicity");
+      await racing.click({ id: "ev_toxicity", choice: "yes" });
+
+      const answer = await racing.deleteEvaluator("ev_toxicity");
+
+      expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
+      expect(answer.body.message).toContain("Run the same command again.");
+      expect(racing.started).toHaveLength(1);
     });
   });
 

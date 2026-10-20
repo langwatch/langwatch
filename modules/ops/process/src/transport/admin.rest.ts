@@ -47,6 +47,7 @@ export const adminRest = defineRestRouter(OpsApi)
 
   .delete("/api/admin/impersonate", "stopAdminImpersonation")
   .withAudit("ops.stopImpersonation")
+  .withoutConfirmation("answers only a signed-in browser, never an API key")
   .withInput(adminEmptyRequestSchema)
   .withCredential("browser")
   // ops:view, because ops:manage is not answered while impersonating and this is the way out.

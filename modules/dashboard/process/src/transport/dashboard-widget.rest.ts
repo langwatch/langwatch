@@ -270,7 +270,7 @@ export const dashboardWidgetRest = defineRestRouter(DashboardApi)
       app.getDashboardWidget({ projectId, id }).then(
         (widget) => widget.name,
         (error: unknown) => {
-          if (error instanceof DashboardWidgetNotFoundError) return null;
+          if (error instanceof DashboardWidgetNotFoundError) return undefined;
           throw error;
         },
       ),

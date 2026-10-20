@@ -112,6 +112,7 @@ export const scimTokenRest = defineRestRouter(ScimApi)
 
   .delete("/:id", "revokeScimToken")
   .withAudit("scimToken.revoke")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .withParams(scimTokenIdParamsSchema)
   .withPermission("organization:manage")
   .withEntitlement("enterprise", { feature: "SCIM" })

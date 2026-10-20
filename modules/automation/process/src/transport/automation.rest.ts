@@ -8,6 +8,7 @@ import {
   defineRestRouter,
   MANAGEMENT_API_VERSION,
   projectRequestContext,
+  type RestConfirmation,
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -110,26 +111,25 @@ function firePageWire(page: TriggerFirePage): AutomationRestFirePage {
   };
 }
 
-/**
- * The automation's name as its confirmation card shows it; its id when it is gone, so the card
- * still names what Langy asked about.
- */
-function automationName({
-  app,
-  projectId,
-  id,
-}: {
-  app: AutomationApi;
-  projectId: string;
-  id: string;
-}): Promise<string> {
-  return app.getPublicTrigger({ triggerId: id, projectId }).then(
-    (trigger) => trigger.name,
-    (error: unknown) => {
-      if (HandledError.isHandled(error) && error.httpStatus === 404) return id;
-      throw error;
-    },
-  );
+/** The click an automation route asks a Langy key for, named from the automation itself. */
+function automationConfirmation(
+  action: "delete" | "disable",
+  when?: RestConfirmation<AutomationApi>["when"],
+): RestConfirmation<AutomationApi> {
+  return {
+    resource: "automation",
+    action,
+    idParam: "triggerId",
+    ...(when ? { when } : {}),
+    name: ({ app, projectId, id }) =>
+      app.getPublicTrigger({ triggerId: id, projectId }).then(
+        (trigger) => trigger.name,
+        (error: unknown) => {
+          if (HandledError.isHandled(error) && error.httpStatus === 404) return undefined;
+          throw error;
+        },
+      ),
+  };
 }
 
 /** The `/api/triggers` endpoints; each also answers under `/api/v1/triggers`. */
@@ -238,13 +238,7 @@ export function createAutomationRest(): Readonly<{
       .withInput(automationRestUpdateInputSchema)
       .withPermission("triggers:update")
       // An update that pauses the automation is a disable, and the disable route's click covers it.
-      .withConfirmation({
-        resource: "automation",
-        action: "disable",
-        idParam: "triggerId",
-        when: (input) => input.active === false,
-        name: automationName,
-      })
+      .withConfirmation(automationConfirmation("disable", (input) => input.active === false))
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -301,12 +295,7 @@ export function createAutomationRest(): Readonly<{
       .withParams(automationRestIdParamsSchema)
       .withInput(automationRestNoBodySchema)
       .withPermission("triggers:update")
-      .withConfirmation({
-        resource: "automation",
-        action: "disable",
-        idParam: "triggerId",
-        name: automationName,
-      })
+      .withConfirmation(automationConfirmation("disable"))
       .responds({ 200: automationRestResponseSchema, 404: badRequestSchema })
       .withDocs({
         tags: ["Triggers"],
@@ -356,12 +345,7 @@ export function createAutomationRest(): Readonly<{
       .withAudit("automation.deleteById")
       .withParams(automationRestIdParamsSchema)
       .withPermission("triggers:manage")
-      .withConfirmation({
-        resource: "automation",
-        action: "delete",
-        idParam: "triggerId",
-        name: automationName,
-      })
+      .withConfirmation(automationConfirmation("delete"))
       .responds({ 200: automationRestDeletedSchema, 404: badRequestSchema })
       .withDocs({ tags: ["Triggers"], description: "Delete (soft-delete) a trigger" })
       .handle(async ({ app, input, scope }) => {

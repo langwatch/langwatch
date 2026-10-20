@@ -77,10 +77,11 @@ export const annotationRest = defineRestRouter(AnnotationApi)
     idParam: "id",
     name: async ({ app, projectId, id }) => {
       const annotation = await app.getById({ id, projectId }).catch((error: unknown) => {
-        if (HandledError.isHandled(error) && error.httpStatus === 404) return null;
+        if (HandledError.isHandled(error) && error.httpStatus === 404) return undefined;
         throw error;
       });
-      return annotation?.comment ? annotation.comment.slice(0, 60) : null;
+      if (!annotation) return undefined;
+      return annotation.comment ? annotation.comment.slice(0, 60) : null;
     },
   })
   .withOutput(annotationRestDeletedSchema)

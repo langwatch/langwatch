@@ -318,7 +318,7 @@ export function createTestSuitesRest(): Readonly<{
         app.getByIdOrTestSuite({ id, projectId }).then(
           (found) => (found.kind === "suite" ? found.suite.name : found.testSuite.name),
           (error: unknown) => {
-            if (error instanceof SuiteNotFoundError) return null;
+            if (error instanceof SuiteNotFoundError) return undefined;
             throw error;
           },
         ),

@@ -7,7 +7,11 @@ import type { AuthzDeclaredScopeId } from "@langwatch/authorization";
 
 import { ConfirmationRequiredError } from "../errors.ts";
 import type { MiddlewareBinding, TransportPeers } from "../hosting/transport-hosts.ts";
-import { isKeyDoor, recordedKeyOfDoor } from "./key-credential.ts";
+import { recordedKeyCredentialOf } from "./credential.ts";
+import { isKeyDoor, keyCredentialOf } from "./key-credential.ts";
+
+/** The most records one request may ask clicks for: each one is a card the person reads. */
+export const MAX_CONFIRMED_IDS = 10;
 
 /** What a route that removes or disables something declares about the record it acts on. */
 export type RestConfirmation<Api = unknown> = Readonly<{
@@ -22,10 +26,11 @@ export type RestConfirmation<Api = unknown> = Readonly<{
   /** Asks only when this holds, as for a toggle that only sometimes disables. */
   when?: (input: Readonly<Record<string, unknown>>) => boolean;
   /**
-   * The record's own name, read from the module that owns it; null when there is none. A method,
-   * so a route over one module's app still reads as a route of any app.
+   * The record's own name, read from the module that owns it: null when the record has no name,
+   * undefined when there is no such record, so the handler answers for it and no card is shown.
+   * A method, so a route over one module's app still reads as a route of any app.
    */
-  name(args: { app: Api; projectId: string; id: string }): Promise<string | null>;
+  name(args: { app: Api; projectId: string; id: string }): Promise<string | null | undefined>;
 }>;
 
 /** One request the gate is asked about: which key, which project, which records. */
@@ -35,8 +40,11 @@ export type RestConfirmationRequest = Readonly<{
   projectId: string;
   resource: string;
   action: string;
-  /** Each record, with its name read only when a card has to show it. */
-  targets: readonly Readonly<{ id: string; name: () => Promise<string | null> }>[];
+  /**
+   * Each record, with its name read only when a card has to show it: null for a record with no
+   * name, undefined for one that does not exist.
+   */
+  targets: readonly Readonly<{ id: string; name: () => Promise<string | null | undefined> }>[];
 }>;
 
 /** Where the clicks are kept. */
@@ -123,14 +131,30 @@ export async function confirmMarkedRequest<Api>({
   app: () => Api;
 }): Promise<void> {
   if (!mark || !isKeyDoor(credential)) return;
-  const key = recordedKeyOfDoor({ door: credential, request });
-  if (key?.kind !== "langy_session_key") return;
+  const recorded = recordedKeyCredentialOf({ door: credential, request });
+  // Every key door records the key it let in; one that did not is never trusted to be no Langy key.
+  if (!recorded) {
+    throw new Error(`The ${credential} door recorded no key for a route that asks for a click`);
+  }
+  const key = keyCredentialOf(recorded);
+  if (key.kind !== "langy_session_key") return;
 
   const fields = (input ?? {}) as Readonly<Record<string, unknown>>;
   if (mark.when && !mark.when(fields)) return;
 
   const ids = idsOf({ mark, fields });
-  if (!gate || !key.apiKeyId || scope?.tier !== "project" || ids.length === 0) {
+  if (ids.length > MAX_CONFIRMED_IDS) {
+    throw new ConfirmationRequiredError({
+      message:
+        `This request names ${ids.length} records, and one request can ask for at most ` +
+        `${MAX_CONFIRMED_IDS} confirmation clicks. Do it in batches of ${MAX_CONFIRMED_IDS} or fewer.`,
+      resource: mark.resource,
+      action: mark.action,
+    });
+  }
+
+  const projectId = scope?.tier === "project" ? scope.id : keyProjectOf(recorded);
+  if (!gate || !key.apiKeyId || !projectId || ids.length === 0) {
     throw new ConfirmationRequiredError({
       message:
         "Deleting needs a confirmation click, and no confirmation card can be shown for this request.",
@@ -139,7 +163,6 @@ export async function confirmMarkedRequest<Api>({
     });
   }
 
-  const projectId = scope.id;
   await gate.confirm({
     apiKeyId: key.apiKeyId,
     ownerUserId: key.ownerUserId,
@@ -148,6 +171,16 @@ export async function confirmMarkedRequest<Api>({
     action: mark.action,
     targets: ids.map((id) => ({ id, name: () => mark.name({ app: app(), projectId, id }) })),
   });
+}
+
+/** The project the key itself acts in, where the door's scope names none (the key door). */
+function keyProjectOf(
+  recorded: NonNullable<ReturnType<typeof recordedKeyCredentialOf>>,
+): string | null {
+  if ("type" in recorded) return recorded.type === "apiKey-org" ? null : recorded.project.id;
+  if (recorded.kind === "apiKey") return recorded.resolvedProject?.id ?? null;
+
+  return recorded.projectId;
 }
 
 /** The ids the request names, each once, in the order it named them. */

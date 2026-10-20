@@ -17,6 +17,7 @@ import {
   confirmationRefusalMessage,
   type ConfirmChoice,
   namedRecord,
+  retryRefusalMessage,
   selectedOption,
   unboundRefusalMessage,
 } from "../../../rules/langy-delete-confirmation.rules.ts";
@@ -26,6 +27,9 @@ import type { UserWaitService } from "../../local-control/services/langy-local-u
 import type { LangyConfirmationAnswersService } from "./langy-confirmation-answers.service.ts";
 
 const logger = createLogger("langwatch:langy:delete-confirmation");
+
+/** How long one request may hold the right to raise a card before another may try. */
+const CARD_RAISE_TTL_SECONDS = 30;
 
 type DeleteConfirmationMembers = Readonly<{
   confirmations: LangyDeleteConfirmationRepository;
@@ -55,7 +59,8 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
   private constructor(private readonly members: DeleteConfirmationMembers) {}
 
   /**
-   * Spends one click per record, all or none.
+   * Spends one click per record, all or none. A record that does not exist needs no click, so
+   * the request goes on and its handler answers for it.
    * @throws {ConfirmationRequiredError} when any record has no unspent click, or the key belongs
    * to no conversation
    */
@@ -78,11 +83,32 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     }));
     if (await this.members.confirmations.consumeGrants(targets)) return;
 
-    const records: string[] = [];
-    let everyCardShown = true;
+    const unclicked: { target: ConfirmTarget; name: string | null }[] = [];
+    const gone = new Set<ConfirmTarget>();
     for (const [index, target] of targets.entries()) {
       if (await this.members.confirmations.hasGrant(target)) continue;
-      const name = (await request.targets[index]?.name()) ?? target.id;
+      const name = await request.targets[index]?.name();
+      if (name === undefined) gone.add(target);
+      else unclicked.push({ target, name });
+    }
+
+    // No record still lacks a click: spend the clicks of those that exist, and the handler
+    // answers for any that do not.
+    if (unclicked.length === 0) {
+      const existing = targets.filter((target) => !gone.has(target));
+      if (existing.length === 0 || (await this.members.confirmations.consumeGrants(existing))) {
+        return;
+      }
+      throw new ConfirmationRequiredError({
+        message: retryRefusalMessage(request.action),
+        resource: request.resource,
+        action: request.action,
+      });
+    }
+
+    const records: string[] = [];
+    let everyCardShown = true;
+    for (const { target, name } of unclicked) {
       const shown = await this.showCard({
         target,
         name,
@@ -90,7 +116,7 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
         ownerUserId: request.ownerUserId,
       });
       everyCardShown &&= shown;
-      records.push(namedRecord({ resource: target.resource, name }));
+      records.push(namedRecord({ resource: target.resource, name, id: target.id }));
     }
 
     throw new ConfirmationRequiredError({
@@ -168,20 +194,43 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     await this.members.answers.decide({ wait, choice });
   }
 
-  /** The card for one record, unless one is already waiting for it. True when a card is waiting. */
-  private async showCard({
+  /**
+   * The card for one record, unless one is already waiting for it or another request is raising
+   * it right now. True when a card is waiting.
+   */
+  private async showCard(card: {
+    target: ConfirmTarget;
+    name: string | null;
+    binding: ConfirmKeyBinding;
+    ownerUserId: string | null;
+  }): Promise<boolean> {
+    const { target } = card;
+    if (await this.isWaiting(target)) return true;
+    const raising = await this.members.confirmations.claimCardRaise({
+      target,
+      ttlSeconds: CARD_RAISE_TTL_SECONDS,
+    });
+    if (!raising) return true;
+
+    try {
+      // Checked again under the claim: a request that raised the card just before it let go.
+      return (await this.isWaiting(target)) || (await this.raiseCard(card));
+    } finally {
+      await this.members.confirmations.releaseCardRaise(target);
+    }
+  }
+
+  private async raiseCard({
     target,
     name,
     binding,
     ownerUserId,
   }: {
     target: ConfirmTarget;
-    name: string;
+    name: string | null;
     binding: ConfirmKeyBinding;
     ownerUserId: string | null;
   }): Promise<boolean> {
-    if (await this.isWaiting(target)) return true;
-
     const turnId = await this.turnOf({ binding, ownerUserId });
     if (!turnId) {
       logger.warn(

@@ -122,6 +122,7 @@ export const storedObjectRest = defineRestRouter(StoredObjectApi)
 
   .delete("/:storedObjectId", "deleteStoredObject")
   .withAudit("storedObjects.delete")
+  .withoutConfirmation("Langy keys cannot hold project:manage")
   .withParams(z.object({ storedObjectId: storedObjectsDeleteInputSchema.shape.id }))
   .withInput(storedObjectsDeleteInputSchema.pick({ projectId: true, idempotencyKey: true }))
   .withPermission("project:manage")

@@ -55,15 +55,15 @@ describe("the confirmation gate over Redis", () => {
       expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
       expect(answer.body.message).toBe(
         'Deleting needs a confirmation click. A confirmation card for evaluator "Toxicity check" ' +
-          "is now shown to the user. Wait for their answer; after they choose Yes, run the same " +
-          "command again.",
+          "(…city) is now shown to the user. Wait for their answer; after they choose Yes, run the " +
+          "same command again.",
       );
       expect(langy.started).toEqual([
         expect.objectContaining({
           turnId: "turn_1",
           questions: [
             expect.objectContaining({
-              question: 'Delete evaluator "Toxicity check"?',
+              question: 'Delete evaluator "Toxicity check" (…city)?',
               options: [{ label: "Yes, delete" }, { label: "No, keep it" }],
               multiple: false,
               allowOther: false,
@@ -72,6 +72,20 @@ describe("the confirmation gate over Redis", () => {
         }),
       ]);
       expect(langy.started[0]?.toolCallId).toBeUndefined();
+      expect(langy.archived).toEqual([]);
+    });
+  });
+
+  describe("when Langy deletes the evaluator twice at the same moment", () => {
+    /** @scenario "Two requests at once show one card" */
+    it("refuses both and shows one card", async () => {
+      const answers = await Promise.all([
+        langy.deleteEvaluator("ev_toxicity"),
+        langy.deleteEvaluator("ev_toxicity"),
+      ]);
+
+      expect(answers.map(({ status }) => status)).toEqual([409, 409]);
+      expect(langy.started).toHaveLength(1);
       expect(langy.archived).toEqual([]);
     });
   });

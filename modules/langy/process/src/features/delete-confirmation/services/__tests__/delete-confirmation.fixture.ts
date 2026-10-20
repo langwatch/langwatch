@@ -33,7 +33,8 @@ interface EvaluatorsApi {
   archive(id: string): Promise<void>;
   archiveRows(ids: readonly string[]): Promise<void>;
   disable(id: string): Promise<void>;
-  nameOf(id: string): Promise<string | null>;
+  /** Undefined when there is no such evaluator. */
+  nameOf(id: string): Promise<string | undefined>;
 }
 
 const EvaluatorsApi = moduleApi<EvaluatorsApi>()("evaluator");
@@ -96,6 +97,7 @@ export function deleteConfirmationFixture({
   const names = new Map([
     ["ev_toxicity", "Toxicity check"],
     ["ev_faithful", "Faithfulness"],
+    ["ev_sprawling_a1b2", `scratch\ncopy\u0007 ${"x".repeat(120)}`],
   ]);
   const archived: string[] = [];
   const disabled: string[] = [];
@@ -103,7 +105,7 @@ export function deleteConfirmationFixture({
     archive: async (id) => void archived.push(id),
     archiveRows: async (ids) => void archived.push(...ids),
     disable: async (id) => void disabled.push(id),
-    nameOf: async (id) => names.get(id) ?? null,
+    nameOf: async (id) => names.get(id),
   };
 
   const router = defineRestRouter(EvaluatorsApi)

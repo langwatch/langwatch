@@ -251,6 +251,7 @@ export const webhookRest = defineRestRouter(WebhookApi)
     description: "Archive a webhook endpoint",
   })
   .withAudit("management.webhook-endpoints.archive")
+  .withoutConfirmation("Langy keys cannot hold webhookEndpoints:manage")
   .handle(async ({ app, input, scope }) => {
     await app.assertEndpointsEntitled(scope.id);
 

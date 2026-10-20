@@ -494,6 +494,7 @@ export const apiKeyRest = defineRestRouter(ApiKeyApi)
   })
   .withMiddlewareContext(apiKeyRestCredential)
   .withAudit("management.api-key.revoke")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope }, caller) => {
     // Real adminness, so revoke() can enforce its owner-only path: without
     // this, any organization:manage holder could revoke anyone's key.

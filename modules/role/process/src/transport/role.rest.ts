@@ -179,6 +179,7 @@ export const roleRest = defineRestRouter(RoleApi)
   })
   .withMiddlewareContext(roleRestContext)
   .withAudit("management.role.delete")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, actor }, organization) =>
     app.deleteRoleInOrganization(
       { roleId: input.id, organizationId: organization.organizationId },

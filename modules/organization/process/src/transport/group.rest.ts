@@ -153,6 +153,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
   .withMiddlewareContext(organizationKeyContext)
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .withAudit("management.group.delete")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope, actor }, key) => {
     await app.deleteGroup(
       { groupId: input.groupId, organizationId: scope.id },
@@ -200,6 +201,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
   .withDocs({ tags: ["Groups"], description: "Remove a member from a group" })
   .withEntitlement("enterprise", { feature: "GROUPS" })
   .withAudit("management.group.remove-member")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .handle(async ({ app, input, scope }) => {
     await app.removeGroupMember({
       groupId: input.groupId,
@@ -252,6 +254,7 @@ export const groupsRest = defineRestRouter(OrganizationApi)
 
   .delete("/:groupId/bindings/:bindingId", "deleteApiGroupsByIdBindingsByBindingId")
   .withAudit("management.group.remove-binding")
+  .withoutConfirmation("Langy keys cannot hold organization:manage")
   .withPermission("organization:manage")
   .withParams(organizationGroupRestBindingParamsSchema)
   .withOutput(organizationRestSuccessSchema)

@@ -118,6 +118,7 @@ export const secretRest = defineRestRouter(SecretApi)
 
   .delete("/:id", "deleteApiSecretsById")
   .withAudit("secrets.delete")
+  .withoutConfirmation("Langy keys cannot hold secrets:manage")
   .withParams(secretPublicAliasParamsSchema)
   .withInput(secretPublicDeleteInputSchema)
   .withPermission("secrets:manage")

@@ -7,6 +7,7 @@ import {
   MANAGEMENT_API_VERSION,
   RequestValidationError,
   resolver,
+  type RestConfirmation,
 } from "@langwatch/api/rest";
 import {
   type gatewayBudgetWireSchema,
@@ -69,6 +70,40 @@ const canonicalGoneResponses = {
     content: { "application/json": { schema: resolver(apiErrorSchema) } },
   },
 } as const;
+
+/**
+ * The click a virtual key route asks a Langy key for, named from the key itself in the
+ * organization the route acts in.
+ */
+function virtualKeyConfirmation(action: "disable" | "revoke"): RestConfirmation<GatewayApi> {
+  return {
+    resource: "virtual key",
+    action,
+    idParam: "id",
+    name: async ({ app, projectId, id }) =>
+      (await app.findVirtualKeyById(id, await app.organizationIdForProject(projectId)))?.name,
+  };
+}
+
+/**
+ * The click a cache rule route asks a Langy key for. A rule belongs to the whole organization, so
+ * its name is read in the organization the project belongs to, the one the route acts in.
+ */
+function cacheRuleConfirmation(action: "delete" | "disable"): RestConfirmation<GatewayApi> {
+  return {
+    resource: "cache rule",
+    action,
+    idParam: "id",
+    ...(action === "disable" ? { when: (input) => input.enabled === false } : {}),
+    name: async ({ app, projectId, id }) =>
+      (
+        await app.findCacheRule({
+          id,
+          organizationId: await app.organizationIdForProject(projectId),
+        })
+      )?.name,
+  };
+}
 
 /** The credential this request arrived on, as the project door resolved it. */
 export const gatewayRestCredential = defineMiddlewareContext(
@@ -483,6 +518,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayDisableVkSchema)
   .withPermission("virtualKeys:update", { at: "grants" })
+  .withConfirmation(virtualKeyConfirmation("disable"))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Disable virtual key",
@@ -539,6 +575,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withParams(gatewayIdParamsSchema)
   .withInput(gatewayRevokeVirtualKeyBodySchema)
   .withPermission("virtualKeys:delete", { at: "grants" })
+  .withConfirmation(virtualKeyConfirmation("revoke"))
   .withOutput(z.object({ virtual_key: gatewayVirtualKeyDtoSchema }))
   .withDocs({
     summary: "Revoke virtual key",
@@ -701,6 +738,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .delete("/budgets/:id", "deleteApiGatewayV1BudgetsById")
   .withAudit("gatewayBudgets.archive")
+  .withoutConfirmation("asked at the organization, where a Langy key holds no grant")
   .withCredential("api_key")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayBudgets:delete", { at: "organization" })
@@ -840,16 +878,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withInput(gatewayUpdateCacheRuleSchema)
   .withPermission("gatewayCacheRules:update")
   // An update that switches the rule off is a disable, so it needs its own click.
-  .withConfirmation({
-    resource: "cache rule",
-    action: "disable",
-    idParam: "id",
-    when: (input) => input.enabled === false,
-    name: async ({ app, projectId, id }) => {
-      const organizationId = await app.organizationIdForProject(projectId);
-      return (await app.findCacheRule({ id, organizationId }))?.name ?? null;
-    },
-  })
+  .withConfirmation(cacheRuleConfirmation("disable"))
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))
   .withDocs({
     summary: "Update a cache rule",
@@ -883,15 +912,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
   .withAudit("gatewayCacheRules.archive")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayCacheRules:delete")
-  .withConfirmation({
-    resource: "cache rule",
-    action: "delete",
-    idParam: "id",
-    name: async ({ app, projectId, id }) => {
-      const organizationId = await app.organizationIdForProject(projectId);
-      return (await app.findCacheRule({ id, organizationId }))?.name ?? null;
-    },
-  })
+  .withConfirmation(cacheRuleConfirmation("delete"))
   .withOutput(z.object({ cache_rule: gatewayPlatformCacheRuleDtoSchema }))
   .withDocs({
     summary: "Archive a cache rule",
@@ -967,6 +988,7 @@ export const gatewayPlatformRest = defineRestRouter(GatewayApi)
 
   .delete("/providers/:id", "deleteApiGatewayV1ProvidersById")
   .withAudit("gatewayProviders.delete")
+  .withoutConfirmation("Langy keys cannot hold gatewayProviders:manage")
   .withParams(gatewayIdParamsSchema)
   .withPermission("gatewayProviders:manage")
   .withOutput(z.void())

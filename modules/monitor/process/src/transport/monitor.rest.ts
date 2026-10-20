@@ -9,6 +9,7 @@ import {
   documentedResponses,
   MANAGEMENT_API_VERSION,
   projectRequestContext,
+  type RestConfirmation,
   type RestDoorCredential,
   type RestTransportDeclaration,
 } from "@langwatch/api/rest";
@@ -27,6 +28,20 @@ import {
 import { z } from "zod";
 
 const notFound = documentedResponses({ 404: badRequestSchema });
+
+/**
+ * The click a monitor route asks a Langy key for, named from the monitor itself. A disable asks
+ * only when the call turns the monitor off; turning it on removes nothing.
+ */
+function monitorConfirmation(action: "delete" | "disable"): RestConfirmation<MonitorApi> {
+  return {
+    resource: "monitor",
+    action,
+    idParam: "id",
+    ...(action === "disable" ? { when: (input) => input.enabled === false } : {}),
+    name: async ({ app, projectId, id }) => (await app.findById({ id, projectId }))?.name,
+  };
+}
 
 /** Where an online evaluation opens in the platform. */
 function monitorWire(params: {
@@ -149,14 +164,7 @@ export function createMonitorsRest(): Readonly<{
       .withInput(monitorRestUpdateInputSchema)
       .withPermission("evaluations:update")
       // An update that switches the monitor off is a disable, and the toggle's click covers it.
-      .withConfirmation({
-        resource: "monitor",
-        action: "disable",
-        idParam: "id",
-        when: (input) => input.enabled === false,
-        name: async ({ app, projectId, id }) =>
-          (await app.findById({ id, projectId }))?.name ?? null,
-      })
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestResponseSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -180,15 +188,7 @@ export function createMonitorsRest(): Readonly<{
       .withParams(monitorRestIdParamsSchema)
       .withInput(monitorRestToggleInputSchema)
       .withPermission("evaluations:update")
-      // Only the call that turns the monitor off asks for the click; turning it on removes nothing.
-      .withConfirmation({
-        resource: "monitor",
-        action: "disable",
-        idParam: "id",
-        when: (input) => input.enabled === false,
-        name: async ({ app, projectId, id }) =>
-          (await app.findById({ id, projectId }))?.name ?? null,
-      })
+      .withConfirmation(monitorConfirmation("disable"))
       .withOutput(monitorRestToggledSchema)
       .withDocs({
         tags: ["Monitors"],
@@ -206,13 +206,7 @@ export function createMonitorsRest(): Readonly<{
       .withAudit("monitors.delete")
       .withParams(monitorRestIdParamsSchema)
       .withPermission("evaluations:manage")
-      .withConfirmation({
-        resource: "monitor",
-        action: "delete",
-        idParam: "id",
-        name: async ({ app, projectId, id }) =>
-          (await app.findById({ id, projectId }))?.name ?? null,
-      })
+      .withConfirmation(monitorConfirmation("delete"))
       .withOutput(monitorRestDeletedSchema)
       .withDocs({
         tags: ["Monitors"],

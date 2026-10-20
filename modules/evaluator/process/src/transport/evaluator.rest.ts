@@ -241,8 +241,7 @@ export function createEvaluatorRest(): Readonly<{
         resource: "evaluator",
         action: "delete",
         idParam: "id",
-        name: async ({ app, projectId, id }) =>
-          (await app.findById({ id, projectId }))?.name ?? null,
+        name: async ({ app, projectId, id }) => (await app.findById({ id, projectId }))?.name,
       })
       .withOutput(archivedEvaluatorResponseSchema)
       .withDocs({

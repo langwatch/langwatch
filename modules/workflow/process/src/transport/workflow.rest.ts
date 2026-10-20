@@ -136,7 +136,7 @@ export function createWorkflowRest(): Readonly<{
           app.getById({ id, projectId }).then(
             (workflow) => workflow.name,
             (error: unknown) => {
-              if (error instanceof WorkflowNotFoundError) return null;
+              if (error instanceof WorkflowNotFoundError) return undefined;
               throw error;
             },
           ),

@@ -258,7 +258,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
       app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
         (chart) => chart.name,
         (error: unknown) => {
-          if (error instanceof SavedWorkbenchChartNotFoundError) return null;
+          if (error instanceof SavedWorkbenchChartNotFoundError) return undefined;
           throw error;
         },
       ),
@@ -339,7 +339,7 @@ export const savedWorkbenchChartRest = defineRestRouter(DashboardApi)
       app.getSavedWorkbenchChart({ projectId, chartId: id }).then(
         (chart) => chart.name,
         (error: unknown) => {
-          if (error instanceof SavedWorkbenchChartNotFoundError) return null;
+          if (error instanceof SavedWorkbenchChartNotFoundError) return undefined;
           throw error;
         },
       ),

@@ -141,6 +141,11 @@ export function confirmCardKey(target: ConfirmTarget): string {
   return `${PREFIX}:confirm_card:${confirmTargetPath(target)}`;
 }
 
+/** Held while one request raises the card for a record, so requests racing it raise no second. */
+export function confirmRaiseKey(target: ConfirmTarget): string {
+  return `${PREFIX}:confirm_raise:${confirmTargetPath(target)}`;
+}
+
 /** Set by a card's first answer, so the click and its message fallback grant once between them. */
 export function confirmClaimKey(waitId: string): string {
   return `${PREFIX}:confirm_claim:${waitId}`;

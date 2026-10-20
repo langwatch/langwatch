@@ -129,7 +129,7 @@ export const graphRest = defineRestRouter(DashboardApi)
       app.getGraph({ projectId, graphId: id }).then(
         (graph) => graph.name,
         (error: unknown) => {
-          if (error instanceof GraphNotFoundError) return null;
+          if (error instanceof GraphNotFoundError) return undefined;
           throw error;
         },
       ),

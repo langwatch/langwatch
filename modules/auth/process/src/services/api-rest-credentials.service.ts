@@ -258,6 +258,7 @@ export class ApiRestCredentialsService {
           userId: resolved.userId,
           organizationId: resolved.organizationId,
           resolvedProject: { id: resolved.project.id, teamId: resolved.project.teamId },
+          ...(resolved.isLangySessionKey ? { isLangySessionKey: true } : {}),
         },
         organizationId: resolved.organizationId,
         markUsed: () => this.apiKeys.markUsed({ id: resolved.apiKeyId }),
@@ -266,10 +267,16 @@ export class ApiRestCredentialsService {
 
     const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!organization.ok) throw new ProjectInvalidCredentialsError();
-    const { apiKeyId, userId, organizationId } = organization.resolved;
+    const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
 
     return {
-      principal: { kind: "apiKey", apiKeyId, userId, organizationId },
+      principal: {
+        kind: "apiKey",
+        apiKeyId,
+        userId,
+        organizationId,
+        ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+      },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
     };
@@ -288,6 +295,7 @@ export class ApiRestCredentialsService {
     const { reach } = input;
     const credential = await this.identifyKey({ request: input.request });
     for (const permission of asked(input.permissions)) {
+      refuseUndelegated({ principal: credential.principal, permission });
       const allowed = await this.keyHolds.holds({
         principal: credential.principal,
         permission,
@@ -416,6 +424,21 @@ export class ApiRestCredentialsService {
       permission,
     });
   }
+}
+
+/**
+ * A Langy key is refused what Langy is never delegated on the key door too, by the policy itself
+ * rather than by whatever grants the key happens to carry.
+ */
+function refuseUndelegated(input: {
+  principal: RestKeyDoorPrincipal;
+  permission: AuthzPermission;
+}): void {
+  const { principal, permission } = input;
+  if (principal.kind !== "apiKey" || !principal.isLangySessionKey) return;
+  if (classifyForLangy(permission).disposition === "granted") return;
+
+  throw new ApiKeyPermissionNotDelegableError(permission, { subject: "Langy" });
 }
 
 /** The one denial every tier answers with, at the scope the key was asked at. */

@@ -98,6 +98,7 @@ const directory = defineRestRouter(DirectoryApi)
 
   .delete("/directory/Users/:id", "directoryDeleteUser")
   .withParams(z.object({ id: z.string() }))
+  .withoutConfirmation("test route")
   .withAccess(anyAuthenticated({ reason: GATE }))
   .withResponse("protocol", { produces: PROTOCOL, because: BECAUSE, refusal })
   .withoutAudit("test route")
