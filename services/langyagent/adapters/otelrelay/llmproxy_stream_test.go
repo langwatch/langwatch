@@ -8,6 +8,7 @@ import (
 	"strings"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/langwatch/langwatch/pkg/herr"
 )
@@ -182,7 +183,14 @@ func TestLLMProxyStreamCut_CleanStreamClears(t *testing.T) {
 	}
 	_, _ = io.ReadAll(cleanPass.Body)
 
-	if _, ok := relay.LastLLMError(token); ok {
+	// The proxy clears the capture when it reads the upstream EOF, which can
+	// land just after the client has read a Content-Length body to its end.
+	cleared := false
+	for deadline := time.Now().Add(time.Second); !cleared && time.Now().Before(deadline); time.Sleep(5 * time.Millisecond) {
+		_, captured := relay.LastLLMError(token)
+		cleared = !captured
+	}
+	if !cleared {
 		t.Error("the clean stream must clear the captured cause")
 	}
 	final := rateLimitCall(t, relay, token)
