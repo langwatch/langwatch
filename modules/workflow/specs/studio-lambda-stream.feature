@@ -138,3 +138,28 @@ Feature: Optimization studio execution on a per-project Lambda
     Given a deployment that left S3_KEY_SALT unset
     When a studio run is dispatched
     Then the engine receives no X-S3-Cache-Key header
+
+  @unit
+  Scenario: A run the engine's function raised on names the cause in the log
+    Given a workflow run whose engine function raised, answering a gateway status
+    When the failure is logged
+    Then the log carries the error type the function raised, capped in length
+    And the message too when the Lambda runtime raised it, capped in length
+    And nothing else from the answer is logged
+
+  @unit
+  Scenario: A run whose workflow code raised logs the error type but not its message
+    Given a workflow run whose own code raised an exception quoting its input
+    When the failure is logged
+    Then the log carries the error type
+    And the exception's message is not logged
+
+  # The stop flag is read from Redis on a timer while a chunk is pending. A read
+  # that failed was an unhandled rejection, and an unhandled rejection exits the
+  # worker: one Redis blip killed every run on it.
+  @integration
+  Scenario: A stop flag that cannot be read leaves the run streaming
+    Given a studio run streaming from a slow model
+    When reading the stop flag fails while a chunk is pending
+    Then the run is treated as not stopped and keeps streaming to its end
+    And the failure is logged once as a warning, not as a crash

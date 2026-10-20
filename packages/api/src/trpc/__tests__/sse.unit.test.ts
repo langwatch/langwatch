@@ -1,5 +1,6 @@
 /** @vitest-environment node */
 
+import { TRPCError } from "@trpc/server";
 import { describe, expect, it } from "vitest";
 
 import { SseLane } from "../sse.ts";
@@ -149,4 +150,40 @@ describe("a live subscription whose signal aborted before the stream started", (
 
     expect(records.filter((record) => record.level === "error")).toHaveLength(1);
   });
+});
+
+describe("a live subscription the access policy refuses", () => {
+  /** @scenario "A live subscription refused for access is logged as a warning, not an error" */
+  it.each(["UNAUTHORIZED", "FORBIDDEN"] as const)(
+    "logs a bare %s as a warning and nothing at error",
+    async (code) => {
+      const records: LogRecord[] = [];
+      const lane = SseLane.create({
+        members: {
+          createCaller: async () => ({
+            traces: {
+              watch: async () => {
+                throw new TRPCError({ code });
+              },
+            },
+          }),
+          procedureTypeAt: () => "subscription",
+        },
+        logger: recordingLogger(records),
+      });
+
+      const response = await lane.answer(
+        new Request("http://api.test/api/sse/traces/watch", {
+          headers: { "sec-fetch-site": "same-origin" },
+        }),
+        new Headers(),
+      );
+      await response.text();
+
+      expect(records.filter((record) => record.level === "error")).toEqual([]);
+      expect(records).toContainEqual(
+        expect.objectContaining({ level: "warn", message: "SSE handler error" }),
+      );
+    },
+  );
 });

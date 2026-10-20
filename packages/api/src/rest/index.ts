@@ -105,6 +105,7 @@ export {
   defineMiddlewareContext,
   loggerMiddleware,
   multipartMiddleware,
+  recordAnsweredCause,
   RequestValidationError,
   requestValidationErrorFrom,
   restCacheKey,
