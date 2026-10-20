@@ -59,6 +59,7 @@ describe("MemoryProjectRepository project and organisation paging", () => {
 
       expect(await repository.listAllWithOrganization()).toEqual({
         projects: [a, b, c],
+        orphanIds: [],
         next: null,
       });
     });
@@ -69,6 +70,7 @@ describe("MemoryProjectRepository project and organisation paging", () => {
 
       expect(await repository.listAllWithOrganization({ limit: 2 })).toEqual({
         projects: [a, b],
+        orphanIds: [],
         next: "project_b",
       });
     });
@@ -79,6 +81,34 @@ describe("MemoryProjectRepository project and organisation paging", () => {
 
       expect(await repository.listAllWithOrganization({ after: "project_b", limit: 2 })).toEqual({
         projects: [c],
+        orphanIds: [],
+        next: null,
+      });
+    });
+  });
+
+  describe("given an install with a project whose team was deleted, between two that have one", () => {
+    /** @scenario "A project whose team is gone is named as an orphan instead of paged with an organisation" */
+    it("names the orphan on the page and continues after it", async () => {
+      const repository = await seeded();
+      const orphan = await repository.create({
+        id: "project_ab",
+        name: "project_ab",
+        slug: "project_ab",
+        apiKey: "sk-lw-project_ab",
+        teamId: "team_deleted",
+        language: "python",
+        framework: "openai",
+      });
+
+      expect(await repository.listAllWithOrganization({ limit: 2 })).toEqual({
+        projects: [a],
+        orphanIds: [orphan.id],
+        next: "project_ab",
+      });
+      expect(await repository.listAllWithOrganization({ after: "project_ab", limit: 2 })).toEqual({
+        projects: [b, c],
+        orphanIds: [],
         next: null,
       });
     });
@@ -89,7 +119,11 @@ describe("MemoryProjectRepository project and organisation paging", () => {
     it("yields an empty page", async () => {
       const repository = await seeded({ empty: true });
 
-      expect(await repository.listAllWithOrganization()).toEqual({ projects: [], next: null });
+      expect(await repository.listAllWithOrganization()).toEqual({
+        projects: [],
+        orphanIds: [],
+        next: null,
+      });
     });
   });
 });

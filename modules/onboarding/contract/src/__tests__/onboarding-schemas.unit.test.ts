@@ -44,4 +44,17 @@ describe("parseGuidedOnboardingState", () => {
   it("returns the empty default when there is no sign-up data at all", () => {
     expect(parseGuidedOnboardingState(undefined)).toEqual({ paths: [], donePaths: [] });
   });
+
+  it("keeps a put-off model prompt when the stored state is read back", () => {
+    const state = parseGuidedOnboardingState({
+      guidedOnboarding: {
+        paths: ["llmops"],
+        donePaths: [],
+        providerSkippedAt: "2026-10-18T09:00:00.000Z",
+        providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
+      },
+    });
+
+    expect(state.providerPromptDismissedAt).toBe("2026-10-18T09:05:00.000Z");
+  });
 });
