@@ -2,6 +2,8 @@ import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
 import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
+import type { LwqlUnconfirmedSinceRepository } from "../repositories/langwatch-ql-unconfirmed-since.repository.ts";
+import { isCollectionUnconfirmed } from "../rules/langwatch-ql-collection-probe.rules.ts";
 import {
   clickHouseErrorCodeFields,
   clickHouseErrorSummary,
@@ -24,6 +26,9 @@ const CONVERGE_FAILED_MESSAGES: Record<LwqlStore, string> = {
 /** An unchanged failure is logged at error again after this, so a lapsed alert fires anew. */
 const REALERT_AFTER_MS = 60 * 60_000;
 
+/** How long after the fleet's first failed check an unconfirmed collection alerts. */
+export const LWQL_UNCONFIRMED_ALERT_AFTER_MS = 15 * 60_000;
+
 interface LwqlReconvergenceRunDeps {
   /** Throws when ClickHouse is unreachable; the next check probes again. */
   readonly probe: () => Promise<LwqlAccessModelOwner>;
@@ -35,6 +40,8 @@ interface LwqlReconvergenceRunDeps {
   readonly convergeAppOwned: (drift: LwqlAppOwnedDrift) => Promise<void>;
   /** Writes each project's missing key-map row; level-triggered, so a rerun inserts nothing. */
   readonly fillKeyMap: () => Promise<unknown>;
+  /** The fleet's shared time of the first check that left tables on old credentials. */
+  readonly unconfirmedSince: LwqlUnconfirmedSinceRepository;
   /** Epoch ms; the wall clock unless a test pins it. */
   readonly now?: () => number;
 }
@@ -111,12 +118,14 @@ async function convergeStore({
   drift,
   convergeAppOwned,
   alerts,
+  unconfirmedSince,
   now,
 }: {
   store: LwqlStore;
   drift: LwqlAppOwnedDrift;
   convergeAppOwned: LwqlReconvergenceRunDeps["convergeAppOwned"];
   alerts: LwqlAlerts;
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
   now: () => number;
 }): Promise<boolean> {
   const only = driftIn(store, drift);
@@ -125,17 +134,71 @@ async function convergeStore({
   if (pending === "unknown") return false;
   if (pending.length === 0) {
     alerts.delete(store);
+    if (store === "clickHouse") await endUnconfirmedRun(unconfirmedSince);
     return true;
   }
   logger.info(driftFields(only), "lwql reconvergence check found app-owned objects to converge");
   try {
     await convergeAppOwned(only);
     alerts.delete(store);
+    if (store === "clickHouse") await endUnconfirmedRun(unconfirmedSince);
     return true;
   } catch (error) {
-    logConvergeFailure({ store, error, drift: only, alerts, at: now() });
+    const at = now();
+    const run = await readUnconfirmedRun({ error, unconfirmedSince, at });
+    if (run.open && at - run.since < LWQL_UNCONFIRMED_ALERT_AFTER_MS) {
+      logger.warn(
+        { ...failureCodeFields(store, error), ...driftFields(only), unconfirmedSince: run.since },
+        "lwql left engine tables on their current credentials while ClickHouse has not shown it holds the new ones; the check retries in 5 minutes",
+      );
+      return false;
+    }
+    logConvergeFailure({ store, error, drift: only, alerts, at });
     return false;
   }
+}
+
+/** A shared run of unconfirmed checks, open since its first failure; closed alerts at once. */
+type LwqlUnconfirmedRun =
+  | { readonly open: false }
+  | { readonly open: true; readonly since: number };
+
+/**
+ * Extends the shared run when this failure is an unconfirmed collection; otherwise ends it.
+ * An unreadable run reads as closed, so the check alerts rather than stays silent.
+ */
+async function readUnconfirmedRun({
+  error,
+  unconfirmedSince,
+  at,
+}: {
+  error: unknown;
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
+  at: number;
+}): Promise<LwqlUnconfirmedRun> {
+  if (!isCollectionUnconfirmed(error)) {
+    await endUnconfirmedRun(unconfirmedSince);
+    return { open: false };
+  }
+  try {
+    return { open: true, since: await unconfirmedSince.mark(at) };
+  } catch (markError) {
+    logger.warn(
+      { error: clickHouseErrorSummary(markError) },
+      "lwql could not read when ClickHouse first failed to show the new collection; alerting now",
+    );
+    return { open: false };
+  }
+}
+
+/** A failed clear leaves the run to expire; the alert then fires early, never late. */
+async function endUnconfirmedRun(unconfirmedSince: LwqlUnconfirmedSinceRepository) {
+  await unconfirmedSince.clear().catch((error: unknown) => {
+    logger.warn(
+      { error: clickHouseErrorSummary(error) },
+      "lwql could not clear the unconfirmed-collection clock",
+    );
+  });
 }
 
 /** Fills the key map, or throws the failure with its ClickHouse error kept as the cause. */
@@ -179,7 +242,14 @@ export function runLwqlReconvergence(
   const now = deps.now ?? (() => nowInstant().epochMilliseconds);
   const alerts: LwqlAlerts = new Map();
   const converge = (store: LwqlStore, drift: LwqlAppOwnedDrift) =>
-    convergeStore({ store, drift, convergeAppOwned: deps.convergeAppOwned, alerts, now });
+    convergeStore({
+      store,
+      drift,
+      convergeAppOwned: deps.convergeAppOwned,
+      alerts,
+      unconfirmedSince: deps.unconfirmedSince,
+      now,
+    });
 
   return async ({ fillKeyMap }, { attempt } = FIRST_DELIVERY): Promise<void> => {
     // Only a failed fill throws, so a redelivery owes that fill alone. The next wake's check

@@ -9,8 +9,12 @@ import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytic
 import { ClickHouseLangWatchQLAppFunctionStoreRepository } from "../clickhouse/clickhouse.langwatch-ql-app-function-store.repository.ts";
 import type { LwqlProvisioningDatabase } from "../langwatch-ql-postgres.repository.ts";
 import { RedisAnalyticsRateLimitRepository } from "../redis/redis.analytics-rate-limit.repository.ts";
+import {
+  type LwqlUnconfirmedSinceRedis,
+  RedisLwqlUnconfirmedSinceRepository,
+} from "../redis/redis.langwatch-ql-unconfirmed-since.repository.ts";
 
-/** Analytics' live stores: rows in ClickHouse, windows in Redis, LangWatchQL's server targets. */
+/** Analytics' live stores: ClickHouse rows, Redis windows and a clock, LangWatchQL's targets. */
 export class LiveAnalyticsRepositories {
   static readonly requires = [
     "clickhouse",
@@ -18,6 +22,7 @@ export class LiveAnalyticsRepositories {
     "clickhouseAdmin",
     "databaseTarget",
     "prisma",
+    "redis",
   ] as const;
 
   static create({
@@ -26,12 +31,14 @@ export class LiveAnalyticsRepositories {
     clickhouseAdmin,
     databaseTarget,
     prisma,
+    redis,
   }: Readonly<{
     clickhouse: ClickHouseQueryClient;
     rateLimiter: RateLimiter;
     clickhouseAdmin: LangWatchQlSupply["admin"];
     databaseTarget: LangWatchQlSupply["postgres"];
     prisma: LwqlProvisioningDatabase;
+    redis: LwqlUnconfirmedSinceRedis;
   }>): AnalyticsRepositories {
     const sessions = ClickHouseAnalyticsSessionsRepository.create(clickhouse);
     const resolveClient = (tenantId: string) => sessions.resolve(tenantId);
@@ -45,7 +52,12 @@ export class LiveAnalyticsRepositories {
       appFunctionStore: ClickHouseLangWatchQLAppFunctionStoreRepository.create(clickhouse),
       recency: ClickHouseAnalyticsRecencyRepository.create(clickhouse),
       rateLimits: RedisAnalyticsRateLimitRepository.create(rateLimiter),
-      langWatchQl: { admin: clickhouseAdmin, postgres: databaseTarget, database: () => prisma },
+      langWatchQl: {
+        admin: clickhouseAdmin,
+        postgres: databaseTarget,
+        database: () => prisma,
+        unconfirmedSince: RedisLwqlUnconfirmedSinceRepository.create({ redis }),
+      },
     };
   }
 }

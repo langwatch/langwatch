@@ -280,6 +280,7 @@ function lwqlProvisioningOperations({
     settings: {
       LWQL_ACCESS_MODEL_MODE: settings.accessModelMode,
       LWQL_ACCESS_MODEL_SQL_SINGLE_NODE: settings.sqlSingleNode,
+      CLICKHOUSE_CLUSTER: settings.clickhouseCluster,
     },
     openRepository,
   });

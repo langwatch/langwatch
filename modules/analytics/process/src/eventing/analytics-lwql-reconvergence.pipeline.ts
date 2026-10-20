@@ -18,6 +18,7 @@ import {
 
 import type { LwqlAppOwnedDrift } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import type { AnalyticsRepositories } from "../repositories/analytics.repositories.ts";
+import type { LwqlUnconfirmedSinceRepository } from "../repositories/langwatch-ql-unconfirmed-since.repository.ts";
 import type { LwqlAccessModelOwner } from "../rules/langwatch-ql-config-store.rules.ts";
 import {
   LWQL_RECONVERGENCE_PROCESS_NAME,
@@ -47,8 +48,11 @@ interface LwqlReconvergenceApp {
 
 export function buildLwqlReconvergence({
   app,
+  unconfirmedSince,
 }: {
   app: LwqlReconvergenceApp;
+  /** Shared by the fleet, so the unconfirmed-collection alert waits on time, not on one worker. */
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
 }): StaticPipelineDefinition<never> {
   return definePipeline({
     name: LWQL_RECONVERGENCE_PIPELINE_NAME,
@@ -74,6 +78,7 @@ export function buildLwqlReconvergence({
             findDrift: () => app.findLwqlAppOwnedDrift(),
             convergeAppOwned: (drift) => app.convergeLwqlAppOwnedObjects(drift),
             fillKeyMap: () => app.fillLwqlProjectKeys({ dryRun: false }),
+            unconfirmedSince,
           }),
         )
         // One check at a time. Only a failed key-map fill throws: its check is delivered again
@@ -105,12 +110,15 @@ function isReconvergenceApp(app: unknown): app is LwqlReconvergenceApp {
 /** Narrowed to the constructed app, as licensing's middleware bindings do, not the contract. */
 export const lwqlReconvergenceEventing = defineEventingModule({
   pipeline: LWQL_RECONVERGENCE_PIPELINE_NAME,
-  build: ({ app }: EventingSetup<AnalyticsRepositories, AnalyticsApi>) => {
+  build: ({ app, repositories }: EventingSetup<AnalyticsRepositories, AnalyticsApi>) => {
     if (!isReconvergenceApp(app)) {
       throw new TypeError(
         "The LangWatchQL reconvergence watch requires the constructed analytics app",
       );
     }
-    return buildLwqlReconvergence({ app });
+    return buildLwqlReconvergence({
+      app,
+      unconfirmedSince: repositories.langWatchQl.unconfirmedSince,
+    });
   },
 });

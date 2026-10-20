@@ -18,6 +18,7 @@ import {
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
+  type LwqlCollectionProbe,
   type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
@@ -28,7 +29,9 @@ import type {
   ProvisioningFailureLevel,
 } from "../repositories/langwatch-ql-provisioning.repository.ts";
 import { PrismaLangWatchQLPostgresRepository } from "../repositories/prisma/prisma.langwatch-ql-postgres.repository.ts";
+import { collectionUnconfirmedError } from "../rules/langwatch-ql-collection-probe.rules.ts";
 import {
+  clickHouseErrorCodeFields,
   clickHouseErrorSummary,
   postgresErrorCodeFields,
 } from "../rules/langwatch-ql-config-store.rules.ts";
@@ -233,6 +236,97 @@ async function withSelfProvisionLock<T>({
   });
 }
 
+/** Whether both reads succeeded; when one failed, which read and its error. */
+type LwqlCollectionProbeResult =
+  | { readonly shown: true }
+  | { readonly shown: false; readonly read: string; readonly error: unknown };
+
+async function probeCollection({
+  repository,
+  probe,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  probe: LwqlCollectionProbe;
+  cluster: string | undefined;
+}): Promise<LwqlCollectionProbeResult> {
+  const reads = {
+    collection: () =>
+      repository.probePostgresCollection({
+        collection: probe.collection,
+        relation: probe.relation,
+        cluster,
+      }),
+    appCredentials: () =>
+      repository.probePostgresCredentials({
+        credentials: probe.connection,
+        relation: probe.relation,
+        cluster,
+      }),
+  };
+  for (const [read, run] of Object.entries(reads)) {
+    try {
+      await run();
+    } catch (error) {
+      return { shown: false, read, error };
+    }
+  }
+  return { shown: true };
+}
+
+/** What the gate decided, and the present engine tables it left on their current pool. */
+interface LwqlEngineTableGate {
+  readonly collectionLoaded: boolean;
+  readonly only: readonly string[] | undefined;
+  readonly left?: { readonly read: string; readonly error: unknown; readonly tables: number };
+}
+
+/**
+ * Stamps the engine tables only once ClickHouse is shown to hold the app's collection values.
+ * Unshown, a check leaves each present engine table on its pool and a deploy replaces them
+ * unstamped, so a later check rebuilds them once the values load (#8858).
+ */
+async function gateEngineTables({
+  repository,
+  request,
+  names,
+  only,
+  cluster,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  request: Extract<LwqlSelfProvisionRequest, { complete: true }>;
+  names: LangWatchQLNames;
+  only: readonly string[] | undefined;
+  /** `CLICKHOUSE_CLUSTER`: set, both reads must pass on every replica. */
+  cluster: string | undefined;
+}): Promise<LwqlEngineTableGate> {
+  const engineTables = selfProvisioning.engineTablesIn({ only });
+  if (engineTables.length === 0) return { collectionLoaded: false, only };
+  const probe = selfProvisioning.collectionProbe({
+    names,
+    postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+  });
+  const result = await probeCollection({ repository, probe, cluster });
+  if (result.shown) return { collectionLoaded: true, only };
+  const { read, error } = result;
+  logger.warn(
+    { read, error: clickHouseErrorSummary(error), ...clickHouseErrorCodeFields(error) },
+    "lwql could not show that ClickHouse holds the app's PostgreSQL credentials in the named collection, so no engine table is rebuilt on them yet; the next check retries",
+  );
+  if (only === undefined) return { collectionLoaded: false, only };
+  const present = await repository.readInventory({
+    database: names.database,
+    relations: engineTables,
+    functions: [],
+  });
+  const left = only.filter((name) => present.relations.includes(name));
+  return {
+    collectionLoaded: false,
+    only: only.filter((name) => !left.includes(name)),
+    ...(left.length === 0 ? {} : { left: { read, error, tables: left.length } }),
+  };
+}
+
 /** Inventory, app-function probe, SQL-mode guard, then the statements; the key map is a step's. */
 async function convergeClickHouse({
   repository,
@@ -258,6 +352,18 @@ async function convergeClickHouse({
   if (mode === "sql") {
     await clusterGuard.assertSafe({ query: (sql) => repository.queryRows(sql), source });
   }
+  // A sql-mode deploy creates the collection in its own batch, so it stamps unprobed. A check
+  // probes in either mode: it never recreates the collection, and an unstamped table would loop.
+  const gate: LwqlEngineTableGate =
+    mode === "sql" && only === undefined
+      ? { collectionLoaded: false, only }
+      : await gateEngineTables({
+          repository,
+          request,
+          names,
+          only,
+          cluster: source.CLICKHOUSE_CLUSTER || undefined,
+        });
   const result = await repository.runStatements({
     configStoreEntities,
     failureLevel,
@@ -268,7 +374,8 @@ async function convergeClickHouse({
       postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
       includeAppFunctions,
       mode,
-      ...(only === undefined ? {} : { only }),
+      collectionLoaded: gate.collectionLoaded,
+      ...(gate.only === undefined ? {} : { only: gate.only }),
     }),
   });
   if (result.skipped.length > 0) {
@@ -276,6 +383,11 @@ async function convergeClickHouse({
       { skippedCount: result.skipped.length },
       "lwql provisioning yielded to config-store-owned entities and provisioned the rest",
     );
+  }
+  // Raised after the rest converged, so the check's alerting sees tables left on old credentials.
+  if (gate.left) {
+    const { read, error, tables } = gate.left;
+    throw collectionUnconfirmedError({ read, engineTables: tables, cause: error });
   }
 }
 
@@ -287,7 +399,7 @@ export interface LwqlConvergencePlan {
   readonly sourceDatabase: () => string;
   readonly schema: string;
   readonly connectionLimit?: number;
-  /** `LWQL_ACCESS_MODEL_MODE` and `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE`. */
+  /** `LWQL_ACCESS_MODEL_MODE`, `LWQL_ACCESS_MODEL_SQL_SINGLE_NODE` and `CLICKHOUSE_CLUSTER`. */
   readonly settings: Readonly<Record<string, string | undefined>>;
   readonly openRepository: () => LangWatchQLProvisioningRepository;
 }
@@ -488,19 +600,23 @@ async function expectedAppFunctions({
 }
 
 /**
- * Which app-owned objects are absent, from catalog reads only: the key map, engine tables, views
- * and app functions in ClickHouse, the approved views and their grant in PostgreSQL. Columns are
- * the deploy's, never compared. Throws when ClickHouse cannot be read.
+ * Which app-owned objects are absent, from catalog reads only (key map, engine tables, views,
+ * app functions; approved views and their grant). An engine table not stamped with the current
+ * credentials counts as absent; columns are never compared. Throws when ClickHouse is unreadable.
  */
 export async function findLwqlAppOwnedDrift({
   database,
   plan,
 }: {
   database: LwqlProvisioningDatabase;
-  plan: Pick<LwqlConvergencePlan, "names" | "schema" | "openRepository">;
+  plan: Pick<LwqlConvergencePlan, "request" | "names" | "schema" | "openRepository">;
 }): Promise<LwqlAppOwnedDrift> {
-  const { names } = plan;
+  const { names, request } = plan;
   const relations = selfProvisioning.appOwnedRelations({ names });
+  const credentialFingerprint = selfProvisioning.credentialFingerprint({
+    names,
+    postgres: { endpoint: request.endpoint, readerPassword: request.postgresReaderPassword },
+  });
   const clickHouse = await withProvisioningRepository({
     open: plan.openRepository,
     fn: async (repository) => {
@@ -510,7 +626,13 @@ export async function findLwqlAppOwnedDrift({
         functions: lwqlAppFunctionNames(),
       });
       const functions = await expectedAppFunctions({ repository, held: found.functions });
-      return selfProvisioning.findDrift({ names, relations, functions, found });
+      return selfProvisioning.findDrift({
+        names,
+        relations,
+        functions,
+        found,
+        credentialFingerprint,
+      });
     },
   });
   const postgres = await readPostgresGaps({ database, schema: plan.schema });

@@ -6,6 +6,7 @@ import type { AnalyticsRepository } from "./analytics.repository.ts";
 import type { LangWatchQLAppFunctionStoreRepository } from "./langwatch-ql-app-function-store.repository.ts";
 import type { LwqlProvisioningDatabase } from "./langwatch-ql-postgres.repository.ts";
 import type { ClickHouseAdminStatements } from "./langwatch-ql-provisioning.repository.ts";
+import type { LwqlUnconfirmedSinceRepository } from "./langwatch-ql-unconfirmed-since.repository.ts";
 
 /**
  * Whether this deployment offers LangWatchQL (ADR-159): the credential-free ClickHouse target and
@@ -34,6 +35,8 @@ export type LangWatchQlSupply = Readonly<{
       }
   >;
   database: () => LwqlProvisioningDatabase;
+  /** The fleet's first failure to show the collection loaded, for the check's alert. */
+  unconfirmedSince: LwqlUnconfirmedSinceRepository;
 }>;
 
 /** What the analytics module reads and counts, chosen once at boot. */
