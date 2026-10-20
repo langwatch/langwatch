@@ -54,6 +54,13 @@ const registry = {
     ],
   },
 
+  dataset_invalid_column: {
+    tips: [
+      "Add the column to the dataset, or remove it from the row, and send it again; retrying unchanged will fail identically",
+      "The message names the dataset's valid columns",
+    ],
+  },
+
   // ---- traces ----
   trace_not_found: {
     tips: [
