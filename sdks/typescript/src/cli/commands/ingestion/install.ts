@@ -8,11 +8,7 @@ import {
 } from "@/cli/utils/governance/claude-plugin";
 import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
-import {
-  buildOtelEnvBlock,
-  SOURCE_TYPE_BY_TOOL,
-  TOOL_BY_SOURCE_TYPE,
-} from "@/cli/utils/governance/otel-env-block";
+import { buildOtelEnvBlock, TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import { sessionContextAgentByKeySourceType } from "@/cli/utils/governance/session-context-agents";
 import { installSessionContextHooks } from "@/cli/utils/governance/session-context-hooks";
 import {
@@ -117,16 +113,9 @@ export async function installCommand(toolArg: string, options: InstallOptions = 
   }
 }
 
-/**
- * The source type a tool argument names. A command name (`copilot`) reads as
- * the source type it mints under (`copilot_cli`), through the same table the
- * rest of the CLI keys its config by.
- */
 function normaliseTool(raw: string): SupportedTool | null {
   const slug = raw.trim().toLowerCase().replace(/-/g, "_");
-  if (isSupportedTool(slug)) return slug;
-  const sourceType = SOURCE_TYPE_BY_TOOL[slug];
-  return sourceType && isSupportedTool(sourceType) ? sourceType : null;
+  return isSupportedTool(slug) ? slug : null;
 }
 
 async function runInstall(

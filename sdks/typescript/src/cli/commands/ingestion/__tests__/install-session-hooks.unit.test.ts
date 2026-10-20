@@ -97,7 +97,7 @@ const runOpencodeInstall = async (): Promise<void> => {
 
 const runCopilotInstall = async (): Promise<void> => {
   const { installCommand } = await import("../install.js");
-  await installCommand("copilot");
+  await installCommand("copilot_cli");
 };
 
 /** What `langwatch logout` does with the targets it finds, without its prompt or revoke. */
@@ -336,7 +336,7 @@ describe("the copilot ingestion install", () => {
 
     it("mints the key under the CLI's own source type", async () => {
       const { installCommand } = await import("../install.js");
-      await installCommand("copilot", { json: true });
+      await installCommand("copilot_cli", { json: true });
 
       expect(mintIngestionKeyMock.mock.calls[0]?.[1]).toBe("copilot_cli");
       expect(JSON.parse(stdout())).toMatchObject({
@@ -348,7 +348,7 @@ describe("the copilot ingestion install", () => {
 
     it("writes no hook file when only the exports were asked for", async () => {
       const { installCommand } = await import("../install.js");
-      await installCommand("copilot", { envOnly: true });
+      await installCommand("copilot_cli", { envOnly: true });
 
       expect(fs.existsSync(copilotHooksDir)).toBe(false);
     });
