@@ -807,9 +807,15 @@ export class FoldProjectionExecutor {
       typeof loaded === "object" && loaded !== null
         ? Reflect.get(loaded, projection.LastEventOccurredAtKey)
         : 0;
+    // A missed event whose key the stored set already holds is a redelivery of
+    // the copy that arrived first. It must not vouch for that key, or a history
+    // read lagging behind the log would fold it in the first copy's place: only
+    // the log can account for the key, and the rebuild retries until it does.
+    const missedToken = appliedTokenOf(missed);
+    const redeliversAppliedKey = missedToken !== missed.id && appliedEventIds.includes(missedToken);
     const { history, gap } = await this.readHistoryUntilComplete({
       projection,
-      delivered: [missed],
+      delivered: redeliversAppliedKey ? [] : [missed],
       context,
       occurredAtMs: missed.occurredAt,
       loadedAppliedIds: appliedEventIds,
@@ -823,7 +829,7 @@ export class FoldProjectionExecutor {
     const consumes = projectionConsumes<E, Event>(projection);
     // By applied token: a redelivery under a new id is the event the log kept.
     const seen = new Set(history.map(appliedTokenOf));
-    const alreadyInHistory = seen.has(appliedTokenOf(missed));
+    const alreadyInHistory = seen.has(missedToken);
     const replaysMissed = !alreadyInHistory && consumes(missed);
     const combined = [...history.filter(consumes), ...(replaysMissed ? [missed] : [])].toSorted(
       (a, b) => compareFoldEvents(projection, a, b),
