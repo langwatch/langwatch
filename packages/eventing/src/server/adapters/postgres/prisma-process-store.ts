@@ -62,6 +62,12 @@ function isPrismaTransactionClient(
 
 class DuplicateInboxRollback extends Error {}
 
+/** One instance a wake claim took, with the due time it held before the claim moved it. */
+type ClaimedWakeRow = Pick<
+  ProcessManagerInstance,
+  "processName" | "projectId" | "processKey" | "revision"
+> & { wakeAt: Date };
+
 /** A commit or transaction before its read: `decide` sees the row the lock is holding. */
 type LockedWrite<State> = Omit<ProcessTransaction<State>, "apply"> & {
   decide: (
@@ -789,6 +795,77 @@ export class PrismaProcessStore implements ProcessStore {
             },
           ],
     );
+  }
+
+  async leaseDueWakes(params: {
+    now: number;
+    limit: number;
+    leaseDurationMs: number;
+    processNames?: readonly string[];
+  }): Promise<DueWake[]> {
+    if (params.limit <= 0) return [];
+    if (params.processNames && params.processNames.length === 0) return [];
+    const processNameFilter = params.processNames
+      ? Prisma.sql`AND "processName" IN (${Prisma.join([...params.processNames])})`
+      : Prisma.empty;
+    // One statement claims the batch, as leaseDueMessages does: SKIP LOCKED hands concurrent
+    // workers disjoint rows and never waits, and the lease keeps a claimed row out of later
+    // scans. The revision is untouched, so the wake's fence still holds against any commit.
+    const rows = await this.#prisma.$queryRaw<ClaimedWakeRow[]>(
+      Prisma.sql`
+        ${skipTenantCheck({
+          // The due-wake claim is cross-project worker infrastructure: it takes every process
+          // instance whose wake time has passed, in any project.
+          SKIP_TENANT_CHECK: true,
+        })}
+        WITH due AS MATERIALIZED (
+          SELECT "id", "nextWakeAt"
+          FROM "ProcessManagerInstance"
+          WHERE "nextWakeAt" <= ${asDate(params.now)}
+          ${processNameFilter}
+          ORDER BY "nextWakeAt" ASC, "processName" ASC,
+                   "projectId" ASC, "processKey" ASC
+          FOR UPDATE SKIP LOCKED
+          LIMIT ${params.limit}
+        ),
+        claimed AS (
+          UPDATE "ProcessManagerInstance" AS instance
+          SET "nextWakeAt" = ${asDate(params.now + params.leaseDurationMs)}
+          FROM due
+          WHERE instance."id" = due."id"
+          RETURNING instance."processName", instance."projectId", instance."processKey",
+                    instance."revision", due."nextWakeAt" AS "wakeAt"
+        )
+        SELECT * FROM claimed
+        ORDER BY "wakeAt" ASC, "processName" ASC, "projectId" ASC, "processKey" ASC
+      `,
+    );
+    return rows.map((row) => ({
+      ref: {
+        processName: row.processName,
+        projectId: row.projectId,
+        processKey: row.processKey,
+      },
+      revision: row.revision,
+      wakeAt: row.wakeAt.getTime(),
+    }));
+  }
+
+  async releaseWakeClaim(params: {
+    ref: ProcessRef;
+    revision: number;
+    wakeAt: number;
+    claimedUntil: number;
+  }): Promise<{ applied: boolean }> {
+    const result = await this.#prisma.processManagerInstance.updateMany({
+      where: {
+        ...refWhere(params.ref),
+        revision: params.revision,
+        nextWakeAt: asDate(params.claimedUntil),
+      },
+      data: { nextWakeAt: asDate(params.wakeAt) },
+    });
+    return { applied: result.count === 1 };
   }
 
   async requeueDeadMessages(params: {
