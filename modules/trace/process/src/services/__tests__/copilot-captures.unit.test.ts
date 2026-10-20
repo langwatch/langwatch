@@ -89,6 +89,11 @@ describe("Copilot canonicalisation over real captures", () => {
     describe("when the canonicalisation chain runs", () => {
       const attributes = canonicalizeCaptured(vscodeAgentSpan);
 
+      /** @scenario A VS Code agent rollup is not counted on top of its chat spans */
+      it("flags the rollup to skip token accumulation", () => {
+        expect(attributes["langwatch.reserved.skip_token_accumulation"]).toBe("true");
+      });
+
       /** @scenario A captured VS Code agent rollup keeps the repository as the remote URL it was sent as */
       it("carries the repository remote URL as metadata", () => {
         expect(attributes["metadata.copilot_repository"]).toBe(

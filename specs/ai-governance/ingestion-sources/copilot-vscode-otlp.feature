@@ -86,7 +86,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
     ADR-039 §Extension #3. Each scenario replays a redacted VS Code Copilot Chat
     0.67 capture from #8803.
 
-    @unit @unimplemented
+    @unit
     Scenario: A VS Code agent rollup is not counted on top of its chat spans
       Given a redacted invoke_agent span captured from VS Code Copilot Chat
       When the canonicalisation chain runs
