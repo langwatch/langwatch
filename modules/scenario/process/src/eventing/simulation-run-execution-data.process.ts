@@ -162,6 +162,12 @@ export const finishRunIntentSchema = z.object({
   projectId: z.string(),
   status: z.string(),
   error: z.string().optional(),
+  /**
+   * When the outcome became true, in business time (stall deadline, cancel grace deadline, or
+   * the event that made the run unexecutable), so a run caught up long after it died is not
+   * finished "today". Optional so intents already in the outbox parse; those finish now.
+   */
+  outcomeAtMs: z.number().optional(),
 });
 export type FinishRunIntent = z.infer<typeof finishRunIntentSchema>;
 
