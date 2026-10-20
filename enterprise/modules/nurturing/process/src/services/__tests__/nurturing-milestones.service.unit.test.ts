@@ -322,6 +322,60 @@ describe("NurturingMilestonesService", () => {
         { organizationEvaluationCount: 1 },
       ]);
     });
+
+    describe("when giving the failed project's claims back fails too", () => {
+      it("still reports the count failure and goes on to the next project", async () => {
+        const memory = MemoryNurturingMilestonesRepository.create();
+        const claimed = new Set<string>();
+        const service = NurturingMilestonesService.create({
+          milestones: {
+            recordOrganization: (input) => memory.recordOrganization(input),
+            countSimulationRun: (input) => memory.countSimulationRun(input),
+            countEvaluation: async (input) => {
+              if (input.organizationId === "org-1") throw new Error("database unavailable");
+              return memory.countEvaluation(input);
+            },
+          },
+          projects: MemoryNurturingProjectDirectoryRepository.create({
+            placed: new Map([
+              ["project-1", "org-1"],
+              ["project-2", "org-2"],
+            ]),
+          }),
+          claims: {
+            claim: async (key) => {
+              if (claimed.has(key)) return false;
+              claimed.add(key);
+              return true;
+            },
+            release: async () => {
+              throw new Error("redis unavailable");
+            },
+          },
+        });
+        await service.projectCreated(projectCreatedFact());
+        await service.projectCreated(
+          projectCreatedFact({
+            projectId: "project-2",
+            organizationId: "org-2",
+            adminUserId: "admin-2",
+          }),
+        );
+        const batch = [
+          settled("eval-1"),
+          settled("eval-2", { tenantId: "project-2", projectId: "project-2" }),
+        ];
+        const delivered: NurturingSignal[] = [];
+        const deliver = async (signal: NurturingSignal) => void delivered.push(signal);
+
+        await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow(
+          COUNT_FAILED,
+        );
+        expect(delivered).toMatchObject([
+          { projectId: "project-2", organizationEvaluationCount: 1 },
+        ]);
+      });
+    });
   });
 
   describe("when taking a claim fails", () => {

@@ -200,7 +200,7 @@ export class NurturingMilestonesService {
       try {
         signals = await signalsFor(project);
       } catch (error) {
-        await Promise.all(
+        await Promise.allSettled(
           project.map((item) => this.dependencies.claims.release(claimKeyOf(item))),
         );
         failures.push(error);
