@@ -682,13 +682,12 @@ describe("given the PostgreSQL-resident catalog mapped into ClickHouse through t
         `SELECT ${PG_MAPPED_TENANT_COLUMN} FROM ${database}.${PG_MAPPED_VIEW}`,
       );
 
-      const tenants = (tenantId: string) =>
-        rows.filter((row) => row.TenantId === tenantId).length;
+      const tenants = (tenantId: string) => rows.filter((row) => row.TenantId === tenantId).length;
       expect(tenants(harness.tenantA.tenantId)).toBe(control.tenantA);
       expect(tenants(harness.tenantB.tenantId)).toBe(control.tenantB);
       expect(rows).toHaveLength(control.tenantA + control.tenantB);
 
-      const [low, high] = [harness.tenantA.tenantId, harness.tenantB.tenantId].sort();
+      const [low, high] = [harness.tenantA.tenantId, harness.tenantB.tenantId].toSorted();
       const scans = statementsLoggedSince(before, await postgres.readLog()).filter((statement) =>
         statement.includes(postgres.approvedView),
       );
