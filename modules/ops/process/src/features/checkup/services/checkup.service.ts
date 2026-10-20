@@ -187,7 +187,9 @@ export class CheckupService {
         outcome: "unchecked",
         detail:
           "ClickHouse did not answer the provisioning probe (system.replicas and, when replicated, system.zookeeper and system.functions).",
-        fix: "Give the app's ClickHouse user read access to system.replicas, system.zookeeper, system.clusters and system.functions; the cross-replica read (clusterAllReplicas) also needs the REMOTE grant and inter-server authentication on every replica.",
+        fix:
+          "Give the app's ClickHouse user read access to system.replicas, system.zookeeper, system.clusters and system.functions; " +
+          "the cross-replica read (clusterAllReplicas) also needs the REMOTE grant and inter-server authentication on every replica.",
         docsPath: CHECKUP_DOCS.lwql,
       };
     }
