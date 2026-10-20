@@ -1380,11 +1380,16 @@ export function pendingWaitDispatches({
   return dispatches;
 }
 
-/** Whitespace tokens of a command, with simple single/double quotes kept as one token. */
+/**
+ * Tokens of a command: simple single/double quotes stay one token, and unquoted
+ * `&&`, `||`, `;`, `|`, `&` and newline are their own tokens even when glued to
+ * a word. A newline becomes `;` so it never reads as a quoted token.
+ */
 function commandTokens(command: string): string[] {
-  return (command.match(/"[^"]*"|'[^']*'|\S+/g) ?? []).map((token) =>
-    /^(["']).*\1$/.test(token) ? token.slice(1, -1) : token,
-  );
+  return (command.match(/"[^"]*"|'[^']*'|&&|\|\||[;|&\n]|[^\s;|&"']+/g) ?? []).map((token) => {
+    if (token === "\n") return ";";
+    return /^(["']).*\1$/.test(token) ? token.slice(1, -1) : token;
+  });
 }
 
 const OPEN_GROUP = /^(\$\(|\(|`)+/;
@@ -1394,7 +1399,7 @@ const CLOSE_GROUP = /[)`]+$/;
 function commandSegments(tokens: string[]): string[][] {
   const segments: string[][] = [[]];
   for (const token of tokens) {
-    if (["&&", "||", ";", "|"].includes(token)) segments.push([]);
+    if (["&&", "||", ";", "|", "&"].includes(token)) segments.push([]);
     else {
       if (OPEN_GROUP.test(token)) segments.push([]);
       const bare = token.replace(OPEN_GROUP, "").replace(CLOSE_GROUP, "");

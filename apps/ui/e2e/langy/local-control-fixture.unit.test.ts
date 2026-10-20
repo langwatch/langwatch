@@ -610,6 +610,13 @@ describe("isDeleteCommand", () => {
     ["echo $(langwatch monitor remove y)", true],
     ["echo `langwatch evaluator delete x`", true],
     ["cd /tmp; (langwatch evaluator delete x)", true],
+    ["langwatch evaluator list\nlangwatch evaluator delete x", true],
+    ["cd /tmp&&langwatch evaluator delete x", true],
+    ["ls;langwatch monitor delete y", true],
+    ["a&langwatch evaluator delete x", true],
+    ["x|langwatch evaluator delete z", true],
+    ['langwatch evaluator get "a;b"', false],
+    ["langwatch evaluator list\nlangwatch evaluator get x", false],
     // The CLI rejects a global flag before the resource ("unknown option
     // '--format'"), so this form never deletes and is not treated as one.
     ["langwatch --format json evaluator delete x", false],
