@@ -89,8 +89,20 @@ describe("identity's sign-in switch carry-over step", () => {
       signal: new AbortController().signal,
     };
     try {
-      expect(await step.run({ log: { info: () => undefined, warn: () => undefined }, ...context, dryRun: false })).toEqual({ copied: 0 });
-      expect(await step.run({ log: { info: () => undefined, warn: () => undefined }, ...context, dryRun: true })).toEqual({ wouldCopy: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: false,
+        }),
+      ).toEqual({ copied: 0 });
+      expect(
+        await step.run({
+          log: { info: () => undefined, warn: () => undefined },
+          ...context,
+          dryRun: true,
+        }),
+      ).toEqual({ wouldCopy: 0 });
     } finally {
       await runtime.stop();
     }

@@ -168,7 +168,8 @@ export async function runStep({
   signal?: AbortSignal;
 }) {
   const saves: MigrationStepReport[] = [];
-  const report = await step.run({ log: { info: () => undefined, warn: () => undefined },
+  const report = await step.run({
+    log: { info: () => undefined, warn: () => undefined },
     checkpoint: { resumeFrom, save: async ({ report: saved }) => void saves.push(saved) },
     dryRun,
     signal,

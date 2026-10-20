@@ -245,7 +245,8 @@ describe("given the licensing module installed on a worker", () => {
 
     expect(step).toMatchObject({ kind: "data", mode: "background", needsOldWritersGone: true });
     await expect(
-      step?.run({ log: { info: () => undefined, warn: () => undefined },
+      step?.run({
+        log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
         dryRun: false,
         signal: new AbortController().signal,

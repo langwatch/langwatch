@@ -181,7 +181,8 @@ async function runStep({
   dryRun?: boolean;
 }): Promise<{ report: MigrationStepReport; saves: MigrationStepReport[] }> {
   const saves: MigrationStepReport[] = [];
-  const report = await worker.step(STEP).run({ log: { info: () => undefined, warn: () => undefined },
+  const report = await worker.step(STEP).run({
+    log: { info: () => undefined, warn: () => undefined },
     checkpoint: { resumeFrom, save: async ({ report: saved }) => void saves.push(saved) },
     dryRun,
     signal: new AbortController().signal,
