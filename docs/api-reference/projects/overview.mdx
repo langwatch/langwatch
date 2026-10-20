@@ -31,6 +31,19 @@ Project API keys (`X-Auth-Token`) cannot be used here, because they lack organiz
 | `GET`    | `/api/v1/projects/{id}/api-key`            | Get the project's API key                                    |
 | `POST`   | `/api/v1/projects/{id}/regenerate-api-key` | Regenerate the project API key                               |
 
+## Dashboards boards
+
+These routes manage the boards of the Dashboards area in one project. Unlike the routes above, they take the project API key in the `X-Auth-Token` header, not an organization key.
+
+| Method   | Path                                                   | Description                                                                    |
+| -------- | ------------------------------------------------------ | ------------------------------------------------------------------------------ |
+| `GET`    | `/api/v1/projects/{projectId}/analytics/boards`           | List the project's boards, each with its `widgetCount`                         |
+| `GET`    | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Get one board                                                                   |
+| `POST`   | `/api/v1/projects/{projectId}/analytics/boards`           | Create an empty board from a `name`; answers `201` with the board              |
+| `DELETE` | `/api/v1/projects/{projectId}/analytics/boards/{boardId}` | Delete a board; its widgets stay saved but are no longer on a board            |
+
+A board in another project answers `404`. For example, a scenario's [setup and teardown hooks](/agent-testing/setup-and-teardown-hooks#example-a-dashboards-board-per-run) can create a board for each run and delete it afterwards.
+
 ## Moving a Project to Another Team
 
 You can move a project to a different team by including `teamId` in the `PATCH` request:
