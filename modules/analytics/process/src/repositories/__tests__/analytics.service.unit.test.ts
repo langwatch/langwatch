@@ -7,25 +7,18 @@ import type {
   SharedFiltersInput,
 } from "@langwatch/analytics-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
-import {
-  ClickHouseQueryClient,
-  fenceFor,
-  type QueryRequest,
-  TenantGuard,
-} from "@langwatch/clickhouse-client";
+import { fenceFor } from "@langwatch/clickhouse-client";
 import { InProcessTenantStatementLimiter } from "@langwatch/limiter";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { clickHouseClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
-import { addDays, differenceInCalendarDays, Temporal } from "@langwatch/time";
+import { addDays, differenceInCalendarDays, nowInstant, Temporal } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
 import { AnalyticsService } from "../../services/analytics.service.ts";
 import { NullAnalyticsEvaluationRepository } from "../analytics-persistence.repository.ts";
 import { AnalyticsRepository, type AnalyticsTimeseriesQuery } from "../analytics.repository.ts";
-import {
-  ClickHouseAnalyticsEvaluationRepository,
-  type EvaluationAnalyticsClickHouseClient,
-} from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
+import { clickHouseQueryClientOver } from "../clickhouse/__tests__/support/clickhouse-query-client.support.ts";
+import { ClickHouseAnalyticsEvaluationRepository } from "../clickhouse/clickhouse.analytics-persistence.repository.ts";
 import { pickAnalyticsTable } from "../clickhouse/clickhouse.analytics-route-table.mapper.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse/clickhouse.analytics.repository.ts";
 import { analyticsProof, analyticsTestAuthz } from "./analytics-proof.fixture.ts";
@@ -39,41 +32,14 @@ const tenantLimiter = ({ maxConcurrent = 4 }: { maxConcurrent?: number } = {}) =
     overloadErrorFactory: { create: ({ cause }: { cause: unknown }) => cause },
   });
 
-/** The fenced reads' routed client, sending each statement through the same client double. */
-const queryClientOver = (
-  resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>,
-): ClickHouseQueryClient =>
-  new ClickHouseQueryClient({
-    tenantGuard: new TenantGuard(),
-    driver: {
-      async execute<Row>(request: QueryRequest) {
-        const client = await resolveClient(request.tenantId);
-        if (!client) throw new Error("ClickHouse client unavailable");
-        const result = await client.query({
-          query: request.sql,
-          query_params: request.params ?? {},
-          format: "JSONEachRow",
-          ...(request.settings === undefined ? {} : { clickhouse_settings: request.settings }),
-        });
-        return { rows: (await result.json()) as Row[] };
-      },
-      insert: async () => {
-        throw new Error("No insert is expected through the fenced reader");
-      },
-      command: async () => {
-        throw new Error("No command is expected through the fenced reader");
-      },
-    },
-  });
-
 const serviceOver = (options: {
-  resolveClient: (tenantId: string) => Promise<EvaluationAnalyticsClickHouseClient | null>;
+  resolveClient: (tenantId: string) => Promise<ClickHouseClient | null>;
   clickhouseEnabled: boolean;
 }): AnalyticsService =>
   AnalyticsService.create({
     repository: ClickHouseAnalyticsRepository.create({
       resolveClient: options.resolveClient,
-      clickhouse: queryClientOver(options.resolveClient),
+      clickhouse: clickHouseQueryClientOver(options.resolveClient),
     }),
     evaluationRepository: options.clickhouseEnabled
       ? ClickHouseAnalyticsEvaluationRepository.create({
@@ -607,13 +573,13 @@ describe("AnalyticsService under a proof (ADR-177)", () => {
     it("reads each caller's series under its own proof and serves a repeat from the cache", async () => {
       const repository = new RecordingRepository();
       const service = createService(repository);
-      const withMember = analyticsProof({
+      const memberProof = analyticsProof({
         projectId: "project-1",
         shared: [member(Date.UTC(2026, 0, 1))],
       });
       const alone = analyticsProof({ projectId: "project-1" });
 
-      await service.getTimeseries(input(), { authorization: withMember });
+      await service.getTimeseries(input(), { authorization: memberProof });
       await service.getTimeseries(input(), { authorization: alone });
       // A fresh proof fencing the same windows is the same scope, so it is answered from cache.
       await service.getTimeseries(input(), {
@@ -623,7 +589,27 @@ describe("AnalyticsService under a proof (ADR-177)", () => {
         }),
       });
 
-      expect(repository.queries.map((query) => query.authorization)).toEqual([withMember, alone]);
+      expect(repository.queries.map((query) => query.authorization)).toEqual([memberProof, alone]);
+    });
+  });
+
+  describe("given a series already cached and a repeat under a proof that has expired", () => {
+    it("refuses the repeat instead of answering it from the cache", async () => {
+      const repository = new RecordingRepository();
+      const service = createService(repository);
+      await service.getTimeseries(input(), {
+        authorization: analyticsProof({ projectId: "project-1" }),
+      });
+
+      const repeat = service.getTimeseries(input(), {
+        authorization: analyticsProof({
+          projectId: "project-1",
+          expiresAt: nowInstant().epochMilliseconds - 1,
+        }),
+      });
+
+      await expect(repeat).rejects.toMatchObject({ code: "authorization_expired" });
+      expect(repository.queries).toHaveLength(1);
     });
   });
 });

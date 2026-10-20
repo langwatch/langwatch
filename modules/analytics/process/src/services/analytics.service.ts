@@ -25,6 +25,7 @@ import {
   internalActor,
   projectIdsReadBy,
   readScopeKeyOf,
+  usableAuthorization,
 } from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
@@ -234,8 +235,12 @@ export class AnalyticsService {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         refuseDisallowedSeriesAggregations(parsed);
-        const authorization =
-          options?.authorization ?? (await this.ownProof({ projectId: parsed.projectId }));
+        // Checked before the cache, so an expired or forged proof is refused even on a repeat.
+        const authorization = usableAuthorization({
+          authorization:
+            options?.authorization ?? (await this.ownProof({ projectId: parsed.projectId })),
+          now: nowInstant().epochMilliseconds,
+        });
         // Keyed on who the proof fences, not the proof: each request mints a fresh one, and two
         // callers on one aggregate with different grants must not share an answer.
         const cacheKey = JSON.stringify({

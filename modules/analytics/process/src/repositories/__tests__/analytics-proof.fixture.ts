@@ -18,13 +18,18 @@ const TEST_PROOF_LIFETIME_MS = 5 * 60 * 1000;
 /** A shared member project and the window its grant opens, in epoch milliseconds. */
 export type TestSharedWindow = { projectId: string; from: number; until?: number };
 
-/** A proof whose own grant is `projectId`, plus one shared trace grant per member window. */
+/**
+ * A proof whose own grant is `projectId`, plus one shared trace grant per member window. It
+ * lives five minutes unless `expiresAt` says otherwise.
+ */
 export function analyticsProof({
   projectId,
   shared = [],
+  expiresAt = nowInstant().epochMilliseconds + TEST_PROOF_LIFETIME_MS,
 }: {
   projectId: string;
   shared?: readonly TestSharedWindow[];
+  expiresAt?: number;
 }): Authorization {
   const own: AuthorizationGrant = {
     projectId,
@@ -44,7 +49,7 @@ export function analyticsProof({
     principal: { type: "internal", codePath: "analytics.test" },
     scope: { organizationId: TEST_ORGANIZATION_ID },
     grants: [own, ...members],
-    expiresAt: nowInstant().epochMilliseconds + TEST_PROOF_LIFETIME_MS,
+    expiresAt,
     purpose: { kind: "operator", entry: "analytics.test" },
   });
 }
