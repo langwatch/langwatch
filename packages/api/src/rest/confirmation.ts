@@ -185,7 +185,8 @@ export async function confirmMarkedRequest<Api>({
   if (!gate || !key.apiKeyId || !projectId || ids.length === 0) {
     throw new ConfirmationRequiredError({
       message:
-        "Deleting needs a confirmation click, and no confirmation card can be shown for this request.",
+        `${gerund(mark.action)} needs a confirmation click, and no confirmation card can be ` +
+        "shown for this request.",
       resource: mark.resource,
       action: mark.action,
     });
@@ -223,4 +224,10 @@ function idsOf<Api>({
   if (!Array.isArray(named)) return [];
 
   return [...new Set(named.filter((id): id is string => typeof id === "string" && id !== ""))];
+}
+
+/** "delete" → "Deleting", "disable" → "Disabling". */
+function gerund(action: string): string {
+  const stem = action.replace(/e$/, "");
+  return `${stem.charAt(0).toUpperCase()}${stem.slice(1)}ing`;
 }

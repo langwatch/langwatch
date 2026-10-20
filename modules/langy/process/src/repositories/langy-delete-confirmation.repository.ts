@@ -43,10 +43,14 @@ export abstract class LangyDeleteConfirmationRepository {
    * True for exactly one caller at a time: the one that may raise the card for this target. It
    * lapses by itself, so a caller that died mid-raise blocks nobody for long.
    */
-  abstract claimCardRaise(input: { target: ConfirmTarget; ttlSeconds: number }): Promise<boolean>;
+  abstract claimCardRaise(input: {
+    target: ConfirmTarget;
+    token: string;
+    ttlSeconds: number;
+  }): Promise<boolean>;
 
-  /** Lets the next caller raise a card for this target. */
-  abstract releaseCardRaise(target: ConfirmTarget): Promise<void>;
+  /** Lets the next caller raise a card, unless the claim lapsed and another caller now holds it. */
+  abstract releaseCardRaise(input: { target: ConfirmTarget; token: string }): Promise<void>;
 
   /** The wait of the card last raised for this target, while its record lives. */
   abstract lookupPendingCard(target: ConfirmTarget): Promise<LocalRecordLookup<string>>;

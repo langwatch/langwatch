@@ -202,6 +202,9 @@ export type RestRuntimeMembers = Readonly<{
   servedDoors?: true;
 }>;
 
+/** The logger a failed give-back of confirmation clicks is reported through. */
+const confirmationLogger = createLogger("langwatch:api:confirmation");
+
 /** Runs the handler; a fault on our side leaves the record in place, so the click is given back. */
 async function refundingOnFault<Result>(
   receipt: RestConfirmationReceipt | void,
@@ -210,7 +213,14 @@ async function refundingOnFault<Result>(
   try {
     return await run();
   } catch (error) {
-    if (receipt && !isCustomerFault(error)) await receipt.refund().catch(() => {});
+    if (receipt && !isCustomerFault(error)) {
+      await receipt.refund().catch((refundError: unknown) => {
+        confirmationLogger.warn(
+          { error: refundError, cause: error },
+          "a failed route could not give back its confirmation clicks",
+        );
+      });
+    }
     throw error;
   }
 }

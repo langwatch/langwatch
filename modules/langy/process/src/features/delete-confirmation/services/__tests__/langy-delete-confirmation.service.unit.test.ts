@@ -140,6 +140,7 @@ describe("the confirmation gate", () => {
             action: "delete",
             id: "ev_toxicity",
           },
+          token: "other-request",
           ttlSeconds: 30,
         });
 
@@ -147,7 +148,30 @@ describe("the confirmation gate", () => {
 
         expect(answer.status).toBe(409);
         expect(answer.body.message).not.toContain("is now shown");
+        expect(answer.body.message).toContain("the confirmation card is being shown now");
+        expect(langy.started).toEqual([]);
       });
+    });
+  });
+
+  describe("given a raise claim that lapsed and was taken by another request", () => {
+    it("leaves the newer request's claim in place when the first lets go", async () => {
+      const target = {
+        projectId: "proj_unit",
+        conversationId: "conv_unit",
+        resource: "evaluator",
+        action: "delete",
+        id: "ev_toxicity",
+      };
+      await confirmations.claimCardRaise({ target, token: "first", ttlSeconds: 30 });
+      now += 31_000;
+      await confirmations.claimCardRaise({ target, token: "second", ttlSeconds: 30 });
+
+      await confirmations.releaseCardRaise({ target, token: "first" });
+
+      expect(await confirmations.claimCardRaise({ target, token: "third", ttlSeconds: 30 })).toBe(
+        false,
+      );
     });
   });
 

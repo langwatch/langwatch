@@ -165,6 +165,14 @@ export function retryRefusalMessage(action: string): string {
   return `${gerund(action)} did not run this time. Run the same command again.`;
 }
 
+/** What Langy reads while another request puts the card for this record in front of the person. */
+export function cardRaisingRefusalMessage(action: string): string {
+  return (
+    `${gerund(action)} needs a confirmation click, and the confirmation card is being shown ` +
+    "now. Wait for the user's answer, then run the same command again."
+  );
+}
+
 /** What Langy reads when a click is needed but no card could be put in front of the person. */
 export function cardUnavailableRefusalMessage(action: string): string {
   return (

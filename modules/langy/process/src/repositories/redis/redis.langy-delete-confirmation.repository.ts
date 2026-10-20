@@ -29,6 +29,11 @@ const CONSUME_ALL_OR_NONE =
   "for i = 1, #KEYS do redis.call('DEL', KEYS[i]) end\n" +
   "return 1";
 
+/** Deletes the raise claim only while it is still the caller's own. */
+const RELEASE_IF_OWN =
+  "if redis.call('GET', KEYS[1]) == ARGV[1] then return redis.call('DEL', KEYS[1]) end\n" +
+  "return 0";
+
 /** The confirmation records in the process's Redis, under the local-control key family. */
 export class LangyDeleteConfirmationRedisRepository extends LangyDeleteConfirmationRepository {
   private constructor(private readonly redis: LangyDeleteConfirmationRedis) {
@@ -98,16 +103,24 @@ export class LangyDeleteConfirmationRedisRepository extends LangyDeleteConfirmat
 
   async claimCardRaise({
     target,
+    token,
     ttlSeconds,
   }: {
     target: ConfirmTarget;
+    token: string;
     ttlSeconds: number;
   }): Promise<boolean> {
-    return (await this.redis.set(confirmRaiseKey(target), "1", "EX", ttlSeconds, "NX")) === "OK";
+    return (await this.redis.set(confirmRaiseKey(target), token, "EX", ttlSeconds, "NX")) === "OK";
   }
 
-  async releaseCardRaise(target: ConfirmTarget): Promise<void> {
-    await this.redis.del(confirmRaiseKey(target));
+  async releaseCardRaise({
+    target,
+    token,
+  }: {
+    target: ConfirmTarget;
+    token: string;
+  }): Promise<void> {
+    await this.redis.eval(RELEASE_IF_OWN, 1, confirmRaiseKey(target), token);
   }
 
   async lookupPendingCard(target: ConfirmTarget): Promise<LocalRecordLookup<string>> {

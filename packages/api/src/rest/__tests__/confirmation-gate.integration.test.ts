@@ -356,6 +356,19 @@ describe("a route marked as removing something", () => {
       expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
       expect(ran).toEqual([]);
     });
+
+    it("names the route's own action in the refusal", async () => {
+      const answer = await call({
+        gate: undefined,
+        token: "langy",
+        method: "POST",
+        path: "/x/toggle",
+        body: { enabled: false },
+      });
+
+      expect(answer.status).toBe(409);
+      expect(answer.body.message).toMatch(/^Disabling needs a confirmation click/);
+    });
   });
 
   describe("when a bulk route names several ids", () => {
@@ -536,6 +549,21 @@ describe("when the route fails after the click was spent", () => {
 
     expect(answer.status).toBe(500);
     expect(refunded).toBe(1);
+  });
+
+  it("keeps the route's own answer when giving the click back fails too", async () => {
+    failWith = new Error("database went away");
+    const gate: RestConfirmationGate = {
+      confirm: async () => ({
+        refund: async () => {
+          throw new Error("redis went away");
+        },
+      }),
+    };
+
+    const answer = await call({ gate, token: "langy", method: "DELETE", path: "/ev-1" });
+
+    expect(answer.status).toBe(500);
   });
 
   it("keeps the click spent for a refusal the caller caused", async () => {

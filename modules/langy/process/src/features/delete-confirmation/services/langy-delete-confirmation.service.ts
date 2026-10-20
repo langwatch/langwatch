@@ -5,6 +5,7 @@ import type {
   RestConfirmationRequest,
 } from "@langwatch/api/rest";
 import { HandledError } from "@langwatch/handled-error";
+import { generate } from "@langwatch/ksuid";
 import { parseLangyChoiceSelectionPart } from "@langwatch/langy-contract";
 import { createLogger } from "@langwatch/observability";
 
@@ -18,6 +19,7 @@ import {
   CONFIRM_GRANT_TTL_SECONDS,
   confirmBlockWait,
   confirmationCard,
+  cardRaisingRefusalMessage,
   cardUnavailableRefusalMessage,
   confirmationRefusalMessage,
   type ConfirmChoice,
@@ -35,6 +37,12 @@ const logger = createLogger("langwatch:langy:delete-confirmation");
 
 /** How long one request may hold the right to raise a card before another may try. */
 const CARD_RAISE_TTL_SECONDS = 30;
+
+/**
+ * Whether a record's card waits for the person, is being raised by another request, or cannot be
+ * shown.
+ */
+type CardState = "shown" | "raising" | "unavailable";
 
 type DeleteConfirmationMembers = Readonly<{
   confirmations: LangyDeleteConfirmationRepository;
@@ -106,22 +114,21 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     }
 
     const records: string[] = [];
-    let everyCardShown = true;
+    const cards = new Set<CardState>();
     for (const { target, name } of unclicked) {
-      const shown = await this.showCard({
-        target,
-        name,
-        binding,
-        ownerUserId: request.ownerUserId,
-      });
-      everyCardShown &&= shown;
+      cards.add(
+        await this.showCard({
+          target,
+          name,
+          binding,
+          ownerUserId: request.ownerUserId,
+        }),
+      );
       records.push(namedRecord({ resource: target.resource, name, id: target.id }));
     }
 
     throw new ConfirmationRequiredError({
-      message: everyCardShown
-        ? confirmationRefusalMessage({ action: request.action, records })
-        : cardUnavailableRefusalMessage(request.action),
+      message: refusalFor({ action: request.action, cards, records }),
       resource: request.resource,
       action: request.action,
     });
@@ -193,10 +200,6 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     await this.members.answers.decide({ wait, choice });
   }
 
-  /**
-   * The card for one record, unless one is already waiting for it or another request is raising
-   * it right now. True when a card is waiting.
-   */
   /** The records still lacking a click, with their names, and those that no longer exist. */
   private async sortUnclicked({
     request,
@@ -232,26 +235,33 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
     };
   }
 
+  /**
+   * The card for one record, unless one is already waiting for it or another request is raising
+   * it right now.
+   */
   private async showCard(card: {
     target: ConfirmTarget;
     name: string | null;
     binding: ConfirmKeyBinding;
     ownerUserId: string | null;
-  }): Promise<boolean> {
+  }): Promise<CardState> {
     const { target } = card;
-    if (await this.isWaiting(target)) return true;
-    const raising = await this.members.confirmations.claimCardRaise({
+    if (await this.isWaiting(target)) return "shown";
+    const token = generate("langy").toString();
+    const claimed = await this.members.confirmations.claimCardRaise({
       target,
+      token,
       ttlSeconds: CARD_RAISE_TTL_SECONDS,
     });
     // Another request is raising it: say a card is shown only once it is, never on its word.
-    if (!raising) return this.isWaiting(target);
+    if (!claimed) return (await this.isWaiting(target)) ? "shown" : "raising";
 
     try {
       // Checked again under the claim: a request that raised the card just before it let go.
-      return (await this.isWaiting(target)) || (await this.raiseCard(card));
+      const shown = (await this.isWaiting(target)) || (await this.raiseCard(card));
+      return shown ? "shown" : "unavailable";
     } finally {
-      await this.members.confirmations.releaseCardRaise(target);
+      await this.members.confirmations.releaseCardRaise({ target, token });
     }
   }
 
@@ -343,4 +353,19 @@ export class LangyDeleteConfirmationService implements RestConfirmationGate {
       throw error;
     });
   }
+}
+
+/** What Langy reads after the cards: the worst state among them decides. */
+function refusalFor({
+  action,
+  cards,
+  records,
+}: {
+  action: string;
+  cards: ReadonlySet<CardState>;
+  records: readonly string[];
+}): string {
+  if (cards.has("unavailable")) return cardUnavailableRefusalMessage(action);
+  if (cards.has("raising")) return cardRaisingRefusalMessage(action);
+  return confirmationRefusalMessage({ action, records });
 }

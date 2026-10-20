@@ -84,19 +84,28 @@ export class LangyDeleteConfirmationMemoryRepository extends LangyDeleteConfirma
 
   async claimCardRaise({
     target,
+    token,
     ttlSeconds,
   }: {
     target: ConfirmTarget;
+    token: string;
     ttlSeconds: number;
   }): Promise<boolean> {
     const key = confirmRaiseKey(target);
     if (this.#get(key) !== undefined) return false;
-    this.#set(key, "1", ttlSeconds);
+    this.#set(key, token, ttlSeconds);
     return true;
   }
 
-  async releaseCardRaise(target: ConfirmTarget): Promise<void> {
-    this.#values.delete(confirmRaiseKey(target));
+  async releaseCardRaise({
+    target,
+    token,
+  }: {
+    target: ConfirmTarget;
+    token: string;
+  }): Promise<void> {
+    const key = confirmRaiseKey(target);
+    if (this.#get(key) === token) this.#values.delete(key);
   }
 
   async lookupPendingCard(target: ConfirmTarget): Promise<LocalRecordLookup<string>> {
