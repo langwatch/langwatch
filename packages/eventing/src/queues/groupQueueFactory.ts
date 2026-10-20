@@ -162,6 +162,29 @@ function consumerDependencies({
 }
 
 /**
+ * Consumers first: a draining job sends its fan-out through THIS producer, whose gate shuts
+ * once its own close ends. Every consumer settles, even if one fails, before the producer
+ * closes; the first failure is rethrown. Spec: specs/background/queue-drain-send-gate.feature
+ */
+async function closeConsumersThenProducer({
+  consumers,
+  producer,
+}: {
+  consumers: readonly { close: () => Promise<void> }[];
+  producer: { close: () => Promise<void> };
+}): Promise<void> {
+  try {
+    const drained = await Promise.allSettled(consumers.map((each) => each.close()));
+    const failed = drained.find(
+      (each): each is PromiseRejectedResult => each.status === "rejected",
+    );
+    if (failed) throw failed.reason;
+  } finally {
+    await producer.close();
+  }
+}
+
+/**
  * Adapts the capability-split Group Queue API to Eventing's shared runtime
  * queue port. Application composition owns the Redis and storage dependencies;
  * Eventing owns only the routing definition and handler registry.
@@ -255,21 +278,7 @@ export function createEventingGroupQueueFactory({
           ...consumers.map((each) => each.waitUntilReady()),
         ]);
       },
-      // Consumers first: a job still draining sends its fan-out through THIS producer, and a
-      // producer's gate shuts the moment its own close ends, which for a processor with nothing
-      // in flight is at once. Spec: specs/background/queue-drain-send-gate.feature
-      // Every consumer settles first, even when one fails, so a failure never shuts the gate early.
-      async close() {
-        try {
-          const drained = await Promise.allSettled(consumers.map((each) => each.close()));
-          const failed = drained.find(
-            (each): each is PromiseRejectedResult => each.status === "rejected",
-          );
-          if (failed) throw failed.reason;
-        } finally {
-          await producer.close();
-        }
-      },
+      close: () => closeConsumersThenProducer({ consumers, producer }),
     };
   };
 }

@@ -108,13 +108,15 @@ describe("createEventingGroupQueueFactory close", () => {
             : Promise.reject(drainFailure);
         const queue = startedQueue({ listedConsumer: true });
 
-        const closing = queue.close();
-        const outcome = expect(closing).rejects.toBe(drainFailure);
+        const outcome = queue.close().then(
+          () => undefined,
+          (error: unknown) => error,
+        );
         await new Promise((resolve) => setTimeout(resolve, 10));
         expect(steps).toEqual([]);
 
         finishDrain();
-        await outcome;
+        expect(await outcome).toBe(drainFailure);
         expect(steps).toEqual(["listed consumer drained", "producer closed"]);
       });
     });
