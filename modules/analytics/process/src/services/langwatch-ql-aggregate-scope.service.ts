@@ -66,10 +66,13 @@ export class LangWatchQLAggregateScopeService {
         project: await this.deps.projects.findById(window.projectId),
       })),
     );
-    const missing = found
-      .filter(({ project }) => !project?.lwqlKey)
-      .map(({ window }) => window.projectId);
-    if (missing.length > 0) throw new LangWatchQLMemberKeyMissingError({ projectIds: missing });
+    const missing = found.filter(({ project }) => !project?.lwqlKey);
+    if (missing.length > 0) {
+      throw new LangWatchQLMemberKeyMissingError({
+        projectIds: missing.map(({ window }) => window.projectId),
+        projectNames: missing.flatMap(({ project }) => (project ? [project.name] : [])),
+      });
+    }
 
     return {
       projects: found.flatMap(({ project }) =>

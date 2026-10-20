@@ -207,6 +207,8 @@ interface AnalyticsAppDependencies {
   lwqlProvisioning: LwqlProvisioningOperations;
   /** A new project's key-map row, written on project's created event; no-op without LangWatchQL. */
   lwqlKeyMap: LwqlKeyMapService;
+  /** How many members one group project's statement may name; the key set's ceiling unset. */
+  lwqlAggregateMaxMembers?: number;
 }
 
 /** The peer modules the Workbench's access rules read, resolved through their own tokens. */
@@ -516,6 +518,9 @@ export class AnalyticsModule
             ? { target: { connection, sourceDatabase: admin.target.database } }
             : {}),
         }),
+        ...(lwqlConfig.aggregateMaxMembers === undefined
+          ? {}
+          : { lwqlAggregateMaxMembers: lwqlConfig.aggregateMaxMembers }),
       },
       setup.config.publicBaseUrl,
     );
@@ -535,7 +540,12 @@ export class AnalyticsModule
   private constructor(dependencies: AnalyticsAppDependencies, publicBaseUrl: string | undefined) {
     this.#dependencies = dependencies;
     this.#queryScope = LangWatchQLQueryScopeService.create(dependencies);
-    this.#aggregateScope = LangWatchQLAggregateScopeService.create(dependencies);
+    this.#aggregateScope = LangWatchQLAggregateScopeService.create({
+      projects: dependencies.projects,
+      ...(dependencies.lwqlAggregateMaxMembers === undefined
+        ? {}
+        : { maxMembers: dependencies.lwqlAggregateMaxMembers }),
+    });
     this.#protections = WorkbenchProtectionsService.create(dependencies);
     this.#validationReport = LangWatchQLValidationReportService.create({
       langWatchQL: dependencies.langWatchQL,

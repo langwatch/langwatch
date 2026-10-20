@@ -87,16 +87,17 @@ function postgresTenantPredicate({
   // taking for two characters.
   const keyMap = `${sqlText.assertIdentifier(sourceDatabase, "sourceDatabase")}.${sqlText.assertIdentifier(names.keyMapTable, "keyMapTable")}`;
 
-  // The self-policy narrows the subquery to one *hash*, not to one *row*. The key map is
-  // `ENGINE = MergeTree ORDER BY KeyHash`, which enforces no uniqueness, so a retried
-  // provisioning step or a re-issued key leaves two rows the policy both admits and the scalar
-  // subquery fails the whole query with `INCORRECT_RESULT_OF_SCALAR_SUBQUERY`.
+  // A group project's session holds one hash per member, so the self-policy admits one row per
+  // member and an equality kept only the first. `IN (subquery)` stays a set and is not pushed
+  // down, so the bound is a min/max range of scalars: one tenant still sends an exact match, a
+  // group sends the span of its members, and the row policy underneath decides the answer.
+  const tenantId = `${KEY_MAP_ALIAS}.${sqlText.quotedColumn(KEY_MAP_COLUMNS.tenantId)}`;
+  const bound = (fn: "min" | "max") =>
+    `(SELECT ${fn}(${tenantId}) FROM ${keyMap} AS ${KEY_MAP_ALIAS})`;
+
   return (
-    `WHERE ${sourceColumn(TENANT_COLUMN)} = (\n` +
-    `    SELECT ${KEY_MAP_ALIAS}.${sqlText.quotedColumn(KEY_MAP_COLUMNS.tenantId)}\n` +
-    `    FROM ${keyMap} AS ${KEY_MAP_ALIAS}\n` +
-    `    LIMIT 1\n` +
-    `  )`
+    `WHERE ${sourceColumn(TENANT_COLUMN)} >= ${bound("min")}\n` +
+    `  AND ${sourceColumn(TENANT_COLUMN)} <= ${bound("max")}`
   );
 }
 

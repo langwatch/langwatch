@@ -3,6 +3,7 @@ import {
   type LangWatchQLCaller,
   type LangWatchQLMemberWindow,
   type LangWatchQLProtections,
+  LangWatchQLTableModifierError,
   type LangWatchQLTimeWindow,
 } from "@langwatch/analytics-contract";
 import { DEFAULT_TRACE_ORIGIN } from "@langwatch/trace-contract";
@@ -120,6 +121,32 @@ function findViewReferences({
     });
   }
   return [...byStart.values()].toSorted((left, right) => right.start - left.start);
+}
+
+/**
+ * Refuses `FINAL` or `SAMPLE` on a view about to be read as a subquery, which ClickHouse rejects
+ * with a bare error. The parser gives neither a position, so neither can be moved inside.
+ * @throws {LangWatchQLTableModifierError} naming the modifiers written.
+ */
+function assertNoTableModifiers({
+  statements,
+  references,
+}: {
+  statements: readonly SqlAstNode[];
+  references: readonly ViewReference[];
+}): void {
+  const rewritten = new Set(references.map((reference) => reference.start));
+  const modifiers = new Set<string>();
+  for (const expression of collectNodes(statements, "TableExpression", [])) {
+    const table = expression.database_and_table_name as
+      | { location?: { start?: { offset?: unknown } } }
+      | undefined;
+    const start = table?.location?.start?.offset;
+    if (typeof start !== "number" || !rewritten.has(start)) continue;
+    if (expression.final === true) modifiers.add("FINAL");
+    if (expression.sample_size !== undefined) modifiers.add("SAMPLE");
+  }
+  if (modifiers.size > 0) throw new LangWatchQLTableModifierError({ modifiers: [...modifiers] });
 }
 
 /**
@@ -257,14 +284,22 @@ export function scopeLangWatchQL({
     isWindowed && memberWindows
       ? buildWindowPredicates({ views, database, memberWindows })
       : undefined;
+  const rewrites = findViewReferences({ statements: parsed.statements, database }).flatMap(
+    (reference) => {
+      const window =
+        windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
+      const predicate = [origins.get(reference.qualified), window]
+        .filter((part) => part !== undefined)
+        .join(" AND ");
+      return predicate === "" ? [] : [{ reference, predicate }];
+    },
+  );
+  assertNoTableModifiers({
+    statements: parsed.statements,
+    references: rewrites.map(({ reference }) => reference),
+  });
   let scoped = sql;
-  for (const reference of findViewReferences({ statements: parsed.statements, database })) {
-    const window =
-      windows === undefined ? undefined : (windows.get(reference.qualified) ?? NO_ROWS);
-    const predicate = [origins.get(reference.qualified), window]
-      .filter((part) => part !== undefined)
-      .join(" AND ");
-    if (predicate === "") continue;
+  for (const { reference, predicate } of rewrites) {
     const written = sql.slice(reference.start, reference.end);
     const alias = reference.impliedAlias === undefined ? "" : ` AS ${reference.impliedAlias}`;
     scoped =

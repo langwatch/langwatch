@@ -106,7 +106,25 @@ describe("LangWatchQLAggregateScopeService", () => {
         .catch((error: unknown) => error);
 
       expect(codeOf(refusal)).toBe("lwql_member_key_missing");
-      expect(refusal).toMatchObject({ meta: { projectIds: ["project_b"] } });
+      expect(refusal).toMatchObject({ meta: { projectIds: ["project_b"], projectNames: [] } });
+    });
+
+    it("names a member that exists but has no key, so the page can say which", async () => {
+      const refusal = await LangWatchQLAggregateScopeService.create({
+        projects: createApiFixture<ProjectApi>({
+          findById: async (id) =>
+            project(id, {
+              name: `Name of ${id}`,
+              lwqlKey: id === "project_b" ? null : (KEYS[id] ?? null),
+            }),
+        }),
+      })
+        .getMemberScope({ shared: sharedOf(aggregateProof()) })
+        .catch((error: unknown) => error);
+
+      expect(refusal).toMatchObject({
+        meta: { projectIds: ["project_b"], projectNames: ["Name of project_b"] },
+      });
     });
   });
 

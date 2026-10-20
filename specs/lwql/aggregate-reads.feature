@@ -66,6 +66,13 @@ Feature: LangWatchQL on an aggregate project reads its members inside their gran
     Then that view keeps rows of project A only
 
   @unit
+  Scenario: FINAL or SAMPLE on a narrowed view is refused with a clear message
+    Given project B is shared from a point in time
+    When ana runs a statement that reads a view with FINAL or SAMPLE
+    Then the run is refused saying FINAL and SAMPLE cannot be used on this read
+    And no statement reaches the store
+
+  @unit
   Scenario: App functions read text only from members shared for their whole history
     Given project B is shared from a point in time
     When ana runs a statement on the aggregate that reads trace text through an app function
