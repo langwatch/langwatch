@@ -10,29 +10,38 @@ import {
   TestModelProviderCatalog,
 } from "../../../../__tests__/support/model-provider-integration.support.ts";
 import type { ModelDefaultRepository } from "../../../../repositories/model-default.repository.ts";
-import type { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
+import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
 import { ModelProviderDefaultsWriteService } from "../model-provider-defaults-write.service.ts";
 
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
 const TOPIC_CLUSTERING = "analytics.topic_clustering_llm";
-const SCOPE = { scopeType: "PROJECT" as const, scopeId: "project-1" };
+const SCOPE = { scopeType: "ORGANIZATION" as const, scopeId: "organization-1" };
 
 function writerOver(existing: ModelDefaultConfig) {
   const saved: Record<string, string>[] = [];
   const deleted: string[] = [];
-  const defaults = {
+  const defaults: ModelDefaultRepository = {
+    findForProject: async () => [],
     getById: async () => existing,
-    delete: async (id: string) => {
-      deleted.push(id);
-    },
-    save: async (input: { config: Record<string, string> }) => {
+    getByScope: async () => existing,
+    save: async (input) => {
       saved.push(input.config);
       return { ...existing, config: input.config };
     },
-  } as unknown as ModelDefaultRepository;
-  const scopes = {
-    getOrganizationIdForScopes: async () => "organization-1",
-  } as unknown as ModelProviderScopeService;
+    set: async () => {},
+    delete: async (id) => {
+      deleted.push(id);
+    },
+    findForOrganization: async () => [],
+  };
+  const scopes = ModelProviderScopeService.create({
+    projects: {} as never,
+    organizations: {
+      getBillingProfile: async (input: { organizationId: string }) => ({
+        id: input.organizationId,
+      }),
+    } as never,
+  });
   const writer = ModelProviderDefaultsWriteService.create({
     defaults,
     catalog: new TestModelProviderCatalog(),
@@ -79,7 +88,10 @@ describe("ModelProviderDefaultsWriteService.save", () => {
         const { writer, saved, deleted } = writerOver(existing);
 
         await expect(
-          writer.save({ id: existing.id, scopes: [SCOPE, { ...SCOPE, scopeId: "project-2" }] }),
+          writer.save({
+            id: existing.id,
+            scopes: [SCOPE, { scopeType: "PROJECT" as const, scopeId: "project-2" }],
+          }),
         ).rejects.toMatchObject({ code: "validation_error" });
         expect(saved).toEqual([]);
         expect(deleted).toEqual([]);
