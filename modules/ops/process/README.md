@@ -941,7 +941,7 @@ interface Response {
 
 #### `DELETE /api/admin/impersonate` · `stopAdminImpersonation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:48`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:49`.
 
 Answers at `/api/admin/impersonate`, `/api/v1/admin/impersonate`.
 
@@ -956,7 +956,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:61`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:62`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 
@@ -1039,7 +1039,7 @@ interface Body {
   metadata?: Record<string, string | number | boolean>;
 }
 type Headers = z.infer<typeof bugReportIntakeHeadersSchema>; // ../contract/src/ops-bug-report.ts:125
-// Response: inline, src/transport/ops-bug-report.rest.ts:66
+// Response: inline, src/transport/ops-bug-report.rest.ts:67
 type Response = unknown;
 ```
 
@@ -1066,7 +1066,7 @@ interface Body {
   query: string;
   type?: "PLAN" | "SYNTAX" | "PIPELINE" | "AST" | "INDEXES";
 }
-// Response: inline, src/transport/ops-clickhouse-explain.rest.ts:55
+// Response: inline, src/transport/ops-clickhouse-explain.rest.ts:56
 type Response = unknown;
 ```
 

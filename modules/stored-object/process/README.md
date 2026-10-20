@@ -271,7 +271,7 @@ interface Response {
 
 Confirm a stored-object upload
 
-Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:58`.
+Permission `project:update`. Declared at `src/transport/stored-object.rest.ts:59`.
 
 Answers at `/api/stored-objects/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/uploads/:storedObjectId/confirmation`; also, undocumented, `/api/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/2026-08-22/uploads/:storedObjectId/confirmation`, `/api/stored-objects/latest/uploads/:storedObjectId/confirmation`, `/api/v1/stored-objects/latest/uploads/:storedObjectId/confirmation`.
 
@@ -280,7 +280,7 @@ Answers at `/api/stored-objects/uploads/:storedObjectId/confirmation`, `/api/v1/
 interface Params {
   storedObjectId: string;
 }
-// Body: inline, src/transport/stored-object.rest.ts:61
+// Body: inline, src/transport/stored-object.rest.ts:63
 interface Body {
   projectId: string;
 }
@@ -289,18 +289,18 @@ type Response = z.infer<typeof storedObjectsConfirmUploadOutputSchema>; // ../co
 
 #### `PUT /uploads/:storedObjectId/content` · `putStoredObjectUploadContent`
 
-Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:73`.
+Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:75`.
 
 Answers at `/api/stored-objects/uploads/:storedObjectId/content`, `/api/v1/stored-objects/uploads/:storedObjectId/content`; also, undocumented, `/api/stored-objects/2026-08-22/uploads/:storedObjectId/content`, `/api/v1/stored-objects/2026-08-22/uploads/:storedObjectId/content`, `/api/stored-objects/latest/uploads/:storedObjectId/content`, `/api/v1/stored-objects/latest/uploads/:storedObjectId/content`.
 
 ```typescript
 type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:70
-// Query: inline, src/transport/stored-object.rest.ts:76
+// Query: inline, src/transport/stored-object.rest.ts:79
 interface Query {
   sig: string;
 }
-// Rawbody: "stream" (inline, src/transport/stored-object.rest.ts:77)
-// Response: inline, src/transport/stored-object.rest.ts:79
+// Rawbody: "stream" (inline, src/transport/stored-object.rest.ts:80)
+// Response: inline, src/transport/stored-object.rest.ts:82
 interface Response {
   ok: true;
 }
@@ -308,17 +308,17 @@ interface Response {
 
 #### `GET,HEAD /:storedObjectId/content` · `getStoredObjectContent`
 
-Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:93`.
+Public: signed URL: the sealed signature in the query is the credential. Hidden from the OpenAPI document. Declared at `src/transport/stored-object.rest.ts:96`.
 
 Answers at `/api/stored-objects/:storedObjectId/content`, `/api/v1/stored-objects/:storedObjectId/content`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId/content`, `/api/v1/stored-objects/2026-08-22/:storedObjectId/content`, `/api/stored-objects/latest/:storedObjectId/content`, `/api/v1/stored-objects/latest/:storedObjectId/content`.
 
 ```typescript
 type Params = z.infer<typeof storedObjectParamsSchema>; // ../contract/src/uploads.ts:70
-// Query: inline, src/transport/stored-object.rest.ts:95
+// Query: inline, src/transport/stored-object.rest.ts:98
 interface Query {
   sig: string;
 }
-// Response: inline, src/transport/stored-object.rest.ts:97
+// Response: inline, src/transport/stored-object.rest.ts:100
 type Response = unknown;
 ```
 
@@ -326,16 +326,16 @@ type Response = unknown;
 
 Resolve a fresh stored-object capability
 
-Permission `project:view`. Declared at `src/transport/stored-object.rest.ts:109`.
+Permission `project:view`. Declared at `src/transport/stored-object.rest.ts:112`.
 
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: inline, src/transport/stored-object.rest.ts:110
+// Params: inline, src/transport/stored-object.rest.ts:113
 interface Params {
   storedObjectId: string;
 }
-// Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:111)
+// Query: storedObjectsGetInputSchema.pick({ projectId: true, audience: true }) (inline, src/transport/stored-object.rest.ts:114)
 type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src/stored-object.commands.ts:45
 ```
 
@@ -343,16 +343,16 @@ type Response = z.infer<typeof storedObjectsGetOutputSchema>; // ../contract/src
 
 Delete a stored object
 
-Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:123`.
+Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:126`.
 
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: inline, src/transport/stored-object.rest.ts:126
+// Params: inline, src/transport/stored-object.rest.ts:129
 interface Params {
   storedObjectId: string;
 }
-// Body: inline, src/transport/stored-object.rest.ts:127
+// Body: inline, src/transport/stored-object.rest.ts:130
 interface Body {
   projectId: string;
   idempotencyKey: string;

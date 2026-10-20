@@ -247,9 +247,9 @@ Answers at `/api/evaluations/:evaluator/evaluate`, `/api/v1/evaluations/:evaluat
 interface Params {
   evaluator: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:188
+// Body: inline, src/transport/evaluations-legacy.rest.ts:189
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:191
+// Response: inline, src/transport/evaluations-legacy.rest.ts:192
 type Response = unknown;
 ```
 
@@ -257,7 +257,7 @@ type Response = unknown;
 
 Run a namespaced evaluator
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:215`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:216`.
 
 Answers at `/api/evaluations/:evaluator/:subpath/evaluate`, `/api/v1/evaluations/:evaluator/:subpath/evaluate`.
 
@@ -267,9 +267,9 @@ interface Params {
   evaluator: string;
   subpath: string;
 }
-// Body: inline, src/transport/evaluations-legacy.rest.ts:222
+// Body: inline, src/transport/evaluations-legacy.rest.ts:224
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:225
+// Response: inline, src/transport/evaluations-legacy.rest.ts:227
 type Response = unknown;
 ```
 
@@ -277,15 +277,15 @@ type Response = unknown;
 
 Run an evaluator as a guardrail
 
-Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:249`.
+Permission `evaluations:manage`. Declared at `src/transport/evaluations-legacy.rest.ts:251`.
 
 Answers at `/api/guardrails/:evaluator/evaluate`, `/api/v1/guardrails/:evaluator/evaluate`.
 
 ```typescript
 type Params = z.infer<typeof evaluatorParamsSchema>; // ../contract/src/evaluation-legacy.schemas.ts:17
-// Body: inline, src/transport/evaluations-legacy.rest.ts:252
+// Body: inline, src/transport/evaluations-legacy.rest.ts:255
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/evaluations-legacy.rest.ts:255
+// Response: inline, src/transport/evaluations-legacy.rest.ts:258
 type Response = unknown;
 ```
 

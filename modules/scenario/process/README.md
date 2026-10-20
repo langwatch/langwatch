@@ -542,7 +542,7 @@ Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented
 
 ```typescript
 type Body = z.infer<typeof scenarioEventSchema>; // ../contract/src/schemas/event-schemas.ts:510
-// Response: inline, src/transport/scenario-event.rest.ts:28
+// Response: inline, src/transport/scenario-event.rest.ts:29
 interface Response {
   success: boolean;
   url?: string | null;
@@ -553,7 +553,7 @@ interface Response {
 
 Offer a batch run to an already-open simulations tab on the caller's machine. Returns whether a live tab took it.
 
-Permission `scenarios:create`. Declared at `src/transport/scenario-event.rest.ts:50`.
+Permission `scenarios:create`. Declared at `src/transport/scenario-event.rest.ts:51`.
 
 Answers at `/api/scenario-events/browser-tab`, `/api/v1/scenario-events/browser-tab`; also, undocumented, `/api/scenario-events/2026-08-07/browser-tab`, `/api/v1/scenario-events/2026-08-07/browser-tab`, `/api/scenario-events/latest/browser-tab`, `/api/v1/scenario-events/latest/browser-tab`.
 
@@ -564,7 +564,7 @@ interface Body {
   batchRunId: string;
   scenarioSetId?: string;
 }
-// Response: inline, src/transport/scenario-event.rest.ts:54
+// Response: inline, src/transport/scenario-event.rest.ts:56
 interface Response {
   delivered: boolean;
   url: string;
@@ -575,7 +575,7 @@ interface Response {
 
 Archive simulation runs. Pass exactly one of scenarioSetId (archives every run in the set; scenarioSetId=default targets the implicit default set) or scenarioRunId (archives that one run).
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario-event.rest.ts:69`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario-event.rest.ts:71`.
 
 Answers at `/api/scenario-events`, `/api/v1/scenario-events`; also, undocumented, `/api/scenario-events/2026-08-07`, `/api/v1/scenario-events/2026-08-07`, `/api/scenario-events/latest`, `/api/v1/scenario-events/latest`.
 
@@ -661,7 +661,7 @@ interface Body {
   startDate?: number;
   endDate?: number;
 }
-// Response: inline, src/transport/scenario-run-export.rest.ts:18
+// Response: inline, src/transport/scenario-run-export.rest.ts:19
 type Response = unknown;
 ```
 
@@ -705,7 +705,7 @@ interface Response {
 
 Ingest a finished browser voice call as a scenario run
 
-Authenticated: The voice flag and scenarios:create are checked in the app; evaluations:manage only when the call creates an agent, which a finish learns from its verified session token (#8021). Declared at `src/transport/scenario-voice.rest.ts:32`.
+Authenticated: The voice flag and scenarios:create are checked in the app; evaluations:manage only when the call creates an agent, which a finish learns from its verified session token (#8021). Declared at `src/transport/scenario-voice.rest.ts:33`.
 
 Answers at `/api/voice/session/:sessionId/finish`.
 
@@ -731,7 +731,7 @@ interface Response {
 
 Stream a voice call's recording from its provider
 
-Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:42`.
+Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:44`.
 
 Answers at `/api/voice/session/:conversationId/audio`.
 
@@ -744,7 +744,7 @@ interface Params {
 interface Query {
   projectId: string;
 }
-// Response: inline, src/transport/scenario-voice.rest.ts:46
+// Response: inline, src/transport/scenario-voice.rest.ts:48
 type Response = unknown;
 ```
 
@@ -752,7 +752,7 @@ type Response = unknown;
 
 Stream a headless voice run's whole-call recording from its provider
 
-Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:61`.
+Permission `scenarios:view`. Declared at `src/transport/scenario-voice.rest.ts:63`.
 
 Answers at `/api/voice/run/:scenarioRunId/audio`.
 
@@ -762,7 +762,7 @@ interface Params {
   scenarioRunId: string;
 }
 type Query = z.infer<typeof voiceSessionAudioQuerySchema>; // ../contract/src/voice/voice-session.schemas.ts:113
-// Response: inline, src/transport/scenario-voice.rest.ts:65
+// Response: inline, src/transport/scenario-voice.rest.ts:67
 type Response = unknown;
 ```
 
@@ -821,7 +821,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:227`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:228`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -835,7 +835,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Update an existing scenario
 
-Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:258`.
+Permission `scenarios:update`. Declared at `src/transport/scenario.rest.ts:260`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -849,7 +849,7 @@ type Response = z.infer<typeof scenarioRestResponseWithPlatformUrlSchema>; // ..
 
 Archive (soft-delete) a scenario
 
-Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:292`.
+Permission `scenarios:manage`. Declared at `src/transport/scenario.rest.ts:295`.
 
 Answers at `/api/scenarios/:id`, `/api/v1/scenarios/:id`; also, undocumented, `/api/scenarios/2026-08-07/:id`, `/api/v1/scenarios/2026-08-07/:id`, `/api/scenarios/latest/:id`, `/api/v1/scenarios/latest/:id`.
 
@@ -866,7 +866,7 @@ interface Response {
 
 List the saved versions of a scenario, newest first. A scenario saved before versions were recorded closes its history with a synthesized Created entry.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:318`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:321`.
 
 Answers at `/api/scenarios/:id/versions`, `/api/v1/scenarios/:id/versions`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions`, `/api/v1/scenarios/2026-08-07/:id/versions`, `/api/scenarios/latest/:id/versions`, `/api/v1/scenarios/latest/:id/versions`.
 
@@ -896,7 +896,7 @@ interface Response {
 
 Get one saved version of a scenario, with the name, situation, criteria, labels and parameters as that version saved them.
 
-Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:356`.
+Permission `scenarios:view`. Declared at `src/transport/scenario.rest.ts:359`.
 
 Answers at `/api/scenarios/:id/versions/:version`, `/api/v1/scenarios/:id/versions/:version`; also, undocumented, `/api/scenarios/2026-08-07/:id/versions/:version`, `/api/v1/scenarios/2026-08-07/:id/versions/:version`, `/api/scenarios/latest/:id/versions/:version`, `/api/v1/scenarios/latest/:id/versions/:version`.
 
