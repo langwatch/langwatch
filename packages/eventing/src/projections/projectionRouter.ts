@@ -432,31 +432,7 @@ export class ProjectionRouter<
           name: subscriber.name,
           parentProjection,
           parentType,
-          handler: {
-            handle: async (payload: ProjectionSubscriberJob<EventType>) => {
-              const tenantId = payload.event.tenantId;
-              const aggregateId = String(payload.event.aggregateId);
-              if (!("foldState" in payload)) {
-                // The lane's parse refuses a compact body for a subscriber that reads none,
-                // so reaching here without a reader fails the job rather than dropping it.
-                if (!subscriber.compactJob) {
-                  throw new ConfigurationError(
-                    "ProjectionRouter",
-                    `Event subscriber "${subscriber.name}" received a compact job but reads none`,
-                    { subscriberName: subscriber.name },
-                  );
-                }
-                await subscriber.compactJob.handle(payload.job, { tenantId, aggregateId });
-                return;
-              }
-              await subscriber.handle(payload.event, {
-                tenantId,
-                aggregateId,
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
+          handler: { handle: this.subscriberJobHandler(subscriber) },
           readsCompactJobs: subscriber.compactJob !== undefined,
           ...this.compactJobStage(subscriber),
           groupKeyFn: subscriber.options?.groupKeyFn,
@@ -476,6 +452,33 @@ export class ProjectionRouter<
       }
     }
     return definitions;
+  }
+
+  /** Runs one queued subscriber job: a full body goes to `handle`, a compact one to its reader. */
+  private subscriberJobHandler(subscriber: SubscriberDispatchDefinition<EventType>) {
+    return async (payload: ProjectionSubscriberJob<EventType>) => {
+      const tenantId = payload.event.tenantId;
+      const aggregateId = String(payload.event.aggregateId);
+      if ("foldState" in payload) {
+        await subscriber.handle(payload.event, {
+          tenantId,
+          aggregateId,
+          foldState: payload.foldState,
+          isReplay: LIVE_DISPATCH_IS_REPLAY,
+        });
+        return;
+      }
+      // The lane's parse refuses a compact body for a subscriber that reads none,
+      // so reaching here without a reader fails the job rather than dropping it.
+      if (!subscriber.compactJob) {
+        throw new ConfigurationError(
+          "ProjectionRouter",
+          `Event subscriber "${subscriber.name}" received a compact job but reads none`,
+          { subscriberName: subscriber.name },
+        );
+      }
+      await subscriber.compactJob.handle(payload.job, { tenantId, aggregateId });
+    };
   }
 
   /** A subscriber queueing compact bodies stages each delivery into its identity and job body. */

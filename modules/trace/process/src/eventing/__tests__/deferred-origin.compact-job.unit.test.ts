@@ -116,7 +116,10 @@ function typicalSpan(occurredAt: number) {
 /** The group queue stores raw JSON up to this size and only tries gzip above it. */
 const COMPRESSION_THRESHOLD_BYTES = 1024;
 
-/** The bytes the group queue stores for a body: JSON, gzipped and base64 encoded when over the threshold and smaller. */
+/**
+ * The bytes the group queue stores for a body: JSON, gzipped and base64 encoded when it is over
+ * the threshold and the encoding comes out smaller.
+ */
 function encodedBytes(body: object): { json: number; stored: number } {
   const json = JSON.stringify(body);
   const jsonBytes = Buffer.byteLength(json);
@@ -271,7 +274,8 @@ describe("the deferred origin check's queued job", () => {
       const compact = encodedBytes(compactBody);
       expect(JSON.stringify(compactBody)).not.toContain("booking-agent");
       expect(compact.stored).toBeLessThan(1024);
-      // Measured 2026-10-20: full 3059 B JSON, 1501 B stored; compact 312 B JSON, stored raw at 312 B.
+      // Measured 2026-10-20: full 3059 B JSON, 1501 B stored;
+      // compact 312 B JSON, stored raw at 312 B.
       expect(compact.stored * 4).toBeLessThan(full.stored);
     });
 
