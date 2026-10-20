@@ -35,7 +35,7 @@ specifier can become `@langwatch/test-harness/vitest-config` in one pass.
 | key                    | value                                    | why                                                                                                                                                                                                              |
 | ---------------------- | ---------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `test.pool`            | `"forks"`                                | vitest 5's own default, declared so a package never drifts onto `vmThreads`, which cannot disable isolation                                                                                                      |
-| `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker                                                                                           |
+| `test.isolate`         | `false` for every kind, `jsdom` included | a fresh worker per test file re-evaluates the whole module graph per file; off, the graph is evaluated once per worker. `true` isolates only the files that mock modules, see below                              |
 | `test.maxWorkers`      | `1` in fast mode, when isolation is off  | collapses the run onto one child process instead of one per core, cutting fork/spawn overhead on top of the isolation win. Not set when a package asks for `isolate: true`, where separate workers are the point |
 | `test.fsModuleCache`   | `true` in fast mode                      | persists transformed modules to `node_modules/.vitest-cache` between runs, so a rerun skips the transform share                                                                                                  |
 | `test.css`             | `false` in fast mode                     | skips CSS parse/transform on import; no package under the helper asserts on real computed CSS                                                                                                                    |
@@ -122,6 +122,35 @@ Two further reasons, both worth checking before flipping a package:
 A package that fails only with isolation off has either a leak worth fixing or
 a legitimate reason to keep it on. Record the reason in the config, next to
 `isolate: true`.
+
+## `isolate: true` isolates only the files that need it
+
+`isolate: true` no longer isolates the whole suite. `defineModuleVitestConfig`
+reads the suite's test files and splits it into two vitest projects: the files
+that name one of the calls above (`vi.mock`, `vi.doMock`, `vi.unmock`,
+`vi.doUnmock`, `vi.resetModules`) run in `isolated`, and every other file runs
+in `shared-modules`, where each worker loads the module graph once. The scan
+follows a test file's relative imports, so a shared harness that calls `vi.mock`
+isolates every file importing it. A setup file's mocks apply to every file
+alike, so they do not count.
+
+A leak the scan cannot see, typically a module that patches the DOM when it
+first loads, goes in `alsoIsolate`: globs, relative to the package, matched
+against each test file and everything it imports by relative path.
+`packages/design-system` isolates every test that reaches `.storybook/**`,
+because Storybook patches `HTMLElement.prototype.focus` on load. On the trace
+explorer suite the split took a run from 199s to 132s with every file passing.
+
+So the way to make a suite faster is to make its files stop mocking modules: a
+test that renders inside a fake of the host port it needs, rather than
+`vi.mock`ing the port, moves to `shared-modules` the moment its last mock goes,
+with no list to edit. `isolate: "all"` restores the old whole-suite isolation
+for a suite whose files leak state some other way (module-level state, DOM left
+behind); say why next to it. The split happens in fast mode only, and only for
+configs built with `defineModuleVitestConfig`.
+
+Two vitest projects mean two labels in the output, `shared-modules` and
+`isolated`, and `--project <name>` runs one of them.
 
 ## Reading `vitest doctor`
 
