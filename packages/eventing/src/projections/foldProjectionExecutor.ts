@@ -170,7 +170,7 @@ function applyUnseenEvents<State, E extends Event>({
   let next = state;
   let appliedCount = 0;
   for (const event of events) {
-    const dedupKey = event.idempotencyKey || event.id;
+    const dedupKey = appliedTokenOf(event);
     if (seen.has(dedupKey)) continue;
     seen.add(dedupKey);
     next = projection.apply(next, event as E);
@@ -1229,7 +1229,7 @@ export class FoldProjectionExecutor {
     );
 
     for (const event of delivered) {
-      const dedupKey = event.idempotencyKey || event.id;
+      const dedupKey = appliedTokenOf(event);
       if (seen.has(dedupKey)) continue;
       seen.add(dedupKey);
       state = projection.apply(state, event);

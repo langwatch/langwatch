@@ -97,6 +97,7 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
     });
 
     describe("when the first history read lags behind the log", () => {
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
       it("retries until the log returns its copy and folds that copy, not the redelivery", async () => {
         const original = keyed(1_000, "evt-original");
         const redelivery = keyed(2_000, "evt-redelivery");
@@ -116,6 +117,7 @@ describe("rebuilding a fold's aggregate for a missed hand-off", () => {
     });
 
     describe("when the log never returns an event under the key", () => {
+      /** @scenario "A rebuild for a redelivered key folds the event log's copy, not the redelivery" */
       it("refuses the incomplete history and leaves the job to retry", async () => {
         const original = keyed(1_000, "evt-original");
         const redelivery = keyed(2_000, "evt-redelivery");
