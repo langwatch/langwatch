@@ -1,4 +1,4 @@
-import type { ExhaustedOutcome } from "@langwatch/group-queue";
+import { type ExhaustedOutcome, sendPreparedInOrder } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 import { z } from "zod";
@@ -18,8 +18,9 @@ import type {
   DeduplicationStrategy,
   EventSourcedQueueProcessor,
   QueueSendOptions,
+  QueueSendResult,
 } from "../../queues/index.ts";
-import { resolveDeduplicationStrategy } from "../../queues/index.ts";
+import { resolveDeduplicationStrategy, sendEach } from "../../queues/index.ts";
 import type { JobDelivery } from "../../queues/queue.types.ts";
 import type { EventStoreReadContext } from "../../stores/eventStore.types.ts";
 import { mapValidationIssues } from "../../utils/errors.ts";
@@ -59,6 +60,8 @@ export type { JobRegistryEntry } from "./jobLane.ts";
 interface JobSender<P> {
   send: (payload: P, options?: QueueSendOptions<P>) => Promise<void>;
   sendBatch: (payloads: P[], options?: QueueSendOptions<P>) => Promise<void>;
+  /** Each payload as `send` sends it, in bounded batches; one answer per payload, in order. */
+  sendEach: (payloads: P[], options?: QueueSendOptions<P>) => Promise<QueueSendResult[]>;
   close: () => Promise<void>;
   waitUntilReady: () => Promise<void>;
 }
@@ -187,6 +190,25 @@ function buildValidatingCommandFacade<EventType extends Event, Payload extends T
         validated,
         sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
       );
+    },
+    // Validated one by one: an invalid payload is rejected alone, the rest still send.
+    sendEach: (payloads, options) => {
+      const rawOf = new Map<Payload, Record<string, unknown>>();
+      return sendPreparedInOrder({
+        inputs: payloads,
+        prepare: (payload) => {
+          const validated = validateCommandPayload(cmdEntry, payload);
+          rawOf.set(validated, payload);
+          return validated;
+        },
+        send: async (validated) => {
+          await registerPreflight(validated.map(identityOf));
+          return baseFacade.sendEach(
+            validated,
+            sendOptionsOverRaw(options, (payload) => rawOf.get(payload) ?? {}),
+          );
+        },
+      });
     },
     close: baseFacade.close,
     waitUntilReady: baseFacade.waitUntilReady,
@@ -391,6 +413,15 @@ export class QueueManager<EventType extends Event = Event> {
           payloads.map((payload) => envelopeOf(payload, deduplication)),
           queued,
         );
+      },
+      sendEach: (payloads, options) => {
+        const { deduplication, queued } = sendOptionsOf(options);
+        return sendPreparedInOrder({
+          inputs: payloads,
+          prepare: (payload) => envelopeOf(payload, deduplication),
+          send: (envelopes) =>
+            sendEach({ processor: globalQueue, payloads: envelopes, options: queued }),
+        });
       },
       // Global queue lifecycle is owned by EventSourcing — facade close is a no-op
       close: async () => undefined,

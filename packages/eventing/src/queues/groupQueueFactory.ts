@@ -241,6 +241,7 @@ export function createEventingGroupQueueFactory({
     return {
       send: (payload, options) => producer.send(payload, options),
       sendBatch: (payloads, options) => producer.sendBatch(payloads, options),
+      sendEach: (payloads, options) => producer.sendEach(payloads, options),
       runListedWork: (input) => producer.runListedWork(input),
       start() {
         if (!consumersEnabled || consumers.length > 0) return;

@@ -5,6 +5,7 @@ export {
 } from "./capabilities.ts";
 export type {
   DeduplicationConfig,
+  GroupBatchRoute,
   GroupQueueActivity,
   GroupQueueContextMetadata,
   GroupQueueContext,
@@ -12,12 +13,15 @@ export type {
   GroupQueueDependencies,
   GroupQueueFailureClassifier,
   GroupQueueFailureDecision,
+  GroupQueueGroupBatching,
   GroupQueueHandlerContext,
   GroupQueuePayloadSchema,
   GroupQueuePolicy,
   ListedRun,
   QueueSendOptions,
+  QueueSendResult,
 } from "./contracts.ts";
+export { sendPreparedInOrder } from "./boundedStaging.ts";
 export { EXHAUSTED_OUTCOMES, type ExhaustedOutcome } from "./deadLetter.ts";
 export { defineGroupQueue } from "./definition.ts";
 export { GroupQueueProcessor } from "./groupQueue.ts";

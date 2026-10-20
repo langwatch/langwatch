@@ -45,6 +45,16 @@ export interface QueueSendOptions<Payload> {
   deduplication?: DeduplicationConfig<Payload>;
 }
 
+/**
+ * One payload's answer from `sendEach`, at its input position. `rejected` wrote nothing for it;
+ * `unknown` means Redis may or may not have staged it, so resend it with the same identity.
+ */
+export type QueueSendResult =
+  | Readonly<{ status: "staged" }>
+  | Readonly<{ status: "deduplicated" }>
+  | Readonly<{ status: "rejected"; error: unknown }>
+  | Readonly<{ status: "unknown"; error: unknown }>;
+
 export interface JobDelivery {
   attempt: number;
   isContinuation?: boolean;
@@ -58,14 +68,48 @@ export interface GroupQueueHandlerContext extends JobDelivery {
   signal: AbortSignal;
 }
 
+/** One group's share of a cross-group batch: its payloads in queue order and its own delivery. */
+export interface GroupBatchEntry<Payload> {
+  payloads: Payload[];
+  delivery: JobDelivery;
+}
+
+/** A handler identity whose ready groups may share one call: the envelope's routing trio. */
+export interface GroupBatchRoute {
+  pipelineName: string;
+  jobType: string;
+  jobName: string;
+}
+
+/**
+ * Ready groups of one handler and one tenant run as one call (ARCHITECTURE §9). The call is
+ * all-or-nothing; a failure is narrowed to whole groups by halving, and each group keeps its
+ * own claim, attempts and order.
+ */
+export interface GroupQueueGroupBatching<Payload> {
+  /** The handler identities that accept a cross-group call; read before each claim. */
+  readonly routes: () => readonly GroupBatchRoute[];
+  readonly run: (
+    groups: { payloads: Payload[]; context: GroupQueueHandlerContext }[],
+  ) => Promise<void>;
+}
+
 export interface GroupQueuePolicy {
   globalConcurrency?: number;
+  /** Most slots a consumer adapts up to; at or below `globalConcurrency` the count stays fixed. */
+  adaptiveSlotsCeiling?: number;
   drainTimeoutMs?: number;
   tenantConcurrencyCap?: number;
   globalConcurrencyBudget?: number;
   confirmedDeathThreshold?: number;
   quarantineFailureThreshold?: number;
   bisectionSplitBudget?: number;
+  /** Milliseconds a fresh group collects jobs before it is claimable; 0 claims at once. */
+  settleWindowMs?: number;
+  /** Most ready groups one cross-group call carries; 1 runs every group alone. */
+  groupBatchMaxGroups?: number;
+  /** Byte budget a cross-group call's coalesced payloads share. */
+  groupBatchMaxBytes?: number;
   compression?: "gzip" | "zstd";
   payloadCodec?: "json" | "msgpack";
 }
@@ -147,6 +191,9 @@ export interface GroupQueueRuntimeDefinition<Payload extends Record<string, unkn
   name: string;
   process: (payload: Payload, delivery?: JobDelivery) => Promise<void>;
   processBatch?: (payloads: Payload[], delivery?: JobDelivery) => Promise<void>;
+  /** Several groups of one handler and tenant in one call; see {@link GroupQueueGroupBatching}. */
+  processGroups?: (groups: GroupBatchEntry<Payload>[]) => Promise<void>;
+  groupBatchRoutes?: () => readonly GroupBatchRoute[];
   coalesceMaxBatch?: (payload: Payload) => number | undefined;
   coalesceMaxBytes?: (payload: Payload) => number | undefined;
   onExhausted?: (payload: Payload) => ExhaustedOutcome;

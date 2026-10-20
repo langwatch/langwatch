@@ -1,5 +1,15 @@
 import { promisify } from "node:util";
-import { gunzip, gzip, zstdCompress, zstdDecompress } from "node:zlib";
+import {
+  constants,
+  gunzip,
+  gunzipSync,
+  gzip,
+  gzipSync,
+  zstdCompress,
+  zstdCompressSync,
+  zstdDecompress,
+  zstdDecompressSync,
+} from "node:zlib";
 
 import { Packr } from "msgpackr";
 
@@ -17,6 +27,11 @@ const zstdDecompressAsync = promisify(zstdDecompress);
  */
 const GUNZIP_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
 const ZSTD_OPTS = { maxOutputLength: MAX_BLOB_BYTES };
+
+/** Below this a body compresses in-line: a pooled async stream costs more than the work itself. */
+const SYNC_CODEC_MAX_BYTES = 64 * 1024;
+const GZIP_FAST = { level: 1 };
+const ZSTD_FAST = { params: { [constants.ZSTD_c_compressionLevel]: 1 } };
 
 /**
  * msgpackr's record extension shares a stateful structure table across
@@ -62,6 +77,9 @@ export function detectCompression(buf: Buffer): CompressionCodec {
 }
 
 export async function compress(data: Buffer | string, codec: CompressionCodec): Promise<Buffer> {
+  if (codec !== "none" && data.length <= SYNC_CODEC_MAX_BYTES) {
+    return codec === "gzip" ? gzipSync(data, GZIP_FAST) : zstdCompressSync(data, ZSTD_FAST);
+  }
   switch (codec) {
     case "gzip":
       return gzipAsync(data);
@@ -74,7 +92,11 @@ export async function compress(data: Buffer | string, codec: CompressionCodec): 
 
 /** Decompresses by sniffing the payload, so gzip and zstd blobs coexist. */
 export async function decompress(buf: Buffer): Promise<Buffer> {
-  switch (detectCompression(buf)) {
+  const codec = detectCompression(buf);
+  if (codec !== "none" && buf.length <= SYNC_CODEC_MAX_BYTES / 4) {
+    return codec === "gzip" ? gunzipSync(buf, GUNZIP_OPTS) : zstdDecompressSync(buf, ZSTD_OPTS);
+  }
+  switch (codec) {
     case "gzip":
       return gunzipAsync(buf, GUNZIP_OPTS);
     case "zstd":
@@ -86,21 +108,24 @@ export async function decompress(buf: Buffer): Promise<Buffer> {
 
 /**
  * Serializes a payload, choosing msgpack only above {@link MSGPACK_MIN_BYTES}.
- * Returns the codec alongside the bytes since the caller must fold it into
- * the content hash, see {@link contentHashSource}.
+ * Returns the codec since the caller folds it into the content hash ({@link
+ * contentHashSource}); JSON stays a string, as an inline body never needs a buffer.
  */
 export function encodePayload(
   payload: Record<string, unknown>,
   { msgpackEnabled }: { msgpackEnabled: boolean },
-): { bytes: Buffer; codec: PayloadCodec; json: string | null } {
+):
+  | { codec: "json"; json: string; byteLength: number }
+  | { codec: "msgpack"; json: string; byteLength: number; bytes: Buffer } {
   const json = JSON.stringify(payload);
   const jsonBytes = Buffer.byteLength(json);
 
   if (!msgpackEnabled || jsonBytes < MSGPACK_MIN_BYTES) {
-    return { bytes: Buffer.from(json), codec: "json", json };
+    return { codec: "json", json, byteLength: jsonBytes };
   }
 
-  return { bytes: packr.pack(payload), codec: "msgpack", json };
+  const bytes = packr.pack(payload);
+  return { codec: "msgpack", json, byteLength: bytes.length, bytes };
 }
 
 /**

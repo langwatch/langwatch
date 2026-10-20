@@ -16,35 +16,57 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import {
   type SpanDedupClaim,
+  type SpanDedupRef,
   TraceSpanDedupRepository,
 } from "../../../../repositories/trace-span-dedup.repository.ts";
 import { TraceEdgeMediaPayloadService } from "../../../media/services/trace-edge-media-payload.service.ts";
 import { TraceEdgeMediaTelemetryService } from "../../../media/services/trace-edge-media-telemetry.service.ts";
 import {
   type CodingAgentIngestFilter,
+  type RecordSpanOutcome,
   TraceIngressCommand,
+  TraceIngressPayload,
   TraceIngestionService,
 } from "../trace-ingestion.service.ts";
 
+/** Each span of a batched hand-off goes through `record`, so one spy sees both paths. */
 class TestTraceIngressCommand extends TraceIngressCommand {
   readonly record = vi.fn(async (_data: RecordSpanCommandData) => void 0);
+  readonly handOff = vi.fn((_data: readonly RecordSpanCommandData[]) => void 0);
 
   recordSpan(data: RecordSpanCommandData): Promise<void> {
     return this.record(data);
+  }
+
+  async recordSpans(data: readonly RecordSpanCommandData[]): Promise<RecordSpanOutcome[]> {
+    this.handOff(data);
+    const outcomes: RecordSpanOutcome[] = [];
+    for (const each of data) {
+      try {
+        await this.record(each);
+        outcomes.push({ status: "recorded" });
+      } catch (error) {
+        outcomes.push({ status: "failed", error });
+      }
+    }
+    return outcomes;
   }
 }
 
 class TestTraceSpanDedup extends TraceSpanDedupRepository {
   readonly acquire = vi.fn<() => Promise<SpanDedupClaim>>(async () => ({ outcome: "acquired" }));
-  readonly confirm = vi.fn(async () => void 0);
+  readonly claimed = vi.fn((_spans: readonly SpanDedupRef[]) => void 0);
+  readonly confirm = vi.fn(async (_spans: readonly SpanDedupRef[]) => void 0);
   readonly release = vi.fn(async () => void 0);
 
-  claimProcessing(): Promise<SpanDedupClaim> {
-    return this.acquire();
+  claimProcessing(spans: readonly SpanDedupRef[]): Promise<SpanDedupClaim[]> {
+    this.claimed(spans);
+    return Promise.all(spans.map(() => this.acquire()));
   }
 
-  confirmProcessed(): Promise<void> {
-    return this.confirm();
+  confirmProcessed(spans: readonly SpanDedupRef[]): Promise<void> {
+    if (spans.length === 0) return Promise.resolve();
+    return this.confirm(spans);
   }
 
   releaseOnFailure(): Promise<void> {
@@ -745,6 +767,174 @@ describe("TraceIngestionService.handleOtlpTraceRequest edge media fail-open seri
       expect(
         metrics.valueOf("langwatch_edge_media_extract_fail_open_total", { reason: "flag_store" }),
       ).toBe(1);
+    });
+  });
+});
+
+describe("TraceIngestionService dedup round trips", () => {
+  const ids = (spans: readonly SpanDedupRef[] | undefined) => (spans ?? []).map((s) => s.spanId);
+
+  describe("given a request holding several spans", () => {
+    it("claims them all in one round trip and confirms them in one", async () => {
+      const { dedup, service } = fixture();
+
+      await handle(service, [span({ spanId: "span-1" }), span({ spanId: "span-2" })]);
+
+      expect(dedup.claimed).toHaveBeenCalledOnce();
+      expect(ids(dedup.claimed.mock.calls[0]?.[0])).toEqual(["span-1", "span-2"]);
+      expect(dedup.confirm).toHaveBeenCalledOnce();
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["span-1", "span-2"]);
+    });
+
+    it("confirms only the spans the pipeline took, and releases the one it refused", async () => {
+      const { commands, dedup, service } = fixture();
+      commands.record.mockResolvedValueOnce(undefined).mockRejectedValueOnce(new Error("down"));
+
+      await handle(service, [span({ spanId: "span-1" }), span({ spanId: "span-2" })]);
+
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["span-1"]);
+      expect(dedup.release).toHaveBeenCalledOnce();
+    });
+
+    it("never confirms a span dedup had already seen", async () => {
+      const { commands, dedup, service } = fixture();
+      dedup.acquire.mockResolvedValueOnce({ outcome: "held" });
+
+      await handle(service, [span({ spanId: "span-1" }), span({ spanId: "span-2" })]);
+
+      expect(commands.record).toHaveBeenCalledOnce();
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["span-2"]);
+    });
+  });
+
+  describe("given a request holding only spans dropped at the door", () => {
+    it("asks the dedup store nothing", async () => {
+      const { dedup, service } = fixture();
+
+      await handle(service, [{ traceId: "bad" }]);
+
+      expect(dedup.claimed).not.toHaveBeenCalled();
+      expect(dedup.confirm).not.toHaveBeenCalled();
+    });
+  });
+});
+
+describe("TraceIngestionService batched hand-off", () => {
+  const ids = (spans: readonly { spanId: string }[] | undefined) =>
+    (spans ?? []).map((s) => s.spanId);
+  const handedOff = (commands: TestTraceIngressCommand) =>
+    commands.handOff.mock.calls.map(([data]) => data.map((each) => each.span.spanId));
+
+  describe("given a request whose spans are all claimed", () => {
+    /** @scenario The claimed spans of a request are handed off in one call */
+    it("hands them to the pipeline in one call, in request order", async () => {
+      const { commands, service } = fixture();
+
+      await handle(service, [
+        span({ spanId: "span-1" }),
+        span({ spanId: "span-2" }),
+        span({ spanId: "span-3" }),
+      ]);
+
+      expect(handedOff(commands)).toEqual([["span-1", "span-2", "span-3"]]);
+    });
+  });
+
+  describe("given a span held elsewhere, one claimed and one whose claim went unanswered", () => {
+    /** @scenario Only spans the pipeline took are confirmed, after it answered */
+    it("confirms only the taken span, once the pipeline answered, and releases no unclaimed span", async () => {
+      const { commands, dedup, service } = fixture();
+      dedup.acquire
+        .mockResolvedValueOnce({ outcome: "held" })
+        .mockResolvedValueOnce({ outcome: "acquired" })
+        .mockResolvedValueOnce({ outcome: "unknown" });
+      commands.record
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("queue answer lost"));
+
+      const result = await handle(service, [
+        span({ spanId: "held" }),
+        span({ spanId: "claimed" }),
+        span({ spanId: "unanswered" }),
+      ]);
+
+      expect(handedOff(commands)).toEqual([["claimed", "unanswered"]]);
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["claimed"]);
+      expect(dedup.confirm.mock.invocationCallOrder[0]).toBeGreaterThan(
+        commands.handOff.mock.invocationCallOrder[0] ?? Number.POSITIVE_INFINITY,
+      );
+      expect(dedup.release).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ rejectedSpans: 1, ingestionFailures: 1 });
+    });
+  });
+
+  describe("given a request where one span cannot be prepared", () => {
+    class FailingPayloads extends TraceIngressPayload {
+      async prepare(data: RecordSpanCommandData): Promise<RecordSpanCommandData> {
+        if (data.span.spanId === "broken") throw new Error("spool unavailable");
+        return data;
+      }
+    }
+
+    /** @scenario A span that fails its preparation fails alone and releases its claim */
+    it("fails that span, releases its claim, and still hands off the others", async () => {
+      const dedup = new TestTraceSpanDedup();
+      const commands = new TestTraceIngressCommand();
+      const service = TraceIngestionService.create({
+        codingAgentFilter: { shouldFilterSpan: shouldFilterCodingAgentSpan },
+        codingAgentSpanFilterEnabled: false,
+        dedup,
+        commands,
+        payloads: new FailingPayloads(),
+      });
+
+      const result = await handle(service, [span({ spanId: "broken" }), span({ spanId: "fine" })]);
+
+      expect(handedOff(commands)).toEqual([["fine"]]);
+      expect(dedup.release).toHaveBeenCalledOnce();
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["fine"]);
+      expect(result).toMatchObject({
+        rejectedSpans: 1,
+        ingestionFailureMessage: "spool unavailable",
+      });
+    });
+  });
+
+  describe("given a request handed off whole where the pipeline fails some spans", () => {
+    /** @scenario A span the pipeline could not take releases its claim */
+    it("releases each failed span's claim and confirms only the taken ones", async () => {
+      const { commands, dedup, service } = fixture();
+      commands.record
+        .mockRejectedValueOnce(new Error("down"))
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error("down"));
+
+      const result = await handle(service, [
+        span({ spanId: "span-1" }),
+        span({ spanId: "span-2" }),
+        span({ spanId: "span-3" }),
+      ]);
+
+      expect(dedup.release).toHaveBeenCalledTimes(2);
+      expect(ids(dedup.confirm.mock.calls[0]?.[0])).toEqual(["span-2"]);
+      expect(result).toMatchObject({ rejectedSpans: 2, ingestionFailures: 2 });
+    });
+  });
+
+  describe("given a request whose hand-off call throws", () => {
+    /** @scenario A hand-off that fails outright fails every span it carried */
+    it("fails every claimed span, releases each claim and confirms nothing", async () => {
+      const { commands, dedup, service } = fixture();
+      vi.spyOn(commands, "recordSpans").mockRejectedValueOnce(new Error("redis unreachable"));
+
+      const result = await handle(service, [
+        span({ spanId: "span-1" }),
+        span({ spanId: "span-2" }),
+      ]);
+
+      expect(dedup.release).toHaveBeenCalledTimes(2);
+      expect(dedup.confirm).not.toHaveBeenCalled();
+      expect(result).toMatchObject({ rejectedSpans: 2, ingestionFailures: 2 });
     });
   });
 });

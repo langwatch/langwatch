@@ -23,6 +23,8 @@ import type { IExportTraceServiceRequest } from "@opentelemetry/otlp-transformer
 import { getLangWatchTracer } from "langwatch";
 
 import type {
+  SpanDedupClaim,
+  SpanDedupRef,
   TraceSpanDedupRepository,
   UsageRecordRef,
 } from "../../../repositories/trace-span-dedup.repository.ts";
@@ -41,6 +43,36 @@ type SpanIngestionResult = {
   error?: string;
 };
 
+/** One already-normalized span on its way to the Trace command pipeline. */
+type NormalizedSpanInput = {
+  tenantId: string;
+  span: OtlpSpan;
+  resource: OtlpResource | null;
+  instrumentationScope: OtlpInstrumentationScope | null;
+  piiRedactionLevel: PIIRedactionLevel;
+  otelSpanRef?: OtelSpan;
+};
+
+/** A span's command, and the usage record it claimed, released if the span fails. */
+type PreparedSpan = { data: RecordSpanCommandData; usageRecord: UsageRecordRef | null };
+
+/** A raw span's admission: decided at the door, or admitted for collection. */
+type SpanAdmission =
+  | Readonly<{ result: SpanIngestionResult }>
+  | Readonly<{ ingest: NormalizedSpanInput }>;
+
+/** Spans claimed per dedup round trip: few enough that each is recorded well inside its claim. */
+const DEDUP_BATCH_SIZE = 100;
+
+/** The store gave no answer for this span: ingest it, as an unreachable store would. */
+const UNANSWERED_CLAIM: SpanDedupClaim = { outcome: "unknown" };
+
+/** The pipeline answered fewer spans than it was handed: the missing ones did not land. */
+const NO_HAND_OFF_ANSWER: RecordSpanOutcome = {
+  status: "failed",
+  error: new Error("The trace pipeline gave no answer for this span"),
+};
+
 type TraceRequestCollectionResult = {
   rejectedSpans: number;
   /**
@@ -52,9 +84,18 @@ type TraceRequestCollectionResult = {
   errorMessage: string;
 };
 
+/** One span's hand-off answer from `recordSpans`, at its input position. */
+export type RecordSpanOutcome =
+  | Readonly<{ status: "recorded" }>
+  | Readonly<{ status: "failed"; error: unknown }>;
+
 /** The Trace pipeline's one named command handoff. */
 export abstract class TraceIngressCommand {
   abstract recordSpan(data: RecordSpanCommandData): Promise<void>;
+  /** Hands each span off as `recordSpan` would, in bounded batches; one answer per span. */
+  abstract recordSpans(
+    data: readonly RecordSpanCommandData[],
+  ): Promise<readonly RecordSpanOutcome[]>;
 }
 
 /** Optional edge/blob preparation, composed by the application when enabled. */
@@ -213,28 +254,19 @@ export class TraceIngestionService {
           scopes: scopedSpansOf(traceRequest),
         });
 
-        for (const resourceSpan of traceRequest.resourceSpans ?? []) {
-          const resource = this.parseResource(resourceSpan?.resource, tenantId);
-
-          for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
-            const scope = this.parseScope(scopeSpan?.scope, tenantId);
-
-            for (const candidate of scopeSpan?.spans ?? []) {
-              tally.record(
-                await this.processSpan({
-                  tenantId,
-                  otelSpan: candidate,
-                  resource,
-                  scope,
-                  piiRedactionLevel,
-                  otelSpanRef,
-                  helperThreads,
-                  maxPastMs,
-                }),
-              );
-            }
-          }
-        }
+        const admissions = this.admitRequestSpans({
+          tenantId,
+          traceRequest,
+          piiRedactionLevel,
+          otelSpanRef,
+          helperThreads,
+          maxPastMs,
+        });
+        // Admitted spans are collected together, so their dedup claims share round trips.
+        const collected = await this.collection.ingestNormalizedSpans(
+          admissions.flatMap((admission) => ("ingest" in admission ? [admission.ingest] : [])),
+        );
+        recordInRequestOrder({ tally, admissions, collected });
 
         tally.describeOn(otelSpanRef);
         this.outcomeMetrics.record(tally.outcomes());
@@ -242,6 +274,48 @@ export class TraceIngestionService {
         return tally.collectionResult();
       },
     );
+  }
+
+  /** Every span of the request admitted or decided at the door, in request order. */
+  private admitRequestSpans({
+    tenantId,
+    traceRequest,
+    piiRedactionLevel,
+    otelSpanRef,
+    helperThreads,
+    maxPastMs,
+  }: {
+    tenantId: string;
+    traceRequest: IExportTraceServiceRequest;
+    piiRedactionLevel: PIIRedactionLevel;
+    otelSpanRef: OtelSpan;
+    helperThreads: Map<string, string>;
+    maxPastMs: number;
+  }): SpanAdmission[] {
+    const admissions: SpanAdmission[] = [];
+    for (const resourceSpan of traceRequest.resourceSpans ?? []) {
+      const resource = this.parseResource(resourceSpan?.resource, tenantId);
+
+      for (const scopeSpan of resourceSpan?.scopeSpans ?? []) {
+        const scope = this.parseScope(scopeSpan?.scope, tenantId);
+
+        for (const candidate of scopeSpan?.spans ?? []) {
+          admissions.push(
+            this.admitSpan({
+              tenantId,
+              otelSpan: candidate,
+              resource,
+              scope,
+              piiRedactionLevel,
+              otelSpanRef,
+              helperThreads,
+              maxPastMs,
+            }),
+          );
+        }
+      }
+    }
+    return admissions;
   }
 
   /**
@@ -272,18 +346,12 @@ export class TraceIngestionService {
    * OTLP request path and the REST tracked-event path both reach it by name;
    * the work itself belongs to {@link TraceSpanCollectionService}.
    */
-  ingestNormalizedSpan(input: {
-    tenantId: string;
-    span: OtlpSpan;
-    resource: OtlpResource | null;
-    instrumentationScope: OtlpInstrumentationScope | null;
-    piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef?: OtelSpan;
-  }): Promise<SpanIngestionResult> {
+  ingestNormalizedSpan(input: NormalizedSpanInput): Promise<SpanIngestionResult> {
     return this.collection.ingestNormalizedSpan(input);
   }
 
-  private async processSpan(input: {
+  /** Validates and filters one raw span: a final result, or the normalized span to collect. */
+  private admitSpan(input: {
     tenantId: string;
     otelSpan: unknown;
     resource: OtlpResource | null;
@@ -293,7 +361,7 @@ export class TraceIngestionService {
     /** Codex helper threads by request span id; absent, nothing is stamped. */
     helperThreads?: Map<string, string>;
     maxPastMs: number;
-  }): Promise<SpanIngestionResult> {
+  }): SpanAdmission {
     const spanParseResult = spanSchema.safeParse(input.otelSpan);
     if (!spanParseResult.success) {
       this.logger.warn(
@@ -302,8 +370,10 @@ export class TraceIngestionService {
       );
 
       return {
-        status: "dropped",
-        error: `span validation failed: ${spanParseResult.error.message}`,
+        result: {
+          status: "dropped",
+          error: `span validation failed: ${spanParseResult.error.message}`,
+        },
       };
     }
 
@@ -311,13 +381,16 @@ export class TraceIngestionService {
     // after the append it throws permanently on a retrying lane. One span's problem.
     const decoded = storableSpanTimesOf(spanParseResult.data);
     if ("unstorable" in decoded) {
-      return { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) };
+      return {
+        result: { status: "dropped", error: unstorableSpanTimeMessage(decoded.unstorable) },
+      };
     }
     const { startTimeUnixMs } = decoded.times;
 
     if (startTimeUnixMs < nowInstant().epochMilliseconds - input.maxPastMs) {
       const days = Math.round(input.maxPastMs / DAY_MS);
-      return { status: "dropped", error: `span start time is more than ${days} days in the past` };
+      const error = `span start time is more than ${days} days in the past`;
+      return { result: { status: "dropped", error } };
     }
 
     // The stamp is the admission: it is applied before the filter reads the span.
@@ -335,17 +408,19 @@ export class TraceIngestionService {
         attributeKeys: span.attributes.map((attribute) => attribute.key),
       });
     if (isFilteredCodingAgentSpan) {
-      return { status: "filtered" };
+      return { result: { status: "filtered" } };
     }
 
-    return this.ingestNormalizedSpan({
-      tenantId: input.tenantId,
-      span: this.withHexIds(span),
-      resource: input.resource,
-      instrumentationScope: input.scope,
-      piiRedactionLevel: input.piiRedactionLevel,
-      otelSpanRef: input.otelSpanRef,
-    });
+    return {
+      ingest: {
+        tenantId: input.tenantId,
+        span: this.withHexIds(span),
+        resource: input.resource,
+        instrumentationScope: input.scope,
+        piiRedactionLevel: input.piiRedactionLevel,
+        otelSpanRef: input.otelSpanRef,
+      },
+    };
   }
 
   /**
@@ -396,78 +471,175 @@ class TraceSpanCollectionService {
     return new TraceSpanCollectionService(options);
   }
 
-  async ingestNormalizedSpan(input: {
-    tenantId: string;
-    span: OtlpSpan;
-    resource: OtlpResource | null;
-    instrumentationScope: OtlpInstrumentationScope | null;
-    piiRedactionLevel: PIIRedactionLevel;
-    otelSpanRef?: OtelSpan;
-  }): Promise<SpanIngestionResult> {
-    let lockAcquired = false;
-    let usageRecord: UsageRecordRef | null = null;
+  async ingestNormalizedSpan(input: NormalizedSpanInput): Promise<SpanIngestionResult> {
+    const ref = spanDedupRefOf(input);
+    const [claim = UNANSWERED_CLAIM] = await this.options.dedup.claimProcessing([ref]);
+    const result = await this.collectClaimed({ input, claim });
+    if (result.status === "collected") await this.options.dedup.confirmProcessed([ref]);
+    return result;
+  }
 
-    try {
-      const claim = await this.options.dedup.claimProcessing({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
+  /** Spans in order, claimed and confirmed per batch rather than per span. */
+  async ingestNormalizedSpans(
+    inputs: readonly NormalizedSpanInput[],
+  ): Promise<SpanIngestionResult[]> {
+    const results: SpanIngestionResult[] = [];
+    for (let start = 0; start < inputs.length; start += DEDUP_BATCH_SIZE) {
+      results.push(...(await this.collectBatch(inputs.slice(start, start + DEDUP_BATCH_SIZE))));
+    }
+    return results;
+  }
+
+  /**
+   * One claim round trip, the claimed spans prepared one by one and handed off together, one
+   * confirmation for those the pipeline took. A failed span releases its claim, so a resend
+   * reaches the pipeline under the same identity (specs/span-admission-batch-hand-off.feature).
+   */
+  private async collectBatch(
+    inputs: readonly NormalizedSpanInput[],
+  ): Promise<SpanIngestionResult[]> {
+    const claims = await this.options.dedup.claimProcessing(inputs.map(spanDedupRefOf));
+    const results: SpanIngestionResult[] = [];
+    const ready: ({ index: number; input: NormalizedSpanInput } & PreparedSpan)[] = [];
+    const failures: Promise<void>[] = [];
+    for (const [index, input] of inputs.entries()) {
+      const claim = claims[index] ?? UNANSWERED_CLAIM;
       if (claim.outcome === "held") {
-        return { status: "deduped" };
+        results[index] = { status: "deduped" };
+        continue;
       }
+      try {
+        ready.push({ index, input, ...(await this.prepareCommand(input)) });
+      } catch (error) {
+        results[index] = this.failedSpan({ input, error });
+        if (claim.outcome === "acquired") failures.push(this.releaseClaim(input));
+      }
+    }
 
-      lockAcquired = claim.outcome === "acquired";
+    const outcomes = await this.handOff(ready.map(({ data }) => data));
+    const recorded: SpanDedupRef[] = [];
+    for (const [offset, { index, input, usageRecord }] of ready.entries()) {
+      const outcome = outcomes[offset] ?? NO_HAND_OFF_ANSWER;
+      if (outcome.status === "recorded") {
+        results[index] = { status: "collected" };
+        recorded.push(spanDedupRefOf(input));
+        continue;
+      }
+      results[index] = this.failedSpan({ input, error: outcome.error });
+      if (claims[index]?.outcome === "acquired") failures.push(this.releaseClaim(input));
+      if (usageRecord) failures.push(this.usage.release({ record: usageRecord }));
+    }
+    await Promise.all(failures);
+    await this.options.dedup.confirmProcessed(recorded);
+    return results;
+  }
 
-      const usage = await this.usage.claim(input);
-      usageRecord = usage.acquired;
+  /** The prepared spans handed off in one call; a call that throws fails every one of them. */
+  private async handOff(
+    data: readonly RecordSpanCommandData[],
+  ): Promise<readonly RecordSpanOutcome[]> {
+    if (data.length === 0) return [];
+    try {
+      return await this.options.commands.recordSpans(data);
+    } catch (error) {
+      return data.map(() => ({ status: "failed", error }));
+    }
+  }
 
-      const commandData: RecordSpanCommandData = {
-        tenantId: input.tenantId,
-        span: usage.span,
-        resource: input.resource,
-        instrumentationScope: input.instrumentationScope,
-        piiRedactionLevel: input.piiRedactionLevel,
-        occurredAt: nowInstant().epochMilliseconds,
-      };
-      const prepared = this.options.payloads
+  /**
+   * The command one span becomes: its usage record claimed, then the optional edge/blob
+   * preparation. A preparation that throws releases the usage record it claimed.
+   */
+  private async prepareCommand(input: NormalizedSpanInput): Promise<PreparedSpan> {
+    const usage = await this.usage.claim(input);
+    const commandData: RecordSpanCommandData = {
+      tenantId: input.tenantId,
+      span: usage.span,
+      resource: input.resource,
+      instrumentationScope: input.instrumentationScope,
+      piiRedactionLevel: input.piiRedactionLevel,
+      occurredAt: nowInstant().epochMilliseconds,
+    };
+    try {
+      const data = this.options.payloads
         ? await this.options.payloads.prepare(commandData)
         : commandData;
+      return { data, usageRecord: usage.acquired };
+    } catch (error) {
+      if (usage.acquired) await this.usage.release({ record: usage.acquired });
+      throw error;
+    }
+  }
 
-      await this.options.commands.recordSpan(prepared);
-      await this.options.dedup.confirmProcessed({
-        tenantId: input.tenantId,
-        traceId: input.span.traceId,
-        spanId: input.span.spanId,
-      });
+  private async releaseClaim(input: NormalizedSpanInput): Promise<void> {
+    await this.options.dedup.releaseOnFailure(spanDedupRefOf(input));
+  }
 
+  /** A span the pipeline did not take, noted on the request span and logged. */
+  private failedSpan({
+    input,
+    error,
+  }: {
+    input: NormalizedSpanInput;
+    error: unknown;
+  }): SpanIngestionResult {
+    input.otelSpanRef?.addEvent("span_ingestion_error", {
+      "error.message": error instanceof Error ? error.message : String(error),
+      "tenant.id": input.tenantId,
+    });
+    this.logger.error(
+      { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
+      "Error dispatching span to the trace processing pipeline",
+    );
+    return {
+      status: "failed",
+      error: error instanceof Error ? error.message : String(error),
+    };
+  }
+
+  private async collectClaimed({
+    input,
+    claim,
+  }: {
+    input: NormalizedSpanInput;
+    claim: SpanDedupClaim;
+  }): Promise<SpanIngestionResult> {
+    if (claim.outcome === "held") {
+      return { status: "deduped" };
+    }
+    let usageRecord: UsageRecordRef | null = null;
+    try {
+      const prepared = await this.prepareCommand(input);
+      usageRecord = prepared.usageRecord;
+      await this.options.commands.recordSpan(prepared.data);
       return { status: "collected" };
     } catch (error) {
-      if (lockAcquired) {
-        await this.options.dedup.releaseOnFailure({
-          tenantId: input.tenantId,
-          traceId: input.span.traceId,
-          spanId: input.span.spanId,
-        });
-      }
-      if (usageRecord) {
-        await this.usage.release({ record: usageRecord });
-      }
-
-      input.otelSpanRef?.addEvent("span_ingestion_error", {
-        "error.message": error instanceof Error ? error.message : String(error),
-        "tenant.id": input.tenantId,
-      });
-      this.logger.error(
-        { error, tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId },
-        "Error dispatching span to the trace processing pipeline",
-      );
-
-      return {
-        status: "failed",
-        error: error instanceof Error ? error.message : String(error),
-      };
+      if (claim.outcome === "acquired") await this.releaseClaim(input);
+      if (usageRecord) await this.usage.release({ record: usageRecord });
+      return this.failedSpan({ input, error });
     }
+  }
+}
+
+/** A span's dedup identity: its id within its trace and tenant. */
+function spanDedupRefOf(input: NormalizedSpanInput): SpanDedupRef {
+  return { tenantId: input.tenantId, traceId: input.span.traceId, spanId: input.span.spanId };
+}
+
+/** Tallies each span's outcome in request order; collected results follow the admitted spans. */
+function recordInRequestOrder({
+  tally,
+  admissions,
+  collected,
+}: {
+  tally: SpanIngestionTally;
+  admissions: readonly SpanAdmission[];
+  collected: readonly SpanIngestionResult[];
+}): void {
+  let next = 0;
+  for (const admission of admissions) {
+    const result = "ingest" in admission ? collected[next++] : admission.result;
+    if (result) tally.record(result);
   }
 }
 

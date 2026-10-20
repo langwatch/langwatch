@@ -2208,6 +2208,9 @@ A replay reads its projections off the pipelines the process registered: `replay
 unwraps a `RedisCachedFoldStore` to its durable tier, and a map projection's owner declares the
 `targetTable` a rebuild optimizes on its definition. No list outside the owning module names a
 store or a table (Alex, 2026-09-28).
+Ready groups of one handler and one tenant run as one batch, with one store write and one
+fold-state read; a failure retries per group, and a batch never waits past the settling window
+(Alex, 2026-10-16; `packages/group-queue/specs/cross-group-batch.feature`).
 A pipeline whose projections write tenant rows declares each tenant's retention itself (Alex,
 2026-09-28): `.withRetention(resolver)`, built from its module's own `DataRetentionApi` dependency
 (`getResolvedForProject`, a tenant being a project), and registration prefers it to the runtime's.

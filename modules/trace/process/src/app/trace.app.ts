@@ -264,6 +264,7 @@ import {
   TraceIngestionService,
   TraceIngressCommand,
   type CodingAgentIngestFilter,
+  type RecordSpanOutcome,
 } from "../features/ingestion/services/trace-ingestion.service.ts";
 import type {
   ResolveTraceSpansBatchFn,
@@ -4007,6 +4008,16 @@ class TraceComposedIngressCommand extends TraceIngressCommand {
 
   async recordSpan(data: RecordSpanCommandData): Promise<void> {
     await this.#commands.recordSpan(data);
+  }
+
+  /** A span the queue staged or folded into one already staged is recorded; else it failed. */
+  async recordSpans(data: readonly RecordSpanCommandData[]): Promise<RecordSpanOutcome[]> {
+    const results = await this.#commands.recordSpans(data);
+    return results.map((result) =>
+      result.status === "staged" || result.status === "deduplicated"
+        ? { status: "recorded" }
+        : { status: "failed", error: result.error },
+    );
   }
 }
 

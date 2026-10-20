@@ -2,6 +2,7 @@ import {
   BLOB_RECLAIM_TTL_THRESHOLD_SECONDS,
   BLOB_RELEASE_GRACE_TTL_SECONDS,
 } from "./blobConstants.ts";
+import { realHolderCountLua } from "./blobGraceLua.ts";
 
 /**
  * The verdicts {@link BLOB_SWEEP_LUA} can return for one blob. Every sweep
@@ -9,7 +10,7 @@ import {
  * whole keyspace rather than only the interesting half.
  */
 export const BLOB_SWEEP_OUTCOMES = [
-  /** A live lease still references the blob. Untouched. */
+  /** A live lease or a real legacy holder still references the blob. Untouched. */
   "leased",
   /** Unleased and holding more than the grace window: expiry shortened to it. */
   "repaired",
@@ -26,7 +27,7 @@ export type BlobSweepOutcome = (typeof BLOB_SWEEP_OUTCOMES)[number];
 /**
  * Sweep one blob: REPAIR shortens deadlines safely (never destroys bytes),
  * RECLAIM deletes bytes only when TTL proves blob was unreferenced past safety margin.
- * Atomic cluster eval; ARGV[1]="1" to dry-run.
+ * Atomic cluster eval; ARGV[1]="1" to dry-run, which reports the verdict and writes nothing.
  */
 export const BLOB_SWEEP_LUA = `
 local dryRun = ARGV[1] == "1"
@@ -34,10 +35,14 @@ local dryRun = ARGV[1] == "1"
 local now = redis.call("TIME")
 local nowMs = (tonumber(now[1]) * 1000) + math.floor(tonumber(now[2]) / 1000)
 
--- Prune deadlines that have passed before reading liveness, exactly as every
--- other lease query does: an expired member is not a reference.
-redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs)
-if redis.call("ZCARD", KEYS[1]) > 0 then return "leased" end
+-- An expired member is not a reference. A real sweep prunes them; a dry run
+-- counts only live deadlines so it leaves every member where it found it.
+if not dryRun then redis.call("ZREMRANGEBYSCORE", KEYS[1], "-inf", nowMs) end
+if redis.call("ZCOUNT", KEYS[1], "(" .. nowMs, "+inf") > 0 then return "leased" end
+
+-- The release grace window's own rule: a holder other than the sentinel may be
+-- a reader no lease measures, so nothing is shortened or deleted under it.
+if ${realHolderCountLua({ holderKey: "KEYS[2]" })} > 0 then return "leased" end
 
 local ttl = redis.call("TTL", KEYS[3])
 

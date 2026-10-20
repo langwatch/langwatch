@@ -1,6 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { LEGACY_HOLDER_LEASE_GUARD } from "../blobConstants.ts";
+import { GQ_BLOB_GRACE_LUA, realHolderCountLua } from "../blobGraceLua.ts";
 import { BlobLeases } from "../blobLeases.ts";
+import { BLOB_SWEEP_LUA } from "../blobSweepLua.ts";
 import { CachedLuaScript } from "../cachedLuaScript.ts";
 import { createTenantId } from "../storage.ts";
 
@@ -132,6 +135,31 @@ describe("BlobLeases", () => {
           "holder-1",
           expect.any(String),
         );
+      });
+    });
+  });
+});
+
+describe("the blob liveness rule", () => {
+  describe("given a holder set key", () => {
+    describe("when the real-holder count is built", () => {
+      it("subtracts only the migration sentinel from the set's size", () => {
+        expect(realHolderCountLua({ holderKey: "KEYS[2]" })).toBe(
+          `(redis.call("SCARD", KEYS[2]) - redis.call("SISMEMBER", KEYS[2], "${LEGACY_HOLDER_LEASE_GUARD}"))`,
+        );
+      });
+    });
+  });
+
+  describe("given the release grace window and the sweep", () => {
+    describe("when either decides whether a holder protects a blob", () => {
+      it("both apply the same real-holder count", () => {
+        expect(GQ_BLOB_GRACE_LUA).toContain(realHolderCountLua({ holderKey: "legacyKey" }));
+        expect(BLOB_SWEEP_LUA).toContain(realHolderCountLua({ holderKey: "KEYS[2]" }));
+      });
+
+      it("no longer reads a bare set size as the holder count", () => {
+        expect(GQ_BLOB_GRACE_LUA).not.toContain(`redis.call("SCARD", legacyKey) > 1`);
       });
     });
   });
