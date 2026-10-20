@@ -267,3 +267,22 @@ describe("given a sign-in fails for a reason the person has to act on", () => {
     expect(document.body.textContent).not.toContain("OAuthAccountNotLinked");
   });
 });
+
+describe("given a sign-in whose state no longer matches this browser", () => {
+  /** @scenario "A sign-in that expired or started elsewhere crosses with its own code" */
+  it("crosses as itself and offers to start again from the sign-in page", () => {
+    expect(signInErrorMayCross("state_mismatch")).toBe(true);
+
+    renderError("state_mismatch", { callbackUrl: "/dashboard" });
+
+    expect(screen.getByText("Your sign-in expired")).toBeTruthy();
+    expect(
+      screen.getByText(
+        "Your sign-in expired or was started in another tab or browser. Start again.",
+      ),
+    ).toBeTruthy();
+    const restart = screen.getByRole("link", { name: /start again/i });
+    expect(restart.getAttribute("href")).toBe("/auth/signin?callbackUrl=%2Fdashboard");
+    expect(screen.queryAllByText(/Something went wrong signing you in/i)).toHaveLength(0);
+  });
+});
