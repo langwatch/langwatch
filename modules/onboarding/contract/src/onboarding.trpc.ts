@@ -141,6 +141,10 @@ export const onboardingTrpc = defineTrpcContract("onboarding")
   .withInput(organizationIdInputSchema)
   .withOutput(guidedStateOutputSchema)
 
+  .mutation("recordProviderPromptDismissed")
+  .withInput(organizationIdInputSchema)
+  .withOutput(guidedStateOutputSchema)
+
   .mutation("recordVirtualKeyReveal")
   .withInput(recordVirtualKeyRevealInputSchema)
   .withOutput(guidedStateOutputSchema)

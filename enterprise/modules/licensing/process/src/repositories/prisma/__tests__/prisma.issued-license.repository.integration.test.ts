@@ -259,8 +259,8 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     expect(rows[0]?.organizationName).toContain("Zebra Logistics");
   });
 
-  /** @scenario "The license list hides inactive and internal test licenses until asked" */
-  it("keeps only active licences, and drops internal addresses case aside, when asked", async () => {
+  /** @scenario The license list filters by status and by who the license is for */
+  it("keeps active or inactive licences, and internal addresses or the rest case aside", async () => {
     const tag = `Filters ${RUN}`;
     const { license: active } = await issue(`${tag} active`, "ops@customer.com");
     const { license: revoked } = await issue(`${tag} revoked`, "it@customer.com");
@@ -272,20 +272,25 @@ describe.skipIf(!TEST_DATABASE_URL)("the license registry on Postgres", () => {
     await repository.update(superseded.id, { supersededAt: now });
     await repository.update(expired.id, { expiresAt: now.subtract({ hours: 1 }) });
     const query = { page: 0, pageSize: 25, search: tag };
+    const ids = (page: { rows: { id: string }[] }) => page.rows.map((row) => row.id).toSorted();
+    const internalOnes = (matching: boolean) => ({
+      emailSuffixes: { suffixes: ["@langwatch.ai"], matching },
+    });
 
     const everything = await repository.listAll(query);
-    const onlyActive = await repository.listAll({ ...query, activeAt: now });
+    const onlyActive = await repository.listAll({ ...query, status: { at: now, active: true } });
+    const inactive = await repository.listAll({ ...query, status: { at: now, active: false } });
     const external = await repository.listAll({
       ...query,
-      activeAt: now,
-      excludeEmailSuffixes: ["@langwatch.ai"],
+      status: { at: now, active: true },
+      ...internalOnes(false),
     });
 
     expect(everything.total).toBe(5);
-    expect(onlyActive.rows.map((row) => row.id).toSorted()).toEqual(
-      [active.id, internal.id].toSorted(),
-    );
-    expect(external.rows.map((row) => row.id)).toEqual([active.id]);
+    expect(ids(onlyActive)).toEqual([active.id, internal.id].toSorted());
+    expect(ids(inactive)).toEqual([revoked.id, superseded.id, expired.id].toSorted());
+    expect(ids(external)).toEqual([active.id]);
     expect(external.total).toBe(1);
+    expect(await repository.countAll({ search: tag, ...internalOnes(true) })).toBe(1);
   });
 });

@@ -198,6 +198,7 @@ export class ProjectModule implements ProjectApiContract, ProjectManagementApi, 
       factsBackfill: ProjectFactsBackfillService.create({
         projects: repositories.projects,
         lifecycle,
+        logger: createLogger("langwatch:project:facts-backfill"),
       }),
       authorization: dependencies.authorization,
       dataPrivacy: dependencies.dataPrivacy,

@@ -7,15 +7,23 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 
 import {
+  ANOTHER_FOLDER_LINE,
   ANSWERED_CARD_MESSAGE,
   CLOSING_LINE,
   CLOSING_LINE_PUSHBACK,
   closingLineRefusal,
   COMPLETE_PATH_COMMAND,
   completePathRan,
+  CONTINUATION_DEAD_END_LINE,
+  CONTINUATION_NOTE_OPENER,
+  continuationPrompt,
   FRAMEWORK_LINE_SHAPE,
   LLMOPS_STEP_TITLES,
   MAX_TURN_CONTINUATIONS,
+  MID_SETUP_LINE,
+  MID_SETUP_LINE_PUSHBACK,
+  midSetupLineRefusal,
+  STARTER_FRAMEWORK_LINE,
   STEP2_LINE_TEMPLATES,
   STEP2_LINES_ITEM,
   TRANSPARENT_TOOL_NAMES,
@@ -603,6 +611,10 @@ describe("the guided turn end guard", () => {
       expect(skill).toContain(`11. ${STEP2_LINES_ITEM}`);
       expect(skill).toContain(`${COMPLETE_PATH_COMMAND} <path>`);
       expect(skill).toContain(`\n${CLOSING_LINE}\n`);
+      expect(skill).toContain(MID_SETUP_LINE);
+      expect(skill).toContain(`\n${ANOTHER_FOLDER_LINE}\n`);
+      expect(skill).toContain(STARTER_FRAMEWORK_LINE);
+      expect(skill).toContain(CONTINUATION_NOTE_OPENER);
     });
 
     /** @scenario "The continuation names what the history shows done and the step to continue from" */
@@ -619,6 +631,88 @@ describe("the guided turn end guard", () => {
       expect(branch.test(BRANCH)).toBe(true);
       expect(branch.test("I left the branch checked out.")).toBe(false);
       expect(branch.test(`${BRANCH} Next I will write a scenario.`)).toBe(false);
+    });
+  });
+
+  describe("when the worker continues a turn", () => {
+    /** @scenario "The continuation says the person sent nothing and names the way out" */
+    it("opens on the note that the person sent nothing, carries the guard's message, and ends on the way out", () => {
+      const message = "The path is not finished. Continue with the next step.";
+      const prompt = continuationPrompt(message);
+      expect(prompt.startsWith(`${CONTINUATION_NOTE_OPENER} `)).toBe(true);
+      expect(CONTINUATION_NOTE_OPENER).toBe("LangWatch note: the person sent nothing.");
+      expect(prompt).toContain(message);
+      expect(prompt.endsWith(CONTINUATION_DEAD_END_LINE)).toBe(true);
+      expect(CONTINUATION_DEAD_END_LINE).toContain(
+        'ask the matching question of "When a step fails"',
+      );
+    });
+
+    // The turn a test account ran on a folder with no LLM agent: Langy read
+    // the folder, wrote the plan with one item done and said the setup was
+    // not done, with no command failed and no card.
+    it("continues the turn that stopped on a line with no failed command and no card", () => {
+      const calls = [
+        call("offer_notifications", {}),
+        call("local_ls", { path: "" }),
+        shell("git status --short --branch"),
+        call("local_read", { path: "hello_world/ContentView.swift" }),
+        call("todowrite", {
+          todos: [{ content: "Read the code and name the framework", status: "completed" }],
+        }),
+        say(
+          "The tracing setup is not done because this folder contains a SwiftUI Bluetooth app and ESP32 firmware, with no LLM agent entry point to instrument or connect.",
+        ),
+      ];
+      expect(guidedTurnEnding(calls)).toBe("bare");
+      expect(decideGuidedContinuation({ calls, guided: true, continuations: 0 }).kind).toBe(
+        "continue",
+      );
+    });
+  });
+
+  describe("when the mid-setup line is said", () => {
+    /** @scenario "The mid-setup line is refused in a continued turn" */
+    it("is refused once the worker continued the turn, and said as usual before", () => {
+      expect(midSetupLineRefusal({ text: MID_SETUP_LINE, continued: true })).toBe(
+        MID_SETUP_LINE_PUSHBACK,
+      );
+      expect(
+        midSetupLineRefusal({
+          text: "We’ll get to that! Let me finish getting you set up first.",
+          continued: true,
+        }),
+      ).toBe(MID_SETUP_LINE_PUSHBACK);
+      expect(midSetupLineRefusal({ text: MID_SETUP_LINE, continued: false })).toBeUndefined();
+      expect(midSetupLineRefusal({ text: FRAMEWORK, continued: true })).toBeUndefined();
+      expect(MID_SETUP_LINE_PUSHBACK).toContain("the person sent nothing");
+    });
+  });
+
+  describe("when the turn hands the setup back for another folder", () => {
+    /** @scenario "A folder with no LLM agent gets a question, never a stop" */
+    it("ends the turn on the no-agent question card or on the another-folder line as its last words", () => {
+      const asked = [shell("ls"), say("I read acme-pocket and found no LLM agent."), question()];
+      expect(guidedTurnEnding(asked)).toBe("card");
+      expect(decideGuidedContinuation({ calls: asked, guided: true, continuations: 0 }).kind).toBe(
+        "leave",
+      );
+      expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE)])).toBe("handover");
+      expect(guidedTurnEnding([say(`Got it. ${ANOTHER_FOLDER_LINE}`)])).toBe("handover");
+      expect(guidedTurnEnding([say(ANOTHER_FOLDER_LINE), say("Anything else?")])).toBe("bare");
+      expect(guidedTurnEnding([say(`${ANOTHER_FOLDER_LINE} Let me start the setup now.`)])).toBe(
+        "bare",
+      );
+      expect(
+        decideGuidedContinuation({
+          calls: [shell("git status"), say(ANOTHER_FOLDER_LINE)],
+          guided: true,
+          continuations: 0,
+        }),
+      ).toEqual({ kind: "leave", reason: "handover" });
+      expect(missingStep2Lines([say(STARTER_FRAMEWORK_LINE), say(BRANCH), say(NO_REMOTE)])).toEqual(
+        [],
+      );
     });
   });
 
