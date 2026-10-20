@@ -454,6 +454,72 @@ from .delete_api_teams_by_id_members_by_user_id_response_200 import DeleteApiTea
 from .delete_api_teams_by_id_response_200 import DeleteApiTeamsByIdResponse200
 from .delete_api_triggers_by_id_response_200 import DeleteApiTriggersByIdResponse200
 from .delete_api_triggers_by_id_response_404 import DeleteApiTriggersByIdResponse404
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_200_scope import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_fault import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_meta import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_400_trace import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_fault import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_meta import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_401_trace import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_fault import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_meta import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_403_trace import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_fault import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_meta import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_404_trace import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500 import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_fault import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_meta import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta,
+)
+from .delete_api_v1_projects_by_project_id_analytics_boards_by_board_id_response_500_trace import (
+    DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace,
+)
 from .delete_api_v1_projects_by_project_id_analytics_charts_by_chart_id_placement_response_400 import (
     DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400,
 )
@@ -7005,6 +7071,61 @@ from .post_api_triggers_response_201_templates import PostApiTriggersResponse201
 from .post_api_triggers_response_201_templates_slack_template_type_type_0 import (
     PostApiTriggersResponse201TemplatesSlackTemplateTypeType0,
 )
+from .post_api_v1_projects_by_project_id_analytics_boards_body import PostApiV1ProjectsByProjectIdAnalyticsBoardsBody
+from .post_api_v1_projects_by_project_id_analytics_boards_response_201 import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse201,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_201_scope import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse201Scope,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_400 import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_400_fault import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_400_meta import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_400_trace import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_401 import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_401_fault import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_401_meta import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_401_trace import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_403 import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_403_fault import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_403_meta import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_403_trace import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_500 import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_500_fault import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_500_meta import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta,
+)
+from .post_api_v1_projects_by_project_id_analytics_boards_response_500_trace import (
+    PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace,
+)
 from .post_api_v1_projects_by_project_id_analytics_charts_body import PostApiV1ProjectsByProjectIdAnalyticsChartsBody
 from .post_api_v1_projects_by_project_id_analytics_charts_response_201 import (
     PostApiV1ProjectsByProjectIdAnalyticsChartsResponse201,
@@ -8881,6 +9002,28 @@ __all__ = (
     "DeleteApiTeamsByIdResponse200",
     "DeleteApiTriggersByIdResponse200",
     "DeleteApiTriggersByIdResponse404",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse200Scope",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Fault",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Meta",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse400Trace",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Fault",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Meta",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse401Trace",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Fault",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Meta",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse403Trace",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Fault",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Meta",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse404Trace",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Fault",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Meta",
+    "DeleteApiV1ProjectsByProjectIdAnalyticsBoardsByBoardIdResponse500Trace",
     "DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400",
     "DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400Fault",
     "DeleteApiV1ProjectsByProjectIdAnalyticsChartsByChartIdPlacementResponse400Meta",
@@ -12190,6 +12333,25 @@ __all__ = (
     "PostApiTriggersResponse201ReportType0SourceType2Filters",
     "PostApiTriggersResponse201Templates",
     "PostApiTriggersResponse201TemplatesSlackTemplateTypeType0",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsBody",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse201",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse201Scope",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Fault",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Meta",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse400Trace",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Fault",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Meta",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse401Trace",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Fault",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Meta",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse403Trace",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Fault",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Meta",
+    "PostApiV1ProjectsByProjectIdAnalyticsBoardsResponse500Trace",
     "PostApiV1ProjectsByProjectIdAnalyticsChartsBody",
     "PostApiV1ProjectsByProjectIdAnalyticsChartsResponse201",
     "PostApiV1ProjectsByProjectIdAnalyticsChartsResponse201Definition",
