@@ -249,6 +249,7 @@ export const GROUP_QUEUE_CONFIG = {
   /**
    * Max parallel groups per consumer: the previous release's 100 (Alex, 2026-10-13).
    * GLOBAL_QUEUE_CONCURRENCY raises it; a bench reached 1,474 jobs/s at 1,000.
+   * GLOBAL_QUEUE_CONCURRENCY_CEILING lets slots adapt above it (Alex, 2026-10-20).
    */
   defaultGlobalConcurrency: 100,
   /** TTL for the active key (safety net for crashes), in seconds */
