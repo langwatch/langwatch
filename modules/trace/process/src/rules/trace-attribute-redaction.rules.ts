@@ -1,6 +1,8 @@
 import {
   type CompiledAttributeMatcher,
   compileAttributePatterns,
+  CONTENT_CATEGORIES,
+  type ContentCategory,
 } from "@langwatch/data-privacy-contract";
 import type { Protections } from "@langwatch/trace-contract";
 
@@ -79,4 +81,67 @@ export function createAttributeRedactor({
 
     return (result.changed ? result.value : value) as T;
   };
+}
+
+type CategoryProtections = Pick<
+  Protections,
+  | "canSeeCapturedInput"
+  | "canSeeCapturedOutput"
+  | "capturedInputVisibleTo"
+  | "capturedOutputVisibleTo"
+  | "contentCategories"
+>;
+
+/** Whether the viewer may read a category, and the audience label when a rule restricts it. */
+function categoryVisibility(
+  protections: CategoryProtections,
+): Record<ContentCategory, { canSee: boolean; visibleTo: string | null | undefined }> {
+  const categories = protections.contentCategories;
+
+  return {
+    input: {
+      canSee: categories?.input.canSee ?? protections.canSeeCapturedInput === true,
+      visibleTo: categories?.input.restrictVisibleTo ?? protections.capturedInputVisibleTo,
+    },
+    output: {
+      canSee: categories?.output.canSee ?? protections.canSeeCapturedOutput === true,
+      visibleTo: categories?.output.restrictVisibleTo ?? protections.capturedOutputVisibleTo,
+    },
+    system: {
+      canSee: categories?.system.canSee ?? true,
+      visibleTo: categories?.system.restrictVisibleTo,
+    },
+    tools: {
+      canSee: categories?.tools.canSee ?? true,
+      visibleTo: categories?.tools.restrictVisibleTo,
+    },
+  };
+}
+
+/**
+ * Synthetic hidden-attribute rules for the attribute keys that carry each content category the
+ * viewer cannot see (`langwatch.input`, the gen_ai message keys, `gen_ai.system_instructions`,
+ * `gen_ai.tool.call.*`, ...), so their values are replaced whole by the placeholder naming who
+ * can see them, like a custom restrict rule. Shared by the span protections and the v2 read
+ * mappers so one attribute never carries two different audience labels.
+ */
+export function hiddenContentCategoryRules({
+  protections,
+  contentKeyCatalog,
+}: {
+  protections: CategoryProtections;
+  contentKeyCatalog: Readonly<Record<ContentCategory, readonly string[]>>;
+}): { pattern: string; visibleTo: string }[] {
+  const categories = categoryVisibility(protections);
+
+  return CONTENT_CATEGORIES.flatMap((category) =>
+    categories[category].canSee
+      ? []
+      : contentKeyCatalog[category].map((pattern) => ({
+          pattern,
+          // No restrict label means the content is hidden by membership (or a fail-closed policy
+          // read), not by an audience rule.
+          visibleTo: categories[category].visibleTo ?? "members of this project",
+        })),
+  );
 }
