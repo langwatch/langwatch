@@ -60,7 +60,9 @@ export class PrismaNurturingMilestonesRepository
     data,
   }: {
     organizationId: string;
-    data: { evaluationCount: { increment: number } } | { simulationRunCount: { increment: number } };
+    data:
+      | { evaluationCount: { increment: number } }
+      | { simulationRunCount: { increment: number } };
   }): Promise<NurturingOrganizationCounts[]> {
     const { count } = await this.prisma.nurturingOrganization.updateMany({
       where: { organizationId },

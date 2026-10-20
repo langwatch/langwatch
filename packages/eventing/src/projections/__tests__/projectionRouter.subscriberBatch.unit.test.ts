@@ -57,8 +57,7 @@ describe("ProjectionRouter event subscriber batching", () => {
       it("coalesces up to three jobs and hands a drained batch to the batch handler once", async () => {
         const handle = vi.fn(async () => void 0);
         const handleBatch = vi.fn(
-          async (_events: readonly Event[], _contexts: readonly EventSubscriberContext[]) =>
-            void 0,
+          async (_events: readonly Event[], _contexts: readonly EventSubscriberContext[]) => void 0,
         );
         const { registry, router } = routerOverRegistry();
         router.registerEventSubscriber({

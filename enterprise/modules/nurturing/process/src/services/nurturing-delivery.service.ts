@@ -72,6 +72,13 @@ const CIO_SYNC_DEBOUNCED_KINDS = new Set<NurturingSignal["kind"]>([
   "evaluation_completed",
 ]);
 
+/** One PostHog event for a batch of settled evaluations, carrying how many it counted. */
+const evaluationsCompletedEvent = (signal: NurturingSignalOf<"evaluation_completed">) => ({
+  userId: signal.userId,
+  event: "evaluations_completed",
+  properties: { count: signal.evaluationsCounted ?? 1 },
+});
+
 function isoOf(epochMilliseconds: number): string {
   return Temporal.Instant.fromEpochMilliseconds(epochMilliseconds).toString({
     fractionalSecondDigits: 3,
@@ -298,11 +305,7 @@ export class NurturingDeliveryService {
       case "evaluation_ran":
         return track({ userId: signal.userId, event: "evaluation_ran" });
       case "evaluation_completed":
-        return track({
-          userId: signal.userId,
-          event: "evaluations_completed",
-          properties: { count: signal.evaluationsCounted ?? 1 },
-        });
+        return track(evaluationsCompletedEvent(signal));
       case "user_registered":
         return track({ userId: signal.userId, event: "signed_up" });
       case "user_created":
@@ -428,10 +431,7 @@ export class NurturingDeliveryService {
     ]);
   }
 
-  /**
-   * Main's evaluation sync, once per batch: the count, the milestone when `first`, and one
-   * `evaluation_ran` carrying the latest evaluation and how many the batch counted.
-   */
+  /** Main's evaluation sync once per batch; `first` picks the milestone, `count` the batch's. */
   private evaluationCompleted(signal: NurturingSignalOf<"evaluation_completed">): void {
     const { userId, projectId, organizationEvaluationCount: count } = signal;
     const at = isoOf(signal.occurredAt);

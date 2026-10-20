@@ -28,12 +28,18 @@ type WebhookGatewayEventSubscribers = Readonly<{
   gatewaySpendConfirmedDelivery: PeerEventSubscriberDefinition<
     typeof gatewaySpendConfirmedEventDataSchema
   >;
-  gatewaySpendFailedDelivery: PeerEventSubscriberDefinition<typeof gatewaySpendFailedEventDataSchema>;
-  gatewaySpendSettledDelivery: PeerEventSubscriberDefinition<typeof gatewaySpendSettledEventDataSchema>;
+  gatewaySpendFailedDelivery: PeerEventSubscriberDefinition<
+    typeof gatewaySpendFailedEventDataSchema
+  >;
+  gatewaySpendSettledDelivery: PeerEventSubscriberDefinition<
+    typeof gatewaySpendSettledEventDataSchema
+  >;
   gatewayBudgetCrossingDelivery: PeerEventSubscriberDefinition<
     typeof recordBudgetCrossingCommandDataSchema
   >;
-  gatewayVkLifecycleDelivery: PeerEventSubscriberDefinition<typeof recordVkLifecycleCommandDataSchema>;
+  gatewayVkLifecycleDelivery: PeerEventSubscriberDefinition<
+    typeof recordVkLifecycleCommandDataSchema
+  >;
 }>;
 
 /** A fact's delivery identity: its idempotency key when it has one, as gateway's lanes keyed it. */

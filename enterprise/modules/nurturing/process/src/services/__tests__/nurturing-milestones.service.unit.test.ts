@@ -204,7 +204,11 @@ describe("NurturingMilestonesService", () => {
       });
       await service.projectCreated(projectCreatedFact());
       await service.projectCreated(
-        projectCreatedFact({ projectId: "project-2", organizationId: "org-2", adminUserId: "admin-2" }),
+        projectCreatedFact({
+          projectId: "project-2",
+          organizationId: "org-2",
+          adminUserId: "admin-2",
+        }),
       );
 
       expect(

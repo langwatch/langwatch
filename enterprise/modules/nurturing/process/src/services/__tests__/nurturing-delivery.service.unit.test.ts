@@ -664,7 +664,7 @@ describe("NurturingDeliveryService", () => {
   });
 
   describe("when a tenant's trace update is delivered twice within five minutes", () => {
-    /** @scenario "Trace and simulation updates to Customer.io are debounced per tenant" */
+    /** @scenario "Trace, simulation and evaluation updates to Customer.io are debounced per tenant" */
     it("sends Customer.io the update once", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
@@ -690,7 +690,10 @@ describe("NurturingDeliveryService", () => {
   });
 
   describe("when a batch's evaluation count is delivered", () => {
-    function counted(sourceEventId: string, overrides: Partial<NurturingSignalOf<"evaluation_completed">> = {}): NurturingSignal {
+    function counted(
+      sourceEventId: string,
+      overrides: Partial<NurturingSignalOf<"evaluation_completed">> = {},
+    ): NurturingSignal {
       return {
         kind: "evaluation_completed",
         sourceEventId,
@@ -711,7 +714,10 @@ describe("NurturingDeliveryService", () => {
     it("tells Customer.io the new count once and PostHog how many the batch counted", async () => {
       const { posthog, cio, delivery } = deliveryOverBothSinks();
 
-      await delivery.deliver({ key: "evaluation_completed:project-1:eval-3", signal: counted("project-1:eval-3") });
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-3",
+        signal: counted("project-1:eval-3"),
+      });
       await settle();
 
       expect(cio.sent).toEqual([
