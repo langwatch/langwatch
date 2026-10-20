@@ -7,6 +7,7 @@ import type {
   TraceSummaryListQuery,
   TraceSummaryPage,
   TracesForProjectResult,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 
 import type { TraceLegacyRead } from "../../../services/trace-viewer.service.ts";
@@ -148,7 +149,6 @@ export class TraceContentReadService {
     protections: unknown;
     withEditOverlay?: boolean;
     maxTraces?: number;
-    withSpans?: boolean;
   }): Promise<Trace[]> {
     return this.read.getTracesWithSpansByThreadIds({
       authorization: input.authorization,
@@ -157,11 +157,20 @@ export class TraceContentReadService {
       protections: input.protections,
       opts: {
         full: true,
-        ...(input.withSpans === false ? { withSpans: false } : {}),
         ...(input.withEditOverlay !== undefined ? { withEditOverlay: input.withEditOverlay } : {}),
         ...(input.maxTraces !== undefined ? { maxTraces: input.maxTraces } : {}),
       },
     });
+  }
+
+  readThreadsTraceIds(input: {
+    /** The own-only proof every store read goes through (ruling TRACE-PROOF-SHARE). */
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]> {
+    return this.read.getTraceIdsByThreadIds(input);
   }
 
   async readSampleTraces(input: {

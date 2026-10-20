@@ -16,6 +16,7 @@ import type {
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 
 import type { ClickHouseEvaluationRunRow } from "../../../rules/trace-evaluation-mapping.rules.ts";
@@ -127,10 +128,16 @@ export abstract class TraceLegacyReadRepository {
       projectId: string;
       threadIds: string[];
       maxTraces?: number | undefined;
-      /** False answers each trace's summary with no spans, reading no span at all. */
-      withSpans?: boolean | undefined;
     },
   ): Promise<TraceLegacyRow[]>;
+
+  /** The named threads' trace ids, one list per thread, oldest first; keys only, no content. */
+  abstract findTraceIdsByThreadIds(params: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number | undefined;
+  }): Promise<ThreadTraceIds[]>;
 
   abstract resolveTraceIdByPrefix(params: {
     projectId: string;

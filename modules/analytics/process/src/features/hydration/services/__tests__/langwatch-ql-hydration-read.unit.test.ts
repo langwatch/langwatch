@@ -23,6 +23,7 @@ function traceSource(overrides: Partial<LangWatchQLTraceSource> = {}): LangWatch
   return {
     readTraces: async ({ traceIds }) => traceIds.map((id) => trace({ id })),
     readThreadTraces: async () => [],
+    readThreadTraceIds: async () => [],
     ...overrides,
   };
 }
@@ -102,47 +103,6 @@ describe("LangWatchQLHydrationReadService", () => {
     ).rejects.toMatchObject({ code: "lwql_app_function_read_budget" });
   });
 
-  describe("given thread functions over the same conversations", () => {
-    async function threadReadsFor(
-      calls: readonly { column: string; function: string }[],
-    ): Promise<boolean[]> {
-      const withSpans: boolean[] = [];
-      const service = LangWatchQLHydrationReadService.create({
-        traces: traceSource({
-          readThreadTraces: async (input) => {
-            withSpans.push(input.withSpans);
-            return [];
-          },
-        }),
-      });
-      await service.readTraces({
-        ...readInput,
-        resolved: collectLangWatchQLKeys({
-          calls: calls.map((call) => ({ ...call, options: [] })),
-          rows: ["thread-a", "thread-b"].map((thread) =>
-            Object.fromEntries(calls.map(({ column }) => [column, thread])),
-          ),
-        }),
-      });
-      return withSpans;
-    }
-
-    /** @scenario "A content-free thread function reads no span" */
-    it("asks for summaries only when thread_traces is the only thread function", async () => {
-      expect(await threadReadsFor([{ column: "ids", function: "thread_traces" }])).toEqual([false]);
-    });
-
-    /** @scenario "A thread function that renders content still reads the spans" */
-    it("asks for the spans when another thread function renders content", async () => {
-      expect(
-        await threadReadsFor([
-          { column: "ids", function: "thread_traces" },
-          { column: "transcript", function: "conversation" },
-        ]),
-      ).toEqual([true]);
-    });
-  });
-
   /** @scenario "A page of conversations never loses a trace to the read's ceiling" */
   it("asks each thread read for a ceiling sized by its threads, not the read's default", async () => {
     const asked: { threadKeys: readonly string[]; maxTraces: number }[] = [];
@@ -208,6 +168,54 @@ describe("LangWatchQLHydrationReadService", () => {
     });
 
     expect([...fetched.byThread.keys()]).toEqual(["thread-a", "thread-b"]);
+  });
+
+  describe("given thread functions over the same conversations", () => {
+    async function threadReadsFor(calls: readonly { column: string; function: string }[]) {
+      const reads: { traces: string[][]; traceIds: string[][] } = { traces: [], traceIds: [] };
+      const service = LangWatchQLHydrationReadService.create({
+        traces: traceSource({
+          readThreadTraces: async ({ threadKeys }) => {
+            reads.traces.push([...threadKeys]);
+            return [];
+          },
+          readThreadTraceIds: async ({ threadKeys }) => {
+            reads.traceIds.push([...threadKeys]);
+            return threadKeys.map((threadId) => ({ threadId, traceIds: [`${threadId}-1`] }));
+          },
+        }),
+      });
+      const fetched = await service.readTraces({
+        ...readInput,
+        resolved: collectLangWatchQLKeys({
+          calls: calls.map((call) => ({ ...call, options: [] })),
+          rows: ["thread-a", "thread-b"].map((thread) =>
+            Object.fromEntries(calls.map(({ column }) => [column, thread])),
+          ),
+        }),
+      });
+      return { reads, fetched };
+    }
+
+    /** @scenario "A content-free thread function reads only its threads' trace ids" */
+    it("reads only the trace ids when thread_traces is the only thread function", async () => {
+      const { reads, fetched } = await threadReadsFor([
+        { column: "ids", function: "thread_traces" },
+      ]);
+
+      expect(reads).toEqual({ traces: [], traceIds: [["thread-a", "thread-b"]] });
+      expect(fetched.traceIdsByThread.get("thread-b")).toEqual(["thread-b-1"]);
+    });
+
+    /** @scenario "A thread function that renders content still reads the traces" */
+    it("reads the traces whole when another thread function renders content", async () => {
+      const { reads } = await threadReadsFor([
+        { column: "ids", function: "thread_traces" },
+        { column: "transcript", function: "conversation" },
+      ]);
+
+      expect(reads).toEqual({ traces: [["thread-a", "thread-b"]], traceIds: [] });
+    });
   });
 
   /** @scenario "A failed fetch is a platform failure, not a wrong answer" */

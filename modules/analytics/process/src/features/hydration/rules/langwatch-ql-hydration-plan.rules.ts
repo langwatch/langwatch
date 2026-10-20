@@ -161,6 +161,8 @@ interface LangWatchQLDistinctKeys {
   /** First key part of every trace- and span-keyed call. */
   readonly traceIds: ReadonlySet<string>;
   readonly threadKeys: ReadonlySet<string>;
+  /** The thread keys a call renders content for, so their traces are read whole. */
+  readonly threadContentKeys: ReadonlySet<string>;
   /** Whole key id of every span-keyed call, so a pair counts once. */
   readonly spanPairs: ReadonlySet<string>;
   /** Texts judged straight from the column, which are read from nothing. */
@@ -170,6 +172,7 @@ interface LangWatchQLDistinctKeys {
 interface MutableDistinctKeys {
   readonly traceIds: Set<string>;
   readonly threadKeys: Set<string>;
+  readonly threadContentKeys: Set<string>;
   readonly spanPairs: Set<string>;
   readonly texts: Set<string>;
 }
@@ -183,10 +186,12 @@ function addCallKeys({
   into: MutableDistinctKeys;
 }): void {
   const kind = call.keyKind;
+  const readsContent = (call.source ?? call.definition).reads !== "thread-trace-ids";
   for (const [keyId, parts] of call.keys) {
     const [first] = parts;
     if (first === undefined) continue;
     if (kind === "thread") into.threadKeys.add(first);
+    if (kind === "thread" && readsContent) into.threadContentKeys.add(first);
     else if (kind === "text") into.texts.add(first);
     else into.traceIds.add(first);
     if (kind === "span") into.spanPairs.add(keyId);
@@ -204,6 +209,7 @@ export function langWatchQLDistinctKeys(
   const keys: MutableDistinctKeys = {
     traceIds: new Set(),
     threadKeys: new Set(),
+    threadContentKeys: new Set(),
     spanPairs: new Set(),
     texts: new Set(),
   };

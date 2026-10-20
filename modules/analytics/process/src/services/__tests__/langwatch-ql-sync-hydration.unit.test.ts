@@ -56,6 +56,8 @@ const traceSource: LangWatchQLTraceSource = {
   readTraces: async () => [],
   readThreadTraces: async ({ threadKeys }) =>
     threadKeys.includes("thread-a") ? [trace({ id: "trace-a", threadId: "thread-a" })] : [],
+  readThreadTraceIds: async ({ threadKeys }) =>
+    threadKeys.includes("thread-a") ? [{ threadId: "thread-a", traceIds: ["trace-a"] }] : [],
 };
 
 /** Answers with the keys it was given under one column, as the identity UDF does. */

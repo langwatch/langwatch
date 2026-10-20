@@ -11,7 +11,7 @@ import {
   type LangWatchQLProtections,
 } from "@langwatch/analytics-contract";
 import { HandledError } from "@langwatch/handled-error";
-import type { Trace } from "@langwatch/trace-contract";
+import type { ThreadTraceIds, Trace } from "@langwatch/trace-contract";
 
 import { langWatchQLDistinctKeys } from "../rules/langwatch-ql-hydration-plan.rules.ts";
 import type { LangWatchQLResolvedCall } from "../rules/langwatch-ql-hydration-plan.rules.ts";
@@ -47,8 +47,14 @@ export type LangWatchQLThreadTraceReadInput = {
   protections: LangWatchQLProtections;
   /** The most traces the read may answer with, sized by the threads asked for. */
   maxTraces: number;
-  /** False when every thread value needs only the traces' summaries, never their spans. */
-  withSpans: boolean;
+};
+
+/** The named threads' trace ids, without the traces. */
+export type LangWatchQLThreadTraceIdsReadInput = {
+  projectId: string;
+  threadKeys: readonly string[];
+  /** The most trace ids the read may answer with, sized by the threads asked for. */
+  maxTraces: number;
 };
 
 export interface LangWatchQLTraceSource {
@@ -60,17 +66,22 @@ export interface LangWatchQLTraceSource {
    * own `metadata.thread_id`.
    */
   readThreadTraces(input: LangWatchQLThreadTraceReadInput): Promise<readonly Trace[]>;
+  /** The named threads' trace ids, one list per thread, oldest first. */
+  readThreadTraceIds(input: LangWatchQLThreadTraceIdsReadInput): Promise<readonly ThreadTraceIds[]>;
 }
 
 /** Everything the reads brought back, indexed the way the compute reads it. */
 export interface LangWatchQLFetchedTraces {
   readonly byId: ReadonlyMap<string, Trace>;
   readonly byThread: ReadonlyMap<string, readonly Trace[]>;
+  /** Trace ids, oldest first, of the threads no call renders content for. */
+  readonly traceIdsByThread: ReadonlyMap<string, readonly string[]>;
 }
 
 export const LWQL_NO_TRACES: LangWatchQLFetchedTraces = {
   byId: new Map(),
   byThread: new Map(),
+  traceIdsByThread: new Map(),
 };
 
 /** The bytes one hydration has read so far, shared by every read it makes. */
@@ -128,6 +139,28 @@ function groupByThread({
   return grouped;
 }
 
+/**
+ * One list per thread across every project read, kept in each read's order.
+ * A thread we did not ask for is dropped, as {@link groupByThread} drops it.
+ */
+function mergeThreadTraceIds({
+  reads,
+  threadKeys,
+}: {
+  reads: readonly ThreadTraceIds[];
+  threadKeys: ReadonlySet<string>;
+}): ReadonlyMap<string, readonly string[]> {
+  const merged = new Map<string, string[]>();
+  for (const { threadId, traceIds } of reads) {
+    if (!threadKeys.has(threadId)) continue;
+    const existing = merged.get(threadId);
+    if (existing) existing.push(...traceIds);
+    else merged.set(threadId, [...traceIds]);
+  }
+
+  return merged;
+}
+
 export class LangWatchQLHydrationReadService {
   private constructor(private readonly traces: LangWatchQLTraceSource) {}
 
@@ -153,18 +186,15 @@ export class LangWatchQLHydrationReadService {
     maxReadBytes: number;
     signal?: AbortSignal;
   }): Promise<LangWatchQLFetchedTraces> {
-    const { traceIds, threadKeys } = langWatchQLDistinctKeys(resolved);
-    const threadsNeedSpans = resolved.some(
-      ({ keyKind, definition, source }) =>
-        keyKind === "thread" && (source ?? definition).readsSpans !== false,
-    );
+    const { traceIds, threadKeys, threadContentKeys } = langWatchQLDistinctKeys(resolved);
+    const threadIdOnlyKeys = [...threadKeys].filter((key) => !threadContentKeys.has(key));
     const budget = createReadBudget({ maxBytes: maxReadBytes });
     // One signal over every read — the caller's cancel and the budget's own
     // refusal — so a chunk that crosses the line stops the sibling readers.
     const stop = signal ? AbortSignal.any([signal, budget.stopped]) : budget.stopped;
 
     try {
-      const [byIdReads, byThreadReads] = await Promise.all([
+      const [byIdReads, byThreadReads, threadIdReads] = await Promise.all([
         Promise.all(
           projectIds.map((projectId) =>
             this.#readInChunks({
@@ -179,7 +209,7 @@ export class LangWatchQLHydrationReadService {
         Promise.all(
           projectIds.map((projectId) =>
             this.#readInChunks({
-              keys: [...threadKeys],
+              keys: [...threadContentKeys],
               chunkSize: LWQL_HYDRATION_READ_CHUNK.threadKeys,
               budget,
               signal: stop,
@@ -189,16 +219,24 @@ export class LangWatchQLHydrationReadService {
                   threadKeys: chunk,
                   protections,
                   maxTraces: chunk.length * LWQL_TRACES_PER_THREAD_CEILING,
-                  withSpans: threadsNeedSpans,
                 }),
             }),
+          ),
+        ),
+        Promise.all(
+          projectIds.map((projectId) =>
+            this.#readThreadTraceIds({ projectId, threadKeys: threadIdOnlyKeys, signal: stop }),
           ),
         ),
       ]);
 
       return {
         byId: new Map(byIdReads.flat().map((trace) => [trace.trace_id, trace])),
-        byThread: groupByThread({ traces: byThreadReads.flat(), threadKeys }),
+        byThread: groupByThread({ traces: byThreadReads.flat(), threadKeys: threadContentKeys }),
+        traceIdsByThread: mergeThreadTraceIds({
+          reads: threadIdReads.flat(),
+          threadKeys: new Set(threadIdOnlyKeys),
+        }),
       };
     } catch (error) {
       // A refusal we made and a cancellation the caller made are both answers;
@@ -210,6 +248,32 @@ export class LangWatchQLHydrationReadService {
         reasons: [error instanceof Error ? error : new Error(String(error))],
       });
     }
+  }
+
+  /** Ids are keys, not content, so they weigh nothing against the byte budget. */
+  async #readThreadTraceIds({
+    projectId,
+    threadKeys,
+    signal,
+  }: {
+    projectId: string;
+    threadKeys: readonly string[];
+    signal: AbortSignal;
+  }): Promise<readonly ThreadTraceIds[]> {
+    const read: ThreadTraceIds[] = [];
+    for (let start = 0; start < threadKeys.length; start += LWQL_HYDRATION_READ_CHUNK.threadKeys) {
+      signal.throwIfAborted();
+      const chunk = threadKeys.slice(start, start + LWQL_HYDRATION_READ_CHUNK.threadKeys);
+      read.push(
+        ...(await this.traces.readThreadTraceIds({
+          projectId,
+          threadKeys: chunk,
+          maxTraces: chunk.length * LWQL_TRACES_PER_THREAD_CEILING,
+        })),
+      );
+    }
+
+    return read;
   }
 
   /**

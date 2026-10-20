@@ -16,6 +16,7 @@ import type {
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 
@@ -374,6 +375,26 @@ export class TraceLegacyReadService {
     );
   }
 
+  /** Keys only: no mapping, blobs, overlay or enrichment, so no protections apply. */
+  async getTraceIdsByThreadIds({
+    authorization,
+    projectId,
+    threadIds,
+    maxTraces,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]> {
+    return this.clickHouseService.findTraceIdsByThreadIds({
+      authorization,
+      projectId,
+      threadIds,
+      maxTraces,
+    });
+  }
+
   async getTracesWithSpansByThreadIds({
     authorization,
     projectId,
@@ -385,7 +406,7 @@ export class TraceLegacyReadService {
     projectId: string;
     threadIds: string[];
     protections: Protections;
-    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number; withSpans?: boolean };
+    opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number };
   }): Promise<Trace[]> {
     return this.tracer.withActiveSpan(
       "TraceService.getTracesWithSpansByThreadIds",
@@ -404,7 +425,6 @@ export class TraceLegacyReadService {
           opts: {
             resolveBlobs: opts?.full,
             ...(opts?.maxTraces === undefined ? {} : { maxTraces: opts.maxTraces }),
-            ...(opts?.withSpans === false ? { withSpans: false } : {}),
           },
         });
         const enriched = await this.enrichment.enrichCodingAgentTraces(projectId, traces);

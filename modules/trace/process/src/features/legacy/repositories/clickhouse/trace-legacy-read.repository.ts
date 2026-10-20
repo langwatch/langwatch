@@ -34,6 +34,7 @@ import type {
   TraceSummaryListOptions,
   TraceSummaryListQuery,
   TraceSummaryPage,
+  ThreadTraceIds,
 } from "@langwatch/trace-contract";
 import { isStorageAnchoredVersion } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
@@ -70,6 +71,7 @@ import {
 
 const attributeMapSchema = z.record(z.string(), z.unknown());
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const threadTraceIdRowsSchema = z.array(z.looseObject({ ThreadId: chString, TraceId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ total: chString }));
 const topicCountRowsSchema = z.array(
   z.looseObject({ TopicId: chString.nullable(), SubTopicId: chString.nullable(), count: chString }),
@@ -1027,6 +1029,56 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
+   * A trace belongs to the thread its latest summary version naming one of the
+   * threads carries; OccurredAt is immutable, so ordering on it is stable.
+   * @param maxTraces traces the read may return across every thread asked for.
+   */
+  async findTraceIdsByThreadIds({
+    authorization,
+    projectId,
+    threadIds,
+    maxTraces,
+  }: {
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number | undefined;
+  }): Promise<ThreadTraceIds[]> {
+    return this.tracer.withActiveSpan(
+      "TraceLegacyReadClickHouseRepository.findTraceIdsByThreadIds",
+      { attributes: { "tenant.id": projectId, "thread.count": threadIds.length } },
+      async () => {
+        if (threadIds.length === 0) return [];
+        const reader = this.reader({ authorization, projectId });
+        const result = await reader.query({
+          query: `
+            SELECT
+              argMax(Attributes['gen_ai.conversation.id'], UpdatedAt) AS ThreadId,
+              TraceId,
+              min(OccurredAt) AS FirstOccurredAt
+            FROM trace_summaries
+            WHERE ${tenantScope("OccurredAt")}
+              AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
+            GROUP BY TraceId
+            HAVING ThreadId IN ({threadIds:Array(String)})
+            ORDER BY FirstOccurredAt ASC, TraceId ASC
+            LIMIT {maxTraces:UInt32}
+          `,
+          query_params: { threadIds, maxTraces: maxTraces ?? DEFAULT_THREAD_TRACES_LIMIT },
+          format: "JSONEachRow",
+        });
+        const byThread = new Map<string, string[]>();
+        for (const row of threadTraceIdRowsSchema.parse(await result.json())) {
+          const traceIds = byThread.get(row.ThreadId);
+          if (traceIds) traceIds.push(row.TraceId);
+          else byThread.set(row.ThreadId, [row.TraceId]);
+        }
+        return [...byThread].map(([threadId, traceIds]) => ({ threadId, traceIds }));
+      },
+    );
+  }
+
+  /**
    * @param maxTraces traces the read may return across every thread asked
    *   for; a ceiling below what they hold drops the rest without a word.
    */
@@ -1035,14 +1087,12 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     projectId,
     threadIds,
     maxTraces,
-    withSpans,
     retentionDays,
   }: {
     authorization: Authorization;
     projectId: string;
     threadIds: string[];
     maxTraces?: number | undefined;
-    withSpans?: boolean | undefined;
     retentionDays: RetentionDaysProvider | undefined;
   }): Promise<TraceLegacyRow[]> {
     return this.tracer.withActiveSpan(
@@ -1089,9 +1139,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
 
           if (traceIds.length === 0) {
             return [];
-          }
-          if (withSpans === false) {
-            return await this.readSummariesOnly({ reader, projectId, traceIds });
           }
 
           return await this.findTracesWithSpans({
@@ -2550,25 +2597,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     );
   }
 
-  /** The traces' summaries with empty span lists: the summary read alone, no span scan. */
-  private async readSummariesOnly({
-    reader,
-    projectId,
-    traceIds,
-  }: {
-    reader: TenantScopedReader;
-    projectId: string;
-    traceIds: string[];
-  }): Promise<TraceLegacyRow[]> {
-    const { summaryRows } = await this.readJoinedSummaryRows({
-      reader,
-      effectiveOccurredAt: await this.resolveOccurredAtOrNone({ reader, projectId, traceIds }),
-      batchTraceIds: traceIds,
-      shouldReadComputedIO: false,
-    });
-    return summaryRows.map((row) => ({ summary: this.rowToTraceSummaryData(row), spans: [] }));
-  }
-
   private async resolveOccurredAtOrNone({
     reader,
     projectId,
@@ -2752,13 +2780,10 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
     reader,
     effectiveOccurredAt,
     batchTraceIds,
-    shouldReadComputedIO = true,
   }: {
     reader: TenantScopedReader;
     effectiveOccurredAt: OccurredAtRange | undefined;
     batchTraceIds: string[];
-    /** False leaves the captured input and output out, for a caller that reads no content. */
-    shouldReadComputedIO?: boolean;
   }): Promise<{ summaryRows: TraceSummaryRow[]; hasSummaryWindow: boolean }> {
     // When the caller knows the traces' approximate time, bound the summary read to those
     // weekly partitions with a ±2-day safety margin; without a hint keep the unbounded read.
@@ -2796,8 +2821,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
           SpanCount AS ts_SpanCount,
           TotalDurationMs AS ts_TotalDurationMs,
           ComputedIOSchemaVersion AS ts_ComputedIOSchemaVersion,
-          ${shouldReadComputedIO ? "ComputedInput" : "''"} AS ts_ComputedInput,
-          ${shouldReadComputedIO ? "ComputedOutput" : "''"} AS ts_ComputedOutput,
+          ComputedInput AS ts_ComputedInput,
+          ComputedOutput AS ts_ComputedOutput,
           TimeToFirstTokenMs AS ts_TimeToFirstTokenMs,
           TimeToLastTokenMs AS ts_TimeToLastTokenMs,
           TokensPerSecond AS ts_TokensPerSecond,
