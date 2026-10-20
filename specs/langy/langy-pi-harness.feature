@@ -201,8 +201,8 @@ Feature: Langy runs a conversation on the pi worker
     When the relay retells the call as a gen_ai span
     Then the span records the upstream HTTP status
     And it records the provider's error type and the account cause the relay classified
-    And it records the message only for a spent account, the billing sentence or the gateway's own message
-    But any other provider message is left off the span, because it can quote a key
+    And it records a message only when it is the gateway's own exhausted-access message
+    But every provider message, billing sentences included, is left off the span, because it can quote a key
 
   # The gateway drops request options a provider cannot take and names them
   # on the response (X-LangWatch-Params-Dropped). Two production outages were

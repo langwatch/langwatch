@@ -160,6 +160,14 @@ func TestLLMProxy_FailedCallSpanSaysWhy(t *testing.T) {
 		wantStatus(t, span, http.StatusUnauthorized)
 	})
 
+	t.Run("a provider's own billing sentence stays off the span", func(t *testing.T) {
+		gateway, _ := countingGateway(t, http.StatusBadRequest, "application/json",
+			`{"type":"error","error":{"type":"invalid_request_error","message":"Credit balance exhausted for credential SECRET_VALUE"}}`)
+		span := failedCallSpan(t, gateway.URL)
+		wantStr(t, span, "langwatch.langy.error_cause", string(ErrProviderOutOfCredit))
+		wantNoMessage(t, span)
+	})
+
 	t.Run("any other provider message stays off the span", func(t *testing.T) {
 		gateway, _ := countingGateway(t, http.StatusBadRequest, "application/json",
 			`{"type":"error","error":{"type":"invalid_request_error","message":"thinking.type.enabled is not supported for this model."}}`)

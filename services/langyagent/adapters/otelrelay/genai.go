@@ -20,6 +20,7 @@ import (
 	"github.com/langwatch/langwatch/pkg/contexts"
 	"github.com/langwatch/langwatch/pkg/customertracebridge"
 	"github.com/langwatch/langwatch/pkg/otelsetup"
+	"github.com/langwatch/langwatch/pkg/providererr"
 )
 
 // The worker exports no OTLP: the wrapper is a thin stdio process and pi
@@ -411,15 +412,10 @@ func (g *genAICall) forwardSpan() {
 	}()
 }
 
-// maxGenAIErrorMessageBytes bounds the provider message a failed call's span
-// carries.
-const maxGenAIErrorMessageBytes = 1024
-
 // recordFailure states on the span why the call failed: the error's own type
 // and the account cause the proxy classified. Provider prose can quote a key
-// back in shapes nobody enumerated, so a message is recorded only for a spent
-// account (a billing sentence, or the gateway's own governance message).
-// status is 0 for an in-stream error.
+// back in shapes nobody enumerated, so the only message recorded is the
+// gateway's own governance message. status is 0 for an in-stream error.
 func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
 	attrs := span.Attributes()
 	if code := providerErrorCode(body); code != "" {
@@ -429,15 +425,9 @@ func (g *genAICall) recordFailure(span ptrace.Span, body []byte, status int) {
 	if hasCause {
 		attrs.PutStr("langwatch.langy.error_cause", string(cause))
 	}
-	if !hasCause || cause != ErrProviderOutOfCredit {
-		return
-	}
 	message := gjson.GetBytes(body, "error.message").Str
-	if message == "" {
+	if message != providererr.GatewayAccountExhaustedMessage {
 		return
-	}
-	if len(message) > maxGenAIErrorMessageBytes {
-		message = strings.ToValidUTF8(message[:maxGenAIErrorMessageBytes], "")
 	}
 	attrs.PutStr("error.message", message)
 	span.Status().SetMessage(message)
