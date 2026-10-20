@@ -542,13 +542,13 @@ jobs:
               # Not rebuilt: copy the index of the newest bare `git-<sha>` tag, never
               # an `-arm64` manifest (a different media type). The lookup and the
               # match are separate statements so a failed `describe-images` still
-              # trips `set -e`. awk exits 0 on no match.
+              # trips `set -e`. awk reads to the end: exiting early SIGPIPEs `tr`.
               local candidates
               candidates=$(aws ecr describe-images --repository-name "${image}" \
                 --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
                 --output text)
               previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
-                | awk '/^git-[0-9a-f]+$/ { print; exit }')
+                | awk '/^git-[0-9a-f]+$/ && !found { print; found=1 }')
 
               if [ -z "${previous}" ]; then
                 # Expected until every image has been published once. A dispatch
