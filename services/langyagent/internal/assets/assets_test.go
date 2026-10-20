@@ -54,6 +54,38 @@ func TestAgentsTemplate_SaysHowToCount(t *testing.T) {
 	}
 }
 
+// TestAgentsTemplate_EmptyWindowStatesDataAge pins the empty-window rule: state the newest row's age or that it never arrived.
+//
+// @scenario "The prompt no longer answers an empty window with a bare line"
+// @scenario "A filtered question with no matches gets a plain none"
+// @scenario "The prompt lets Langy name a skill's telemetry env vars"
+func TestAgentsTemplate_EmptyWindowStatesDataAge(t *testing.T) {
+	tmpl, err := AgentsTemplate()
+	if err != nil {
+		t.Fatalf("AgentsTemplate: %v", err)
+	}
+	if strings.Contains(tmpl, `"No X in last 24h."`) {
+		t.Errorf(`AGENTS.md still tells the agent to answer an empty time-bounded result with the bare "No X in last 24h."`)
+	}
+	rule := ""
+	for _, line := range strings.Split(tmpl, "\n") {
+		if strings.HasPrefix(line, "- A list question") {
+			rule = strings.ToLower(line)
+		}
+	}
+	if rule == "" {
+		t.Fatalf("AGENTS.md has no line starting with %q", "- A list question")
+	}
+	for _, phrase := range []string{"newest", "never received", "errors", "say none", "likely cause", "never say you cannot see"} {
+		if !strings.Contains(rule, phrase) {
+			t.Errorf("AGENTS.md list-question rule never says %q, so an empty window cannot be told from a broken pipeline or zero errors from a fault", phrase)
+		}
+	}
+	if !strings.Contains(tmpl, "a skill's telemetry env var names (key as `<key>`)") {
+		t.Errorf("AGENTS.md no longer lets the agent name a skill's telemetry env vars with the key as a placeholder, so the Claude Code telemetry setup gets dropped")
+	}
+}
+
 // The prompt has a byte budget so it cannot silently grow back into a rule
 // pile. It once reached 52,795 bytes by accreting one rule per observed
 // failure. A fix that needs the ceiling raised is a fix at the wrong layer:

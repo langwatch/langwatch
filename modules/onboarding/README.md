@@ -11,7 +11,7 @@ Onboarding: the guided paths a new project follows and the steps it has recorded
 | Classification | core (`modules/catalogue.json`)                                                                                   |
 | Subjects       | onboarding                                                                                                        |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)                       |
-| Api token      | `OnboardingApi` = `moduleApi<OnboardingApi>()("onboarding")`, `contract/src/onboarding.api.ts:76` (12 operations) |
+| Api token      | `OnboardingApi` = `moduleApi<OnboardingApi>()("onboarding")`, `contract/src/onboarding.api.ts:77` (13 operations) |
 | Other token    | `IntegrationsChecksApi`, `process/src/transport/integrations-checks.trpc.ts:17`                                   |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                                        |
 

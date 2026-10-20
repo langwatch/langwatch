@@ -29,6 +29,8 @@ export interface StagedJobPayload {
 export interface EventSubscriberContext {
   tenantId: string;
   aggregateId: string;
+  /** The queue's 1-based delivery attempt; absent when the subscriber runs outside the queue. */
+  deliveryAttempt?: number;
 }
 
 /**
