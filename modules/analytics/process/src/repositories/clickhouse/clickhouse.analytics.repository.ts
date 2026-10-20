@@ -14,7 +14,7 @@ import {
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import { nowInstant, toDate } from "@langwatch/time";
+import { toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules.ts";
@@ -36,7 +36,7 @@ import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
 import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
-import { translateClickHouseQueryError } from "./clickhouse.query-error-translation.mapper.ts";
+import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
@@ -103,16 +103,7 @@ type TimeseriesStatementClient = {
  * here, the same way the session translates the own tenant's (ADR-045).
  */
 function translatingFailures(reader: TimeseriesStatementClient): TimeseriesStatementClient {
-  return {
-    async query(input) {
-      const startedAt = nowInstant().epochMilliseconds;
-      try {
-        return await reader.query(input);
-      } catch (error) {
-        throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
-      }
-    },
-  };
+  return { query: (input) => translatingQueryFailures(() => reader.query(input)) };
 }
 
 /** The one ClickHouse persistence implementation for all timeseries tables. */

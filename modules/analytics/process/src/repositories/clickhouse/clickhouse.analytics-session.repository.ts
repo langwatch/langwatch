@@ -1,9 +1,8 @@
 import type { ClickHouseSettings } from "@clickhouse/client";
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
-import { nowInstant } from "@langwatch/time";
 
 import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics-persistence.repository.ts";
-import { translateClickHouseQueryError } from "./clickhouse.query-error-translation.mapper.ts";
+import { translatingQueryFailures } from "./clickhouse.query-error-translation.mapper.ts";
 
 /**
  * The per-tenant session Analytics' repositories read their own tenant through. A `query` failure
@@ -32,18 +31,15 @@ export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalytics
     format: "JSONEachRow";
     clickhouse_settings?: ClickHouseSettings;
   }): Promise<{ json(): Promise<Record<string, unknown>[]> }> {
-    const startedAt = nowInstant().epochMilliseconds;
-    try {
-      const { rows } = await this.clickhouse.query<Record<string, unknown>>({
+    const { rows } = await translatingQueryFailures(() =>
+      this.clickhouse.query<Record<string, unknown>>({
         tenantId: this.tenantId,
         sql: input.query,
         params: input.query_params,
         settings: input.clickhouse_settings as Record<string, string | number> | undefined,
-      });
-      return { json: () => Promise.resolve(rows) };
-    } catch (error) {
-      throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
-    }
+      }),
+    );
+    return { json: () => Promise.resolve(rows) };
   }
 
   async insert(input: {
