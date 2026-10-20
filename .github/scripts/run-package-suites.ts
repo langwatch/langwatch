@@ -226,8 +226,12 @@ export interface SuiteJob {
  * serially against one shared datastore; a browser lane installs Chromium
  * through apt, which holds a machine-wide lock. Everything else is `shared`.
  */
+const LANES: Record<string, "integration" | "browser"> = {
+  "test:integration": "integration",
+  "test:browser": "browser",
+};
 export const laneOf = (script: string): "integration" | "browser" | "shared" =>
-  script === "test:integration" ? "integration" : script === "test:browser" ? "browser" : "shared";
+  LANES[script] ?? "shared";
 
 /**
  * Parses `PACKAGE_SUITES_CONCURRENCY`. Absent means one suite at a time; a
@@ -339,6 +343,16 @@ export const createSuiteRunner = ({
 }) => {
   const unfinished = new Map<SuiteJob, { title: string; chunks: Buffer[] }>();
   const secondsOf = new Map<string, number>();
+  const report = (job: SuiteJob, title: string, chunks: Buffer[], startedAt: number) => {
+    unfinished.delete(job);
+    const seconds = (now() - startedAt) / 1000;
+    secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
+    if (!live) {
+      log(`::group::${title} (${Math.round(seconds)}s)`);
+      write(Buffer.concat(chunks));
+    }
+    log("::endgroup::");
+  };
   const run = (job: SuiteJob): Promise<number> =>
     new Promise((settle) => {
       const startedAt = now();
@@ -346,29 +360,13 @@ export const createSuiteRunner = ({
       log(live ? `::group::${title}` : `started: ${title}`);
       const chunks: Buffer[] = [];
       if (!live) unfinished.set(job, { title, chunks });
-      let finished = false;
-      const finish = (status: number) => {
-        if (finished) return;
-        finished = true;
-        unfinished.delete(job);
-        const seconds = (now() - startedAt) / 1000;
-        secondsOf.set(job.pkg.name, (secondsOf.get(job.pkg.name) ?? 0) + seconds);
-        if (!live) {
-          log(`::group::${title} (${Math.round(seconds)}s)`);
-          write(Buffer.concat(chunks));
-        }
-        log("::endgroup::");
+      const finish = once((status: number) => {
+        report(job, title, chunks, startedAt);
         settle(status);
-      };
-      let child: ScriptProcess;
-      try {
-        child = start(job);
-      } catch {
-        finish(1);
-        return;
-      }
-      child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
-      child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
+      });
+      const child = startSafely(() => start(job));
+      if (child === undefined) return finish(1);
+      collectOutput(child, chunks);
       child.on("error", () => finish(1));
       child.on("close", (code: number | null) => finish(code ?? 1));
     });
@@ -381,6 +379,30 @@ export const createSuiteRunner = ({
     }
   };
   return { run, flushUnfinished, secondsOf };
+};
+
+/** Calls `fn` the first time only: a process can report an error and then close. */
+const once = <T>(fn: (value: T) => void) => {
+  let called = false;
+  return (value: T) => {
+    if (called) return;
+    called = true;
+    fn(value);
+  };
+};
+
+/** The started process, or undefined when starting it threw. */
+const startSafely = (start: () => ScriptProcess): ScriptProcess | undefined => {
+  try {
+    return start();
+  } catch {
+    return undefined;
+  }
+};
+
+const collectOutput = (child: ScriptProcess, chunks: Buffer[]) => {
+  child.stdout?.on("data", (chunk: Buffer) => chunks.push(chunk));
+  child.stderr?.on("data", (chunk: Buffer) => chunks.push(chunk));
 };
 
 /** One line per excluded package: an exclusion nobody can see reads as never found. */
