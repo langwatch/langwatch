@@ -5,6 +5,7 @@
 
 import type { LocalOrchestratorConfig } from "../platform/config/local-orchestrator.config.ts";
 import type { PredepResult } from "../predeps/runner.ts";
+import type { PredepId } from "../predeps/types.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
 import type { PortAllocation } from "../shared/ports.ts";
 
@@ -18,6 +19,13 @@ export type RuntimeContext = {
   userEnv: Record<string, string>;
   /** Immutable launcher settings projected during CLI composition. */
   orchestrator: LocalOrchestratorConfig;
+  /**
+   * Resolves once each named predep is in `predeps`, rejects if one did not install, so a
+   * service starts while the others still download. Absent: every predep is already there.
+   */
+  predepsReady?: (ids: readonly PredepId[]) => Promise<void>;
+  /** The level every service starts at (shared/log-level.ts). Absent: warn. */
+  logLevel?: string;
 };
 
 export type ServiceHandle = {
@@ -30,7 +38,14 @@ export type ServiceHandle = {
 export type RuntimeEvent =
   | { type: "starting"; service: string }
   | { type: "healthy"; service: string; durationMs: number }
-  | { type: "log"; service: string; stream: "stdout" | "stderr"; line: string }
+  | {
+      type: "log";
+      service: string;
+      stream: "stdout" | "stderr";
+      line: string;
+      /** The CLI's own notice about a service: shown at every level, unlike its output. */
+      isNotice?: boolean;
+    }
   /**
    * A previously-healthy service crashed and the supervisor is bringing it
    * back after `delayMs`. Emitted instead of "crashed" while restart budget

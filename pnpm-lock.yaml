@@ -1361,6 +1361,9 @@ importers:
       ora:
         specifier: 'catalog:'
         version: 9.4.1
+      pg:
+        specifier: 'catalog:'
+        version: 8.22.0
       prompts:
         specifier: 'catalog:'
         version: 2.4.2
@@ -1377,6 +1380,9 @@ importers:
       '@types/node':
         specifier: ^26.0.1
         version: 26.2.0
+      '@types/pg':
+        specifier: 'catalog:'
+        version: 8.20.4
       '@types/prompts':
         specifier: 'catalog:'
         version: 2.4.9

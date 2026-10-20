@@ -64,29 +64,42 @@ export type UpgradeConsole = Readonly<{
   tokenTtlMs: number;
 }>;
 
-const escapeHtml = (value: string): string =>
+export const escapeHtml = (value: string): string =>
   value.replace(/[&<>"']/g, (char) => `&#${char.charCodeAt(0)};`);
 
-const consolePage = (body: readonly string[]): string =>
-  [
+const OPERATOR_TITLE = "LangWatch's upgrade needs an operator";
+
+/** The plain page the door shows before the app can: the upgrade console, the npx boot page. */
+export function renderConsolePage({
+  title,
+  body,
+}: {
+  title: string;
+  body: readonly string[];
+}): string {
+  return [
     "<!doctype html>",
-    `<html lang="en"><head><meta charset="utf-8"><title>LangWatch's upgrade needs an operator</title>`,
+    `<html lang="en"><head><meta charset="utf-8"><title>${escapeHtml(title)}</title>`,
     "<style>body{font-family:system-ui,sans-serif;max-width:48rem;margin:10vh auto;padding:0 1rem;color:#1a1a1a}pre{overflow:auto;background:#f4f4f4;padding:.5rem}</style>",
     "</head><body>",
     ...body,
     "</body></html>",
   ].join("");
+}
 
 /** A failed upgrade's page to anyone without a console session: no step, error, host or version. */
 export function renderUpgradeConsoleLogin({ refused }: { refused: boolean }): string {
-  return consolePage([
-    "<h1>LangWatch's upgrade needs an operator</h1>",
-    refused
-      ? `<p><strong>That token was not accepted.</strong> A token opens the console once, within ${UPGRADE_CONSOLE_TOKEN_TTL_MS / 60_000} minutes; restart the api to print a new one.</p>`
-      : "",
-    "<p>Enter the console token this api printed in its log when the upgrade failed.</p>",
-    `<form method="post" action="${UPGRADE_CONSOLE_PATH}"><input type="password" name="token" autocomplete="off" required aria-label="Console token"> <button type="submit">Open the console</button></form>`,
-  ]);
+  return renderConsolePage({
+    title: OPERATOR_TITLE,
+    body: [
+      "<h1>LangWatch's upgrade needs an operator</h1>",
+      refused
+        ? `<p><strong>That token was not accepted.</strong> A token opens the console once, within ${UPGRADE_CONSOLE_TOKEN_TTL_MS / 60_000} minutes; restart the api to print a new one.</p>`
+        : "",
+      "<p>Enter the console token this api printed in its log when the upgrade failed.</p>",
+      `<form method="post" action="${UPGRADE_CONSOLE_PATH}"><input type="password" name="token" autocomplete="off" required aria-label="Console token"> <button type="submit">Open the console</button></form>`,
+    ],
+  });
 }
 
 /** The console a session sees: the failed steps, the run's last lines, Retry. */
@@ -97,12 +110,15 @@ export function renderUpgradeConsole({
   const steps = failedSteps
     .map(({ id, error }) => `<li><code>${escapeHtml(id)}</code>: ${escapeHtml(error ?? "")}</li>`)
     .join("");
-  return consolePage([
-    "<h1>The upgrade failed</h1>",
-    steps === "" ? "" : `<p>Failed steps:</p><ul>${steps}</ul>`,
-    `<p>The last ${logTail.length} lines of the run's log:</p><pre>${escapeHtml(logTail.join("\n"))}</pre>`,
-    `<form method="post" action="${UPGRADE_RETRY_PATH}"><button type="submit">Retry</button></form>`,
-  ]);
+  return renderConsolePage({
+    title: OPERATOR_TITLE,
+    body: [
+      "<h1>The upgrade failed</h1>",
+      steps === "" ? "" : `<p>Failed steps:</p><ul>${steps}</ul>`,
+      `<p>The last ${logTail.length} lines of the run's log:</p><pre>${escapeHtml(logTail.join("\n"))}</pre>`,
+      `<form method="post" action="${UPGRADE_RETRY_PATH}"><button type="submit">Retry</button></form>`,
+    ],
+  });
 }
 
 /**
@@ -317,6 +333,11 @@ server.on("error", (error) => {
   parentPort.postMessage({ type: "failed", code: error.code, message: error.message });
 });
 parentPort.on("message", (message) => {
+  if (message.type === "proxyTo") {
+    target.port = message.port;
+    parentPort.postMessage({ type: "proxying" });
+    return;
+  }
   if (message.type === "lift") {
     consoleHold = null;
     sessions.length = 0;
@@ -369,6 +390,7 @@ type ThreadMessage =
   | { type: "failed"; code?: string; message: string }
   | { type: "closed" }
   | { type: "lifted" }
+  | { type: "proxying" }
   | { type: "retry" }
   | { type: "stragglers" }
   | { type: "clientError"; code?: string; head: string };
@@ -388,6 +410,8 @@ export type LivenessThread = Readonly<{
   liftConsole: () => Promise<void>;
   /** Shows the failure console; true once a console session pressed Retry, false if it ended. */
   holdConsole: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
+  /** Sends every later request to `port` on loopback instead (the npx CLI's boot hand-over). */
+  proxyTo: (target: { port: number }) => Promise<void>;
 }>;
 
 /** Starts the thread and resolves once it is listening; rejects when it cannot bind or start. */
@@ -452,6 +476,11 @@ export async function startLivenessThread({
   });
   return {
     address,
+    proxyTo: async ({ port: proxyPort }) => {
+      const proxying = nextMessage({ thread, type: "proxying" });
+      thread.postMessage({ type: "proxyTo", port: proxyPort });
+      await Promise.race([proxying, exited]);
+    },
     liftConsole: async () => {
       const lifted = nextMessage({ thread, type: "lifted" });
       thread.postMessage({ type: "lift" });

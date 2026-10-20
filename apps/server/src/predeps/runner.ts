@@ -8,25 +8,67 @@ import type { LocalOrchestratorConfig } from "../platform/config/local-orchestra
 import { paths } from "../shared/paths.ts";
 import { detectPlatform, type SupportedPlatform } from "../shared/platform.ts";
 import { predepRegistry } from "./registry.ts";
-import type { Predep } from "./types.ts";
+import type { Predep, PredepId } from "./types.ts";
 
-export type PredepResult = Record<
-  string,
-  { version: string; resolvedPath: string; preInstalled: boolean }
->;
+type ResolvedPredep = { version: string; resolvedPath: string; preInstalled: boolean };
+export type PredepResult = Record<string, ResolvedPredep>;
+/** One predep the moment it is there, found or installed. */
+export type ArrivedPredep = { id: PredepId; resolved: ResolvedPredep };
 
 export type PredepOptions = {
   config: LocalOrchestratorConfig;
   yes?: boolean;
   skipConfirm?: boolean;
   version: string;
+  /** Predeps this install does without: the databases the person brings (10-database-choice). */
+  skip?: readonly PredepId[];
+  /** Told about each predep the moment it is there, found or installed, before the rest finish. */
+  onReady?: (predep: ArrivedPredep) => void;
 };
+
+/**
+ * Fills `predeps` as `runPredeps` reports each one, and lets a service wait on the ones it
+ * needs (RuntimeContext.predepsReady). Once the run finishes, a wait on a missing one fails.
+ */
+export function predepGate({ predeps }: { predeps: PredepResult }) {
+  type Wait = { ids: readonly PredepId[]; resolve: () => void; reject: (error: Error) => void };
+  const waits = new Set<Wait>();
+  let isFinished = false;
+  const settle = () => {
+    for (const wait of waits) {
+      const missing = wait.ids.filter((id) => !(id in predeps));
+      if (missing.length > 0 && !isFinished) continue;
+      waits.delete(wait);
+      if (missing.length === 0) wait.resolve();
+      else wait.reject(new Error(`${missing.join(", ")} did not install`));
+    }
+  };
+  return {
+    ready: (ids: readonly PredepId[]) =>
+      new Promise<void>((resolve, reject) => {
+        waits.add({ ids, resolve, reject });
+        settle();
+      }),
+    add: ({ id, resolved }: ArrivedPredep) => {
+      predeps[id] = resolved;
+      settle();
+    },
+    finish: () => {
+      isFinished = true;
+      settle();
+    },
+  };
+}
+
+export type PredepGate = ReturnType<typeof predepGate>;
 
 export async function runPredeps({
   config,
   yes = false,
   skipConfirm = false,
   version,
+  skip = [],
+  onReady,
 }: PredepOptions): Promise<PredepResult> {
   const platform = detectPlatform();
   mkdirSync(paths.bin, { recursive: true });
@@ -36,8 +78,13 @@ export async function runPredeps({
   mkdirSync(paths.postgresData, { recursive: true });
   mkdirSync(paths.clickhouseData, { recursive: true });
 
-  const predeps = predepRegistry({ version, development: config.development });
+  const predeps = predepRegistry({ version, development: config.development }).filter(
+    (predep) => !skip.includes(predep.id),
+  );
   const detection = await detectAll(predeps);
+  for (const [id, resolved] of Object.entries(collectResult(predeps, detection, {}))) {
+    onReady?.({ id: id as PredepId, resolved });
+  }
   const missing = predeps.filter((p) => !detection[p.id]?.installed);
 
   if (missing.length === 0) {
@@ -57,6 +104,8 @@ export async function runPredeps({
     platform,
     installResults,
     continuousIntegration: config.browser.continuousIntegration,
+    onInstalled: ({ id, result }) =>
+      onReady?.({ id, resolved: { ...result, preInstalled: false } }),
   });
 
   return collectResult(predeps, detection, installResults);
@@ -93,11 +142,16 @@ async function runListr({
   platform,
   installResults,
   continuousIntegration,
+  onInstalled,
 }: {
   predeps: Predep[];
   platform: SupportedPlatform;
   installResults: Record<string, { version: string; resolvedPath: string }>;
   continuousIntegration: boolean;
+  onInstalled: (installed: {
+    id: PredepId;
+    result: { version: string; resolvedPath: string };
+  }) => void;
 }): Promise<void> {
   const remaining = [...predeps];
   // Loop until every predep either installs or the user explicitly skips it.
@@ -112,6 +166,7 @@ async function runListr({
           try {
             const result = await p.install({ platform, paths, task });
             installResults[p.id] = result;
+            onInstalled({ id: p.id, result });
             task.title = `${p.label}  ${chalk.dim(result.version)}`;
           } catch (err) {
             failed.push({ predep: p, error: err as Error });

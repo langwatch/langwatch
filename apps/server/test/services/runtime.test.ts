@@ -39,13 +39,6 @@ const langyStub = makeStub("langyagent");
 const venvsFn = vi.fn(async () => {
   callLog.push("venvs");
 });
-const nodeDepsFn = vi.fn(async () => {
-  callLog.push("node-deps");
-  return "/tmp/.langwatch-test/app";
-});
-const ensureAppDirFn = vi.fn(async () => {
-  callLog.push("app-dir");
-});
 const langyCliFn = vi.fn(async () => {
   callLog.push("langy-cli");
 });
@@ -77,12 +70,7 @@ vi.mock("../../src/services/langy-cli.ts", () => ({
   ensureLangyCli: langyCliFn,
 }));
 vi.mock("../../src/services/venvs.ts", () => ({ syncVenvs: venvsFn }));
-vi.mock("../../src/services/node-deps.ts", () => ({
-  ensureLangwatchDeps: nodeDepsFn,
-  locateLangwatchDir: () => "/tmp/.langwatch-test/app/langwatch",
-}));
 vi.mock("../../src/services/app-dir.ts", () => ({
-  ensureAppDir: ensureAppDirFn,
   appRoot: () => "/tmp/.langwatch-test/app",
 }));
 let envFileContent: Record<string, string> = {};
@@ -103,6 +91,7 @@ function fakeCtx(): RuntimeContext {
       aigateway: 5563,
       langyagent: 5564,
       workerHealth: 5565,
+      backend: 5566,
       postgres: 6560,
       redis: 6561,
       clickhouseHttp: 6562,
@@ -134,7 +123,7 @@ function fakeCtx(): RuntimeContext {
     userEnv: {},
     orchestrator: {
       browser: { openEnabled: true, continuousIntegration: false },
-      development: { aiGatewayDevBuild: false, forceBundledPostgres: false },
+      development: { aiGatewayDevBuild: false, forceBundledPostgres: false, appArchive: undefined },
     },
   };
 }
@@ -151,37 +140,21 @@ describe("services/runtime", () => {
       langevalsStub.fn,
       langwatchStub.fn,
       venvsFn,
-      nodeDepsFn,
-      ensureAppDirFn,
       langyCliFn,
     ].forEach((fn) => fn.mockClear());
   });
 
   describe("when installServices is called", () => {
-    it("runs uv venv sync and langwatch node-deps in parallel", async () => {
+    it("prepares only the uv environment and the tokenizer cache: the app tree is already in place", async () => {
       await runtime.installServices(fakeCtx());
       expect(venvsFn).toHaveBeenCalledTimes(1);
-      expect(nodeDepsFn).toHaveBeenCalledTimes(1);
-      expect(callLog).toContain("venvs");
-      expect(callLog).toContain("node-deps");
-    });
-
-    it("relocates the @langwatch/server tree before venv/node-deps run", async () => {
-      // Order matters: venvs + node-deps both resolve paths via appRoot(),
-      // which only points at LANGWATCH_HOME/app once ensureAppDir has run.
-      await runtime.installServices(fakeCtx());
-      expect(ensureAppDirFn).toHaveBeenCalledTimes(1);
-      const appDirIdx = callLog.indexOf("app-dir");
-      const venvsIdx = callLog.indexOf("venvs");
-      const nodeDepsIdx = callLog.indexOf("node-deps");
-      expect(appDirIdx).toBeGreaterThanOrEqual(0);
-      expect(appDirIdx).toBeLessThan(venvsIdx);
-      expect(appDirIdx).toBeLessThan(nodeDepsIdx);
+      // The assistant's CLI download depends on the feature toggles, not on the app tree.
+      expect(callLog.filter((entry) => entry !== "langy-cli")).toEqual(["venvs"]);
     });
   });
 
   describe("when startAll is called", () => {
-    it("starts infra (pg+redis+clickhouse) → starts app tier with no migration phase (go+langevals+langwatch+langyagent)", async () => {
+    it("starts the Go services and the backend after the stores, with no migration phase", async () => {
       const ctx = fakeCtx();
       const handles = await runtime.startAll(ctx);
       expect(handles).toHaveLength(7);
@@ -189,17 +162,18 @@ describe("services/runtime", () => {
       callLog.forEach((entry, idx) => {
         if (!(entry in positions)) positions[entry] = idx;
       });
-      // Infra phase 1.
       const infraEnd = Math.max(
         positions["start:postgres"]!,
         positions["start:redis"]!,
         positions["start:clickhouse"]!,
       );
       expect(callLog).not.toContain("migrate");
-      // App tier strictly after infra healthy.
       expect(positions["start:go"]).toBeGreaterThan(infraEnd);
-      expect(positions["start:langevals"]).toBeGreaterThan(infraEnd);
       expect(positions["start:langwatch"]).toBeGreaterThan(infraEnd);
+      // The assistant first, so the app is told whether it is there.
+      expect(positions["start:langwatch"]).toBeGreaterThan(positions["start:langyagent"]!);
+      // LangEvals after its environment, and on nothing else.
+      expect(positions["start:langevals"]).toBeGreaterThan(positions.venvs!);
     });
 
     it("runs the api and the worker as the one langwatch process, with no second worker spawn", async () => {
@@ -225,6 +199,7 @@ describe("services/runtime", () => {
   });
 
   describe("when the user's shell carries a provider key", () => {
+    /** @scenario "The ai-gateway sees the same environment as the other app-tier services" */
     it("hands the ai-gateway the same env as the other app-tier services", async () => {
       const ctx = fakeCtx();
       ctx.userEnv = { OPENAI_API_KEY: "sk-user" };
@@ -249,13 +224,16 @@ describe("services/runtime", () => {
 
       await expect(runtime.startAll(fakeCtx())).rejects.toThrow("did not become healthy");
 
-      for (const sibling of ["go", "langevals"]) {
-        expect(callLog).toContain(`stop:${sibling}`);
-      }
-      // Infra + the assistant come down with them.
-      for (const infra of ["postgres", "redis", "clickhouse", "langyagent"]) {
-        expect(callLog).toContain(`stop:${infra}`);
-      }
+      // A sibling still booting at the failure is stopped the moment it comes up.
+      await vi.waitFor(() => {
+        for (const sibling of ["go", "langevals"]) {
+          expect(callLog).toContain(`stop:${sibling}`);
+        }
+        // Infra + the assistant come down with them.
+        for (const infra of ["postgres", "redis", "clickhouse", "langyagent"]) {
+          expect(callLog).toContain(`stop:${infra}`);
+        }
+      });
     });
   });
 
@@ -269,8 +247,10 @@ describe("services/runtime", () => {
 
       await expect(runtime.startAll(fakeCtx())).rejects.toThrow("clickhouse");
 
-      expect(callLog).toContain("stop:postgres");
-      expect(callLog).toContain("stop:redis");
+      await vi.waitFor(() => {
+        expect(callLog).toContain("stop:postgres");
+        expect(callLog).toContain("stop:redis");
+      });
       expect(callLog).not.toContain("start:langwatch");
     });
   });
@@ -361,11 +341,12 @@ describe("services/runtime", () => {
       await runtime.stopAll(handles);
       const stopOrder = callLog.filter((entry) => entry.startsWith("stop:"));
       expect(stopOrder).toHaveLength(7);
-      // First stopped should be langwatch (last started); last stopped should be one of the infra.
-      const firstStopped = stopOrder[0]!.replace("stop:", "");
-      const lastStopped = stopOrder[stopOrder.length - 1]!.replace("stop:", "");
-      expect(firstStopped).toBe("langwatch");
-      expect(["postgres", "redis", "clickhouse"]).toContain(lastStopped);
+      // The backend drains before the stores it writes to go down.
+      for (const store of ["postgres", "redis", "clickhouse"]) {
+        expect(stopOrder.indexOf("stop:langwatch")).toBeLessThan(
+          stopOrder.indexOf(`stop:${store}`),
+        );
+      }
     });
 
     it("does not throw when individual stop() throws", async () => {
@@ -431,5 +412,116 @@ describe("services/runtime", () => {
         ]),
       );
     });
+  });
+});
+
+/** Each predep resolves only when the test says so, as the CLI's gate does. */
+function gatedCtx() {
+  const ctx = fakeCtx();
+  const arrived = new Set<string>();
+  const waiting: { ids: readonly string[]; resolve: () => void }[] = [];
+  ctx.predepsReady = (ids) =>
+    new Promise<void>((resolve) => {
+      waiting.push({ ids, resolve });
+      arrive();
+    });
+  const arrive = (...ids: string[]) => {
+    for (const id of ids) arrived.add(id);
+    for (const wait of waiting.splice(0)) {
+      if (wait.ids.every((id) => arrived.has(id))) wait.resolve();
+      else waiting.push(wait);
+    }
+  };
+  return { ctx, arrive };
+}
+
+describe("services/runtime while the predeps are still arriving", () => {
+  beforeEach(() => {
+    langyBinarySupported = true;
+    callLog.length = 0;
+    venvsFn.mockClear();
+    langevalsStub.fn.mockClear();
+  });
+
+  /** @scenario "The stores start while the app is still arriving" */
+  it("starts the stores and the Go services before the app is in place, and the backend only after", async () => {
+    const { ctx, arrive } = gatedCtx();
+    const booting = runtime.startAll(ctx);
+
+    arrive("postgres", "redis", "clickhouse", "aigateway", "pnpm", "opencode");
+    await vi.waitFor(() => expect(callLog).toContain("start:go"));
+    expect(callLog).toEqual(
+      expect.arrayContaining(["start:postgres", "start:redis", "start:clickhouse"]),
+    );
+    expect(callLog).not.toContain("start:langwatch");
+    expect(callLog).not.toContain("start:langevals");
+
+    arrive("app", "uv");
+    await booting;
+    expect(callLog).toContain("start:langwatch");
+  });
+
+  /** @scenario "The backend does not wait for LangEvals" */
+  it("starts the backend while LangEvals' environment is still being prepared", async () => {
+    const { ctx, arrive } = gatedCtx();
+    let finishVenvs = () => {};
+    venvsFn.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          callLog.push("venvs");
+          finishVenvs = resolve;
+        }),
+    );
+    const booting = runtime.startAll(ctx);
+
+    arrive("postgres", "redis", "clickhouse", "aigateway", "pnpm", "opencode", "app", "uv");
+    await vi.waitFor(() => expect(callLog).toContain("start:langwatch"));
+    expect(callLog).not.toContain("start:langevals");
+
+    finishVenvs();
+    await booting;
+    expect(callLog).toContain("start:langevals");
+  });
+
+  /** @scenario "LangEvals failing its first boot still takes the stack down" */
+  it("stops every service that started when LangEvals never comes up", async () => {
+    langevalsStub.fn.mockImplementationOnce(async () => {
+      callLog.push("start:langevals");
+      throw new Error("langevals did not become healthy: timed out");
+    });
+
+    await expect(runtime.startAll(fakeCtx())).rejects.toThrow("langevals");
+    // A service still booting when LangEvals failed is stopped the moment it comes up.
+    await vi.waitFor(() => {
+      const started = callLog
+        .filter((entry) => entry.startsWith("start:") && entry !== "start:langevals")
+        .map((entry) => entry.slice("start:".length));
+      expect(started).toContain("postgres");
+      for (const service of started) expect(callLog).toContain(`stop:${service}`);
+    });
+  });
+});
+
+describe("services/runtime with a database the person brings", () => {
+  beforeEach(() => {
+    langyBinarySupported = true;
+    callLog.length = 0;
+  });
+
+  /** @scenario "A database they bring is neither downloaded nor started" */
+  it("starts no Postgres and waits on no Postgres predep, and runs Redis and ClickHouse bundled", async () => {
+    envFileContent = { DATABASE_URL: "postgresql://me@db.internal:5432/langwatch" };
+    const { ctx, arrive } = gatedCtx();
+    try {
+      const booting = runtime.startAll(ctx);
+      arrive("redis", "clickhouse", "aigateway", "pnpm", "opencode", "app", "uv");
+      const handles = await booting;
+
+      expect(callLog).not.toContain("start:postgres");
+      expect(callLog).toEqual(expect.arrayContaining(["start:redis", "start:clickhouse"]));
+      expect(handles.map((handle) => handle.name)).toContain("langwatch");
+    } finally {
+      envFileContent = {};
+    }
   });
 });

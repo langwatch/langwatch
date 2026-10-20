@@ -248,6 +248,24 @@ export function reconcileEnvFile(input: { ports: PortAllocation; path: string })
   return reconciledKeys;
 }
 
+/** Sets `values` in an existing .env, replacing each key's line or adding it; the rest stays. */
+export function setEnvValues({
+  path,
+  values,
+}: {
+  path: string;
+  values: Record<string, string>;
+}): void {
+  const lines = readFileSync(path, "utf8").split("\n");
+  for (const [key, value] of Object.entries(values)) {
+    const idx = lines.findIndex((l) => l.startsWith(`${key}=`));
+    if (idx >= 0) lines[idx] = `${key}=${value}`;
+    else lines.splice(lines.at(-1) === "" ? lines.length - 1 : lines.length, 0, `${key}=${value}`);
+  }
+  writeFileSync(path, lines.join("\n"), { mode: 0o600 });
+  chmodSync(path, 0o600);
+}
+
 function readPersistedSecrets(path: string): Record<string, string> {
   if (!existsSync(path)) return {};
   try {

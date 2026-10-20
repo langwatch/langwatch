@@ -361,9 +361,7 @@ Feature: Physical application workspace boundaries
       Given an operator uses npx @langwatch/server
       When the split release is installed and started
       Then the same public package and binary launch the self-host stack
-      And the launcher resolves the built API, worker and task artifacts from the staged distribution
-      And the nested staged workspace retains its frozen lockfile install
-      And first boot installs the @langwatch/server workspace closure
+      And the launcher runs the API, worker and task artifacts from the prebuilt app for its version
       And the operator is not required to install a renamed package
 
     @unimplemented

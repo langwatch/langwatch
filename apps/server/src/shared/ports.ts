@@ -6,7 +6,8 @@ export const MAX_PORT_SLOT_ATTEMPTS = 30;
 export type PortAllocation = {
   base: number;
   // App tier: base..base+9. Each LangWatch-shipped service gets a slot;
-  // 5566..5569 stay free for the next one, clear of the infra tier.
+  // 5567..5569 stay free for the next one, clear of the infra tier.
+  /** The public door the browser opens: the CLI holds it and forwards to `backend`. */
   langwatch: number;
   nlp: number;
   langevals: number;
@@ -14,6 +15,8 @@ export type PortAllocation = {
   langyagent: number;
   // The backend's worker half answers its own health door (WORKER_METRICS_PORT).
   workerHealth: number;
+  /** Where the backend listens; the CLI's door forwards here once it is healthy. */
+  backend: number;
   // Infra tier: base+1000..base+1009. Embedded data stores live here so a
   // user with their own postgres/redis/clickhouse on canonical ports
   // doesn't collide. Auto-shift moves both tiers together by +10.
@@ -36,6 +39,7 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
     aigateway: base + 3,
     langyagent: base + 4,
     workerHealth: base + 5,
+    backend: base + 6,
     postgres: infra,
     redis: infra + 1,
     clickhouseHttp: infra + 2,
@@ -51,6 +55,7 @@ export function portsToCheck(alloc: PortAllocation): { port: number; label: stri
     { port: alloc.aigateway, label: "ai gateway" },
     { port: alloc.langyagent, label: "langy agent" },
     { port: alloc.workerHealth, label: "langwatch worker health" },
+    { port: alloc.backend, label: "langwatch backend" },
     { port: alloc.postgres, label: "postgres" },
     { port: alloc.redis, label: "redis" },
     { port: alloc.clickhouseHttp, label: "clickhouse http" },
