@@ -33,7 +33,7 @@ export class ModelProviderDefaultsWriteService {
 
   async set(input: ModelDefaultAssignmentInput): Promise<void> {
     const parsed = modelDefaultAssignmentInputSchema.parse(input);
-    const config = this.options.catalog.sanitizeDefaultConfig({
+    const { config } = this.options.catalog.sanitizeDefaultConfig({
       config: { [parsed.key]: parsed.model ?? "" },
     });
     if (parsed.model !== null && !config[parsed.key]) {
@@ -63,12 +63,11 @@ export class ModelProviderDefaultsWriteService {
       return this.deleteEmptyConfig(parsed.actorId, existing);
     }
 
-    const submitted = parsed.config ?? existing?.config ?? {};
-    const config = this.options.catalog.sanitizeDefaultConfig({
-      config: submitted,
+    const { config, droppedRestricted } = this.options.catalog.sanitizeDefaultConfig({
+      config: parsed.config ?? existing?.config ?? {},
       stored: existing?.config,
     });
-    if (Object.keys(config).length === 0 && hasPickedModel(submitted)) {
+    if (Object.keys(config).length === 0 && droppedRestricted.length > 0) {
       throw new ModelDefaultValidationError(
         "Every model in this config is restricted to coding-assistant surfaces. Pick another model, or remove the config.",
       );
@@ -147,9 +146,4 @@ export class ModelProviderDefaultsWriteService {
 
     return existing;
   }
-}
-
-/** True when the caller kept at least one model, i.e. did not ask to clear the config. */
-function hasPickedModel(config: Record<string, string>): boolean {
-  return Object.values(config).some((model) => model.length > 0);
 }

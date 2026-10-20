@@ -293,6 +293,13 @@ Feature: Codex, the sign-in-with-OpenAI model provider
     And the config and its scopes are kept
 
   @unit
+  Scenario: A config left with only retired keys is removed on save, not refused
+    Given a saved default-models config whose only model sits under a feature key that no longer exists
+    When the config is saved again
+    Then the config is removed, as any config with nothing left in it is
+    And no Codex restriction error is raised
+
+  @unit
   Scenario: Newly picking a Codex model for topic clustering is still refused
     Given a saved default-models config with no topic clustering model
     When a codex model is picked for topic clustering and the config is saved

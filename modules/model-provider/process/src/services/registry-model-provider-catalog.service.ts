@@ -108,7 +108,8 @@ export abstract class ModelProviderCatalog {
   /**
    * Drops unknown and empty keys, refuses a newly picked restricted model. A
    * restricted model the stored config already held is dropped instead: it
-   * predates the restriction, and refusing it would block every other key.
+   * predates the restriction, and refusing it would block every other key;
+   * `droppedRestricted` names those keys.
    */
   sanitizeDefaultConfig({
     config,
@@ -116,7 +117,7 @@ export abstract class ModelProviderCatalog {
   }: {
     config: Record<string, unknown>;
     stored?: Record<string, string>;
-  }): Record<string, string> {
+  }): { config: Record<string, string>; droppedRestricted: string[] } {
     const valid = new Set<string>([
       "DEFAULT",
       "FAST",
@@ -125,6 +126,7 @@ export abstract class ModelProviderCatalog {
       ...allFeatures().map((feature) => feature.key),
     ]);
     const clean: Record<string, string> = {};
+    const droppedRestricted: string[] = [];
     for (const [key, value] of Object.entries(config)) {
       if (!valid.has(key) || typeof value !== "string" || value.length === 0) {
         continue;
@@ -137,6 +139,7 @@ export abstract class ModelProviderCatalog {
             isModelAllowedForFeature({ modelId: value, featureKey: key }),
           );
       if (!allowed && stored[key] === value) {
+        droppedRestricted.push(key);
         continue;
       }
       if (!allowed) {
@@ -148,7 +151,7 @@ export abstract class ModelProviderCatalog {
       clean[key] = value;
     }
 
-    return clean;
+    return { config: clean, droppedRestricted };
   }
   normalizeRoutingHandle(input: string | null): string | null {
     return normalizeRoutingHandle(input);

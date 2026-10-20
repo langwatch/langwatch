@@ -2,16 +2,40 @@
  * Full-config default writes over a restricted model stored before the
  * restriction (specs/model-providers/codex-account-provider.feature).
  */
-import type { ModelDefaultConfig } from "@langwatch/model-provider-contract";
+import type {
+  ModelDefaultConfig,
+  ModelProviderApiKeyValidation,
+  ModelProviderCredentialVerdict,
+} from "@langwatch/model-provider-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
-import {
-  idService,
-  TestModelProviderCatalog,
-} from "../../../../__tests__/support/model-provider-integration.support.ts";
 import type { ModelDefaultRepository } from "../../../../repositories/model-default.repository.ts";
 import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
+import { PrefixedModelProviderIdService } from "../../../../services/prefixed-model-provider-id.service.ts";
+import { ModelProviderCatalog } from "../../../../services/registry-model-provider-catalog.service.ts";
 import { ModelProviderDefaultsWriteService } from "../model-provider-defaults-write.service.ts";
+
+/** The real catalog rules; only the network-facing members are inert. */
+class OfflineModelProviderCatalog extends ModelProviderCatalog {
+  systemProviders(): Promise<never[]> {
+    return Promise.resolve([]);
+  }
+  validateApiKey(): Promise<ModelProviderApiKeyValidation> {
+    return Promise.resolve({ valid: true });
+  }
+  testConnection(): Promise<ModelProviderCredentialVerdict> {
+    throw new Error("not reached by a defaults write");
+  }
+  assertEndpointAllowed(): Promise<void> {
+    return Promise.resolve();
+  }
+  pickExecutionValue(): string | null {
+    return null;
+  }
+}
 
 const CODEX_MODEL = "openai_codex/gpt-5.6-terra";
 const TOPIC_CLUSTERING = "analytics.topic_clustering_llm";
@@ -35,18 +59,23 @@ function writerOver(existing: ModelDefaultConfig) {
     findForOrganization: async () => [],
   };
   const scopes = ModelProviderScopeService.create({
-    projects: {} as never,
-    organizations: {
-      getBillingProfile: async (input: { organizationId: string }) => ({
-        id: input.organizationId,
-      }),
-    } as never,
+    projects: createApiFixture<ProjectApi>({}, "ProjectApi"),
+    organizations: createApiFixture<OrganizationApi>(
+      {
+        getBillingProfile: async ({ organizationId }) => ({
+          id: organizationId,
+          name: organizationId,
+          billingCustomerId: null,
+        }),
+      },
+      "OrganizationApi",
+    ),
   });
   const writer = ModelProviderDefaultsWriteService.create({
     defaults,
-    catalog: new TestModelProviderCatalog(),
+    catalog: new OfflineModelProviderCatalog(),
     writeAuthorization: {} as never,
-    ids: idService,
+    ids: PrefixedModelProviderIdService.create(),
     scopes,
   });
   return { writer, saved, deleted };
@@ -95,6 +124,22 @@ describe("ModelProviderDefaultsWriteService.save", () => {
         ).rejects.toMatchObject({ code: "validation_error" });
         expect(saved).toEqual([]);
         expect(deleted).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a stored config holding only a retired feature key", () => {
+    const existing = storedConfig({ "retired.feature": "openai/gpt-5-mini" });
+
+    describe("when the config is saved again", () => {
+      /** @scenario "A config left with only retired keys is removed on save, not refused" */
+      it("removes the config instead of refusing it", async () => {
+        const { writer, saved, deleted } = writerOver(existing);
+
+        await writer.save({ id: existing.id, config: existing.config });
+
+        expect(saved).toEqual([]);
+        expect(deleted).toEqual([existing.id]);
       });
     });
   });
