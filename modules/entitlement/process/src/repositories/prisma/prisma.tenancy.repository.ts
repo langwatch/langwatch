@@ -38,7 +38,15 @@ export class PrismaTenancyRepository implements TenancyRepository {
       select: { team: { select: { organizationId: true } } },
     });
 
-    return [...new Set(projects.map((project) => project.team.organizationId))];
+    // relationMode "prisma" keeps no foreign key, so a project can outlive its
+    // team; the generated type still claims `team` is present. Skip orphans
+    // rather than let one dead row stop the sweep for every organization.
+    const organizationIds = projects.flatMap((project) => {
+      const team = project.team as { organizationId: string } | null;
+      return team ? [team.organizationId] : [];
+    });
+
+    return [...new Set(organizationIds)];
   }
 
   async getCurrency({ organizationId }: { organizationId: string }): Promise<"USD" | "EUR"> {
