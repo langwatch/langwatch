@@ -542,20 +542,13 @@ jobs:
               # Not rebuilt: copy the index of the newest bare `git-<sha>` tag, never
               # an `-arm64` manifest (a different media type). The lookup and the
               # match are separate statements so a failed `describe-images` still
-              # trips `set -e`; the app also skips a tag whose CDN copy never finished.
-              local candidates candidate
+              # trips `set -e`. awk exits 0 on no match.
+              local candidates
               candidates=$(aws ecr describe-images --repository-name "${image}" \
                 --query 'reverse(sort_by(imageDetails, &imagePushedAt))[].imageTags[]' \
                 --output text)
-              for candidate in $(printf '%s' "${candidates}" | tr '\t' '\n' | grep -E '^git-[0-9a-f]+$' || true); do
-                if [ "${image}" = "langwatch-app" ] && [ -n "${BUCKET}" ] \
-                  && ! aws s3api head-object --bucket "${BUCKET}" --key "${candidate}/.complete" >/dev/null 2>&1; then
-                  echo "Skipping ${candidate}: its CDN assets never finished uploading"
-                  continue
-                fi
-                previous="${candidate}"
-                break
-              done
+              previous=$(printf '%s' "${candidates}" | tr '\t' '\n' \
+                | awk '/^git-[0-9a-f]+$/ { print; exit }')
 
               if [ -z "${previous}" ]; then
                 # Expected until every image has been published once. A dispatch
