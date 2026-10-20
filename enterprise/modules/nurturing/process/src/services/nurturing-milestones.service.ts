@@ -36,7 +36,10 @@ type MilestonesDependencies = Readonly<{
   claims: NurturingClaimRepository;
 }>;
 
-/** The items whose key the claim repository had not seen inside the window, in order. */
+/**
+ * The items whose key the claim repository had not seen inside the window, in order. A claim that
+ * fails gives back every claim this call took, then throws, so the retry claims the batch whole.
+ */
 async function claimedOnly<Item>({
   items,
   keyOf,
@@ -46,10 +49,22 @@ async function claimedOnly<Item>({
   keyOf: (item: Item) => string;
   claims: NurturingClaimRepository;
 }>): Promise<Item[]> {
-  const claimed = await Promise.all(
-    items.map((item) => claims.claim(keyOf(item), COUNTED_WINDOW_SECONDS)),
+  const results = await Promise.allSettled(
+    items.map(async (item) => ({
+      item,
+      taken: await claims.claim(keyOf(item), COUNTED_WINDOW_SECONDS),
+    })),
   );
-  return items.filter((_, index) => claimed[index]);
+  const taken = results.flatMap((result) =>
+    result.status === "fulfilled" && result.value.taken ? [result.value.item] : [],
+  );
+  const rejected = results.flatMap((result) => (result.status === "rejected" ? [result] : []));
+  if (rejected.length === 0) return taken;
+  await Promise.allSettled(taken.map((item) => claims.release(keyOf(item))));
+  throw new AggregateError(
+    rejected.map((result) => result.reason),
+    "nurturing could not claim every item in the batch",
+  );
 }
 
 /** Items grouped by a key, the groups in order of their first item. */
@@ -153,10 +168,13 @@ export class NurturingMilestonesService {
   }
 
   /**
-   * Claims each item, then counts and delivers project by project. A project whose count fails
-   * gives its claims back, so the queue's retry of the batch counts it; the projects already
-   * counted keep theirs and are skipped. `signalsFor` must fail only before its count commits:
-   * after it, signal building is pure. The batch throws once every project has been tried.
+   * Claims each item, then counts and delivers project by project. A claim that fails gives back
+   * every claim the batch took, so the retry starts whole. A project whose count fails gives its
+   * claims back, so the queue's retry of the batch counts it; the projects already counted keep
+   * theirs and are skipped. `signalsFor` must fail only before its count commits: after it,
+   * signal building is pure. A delivery that fails keeps its project's claims, since the count
+   * committed and counting again would double it, and the batch goes on to the next signal and
+   * project. The batch throws once every project has been tried.
    */
   private async countByProject<Item>({
     items,
@@ -188,7 +206,13 @@ export class NurturingMilestonesService {
         failures.push(error);
         continue;
       }
-      for (const signal of signals) await deliver(signal);
+      for (const signal of signals) {
+        try {
+          await deliver(signal);
+        } catch (error) {
+          failures.push(error);
+        }
+      }
     }
     if (failures.length > 0) {
       throw new AggregateError(failures, "nurturing could not count every project in the batch");

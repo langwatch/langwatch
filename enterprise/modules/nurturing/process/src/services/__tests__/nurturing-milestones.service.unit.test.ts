@@ -318,6 +318,77 @@ describe("NurturingMilestonesService", () => {
       ]);
     });
   });
+
+  describe("when taking a claim fails", () => {
+    /** @scenario "A batch whose claims cannot all be taken is retried whole" */
+    it("gives back the claims it took, so the retry counts every evaluation once", async () => {
+      const claimed = new Set<string>();
+      let failuresLeft = 1;
+      const service = NurturingMilestonesService.create({
+        milestones: MemoryNurturingMilestonesRepository.create(),
+        projects: MemoryNurturingProjectDirectoryRepository.create({
+          placed: new Map([["project-1", "org-1"]]),
+        }),
+        claims: {
+          claim: async (key) => {
+            if (key.endsWith("eval-2") && failuresLeft-- > 0) throw new Error("redis unavailable");
+            if (claimed.has(key)) return false;
+            claimed.add(key);
+            return true;
+          },
+          release: async (key) => void claimed.delete(key),
+        },
+      });
+      await service.projectCreated(projectCreatedFact());
+      const batch = [settled("eval-1"), settled("eval-2")];
+      const delivered: NurturingSignal[] = [];
+      const deliver = async (signal: NurturingSignal) => void delivered.push(signal);
+
+      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow();
+      expect(delivered).toEqual([]);
+
+      await service.evaluationsCompleted({ evaluations: batch, deliver });
+      expect(delivered).toMatchObject([{ organizationEvaluationCount: 2 }]);
+    });
+  });
+
+  describe("when delivering a signal fails", () => {
+    /** @scenario "A failed delivery does not hold back the rest of the batch" */
+    it("still counts and sends the next project, and the retry counts neither again", async () => {
+      const service = serviceOver({
+        placed: new Map([
+          ["project-1", "org-1"],
+          ["project-2", "org-2"],
+        ]),
+      });
+      await service.projectCreated(projectCreatedFact());
+      await service.projectCreated(
+        projectCreatedFact({
+          projectId: "project-2",
+          organizationId: "org-2",
+          adminUserId: "admin-2",
+        }),
+      );
+      const batch = [
+        settled("eval-1"),
+        settled("eval-2", { tenantId: "project-2", projectId: "project-2" }),
+      ];
+      const delivered: NurturingSignal[] = [];
+      let failuresLeft = 1;
+      const deliver = async (signal: NurturingSignal) => {
+        if ("projectId" in signal && signal.projectId === "project-1" && failuresLeft-- > 0) {
+          throw new Error("redis unavailable");
+        }
+        delivered.push(signal);
+      };
+
+      await expect(service.evaluationsCompleted({ evaluations: batch, deliver })).rejects.toThrow();
+      expect(delivered).toMatchObject([{ projectId: "project-2", organizationEvaluationCount: 1 }]);
+
+      await service.evaluationsCompleted({ evaluations: batch, deliver });
+      expect(delivered).toHaveLength(1);
+    });
+  });
 });
 
 describe("given an organization that held a project before nurturing's cutover", () => {

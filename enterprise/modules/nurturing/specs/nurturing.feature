@@ -122,6 +122,20 @@ Feature: Nurturing sends the signals its owners record
     And no evaluation in it is counted a second time
 
   @unit
+  Scenario: A batch whose claims cannot all be taken is retried whole
+    Given a batch of settled evaluations is being claimed
+    When taking one of its claims fails
+    Then the batch gives back the claims it took and fails
+    And the queue's retry counts every evaluation in it once
+
+  @unit
+  Scenario: A failed delivery does not hold back the rest of the batch
+    Given a batch of settled evaluations spans two projects
+    When sending the first project's signal fails
+    Then the second project is still counted and its signal sent
+    And the batch fails, but the retry counts neither project a second time
+
+  @unit
   Scenario: A backed-up project's finished runs are counted in one step
     Given two runs in a project finished while its lane was busy, one delivered twice
     When nurturing takes them as one batch
