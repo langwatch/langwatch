@@ -133,7 +133,8 @@ export type IdIndexFillReport = {
   /** Targets whose partitions `total` already counts, so a retried target is counted once. */
   targetsCounted: string[];
   targetsFailed: { target: string; error: string }[];
-  cursor: IdIndexFillCursor | null;
+  /** One per unfinished target, so a failed target keeps its place while the others walk. */
+  cursors: IdIndexFillCursor[];
   done: number;
   total: number;
   batches: number;
@@ -545,7 +546,9 @@ export function fillReportOf({
     targetsCounted: stringsOf(resumeFrom?.targetsCounted),
     // A failed target is unfinished: every run tries it again.
     targetsFailed: [],
-    cursor: cursorOf(resumeFrom?.cursor),
+    cursors: Array.isArray(resumeFrom?.cursors)
+      ? resumeFrom.cursors.map(cursorOf).filter((each) => each !== null)
+      : [],
     done: numberOf(resumeFrom?.done),
     total: numberOf(resumeFrom?.total),
     batches: numberOf(resumeFrom?.batches),
@@ -603,7 +606,7 @@ class IdIndexFill {
           });
         }
         this.report.targetsDone.push(target.key);
-        this.report.cursor = null;
+        this.report.cursors = this.report.cursors.filter((each) => each.target !== target.key);
         await this.save();
       } catch (error) {
         this.report.targetsFailed.push({ target: target.key, error: messageOf(error) });
@@ -633,7 +636,7 @@ class IdIndexFill {
 
   /** False when the walk was aborted part way; the cursor holds where it stopped. */
   private async fillTarget(target: IdIndexFillTarget): Promise<boolean> {
-    const cursor = this.report.cursor?.target === target.key ? this.report.cursor : null;
+    const cursor = this.cursorFor(target.key);
     const tableAt =
       cursor === null ? -1 : this.options.indexes.findIndex((each) => each.index === cursor.table);
     const listed = await Promise.all(
@@ -678,17 +681,24 @@ class IdIndexFill {
       this.report.done += 1;
       // Saved together with `done`, so a walk stopped before the next partition
       // never counts this one twice.
-      const last = this.report.cursor;
-      if (
-        last !== null &&
-        last.target === target.key &&
-        last.table === index.index &&
-        last.partition === partition.partition
-      ) {
-        this.report.cursor = { ...last, complete: true };
+      const last = this.cursorFor(target.key);
+      if (last !== null && last.table === index.index && last.partition === partition.partition) {
+        this.keepCursor({ ...last, complete: true });
       }
     }
     return true;
+  }
+
+  private cursorFor(target: string): IdIndexFillCursor | null {
+    return this.report.cursors.find((each) => each.target === target) ?? null;
+  }
+
+  /** Replaces its target's cursor and leaves every other target's in place. */
+  private keepCursor(cursor: IdIndexFillCursor): void {
+    this.report.cursors = [
+      ...this.report.cursors.filter((each) => each.target !== cursor.target),
+      cursor,
+    ];
   }
 
   private async fillPartition({
@@ -741,7 +751,7 @@ class IdIndexFill {
         continue;
       }
       committed = cursorAfter({ target, index, partition, batch: next, keyRange });
-      this.report.cursor = committed;
+      this.keepCursor(committed);
       this.report.batches += 1;
       failures = 0;
       // Outside the retry: a save refused for a lost lease must stop the walk, not be retried.

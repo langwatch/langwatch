@@ -119,6 +119,35 @@ function sortedServer() {
   return { client, rowsRead: () => rowsRead, indexed };
 }
 
+/** One 40-row partition of three tenants; the shared target times out after tenant_a's batch. */
+function serve({ sharedFails }: { sharedFails: boolean }) {
+  const attempts: { target: string; throughTenantId: unknown }[] = [];
+  const statements = {
+    query: async <Row>(request: QueryRequest) => {
+      if (request.table === "system.parts") {
+        return { rows: [{ partition_id: "202641", rows: "40" }] as Row[] };
+      }
+      return {
+        rows: [
+          { TenantId: "tenant_a", rows: "10" },
+          { TenantId: "tenant_b", rows: "15" },
+          { TenantId: "tenant_c", rows: "15" },
+        ] as Row[],
+      };
+    },
+    command: async (request: QueryRequest) => {
+      if (request.params?.marker !== undefined) return;
+      const target = request.organizationId ?? "shared";
+      const throughTenantId = request.params?.throughTenantId;
+      attempts.push({ target, throughTenantId });
+      if (sharedFails && target === "shared" && throughTenantId !== "tenant_a") {
+        throw Object.assign(new Error("Timeout exceeded: elapsed 600 s"), { code: "159" });
+      }
+    },
+  };
+  return { attempts, statements };
+}
+
 /** The ledger's checkpoint, in memory: the last saved report and every save. */
 function checkpointFrom(resumeFrom: IdIndexFillReport | null) {
   const saved: IdIndexFillReport[] = [];
@@ -189,7 +218,7 @@ describe("fillIdIndexes", () => {
       expect(second.markers()).toEqual(["shared"]);
       expect(report).toMatchObject({
         targetsDone: ["shared"],
-        cursor: null,
+        cursors: [],
         batches: 3,
         retries: 2,
       });
@@ -337,6 +366,50 @@ describe("fillIdIndexes", () => {
     });
   });
 
+  describe("given a target that fails after one batch while the next target is filled", () => {
+    /** @scenario "a target that failed part way resumes where it stopped after the others are filled" */
+    it("keeps the failed target's cursor, so the retry resumes after its committed batch", async () => {
+      const options = {
+        targets: idIndexFillTargets({ privateRoutes: new Map([["org_p", "http://p"]]) }),
+        indexes: [SPANS],
+        batchRows: 10,
+        minBatchRows: 10,
+        signal: new AbortController().signal,
+        beforeMarker: async () => {},
+        sleep: async () => {},
+      };
+
+      const first = checkpointFrom(null);
+      await expect(
+        fillIdIndexes({
+          ...options,
+          statements: serve({ sharedFails: true }).statements,
+          checkpoint: first.checkpoint,
+        }),
+      ).rejects.toMatchObject({ name: "IdIndexFillIncompleteError" });
+      expect(first.saved.at(-1)).toMatchObject({
+        targetsDone: ["org_p"],
+        cursors: [{ target: "shared", throughTenantId: "tenant_a" }],
+      });
+
+      const retry = serve({ sharedFails: false });
+      const report = await fillIdIndexes({
+        ...options,
+        statements: retry.statements,
+        checkpoint: checkpointFrom(first.saved.at(-1) ?? null).checkpoint,
+      });
+
+      // tenant_a was committed before the failure; the 15-row tenants are split in two.
+      expect(retry.attempts).toEqual(
+        ["tenant_b", "tenant_b", "tenant_c", "tenant_c"].map((throughTenantId) => ({
+          target: "shared",
+          throughTenantId,
+        })),
+      );
+      expect(report).toMatchObject({ targetsDone: ["org_p", "shared"], done: 2, total: 2 });
+    });
+  });
+
   describe("given a partition whose parts live on the cold volume", () => {
     it("starts it at a quarter of the batch", async () => {
       const through: unknown[] = [];
@@ -454,15 +527,17 @@ describe("fillIdIndexes", () => {
         targetsDone: [],
         targetsCounted: ["shared"],
         targetsFailed: [],
-        cursor: {
-          target: "shared",
-          table: "experiment_runs_by_experiment_id_index",
-          partition: "202641",
-          afterTenantId: "",
-          throughTenantId: null,
-          slice: 0,
-          slices: 1,
-        },
+        cursors: [
+          {
+            target: "shared",
+            table: "experiment_runs_by_experiment_id_index",
+            partition: "202641",
+            afterTenantId: "",
+            throughTenantId: null,
+            slice: 0,
+            slices: 1,
+          },
+        ],
         done: 3,
         total: 4,
         batches: 3,
@@ -508,7 +583,7 @@ describe("fillIdIndexes", () => {
 
       expect(server.rowsRead()).toBe(rows.length);
       expect([...server.indexed].toSorted()).toEqual(traces);
-      expect(run.saved.map((report) => report.cursor?.throughKey)).toEqual([
+      expect(run.saved.map((report) => report.cursors[0]?.throughKey)).toEqual([
         ["t4"],
         ["t8"],
         undefined,
@@ -521,16 +596,18 @@ describe("fillIdIndexes", () => {
       const run = checkpointFrom({
         targetsDone: [],
         targetsFailed: [],
-        cursor: {
-          target: "shared",
-          table: "stored_spans_id_index",
-          partition: "202641",
-          afterTenantId: "",
-          throughTenantId: "tenant_big",
-          slice: 0,
-          slices: 1,
-          throughKey: ["t4"],
-        },
+        cursors: [
+          {
+            target: "shared",
+            table: "stored_spans_id_index",
+            partition: "202641",
+            afterTenantId: "",
+            throughTenantId: "tenant_big",
+            slice: 0,
+            slices: 1,
+            throughKey: ["t4"],
+          },
+        ],
         done: 0,
         total: 1,
         batches: 1,

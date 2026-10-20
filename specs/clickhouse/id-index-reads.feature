@@ -275,6 +275,14 @@ Feature: A lookup by id reads only the partitions its id index names
     Then the report's partition total counts that target's partitions once
 
   @unit
+  Scenario: a target that failed part way resumes where it stopped after the others are filled
+    Given a fill over two targets whose first target fails after committing a batch
+    And the second target is filled in the same walk
+    When the ledger retries the fill
+    Then the first target resumes after its last committed batch
+    And no partition is counted twice
+
+  @unit
   Scenario: a marker never reaches ClickHouse unexpanded
     Given a statement that carries an id-bound marker
     When it is sent as a command, or streamed
