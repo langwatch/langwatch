@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, type Mock } from "vitest";
 
 vi.mock("../../../utils/apiKey", () => ({
   resolveCredentials: vi.fn(async () => ({
@@ -116,7 +116,7 @@ const jsonError = async (run: () => Promise<unknown>) => {
 };
 
 describe("getMonitorCommand()", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: Mock<(url: string) => Promise<unknown>>;
 
   beforeEach(() => {
     vi.clearAllMocks();
@@ -150,10 +150,12 @@ describe("getMonitorCommand()", () => {
   });
 
   const notFoundThenList = (rows: unknown[]) => {
-    mockFetch.mockImplementation(async (url: string) =>
-      url.endsWith("/api/v1/monitors")
-        ? { ok: true, status: 200, json: async () => rows }
-        : { ok: false, status: 404, text: async () => '{"error":"monitor_not_found"}' },
+    mockFetch.mockImplementation((url: string) =>
+      Promise.resolve(
+        url.endsWith("/api/v1/monitors")
+          ? { ok: true, status: 200, json: async () => rows }
+          : { ok: false, status: 404, text: async () => '{"error":"monitor_not_found"}' },
+      ),
     );
   };
 
