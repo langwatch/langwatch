@@ -1525,10 +1525,9 @@ export class ProjectionRouter<
   }
 
   /**
-   * A queue that refused because its drain already finished is a shutdown whose consumer drain
-   * overran its budget: the job is still running, and the caller keeps these events for re-drive
-   * (a hand-off, or a fold job that fails and retries). So it warns with the reason; every other
-   * dispatch failure stays an error. Spec: specs/background/queue-drain-send-gate.feature
+   * A drained queue's refusal is a shutdown whose consumer drain overran its budget; the caller
+   * keeps these events for re-drive, so it warns. Every other dispatch failure stays an error.
+   * Spec: specs/background/queue-drain-send-gate.feature
    */
   private logDispatchFailure({
     error,
