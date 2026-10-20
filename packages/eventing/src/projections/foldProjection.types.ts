@@ -101,12 +101,9 @@ export interface FoldProjectionOptions {
   // Re-fold aggregate history for out-of-order events; set false when apply
   // is order-insensitive (sum, counter) and commutes on event data not arrival order.
   refoldOnOutOfOrder?: boolean;
-  /**
-   * Keyed folds can't rebuild from one aggregate, so a missed hand-off retires
-   * dead. Set true to re-send the single event onto the live lane instead; only
-   * safe when applying an event twice leaves the state unchanged. Ignored for
-   * unkeyed folds, which always rebuild.
-   */
+  // Keyed folds can't rebuild from one aggregate, so a missed hand-off retires dead.
+  // True re-sends the single event onto the live lane instead: only safe when applying
+  // an event twice changes nothing. Ignored for unkeyed folds, which always rebuild.
   resendOnRedelivery?: boolean;
   // A spent fold job blocks its group (default) or is dead-lettered; order-tolerant folds only.
   onExhausted?: ExhaustedOutcome;
