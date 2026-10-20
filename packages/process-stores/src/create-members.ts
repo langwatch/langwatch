@@ -4,6 +4,7 @@
  * keyspaces. An unconfigured member REFUSES BY NAME, never a silent omission.
  */
 import type { EventReadSeat } from "@langwatch/eventing";
+import { GROUP_QUEUE_CONFIG } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 import type { OperatorReadMint } from "@langwatch/prisma-client";
 
@@ -426,8 +427,6 @@ export function buildProcessStores(options: BuildProcessStoresOptions): ProcessS
   return { members: source, operatorReads };
 }
 
-/** The queue's own default drain (group-queue), when SHUTDOWN_DRAIN_TIMEOUT_MS is unset. */
-const DEFAULT_QUEUE_DRAIN_MS = 25_000;
 /** Room above the queue drain for closing Redis, Prisma and ClickHouse once eventing drained. */
 const STORE_CLOSE_MARGIN_MS = 5_000;
 
@@ -445,7 +444,7 @@ export function hostedStores({
     stopping: () => source.beginClose?.(),
     stop: () => source.close(),
     drain: true,
-    timeoutMs: (drainTimeoutMs ?? DEFAULT_QUEUE_DRAIN_MS) + STORE_CLOSE_MARGIN_MS,
+    timeoutMs: (drainTimeoutMs ?? GROUP_QUEUE_CONFIG.shutdownTimeoutMs) + STORE_CLOSE_MARGIN_MS,
     ...(source.answer === undefined
       ? {}
       : {
