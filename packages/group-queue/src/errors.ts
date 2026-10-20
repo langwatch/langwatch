@@ -52,12 +52,9 @@ export class QueueStagingClosedError extends GroupQueueError {
   }
 }
 
-/** By name as well as class, so a second copy of this package still recognises it. */
+/** By name, not class, so a second copy of this package still recognises it. */
 export function isQueueStagingClosed(error: unknown): boolean {
-  return (
-    error instanceof QueueStagingClosedError ||
-    (error instanceof Error && error.name === "QueueStagingClosedError")
-  );
+  return error instanceof Error && error.name === "QueueStagingClosedError";
 }
 
 export class NonRetryableGroupQueueError extends Error {

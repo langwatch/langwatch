@@ -7,6 +7,7 @@ import { Redis as IORedis } from "ioredis";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import type { GroupQueueRuntimeDefinition } from "../contracts.ts";
+import { isQueueStagingClosed, QueueStagingClosedError } from "../errors.ts";
 import { GroupQueueProcessor } from "../groupQueue.ts";
 import { GroupStagingScripts } from "../scripts.ts";
 
@@ -143,6 +144,33 @@ describe("GroupQueueProcessor staging gate during shutdown", () => {
       await expect(processor.sendBatch([{ id: "a", groupId: "g" }])).rejects.toThrow(
         /drain has finished/,
       );
+    });
+
+    /** @scenario A dispatch refused because the drain already ended is a warning */
+    it("refuses with a QueueStagingClosedError that isQueueStagingClosed recognises", async () => {
+      const processor = makeProcessor();
+      const closing = processor.close();
+      await drainIsOpen();
+      releaseDrain?.();
+      await closing;
+
+      const refusal = await processor.send({ id: "a", groupId: "g" }).then(
+        () => undefined,
+        (error: unknown) => error,
+      );
+      expect(refusal).toBeInstanceOf(QueueStagingClosedError);
+      expect(isQueueStagingClosed(refusal)).toBe(true);
+    });
+  });
+
+  describe("given an error from another copy of this package", () => {
+    describe("when it carries the QueueStagingClosedError name", () => {
+      /** @scenario A dispatch refused because the drain already ended is a warning */
+      it("is still recognised as a drained-queue refusal", () => {
+        const foreign = Object.assign(new Error("drained"), { name: "QueueStagingClosedError" });
+        expect(isQueueStagingClosed(foreign)).toBe(true);
+        expect(isQueueStagingClosed(new Error("Redis connection lost"))).toBe(false);
+      });
     });
   });
 
