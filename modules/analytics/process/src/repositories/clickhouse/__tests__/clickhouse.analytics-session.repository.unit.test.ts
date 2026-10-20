@@ -1,11 +1,13 @@
 /**
- * Every analytics panel read goes through the per-tenant session, so a ClickHouse refusal is
- * translated there once: a memory-limit error reaches the panel as the handled
+ * A ClickHouse refusal is translated once on every analytics read, through the per-tenant
+ * session or the proof's fenced reader: a memory-limit error reaches the panel as the handled
  * `query_memory_exceeded` with its copy, not as an unknown 500.
  */
 import { ClickHouseQueryClient, type QueryDriver, TenantGuard } from "@langwatch/clickhouse-client";
+import { Temporal } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
+import { analyticsProof } from "../../__tests__/analytics-proof.fixture.ts";
 import { ClickHouseAnalyticsSessionsRepository } from "../clickhouse.analytics-sessions.repository.ts";
 import { ClickHouseAnalyticsRepository } from "../clickhouse.analytics.repository.ts";
 
@@ -61,6 +63,36 @@ describe("ClickHouseAnalyticsRepository", () => {
 
       await expect(repository.findFeedbackEvents(readInput)).rejects.toMatchObject({
         code: "query_memory_exceeded",
+      });
+    });
+
+    it("fails a series read through the proof with query_memory_exceeded", async () => {
+      const raw = memoryLimitExceeded();
+      const repository = repositoryOver(failingWith(() => raw));
+      const startDate = Temporal.Instant.from("2026-07-01T00:00:00Z");
+
+      const failure = repository.runTimeseries({
+        table: "trace_analytics_rollup",
+        authorization: analyticsProof({ projectId: "project-1" }),
+        input: {
+          projectId: "project-1",
+          startDate: startDate.epochMilliseconds,
+          endDate: startDate.epochMilliseconds + 1_000,
+          filters: {},
+          series: [{ metric: "performance.total_cost", aggregation: "sum" }],
+          timeScale: "full",
+          timeZone: "UTC",
+        },
+        startDate,
+        endDate: startDate.add({ seconds: 1 }),
+        previousPeriodStartDate: startDate,
+        adjustedTimeScale: "full",
+        maxResultRows: undefined,
+      });
+
+      await expect(failure).rejects.toMatchObject({
+        code: "query_memory_exceeded",
+        reasons: [raw],
       });
     });
   });

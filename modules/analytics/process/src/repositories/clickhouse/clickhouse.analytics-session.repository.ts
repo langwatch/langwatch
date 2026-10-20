@@ -7,8 +7,10 @@ import { translateClickHouseQueryError } from "./clickhouse.query-error-translat
 
 /**
  * Adapts the process's routing `clickhouse` member to the per-tenant session Analytics'
- * repositories read through. Every analytics read passes `query`, so a failed read is
- * translated here once the client's retries are spent; inserts keep the raw error.
+ * repositories read through for their own tenant. A read through it passes `query`, so its
+ * failure is translated here once the client's retries are spent; inserts keep the raw error.
+ * A series read through the proof's fenced reader skips this session and is translated in
+ * `ClickHouseAnalyticsRepository` instead.
  */
 export class ClickHouseAnalyticsSessionRepository implements EvaluationAnalyticsClickHouseClient {
   static create({

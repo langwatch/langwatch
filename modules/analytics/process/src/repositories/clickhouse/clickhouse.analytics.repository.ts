@@ -14,7 +14,7 @@ import {
   tenantScopeKey,
 } from "@langwatch/clickhouse-client";
 import { createLogger } from "@langwatch/observability";
-import { toDate } from "@langwatch/time";
+import { nowInstant, toDate } from "@langwatch/time";
 import { z } from "zod";
 
 import { ANALYTICS_CLICKHOUSE_SETTINGS } from "../../rules/clickhouse-settings.rules.ts";
@@ -36,6 +36,7 @@ import type { EvaluationAnalyticsClickHouseClient } from "./clickhouse.analytics
 import { pickAnalyticsTable } from "./clickhouse.analytics-route-table.mapper.ts";
 import { buildEvalRollupTimeseriesQuery } from "./clickhouse.eval-rollup-timeseries-query.mapper.ts";
 import { buildEvalSlimTimeseriesQuery } from "./clickhouse.eval-slim-timeseries-query.mapper.ts";
+import { translateClickHouseQueryError } from "./clickhouse.query-error-translation.mapper.ts";
 import { buildRollupTimeseriesQuery } from "./clickhouse.rollup-timeseries-query.mapper.ts";
 import { buildSlimTimeseriesQuery } from "./clickhouse.slim-timeseries-query.mapper.ts";
 import { parseTimeseriesRows } from "./clickhouse.timeseries-row-parser.mapper.ts";
@@ -96,6 +97,23 @@ type TimeseriesStatementClient = {
     clickhouse_settings: Record<string, string | number>;
   }): Promise<{ json(): Promise<unknown> }>;
 };
+
+/**
+ * The fenced reader does not go through the per-tenant session, so its failures are translated
+ * here, the same way the session translates the own tenant's (ADR-045).
+ */
+function translatingFailures(reader: TimeseriesStatementClient): TimeseriesStatementClient {
+  return {
+    async query(input) {
+      const startedAt = nowInstant().epochMilliseconds;
+      try {
+        return await reader.query(input);
+      } catch (error) {
+        throw translateClickHouseQueryError(error, nowInstant().epochMilliseconds - startedAt);
+      }
+    },
+  };
+}
 
 /** The one ClickHouse persistence implementation for all timeseries tables. */
 export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
@@ -335,7 +353,7 @@ export class ClickHouseAnalyticsRepository extends AnalyticsRepository {
     if (!reader.fence.own.includes(projectId)) {
       throw new AnalyticsProofProjectMismatchError(projectId);
     }
-    if (scope === "fenced") return reader;
+    if (scope === "fenced") return translatingFailures(reader);
     return this.clientFor(projectId);
   }
 

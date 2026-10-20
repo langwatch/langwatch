@@ -16,6 +16,10 @@ function principalOf(actor: Actor): AuthorizationInput["principal"] {
       return { type: "system", name: actor.name };
     case "user":
       return { type: "user", id: actor.id };
+    default: {
+      const exhaustive: never = actor;
+      return exhaustive;
+    }
   }
 }
 
