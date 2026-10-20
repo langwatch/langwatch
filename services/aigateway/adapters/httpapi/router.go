@@ -2079,6 +2079,7 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 	// Every error response is logged with fault attribution before it is
 	// written, so failures are visible in CloudWatch even when the response
 	// correctly forwards the provider's error to the client.
+	err = abandonedOnClientCancel(ctx, err)
 	logWriteError(logger, ctx, err)
 	var ue *domain.UpstreamError
 	if errors.As(err, &ue) {
@@ -2091,6 +2092,26 @@ func writeError(logger *zap.Logger, w http.ResponseWriter, ctx context.Context, 
 		return
 	}
 	herr.WriteHTTP(w, domain.Remediate(withFault(herr.New(ctx, domain.ErrInternal, nil))))
+}
+
+// abandonedOnClientCancel names a raw context.Canceled for what it is: the
+// caller went away. Unnamed, it would be written and logged as an unhandled
+// internal error, a platform fault on the line operators page on. A handled
+// error or a forwarded provider answer already says what happened and is
+// left alone. Both cancels must hold: a handler can raise a Canceled of its
+// own while the request is still live, and that one is ours.
+func abandonedOnClientCancel(ctx context.Context, err error) error {
+	if !errors.Is(err, context.Canceled) || !errors.Is(ctx.Err(), context.Canceled) {
+		return err
+	}
+	var e herr.E
+	var ue *domain.UpstreamError
+	if errors.As(err, &e) || errors.As(err, &ue) {
+		return err
+	}
+	return herr.New(ctx, domain.ErrRequestAbandoned, herr.M{
+		"message": "the caller went away before the request finished",
+	}, err)
 }
 
 // withFault stamps the error's fault attribution onto the envelope, from the

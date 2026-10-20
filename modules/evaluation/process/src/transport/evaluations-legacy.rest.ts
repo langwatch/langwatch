@@ -8,6 +8,7 @@ import { defineRestRouter, MANAGEMENT_API_VERSION, resolver } from "@langwatch/a
 import { mapZodIssuesToLogContext } from "@langwatch/config";
 import {
   EvaluationApi,
+  EvaluationReportUnavailableError,
   EvaluatorMissingFieldError,
   evaluateErrorSchema,
   evaluateResponseSchema,
@@ -706,6 +707,8 @@ async function reportVerdict({
       { err: eventError, projectId, evaluationId },
       "Failed to emit evaluation reported event",
     );
+    // A 200 here would lose the verdict for good; a retryable 503 lets the caller send it again.
+    throw new EvaluationReportUnavailableError();
   }
 }
 

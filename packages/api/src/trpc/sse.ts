@@ -378,8 +378,8 @@ function subscriptionPathOf(url: URL): string {
 
 /**
  * Stream-failure logging, same fault-axis rule as the tRPC and REST request
- * loggers: customer-fault handled errors warn (spike-watched), platform /
- * provider and unhandled errors log at error.
+ * loggers: customer-fault handled errors and access refusals warn
+ * (spike-watched), platform / provider and unhandled errors log at error.
  */
 function logStreamFailure({
   logger,
@@ -393,7 +393,8 @@ function logStreamFailure({
   msg: string;
 }) {
   const handled = handledCauseOf(err);
-  const level = handled && handled.fault === "customer" ? "warn" : "error";
+  const quiet = handled ? handled.fault === "customer" : isAccessRefusal(err);
+  const level = quiet ? "warn" : "error";
 
   logger[level](
     {
@@ -402,6 +403,15 @@ function logStreamFailure({
     },
     msg,
   );
+}
+
+/**
+ * A bare UNAUTHORIZED or FORBIDDEN with no handled cause is the access policy
+ * refusing the subscriber (signed out, or not a member), answered to the
+ * caller and no fault of ours.
+ */
+function isAccessRefusal(err: unknown): boolean {
+  return err instanceof TRPCError && (err.code === "UNAUTHORIZED" || err.code === "FORBIDDEN");
 }
 
 function isAsyncIterable(value: unknown): value is AsyncIterable<unknown> {
