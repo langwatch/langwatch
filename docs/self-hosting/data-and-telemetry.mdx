@@ -148,7 +148,9 @@ When a background upgrade step fails, it is almost always a problem on our side.
 
 A bundle holds one step: its id, kind, mode, release, status and attempt count, its last error, its checkpoint report, each target's error, the last lines it logged, the release, chart version and install method, and the instance id.
 
-Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB. The bundle reads nothing else from the install: no traces, table rows, user records or environment variables. Its error, report and log lines are what the step itself wrote, after the masking above, so they can still name something such as a project id. **Send to LangWatch** shows the exact bundle before it is sent, and sends that bundle.
+Every string has passwords in URLs and secret-named values masked, and every value the install holds as a store URL removed. Values a validation error quotes are dropped, every string is cut at 4 KB, and the bundle stays under 64 KB.
+
+The bundle reads only the step's ledger records, the deployment facts above and the instance id, not traces, table rows, user records or environment variables. Its error, report and log lines are what the step itself wrote, after the masking above, so they can still name something such as a project id. **Send to LangWatch** shows the exact bundle before it is sent, and sends that bundle.
 
 On an install with a license, the hourly upgrade check sends the bundle of each newly failed step by itself, once per failure, and the alert email says so. Switch **Upgrade diagnostics** off on **Settings, Checkup**, or set `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND=true`, and a bundle is sent only when an admin presses **Send to LangWatch**. Without a license, or with `LANGWATCH_CONNECT_DISABLED=true`, the install sends no bundle, and the step's page offers the download to email to support@langwatch.ai.
 

@@ -1,42 +1,30 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 import type { SlackNoticeMessage } from "@langwatch/internal-slack";
-import { fetch as undiciFetch } from "undici";
+import { IncomingWebhook } from "@slack/webhook";
 
 import { UpgradeDiagnosticsAnnouncementChannel } from "../upgrade-diagnostics-announcement.channel.ts";
 
 const SLACK_TIMEOUT_MS = 10_000;
 
-type Post = (
-  url: string,
-  init: { method: "POST"; headers: Record<string, string>; body: string; signal: AbortSignal },
-) => Promise<{ ok: boolean; status: number }>;
+type SlackWebhook = Pick<IncomingWebhook, "send">;
 
 /** Posts to the incoming webhook it was built with; the URL never leaves it. */
 export class SlackUpgradeDiagnosticsAnnouncementChannel extends UpgradeDiagnosticsAnnouncementChannel {
-  private constructor(
-    private readonly webhookUrl: string,
-    private readonly send: Post,
-  ) {
+  private constructor(private readonly webhook: SlackWebhook) {
     super();
   }
 
   static create({
     webhookUrl,
-    send = undiciFetch,
+    createWebhook = (url) => new IncomingWebhook(url, { timeout: SLACK_TIMEOUT_MS }),
   }: {
     webhookUrl: string;
-    send?: Post;
+    createWebhook?: (url: string) => SlackWebhook;
   }): SlackUpgradeDiagnosticsAnnouncementChannel {
-    return new SlackUpgradeDiagnosticsAnnouncementChannel(webhookUrl, send);
+    return new SlackUpgradeDiagnosticsAnnouncementChannel(createWebhook(webhookUrl));
   }
 
   async post(message: SlackNoticeMessage): Promise<void> {
-    const response = await this.send(this.webhookUrl, {
-      method: "POST",
-      headers: { "content-type": "application/json" },
-      body: JSON.stringify(message),
-      signal: AbortSignal.timeout(SLACK_TIMEOUT_MS),
-    });
-    if (!response.ok) throw new Error(`Slack refused the post with status ${response.status}`);
+    await this.webhook.send(message);
   }
 }

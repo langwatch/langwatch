@@ -11,6 +11,7 @@ import type { SelfHostedInstanceRecord } from "../repositories/self-hosted-insta
 import { isReportNumber } from "../rules/self-hosted-report.rules.ts";
 import { SIGNAL_EVENTS, SIGNAL_HEADLINES } from "../rules/self-hosted-signals.rules.ts";
 import type { SelfHostedSignalEvent } from "../rules/self-hosted-signals.rules.ts";
+import { selfHostedInstanceAdminUrl } from "../rules/upgrade-diagnostics.rules.ts";
 import type { LicenseLogger } from "./license.service.ts";
 
 type SignalAnnouncement = Readonly<{
@@ -140,7 +141,10 @@ export class SelfHostedCrmService {
     leadingDomain: string | undefined;
     organizationName: string | null;
   }): Promise<void> {
-    const instanceUrl = `${this.collaborators.baseUrl}/ops/cloud/self-hosted-instances`;
+    const instanceUrl = selfHostedInstanceAdminUrl({
+      baseUrl: this.collaborators.baseUrl,
+      instanceRowId: null,
+    });
     const counts = reportedCounts(instance, { users: "users", traces28d: "traces_28d" });
     for (const signal of signals) {
       try {

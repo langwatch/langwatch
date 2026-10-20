@@ -17,7 +17,10 @@ function sender({ connect, credentials }: { connect: boolean; credentials: Conne
     diagnosticsAnswer: { reportId: "report-1", receivedAt: "2026-10-20T10:00:00Z" },
   });
   const service = UpgradeDiagnosticsSenderService.create({
-    install: { findInstallCredential: async () => credentials },
+    install: {
+      findInstallCredential: async () => credentials,
+      holdsInstallLicence: async () => credentials.length > 0,
+    },
     ...(connect ? { host } : {}),
   });
   return { service, host };

@@ -15,7 +15,7 @@ import type { ConnectLicenseChannel } from "../channels/connect-license.channel.
 import type { ConnectInstallService } from "./connect-install.service.ts";
 
 type UpgradeDiagnosticsSenderDependencies = Readonly<{
-  install: Pick<ConnectInstallService, "findInstallCredential">;
+  install: Pick<ConnectInstallService, "findInstallCredential" | "holdsInstallLicence">;
   /** Absent where the deployment switched Connect off: nothing is called. */
   host?: ConnectLicenseChannel;
 }>;
@@ -27,10 +27,12 @@ export class UpgradeDiagnosticsSenderService {
 
   private constructor(private readonly deps: UpgradeDiagnosticsSenderDependencies) {}
 
+  /** Reads only: the instance id is minted by `send`, not by asking whether one could be. */
   async availability(): Promise<UpgradeDiagnosticsAvailability> {
     if (!this.deps.host) return { available: false, reason: "connect_disabled" };
-    const [credential] = await this.deps.install.findInstallCredential();
-    if (!credential) return { available: false, reason: "no_licence" };
+    if (!(await this.deps.install.holdsInstallLicence())) {
+      return { available: false, reason: "no_licence" };
+    }
     return { available: true, reason: null };
   }
 

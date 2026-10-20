@@ -29,6 +29,12 @@ Feature: Upgrade diagnostics over Connect
     When each is asked whether upgrade diagnostics can be sent
     Then they answer connect_disabled, no_licence, and available
 
+  @unit
+  Scenario: Asking whether sending is available mints no instance id
+    Given an install with a licence that has never minted an instance id
+    When ops asks whether diagnostics can be sent
+    Then the answer comes from the licence alone and no instance id is minted
+
   # The hosted end
 
   @unit
