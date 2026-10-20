@@ -125,11 +125,19 @@ const STRUCTURAL_KEYS: ReadonlySet<string> = new Set(["role", "type"]);
  */
 const MIN_CONTAINED_REDACTION_LENGTH = 8;
 
+/** Scripts written without spaces between words; no word boundary exists inside them. */
+const UNSPACED_SCRIPTS =
+  "\\p{sc=Han}\\p{sc=Hiragana}\\p{sc=Katakana}\\p{sc=Thai}\\p{sc=Lao}\\p{sc=Khmer}\\p{sc=Myanmar}";
+const UNSPACED_SCRIPT_CHAR = new RegExp(`[${UNSPACED_SCRIPTS}]`, "u");
+
+/** A word character that separates words: letters and digits of spaced scripts, and `_`. */
+const SPACED_WORD_CHAR = `[[\\p{L}\\p{N}_]--[${UNSPACED_SCRIPTS}]]`;
+
 function isStructuralValue(key: string, value: unknown): boolean {
   return STRUCTURAL_KEYS.has(key) && typeof value === "string" && SPAN_IO_SHAPE_LITERALS.has(value);
 }
 
-/** A string leaf as a redaction: blank strings carry no content and are contained in every value. */
+/** A string leaf as a redaction; blank strings carry no content and match every value. */
 function contentStrings(value: string): string[] {
   return value.trim() === "" ? [] : [value];
 }
@@ -193,12 +201,18 @@ function matchersFor(redactions: Set<string>): RedactionMatchers {
 
   const matchers: RedactionMatchers = { long: [], short: [] };
   for (const redaction of redactions) {
-    if (redaction.length >= MIN_CONTAINED_REDACTION_LENGTH) {
+    // A short string in an unspaced script has no word boundary, so it matches anywhere.
+    if (
+      redaction.length >= MIN_CONTAINED_REDACTION_LENGTH ||
+      UNSPACED_SCRIPT_CHAR.test(redaction)
+    ) {
       matchers.long.push(redaction);
       continue;
     }
     const escaped = redaction.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    matchers.short.push(new RegExp(`(?<![\\p{L}\\p{N}_])${escaped}(?![\\p{L}\\p{N}_])`, "u"));
+    matchers.short.push(
+      new RegExp(`(?<!${SPACED_WORD_CHAR})${escaped}(?!${SPACED_WORD_CHAR})`, "v"),
+    );
   }
   matchersByRedactions.set(redactions, matchers);
 
@@ -339,12 +353,9 @@ export const applySpanProtections = (
     }
   }
 
-  // A copy of hidden content riding along in any param is scrubbed by the redactions set
-  // first. Then custom attribute rules with a restrict disposition, plus the attributes that
-  // carry a hidden content category (`langwatch.input`, the gen_ai message keys), replace the
-  // matched params whole (the mapper unflattens dotted keys into nested objects, so the matcher
-  // walks the nested paths) with the placeholder naming who can see them. In that order the
-  // scrub never rewrites a placeholder that shares a word with the hidden content.
+  // Scrub copies of hidden content first, then replace restricted and hidden-category params
+  // whole with the audience placeholder (the matcher walks the unflattened nested paths). In
+  // this order the scrub never rewrites a placeholder that shares a word with hidden content.
   const transformedParams = createAttributeRedactor({
     hidden: [
       ...(protections.hiddenAttributes ?? []),

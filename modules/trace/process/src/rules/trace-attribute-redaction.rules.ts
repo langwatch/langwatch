@@ -119,11 +119,9 @@ function categoryVisibility(
 }
 
 /**
- * Synthetic hidden-attribute rules for the attribute keys that carry each content category the
- * viewer cannot see (`langwatch.input`, the gen_ai message keys, `gen_ai.system_instructions`,
- * `gen_ai.tool.call.*`, ...), so their values are replaced whole by the placeholder naming who
- * can see them, like a custom restrict rule. Shared by the span protections and the v2 read
- * mappers so one attribute never carries two different audience labels.
+ * Hidden-attribute rules for the keys carrying each content category the viewer cannot see, so
+ * their values are replaced whole by the audience placeholder. Shared by the span protections and
+ * the v2 read mappers, so one attribute never carries two different audience labels.
  */
 export function hiddenContentCategoryRules({
   protections,

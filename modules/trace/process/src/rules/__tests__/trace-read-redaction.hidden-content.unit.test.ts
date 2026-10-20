@@ -47,7 +47,7 @@ function chatSpan(params: Record<string, unknown>, question: string = HIDDEN_QUE
   } as Span;
 }
 
-function protect(span: Span, protections: Protections): Record<string, any> {
+function protect(span: Span, protections: Protections): unknown {
   const redactions = new Set([
     ...(protections.canSeeCapturedInput === true ? [] : extractRedactionsFromAllSpanInputs([span])),
     ...(protections.canSeeCapturedOutput === true
@@ -55,7 +55,20 @@ function protect(span: Span, protections: Protections): Record<string, any> {
       : extractRedactionsFromAllSpanOutputs([span])),
   ]);
 
-  return applySpanProtections(span, protections, redactions).params as Record<string, any>;
+  return applySpanProtections(span, protections, redactions).params;
+}
+
+/** The value at a dotted path through nested params. */
+function at(params: unknown, path: string): unknown {
+  return path
+    .split(".")
+    .reduce<unknown>(
+      (node, key) =>
+        typeof node === "object" && node !== null
+          ? (node as Record<string, unknown>)[key]
+          : undefined,
+      params,
+    );
 }
 
 const inputHiddenFromDave: Protections = {
@@ -71,15 +84,15 @@ describe("given dave cannot see the input of a span", () => {
     it("replaces the input attributes with a placeholder naming the audience", () => {
       const params = protect(chatSpan({}), inputHiddenFromDave);
 
-      expect(params.langwatch.input).toBe("[REDACTED] (visible to Admins)");
-      expect(params.gen_ai.input.messages).toBe("[REDACTED] (visible to Admins)");
+      expect(at(params, "langwatch.input")).toBe("[REDACTED] (visible to Admins)");
+      expect(at(params, "gen_ai.input.messages")).toBe("[REDACTED] (visible to Admins)");
     });
 
     /** @scenario "Hidden input is replaced whole in the attributes that carry it" */
     it("keeps the audience in the placeholder when the hidden input shares a word with it", () => {
       const params = protect(chatSpan({}, "Admins"), inputHiddenFromDave);
 
-      expect(params.langwatch.input).toBe("[REDACTED] (visible to Admins)");
+      expect(at(params, "langwatch.input")).toBe("[REDACTED] (visible to Admins)");
     });
   });
 
@@ -95,13 +108,13 @@ describe("given dave cannot see the input of a span", () => {
         inputHiddenFromDave,
       );
 
-      expect(params.extra_params).toEqual({
+      expect(at(params, "extra_params")).toEqual({
         selection: "user_selected",
         audience: "user",
         format: "text",
       });
-      expect(params.response_schema).toEqual({ type: "object", required: ["answer"] });
-      expect(params.temperature).toBe(0.2);
+      expect(at(params, "response_schema")).toEqual({ type: "object", required: ["answer"] });
+      expect(at(params, "temperature")).toBe(0.2);
     });
   });
 
@@ -113,7 +126,7 @@ describe("given dave cannot see the input of a span", () => {
         inputHiddenFromDave,
       );
 
-      expect(params.notes.summary).toBe("[REDACTED]");
+      expect(at(params, "notes.summary")).toBe("[REDACTED]");
     });
 
     /** @scenario "Hidden input copied into another attribute is still scrubbed" */
@@ -123,8 +136,33 @@ describe("given dave cannot see the input of a span", () => {
         inputHiddenFromDave,
       );
 
-      expect(params.notes.verdict).toBe("[REDACTED]");
-      expect(params.notes.tag).toBe("antifraud_v2");
+      expect(at(params, "notes.verdict")).toBe("[REDACTED]");
+      expect(at(params, "notes.tag")).toBe("antifraud_v2");
+    });
+
+    /** @scenario "Hidden input copied into another attribute is still scrubbed" */
+    it("redacts a short hidden word embedded in text written without spaces", () => {
+      const params = protect(
+        chatSpan(
+          { notes: { zh: "客户说fraud了", ja: "注文番号は返金済み", tag: "antifraud_v2" } },
+          "fraud",
+        ),
+        inputHiddenFromDave,
+      );
+
+      expect(at(params, "notes.zh")).toBe("[REDACTED]");
+      expect(at(params, "notes.ja")).toBe("注文番号は返金済み");
+      expect(at(params, "notes.tag")).toBe("antifraud_v2");
+    });
+
+    /** @scenario "Hidden input copied into another attribute is still scrubbed" */
+    it("redacts a short hidden string in an unspaced script wherever it appears", () => {
+      const params = protect(
+        chatSpan({ notes: { ja: "注文番号は返金済み" } }, "返金"),
+        inputHiddenFromDave,
+      );
+
+      expect(at(params, "notes.ja")).toBe("[REDACTED]");
     });
   });
 });
@@ -140,8 +178,8 @@ describe("given dave can see the input of a span but not its output", () => {
         capturedOutputVisibleTo: "Admins",
       });
 
-      expect(params.gen_ai.output.messages).toBe("[REDACTED] (visible to Admins)");
-      expect(JSON.parse(params.gen_ai.input.messages as string)[1].content[0].text).toBe(
+      expect(at(params, "gen_ai.output.messages")).toBe("[REDACTED] (visible to Admins)");
+      expect(JSON.parse(at(params, "gen_ai.input.messages") as string)[1].content[0].text).toBe(
         HIDDEN_QUESTION,
       );
     });
