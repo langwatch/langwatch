@@ -329,6 +329,19 @@ def test_setup_return_is_sent_as_the_state():
     }
 
 
+# @scenario "A setup that returns nothing sends an empty state"
+def test_setup_that_returns_nothing_sends_an_empty_state():
+    agent = shop_assistant()
+
+    @agent.scenario.setup
+    async def setup(run):
+        return None
+
+    result = answer(agent, call_frame(kind="setup"))
+
+    assert without_envelope(result) == {"state": {}}
+
+
 # @scenario "Teardown receives the state setup returned"
 def test_teardown_receives_the_state():
     agent = shop_assistant()

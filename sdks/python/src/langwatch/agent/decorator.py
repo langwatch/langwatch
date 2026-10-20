@@ -389,7 +389,11 @@ class ConnectedAgent:
         run = ScenarioRun.from_frame(call.run)
         args: list[Any] = [run] if kind == "setup" else [run, call.state]
         parameters = hook.signature.resolve_parameters(call.parameters)
-        return CallAnswer(state=coerce_state(await _run(hook.func, args, parameters)))
+        returned = await _run(hook.func, args, parameters)
+        if kind == "setup" and returned is None:
+            # The platform needs a setup's state; a setup that only seeds data sends an empty one.
+            returned = {}
+        return CallAnswer(state=coerce_state(returned))
 
     async def call(self, input: Any) -> Output:
         """Duck-typed entry for the scenario library's `AgentAdapter.call`.

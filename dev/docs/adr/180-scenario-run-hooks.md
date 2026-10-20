@@ -73,6 +73,8 @@ Putting hooks in the customer's process gives them their own database and secret
 
 The register frame, call envelope and result frame change (additively; `protocol` stays 1). Run state gains hook records and a new event. The run view gains hook rows and the labels above. Series follow-ups: SDKs, platform calling hooks, scoring, run-result UI, dogfooding on the platform's own assistant, then docs in `docs/agent-testing/` after dogfooding.
 
+In the Python SDK, `state` becomes a reserved turn field. An agent that already has a run parameter named `state` now receives the scenario state in it, and the parameter leaves the registered schema. The Python SDK release notes say so; such an agent renames its parameter.
+
 ## References
 
 - Related ADRs: ADR-128 (connected agents)

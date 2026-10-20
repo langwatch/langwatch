@@ -71,6 +71,12 @@ Feature: Scenario setup and teardown hooks on connected agents (SDK and protocol
     Then the result frame carries that dictionary as state
 
   @unit
+  Scenario: A setup that returns nothing sends an empty state
+    Given a setup function that only seeds data and returns nothing
+    When the SDK answers a call with kind "setup"
+    Then the result frame carries an empty object as state
+
+  @unit
   Scenario: Teardown receives the state setup returned
     Given a call with kind "teardown" and a state
     When the SDK handles the call

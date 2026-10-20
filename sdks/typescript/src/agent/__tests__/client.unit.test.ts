@@ -1145,6 +1145,21 @@ describe("the agent client, given a fake platform", () => {
       });
     });
 
+    /** @scenario "A setup that returns nothing sends an empty state" */
+    it("sends an empty state when setup returns nothing", async () => {
+      const { connection } = await connectShop((agent) => {
+        agent.scenario.setup(async () => {});
+      });
+
+      expect(
+        await answerTo(connection, {
+          kind: "setup",
+          params: {},
+          run: { scenarioRunId: "run_1", scenarioName: "Refund", batchRunId: "batch_1" },
+        }),
+      ).toEqual({ state: {} });
+    });
+
     /** @scenario "Teardown receives the state setup returned" */
     /** @scenario "Teardown's returned object is sent back" */
     it("hands teardown the state and sends back what it returns", async () => {

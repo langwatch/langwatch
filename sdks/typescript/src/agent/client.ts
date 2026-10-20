@@ -115,7 +115,8 @@ const answerCall = async ({
     return { ...result, state: checkState(result.state) };
   }
   const state = await hook({ run: frame.run, state: frame.state, params: call.params });
-  return { state: checkState(state) };
+  // The platform needs a setup's state; a setup that only seeds data sends an empty one.
+  return { state: checkState(frame.kind === "setup" ? (state ?? {}) : state) };
 };
 
 export interface AgentClientConfig {
