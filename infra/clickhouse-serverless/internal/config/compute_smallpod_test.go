@@ -4,6 +4,7 @@ import "testing"
 
 const mb1 int64 = 1 << 20
 
+// @scenario "A pod of 4 GiB or less bounds its caches, threads and system logs"
 func TestComputeFromResources_SmallPodBudget(t *testing.T) {
 	tests := []struct {
 		name                string
@@ -65,6 +66,21 @@ func TestComputeFromResources_SmallPodBudget(t *testing.T) {
 	}
 }
 
+// @scenario "A replicated small pod keeps its thread pools"
+func TestComputeFromResources_ReplicatedSmallPodKeepsThreadPools(t *testing.T) {
+	c := ComputeFromResources(2, 4*gb1, &Input{Replicated: true})
+	if c.BackgroundSchedulePoolSize != 0 || c.BackgroundCommonPoolSize != 0 || c.BackgroundMovePoolSize != 0 ||
+		c.BackgroundBrokerPoolSize != 0 || c.BackgroundDistPoolSize != 0 || c.BackgroundBufferPoolSize != 0 ||
+		c.BackgroundFetchesPoolSize != 0 || c.MaxThreadPoolFreeSize != 0 {
+		t.Errorf("replicated pods fetch and schedule on these pools; they must keep the defaults, got %+v", c)
+	}
+	if c.MarkCacheSize != 4*gb1/16 || c.SystemLogMaxSizeRows != 16384 {
+		t.Errorf("replicated small pods still get the cache and log budget, got mark cache %d, log rows %d",
+			c.MarkCacheSize, c.SystemLogMaxSizeRows)
+	}
+}
+
+// @scenario "A pod of 8 GiB or more keeps the ClickHouse defaults"
 func TestComputeFromResources_LargePodKeepsDefaults(t *testing.T) {
 	for _, ram := range []int64{8 * gb1, 16 * gb1} {
 		c := ComputeFromResources(4, ram, nil)

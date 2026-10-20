@@ -84,6 +84,8 @@ ClickHouse defaults for all of these:
 | System log queues (`max_size_rows` etc.)        | 16384 / 1024 reserved / 8192 flush |
 | `query_metric_log`, `query_thread_log`, `query_views_log`, `asynchronous_insert_log` | removed |
 
+Replicated pods (`CH_REPLICATED`) keep the ClickHouse default thread pools, because
+replication fetches and schedules on them; they still get the cache and log budget.
 Each value can be overridden by the env var named in `internal/config/compute.go`.
 
 ## Testing

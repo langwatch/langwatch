@@ -124,7 +124,7 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 	c.CacheMaxSize = ramBytes / 4 // 25% for S3 cache
 
 	if ramBytes <= smallPodRAM {
-		applySmallPodBudget(c, ramBytes)
+		applySmallPodBudget(c, ramBytes, input != nil && input.Replicated)
 	}
 
 	// --- CPU allocation ---
@@ -199,9 +199,9 @@ func ComputeFromResources(cpu int, ramBytes int64, input *Input) *Computed {
 
 // applySmallPodBudget bounds the caches ClickHouse otherwise sizes at up to
 // half of RAM each (cache_size_to_ram_max_ratio 0.5), trims idle thread pools
-// and caps system log queues so a failed flush cannot hold memory forever.
-// Every name is a 25.10 server setting; the log caps are per-table keys.
-func applySmallPodBudget(c *Computed, ramBytes int64) {
+// on a single node (replication fetches and schedules on them) and caps system
+// log queues. Every name is a 25.10 server setting; log caps are per-table keys.
+func applySmallPodBudget(c *Computed, ramBytes int64, replicated bool) {
 	c.MarkCacheSize = ramBytes / 16
 	c.IndexMarkCacheSize = ramBytes / 64
 	c.PrimaryIndexCacheSize = ramBytes / 64
@@ -210,6 +210,14 @@ func applySmallPodBudget(c *Computed, ramBytes int64) {
 	c.MmapCacheSize = 128
 	c.MergesMemoryRatio = 0.25
 
+	c.SystemLogMaxSizeRows = 16384
+	c.SystemLogReservedSizeRows = 1024
+	c.SystemLogFlushThresholdRows = 8192
+	c.RemoveQueryDetailLogs = true
+
+	if replicated {
+		return
+	}
 	// Each idle thread keeps its own allocator cache: 338 threads held ~350 MiB untracked at 1 GiB.
 	c.BackgroundSchedulePoolSize = 16
 	c.BackgroundCommonPoolSize = 4
@@ -219,9 +227,4 @@ func applySmallPodBudget(c *Computed, ramBytes int64) {
 	c.BackgroundBufferPoolSize = 1
 	c.BackgroundFetchesPoolSize = 1
 	c.MaxThreadPoolFreeSize = 8
-
-	c.SystemLogMaxSizeRows = 16384
-	c.SystemLogReservedSizeRows = 1024
-	c.SystemLogFlushThresholdRows = 8192
-	c.RemoveQueryDetailLogs = true
 }
