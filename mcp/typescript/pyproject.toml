@@ -29,6 +29,7 @@ constraint-dependencies = [
   "urllib3>=2.8.0", # security: urllib3 advisories covering <2.8.0 (#2591, #2592, #2608)
   "fsspec>=2026.6.0", # security: fsspec advisory covering <2026.6.0 (#2731)
   "litellm>=1.96.2", # security: litellm advisory covering 1.96.0-1.96.1 (#2648)
+  "aiohttp>=3.14.4", # security: aiohttp advisories covering <=3.14.3, two HIGH (#2842-#2844)
   "mcp>=2.2.0", # security: MCP SDK unbounded StreamableHTTP sessions, fixed in 2.2.0 (#2823)
 ]
 
