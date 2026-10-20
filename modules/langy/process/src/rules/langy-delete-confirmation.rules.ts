@@ -169,7 +169,8 @@ export function retryRefusalMessage(action: string): string {
 export function cardRaisingRefusalMessage(action: string): string {
   return (
     `${gerund(action)} needs a confirmation click, and the confirmation card is being shown ` +
-    "now. Wait for the user's answer, then run the same command again."
+    "now. Wait for the user's answer, then run the same command again. If no card appears, " +
+    "run the command again."
   );
 }
 

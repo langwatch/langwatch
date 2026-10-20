@@ -7,7 +7,7 @@ import {
   internalActor,
 } from "@langwatch/authorization";
 import { HandledError } from "@langwatch/handled-error";
-import { createLogger, validationMeta } from "@langwatch/observability";
+import { createLogger, REQUEST_CAUSE_FIELD, validationMeta } from "@langwatch/observability";
 import type { Context, ErrorHandler, Hono as HonoApp, MiddlewareHandler } from "hono";
 import { Hono } from "hono";
 import { uniqueSymbol, validator as openApiValidator } from "hono-openapi";
@@ -151,6 +151,19 @@ import {
 
 const outputLogger = createLogger("langwatch:api:output-validation");
 
+/** The logger a failed give-back of confirmation clicks is reported through. */
+const confirmationLogger = createLogger("langwatch:api:confirmation");
+
+/** The default report: both errors under keys the log serialises in full. */
+const loggedConfirmations: RestConfirmationLog = {
+  refundFailed: ({ refundError, routeError }) => {
+    confirmationLogger.warn(
+      { error: refundError, [REQUEST_CAUSE_FIELD]: routeError },
+      "a failed route could not give back its confirmation clicks",
+    );
+  },
+};
+
 // The one REST execution path: authenticate, parse, decide, handle, check answer, respond.
 // The caller is authenticated BEFORE the body is parsed, so a refused credential never learns
 // the body failed its schema (ARCHITECTURE.md §8). Routes answer at three addresses (dated
@@ -200,25 +213,31 @@ export type RestRuntimeMembers = Readonly<{
    * fakes its identity and records nothing, so it leaves this unset.
    */
   servedDoors?: true;
+  /** Told when a failed route could not give back its clicks. Defaults to a warning log. */
+  confirmationLog?: RestConfirmationLog;
 }>;
 
-/** The logger a failed give-back of confirmation clicks is reported through. */
-const confirmationLogger = createLogger("langwatch:api:confirmation");
+/** Where a failed give-back of confirmation clicks is reported, beside the route's own fault. */
+export type RestConfirmationLog = Readonly<{
+  refundFailed(input: { refundError: unknown; routeError: unknown }): void;
+}>;
 
 /** Runs the handler; a fault on our side leaves the record in place, so the click is given back. */
-async function refundingOnFault<Result>(
-  receipt: RestConfirmationReceipt | void,
-  run: () => Promise<Result>,
-): Promise<Result> {
+async function refundingOnFault<Result>({
+  receipt,
+  log,
+  run,
+}: {
+  receipt: RestConfirmationReceipt | void;
+  log: RestConfirmationLog;
+  run: () => Promise<Result>;
+}): Promise<Result> {
   try {
     return await run();
   } catch (error) {
     if (receipt && !isCustomerFault(error)) {
       await receipt.refund().catch((refundError: unknown) => {
-        confirmationLogger.warn(
-          { error: refundError, cause: error },
-          "a failed route could not give back its confirmation clicks",
-        );
+        log.refundFailed({ refundError, routeError: error });
       });
     }
     throw error;
@@ -1508,23 +1527,26 @@ function handlerMiddleware<Api>({
             app: options.app,
           });
 
-          return refundingOnFault(receipt, async () =>
-            route.handler(
-              handlerArguments({
-                context,
-                route,
-                options,
-                input,
-                actor,
-                scope: handlerScopeOf({ route, credential, caller }),
-                target,
-                authorization,
-                session: sessionOf({ route, credential, caller }),
-                key: keyOf({ route, credential, request: context.req.raw }),
-              }),
-              ...(await resolveContexts({ route, contexts, context, input })),
-            ),
-          );
+          return refundingOnFault({
+            receipt,
+            log: ports.confirmationLog ?? loggedConfirmations,
+            run: async () =>
+              route.handler(
+                handlerArguments({
+                  context,
+                  route,
+                  options,
+                  input,
+                  actor,
+                  scope: handlerScopeOf({ route, credential, caller }),
+                  target,
+                  authorization,
+                  session: sessionOf({ route, credential, caller }),
+                  key: keyOf({ route, credential, request: context.req.raw }),
+                }),
+                ...(await resolveContexts({ route, contexts, context, input })),
+              ),
+          });
         },
       });
 

@@ -62,6 +62,7 @@ export { canonicalOtlpRequest, withOtlpPathAliases } from "./otlp-path-alias.ts"
 
 export {
   createRestRuntime,
+  type RestConfirmationLog,
   type RestDeprecationLog,
   type RestMountOptions,
   type RestRuntime,

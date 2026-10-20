@@ -18,7 +18,11 @@ import { z } from "zod";
 import { authorizationPort } from "../../__tests__/api-double.ts";
 import { ConfirmationRequiredError } from "../../errors.ts";
 import type { RestCaller, RestIdentity } from "../../hosting/api-door.ts";
-import type { RestConfirmationGate, RestConfirmationRequest } from "../confirmation.ts";
+import {
+  gerund,
+  type RestConfirmationGate,
+  type RestConfirmationRequest,
+} from "../confirmation.ts";
 import {
   recordKeyCredential,
   recordOrganizationCredential,
@@ -216,6 +220,7 @@ const router = defineRestRouter(RecordsApi)
 let ran: string[];
 let refunded: number;
 let failWith: Error | undefined;
+let refundFailures: { refundError: unknown; routeError: unknown }[] = [];
 let asked: { request: RestConfirmationRequest; names: (string | null | undefined)[] }[];
 
 const app: RecordsApi = {
@@ -255,6 +260,7 @@ function mount(gate: RestConfirmationGate | undefined, servedDoors = true) {
     audit: { record: async () => {} },
     ...(gate ? { confirmations: gate } : {}),
     ...(servedDoors ? { servedDoors: true as const } : {}),
+    confirmationLog: { refundFailed: (failure) => void refundFailures.push(failure) },
     // The envelope every REST family answers with, so the refusal reads as Langy reads it.
   }).mount(router, { app: () => app, onError: canonicalErrorResponse });
 }
@@ -289,6 +295,7 @@ beforeEach(() => {
   ran = [];
   refunded = 0;
   failWith = undefined;
+  refundFailures = [];
   asked = [];
 });
 
@@ -564,6 +571,9 @@ describe("when the route fails after the click was spent", () => {
     const answer = await call({ gate, token: "langy", method: "DELETE", path: "/ev-1" });
 
     expect(answer.status).toBe(500);
+    expect(refundFailures).toEqual([
+      { refundError: new Error("redis went away"), routeError: new Error("database went away") },
+    ]);
   });
 
   it("keeps the click spent for a refusal the caller caused", async () => {
@@ -578,6 +588,19 @@ describe("when the route fails after the click was spent", () => {
 
     expect(answer.status).toBe(409);
     expect(refunded).toBe(0);
+  });
+});
+
+describe("naming the action in a refusal", () => {
+  it.each([
+    ["delete", "Deleting"],
+    ["disable", "Disabling"],
+    ["remove", "Removing"],
+    ["revoke", "Revoking"],
+    ["archive", "Archiving"],
+    ["edit", "Editing"],
+  ])("reads %s as %s", (action, word) => {
+    expect(gerund(action)).toBe(word);
   });
 });
 

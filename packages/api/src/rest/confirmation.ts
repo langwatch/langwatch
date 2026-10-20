@@ -226,8 +226,11 @@ function idsOf<Api>({
   return [...new Set(named.filter((id): id is string => typeof id === "string" && id !== ""))];
 }
 
-/** "delete" → "Deleting", "disable" → "Disabling". */
-function gerund(action: string): string {
+/**
+ * "delete" → "Deleting", "disable" → "Disabling". Mirrors `gerund` in the langy rules, which this
+ * package cannot import.
+ */
+export function gerund(action: string): string {
   const stem = action.replace(/e$/, "");
   return `${stem.charAt(0).toUpperCase()}${stem.slice(1)}ing`;
 }
