@@ -535,7 +535,7 @@ type Response = z.infer<typeof archiveResultSchema>; // ../contract/src/agent-re
 
 Send one conversation turn to an online connected agent
 
-Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:209`.
+Permission `scenarios:create`. Declared at `src/transport/agent.rest.ts:210`.
 
 Answers at `/api/v1/agents/:id/call`.
 

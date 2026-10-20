@@ -436,7 +436,7 @@ Answers at `/api/model-defaults/:id`, `/api/v1/model-defaults/:id`; also, undocu
 
 ```typescript
 type Params = z.infer<typeof modelDefaultsRestParamsSchema>; // ../contract/src/model-provider-rest.schemas.ts:88
-// Response: inline, src/transport/model-defaults.rest.ts:162
+// Response: inline, src/transport/model-defaults.rest.ts:163
 type Response = unknown;
 ```
 

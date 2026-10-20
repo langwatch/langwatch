@@ -168,7 +168,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/monitor.rest.ts:73`       |
+| Declared at | `src/transport/monitor.rest.ts:88`       |
 | Base URL    | `/api/monitors`, twin `/api/v1/monitors` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -178,19 +178,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number }): Promise<Mo
 
 List all online evaluation monitors for the project
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:77`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:92`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
 ```typescript
-// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:79)
+// Response: z.array(monitorRestResponseSchema) (inline, src/transport/monitor.rest.ts:94)
 ```
 
 #### `GET /:id` · `getApiMonitorsById`
 
 Get a monitor by its ID
 
-Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:91`.
+Permission `evaluations:view`. Declared at `src/transport/monitor.rest.ts:106`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
@@ -206,7 +206,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Create a new online evaluation monitor
 
-Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:113`.
+Permission `evaluations:create`. Declared at `src/transport/monitor.rest.ts:128`.
 
 Answers at `/api/monitors`, `/api/v1/monitors`; also, undocumented, `/api/monitors/2026-08-07`, `/api/v1/monitors/2026-08-07`, `/api/monitors/latest`, `/api/v1/monitors/latest`.
 
@@ -219,7 +219,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Update a monitor (name, enabled state, settings, etc.)
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:146`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:161`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 
@@ -233,7 +233,7 @@ type Response = z.infer<typeof monitorRestResponseSchema>; // ../contract/src/mo
 
 Enable or disable a monitor
 
-Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:169`.
+Permission `evaluations:update`. Declared at `src/transport/monitor.rest.ts:186`.
 
 Answers at `/api/monitors/:id/toggle`, `/api/v1/monitors/:id/toggle`; also, undocumented, `/api/monitors/2026-08-07/:id/toggle`, `/api/v1/monitors/2026-08-07/:id/toggle`, `/api/monitors/latest/:id/toggle`, `/api/v1/monitors/latest/:id/toggle`.
 
@@ -254,7 +254,7 @@ interface Response {
 
 Delete a monitor
 
-Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:187`.
+Permission `evaluations:manage`. Declared at `src/transport/monitor.rest.ts:205`.
 
 Answers at `/api/monitors/:id`, `/api/v1/monitors/:id`; also, undocumented, `/api/monitors/2026-08-07/:id`, `/api/v1/monitors/2026-08-07/:id`, `/api/monitors/latest/:id`, `/api/v1/monitors/latest/:id`.
 

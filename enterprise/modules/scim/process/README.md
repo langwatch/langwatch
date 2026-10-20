@@ -396,7 +396,7 @@ Answers at `/api/scim/v2/Users/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Response: inline, src/transport/scim-protocol.rest.ts:664
+// Response: inline, src/transport/scim-protocol.rest.ts:665
 type Response = unknown;
 ```
 
@@ -404,7 +404,7 @@ type Response = unknown;
 
 List provisioned groups
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:683`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:684`.
 
 Answers at `/api/scim/v2/Groups`.
 
@@ -416,7 +416,7 @@ interface Query {
   count?: number;
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:687
+// Response: inline, src/transport/scim-protocol.rest.ts:688
 type Response = unknown;
 ```
 
@@ -424,13 +424,13 @@ type Response = unknown;
 
 Provision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:716`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:717`.
 
 Answers at `/api/scim/v2/Groups`.
 
 ```typescript
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:718)
-// Response: inline, src/transport/scim-protocol.rest.ts:721
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:719)
+// Response: inline, src/transport/scim-protocol.rest.ts:722
 type Response = unknown;
 ```
 
@@ -438,7 +438,7 @@ type Response = unknown;
 
 Get a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:759`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:760`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
@@ -448,7 +448,7 @@ type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:1
 interface Query {
   excludedAttributes?: string;
 }
-// Response: inline, src/transport/scim-protocol.rest.ts:764
+// Response: inline, src/transport/scim-protocol.rest.ts:765
 type Response = unknown;
 ```
 
@@ -456,14 +456,14 @@ type Response = unknown;
 
 Replace a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:787`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:788`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:790)
-// Response: inline, src/transport/scim-protocol.rest.ts:793
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:791)
+// Response: inline, src/transport/scim-protocol.rest.ts:794
 type Response = unknown;
 ```
 
@@ -471,14 +471,14 @@ type Response = unknown;
 
 Update a provisioned group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:817`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:818`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:820)
-// Response: inline, src/transport/scim-protocol.rest.ts:823
+// Rawbody: "text" (inline, src/transport/scim-protocol.rest.ts:821)
+// Response: inline, src/transport/scim-protocol.rest.ts:824
 type Response = unknown;
 ```
 
@@ -486,13 +486,13 @@ type Response = unknown;
 
 Deprovision a group
 
-Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:847`.
+Authenticated: a SCIM token carries no RBAC permission: the organization it was minted for, and whether that organization still holds the plan, are the whole of what the door decides. Declared at `src/transport/scim-protocol.rest.ts:848`.
 
 Answers at `/api/scim/v2/Groups/:id`.
 
 ```typescript
 type Params = z.infer<typeof idParams>; // src/transport/scim-protocol.rest.ts:158
-// Response: inline, src/transport/scim-protocol.rest.ts:852
+// Response: inline, src/transport/scim-protocol.rest.ts:854
 type Response = unknown;
 ```
 
@@ -563,7 +563,7 @@ Answers at `/api/scim-tokens/:id`, `/api/v1/scim-tokens/:id`; also, undocumented
 interface Params {
   id: string;
 }
-// Response: inline, src/transport/scim-token.rest.ts:118
+// Response: inline, src/transport/scim-token.rest.ts:119
 interface Response {
   success: true;
 }

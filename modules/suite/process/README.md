@@ -503,7 +503,7 @@ interface Response {
 
 Run a test suite
 
-Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:322`.
+Permission `scenarios:create`. Declared at `src/transport/test-suites.rest.ts:335`.
 
 Answers at `/api/v1/test-suites/:id/run`.
 

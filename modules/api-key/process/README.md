@@ -542,7 +542,7 @@ interface Response {
 
 Create an ingestion API key
 
-Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:512`.
+Permission `traces:create`. Credential `project`. Declared at `src/transport/api-key.rest.ts:513`.
 
 Answers at `/api/api-keys/ingestion`, `/api/v1/api-keys/ingestion`; also, undocumented, `/api/api-keys/2026-08-07/ingestion`, `/api/v1/api-keys/2026-08-07/ingestion`, `/api/api-keys/latest/ingestion`, `/api/v1/api-keys/latest/ingestion`.
 
@@ -555,7 +555,7 @@ type Response = z.infer<typeof apiKeyRestMintedSchema>; // ../contract/src/api-k
 
 Create a full-access API key
 
-Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:555`.
+Permission `project:manage`. Credential `project`. Declared at `src/transport/api-key.rest.ts:556`.
 
 Answers at `/api/api-keys/full-access`, `/api/v1/api-keys/full-access`; also, undocumented, `/api/api-keys/2026-08-07/full-access`, `/api/v1/api-keys/2026-08-07/full-access`, `/api/api-keys/latest/full-access`, `/api/v1/api-keys/latest/full-access`.
 

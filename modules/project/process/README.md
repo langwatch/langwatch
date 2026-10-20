@@ -478,7 +478,7 @@ interface Response {
 
 Get the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:192`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:193`.
 
 Answers at `/api/projects/:id/api-key`, `/api/v1/projects/:id/api-key`; also, undocumented, `/api/projects/2026-08-07/:id/api-key`, `/api/v1/projects/2026-08-07/:id/api-key`, `/api/projects/latest/:id/api-key`, `/api/v1/projects/latest/:id/api-key`.
 
@@ -494,7 +494,7 @@ interface Response {
 
 Regenerate the project API key
 
-Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:211`.
+Authenticated: the base key is never handed to an API token, so there is no permission that would grant this and the refusal is the answer for every authenticated caller. Declared at `src/transport/project.rest.ts:212`.
 
 Answers at `/api/projects/:id/regenerate-api-key`, `/api/v1/projects/:id/regenerate-api-key`; also, undocumented, `/api/projects/2026-08-07/:id/regenerate-api-key`, `/api/v1/projects/2026-08-07/:id/regenerate-api-key`, `/api/projects/latest/:id/regenerate-api-key`, `/api/v1/projects/latest/:id/regenerate-api-key`.
 

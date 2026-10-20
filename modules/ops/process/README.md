@@ -956,7 +956,7 @@ interface Response {
 
 #### `POST /api/admin/:resource` · `runAdminOperation`
 
-Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:60`.
+Platform permission `ops:view`. Credential `browser`. Declared at `src/transport/admin.rest.ts:61`.
 
 Answers at `/api/admin/:resource`, `/api/v1/admin/:resource`.
 

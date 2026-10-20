@@ -599,12 +599,12 @@ interface Response {
 
 #### `POST /api/internal/langy/relay/frames` · `streamRelayFrames`
 
-Authenticated: the caller is the deployment's own Langy service, not a tenant; its shared bearer is the whole gate and no RBAC grain applies. Credential `internal_secret`. Declared at `src/transport/langy-internal.rest.ts:39`.
+Authenticated: the caller is the deployment's own Langy service, not a tenant; its shared bearer is the whole gate and no RBAC grain applies. Credential `internal_secret`. Declared at `src/transport/langy-internal.rest.ts:40`.
 
 Answers at `/api/internal/langy/relay/frames`.
 
 ```typescript
-// Rawbody: "stream" (inline, src/transport/langy-internal.rest.ts:44)
+// Rawbody: "stream" (inline, src/transport/langy-internal.rest.ts:45)
 // Response: langyRelayTallySchema, ../contract/src/langy-rest.schemas.ts:327
 interface Response {
   applied: number;
@@ -1361,7 +1361,7 @@ Declared at `src/eventing/langy-maintenance.pipeline.ts:30`.
 
 | Kind   | Leaf                 | Environment variable        | Declared at                          |
 | ------ | -------------------- | --------------------------- | ------------------------------------ |
-| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:289`           |
+| secret | `–`                  | `LANGY_INTERNAL_SECRET`     | `src/app/langy.app.ts:293`           |
 | config | `agentUrl`           | `LANGY_AGENT_URL`           | `../contract/src/langy.config.ts:18` |
 | config | `workerCallbackUrl`  | `LANGY_WORKER_CALLBACK_URL` | `../contract/src/langy.config.ts:19` |
 | config | `workerGatewayUrl`   | `LANGY_WORKER_GATEWAY_URL`  | `../contract/src/langy.config.ts:20` |

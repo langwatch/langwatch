@@ -348,11 +348,11 @@ Permission `project:manage`. Declared at `src/transport/stored-object.rest.ts:12
 Answers at `/api/stored-objects/:storedObjectId`, `/api/v1/stored-objects/:storedObjectId`; also, undocumented, `/api/stored-objects/2026-08-22/:storedObjectId`, `/api/v1/stored-objects/2026-08-22/:storedObjectId`, `/api/stored-objects/latest/:storedObjectId`, `/api/v1/stored-objects/latest/:storedObjectId`.
 
 ```typescript
-// Params: inline, src/transport/stored-object.rest.ts:125
+// Params: inline, src/transport/stored-object.rest.ts:126
 interface Params {
   storedObjectId: string;
 }
-// Body: inline, src/transport/stored-object.rest.ts:126
+// Body: inline, src/transport/stored-object.rest.ts:127
 interface Body {
   projectId: string;
   idempotencyKey: string;

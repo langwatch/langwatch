@@ -509,7 +509,7 @@ type Response = unknown;
 
 |             |                                            |
 | ----------- | ------------------------------------------ |
-| Declared at | `src/transport/workflow.rest.ts:67`        |
+| Declared at | `src/transport/workflow.rest.ts:68`        |
 | Base URL    | `/api/workflows`, twin `/api/v1/workflows` |
 | Addressing  | dated                                      |
 | Credential  | project                                    |
@@ -519,12 +519,12 @@ type Response = unknown;
 
 List all non-archived workflows for the project
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:72`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:73`.
 
 Answers at `/api/workflows`, `/api/v1/workflows`; also, undocumented, `/api/workflows/2026-08-07`, `/api/v1/workflows/2026-08-07`, `/api/workflows/latest`, `/api/v1/workflows/latest`.
 
 ```typescript
-// Response: inline, src/transport/workflow.rest.ts:74
+// Response: inline, src/transport/workflow.rest.ts:75
 type Response = {
   id: string;
   name: string;
@@ -542,7 +542,7 @@ type Response = {
 
 Get a workflow by its ID
 
-Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:87`.
+Permission `workflows:view`. Declared at `src/transport/workflow.rest.ts:88`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -569,7 +569,7 @@ interface Response {
 
 Update a workflow's metadata (name, icon, description)
 
-Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:105`.
+Permission `workflows:update`. Declared at `src/transport/workflow.rest.ts:106`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 
@@ -588,7 +588,7 @@ type Response = z.infer<typeof workflowRestDetailSchema>; // ../contract/src/wor
 
 Archive (soft-delete) a workflow
 
-Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:126`.
+Permission `workflows:manage`. Declared at `src/transport/workflow.rest.ts:127`.
 
 Answers at `/api/workflows/:id`, `/api/v1/workflows/:id`; also, undocumented, `/api/workflows/2026-08-07/:id`, `/api/v1/workflows/2026-08-07/:id`, `/api/workflows/latest/:id`, `/api/v1/workflows/latest/:id`.
 

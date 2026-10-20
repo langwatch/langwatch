@@ -1146,7 +1146,7 @@ Answers at `/api/trace/:id/unshare`.
 
 ```typescript
 type Params = z.infer<typeof traceLegacyIdParamsSchema>; // ../contract/src/trace-rest.schemas.ts:152
-// Response: inline, src/transport/trace-legacy.rest.ts:431
+// Response: inline, src/transport/trace-legacy.rest.ts:432
 type Response = unknown;
 ```
 
@@ -1154,20 +1154,20 @@ type Response = unknown;
 
 Search traces
 
-Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:450`.
+Permission `traces:view`. Declared at `src/transport/trace-legacy.rest.ts:451`.
 
 Answers at `/api/trace/search`.
 
 ```typescript
-// Body: inline, src/transport/trace-legacy.rest.ts:452
+// Body: inline, src/transport/trace-legacy.rest.ts:453
 type Body = Record<string, unknown>;
-// Response: inline, src/transport/trace-legacy.rest.ts:456
+// Response: inline, src/transport/trace-legacy.rest.ts:457
 type Response = unknown;
 ```
 
 #### `GET /api/thread/:threadId` · `getLegacyThread`
 
-Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:478`.
+Permission `traces:view`. Hidden from the OpenAPI document. Declared at `src/transport/trace-legacy.rest.ts:479`.
 
 Answers at `/api/thread/:threadId`.
 
@@ -1176,7 +1176,7 @@ Answers at `/api/thread/:threadId`.
 interface Params {
   threadId: string;
 }
-// Response: inline, src/transport/trace-legacy.rest.ts:482
+// Response: inline, src/transport/trace-legacy.rest.ts:483
 type Response = unknown;
 ```
 

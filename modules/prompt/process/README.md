@@ -483,7 +483,7 @@ Answers at `/api/prompts/tags/:tag`, `/api/v1/prompts/tags/:tag`.
 
 ```typescript
 type Params = z.infer<typeof tagParamsSchema>; // ../contract/src/prompt-rest.schemas.ts:194
-// Response: inline, src/transport/prompt.rest.ts:210
+// Response: inline, src/transport/prompt.rest.ts:216
 type Response = unknown;
 ```
 
@@ -491,7 +491,7 @@ type Response = unknown;
 
 Get all versions for a prompt. Does not include base prompt data, only versioned data.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:220`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:226`.
 
 Answers at `/api/prompts/:id{.+?}/versions`, `/api/v1/prompts/:id{.+?}/versions`.
 
@@ -500,14 +500,14 @@ Answers at `/api/prompts/:id{.+?}/versions`, `/api/v1/prompts/:id{.+?}/versions`
 interface Params {
   id: string;
 }
-// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:223)
+// Response: z.array(promptWireSchema) (inline, src/transport/prompt.rest.ts:229)
 ```
 
 #### `POST /api/prompts/:id{.+?}/versions/:versionId/restore` · `postApiPromptsByIdVersionsByVersionIdRestore`
 
 Restore a prompt to a previous version. Creates a new version with the same config data as the specified version.
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:256`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:262`.
 
 Answers at `/api/prompts/:id{.+?}/versions/:versionId/restore`, `/api/v1/prompts/:id{.+?}/versions/:versionId/restore`.
 
@@ -526,7 +526,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Get a specific prompt by slug, with optional shorthand syntax for tags and versions. Pass a bare slug like "pizza-prompt" to get the latest version, "pizza-prompt:production" to resolve a tagged version, or "pizza-prompt:2" to fetch version 2. Alternatively, use the tag or version query parameters with a bare slug.
 
-Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:304`.
+Permission `prompts:view`. Declared at `src/transport/prompt.rest.ts:310`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
@@ -544,7 +544,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Create a new prompt with default initial version
 
-Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:343`.
+Permission `prompts:create`. Declared at `src/transport/prompt.rest.ts:349`.
 
 Answers at `/api/prompts`, `/api/v1/prompts`.
 
@@ -557,7 +557,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Sync/upsert a prompt with local content
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:370`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:376`.
 
 Answers at `/api/prompts/:id{.+?}/sync`, `/api/v1/prompts/:id{.+?}/sync`.
 
@@ -571,7 +571,7 @@ type Response = z.infer<typeof promptSyncResultSchema>; // ../contract/src/promp
 
 Update a prompt
 
-Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:399`.
+Permission `prompts:update`. Declared at `src/transport/prompt.rest.ts:405`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 
@@ -585,7 +585,7 @@ type Response = z.infer<typeof promptWireSchema>; // ../contract/src/prompt-rest
 
 Delete a prompt
 
-Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:435`.
+Permission `prompts:manage`. Declared at `src/transport/prompt.rest.ts:441`.
 
 Answers at `/api/prompts/:id{.+}`, `/api/v1/prompts/:id{.+}`.
 

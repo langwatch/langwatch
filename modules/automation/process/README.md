@@ -464,7 +464,7 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 |             |                                          |
 | ----------- | ---------------------------------------- |
-| Declared at | `src/transport/automation.rest.ts:123`   |
+| Declared at | `src/transport/automation.rest.ts:146`   |
 | Base URL    | `/api/triggers`, twin `/api/v1/triggers` |
 | Addressing  | dated                                    |
 | Credential  | project                                  |
@@ -474,19 +474,19 @@ countUsage(input: { projectIds: readonly string[]; since?: number; }): Promise<A
 
 List the project's automations, newest first. Paused automations are included.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:127`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:150`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
 ```typescript
-// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:129)
+// Response: z.array(automationRestResponseSchema) (inline, src/transport/automation.rest.ts:152)
 ```
 
 #### `GET /:triggerId` · `getApiTriggersById`
 
 Get a trigger by its ID
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:144`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:167`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -501,7 +501,7 @@ interface Params {
 
 What this automation has done: its fires, newest first. Metadata only (no trace ids and no trace content). Send `nextCursor` back as `cursor` to read the page after this one.
 
-Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:162`.
+Permission `triggers:view`. Declared at `src/transport/automation.rest.ts:185`.
 
 Answers at `/api/triggers/:triggerId/fires`, `/api/v1/triggers/:triggerId/fires`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/fires`, `/api/v1/triggers/2026-08-07/:triggerId/fires`, `/api/triggers/latest/:triggerId/fires`, `/api/v1/triggers/latest/:triggerId/fires`.
 
@@ -518,7 +518,7 @@ interface Query {
 
 Create an automation. Send `customGraphId` + `graphAlert` for an alert on a metric, `report` for a scheduled report, or conditions for a trace automation. The delivery channel is fixed at creation.
 
-Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:187`.
+Permission `triggers:create`. Declared at `src/transport/automation.rest.ts:210`.
 
 Answers at `/api/triggers`, `/api/v1/triggers`; also, undocumented, `/api/triggers/2026-08-07`, `/api/v1/triggers/2026-08-07`, `/api/triggers/latest`, `/api/v1/triggers/latest`.
 
@@ -531,7 +531,7 @@ type Response = z.infer<typeof automationRestResponseSchema>; // ../contract/src
 
 Update an automation. Every field is optional and what is left out is left alone, except `actionParams`, which replaces the delivery configuration as a whole. The delivery channel and an alert's graph cannot be changed.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:212`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:235`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 
@@ -544,7 +544,7 @@ type Body = z.infer<typeof automationRestUpdateInputSchema>; // ../contract/src/
 
 Resume a paused automation. A report goes back on its schedule; the pause record is cleared.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:243`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:268`.
 
 Answers at `/api/triggers/:triggerId/enable`, `/api/v1/triggers/:triggerId/enable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/enable`, `/api/v1/triggers/2026-08-07/:triggerId/enable`, `/api/triggers/latest/:triggerId/enable`, `/api/v1/triggers/latest/:triggerId/enable`.
 
@@ -558,7 +558,7 @@ type Body = Record<string, unknown>;
 
 Pause an automation. A report stops claiming its schedule.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:268`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:293`.
 
 Answers at `/api/triggers/:triggerId/disable`, `/api/v1/triggers/:triggerId/disable`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/disable`, `/api/v1/triggers/2026-08-07/:triggerId/disable`, `/api/triggers/latest/:triggerId/disable`, `/api/v1/triggers/latest/:triggerId/disable`.
 
@@ -571,7 +571,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Send this automation's message to the destination it is configured with, so you can confirm it arrives. Nothing is recorded as a fire.
 
-Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:294`.
+Permission `triggers:update`. Declared at `src/transport/automation.rest.ts:320`.
 
 Answers at `/api/triggers/:triggerId/test-fire`, `/api/v1/triggers/:triggerId/test-fire`; also, undocumented, `/api/triggers/2026-08-07/:triggerId/test-fire`, `/api/v1/triggers/2026-08-07/:triggerId/test-fire`, `/api/triggers/latest/:triggerId/test-fire`, `/api/v1/triggers/latest/:triggerId/test-fire`.
 
@@ -584,7 +584,7 @@ type Body = z.infer<typeof automationRestNoBodySchema>; // ../contract/src/autom
 
 Delete (soft-delete) a trigger
 
-Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:318`.
+Permission `triggers:manage`. Declared at `src/transport/automation.rest.ts:344`.
 
 Answers at `/api/triggers/:triggerId`, `/api/v1/triggers/:triggerId`; also, undocumented, `/api/triggers/2026-08-07/:triggerId`, `/api/v1/triggers/2026-08-07/:triggerId`, `/api/triggers/latest/:triggerId`, `/api/v1/triggers/latest/:triggerId`.
 

@@ -1011,7 +1011,7 @@ interface Response {
 
 Clone a platform-published template into the caller's org
 
-Permission `aiTools:manage`. Declared at `src/transport/governance.rest.ts:261`.
+Permission `aiTools:manage`. Declared at `src/transport/governance.rest.ts:262`.
 
 Answers at `/api/governance/ingestion-templates/clone`, `/api/v1/governance/ingestion-templates/clone`; also, undocumented, `/api/governance/2026-08-07/ingestion-templates/clone`, `/api/v1/governance/2026-08-07/ingestion-templates/clone`, `/api/governance/latest/ingestion-templates/clone`, `/api/v1/governance/latest/ingestion-templates/clone`.
 
