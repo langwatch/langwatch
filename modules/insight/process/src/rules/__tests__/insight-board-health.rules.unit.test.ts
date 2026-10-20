@@ -72,12 +72,15 @@ const broken = (id: string, reason: BrokenWidget["reason"] = "no_data"): BrokenW
 describe("given a statement's result", () => {
   /** @scenario "A widget whose every statement comes back empty shows no data" */
   it.each([
-    ["no rows", { rows: [] }],
-    ["rows whose every value is null", { rows: [{ a: null, b: null }, { a: null }] }],
     [
       "no rows beside a report of a missing field",
       { rows: [], completeness: { state: "missing" } },
     ],
+    [
+      "rows whose every value is null beside a report of a missing field",
+      { rows: [{ a: null, b: null }, { a: null }], completeness: { state: "missing" } },
+    ],
+    ["no rows beside a report of no traffic", { rows: [], completeness: { state: "no_traffic" } }],
     [
       "one row of zeros beside a report of no traffic",
       { rows: [{ count: 0, total: "0", avg: null }], completeness: { state: "no_traffic" } },
@@ -102,8 +105,10 @@ describe("given a statement's result", () => {
     expect(readResult(result)).toEqual({ kind: "unchecked" });
   });
 
-  /** @scenario "An empty answer over a period with traffic is not checked" */
+  /** @scenario "An empty answer over a period with traffic, or with no report, is not checked" */
   it.each([
+    ["no rows beside no report, as from a rollup view", { rows: [] }],
+    ["rows whose every value is null beside no report", { rows: [{ a: null }, { a: null }] }],
     ["no rows beside a report of traffic", { rows: [], completeness: { state: "complete" } }],
     [
       "no rows beside a report of partial traffic",
@@ -155,10 +160,10 @@ describe("given a widget's statements", () => {
   it("runs a statement with each parameter's default, and none whose parameter has no default", () => {
     expect(
       statementParameters({ sql: "q", parameters: [{ name: "model", default: "gpt" }] }),
-    ).toEqual({ runnable: true, values: { model: "gpt" } });
-    expect(statementParameters({ sql: "q" })).toEqual({ runnable: true, values: {} });
+    ).toEqual({ isRunnable: true, values: { model: "gpt" } });
+    expect(statementParameters({ sql: "q" })).toEqual({ isRunnable: true, values: {} });
     expect(statementParameters({ sql: "q", parameters: [{ name: "model" }] })).toEqual({
-      runnable: false,
+      isRunnable: false,
     });
   });
 });

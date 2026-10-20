@@ -117,7 +117,7 @@ type ScriptedWidget = {
  */
 export type ScriptedStatement = {
   rows?: Record<string, unknown>[];
-  completeness?: "complete" | "no_traffic";
+  completeness?: "complete" | "missing" | "no_traffic";
   /** Thrown by the execution, as the analytics module refuses or fails it. */
   error?: Error;
   /** Thrown by the validation. */

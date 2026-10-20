@@ -38,7 +38,8 @@ function harness({
   store = {},
 }: {
   fullFor: number;
-  store?: Partial<{ readFails: boolean; writeFails: boolean }>;
+  /** `writeFailsFrom` is the first write, counted from 1, that fails, and every one after. */
+  store?: Partial<{ readFails: boolean; writeFailsFrom: number }>;
 }) {
   const started: { sql: string; at: number }[] = [];
   const filed: unknown[] = [];
@@ -71,6 +72,7 @@ function harness({
           diagnostics: [],
           followsTimeWindow: true,
           followsGranularity: true,
+          completeness: { state: "no_traffic", unit: "traces", total: 0, fields: [] },
         };
       },
     }),
@@ -84,7 +86,10 @@ function harness({
       : MemoryInsightRepository.create({ rows: InsightMemoryStore.create() }),
     commands: createApiFixture<Pick<InsightCommandsService, "fileInsight" | "renewInsight">>({
       fileInsight: async (input) => {
-        if (store.writeFails) throw new Error("command bus unavailable");
+        const write = filed.length + 1;
+        if (store.writeFailsFrom !== undefined && write >= store.writeFailsFrom) {
+          throw new Error("command bus unavailable");
+        }
         filed.push(input);
       },
     }),
@@ -160,7 +165,7 @@ describe("given a widget that shows no data", () => {
   /** @scenario "A failed read or write of the cards leaves the run to carry on" */
   it.each([
     ["read", { readFails: true }],
-    ["write", { writeFails: true }],
+    ["write", { writeFailsFrom: 1 }],
   ])("reports no card when the insights store fails to %s it", async (_step, store) => {
     const { service, filed } = harness({ fullFor: 0, store });
 
@@ -168,5 +173,23 @@ describe("given a widget that shows no data", () => {
 
     expect(report).toEqual({ filedCount: 0, renewedCount: 0, reported: [] });
     expect(filed).toEqual([]);
+  });
+});
+
+describe("given three widgets that show no data, and a store that fails the second write", () => {
+  it("reports the one card filed before the failure", async () => {
+    const { service, filed } = harness({ fullFor: 0, store: { writeFailsFrom: 2 } });
+
+    const report = await checked(service, {
+      ...CHECK,
+      widgets: [widget("widget-1"), widget("widget-2"), widget("widget-3")],
+    });
+
+    expect(filed).toHaveLength(1);
+    expect(report).toEqual({
+      filedCount: 1,
+      renewedCount: 0,
+      reported: [{ id: "widget-1", name: "widget-1" }],
+    });
   });
 });

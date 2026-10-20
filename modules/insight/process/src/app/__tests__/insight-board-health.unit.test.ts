@@ -99,7 +99,7 @@ describe("given a project that took no trace since the run's window began", () =
         name: "Costs",
         widgets: [{ id: "widget-errors", name: "Errors per day", queries: [ERRORS_QUERY] }],
       });
-      errorsWidget({ rows: [] });
+      errorsWidget({ rows: [], completeness: "no_traffic" });
     });
 
     /** @scenario "A widget that shows no data files a card on a day without new traces" */
@@ -154,9 +154,9 @@ describe("given a project that took no trace since the run's window began", () =
   });
 });
 
-describe("given a project that took a trace and a widget that returns no rows", () => {
+describe("given a project that took a trace and a widget whose field it lacks", () => {
   beforeEach(() => {
-    errorsWidget({ rows: [] });
+    errorsWidget({ rows: [], completeness: "missing" });
   });
 
   /** @scenario "The check's cards and Langy's findings add up in one outcome" */
@@ -432,7 +432,7 @@ describe("given a query window that stays full for longer than the check has lef
 
 describe("given a card the check filed yesterday", () => {
   beforeEach(async () => {
-    errorsWidget({ rows: [] });
+    errorsWidget({ rows: [], completeness: "no_traffic" });
     await runAt();
   });
 

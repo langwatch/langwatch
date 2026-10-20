@@ -69,11 +69,13 @@ export type HealthStatement = Readonly<{
  */
 export function statementParameters(
   statement: HealthStatement,
-): Readonly<{ runnable: true; values: Record<string, unknown> }> | Readonly<{ runnable: false }> {
+):
+  | Readonly<{ isRunnable: true; values: Record<string, unknown> }>
+  | Readonly<{ isRunnable: false }> {
   const declared = statement.parameters ?? [];
-  if (declared.some((parameter) => parameter.default === undefined)) return { runnable: false };
+  if (declared.some((parameter) => parameter.default === undefined)) return { isRunnable: false };
   return {
-    runnable: true,
+    isRunnable: true,
     values: Object.fromEntries(declared.map((parameter) => [parameter.name, parameter.default])),
   };
 }
@@ -109,9 +111,9 @@ function isZero(value: unknown): boolean {
 }
 
 /**
- * Empty for a report of no traffic, or no rows or rows of nulls beside no report of traffic.
- * Beside one, a filter that matched nothing answered, and one row of zeros beside no report (a
- * rollup view has none) may be a count: both are unchecked, never "no data".
+ * Empty for a report of no traffic, or for no rows or rows of nulls beside a report of a missing
+ * field. Beside traffic, or no report at all (a rollup view has none), a correct filter can be
+ * empty, and one row of zeros may be a count: both are unchecked, never "no data".
  */
 export function readResult({
   rows,
@@ -121,9 +123,9 @@ export function readResult({
   completeness?: Readonly<{ state: string }>;
 }>): Extract<StatementOutcome, { kind: "data" | "empty" | "unchecked" }> {
   if (completeness?.state === "no_traffic") return { kind: "empty" };
-  const hadTraffic = completeness?.state === "complete" || completeness?.state === "partial";
   const allNothing = rows.every((row) => Object.values(row).every(isNothing));
-  if (allNothing) return hadTraffic ? { kind: "unchecked" } : { kind: "empty" };
+  if (allNothing)
+    return completeness?.state === "missing" ? { kind: "empty" } : { kind: "unchecked" };
   const [only, ...rest] = rows;
   if (only === undefined || rest.length > 0) return { kind: "data" };
   const isZeroRow = Object.values(only).every((value) => isNothing(value) || isZero(value));

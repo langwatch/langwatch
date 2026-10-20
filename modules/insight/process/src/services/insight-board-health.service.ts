@@ -99,6 +99,21 @@ type CheckContext = Readonly<{
   startedAt: number;
 }>;
 
+function reportOf({
+  acts,
+  reported,
+}: {
+  acts: readonly BoardHealthAct[];
+  reported: readonly Readonly<{ id: string; name: string }>[];
+}): BoardHealthReport {
+  const filedCount = acts.filter((act) => act.kind === "file").length;
+  return {
+    filedCount,
+    renewedCount: acts.length - filedCount,
+    reported: reported.map(({ id, name }) => ({ id, name })),
+  };
+}
+
 export class InsightBoardHealthService {
   private constructor(private readonly members: InsightBoardHealthMembers) {}
 
@@ -166,7 +181,7 @@ export class InsightBoardHealthService {
     statement: HealthStatement;
   }): Promise<StatementOutcome | Stop> {
     const parameters = statementParameters(statement);
-    if (!parameters.runnable) return { kind: "unchecked" };
+    if (!parameters.isRunnable) return { kind: "unchecked" };
     const prepared = { sql: statement.sql, values: parameters.values };
     try {
       if (this.callsAJudge({ context, statement: prepared })) return { kind: "unchecked" };
@@ -268,13 +283,21 @@ export class InsightBoardHealthService {
     );
     if (broken.length === 0) return NO_BOARD_HEALTH;
     const acts = await this.decide({ input, broken });
-    for (const act of acts) await this.write({ input, act });
-    const filedCount = acts.filter((act) => act.kind === "file").length;
-    return {
-      filedCount,
-      renewedCount: acts.length - filedCount,
-      reported: broken.map(({ widget }) => ({ id: widget.id, name: widget.name })),
-    };
+    const written: BoardHealthAct[] = [];
+    try {
+      for (const act of acts) {
+        await this.write({ input, act });
+        written.push(act);
+      }
+    } catch (error) {
+      // The cards written before the failure stand; the rest wait for the next run.
+      logger.warn({ error, projectId: input.projectId }, "board check could not report");
+      return reportOf({
+        acts: written,
+        reported: written.flatMap(({ card }) => card.widget ?? []),
+      });
+    }
+    return reportOf({ acts, reported: broken.map(({ widget }) => widget) });
   }
 
   private async decide({
