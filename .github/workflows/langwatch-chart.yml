@@ -90,8 +90,11 @@ on:
 concurrency:
   # A label event for any label but `ci:full` gets its own group, so it neither
   # cancels a running full run nor is cancelled by one.
-  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  # Every Dependabot-authored PR shares one group, so one runs at a time (#8638).
+  group: ${{ github.workflow }}-${{ (github.event_name == 'pull_request' && github.event.action == 'labeled' && github.event.label.name != 'ci:full') && format('label-{0}', github.run_id) || (github.event.pull_request.user.login == 'dependabot[bot]' && 'dependabot-all') || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' && github.event.pull_request.user.login != 'dependabot[bot]' }}
+  # Dependabot runs wait in line (up to 100) instead of replacing each other.
+  queue: ${{ github.event.pull_request.user.login == 'dependabot[bot]' && 'max' || 'single' }}
 
 jobs:
   # One runner renders every published preset and runs every rendered-output
