@@ -1078,7 +1078,7 @@ Feature: Dashboards v2 polish and bring-your-own-AI
     Then the Dashboards board takes it, and the Reports board is not found
 
   @unit @integration
-  Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden; Scenario: AC199n Split: the public API creates and deletes Dashboards boards; Scenario: AC199o Split: a member's REST create follows the board scope rules
+  Scenario: AC199m Split: Analytics Reports keeps another member's Only me board hidden
     Given a mixed board one member made at Only me before the split, holding a chart made in Reports
       and a saved workbench chart
     When another member or a project credential lists, opens or writes the Reports boards, their
