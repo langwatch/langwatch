@@ -4,6 +4,7 @@ import {
   EVALUATION_COMPLETED_EVENT_TYPE,
   EVALUATION_REPORTED_EVENT_TYPE,
   type EvaluationProcessingEvent,
+  evaluationAttemptFailedEventSchema,
   evaluationScheduledEventSchema,
   evaluationStartedEventSchema,
   evaluationCompletedEventSchema,
@@ -157,6 +158,7 @@ export class EvaluationProcessingPipelineAdapter {
         evaluationStartedEventSchema,
         evaluationCompletedEventSchema,
         evaluationReportedEventSchema,
+        evaluationAttemptFailedEventSchema,
       ])
       .withClickHouseFoldProjection(
         EvaluationRunFoldProjection.create({

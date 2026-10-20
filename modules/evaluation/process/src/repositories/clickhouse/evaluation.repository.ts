@@ -31,6 +31,7 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     super();
     this.reader = EvaluationRunClickHouseReadRepository.create({
       clickhouse: new AuthorizedClickHouse({ resolveClient: options.resolveQueryClient }),
+      resolveQueryClient: options.resolveQueryClient,
     });
     this.writer = EvaluationRunClickHouseWriteRepository.create({
       resolveClient: options.resolveClient,

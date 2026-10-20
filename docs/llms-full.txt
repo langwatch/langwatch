@@ -63809,6 +63809,7 @@ The restriction applies to email and password sign-up, passkey sign-up, and firs
 | `LANGWATCH_NLP_SERVICE`         | URL of the NLP service. Required                                                                                                                                                                                                                | - (Docker Compose: `http://langwatch_nlp:5561`, Helm: `http://<release>-langwatch-nlp:5561`) |
 | `LANGWATCH_NLP_INTERNAL_SECRET` | Shared credential for the app to NLP service hop. The app sends it on every NLP request and the NLP service refuses requests that do not carry it, so set the same value on both. Unset on the NLP service, it accepts unauthenticated requests | -                                                                                            |
 | `LANGEVALS_ENDPOINT`            | URL of the LangEvals service                                                                                                                                                                                                                    | - (Docker Compose: `http://langevals:5562`, Helm: `http://<release>-langevals:5562`)         |
+| `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | How long an evaluation keeps retrying while LangEvals is unreachable or starting before it is recorded as an error, in minutes (at most 120) | `120` |
 
 `LANGWATCH_NLP_INTERNAL_SECRET` is optional, and how you provide it depends on the deployment:
 

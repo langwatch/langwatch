@@ -235,13 +235,26 @@ export class TestEvaluationExecutionReceipt implements Pick<
   ) {}
 }
 
+/** Records each next attempt the outcome sends instead of queueing it. */
+export class TestEvaluationRetries {
+  readonly retryEvaluation = vi.fn(
+    async (_input: { data: ExecuteEvaluationCommandData; delayMs: number }): Promise<void> =>
+      undefined,
+  );
+}
+
 export interface EvaluationExecutionFixtureOptions {
   monitor?: MonitorWithEvaluator | null;
   executionResult?: EvaluationExecutionResult;
   executionError?: Error;
   azureCredentials?: Record<string, string> | null;
   settingsRecoveryDisabled?: () => Promise<boolean>;
+  /** The deployment's evaluator retry window; two hours, the default, unless a test names one. */
+  retryWindowMs?: number;
 }
+
+/** evaluatorRetryWindowMinutes' default, in milliseconds. */
+export const DEFAULT_RETRY_WINDOW_MS = 120 * 60_000;
 
 export function buildExecutionDeps(
   options: EvaluationExecutionFixtureOptions = {},
@@ -251,6 +264,7 @@ export function buildExecutionDeps(
   evaluations: TestEvaluationService;
   costRecorder: TestCostRecorder;
   executionReceipt: TestEvaluationExecutionReceipt;
+  retries: TestEvaluationRetries;
 } {
   const monitors = new TestMonitorLookup(options.monitor ?? buildMonitor());
   const traces = new TestTraceApi();
@@ -280,6 +294,8 @@ export function buildExecutionDeps(
     inputsOffload: {
       offload: async ({ inputs }) => inputs,
     },
+    retryWindowMs: options.retryWindowMs ?? DEFAULT_RETRY_WINDOW_MS,
+    retries: new TestEvaluationRetries(),
     evaluations,
     costRecorder,
   };

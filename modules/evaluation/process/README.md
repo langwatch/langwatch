@@ -382,23 +382,23 @@ Declared at `src/eventing/evaluation-lifecycle.pipeline.ts:42`. Events: `evaluat
 
 ### Pipeline `evaluation_processing` (aggregate `evaluation`)
 
-Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:149`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`.
+Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:150`. Events: `evaluationScheduledEventSchema`, `evaluationStartedEventSchema`, `evaluationCompletedEventSchema`, `evaluationReportedEventSchema`, `evaluationAttemptFailedEventSchema`.
 
 | Kind                       | Name                                                                                           | Handles                                                                      | Declared at                                                     |
 | -------------------------- | ---------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------- | --------------------------------------------------------------- |
-| command                    | –                                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:189` |
-| command                    | `startEvaluation`                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:202` |
-| command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:205` |
-| command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:208` |
-| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:216` |
-| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:234` |
-| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:245` |
-| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:269` |
-| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:161` |
-| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:166` |
-| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:171` |
-| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:176` |
-| lane aliases               | `≈ MAIN_TRACE_REACTION_LANE_ALIASES`                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:275` |
+| command                    | –                                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:191` |
+| command                    | `startEvaluation`                                                                              | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:204` |
+| command                    | `completeEvaluation`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:207` |
+| command                    | `reportEvaluation`                                                                             | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:210` |
+| peer subscriber            | `traceEvaluationTrigger`                                                                       | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:218` |
+| peer subscriber            | `traceOriginEvaluationTrigger`                                                                 | `lw.obs.trace.origin_resolved` from [trace](../../trace/README.md)           | `src/eventing/evaluation-processing-definition.pipeline.ts:236` |
+| peer subscriber            | `traceCustomEvaluationSync`                                                                    | `lw.obs.trace.span_received` from [trace](../../trace/README.md)             | `src/eventing/evaluation-processing-definition.pipeline.ts:247` |
+| peer subscriber            | `traceCollectorEvaluation`                                                                     | `lw.trace.collector_evaluation_received` from [trace](../../trace/README.md) | `src/eventing/evaluation-processing-definition.pipeline.ts:271` |
+| ClickHouse fold projection | `≈ EvaluationRunFoldProjection.create({ store: this.deps.evalRunStore, })`                     | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:163` |
+| ClickHouse fold projection | `≈ EvaluationAnalyticsFoldProjection.create({ store: this.deps.evaluationAnalyticsStore, })`   | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:168` |
+| ClickHouse map projection  | `≈ EvaluationAnalyticsRollupMapProjection.create({ store: this.deps.evaluationAnalyticsRollu…` | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:173` |
+| projection subscriber      | `lifecycleCompleted`                                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:178` |
+| lane aliases               | `≈ MAIN_TRACE_REACTION_LANE_ALIASES`                                                           | –                                                                            | `src/eventing/evaluation-processing-definition.pipeline.ts:277` |
 
 ## Configuration
 
@@ -416,6 +416,7 @@ Declared at `src/eventing/evaluation-processing-definition.pipeline.ts:149`. Eve
 | config | `azureContentSafetyEndpoint`     | `AZURE_CONTENT_SAFETY_ENDPOINT`            | `../contract/src/evaluation.config.ts:59` |
 | config | `enablePresidio`                 | `LANGWATCH_ENABLE_PRESIDIO`                | `../contract/src/evaluation.config.ts:60` |
 | config | `enableLingua`                   | `LANGWATCH_ENABLE_LINGUA`                  | `../contract/src/evaluation.config.ts:61` |
-| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:62` |
+| config | `evaluatorRetryWindowMinutes`    | `LANGWATCH_EVALUATOR_RETRY_WINDOW_MINUTES` | `../contract/src/evaluation.config.ts:65` |
+| config | `foldCacheTtlSeconds`            | `LANGWATCH_FOLD_CACHE_TTL_SECONDS`         | `../contract/src/evaluation.config.ts:69` |
 
 <!-- readme:generated:end -->

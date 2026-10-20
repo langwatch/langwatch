@@ -1371,7 +1371,7 @@ Contract `../contract/src/traces.trpc.ts:620`, router `src/transport/shared-trac
 interface Input {
   token: string;
 }
-type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:213
+type Output = z.infer<typeof sharedTraceDtoSchema>; // ../contract/src/trace-share.schemas.ts:215
 ```
 
 ### `spans`
@@ -1492,7 +1492,7 @@ interface Input {
   traceId: string;
   withEditOverlay?: boolean;
 }
-type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:816
+type Output = z.infer<typeof traceSchema>; // ../contract/src/trace-format.schemas.ts:822
 
 // traces.getEvaluations
 // Input: inline, ../contract/src/traces.trpc.ts:191

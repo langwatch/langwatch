@@ -368,3 +368,46 @@ Feature: Evaluation service boundary
     When a reader holding evaluations:view and analytics:view asks for the trend
     Then evaluation lists the project's monitors itself and compares the last seven days with the window analytics resolves
     And a project with no monitors answers no rows without querying evaluations
+
+  @unit
+  Scenario: An evaluator called before the evaluator service is up is retried, not recorded as a failure
+    Given the evaluator service cannot be reached yet, or answers 503 while it starts
+    When an evaluation calls an evaluator
+    Then the failure is retryable, answers 503 and keeps the code evaluator_execution_error
+    And a queued evaluation sends its next attempt, delayed, instead of being recorded as an error
+
+  @unit
+  Scenario: Each failed attempt records an attempt event with its number, error and next try
+    Given the evaluator service is not up yet
+    When attempt 1 of a queued evaluation fails inside the retry window
+    Then an attempt event records attempt 1, the error the customer may see and when the next try is due
+    And attempt 2 is sent with the same evaluation, delayed until that time, and measured from the first try
+    And the next attempt is not collapsed onto the first send or onto another attempt
+
+  @unit
+  Scenario: Attempts back off from five seconds, doubling, up to ten minutes
+    Given an attempt failed because the evaluator service was not up
+    When the next attempt is planned
+    Then it waits five seconds after attempt 1, doubling with each attempt
+    And never less than the evaluator service asked for, nor more than ten minutes
+
+  @unit
+  Scenario: An evaluator service that stays down is recorded as an error once the retry window ends
+    Given the evaluator service has been unreachable since the evaluation was issued
+    And the retry window is two hours by default, a deployment setting
+    When the evaluation fails retryably and its next attempt would start after the retry window
+    Then it is recorded as an error, as before
+    And no further attempt is sent
+
+  @unit
+  Scenario: A retrying evaluation shows as in progress
+    Given the evaluator service is not up yet
+    When an attempt of the evaluation fails inside the retry window
+    Then the run is in progress and shows its number of attempts, the last attempt's time and error, and the next try
+
+  @unit
+  Scenario: A run that ends after failed attempts keeps how many attempts failed
+    Given a run with failed attempts
+    When the run is recorded as processed, skipped or an error
+    Then it keeps its number of attempts and its last attempt's time and error
+    And it has no next try

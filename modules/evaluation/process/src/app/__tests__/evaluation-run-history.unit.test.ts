@@ -1,6 +1,6 @@
 import { AnalyticsApi } from "@langwatch/analytics-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
-import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
+import { ClickHouseColumns, type ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 /**
  * @vitest-environment node
  */
@@ -131,6 +131,7 @@ describe("given the live evaluation repositories over the process's ClickHouse m
           statements.push({ tenantId: request.tenantId, settings: request.settings });
           return { rows: [] };
         },
+        columns: () => ClickHouseColumns.over({ read: async () => [] }),
       });
       const repositories = LiveEvaluationRepositories.create({
         prisma: createApiFixture<PrismaClient>(),
@@ -177,6 +178,7 @@ describe("given the live run read over a tenant's retention from data retention"
           if (typeof sinceMs === "number") probes.push(sinceMs);
           return { rows: [] };
         },
+        columns: () => ClickHouseColumns.over({ read: async () => [] }),
       }),
       redis: createApiFixture<RedisConnection>(),
       objectStorage: createApiFixture<ObjectStorage>(),

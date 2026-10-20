@@ -7,6 +7,7 @@ import type { MonitorApi } from "@langwatch/monitor-contract";
 import { createLogger } from "@langwatch/observability";
 import type { TraceApi } from "@langwatch/trace-contract";
 
+import type { EvaluationCommandDispatcherService } from "../../../services/evaluation-command-dispatcher.service.ts";
 import { EvaluationReportedEventService } from "../../../services/evaluation-reported-event.service.ts";
 import type { AzureSafetyCredentialsService } from "../../evaluators/services/azure-safety-credentials.service.ts";
 import { EvaluationExecutionOutcomeService } from "./evaluation-execution-outcome.service.ts";
@@ -30,6 +31,8 @@ export class EvaluationExecutionIntentService {
       EvaluationExecutionOutcomeService.create({
         executionReceipt: deps.executionReceipt,
         reportedEvents,
+        retries: deps.retries,
+        retryWindowMs: deps.retryWindowMs,
       }),
       reportedEvents,
     );
@@ -92,4 +95,8 @@ export interface ExecuteEvaluationCommandDeps {
   azureSafetyCredentials: Pick<AzureSafetyCredentialsService, "resolveForTenant">;
   settingsRecovery: Pick<EvaluationSettingsRecoverySwitchService, "isDisabled">;
   inputsOffload: EvaluationInputsOffload;
+  /** How long an evaluator service that is not up is retried (evaluatorRetryWindowMinutes). */
+  retryWindowMs: number;
+  /** Sends the next attempt when the evaluator service was not up. */
+  retries: Pick<EvaluationCommandDispatcherService, "retryEvaluation">;
 }

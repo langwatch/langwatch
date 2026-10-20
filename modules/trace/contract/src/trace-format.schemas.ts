@@ -712,12 +712,16 @@ const evaluationSchemaDefinition = z.object({
   inputs: z.record(z.string(), z.any()).optional().nullable(),
   error: errorCaptureSchema.optional().nullable(),
   retries: z.number().optional().nullable(),
+  attempts: z.number().int().nonnegative().optional(),
+  last_attempt_error: z.string().optional().nullable(),
   timestamps: z.object({
     ignore_timestamps_on_write: z.boolean().optional().nullable(),
     inserted_at: z.number().optional().nullable(),
     started_at: z.number().optional().nullable(),
     finished_at: z.number().optional().nullable(),
     updated_at: z.number().optional().nullable(),
+    last_attempt_at: z.number().optional().nullable(),
+    next_attempt_at: z.number().optional().nullable(),
   }),
 });
 export interface EvaluationSchema extends Named<typeof evaluationSchemaDefinition> {}
@@ -736,6 +740,8 @@ const rESTEvaluationSchemaDefinition = z.object({
     status: true,
     timestamps: true,
     retries: true,
+    attempts: true,
+    last_attempt_error: true,
   }).shape,
   evaluation_id: z.string().optional().nullable(),
   evaluator_id: z.string().optional().nullable(),

@@ -1,3 +1,4 @@
+import { ClickHouseColumns } from "@langwatch/clickhouse-client";
 import type { EvaluationRunData } from "@langwatch/evaluation-contract";
 import { SecurityError } from "@langwatch/eventing";
 import { clickHouseQueryClientDouble } from "@langwatch/test-harness/client-doubles/clickhouse";
@@ -117,7 +118,9 @@ function harness(rows: Record<string, unknown>[][] = []): {
     }),
   };
   const floor = new TestRetention();
-  const queryClient = clickHouseQueryClientDouble({ query: reader });
+  // Every column present: the column list is the schema's, never a scripted answer.
+  const allColumns = ClickHouseColumns.over({ read: async () => [] });
+  const queryClient = clickHouseQueryClientDouble({ query: reader, columns: () => allColumns });
   return {
     client,
     reader,
