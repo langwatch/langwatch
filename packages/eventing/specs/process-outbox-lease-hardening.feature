@@ -183,6 +183,18 @@ Feature: Process outbox lease hardening
     Then the attempt log records only the redacted sentence
     And the server log records the original message and stack once, at error level, without the message payload
 
+  @unit
+  Scenario: A message dead-lettered by the customer's own setup is logged as a warning
+    Given an outbox message whose dispatch is refused with a customer fault
+    When it is dead-lettered
+    Then the dead-letter is logged at warn level, not error
+
+  @unit
+  Scenario: A message dead-lettered by our own or a provider's failure is logged as an error
+    Given an outbox message whose dispatch fails with a platform, provider or unattributed fault
+    When it is dead-lettered
+    Then the dead-letter is logged at error level
+
   @unit @unimplemented
   Scenario: A wake scheduled for a process that no longer exists is discarded
     Given a wake for a completed process instance

@@ -161,6 +161,17 @@ function isTerminalError(error: unknown): boolean {
   return refusesRetry(error);
 }
 
+/**
+ * A handled error the customer caused (bad configuration, invalid parameters). Read by
+ * field, not instanceof, since the error may have crossed a serialisation boundary.
+ */
+function isCustomerFault(error: unknown): boolean {
+  if (typeof error !== "object" || error === null) return false;
+  return (
+    Reflect.get(error, "fault") === "customer" && typeof Reflect.get(error, "code") === "string"
+  );
+}
+
 /** Attempt log records DispatchError diagnostics; check by name not instanceof. */
 function toAttemptDiagnostic(error: unknown): {
   errorType: string;
@@ -831,7 +842,14 @@ export class OutboxDispatcherService {
       },
     });
     if (dead || attempt === 1) {
-      this.logDispatchFailure({ message, attempt, dead, errorType, errorMessage });
+      this.logDispatchFailure({
+        message,
+        attempt,
+        dead,
+        errorType,
+        errorMessage,
+        customerFault: isCustomerFault(error),
+      });
       if (diagnosticIsRedacted(error)) this.logRedactedCause({ message, attempt, error });
     }
   }
@@ -873,12 +891,14 @@ export class OutboxDispatcherService {
     dead,
     errorType,
     errorMessage,
+    customerFault,
   }: {
     message: LeasedOutboxMessageRecord;
     attempt: number;
     dead: boolean;
     errorType: string;
     errorMessage: string;
+    customerFault: boolean;
   }): void {
     // Intentionally retain this opaque operational ID for delivery diagnostics.
     const fields = {
@@ -895,7 +915,10 @@ export class OutboxDispatcherService {
       errorType,
       errorMessage,
     };
-    if (dead) {
+    if (dead && customerFault) {
+      // The customer's own setup refused the delivery; nothing for on-call to act on.
+      this.logger.warn(fields, "Process-manager outbox message exhausted delivery attempts");
+    } else if (dead) {
       this.logger.error(fields, "Process-manager outbox message exhausted delivery attempts");
     } else {
       this.logger.warn(fields, "Process-manager outbox delivery failed; retry scheduled");

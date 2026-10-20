@@ -420,6 +420,50 @@ describe("OutboxDispatcherService", () => {
         expect(lines.findLine("error", "redacted cause")).toBeUndefined();
       });
 
+      describe("when the message is dead-lettered", () => {
+        const DEAD_LINE = "exhausted delivery attempts";
+
+        async function deadLetterOn(error: unknown) {
+          const { logger, lines } = createTestLogger();
+          const dispatcher = new OutboxDispatcherService({
+            store,
+            handlers: { "worker-dispatch": vi.fn().mockRejectedValue(error) },
+            retryDelayMs: () => 1_000,
+            maxAttempts: 1,
+            logger,
+          });
+          const report = await dispatcher.runOnce({ now: T0 + 1 });
+          expect(report.dead).toEqual(["dispatch:turn_1:1"]);
+          return lines;
+        }
+
+        /** @scenario "A message dead-lettered by the customer's own setup is logged as a warning" */
+        it("logs a customer-fault dead-letter at warn, even after serialisation", async () => {
+          const serialised = Object.assign(new Error("invalid_action"), {
+            code: "invalid_action",
+            fault: "customer",
+            retryable: false,
+          });
+
+          const lines = await deadLetterOn(serialised);
+
+          expect(lines.findLine("warn", DEAD_LINE)).toBeDefined();
+          expect(lines.findLine("error", DEAD_LINE)).toBeUndefined();
+        });
+
+        /** @scenario "A message dead-lettered by our own or a provider's failure is logged as an error" */
+        it.each([
+          ["platform", { code: "internal_failure", fault: "platform" }],
+          ["provider", { code: "provider_failure", fault: "provider" }],
+          ["unattributed", {}],
+        ])("logs a %s dead-letter at error", async (_fault, fields) => {
+          const lines = await deadLetterOn(Object.assign(new Error("failed"), fields));
+
+          expect(lines.findLine("error", DEAD_LINE)).toBeDefined();
+          expect(lines.findLine("warn", DEAD_LINE)).toBeUndefined();
+        });
+      });
+
       /** @scenario A recording failure never fails the delivery accounting */
       it("retries and retires exactly as it would have when the attempt log write throws", async () => {
         const failingStore = new Proxy(store, {
