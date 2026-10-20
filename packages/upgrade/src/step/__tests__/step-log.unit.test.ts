@@ -13,7 +13,7 @@ describe("StepLogTail", () => {
       const log = StepLogTail.create({
         redact: ledgerRedactor({ secretValues: [] }),
         forward: () => undefined,
-        now: () => new Date("2026-10-20T00:00:00.000Z"),
+        now: () => "2026-10-20T00:00:00.000Z",
       });
 
       for (let line = 1; line <= 500; line += 1) log.info(`line ${line}`);

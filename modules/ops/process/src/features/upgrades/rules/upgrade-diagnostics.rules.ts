@@ -33,11 +33,12 @@ function scrub({
   if (value === null || typeof value !== "object") return value;
   const kept: Record<string, unknown> = {};
   for (const [key, each] of Object.entries(value)) {
+    const at = path === "" ? key : `${path}.${key}`;
     if (QUOTED_VALUE_KEYS.has(key)) {
-      omitted.push(`${path}.${key}`);
+      omitted.push(at);
       continue;
     }
-    kept[key] = scrub({ value: each, path: `${path}.${key}`, omitted });
+    kept[key] = scrub({ value: each, path: at, omitted });
   }
   return kept;
 }
@@ -45,7 +46,7 @@ function scrub({
 const byteLengthOf = (bundle: UpgradeDiagnosticsBundle) =>
   Buffer.byteLength(JSON.stringify(bundle), "utf8");
 
-/** Drops the oldest log lines, then the report, until the bundle fits its cap. */
+/** Drops the oldest log lines, then the report, then the last targets, until the bundle fits. */
 function fitted(bundle: UpgradeDiagnosticsBundle): UpgradeDiagnosticsBundle {
   let fitting = bundle;
   let dropped = 0;
@@ -65,6 +66,14 @@ function fitted(bundle: UpgradeDiagnosticsBundle): UpgradeDiagnosticsBundle {
       step: { ...fitting.step, report: null },
       omitted: [...fitting.omitted, "step.report"],
     };
+  }
+  let shed = 0;
+  while (byteLengthOf(fitting) > BUNDLE_MAX_BYTES && fitting.targets.length > 0) {
+    shed += 1;
+    fitting = { ...fitting, targets: fitting.targets.slice(0, -1) };
+  }
+  if (shed > 0) {
+    fitting = { ...fitting, omitted: [...fitting.omitted, `targets: ${shed} of them`] };
   }
   return fitting;
 }
@@ -114,4 +123,14 @@ export function upgradeDiagnosticsOf({
     deployment,
     omitted,
   });
+}
+
+/**
+ * A bundle an operator reviewed, put through the same redaction and size cap again before it
+ * leaves the install. A bundle this module built comes back unchanged.
+ */
+export function resealedDiagnosticsOf(bundle: UpgradeDiagnosticsBundle): UpgradeDiagnosticsBundle {
+  const omitted: string[] = [];
+  const scrubbed = scrub({ value: bundle, path: "", omitted }) as UpgradeDiagnosticsBundle;
+  return fitted({ ...scrubbed, omitted: [...scrubbed.omitted, ...omitted] });
 }

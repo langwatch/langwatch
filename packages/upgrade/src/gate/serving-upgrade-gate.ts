@@ -579,8 +579,8 @@ function backgroundStepsOver({
   };
   redact: LedgerTextRedactor;
 }) {
-  const ledger = UpgradeLedgerRepository.create({ postgres });
-  const runner = UpgradeRunnerRepository.create({ postgres });
+  const ledger = UpgradeLedgerRepository.create({ postgres, redact });
+  const runner = UpgradeRunnerRepository.create({ postgres, redact });
   const log = (level: "info" | "warn", message: string, fields: object) =>
     level === "warn" ? warn(message, { processId, ...fields }) : undefined;
   return {

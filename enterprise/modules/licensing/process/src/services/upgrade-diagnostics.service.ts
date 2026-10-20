@@ -6,6 +6,7 @@
  */
 import {
   UPGRADE_DIAGNOSTICS_RETENTION_DAYS,
+  UpgradeDiagnosticsNotFoundError,
   UpgradeDiagnosticsRateLimitedError,
   type ConnectLicenceCaller,
   type UpgradeDiagnosticsDownload,
@@ -92,7 +93,7 @@ export class UpgradeDiagnosticsService {
     return { reportId, receivedAt: receivedAt.toString() };
   }
 
-  /** Every report of the instance behind one Cloud admin row, newest first. */
+  /** Every unexpired report of the instance behind one Cloud admin row, newest first. */
   async findForInstance({
     instanceRowId,
   }: {
@@ -100,11 +101,13 @@ export class UpgradeDiagnosticsService {
   }): Promise<UpgradeDiagnosticsReport[]> {
     const instance = await this.collaborators.instances.getById(instanceRowId);
     const rows = await this.collaborators.repository.findAllByInstanceId(instance.instanceId);
-    return rows.map(reportOf);
+    return rows.filter((row) => !this.expired(row)).map(reportOf);
   }
 
+  /** A report past its 30 days has lost its bytes to the storage rule, so it reads as unknown. */
   async getDownload({ id }: { id: string }): Promise<UpgradeDiagnosticsDownload> {
     const row = await this.collaborators.repository.getById(id);
+    if (this.expired(row)) throw new UpgradeDiagnosticsNotFoundError();
     const expiresAt = this.collaborators
       .now()
       .add({ minutes: UPGRADE_DIAGNOSTICS_DOWNLOAD_MINUTES });
@@ -113,6 +116,10 @@ export class UpgradeDiagnosticsService {
       expiresAt,
     });
     return { url, expiresAt: expiresAt.toString() };
+  }
+
+  private expired(row: UpgradeDiagnosticRecord): boolean {
+    return row.expiresAt.epochMilliseconds <= this.collaborators.now().epochMilliseconds;
   }
 
   /** The first report of a step and release posts; a later one is listed in Cloud admin only. */

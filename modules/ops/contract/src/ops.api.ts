@@ -77,6 +77,7 @@ import type {
   OpsUpgradeListStepsInput,
   OpsUpgradeListTenantsInput,
   OpsUpgradeReleasePage,
+  OpsUpgradeSendDiagnosticsInput,
   OpsUpgradeRun,
   OpsUpgradeRunPage,
   OpsUpgradeStatus,
@@ -722,8 +723,10 @@ export interface OpsApi {
   /** The step's redacted diagnostics; refuses with `upgrade_not_found` like `getUpgradeStep`. */
   getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle>;
   getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
-  /** Sends the step's bundle to LangWatch over Connect, as the operator who asked. */
-  sendUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<OpsUpgradeDiagnosticsReceipt>;
+  /** Sends the bundle the operator reviewed to LangWatch over Connect, as the operator who asked. */
+  sendUpgradeStepDiagnostics(
+    input: OpsUpgradeSendDiagnosticsInput,
+  ): Promise<OpsUpgradeDiagnosticsReceipt>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

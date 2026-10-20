@@ -3,7 +3,7 @@ import { type UpgradeLease, upgradeLeaseSchema, type UpgradeStepStatus } from ".
 import type { ManifestStep } from "../manifest/manifest.ts";
 import type { UpgradePostgres } from "../ports.ts";
 import { PROJECTION_REPLAY_CURSOR } from "../step/projection-replay-step.ts";
-import { ledgerText } from "../step/step-log.ts";
+import { type LedgerTextRedactor, ledgerText } from "../step/step-log.ts";
 import { redactSecrets } from "./run-log.ts";
 
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
@@ -20,10 +20,20 @@ export type RegisteredStep = ManifestStep & { release: string | null };
  * release attribution and the run's plan. Same tables, same package, as the reader's repository.
  */
 export class UpgradeRunnerRepository {
-  private constructor(private readonly postgres: UpgradePostgres) {}
+  private constructor(
+    private readonly postgres: UpgradePostgres,
+    private readonly redact: LedgerTextRedactor,
+  ) {}
 
-  static create({ postgres }: { postgres: UpgradePostgres }): UpgradeRunnerRepository {
-    return new UpgradeRunnerRepository(postgres);
+  /** `redact` masks stored step errors; the gate passes one that knows its store URLs. */
+  static create({
+    postgres,
+    redact = redactSecrets,
+  }: {
+    postgres: UpgradePostgres;
+    redact?: LedgerTextRedactor;
+  }): UpgradeRunnerRepository {
+    return new UpgradeRunnerRepository(postgres, redact);
   }
 
   /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
@@ -168,7 +178,7 @@ export class UpgradeRunnerRepository {
         ids,
         status,
         runId,
-        lastError === null ? null : ledgerText({ text: lastError, redact: redactSecrets }),
+        lastError === null ? null : ledgerText({ text: lastError, redact: this.redact }),
         report === undefined ? null : JSON.stringify(report),
         SETTLED.has(status),
         logTail === undefined ? null : JSON.stringify(logTail),

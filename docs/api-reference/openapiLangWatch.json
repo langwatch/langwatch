@@ -78629,7 +78629,8 @@
                           },
                           "required": [
                             "optional",
-                            "hostname"
+                            "hostname",
+                            "upgradeDiagnostics"
                           ],
                           "additionalProperties": false
                         },

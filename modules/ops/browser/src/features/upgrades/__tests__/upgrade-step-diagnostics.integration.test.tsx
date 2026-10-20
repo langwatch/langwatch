@@ -163,7 +163,7 @@ describe("UpgradeStepDrawer diagnostics", () => {
         expect(sendMutate).not.toHaveBeenCalled();
 
         fireEvent.click(screen.getByRole("button", { name: "Send" }));
-        expect(sendMutate).toHaveBeenCalledWith({ id: "ops:backfill/v2" });
+        expect(sendMutate).toHaveBeenCalledWith({ bundle: BUNDLE });
       });
     });
   });

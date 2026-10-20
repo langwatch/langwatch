@@ -157,6 +157,46 @@ describe("UpgradeDiagnosticsService", () => {
       expect(sent[0]?.bundle.step.id).toBe("ops:backfill");
     });
 
+    describe("given the bundle an operator reviewed", () => {
+      /** @scenario "Send to LangWatch sends the bundle the operator reviewed" */
+      it("sends that bundle unchanged as the operator's", async () => {
+        const { service, sent } = setup();
+        const reviewed = await service.getBundle({ id: "ops:backfill" });
+
+        await service.sendReviewed({
+          bundle: { ...reviewed, generatedAt: "2026-10-20T09:00:00Z" },
+        });
+
+        expect(sent).toEqual([
+          { trigger: "operator", bundle: { ...reviewed, generatedAt: "2026-10-20T09:00:00Z" } },
+        ]);
+      });
+
+      it("redacts a secret written into it before it leaves", async () => {
+        const { service, sent } = setup();
+        const reviewed = await service.getBundle({ id: "ops:backfill" });
+
+        await service.sendReviewed({
+          bundle: {
+            ...reviewed,
+            step: { ...reviewed.step, lastError: "dial postgres://app:hunter2@db:5432/lw" },
+          },
+        });
+
+        expect(sent[0]?.bundle.step.lastError).not.toContain("hunter2");
+      });
+
+      it("sends nothing for a step the ledger does not know", async () => {
+        const { service, sent } = setup();
+        const reviewed = await service.getBundle({ id: "ops:backfill" });
+
+        await expect(
+          service.sendReviewed({ bundle: { ...reviewed, step: { ...reviewed.step, id: "nope" } } }),
+        ).rejects.toMatchObject({ code: "upgrade_not_found" });
+        expect(sent).toEqual([]);
+      });
+    });
+
     describe("given an unknown step", () => {
       it("sends nothing and refuses with upgrade_not_found", async () => {
         const { service, sent } = setup();

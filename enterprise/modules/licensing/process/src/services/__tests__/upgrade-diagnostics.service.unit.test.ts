@@ -226,4 +226,18 @@ describe("UpgradeDiagnosticsService", () => {
       });
     });
   });
+
+  describe("when a report is past its 30 days", () => {
+    /** @scenario "A report past its 30 days is no longer listed or downloadable" */
+    it("leaves it out of the list and refuses its download", async () => {
+      const { service, advance, instanceRowId } = await setup();
+      await service.record({ caller, submission: upgradeDiagnosticsSubmission() });
+      advance(30 * 24 * 60);
+
+      await expect(service.findForInstance({ instanceRowId })).resolves.toEqual([]);
+      await expect(service.getDownload({ id: "report-1" })).rejects.toMatchObject({
+        code: "upgrade_diagnostics_not_found",
+      });
+    });
+  });
 });

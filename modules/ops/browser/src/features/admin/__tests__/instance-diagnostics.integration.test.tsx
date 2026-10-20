@@ -54,8 +54,11 @@ vi.mock("../../../behavior/ops-api.ts", () => ({
         },
       },
       getDiagnosticsDownload: {
-        useMutation: (options: { onSuccess: (download: { url: string }) => void }) => ({
-          mutate: ({ id }: { id: string }) => {
+        useMutation: () => ({
+          mutate: (
+            { id }: { id: string },
+            options: { onSuccess: (download: { url: string }) => void },
+          ) => {
             calls.downloads.push(id);
             options.onSuccess({ url: `https://bucket.test/${id}.json` });
           },
@@ -74,9 +77,14 @@ describe("Cloud admin upgrade diagnostics", () => {
     calls.instanceFor.length = 0;
     calls.downloads.length = 0;
     opened.length = 0;
-    vi.spyOn(window, "open").mockImplementation((url) => {
-      opened.push(String(url));
-      return null;
+    // The tab opens blank inside the click and is sent to the signed link once it is minted.
+    vi.spyOn(window, "open").mockImplementation(() => {
+      const location = {
+        set href(url: string) {
+          opened.push(url);
+        },
+      };
+      return { opener: {}, location, close: () => undefined } as unknown as Window;
     });
   });
   afterEach(() => vi.restoreAllMocks());

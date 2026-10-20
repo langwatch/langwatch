@@ -2,6 +2,8 @@
  * What one attempt of a step said, redacted and bounded, for the ledger row and its diagnostics.
  * Spec: specs/upgrade/step-diagnostics.feature
  */
+import { nowInstant } from "@langwatch/time";
+
 import { redactSecrets } from "../runner/run-log.ts";
 
 /** How many of an attempt's last lines the step row keeps (plan decision 3). */
@@ -48,17 +50,18 @@ export class StepLogTail implements MigrationStepLog {
   private readonly lines: string[] = [];
 
   private constructor(
-    private readonly options: { redact: LedgerTextRedactor; forward: Forward; now: () => Date },
+    private readonly options: { redact: LedgerTextRedactor; forward: Forward; now: () => string },
   ) {}
 
   static create({
     redact,
     forward,
-    now = () => new Date(),
+    now = () => nowInstant().toString(),
   }: {
     redact: LedgerTextRedactor;
     forward: Forward;
-    now?: () => Date;
+    /** The moment each line is stamped with, as an ISO instant. */
+    now?: () => string;
   }): StepLogTail {
     return new StepLogTail({ redact, forward, now });
   }
@@ -98,7 +101,7 @@ export class StepLogTail implements MigrationStepLog {
   }): void {
     if (forward) this.options.forward(level, message, fields);
     const extra = Object.keys(fields).length > 0 ? ` ${safeJson(fields)}` : "";
-    const line = `${this.options.now().toISOString()} ${level} ${message}${extra}`;
+    const line = `${this.options.now()} ${level} ${message}${extra}`;
     this.lines.push(ledgerText({ text: line, redact: this.options.redact }));
     this.lines.splice(0, Math.max(0, this.lines.length - STEP_LOG_TAIL_LINES));
   }

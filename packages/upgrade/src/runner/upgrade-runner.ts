@@ -17,7 +17,7 @@ import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
-import { StepLogTail } from "../step/step-log.ts";
+import { type LedgerTextRedactor, StepLogTail } from "../step/step-log.ts";
 import { type DifferingIndex, differingPrebuiltIndexes } from "../stepping/prebuilt-indexes.ts";
 import {
   findHandAppliedSql,
@@ -82,6 +82,8 @@ export interface UpgradeRunnerOptions {
   retry?: { attempts: number; backoffMs: number };
   /** Publishes the read hint for each phase change and the finish (round 8, U2-LIVE). */
   hints?: UpgradeReadHintPublish;
+  /** Masks what the ledger stores; `ledgerRedactor` with the store URLs, else pattern-only. */
+  redact?: LedgerTextRedactor;
 }
 
 type LedgerFacts = readonly Pick<UpgradeStep, "id" | "status">[];
@@ -321,8 +323,9 @@ export class UpgradeRunnerService {
   private held: HeldTargets = new Map();
 
   private constructor(private readonly options: UpgradeRunnerOptions) {
-    this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres });
-    this.runner = UpgradeRunnerRepository.create({ postgres: options.postgres });
+    const redact = options.redact ?? redactSecrets;
+    this.ledger = UpgradeLedgerRepository.create({ postgres: options.postgres, redact });
+    this.runner = UpgradeRunnerRepository.create({ postgres: options.postgres, redact });
     this.timing = { ...DEFAULT_LEASE_TIMING, ...options.lease };
     this.codeSteps = new Map((options.codeSteps ?? []).map((step) => [step.id, step]));
     this.shipped = shippedSteps({ image: options.image, manifests: options.releases.manifests });
@@ -1039,7 +1042,7 @@ export class UpgradeRunnerService {
     const reason = `blocking step ${id} passed its ${minutes}-minute deadline`;
     const deadline = stepDeadline({ signal, deadlineMs: BLOCKING_STEP_DEADLINE_MS, reason });
     const stepLog = StepLogTail.create({
-      redact: redactSecrets,
+      redact: this.options.redact ?? redactSecrets,
       forward: (level, message, fields) => this.narrate[level](message, { step: id, ...fields }),
     });
     try {

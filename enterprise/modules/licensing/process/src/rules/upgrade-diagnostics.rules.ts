@@ -41,12 +41,3 @@ export function selfHostedInstanceAdminUrl({
   const page = `${baseUrl.replace(/\/+$/, "")}/ops/cloud/self-hosted-instances`;
   return instanceRowId ? `${page}?instance=${encodeURIComponent(instanceRowId)}` : page;
 }
-
-/** Each step and release announces once; a later attempt of it is listed in Cloud admin only. */
-export function announcementKeyOf(report: {
-  instanceId: string;
-  stepId: string;
-  release: string | null;
-}): string {
-  return `${report.instanceId}\u0000${report.stepId}\u0000${report.release ?? ""}`;
-}

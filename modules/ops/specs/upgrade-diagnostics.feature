@@ -53,6 +53,12 @@ Feature: Upgrade step diagnostics
     Then the bundle is shown first
     And it is sent only once they confirm
 
+  @unit
+  Scenario: Send to LangWatch sends the bundle the operator reviewed
+    Given an operator reviewed a failed step's bundle
+    When they confirm the send
+    Then LangWatch receives that bundle unchanged, redacted and capped again on the way out
+
   @integration
   Scenario: Send to LangWatch is not offered where the install cannot reach LangWatch
     Given an ops admin has a failed step open on an install without Connect

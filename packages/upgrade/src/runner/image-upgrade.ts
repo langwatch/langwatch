@@ -39,6 +39,7 @@ import {
   type MigrationStep,
   type TenantMigrationStep,
 } from "../step/migration-step.ts";
+import { ledgerRedactor } from "../step/step-log.ts";
 import { applyRelease } from "../stepping/apply-release.ts";
 import { SteppingError } from "../stepping/release-directory.ts";
 import {
@@ -568,6 +569,13 @@ export async function withImageUpgradeRunner<Result>({
       log: upgradeRunnerLog(),
       ...(inputs.publish ? { hints: readHints({ inputs }) } : {}),
       ...(inputs.upcasts === undefined ? {} : { upcasts: inputs.upcasts }),
+      redact: ledgerRedactor({
+        secretValues: [
+          inputs.databaseUrl,
+          inputs.environment.REDIS_URL,
+          ...targets.map((target) => target.url),
+        ],
+      }),
     });
     return await use({ runner, release, withClickHouse: targets.length > 0 });
   } finally {

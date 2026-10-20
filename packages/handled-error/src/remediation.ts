@@ -1039,12 +1039,14 @@ const registry = {
       "Paste or activate a LangWatch licence in Settings, then send the diagnostics again",
       "Without a licence, download the diagnostics from the step page and email them to support@langwatch.ai",
     ],
+    docsPath: "/self-hosting/data-and-telemetry",
   },
   upgrade_diagnostics_rate_limited: {
     tips: [
       "The allowance resets within a day; the step's diagnostics stay on the step page meanwhile",
       "Download the diagnostics from the step page and email them to support@langwatch.ai if it cannot wait",
     ],
+    docsPath: "/self-hosting/data-and-telemetry",
   },
   upgrade_diagnostics_not_found: {
     tips: [

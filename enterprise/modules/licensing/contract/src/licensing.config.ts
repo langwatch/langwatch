@@ -96,7 +96,7 @@ export const licensingSecrets = {
   licensePrivateKey: Secret.load("LANGWATCH_LICENSE_PRIVATE_KEY", { optional: true }),
   /** The key this whole deployment is licensed by, where an operator set one. */
   instanceLicenseKey: Secret.load("LANGWATCH_LICENSE_KEY", { optional: true }),
-  /** Cloud only: LangWatch's own Slack channel a received upgrade diagnostics report is posted to. */
+  /** Cloud only: LangWatch's own Slack channel each received upgrade diagnostics report goes to. */
   upgradeDiagnosticsSlackWebhook: Secret.load("SLACK_CHANNEL_UPGRADE_DIAGNOSTICS", {
     optional: true,
   }),

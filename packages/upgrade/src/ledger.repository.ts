@@ -26,7 +26,7 @@ import {
 } from "./ledger.ts";
 import type { UpgradePostgres } from "./ports.ts";
 import { redactSecrets } from "./runner/run-log.ts";
-import { ledgerText } from "./step/step-log.ts";
+import { type LedgerTextRedactor, ledgerText } from "./step/step-log.ts";
 
 // The columns are TIMESTAMP(3) holding UTC, as Prisma writes them; read back as instants.
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
@@ -92,10 +92,20 @@ const ROSTER_COLUMNS = [
 
 /** The runner's own ledger tables. Only the runner package reads or writes them. */
 export class UpgradeLedgerRepository {
-  private constructor(private readonly postgres: UpgradePostgres) {}
+  private constructor(
+    private readonly postgres: UpgradePostgres,
+    private readonly redact: LedgerTextRedactor,
+  ) {}
 
-  static create({ postgres }: { postgres: UpgradePostgres }): UpgradeLedgerRepository {
-    return new UpgradeLedgerRepository(postgres);
+  /** `redact` masks stored target errors; the gate passes one that knows its store URLs. */
+  static create({
+    postgres,
+    redact = redactSecrets,
+  }: {
+    postgres: UpgradePostgres;
+    redact?: LedgerTextRedactor;
+  }): UpgradeLedgerRepository {
+    return new UpgradeLedgerRepository(postgres, redact);
   }
 
   /** Runs `text` against this installation's ledger tables (`ledgerTables`). */
@@ -275,7 +285,7 @@ export class UpgradeLedgerRepository {
         target,
         status,
         version,
-        lastError === null ? null : ledgerText({ text: lastError, redact: redactSecrets }),
+        lastError === null ? null : ledgerText({ text: lastError, redact: this.redact }),
       ],
     );
     return upgradeTargetSchema.parse(rows[0]);

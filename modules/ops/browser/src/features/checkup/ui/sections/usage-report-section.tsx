@@ -146,7 +146,7 @@ function UsageReportSwitchRows({
             </Text>
           </VStack>
           <Switch
-            checked={switches.upgradeDiagnostics ?? true}
+            checked={switches.upgradeDiagnostics}
             disabled={!canManage || isSaving}
             aria-label="Always send upgrade diagnostics to LangWatch"
             inputProps={{ "data-testid": "checkup-switch-upgrade-diagnostics-input" }}

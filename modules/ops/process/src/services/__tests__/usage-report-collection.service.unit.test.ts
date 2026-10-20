@@ -236,7 +236,9 @@ describe("given a customer who switched the optional category off", () => {
     it("still says which release runs and how big the install is", async () => {
       state.emailDomains = { "acme.test": 1 };
 
-      const payload = await report({ switches: { optional: false, hostname: false } });
+      const payload = await report({
+        switches: { optional: false, hostname: false, upgradeDiagnostics: true },
+      });
 
       expect(payload.version).toBe("3.17.0");
       expect(payload.projects).toBe(1);
@@ -254,7 +256,9 @@ describe("given a customer who switched hostname off and nothing else", () => {
     it("keeps the rest of the optional category", async () => {
       state.emailDomains = { "acme.test": 1 };
 
-      const payload = await report({ switches: { optional: true, hostname: false } });
+      const payload = await report({
+        switches: { optional: true, hostname: false, upgradeDiagnostics: true },
+      });
 
       expect(payload.hostname).toBeUndefined();
       expect(payload.user_email_domains).toEqual({ "acme.test": 1 });
@@ -383,7 +387,11 @@ describe("given a process that composes ops health", () => {
   describe("when the report is taken with the optional category on", () => {
     /** @scenario "The report carries the install's ops health as counts" */
     it("carries it under ops_health", async () => {
-      const payload = await withOpsHealth({ optional: true, hostname: true });
+      const payload = await withOpsHealth({
+        optional: true,
+        hostname: true,
+        upgradeDiagnostics: true,
+      });
 
       expect(payload.ops_health).toEqual(OPS_HEALTH);
     });
@@ -392,7 +400,11 @@ describe("given a process that composes ops health", () => {
   describe("when the customer switched the optional category off", () => {
     /** @scenario "Ops health is part of the optional category" */
     it("leaves ops health out with the rest of the category", async () => {
-      const payload = await withOpsHealth({ optional: false, hostname: true });
+      const payload = await withOpsHealth({
+        optional: false,
+        hostname: true,
+        upgradeDiagnostics: true,
+      });
 
       expect(payload.ops_health).toBeUndefined();
       expect(payload.version).toBe("3.17.0");

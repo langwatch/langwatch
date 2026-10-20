@@ -240,6 +240,7 @@ import {
   type SignUpHealth,
   type OpsDoorAnswer,
   type OpsUpgradeIdInput,
+  type OpsUpgradeSendDiagnosticsInput,
   type OpsUpgradeListRunsInput,
   type OpsUpgradeListStepsInput,
   type OpsUpgradeListTenantsInput,
@@ -2051,8 +2052,10 @@ export class OpsModule implements OpsApi {
     return this.#upgradeDiagnostics.getAvailability();
   }
 
-  sendUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<OpsUpgradeDiagnosticsReceipt> {
-    return this.#upgradeDiagnostics.send({ id: input.id, trigger: "operator" });
+  sendUpgradeStepDiagnostics(
+    input: OpsUpgradeSendDiagnosticsInput,
+  ): Promise<OpsUpgradeDiagnosticsReceipt> {
+    return this.#upgradeDiagnostics.sendReviewed({ bundle: input.bundle });
   }
 
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {

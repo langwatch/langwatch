@@ -541,8 +541,8 @@ Authenticated: a self-hosted install presents its license token or activation co
 Answers at `/api/connect/v1/upgrade-diagnostics`.
 
 ```typescript
-type Body = z.infer<typeof upgradeDiagnosticsSubmissionSchema>; // ../contract/src/upgrade-diagnostics.ts:13
-// Response: upgradeDiagnosticsReceiptSchema, ../contract/src/upgrade-diagnostics.ts:20
+type Body = z.infer<typeof upgradeDiagnosticsSubmissionSchema>; // ../contract/src/upgrade-diagnostics.ts:22
+// Response: upgradeDiagnosticsReceiptSchema, ../contract/src/upgrade-diagnostics.ts:34
 interface Response {
   reportId: string;
   receivedAt: string;

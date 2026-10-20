@@ -143,5 +143,21 @@ describe("upgradeDiagnosticsOf", () => {
       expect(bundle.step.report).toBeNull();
       expect(bundle.omitted).toContain("step.report");
     });
+
+    it("sheds targets too when the log and report gone still leave it too big", () => {
+      const targets = Array.from({ length: 40 }, (_, index) => ({
+        target: `org-${index}`,
+        status: "failed",
+        version: "3.22.0",
+        lastError: `${index}`.padEnd(3000, "t"),
+      })) as UpgradeStepDetail["targets"];
+      const bundle = bundleOf(stepDetail({ logTail: ["short"], report: null, targets }));
+
+      expect(Buffer.byteLength(JSON.stringify(bundle), "utf8")).toBeLessThanOrEqual(
+        UPGRADE_DIAGNOSTICS_MAX_BYTES - 1024,
+      );
+      expect(bundle.targets.length).toBeLessThan(40);
+      expect(bundle.omitted).toContain(`targets: ${40 - bundle.targets.length} of them`);
+    });
   });
 });

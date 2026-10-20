@@ -6,14 +6,14 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** What a customer switched off. Both on unless someone switched them off. */
+/** What a customer switched off. All on unless someone switched them off. */
 const usageReportSwitchesSchemaDefinition = z.object({
   /** The optional category as a whole. */
   optional: z.boolean(),
   /** Hostname, which names the customer's own network. */
   hostname: z.boolean(),
   /** A failed upgrade step's diagnostics, sent by the hourly check (not part of the report). */
-  upgradeDiagnostics: z.boolean().optional(),
+  upgradeDiagnostics: z.boolean(),
 });
 export interface UsageReportSwitchesSchema extends Named<
   typeof usageReportSwitchesSchemaDefinition
@@ -22,7 +22,11 @@ export const usageReportSwitchesSchema: UsageReportSwitchesSchema =
   usageReportSwitchesSchemaDefinition;
 export type UsageReportSwitches = z.infer<typeof usageReportSwitchesSchema>;
 
-export const USAGE_REPORT_SWITCHES_ON: UsageReportSwitches = { optional: true, hostname: true };
+export const USAGE_REPORT_SWITCHES_ON: UsageReportSwitches = {
+  optional: true,
+  hostname: true,
+  upgradeDiagnostics: true,
+};
 
 /** Where an install that has never reported shows its identity: the page reads and never mints. */
 export const INSTANCE_ID_NOT_MINTED = "(minted on the first report)";

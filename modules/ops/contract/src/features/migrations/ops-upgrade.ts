@@ -320,6 +320,17 @@ export interface OpsUpgradeIdInputSchema extends Named<typeof opsUpgradeIdInputS
 export const opsUpgradeIdInputSchema: OpsUpgradeIdInputSchema = opsUpgradeIdInputSchemaDefinition;
 export type OpsUpgradeIdInput = z.infer<typeof opsUpgradeIdInputSchema>;
 
+/** The bundle an operator reviewed and confirmed: what Send to LangWatch sends. */
+const opsUpgradeSendDiagnosticsInputSchemaDefinition = z.object({
+  bundle: upgradeDiagnosticsBundleSchema,
+});
+export interface OpsUpgradeSendDiagnosticsInputSchema extends Named<
+  typeof opsUpgradeSendDiagnosticsInputSchemaDefinition
+> {}
+export const opsUpgradeSendDiagnosticsInputSchema: OpsUpgradeSendDiagnosticsInputSchema =
+  opsUpgradeSendDiagnosticsInputSchemaDefinition;
+export type OpsUpgradeSendDiagnosticsInput = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>;
+
 /**
  * One ClickHouse target: its latest done version, steps not done and latest failure, and whether
  * this process can reach it: a private target whose variable is missing or malformed is refused.
@@ -404,9 +415,9 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .withInput(z.void())
   .withOutput(opsUpgradeDiagnosticsAvailabilitySchema)
 
-  /** Sends the step's bundle over Connect; refused by name where Connect is unavailable. */
+  /** Sends the bundle the operator reviewed over Connect; refused by name without Connect. */
   .mutation("sendDiagnostics")
-  .withInput(opsUpgradeIdInputSchema)
+  .withInput(opsUpgradeSendDiagnosticsInputSchema)
   .withOutput(opsUpgradeDiagnosticsReceiptSchema)
 
   /**

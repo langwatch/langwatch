@@ -12,7 +12,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 ## Module API (`OpsApi`)
 
-Peers call these through the token, declared at `../contract/src/ops.api.ts:435`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/ops.api.ts:436`; nothing else in this package is public.
 
 #### `startAdminImpersonation`
 
@@ -926,10 +926,10 @@ getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
 
 #### `sendUpgradeStepDiagnostics`
 
-Sends the step's bundle to LangWatch over Connect, as the operator who asked.
+Sends the bundle the operator reviewed to LangWatch over Connect, as the operator who asked.
 
 ```typescript
-sendUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<OpsUpgradeDiagnosticsReceipt>;
+sendUpgradeStepDiagnostics(input: OpsUpgradeSendDiagnosticsInput): Promise<OpsUpgradeDiagnosticsReceipt>;
 ```
 
 ## REST transport
@@ -2231,7 +2231,7 @@ interface Output {
 
 ### `ops.upgrade`
 
-Contract `../contract/src/features/migrations/ops-upgrade.ts:350`, router `src/transport/ops-upgrade.trpc.ts:16`.
+Contract `../contract/src/features/migrations/ops-upgrade.ts:361`, router `src/transport/ops-upgrade.trpc.ts:16`.
 
 | Procedure                                               | Kind     | Gate                                                                                                                                                                                 | Input                                             | Output                                    |
 | ------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------- | ----------------------------------------- |
@@ -2246,7 +2246,7 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:350`, router `src/t
 | `ops.upgrade.retryStep`                                 | mutation | Platform permission `ops:manage`                                                                                                                                                     | `opsUpgradeIdInputSchema`                         | `opsUpgradeStepDetailSchema`              |
 | `ops.upgrade.getDiagnostics`                            | query    | Platform permission `ops:view`                                                                                                                                                       | `opsUpgradeIdInputSchema`                         | `upgradeDiagnosticsBundleSchema`          |
 | `ops.upgrade.diagnosticsAvailability`                   | query    | Platform permission `ops:view`                                                                                                                                                       | inline                                            | `opsUpgradeDiagnosticsAvailabilitySchema` |
-| `ops.upgrade.sendDiagnostics`                           | mutation | Platform permission `ops:manage`                                                                                                                                                     | `opsUpgradeIdInputSchema`                         | `opsUpgradeDiagnosticsReceiptSchema`      |
+| `ops.upgrade.sendDiagnostics`                           | mutation | Platform permission `ops:manage`                                                                                                                                                     | `opsUpgradeSendDiagnosticsInputSchema`            | `opsUpgradeDiagnosticsReceiptSchema`      |
 | `ops.upgrade.listSystemMigrations`                      | query    | Platform permission `ops:view`                                                                                                                                                       | inline                                            | inline                                    |
 | `ops.upgrade.listTenants`                               | query    | Platform permission `ops:view`                                                                                                                                                       | `opsUpgradeListTenantsInputSchema`                | `opsUpgradeTenantPageSchema`              |
 | `ops.upgrade.listMigrationEnrollments`                  | query    | Platform permission `ops:view`                                                                                                                                                       | inline                                            | `opsMigrationEnrollmentListingSchema`     |
@@ -2261,20 +2261,20 @@ Contract `../contract/src/features/migrations/ops-upgrade.ts:350`, router `src/t
 
 ```typescript
 // ops.upgrade.status
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:353
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:364
 type Input = unknown;
 type Output = z.infer<typeof opsUpgradeStatusSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:137
 
 // ops.upgrade.attentionNotice
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:361
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:372
 type Input = unknown;
-// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:347
+// Output: opsUpgradeAttentionNoticeSchema, ../contract/src/features/migrations/ops-upgrade.ts:358
 interface Output {
   show: boolean;
 }
 
 // ops.upgrade.listReleases
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:366
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:377
 type Input = unknown;
 // Output: opsUpgradeReleasePageSchema, ../contract/src/features/migrations/ops-upgrade.ts:258
 interface Output {
@@ -2328,9 +2328,9 @@ type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/feature
 type Output = z.infer<typeof opsUpgradeRunSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:250
 
 // ops.upgrade.listTargets
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:390
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:401
 type Input = unknown;
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:391
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:402
 type Output = {
   target: string;
   version: string | null;
@@ -2345,12 +2345,12 @@ type Output = z.infer<typeof opsUpgradeStepDetailSchema>; // ../contract/src/fea
 
 // ops.upgrade.getDiagnostics
 type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:17
+type Output = z.infer<typeof upgradeDiagnosticsBundleSchema>; // ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:56
 
 // ops.upgrade.diagnosticsAvailability
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:404
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:415
 type Input = unknown;
-// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:49
+// Output: opsUpgradeDiagnosticsAvailabilitySchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:70
 interface Output {
   available: boolean;
   reason: "connect_disabled" | "no_licence" | null;
@@ -2358,17 +2358,17 @@ interface Output {
 }
 
 // ops.upgrade.sendDiagnostics
-type Input = z.infer<typeof opsUpgradeIdInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:320
-// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:60
+type Input = z.infer<typeof opsUpgradeSendDiagnosticsInputSchema>; // ../contract/src/features/migrations/ops-upgrade.ts:331
+// Output: opsUpgradeDiagnosticsReceiptSchema, ../contract/src/features/migrations/ops-upgrade-diagnostics.ts:84
 interface Output {
   reportId: string;
   receivedAt: string;
 }
 
 // ops.upgrade.listSystemMigrations
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:418
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:429
 type Input = unknown;
-// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:419)
+// Output: opsMigrationOverviewSchema.array() (inline, ../contract/src/features/migrations/ops-upgrade.ts:430)
 
 // ops.upgrade.listTenants
 // Input: opsUpgradeListTenantsInputSchema, ../contract/src/features/migrations/ops-upgrade.ts:307
@@ -2391,7 +2391,7 @@ interface Output {
 }
 
 // ops.upgrade.listMigrationEnrollments
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:431
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:442
 type Input = unknown;
 // Output: opsMigrationEnrollmentListingSchema, ../contract/src/features/migrations/ops-system-migration.ts:160
 interface Output {
@@ -2410,7 +2410,7 @@ interface Output {
 interface Input {
   query: string;
 }
-// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:440
+// Output: inline, ../contract/src/features/migrations/ops-upgrade.ts:451
 type Output = {
   id: string;
   name: string;
@@ -2471,7 +2471,7 @@ interface Output {
 }
 
 // ops.upgrade.runSystemMigrationPass
-// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:483
+// Input: inline, ../contract/src/features/migrations/ops-upgrade.ts:494
 type Input = Record<string, unknown>;
 // Output: opsMigrationPassStartedSchema, ../contract/src/ops.responses.ts:450
 interface Output {
@@ -2595,11 +2595,11 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                 | Environment variable                    | Declared at                        |
 | ------ | ------------------------------------ | --------------------------------------- | ---------------------------------- |
-| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:817`           |
-| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:818`           |
-| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:820`           |
-| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:821`           |
-| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:822`           |
+| secret | `licensePrivateKey`                  | `LANGWATCH_LICENSE_PRIVATE_KEY`         | `src/app/ops.app.ts:818`           |
+| secret | `slackBugReportsBotToken`            | `SLACK_BUG_REPORTS_BOT_TOKEN`           | `src/app/ops.app.ts:819`           |
+| secret | `credentials`                        | `CREDENTIALS_SECRET`                    | `src/app/ops.app.ts:821`           |
+| secret | `credentialsFallback`                | `NEXTAUTH_SECRET`                       | `src/app/ops.app.ts:822`           |
+| secret | `credentialsPrevious`                | `CREDENTIALS_SECRET_PREVIOUS`           | `src/app/ops.app.ts:823`           |
 | config | `apiKey`                             | `LANGWATCH_OPS_API_KEY`                 | `../contract/src/ops.config.ts:30` |
 | config | `clickhouseOpsUrl`                   | `CLICKHOUSE_OPS_URL`                    | `../contract/src/ops.config.ts:32` |
 | config | `usageStats.disabled`                | `DISABLE_USAGE_STATS`                   | `../contract/src/ops.config.ts:34` |

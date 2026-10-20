@@ -1,3 +1,4 @@
+import type { Named } from "@langwatch/module";
 /**
  * Sending a failed upgrade step's diagnostics over Connect and keeping them 30 days on Cloud.
  * The bundle is ops' (`upgradeDiagnosticsBundleSchema`).
@@ -10,21 +11,31 @@ import { z } from "zod";
 export const UPGRADE_DIAGNOSTICS_RETENTION_DAYS = 30;
 
 /** What an install sends: the bundle, and whether the operator or the hourly check sent it. */
-export const upgradeDiagnosticsSubmissionSchema = z.object({
+const upgradeDiagnosticsSubmissionSchemaDefinition = z.object({
   trigger: z.enum(["operator", "automatic"]),
   bundle: upgradeDiagnosticsBundleSchema,
 });
+export interface UpgradeDiagnosticsSubmissionSchema extends Named<
+  typeof upgradeDiagnosticsSubmissionSchemaDefinition
+> {}
+export const upgradeDiagnosticsSubmissionSchema: UpgradeDiagnosticsSubmissionSchema =
+  upgradeDiagnosticsSubmissionSchemaDefinition;
 export type UpgradeDiagnosticsSubmission = z.infer<typeof upgradeDiagnosticsSubmissionSchema>;
 
 /** The licence host's answer: the report id Cloud filed it under. */
-export const upgradeDiagnosticsReceiptSchema = z.object({
+const upgradeDiagnosticsReceiptSchemaDefinition = z.object({
   reportId: z.string(),
   receivedAt: z.string(),
 });
+export interface UpgradeDiagnosticsReceiptSchema extends Named<
+  typeof upgradeDiagnosticsReceiptSchemaDefinition
+> {}
+export const upgradeDiagnosticsReceiptSchema: UpgradeDiagnosticsReceiptSchema =
+  upgradeDiagnosticsReceiptSchemaDefinition;
 export type UpgradeDiagnosticsReceipt = z.infer<typeof upgradeDiagnosticsReceiptSchema>;
 
 /** One received report as Cloud admin lists it; the bundle itself is downloaded on demand. */
-export const upgradeDiagnosticsReportSchema = z.object({
+const upgradeDiagnosticsReportSchemaDefinition = z.object({
   id: z.string(),
   instanceId: z.string(),
   stepId: z.string(),
@@ -36,23 +47,48 @@ export const upgradeDiagnosticsReportSchema = z.object({
   receivedAt: z.string(),
   expiresAt: z.string(),
 });
+export interface UpgradeDiagnosticsReportSchema extends Named<
+  typeof upgradeDiagnosticsReportSchemaDefinition
+> {}
+export const upgradeDiagnosticsReportSchema: UpgradeDiagnosticsReportSchema =
+  upgradeDiagnosticsReportSchemaDefinition;
 export type UpgradeDiagnosticsReport = z.infer<typeof upgradeDiagnosticsReportSchema>;
 
-export const upgradeDiagnosticsDownloadSchema = z.object({
+const upgradeDiagnosticsDownloadSchemaDefinition = z.object({
   url: z.string(),
   expiresAt: z.string(),
 });
+export interface UpgradeDiagnosticsDownloadSchema extends Named<
+  typeof upgradeDiagnosticsDownloadSchemaDefinition
+> {}
+export const upgradeDiagnosticsDownloadSchema: UpgradeDiagnosticsDownloadSchema =
+  upgradeDiagnosticsDownloadSchemaDefinition;
 export type UpgradeDiagnosticsDownload = z.infer<typeof upgradeDiagnosticsDownloadSchema>;
 
 /** Whether this install can send a bundle over Connect, and the reason it cannot. */
-export const upgradeDiagnosticsAvailabilitySchema = z.object({
+const upgradeDiagnosticsAvailabilitySchemaDefinition = z.object({
   available: z.boolean(),
   reason: z.enum(["connect_disabled", "no_licence"]).nullable(),
 });
+export interface UpgradeDiagnosticsAvailabilitySchema extends Named<
+  typeof upgradeDiagnosticsAvailabilitySchemaDefinition
+> {}
+export const upgradeDiagnosticsAvailabilitySchema: UpgradeDiagnosticsAvailabilitySchema =
+  upgradeDiagnosticsAvailabilitySchemaDefinition;
 export type UpgradeDiagnosticsAvailability = z.infer<typeof upgradeDiagnosticsAvailabilitySchema>;
 
 /** Cloud admin's list of one instance's reports, by the instance row it opened. */
-export const findUpgradeDiagnosticsInputSchema = z.object({ instanceRowId: z.string().min(1) });
+const findUpgradeDiagnosticsInputSchemaDefinition = z.object({ instanceRowId: z.string().min(1) });
+export interface FindUpgradeDiagnosticsInputSchema extends Named<
+  typeof findUpgradeDiagnosticsInputSchemaDefinition
+> {}
+export const findUpgradeDiagnosticsInputSchema: FindUpgradeDiagnosticsInputSchema =
+  findUpgradeDiagnosticsInputSchemaDefinition;
 
 /** One report Cloud admin downloads. */
-export const upgradeDiagnosticsIdInputSchema = z.object({ id: z.string().min(1) });
+const upgradeDiagnosticsIdInputSchemaDefinition = z.object({ id: z.string().min(1) });
+export interface UpgradeDiagnosticsIdInputSchema extends Named<
+  typeof upgradeDiagnosticsIdInputSchemaDefinition
+> {}
+export const upgradeDiagnosticsIdInputSchema: UpgradeDiagnosticsIdInputSchema =
+  upgradeDiagnosticsIdInputSchemaDefinition;

@@ -10,6 +10,7 @@ import type { UpgradeLedgerRepository } from "#repositories/upgrade-ledger.repos
 
 import {
   type DiagnosticsDeployment,
+  resealedDiagnosticsOf,
   upgradeDiagnosticsOf,
 } from "../rules/upgrade-diagnostics.rules.ts";
 
@@ -60,7 +61,23 @@ export class UpgradeDiagnosticsService {
     return { ...availability, automatic: availability.available && !optedOut };
   }
 
-  /** Sends the step's bundle; licensing refuses by name where Connect is unavailable. */
+  /**
+   * Sends the bundle an operator reviewed, so LangWatch gets what they saw. It is redacted and
+   * fitted again on the way out, and its step must be in the ledger (`upgrade_not_found`).
+   */
+  async sendReviewed({
+    bundle,
+  }: {
+    bundle: UpgradeDiagnosticsBundle;
+  }): Promise<OpsUpgradeDiagnosticsReceipt> {
+    await this.deps.ledger.getStep({ id: bundle.step.id });
+    return this.deps.licensing.sendUpgradeDiagnostics({
+      trigger: "operator",
+      bundle: resealedDiagnosticsOf(bundle),
+    });
+  }
+
+  /** Builds and sends the step's bundle now; licensing refuses by name without Connect. */
   async send({
     id,
     trigger,

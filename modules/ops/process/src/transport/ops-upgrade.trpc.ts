@@ -60,7 +60,7 @@ export const opsUpgradeTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsUp
 
     .procedure("sendDiagnostics")
     .withPermission("ops:manage", { at: "platform" })
-    .handle(({ app, input }) => app.sendUpgradeStepDiagnostics({ id: input.id }))
+    .handle(({ app, input }) => app.sendUpgradeStepDiagnostics({ bundle: input.bundle }))
 
     .procedure("listSystemMigrations")
     .withPermission("ops:view", { at: "platform" })

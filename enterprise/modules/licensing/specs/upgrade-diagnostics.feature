@@ -91,6 +91,12 @@ Feature: Upgrade diagnostics over Connect
     Then the request is refused as upgrade_diagnostics_not_found
 
   @unit
+  Scenario: A report past its 30 days is no longer listed or downloadable
+    Given a report received more than 30 days ago
+    When Cloud admin lists the instance's reports or asks to download it
+    Then the list leaves it out and the download is refused as upgrade_diagnostics_not_found
+
+  @unit
   Scenario: Listing and downloading diagnostics are both audited
     Given a Cloud admin staff member
     When they list an instance's diagnostics and download one

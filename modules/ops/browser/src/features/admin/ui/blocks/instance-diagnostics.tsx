@@ -11,6 +11,11 @@ import { useUpgradeDiagnosticsDownload } from "../../behavior/use-upgrade-diagno
 
 const TRIGGER_LABELS = { automatic: "Automatically", operator: "By the operator" } as const;
 
+const emptyTitle = ({ loading }: { loading: boolean }) =>
+  loading
+    ? "Loading diagnostics"
+    : "This install has sent no upgrade diagnostics in the last 30 days.";
+
 /** The upgrade diagnostics an install sent, kept 30 days; the bundle opens on Download. */
 export function InstanceDiagnostics({ instanceRowId }: { instanceRowId: string }) {
   const reports = api.selfHostedInstances.findDiagnostics.useQuery({ instanceRowId });
@@ -22,14 +27,7 @@ export function InstanceDiagnostics({ instanceRowId }: { instanceRowId: string }
       {reports.error ? (
         <HandledErrorAlert error={reports.error} fallbackTitle="Couldn't load the diagnostics" />
       ) : rows.length === 0 ? (
-        <NoDataInfoBlock
-          size="line"
-          title={
-            reports.isLoading
-              ? "Loading diagnostics"
-              : "This install has sent no upgrade diagnostics in the last 30 days."
-          }
-        />
+        <NoDataInfoBlock size="line" title={emptyTitle({ loading: reports.isLoading })} />
       ) : (
         <ListTable variant="embedded" density="compact" scroll="x" scrollLabel="Diagnostics table">
           <ListTable.Header>

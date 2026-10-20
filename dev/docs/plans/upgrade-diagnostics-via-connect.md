@@ -1,7 +1,9 @@
 # Upgrade diagnostics via LangWatch Connect
 
-Status: decided 2026-10-19, built on `feat/upgrade-diagnostics` (2026-10-20). Decisions below under "Decided". The upgrade-alert email
-(`packages/mail/src/templates/upgrade-alert-email.tsx`) is already worded for it.
+Status: built on `feat/upgrade-diagnostics` (2026-10-20). Decisions are under "Decided"; what
+changed while building it is under "Corrections from building it", and the sections above it are
+kept in step with those corrections. The upgrade-alert email
+(`packages/mail/src/templates/upgrade-alert-email.tsx`) is worded for it.
 
 ## Problem
 
@@ -24,8 +26,9 @@ and an opt-in to send these automatically.
 
 ## What the install would send
 
-One bundle per step, built on the install. A manual send shows it in a preview first; an
-automatic send does not, and the step page shows exactly what was sent:
+One bundle per step, built on the install. A manual send shows it in a preview first and sends
+that previewed bundle. An automatic send shows nothing first and keeps no copy on the install; the
+step page shows the bundle as it stands now:
 
 | Field                                                     | Source                                                                                                          |
 | --------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
@@ -33,18 +36,17 @@ automatic send does not, and the step page shows exactly what was sent:
 | `lastError`                                               | step `last_error` (`packages/upgrade/src/ledger-tables.ts`)                                                     |
 | step `report`                                             | step `report` JSONB (its targets and counts)                                                                    |
 | target errors                                             | target rows' `last_error`                                                                                       |
-| run log tail                                              | the latest run's `report.logTail` (50 info/warn lines, already redacted by `RunLog`, `runner/run-log.ts:10,42`) |
+| step log tail                                             | the step's own `log_tail` column: the last 200 lines of its latest attempt, redacted when written              |
 | image release, chart version, install method              | ops config facts already in the usage report                                                                    |
 | instance id                                               | `InstanceIdentityService` (licensing)                                                                           |
 
-Not sent: organisation, project or user names, row contents, environment
-variables, anything outside the ledger, with two named exceptions: the ops config
-facts (release, chart version, install method) and the instance id above.
+Nothing outside the ledger is read, with two named exceptions: the ops config facts (release,
+chart version, install method) and the instance id above. The error, report and log lines are what
+the step wrote, after redaction, so they can still name something such as a project id; the
+preview is where an operator sees that.
 
-There is **no per-step worker log** stored today: worker lines go to stdout or
-OpenTelemetry only. A "recent worker log lines for this step" field needs either a
-bounded per-step tail kept by the background runner (the same `RunLog` shape) or
-is left out. See open decision 3.
+Before this change there was no per-step worker log: worker lines went to stdout or OpenTelemetry
+only. Decision 3 added the bounded per-step tail.
 
 ### Redaction
 
@@ -57,7 +59,7 @@ is left out. See open decision 3.
   `stepping/prisma-tool.ts:56`).
 - Customer data can appear in a validation error (a zod issue quoting a value).
   Cap each string (4 KB) and drop zod `received`/`input` fields; a manual send
-  previews the exact bundle, and every sent bundle stays viewable on the step page.
+  previews the exact bundle it sends. An automatic send is not kept on the install.
 
 ## Install end (licensing)
 
@@ -69,9 +71,10 @@ is left out. See open decision 3.
   `*Api` to send a bundle. Ops never holds the channel.
 - Step page: a "Send to LangWatch" action next to Retry, for `ops:manage`,
   with a preview of the bundle. Shown only when Connect is available.
-- Setting (Ops, Upgrades): "Always send upgrade diagnostics to LangWatch", on by
-  default for installs with Connect (decision 4), opt-out by the setting or an env var. When on, the hourly alert check sends a bundle for each newly failed
-  step, keyed by step id and `updatedAt` so it is sent once.
+- Setting (Settings, Checkup): "Always send upgrade diagnostics to LangWatch", on by
+  default for installs with Connect (decision 4), opt-out by the setting or an env var. When
+  on, the hourly alert check sends a bundle for each newly failed step, keyed by step id and
+  `updatedAt` so it is sent once.
 
 ## Hosted end (licensing's Connect host door)
 
@@ -81,11 +84,9 @@ is left out. See open decision 3.
   `/api/internal/gateway/connect/*`: those are gateway-signed calls for gateway
   traffic (`enterprise/modules/connect/process/src/transport/connect-hosted.rest.ts`),
   and a diagnostics bundle has nothing to do with the gateway.
-- Lands as a row on the self-hosted instance record (beside
-  `SelfHostedInstanceService.recordReport`, `self-hosted-instance.service.ts:69`)
-  and a Slack signal through the existing `self-hosted-crm.service.ts` path, so
-  the team sees "instance X: step Y failed on 3.23.0" with a link to the bundle
-  in Cloud admin.
+- Lands as a `SelfHostedInstanceDiagnostic` row beside the self-hosted instance record, with the
+  bytes in object storage, and one Slack webhook message per instance, step and release, so the
+  team sees "instance X: step Y failed on 3.23.0" with a link to the instance in Cloud admin.
 - Size-capped (64 KB) and rate-limited per instance.
 
 ## Installs without Connect
@@ -114,8 +115,8 @@ own address, so a reply never reaches us.
 
 ## Decided (2026-10-19)
 
-Alex decided 3, 4 and 5 (5: "you decide, S3, max 30 days"); 1, 2 and 6 are proposals
-not yet confirmed.
+Alex decided 3, 4 and 5 (5: "you decide, S3, max 30 days"). 1, 2 and 6 were proposals and are
+built as proposed; the pull request asks for their confirmation.
 
 1. Route home: the licence host door, `POST /v1/upgrade-diagnostics`, licence token.
 2. Unlicensed installs get copy/download only; no public intake.
@@ -124,25 +125,24 @@ not yet confirmed.
 4. "Always send" is on by default for installs with Connect, with an opt-out (env var and
    Ops setting), listed in the Data and telemetry docs and shown on Checkup. Prerequisite:
    redaction and dropping zod `received`/`input` values ship first.
-5. Bundles land in S3 through stored-object under `upgrade-diagnostics/`, eu-central-1
-   (where all Cloud data lives), expired by an S3 lifecycle rule at 30 days; a row on the
-   self-hosted instance record points at the object and feeds Cloud admin and Slack.
+5. Bundles land in object storage under `upgrade-diagnostics/` (ADR-172, no `stored_objects`
+   row), eu-central-1 (where all Cloud data lives), expired by a lifecycle rule at 30 days; a
+   `SelfHostedInstanceDiagnostic` row points at the object and feeds Cloud admin and Slack.
 6. `last_error` is redacted at write time in the ledger.
 
 ## Slack (Alex, 2026-10-19)
 
-Each received bundle posts one Slack message through the self-hosted signal path: metadata only
-(instance, organisation on the licence, release, step id and description, attempt, first and
-latest failure time, whether it was sent automatically) plus a link to the bundle, valid 7 days.
-No error text or log lines in Slack itself. Caveat: a presigned S3 URL lives at most 7 days and
-only when signed with long-lived IAM keys; signed with the pod's role credentials it dies when
-that session does (hours). Decided: the link opens the report in Cloud admin (a "Diagnostics" tab on the existing
-self-hosted instances view, `modules/ops/browser/src/features/admin/ui/sections/self-hosted-instances-view.tsx`,
-served by `enterprise-ops` `self-hosted-instance.trpc.ts`). The page lists every report for
-that install with its metadata; Download mints a short-lived presigned URL (minutes) on click,
-behind the platform-operator permission. The Slack link stops opening after 7 days; the
-report stays listed in Cloud admin until S3 expires it at 30 days. One message per
-step and release; later attempts thread under it.
+The first report of an instance, step and release posts one message to a Slack webhook:
+metadata only (instance, release, step id and description, attempt, whether it was sent
+automatically) plus a link to the instance in Cloud admin. No error text or log lines in Slack
+itself. A presigned link in the message was rejected: it lives at most 7 days, and signed with the
+pod's role credentials it dies with that session. The link opens the instance drawer of the
+self-hosted instances view
+(`modules/ops/browser/src/features/admin/ui/sections/self-hosted-instances-view.tsx`, served by
+`enterprise-ops` `self-hosted-instance.trpc.ts`), which lists every unexpired report for that
+install; Download mints a five-minute signed link on click, behind the platform-operator
+permission. A report stays listed until its 30 days are up. A webhook cannot thread, so later
+reports of the same step and release post nothing and are listed in Cloud admin only.
 
 ## Build order
 

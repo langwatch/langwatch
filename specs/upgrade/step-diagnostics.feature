@@ -16,6 +16,13 @@ Feature: The ledger keeps a redacted error and log for each step
     Then the stored error does not contain the URL
 
   @unit
+  Scenario: A blocking step's error naming a store URL is redacted before it is stored
+    Given an upgrade run that holds the store URLs it was started with
+    And a blocking step that fails with an error quoting one of them
+    When the run records the failure
+    Then the stored error does not contain the URL
+
+  @unit
   Scenario: A very long step error is cut before it is stored
     Given a background step that fails with an error of 20 KB
     When the worker records the failure

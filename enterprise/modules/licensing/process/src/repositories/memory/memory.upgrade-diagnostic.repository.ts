@@ -27,7 +27,7 @@ export class MemoryUpgradeDiagnosticRepository extends UpgradeDiagnosticReposito
   async findAllByInstanceId(instanceId: string): Promise<UpgradeDiagnosticRecord[]> {
     return this.rows
       .filter((row) => row.instanceId === instanceId)
-      .sort((a, b) => b.receivedAt.epochMilliseconds - a.receivedAt.epochMilliseconds);
+      .toSorted((a, b) => b.receivedAt.epochMilliseconds - a.receivedAt.epochMilliseconds);
   }
 
   async findAllForStep({
@@ -43,7 +43,7 @@ export class MemoryUpgradeDiagnosticRepository extends UpgradeDiagnosticReposito
       .filter(
         (row) => row.instanceId === instanceId && row.stepId === stepId && row.release === release,
       )
-      .sort((a, b) => a.receivedAt.epochMilliseconds - b.receivedAt.epochMilliseconds);
+      .toSorted((a, b) => a.receivedAt.epochMilliseconds - b.receivedAt.epochMilliseconds);
   }
 
   async getById(id: string): Promise<UpgradeDiagnosticRecord> {

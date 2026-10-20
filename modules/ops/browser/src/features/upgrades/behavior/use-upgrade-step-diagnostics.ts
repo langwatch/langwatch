@@ -1,3 +1,4 @@
+import type { UpgradeDiagnosticsBundle } from "@langwatch/ops-contract";
 import { useState } from "react";
 
 import { api } from "../../../behavior/ops-api.ts";
@@ -17,7 +18,10 @@ export function useUpgradeStepDiagnostics({ stepId }: { stepId: string }) {
   const host = useOpsHost();
   const toaster = useOpsToaster();
   const availability = api.ops.upgrade.diagnosticsAvailability.useQuery();
-  const [preview, setPreview] = useState<string | null>(null);
+  const [preview, setPreview] = useState<{
+    text: string;
+    bundle: UpgradeDiagnosticsBundle;
+  } | null>(null);
   const send = api.ops.upgrade.sendDiagnostics.useMutation({
     onSuccess: () => {
       setPreview(null);
@@ -26,16 +30,15 @@ export function useUpgradeStepDiagnostics({ stepId }: { stepId: string }) {
     onError: (error) => host.failed({ error, fallbackTitle: "The diagnostics could not be sent" }),
   });
 
-  const bundleText = async () =>
-    JSON.stringify(await utils.ops.upgrade.getDiagnostics.fetch({ id: stepId }), null, 2);
-
-  const whenRead = (act: (text: string) => void | Promise<void>) => async () => {
-    try {
-      await act(await bundleText());
-    } catch (error) {
-      host.failed({ error, fallbackTitle: "The diagnostics could not be read" });
-    }
-  };
+  const whenRead =
+    (act: (text: string, bundle: UpgradeDiagnosticsBundle) => void | Promise<void>) => async () => {
+      try {
+        const bundle = await utils.ops.upgrade.getDiagnostics.fetch({ id: stepId });
+        await act(JSON.stringify(bundle, null, 2), bundle);
+      } catch (error) {
+        host.failed({ error, fallbackTitle: "The diagnostics could not be read" });
+      }
+    };
 
   return {
     canSend: availability.data?.available ?? false,
@@ -51,11 +54,13 @@ export function useUpgradeStepDiagnostics({ stepId }: { stepId: string }) {
       anchor.click();
       URL.revokeObjectURL(url);
     }),
-    /** Opens the preview; sending happens only from it. */
-    review: whenRead((text) => setPreview(text)),
-    preview,
+    /** Opens the preview; sending happens only from it, and sends the bundle it shows. */
+    review: whenRead((text, bundle) => setPreview({ text, bundle })),
+    preview: preview?.text ?? null,
     closePreview: () => setPreview(null),
-    confirmSend: () => send.mutate({ id: stepId }),
+    confirmSend: () => {
+      if (preview) send.mutate({ bundle: preview.bundle });
+    },
     sending: send.isPending,
   };
 }
