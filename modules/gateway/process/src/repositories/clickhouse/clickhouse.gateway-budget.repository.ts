@@ -15,7 +15,7 @@ import {
   parseSummedNanoUsd,
 } from "@langwatch/gateway-contract";
 import { createLogger } from "@langwatch/observability";
-import { type Instant, nowInstant, Temporal } from "@langwatch/time";
+import { type Instant, nowInstant, Temporal, toDate } from "@langwatch/time";
 
 import { budgetSpendTargetsFor } from "../../rules/gateway-budget-spend-targets.rules.ts";
 import type {
@@ -296,7 +296,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       ProviderSlot: r.providerSlot ?? "",
       DurationMS: r.durationMs ?? 0,
       Status: r.status.toLowerCase(),
-      OccurredAt: r.occurredAt.epochMilliseconds,
+      OccurredAt: toDate(r.occurredAt),
       EventTimestamp: nowInstant().epochMilliseconds,
     }));
 
@@ -355,7 +355,7 @@ export class GatewayBudgetClickHouseRepository implements GatewayBudgetSpendRepo
       ProviderSlot: "",
       DurationMS: 0,
       Status: "success",
-      OccurredAt: r.occurredAt.epochMilliseconds,
+      OccurredAt: toDate(r.occurredAt),
       // The ReplacingMergeTree version. Pull time, not bucket time: a
       // restatement of period P keeps P's OccurredAt, so ordering versions by
       // it would compare the period against itself.
