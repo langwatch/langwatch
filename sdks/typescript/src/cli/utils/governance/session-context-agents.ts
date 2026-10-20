@@ -1,10 +1,6 @@
 /**
- * One row per coding agent whose session reports its repository through a
- * hook: the argument its hook command is called with, the agent the record
- * declares, the source types its personal ingest key is cached under, where
- * its session id and launch directory come from, and where its hook lives.
- * The hook, its install and removal, `ingest context` and the key heal all
- * read this table instead of keeping a list of their own (ADR-039 S5).
+ * One row per coding agent that reports its repository through a hook. The
+ * hook, install, removal, `ingest context` and key heal all read it (ADR-039 S5).
  * Spec: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -23,10 +19,8 @@ export interface HooksTarget {
 }
 
 /**
- * How an agent runs our hook, which decides how it is installed and removed:
- * entries merged into a hook file the user shares with us, a plugin module
- * opencode loads, or a whole file only LangWatch writes in a folder the agent
- * loads every file of.
+ * How an agent runs our hook: entries merged into a file shared with the user,
+ * an opencode plugin, or a whole file of ours in a folder the agent loads.
  */
 export type HookTarget =
   | { kind: "entries"; resolve: () => HooksTarget }

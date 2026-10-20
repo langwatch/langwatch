@@ -1,9 +1,7 @@
 /**
- * The command hooks that make a session report the repository it ran in.
- * Ownership doctrine: an entry is ours only when the command it runs is one
- * of ours -- every other entry is read past and written back untouched. Where
- * an agent loads a whole folder of hook files (Copilot), we own one file of
- * our own there instead and never open the user's.
+ * The hooks that make a session report its repository. An entry is ours only
+ * when its command is ours; others are written back untouched. In a folder of
+ * hook files (Copilot) we own one file and never open the user's.
  */
 
 import * as fs from "node:fs";
@@ -13,7 +11,11 @@ import {
   readAppSettingsFileForUpdate,
   writeAppSettingsFile,
 } from "./app-settings";
-import { type HookedTool, type HooksTarget, SESSION_CONTEXT_AGENTS } from "./session-context-agents";
+import {
+  type HookedTool,
+  type HooksTarget,
+  SESSION_CONTEXT_AGENTS,
+} from "./session-context-agents";
 
 export type { HookedTool } from "./session-context-agents";
 
@@ -70,10 +72,8 @@ export interface SessionContextHooksInstallResult extends HooksTarget {
 }
 
 /**
- * Merges the session-context hooks into the tool's hook file, creating it
- * when missing, or writes the tool's own hook file where it has one.
- * Idempotent -- reports `unchanged` the second run. Throws when an existing
- * shared file isn't a JSON object.
+ * Merges our hooks into the tool's hook file (or writes our own file where it
+ * has one). Idempotent; throws when a shared file isn't a JSON object.
  */
 export function installSessionContextHooks({
   tool,
@@ -156,6 +156,17 @@ export function removeSessionContextHooks({
   if (!isPlainObject(document.hooks)) return false;
   const hooks: Record<string, unknown> = { ...document.hooks };
 
+  if (!stripLangwatchEntries(hooks)) return false;
+
+  if (Object.keys(hooks).length === 0) delete document.hooks;
+  else document.hooks = hooks;
+
+  writeAppSettingsFile({ filePath: target.path, settings: document });
+  return true;
+}
+
+/** Drops our entries from every event, and any event left empty. Returns whether any went. */
+function stripLangwatchEntries(hooks: Record<string, unknown>): boolean {
   let removed = false;
   for (const [event, entries] of Object.entries(hooks)) {
     if (!Array.isArray(entries)) continue;
@@ -165,13 +176,7 @@ export function removeSessionContextHooks({
     if (kept.length === 0) delete hooks[event];
     else hooks[event] = kept;
   }
-  if (!removed) return false;
-
-  if (Object.keys(hooks).length === 0) delete document.hooks;
-  else document.hooks = hooks;
-
-  writeAppSettingsFile({ filePath: target.path, settings: document });
-  return true;
+  return removed;
 }
 
 /**

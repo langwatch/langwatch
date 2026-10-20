@@ -1,8 +1,6 @@
 /**
- * The per-agent table must leave Claude Code, Codex and opencode exactly as
- * they were: the same hook files on disk, the same records posted, the same
- * keys read. The expected bytes and digests below were captured from the CLI
- * before the table existed, so any drift the table introduces fails here.
+ * The table must leave Claude Code, Codex and opencode byte-identical: the
+ * expected bytes and digests were captured from the CLI before it existed.
  * Feature: specs/ai-governance/cli-wrappers/session-context-hook.feature
  */
 
@@ -28,8 +26,7 @@ import {
 const hook = installHookHarness();
 const { posted } = hook;
 
-const sha256 = (bytes: string | Buffer): string =>
-  createHash("sha256").update(bytes).digest("hex");
+const sha256 = (bytes: string | Buffer): string => createHash("sha256").update(bytes).digest("hex");
 
 /**
  * The posted body with the CLI's own version taken out, the one part of it

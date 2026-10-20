@@ -50,7 +50,12 @@ describe("installTelemetryWiring", () => {
     );
 
     it("writes no Copilot hook file for another tool", () => {
-      installTelemetryWiring({ cfg: baseCfg(), tool: "opencode", endpoint: ENDPOINT, token: TOKEN });
+      installTelemetryWiring({
+        cfg: baseCfg(),
+        tool: "opencode",
+        endpoint: ENDPOINT,
+        token: TOKEN,
+      });
 
       expect(fs.existsSync(path.join(temp.home, ".copilot"))).toBe(false);
     });

@@ -6,8 +6,8 @@
 
 import { describe, expect, it, vi } from "vitest";
 
-import { attributesOf, installHookHarness } from "./hook-harness";
 import captured from "./fixtures/copilot-hook-payloads.json";
+import { attributesOf, installHookHarness } from "./hook-harness";
 
 const hook = installHookHarness();
 const { posted } = hook;
@@ -33,24 +33,22 @@ describe("the session context hook run by Copilot", () => {
     it.each([
       ["the Copilot CLI", cli.sessionStart, cli.sessionStart.sessionId, CLI_ENV],
       ["VS Code", vscode.sessionStart, vscode.sessionStart.session_id, {}],
-    ])("posts one record from %s declaring copilot and the payload's session id", async (
-      _surface,
-      input,
-      sessionId,
-      env,
-    ) => {
-      await hook.runHook({ tool: "copilot", input, env });
+    ])(
+      "posts one record from %s declaring copilot and the payload's session id",
+      async (_surface, input, sessionId, env) => {
+        await hook.runHook({ tool: "copilot", input, env });
 
-      expect(posted).toHaveLength(1);
-      expect(attributesOf(posted[0]!)).toMatchObject({
-        "coding_agent.name": "copilot",
-        // The hook session id is the conversation id on Copilot's spans
-        // (#8803 Q4), so this record lands on the row the spans built.
-        "session.id": sessionId,
-        "vcs.repository.name": "langwatch",
-        "vcs.ref.head.name": "feat/session-context",
-      });
-    });
+        expect(posted).toHaveLength(1);
+        expect(attributesOf(posted[0]!)).toMatchObject({
+          "coding_agent.name": "copilot",
+          // The hook session id is the conversation id on Copilot's spans
+          // (#8803 Q4), so this record lands on the row the spans built.
+          "session.id": sessionId,
+          "vcs.repository.name": "langwatch",
+          "vcs.ref.head.name": "feat/session-context",
+        });
+      },
+    );
 
     it("writes nothing on stdout and asks for no exit code", async () => {
       await hook.runHook({ tool: "copilot", input: cli.agentStop, env: CLI_ENV });

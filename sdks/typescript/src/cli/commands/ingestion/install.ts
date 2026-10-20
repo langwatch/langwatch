@@ -69,10 +69,8 @@ interface InstallReport {
    */
   codex_turn_harvest_action?: CodexTurnHarvestOutcome["status"];
   /**
-   * How the tool's session context seam was left: hook entries for
-   * claude_code/codex, the plugin file for opencode, LangWatch's own hook
-   * file for copilot_cli. Absent when the Claude
-   * Code plugin took the install, leaving nothing in settings to report.
+   * How the session context seam was left (entries, opencode plugin, or our
+   * own Copilot hook file). Absent when the Claude Code plugin took it.
    */
   session_hooks_action?: "created" | "updated" | "unchanged";
   session_hooks_path?: string;
@@ -190,32 +188,41 @@ async function runInstall(
   // Every agent knows which repository, branch and worktree a session runs in
   // and exports none of it over telemetry. The session context seam is what
   // reports it, so activating capture installs it alongside the export block.
-  if (!options.envOnly) {
-    // Claude Code takes the seam as a plugin, which carries its own copy of the
-    // hook command and so never breaks when the CLI on PATH is older than the
-    // subcommand a raw entry names. The entries stay as the fallback for a
-    // `claude` that cannot take a plugin, and the report says which one ran.
-    let isClaudePluginHandlingHooks = false;
-    if (tool === "claude_code") {
-      const plugin = ensureLangwatchClaudePlugin({ interactive: true });
-      report.claude_plugin_action = plugin.action;
-      isClaudePluginHandlingHooks =
-        plugin.action === "installed" || plugin.action === "already_installed";
-    }
-
-    // Which seam, if any, comes from the hooked agent whose key this is.
-    const hooked = sessionContextAgentByKeySourceType(tool);
-    if (hooked && !(hooked.id === "claude_code" && isClaudePluginHandlingHooks)) {
-      const result =
-        hooked.id === "opencode"
-          ? installOpencodeSessionContextPlugin({ dirPath: options.opencodePluginDir })
-          : installSessionContextHooks({ tool: hooked.id, filePath: options.hooksPath });
-      report.session_hooks_action = result.action;
-      report.session_hooks_path = result.displayPath;
-    }
-  }
+  if (!options.envOnly) installSessionContextSeam({ tool, options, report });
 
   return report;
+}
+
+function installSessionContextSeam({
+  tool,
+  options,
+  report,
+}: {
+  tool: SupportedTool;
+  options: InstallOptions;
+  report: InstallReport;
+}): void {
+  // Claude Code takes the seam as a plugin, which carries its own copy of the
+  // hook command and so never breaks when the CLI on PATH is older than the
+  // subcommand a raw entry names. The entries stay as the fallback for a
+  // `claude` that cannot take a plugin, and the report says which one ran.
+  let isClaudePluginHandlingHooks = false;
+  if (tool === "claude_code") {
+    const plugin = ensureLangwatchClaudePlugin({ interactive: true });
+    report.claude_plugin_action = plugin.action;
+    isClaudePluginHandlingHooks =
+      plugin.action === "installed" || plugin.action === "already_installed";
+  }
+
+  // Which seam, if any, comes from the hooked agent whose key this is.
+  const hooked = sessionContextAgentByKeySourceType(tool);
+  if (!hooked || (hooked.id === "claude_code" && isClaudePluginHandlingHooks)) return;
+  const result =
+    hooked.id === "opencode"
+      ? installOpencodeSessionContextPlugin({ dirPath: options.opencodePluginDir })
+      : installSessionContextHooks({ tool: hooked.id, filePath: options.hooksPath });
+  report.session_hooks_action = result.action;
+  report.session_hooks_path = result.displayPath;
 }
 
 function buildEnvBlock(tool: SupportedTool, endpoint: string, token: string): string[] {

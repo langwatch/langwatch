@@ -143,10 +143,8 @@ interface DeclaredCheckout {
 }
 
 /**
- * The record `langwatch ingest hook` posts, as log processing stores it: the
- * CLI's own scope and service, the session id and declared agent beside the
- * checkout. Nothing in it is Copilot's own, which is why the server needs no
- * Copilot branch to fold it (ADR-039 S4).
+ * The record `langwatch ingest hook` posts, as stored: CLI scope and service,
+ * session id, agent and checkout. Nothing is Copilot's own (ADR-039 S4).
  */
 function sessionContextRecord({
   agent,
@@ -242,7 +240,10 @@ function foldContextRecords(
       data,
     };
     const state = sessions.get(data.sessionId) ?? projection.init();
-    sessions.set(data.sessionId, projection.handleCodingAgentSessionLogFactsContributed(event, state));
+    sessions.set(
+      data.sessionId,
+      projection.handleCodingAgentSessionLogFactsContributed(event, state),
+    );
   }
   return sessions;
 }

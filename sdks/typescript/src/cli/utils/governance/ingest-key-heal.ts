@@ -90,8 +90,7 @@ function wiringToolFor(sourceType: string): string | null {
 /**
  * Re-mints the personal ingest key cached under `sourceType` and rewrites its tool's wiring,
  * declining without a platform call when this device can't repair the 401.
- * {@link revocationBlocksHeal} decides whether the platform withholds the repair instead of
- * granting it.
+ * {@link revocationBlocksHeal} decides whether the platform withholds the repair.
  */
 export async function healRevokedIngestKey({
   sourceType,

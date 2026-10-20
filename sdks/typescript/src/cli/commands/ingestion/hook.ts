@@ -22,16 +22,16 @@ import {
 import { type HealOutcome, healRevokedIngestKey } from "@/cli/utils/governance/ingest-key-heal";
 import { TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import {
-  type SessionContextAgent,
-  sessionContextAgentFor,
-} from "@/cli/utils/governance/session-context-agents";
-import {
   buildSessionContextLogPayload,
   normalizeSessionName,
   parseOtlpHeaders,
   parseTraceparent,
   sessionContextFingerprint,
 } from "@/cli/utils/governance/session-context";
+import {
+  type SessionContextAgent,
+  sessionContextAgentFor,
+} from "@/cli/utils/governance/session-context-agents";
 import { drainSessionContextSpool } from "@/cli/utils/governance/session-context-spool";
 import { buildSdkIdentityHeaders } from "@/internal/api/request-headers";
 import { LANGWATCH_SDK_VERSION } from "@/internal/constants";

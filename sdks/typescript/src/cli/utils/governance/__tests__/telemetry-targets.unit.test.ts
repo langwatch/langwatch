@@ -263,12 +263,12 @@ describe("scanTelemetryTargets", () => {
     it("lists it as the copilot session hooks and removes the file", () => {
       installSessionContextHooks({ tool: "copilot" });
 
-      expect(presentLabels()).toEqual([
-        "copilot session hooks (~/.copilot/hooks/langwatch.json)",
-      ]);
-      for (const t of scan().filter((t) => t.present)) {
-        expect(t.remove()).toBe(true);
-      }
+      expect(presentLabels()).toEqual(["copilot session hooks (~/.copilot/hooks/langwatch.json)"]);
+      expect(
+        scan()
+          .filter((t) => t.present)
+          .map((t) => t.remove()),
+      ).toEqual([true]);
 
       expect(presentLabels()).toEqual([]);
       expect(fs.existsSync(path.join(tmpHome, ".copilot", "hooks", "langwatch.json"))).toBe(false);

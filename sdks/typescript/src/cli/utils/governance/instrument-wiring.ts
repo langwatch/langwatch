@@ -124,10 +124,8 @@ function clearCodeTerminalEnv({
 }
 
 /**
- * The Copilot CLI and VS Code report their repository through the one hook
- * file LangWatch owns in the folder both load (ADR-039 S4), so wiring either
- * surface writes it. Quiet and idempotent; the env is the wiring that
- * matters and the seam is best-effort, as claude's is.
+ * Both Copilot surfaces load the one hook file LangWatch owns (ADR-039 S4), so
+ * wiring either writes it. Quiet, idempotent and best-effort, as claude's is.
  */
 function assertCopilotSessionHooks(tool: string): void {
   const sourceType = SOURCE_TYPE_BY_TOOL[tool];
