@@ -190,9 +190,10 @@ function addCallKeys({
   for (const [keyId, parts] of call.keys) {
     const [first] = parts;
     if (first === undefined) continue;
-    if (kind === "thread") into.threadKeys.add(first);
-    if (kind === "thread" && shouldReadContent) into.threadContentKeys.add(first);
-    else if (kind === "text") into.texts.add(first);
+    if (kind === "thread") {
+      into.threadKeys.add(first);
+      if (shouldReadContent) into.threadContentKeys.add(first);
+    } else if (kind === "text") into.texts.add(first);
     else into.traceIds.add(first);
     if (kind === "span") into.spanPairs.add(keyId);
   }

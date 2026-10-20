@@ -172,9 +172,17 @@ describe("LangWatchQLHydrationReadService", () => {
 
   describe("given thread functions over the same conversations", () => {
     async function threadReadsFor(calls: readonly { column: string; function: string }[]) {
-      const reads: { traces: string[][]; traceIds: string[][] } = { traces: [], traceIds: [] };
+      const reads: { byTraceId: string[][]; traces: string[][]; traceIds: string[][] } = {
+        byTraceId: [],
+        traces: [],
+        traceIds: [],
+      };
       const service = LangWatchQLHydrationReadService.create({
         traces: traceSource({
+          readTraces: async ({ traceIds }) => {
+            reads.byTraceId.push([...traceIds]);
+            return [];
+          },
           readThreadTraces: async ({ threadKeys }) => {
             reads.traces.push([...threadKeys]);
             return [];
@@ -203,7 +211,7 @@ describe("LangWatchQLHydrationReadService", () => {
         { column: "ids", function: "thread_traces" },
       ]);
 
-      expect(reads).toEqual({ traces: [], traceIds: [["thread-a", "thread-b"]] });
+      expect(reads).toEqual({ byTraceId: [], traces: [], traceIds: [["thread-a", "thread-b"]] });
       expect(fetched.traceIdsByThread.get("thread-b")).toEqual(["thread-b-1"]);
     });
 
@@ -214,7 +222,7 @@ describe("LangWatchQLHydrationReadService", () => {
         { column: "transcript", function: "conversation" },
       ]);
 
-      expect(reads).toEqual({ traces: [["thread-a", "thread-b"]], traceIds: [] });
+      expect(reads).toEqual({ byTraceId: [], traces: [["thread-a", "thread-b"]], traceIds: [] });
     });
   });
 

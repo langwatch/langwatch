@@ -1029,8 +1029,8 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
   }
 
   /**
-   * A trace belongs to the thread its latest summary version naming one of the
-   * threads carries; OccurredAt is immutable, so ordering on it is stable.
+   * A trace belongs to the thread its latest summary version among those naming
+   * one of the threads carries; OccurredAt is immutable, so ordering is stable.
    * @param maxTraces traces the read may return across every thread asked for.
    */
   async findTraceIdsByThreadIds({
@@ -1060,7 +1060,6 @@ export class TraceLegacyReadClickHouseRepository extends TraceLegacyReadReposito
             WHERE ${tenantScope("OccurredAt")}
               AND Attributes['gen_ai.conversation.id'] IN ({threadIds:Array(String)})
             GROUP BY TraceId
-            HAVING ThreadId IN ({threadIds:Array(String)})
             ORDER BY FirstOccurredAt ASC, TraceId ASC
             LIMIT {maxTraces:UInt32}
           `,
