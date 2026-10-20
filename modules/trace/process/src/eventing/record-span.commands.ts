@@ -23,13 +23,17 @@ import {
   type RecordSpanCommandData,
   type SpanReceivedEvent,
   type PIIRedactionLevel,
+  TRUNCATED_ATTRIBUTES_KEY,
 } from "@langwatch/trace-contract";
 import { SpanKind } from "@opentelemetry/api";
 import { getLangWatchTracer } from "langwatch";
 import { z } from "zod";
 
 import { clonePayload } from "../rules/payload-clone.rules.ts";
-import { capOversizedAttributes } from "../rules/trace-attribute-cap.rules.ts";
+import {
+  capOversizedAttributes,
+  MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+} from "../rules/trace-attribute-cap.rules.ts";
 
 export interface TraceSpanPiiRedaction {
   redact(input: {
@@ -75,6 +79,21 @@ const spooledRecordSpanSchema = z.object({
   resource: resourceSchema.nullable(),
   instrumentationScope: instrumentationScopeSchema.nullable(),
 });
+
+/**
+ * Error names the spool's storage raises for an empty address: the stored-object byte layer
+ * (`StoredObjectNotFoundError`, `ObjectNotFoundError`) and S3's `NoSuchKey` on the v1 path.
+ * Matched by name, since the error crosses the adapter that implements the spool port.
+ */
+const MISSING_SPOOL_OBJECT_ERROR_NAMES: ReadonlySet<string> = new Set([
+  "StoredObjectNotFoundError",
+  "ObjectNotFoundError",
+  "NoSuchKey",
+]);
+
+function isMissingSpoolObject(error: unknown): boolean {
+  return error instanceof Error && MISSING_SPOOL_OBJECT_ERROR_NAMES.has(error.name);
+}
 
 export const RECORD_SPAN_DEDUPLICATION = {
   makeId: (payload: RecordSpanCommandData) =>
@@ -177,6 +196,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   private async record(command: Command<RecordSpanCommandData>): Promise<SpanReceivedEvent[]> {
     const tenantId = createTenantId(command.tenantId);
     const commandData = await this.resolveCommandData(command);
+    if (!commandData) return [];
     const traceId = commandData.span.traceId;
     const spanId = commandData.span.spanId;
 
@@ -186,9 +206,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     const resource = commandData.resource ? clonePayload(commandData.resource) : null;
 
     this.stripReservedAttributes(span, resource);
-    if (!command.data.spoolRef) {
-      this.capAttributes({ span, resource, tenantId, traceId, spanId });
-    }
+    this.capAttributes({ span, resource, tenantId, traceId, spanId });
 
     const piiRedactionLevel = commandData.piiRedactionLevel ?? DEFAULT_PII_REDACTION_LEVEL;
     const [piiResult, costResult, tokenResult] = await Promise.allSettled([
@@ -259,9 +277,14 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     return [spanReceivedEvent];
   }
 
+  /**
+   * The command with its spooled span read back, or null when the spool object is gone
+   * (deleted once the event is stored, or expired). No retry can rebuild it, so the command
+   * completes with nothing to record instead of landing in the dead letters.
+   */
   private async resolveCommandData(
     command: Command<RecordSpanCommandData>,
-  ): Promise<RecordSpanCommandData> {
+  ): Promise<RecordSpanCommandData | null> {
     const spoolRef = command.data.spoolRef;
     if (!spoolRef) {
       return command.data;
@@ -272,12 +295,23 @@ export class EventingRecordSpanAdapter implements CommandHandler<
       );
     }
 
-    const serialized = await this.options.spool.read({
+    const identity = {
       spoolRef,
       projectId: command.tenantId,
       traceId: command.data.span.traceId,
       spanId: command.data.span.spanId,
-    });
+    };
+    let serialized: string;
+    try {
+      serialized = await this.options.spool.read(identity);
+    } catch (error) {
+      if (!isMissingSpoolObject(error)) throw error;
+      this.logger.warn(
+        { ...identity, errorName: (error as Error).name },
+        "Spooled span object is gone; recording nothing (a redelivery after the span was stored, or an object that expired before the worker read it)",
+      );
+      return null;
+    }
     const spooled = spooledRecordSpanSchema.parse(JSON.parse(serialized));
 
     return {
@@ -301,7 +335,11 @@ export class EventingRecordSpanAdapter implements CommandHandler<
     traceId: string;
     spanId: string;
   }): void {
-    const cappedAttributeCount = capOversizedAttributes(span, resource);
+    const cappedAttributeCount = capOversizedAttributes(
+      span,
+      resource,
+      MAX_RECORDED_ATTRIBUTE_VALUE_BYTES,
+    );
     if (cappedAttributeCount === 0) {
       return;
     }
@@ -321,9 +359,9 @@ export class EventingRecordSpanAdapter implements CommandHandler<
   private stripReservedAttributes(span: OtlpSpan, resource: OtlpResource | null): void {
     const strip = (attributes: OtlpSpan["attributes"]): OtlpSpan["attributes"] =>
       attributes.filter((attribute) => {
-        const reserved = attribute.key.startsWith(
-          EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX,
-        );
+        const reserved =
+          attribute.key.startsWith(EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PREFIX) ||
+          attribute.key === TRUNCATED_ATTRIBUTES_KEY;
         const allowed = EventingRecordSpanAdapter.RESERVED_ATTRIBUTE_PASSTHROUGH.has(attribute.key);
         if (!reserved || allowed) {
           return true;
@@ -331,7 +369,7 @@ export class EventingRecordSpanAdapter implements CommandHandler<
 
         this.logger.warn(
           { attributeKey: attribute.key },
-          "Stripped user-submitted langwatch.reserved.* attribute",
+          "Stripped a user-submitted reserved attribute",
         );
         return false;
       });

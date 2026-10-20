@@ -19327,6 +19327,8 @@ GROUP BY TenantId ORDER BY cost_usd DESC
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
+
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
 Start with the spend mix:
@@ -31750,7 +31752,7 @@ LangWatch provides a standard OpenTelemetry Protocol (OTLP) endpoint for receivi
 https://app.langwatch.ai/api/otel/v1/traces
 ```
 
-This endpoint accepts OTLP over HTTP and gRPC protocols, making it compatible with all OpenTelemetry SDKs.
+This endpoint accepts OTLP over HTTP, with protobuf or JSON bodies. OTLP over gRPC is not supported: set your exporter to `http/protobuf` or `http/json` (for example `OTEL_EXPORTER_OTLP_PROTOCOL=http/protobuf`), since some SDKs default to gRPC.
 
 ## General Setup Pattern
 
@@ -31863,9 +31865,13 @@ The setup follows this general pattern across all languages:
                 var builder = Sdk.CreateTracerProviderBuilder()
                     .SetResourceBuilder(ResourceBuilder.CreateDefault()
                         .AddService(serviceName: "my-service"))
-                    .AddOtlpExporter(opts => opts
-                        .Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces")
-                        .Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY"))
+                    .AddOtlpExporter(opts =>
+                    {
+                        // Most .NET targets default to gRPC, which LangWatch does not accept.
+                        opts.Protocol = OpenTelemetry.Exporter.OtlpExportProtocol.HttpProtobuf;
+                        opts.Endpoint = new Uri("https://app.langwatch.ai/api/otel/v1/traces");
+                        opts.Headers = "Authorization=Bearer " + Environment.GetEnvironmentVariable("LANGWATCH_API_KEY");
+                    })
                     .Build();
             }
         }
@@ -41729,17 +41735,17 @@ the server and set your API key.
 
 Once connected, your agent has these dashboard tools:
 
-- `platform_list_dashboards`: list every dashboard in the project.
-- `platform_get_dashboard`: read one dashboard, including its widgets.
-- `platform_create_dashboard`: create a new, empty dashboard.
-- `platform_rename_dashboard`: rename a dashboard.
-- `platform_delete_dashboard`: delete a dashboard and its widgets.
+- `list_dashboard_boards`: list the project's dashboards, with the id each
+  widget tool takes.
 - `run_query`: run one read-only LangWatchQL (LWQL) statement and see the rows
   it returns. Use this to check a query before it goes into a widget.
 - `add_dashboard_widget`: create a custom widget and add it to a dashboard.
 - `update_dashboard_widget`: change a widget's name, code, queries or
   description. Pass the dashboard id, the widget id, and only the fields to
   change. Every field you leave out keeps its value.
+
+The `platform_*_dashboard` tools work on the dashboards in Analytics Reports,
+which hold charts, not widgets.
 
 ### The widget definition format
 
@@ -55837,6 +55843,8 @@ GROUP BY TenantId ORDER BY cost_usd DESC
 
 If more than one project comes back, ask whether the report covers the user's own sessions or the whole team. For one project, add `AND TenantId = '<id>'` to every query below; the user's own id is `personal_project.id` in `langwatch whoami`; if that field is missing, ask the user which project id to use.
 
+If the report window has no `model_call` rows, run `SELECT count() AS events, max(TimeUnixMs) AS newest FROM langwatch.coding_session_events WHERE EventKind = 'model_call'` inline (not a `sql` fence) for the newest event in any window, adding `AND TenantId = '<id>'` when the report covers one project. `events = 0` means no Claude Code model call is stored for the report's scope (one project, or the whole team), so there is no cost data; otherwise report the age (`the newest Claude Code event is from <time>, <age> ago`). Name what to check in the Claude Code telemetry setup: `CLAUDE_CODE_ENABLE_TELEMETRY=1`, `OTEL_EXPORTER_OTLP_ENDPOINT` pointing at LangWatch, and the project API key in `OTEL_EXPORTER_OTLP_HEADERS` (`Authorization=Bearer <key>`). Report that gap instead of the cost checks.
+
 `langwatch.coding_sessions` holds one row per session, with `Title`, `PeakContextTokens`, `Compactions`, `Models`, `SubAgentTypes`, `CostUsd`, `StartedAt` and `UserId`. Use it to name example sessions.
 
 Start with the spend mix:
@@ -59899,12 +59907,13 @@ langwatch dashboard-widget list -f json
 langwatch dashboard-widget get <id> -f json      # code, queries, platformUrl
 langwatch dashboard-widget update <id> --code-file widget.tsx --queries-file queries.json
 langwatch dashboard-widget delete <id>
+langwatch dashboard-widget boards -f json                              # the dashboards a widget can go on
 langwatch dashboard-widget pin <id-or-name> --dashboard <id-or-name>   # add to a dashboard
 ```
 
-`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard list` for ids.
+`pin` reassigns the widget to that dashboard, at the dashboard's next free row — edit it from the widget's menu on that board. See `langwatch dashboard-widget boards` for ids. `langwatch dashboard list` lists the Analytics Reports dashboards, which hold no widgets, so `pin` does not find them.
 
-**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board with its id in `ref`. Never pick one from `langwatch dashboard list` on your own.
+**Which dashboard:** place on the dashboard in the user's context (the board they are on, or one they named). If no dashboard is in context, ask which board with the `question` tool, one option per board from `langwatch dashboard-widget boards` with its id in `ref`. Never choose a board for the user.
 
 `update` accepts `--name` on its own, or a full definition (`--code`/`--code-file` together with `--queries-file`) — passing one definition flag without the other is refused locally rather than saving half a widget. A call with nothing to change is refused too.
 
@@ -74210,6 +74219,15 @@ openapi: "POST /api/v1/projects"
 
 ---
 
+# FILE: ./api-reference/projects/get-a-dashboards-board.mdx
+
+---
+title: "Get a Dashboards board"
+openapi: "GET /api/v1/projects/{projectId}/analytics/boards/{boardId}"
+---
+
+---
+
 # FILE: ./api-reference/projects/get-api-key.mdx
 
 ---
@@ -74224,6 +74242,15 @@ openapi: "GET /api/v1/projects/{id}/api-key"
 ---
 title: "Get project"
 openapi: "GET /api/v1/projects/{id}"
+---
+
+---
+
+# FILE: ./api-reference/projects/list-dashboards-boards.mdx
+
+---
+title: "List Dashboards boards"
+openapi: "GET /api/v1/projects/{projectId}/analytics/boards"
 ---
 
 ---
@@ -74860,9 +74887,11 @@ Every tenant-scoped table of the application database, derived from the schema. 
 | `anomaly_alerts` | Persisted anomaly detection. | `output`, `costs` | one row per (TenantId, AnomalyAlertId); an organization-scoped row appears once per project | `TriggerWindowStart` |
 | `anomaly_rules` | Admin-defined anomaly detection rule. | `output` | one row per (TenantId, AnomalyRuleId); an organization-scoped row appears once per project | `CreatedAt` |
 | `costs` | Rows of the Cost table, one row per CostId. | `costs`, `output` | one row per CostId | `CreatedAt` |
-| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable. | `output` | one row per CustomGraphId | `CreatedAt` |
+| `custom_graphs` | Rows of the CustomGraph table, one row per CustomGraphId. Rows placed on a dashboard set to Only me are not queryable, and dashboard widgets are in dashboard_widgets. | `output` | one row per CustomGraphId | `CreatedAt` |
 | `custom_llm_model_costs` | Rows of the CustomLLMModelCost table, one row per CustomLLMModelCostId. | `costs`, `output` | one row per CustomLLMModelCostId | `CreatedAt` |
-| `dashboards` | Rows of the Dashboard table, one row per DashboardId. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
+| `dashboard_widgets` | One row per widget in the Dashboards area: its React source and named LangWatchQL queries, and where it sits on its board. Widgets placed on a dashboard set to Only me are not queryable. | `output` | one row per DashboardWidgetId | `CreatedAt` |
+| `dashboards` | One row per Analytics Reports board. Dashboards set to Only me are not queryable, and a board only the Dashboards area holds is in dashboards_v2. | None | one row per DashboardId | `CreatedAt` |
+| `dashboards_v2` | One row per board in the Dashboards area. A board made before Dashboards and Analytics Reports split kept its id, so it can be in dashboards too. Dashboards set to Only me are not queryable. | None | one row per DashboardId | `CreatedAt` |
 | `data_privacy_policies` | Rows of the DataPrivacyPolicy table, one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project. | `output` | one row per (TenantId, DataPrivacyPolicyId); an organization-scoped row appears once per project | `CreatedAt` |
 | `dataset_records` | Rows of the DatasetRecord table, one row per DatasetRecordId. | `output` | one row per DatasetRecordId | `CreatedAt` |
 | `datasets` | Rows of the Dataset table, one row per DatasetId. | `output` | one row per DatasetId | `CreatedAt` |

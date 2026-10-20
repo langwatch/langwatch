@@ -54,6 +54,21 @@ export type IssuedLicenseDraft = Omit<IssuedLicenseRecord, "id" | "createdAt" | 
 
 export type IssuedLicensePatch = Partial<IssuedLicenseDraft>;
 
+/** Which rows a list keeps. Every part is optional; absent keeps every row. */
+export type IssuedLicenseQuery = {
+  search?: string;
+  /**
+   * Keeps the rows active at `at` (not revoked, superseded or expired), or with
+   * `active` false, the rest.
+   */
+  status?: { at: Instant; active: boolean };
+  /**
+   * Keeps the rows whose email ends with one of these, case aside, or with
+   * `matching` false, the rest.
+   */
+  emailSuffixes?: { suffixes: readonly string[]; matching: boolean };
+};
+
 export interface IssuedLicenseRepository {
   create(data: IssuedLicenseDraft): Promise<IssuedLicenseRecord>;
   findById(id: string): Promise<IssuedLicenseRecord | null>;
@@ -67,11 +82,12 @@ export interface IssuedLicenseRepository {
   findAllSeatsRaised(params: { organizationId?: string }): Promise<IssuedLicenseRecord[]>;
   /** Unrevoked licenses bound to one install, the most recently bound first. */
   findAllBoundToInstance(instanceId: string): Promise<IssuedLicenseRecord[]>;
-  listAll(params: {
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
+  /** One page of the rows the query keeps, the newest first, and how many it keeps in all. */
+  listAll(
+    params: IssuedLicenseQuery & { page: number; pageSize: number },
+  ): Promise<{ rows: IssuedLicenseRecord[]; total: number }>;
+  /** How many rows the query keeps. */
+  countAll(query: IssuedLicenseQuery): Promise<number>;
   update(id: string, data: IssuedLicensePatch): Promise<IssuedLicenseRecord>;
   /** Removes a row a failed flow wrote; a row already gone is not an error. */
   delete(id: string): Promise<void>;

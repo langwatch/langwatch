@@ -364,3 +364,23 @@ Feature: LLM block — Studio signature node executes via the Go AI Gateway
     Then the response status is 400
     And the response body.type names the parse failure
     And no gateway call is made
+
+  @unit @v1
+  Scenario: The runner reads cache-read and cache-write counts from every gateway usage shape
+    Given a gateway reply that reports cached tokens as read and write counts, as cached_tokens only, or as top-level Anthropic counts
+    When the runner parses the reply
+    Then the cache-read and cache-write counts are read from whichever shape carries them
+    And the prompt total stays the gateway's count with the cached tokens included
+
+  @unit @v1
+  Scenario: A signature node reports its cache counts in its node metrics
+    Given a gateway reply that reports cache-read and cache-write tokens but no prompt or completion tokens
+    When the signature node finishes
+    Then its node metrics carry the cache-read and cache-write counts
+
+  @unit @v1
+  Scenario: The LLM span carries cache counts only when the reply has them
+    Given a gateway reply with cache-read and cache-write tokens
+    When the LLM span ends
+    Then it carries the cache-read and cache-creation input token attributes
+    But a reply whose cache counts are zero leaves both attributes off the span

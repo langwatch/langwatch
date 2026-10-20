@@ -51,6 +51,23 @@ Feature: Model Provider service
     Then the stored provider is disabled by default
 
   @unit
+  Scenario: A Vertex AI call carries the service account stored on the provider
+    Given a project has a Vertex AI provider with a service account JSON, a project and a location
+    When a Vertex AI model call is prepared for the project
+    Then vertex_credentials carries the stored service account JSON
+    And vertex_project and vertex_location carry the stored project and location
+    And the service account is never sent as api_key
+
+  @unit
+  Scenario: An evaluator's max tokens fits the model it runs on, Vertex AI included
+    Given an LLM evaluator whose max tokens is not set
+    When it is prepared to run on a model served by Vertex AI
+    Then no max tokens is sent, so the provider's default applies
+    When the user sets a max tokens above a Gemini model's output limit
+    Then the max tokens sent is the catalogue's output limit for that model
+    And on a model whose limit is unknown the value the user set is sent as is
+
+  @unit
   Scenario: The platform chain borrows the Google credential from data privacy
     Given data privacy holds the deployment's Google application credential
     When the platform provider chain is read
