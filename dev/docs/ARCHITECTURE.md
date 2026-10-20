@@ -2169,6 +2169,7 @@ An upcast's step id is `upcast:<pipeline>:<stored type>`; its optional rewrite c
 are gone; a fresh install plans upcast steps by their mode (Alex, 2026-10-06, rounds 15 and 16;
 no floor, Alex, 2026-10-11).
 A lane that moved or was renamed declares `.withLaneAliases([{ from, to: { jobType, lane }, eventTypes?, data? }])` on its pipeline: jobs an older release queued under `from` run on that lane, its own or its peer lane; the alias is kept like every step (Alex, 2026-10-11). They are chosen by the event type they carry, and a reactor's body is read as its event unless `data` reads it. A lane with no successor is tombstoned (`{ from, tombstone }`), and an aliased job whose event type no successor takes is acknowledged with a log line; an alias whose lane is not installed still retries (Alex, 2026-10-08, round 49 E4; `packages/eventing/specs/lane-alias.feature`).
+Beside an event subscriber's `enqueue.stage` (ADR-069), a fold projection subscriber may queue a compact job body parsed by its own schema instead of the event (`withProjectionSubscriber({ job })`); readers accept both bodies before any writer switches (Alex, 2026-10-20; `packages/eventing/specs/compact-subscriber-job.feature`).
 `defineProjectionReplayStep` takes `since`, the instant a first run replays from, so a handed-over
 fold is refolded over the deploy overlap only; absent, the start of the log (round 16).
 A process-manager handler emits intents through the typed accessor `ctx.intent(name, key, payload)`, and

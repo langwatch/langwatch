@@ -32,11 +32,14 @@ import {
 } from "../runtime.types.ts";
 import { ConfigurationError, categorizeError, handleError } from "../services/errorHandling.ts";
 import type { FailedHandoff, HandoffLaneKind } from "../services/handoff/failedHandoff.ts";
-import type { QueueManager } from "../services/queues/queueManager.ts";
+import type { ProjectionSubscriberJob, QueueManager } from "../services/queues/queueManager.ts";
 import type { EventStoreReadContext } from "../stores/eventStore.types.ts";
 import { TIME_LOCAL_AGGREGATE_TYPES } from "../stores/rehydrationWindow.ts";
 import type { EventSubscriberDefinition } from "../subscribers/eventSubscriber.types.ts";
-import type { SubscriberDispatchDefinition } from "../subscribers/subscriber.types.ts";
+import type {
+  CompactSubscriberJob,
+  SubscriberDispatchDefinition,
+} from "../subscribers/subscriber.types.ts";
 import { toError } from "../utils/errors.ts";
 import { EventUtils } from "../utils/event.utils.ts";
 import { MAX_APPLIED_EVENT_IDS } from "./foldCache/foldCacheEntry.ts";
@@ -429,16 +432,9 @@ export class ProjectionRouter<
           name: subscriber.name,
           parentProjection,
           parentType,
-          handler: {
-            handle: async (payload: { event: EventType; foldState: unknown }) => {
-              await subscriber.handle(payload.event, {
-                tenantId: payload.event.tenantId,
-                aggregateId: String(payload.event.aggregateId),
-                foldState: payload.foldState,
-                isReplay: LIVE_DISPATCH_IS_REPLAY,
-              });
-            },
-          },
+          handler: { handle: this.subscriberJobHandler(subscriber) },
+          readsCompactJobs: subscriber.compactJob !== undefined,
+          ...this.compactJobStage(subscriber),
           groupKeyFn: subscriber.options?.groupKeyFn,
           options: {
             disabled: subscriber.options?.disabled,
@@ -458,6 +454,55 @@ export class ProjectionRouter<
     return definitions;
   }
 
+  /** Runs one queued subscriber job: a full body goes to `handle`, a compact one to its reader. */
+  private subscriberJobHandler(subscriber: SubscriberDispatchDefinition<EventType>) {
+    return async (payload: ProjectionSubscriberJob<EventType>) => {
+      const tenantId = payload.event.tenantId;
+      const aggregateId = String(payload.event.aggregateId);
+      if ("foldState" in payload) {
+        await subscriber.handle(payload.event, {
+          tenantId,
+          aggregateId,
+          foldState: payload.foldState,
+          isReplay: LIVE_DISPATCH_IS_REPLAY,
+        });
+        return;
+      }
+      // The lane's parse refuses a compact body for a subscriber that reads none,
+      // so reaching here without a reader fails the job rather than dropping it.
+      if (!subscriber.compactJob) {
+        throw new ConfigurationError(
+          "ProjectionRouter",
+          `Event subscriber "${subscriber.name}" received a compact job but reads none`,
+          { subscriberName: subscriber.name },
+        );
+      }
+      await subscriber.compactJob.handle(payload.job, { tenantId, aggregateId });
+    };
+  }
+
+  /** A subscriber queueing compact bodies stages each delivery into its identity and job body. */
+  private compactJobStage(subscriber: SubscriberDispatchDefinition<EventType>): {
+    stage?: (payload: { event: EventType; foldState: unknown }) => CompactSubscriberJob;
+  } {
+    const compactJob = subscriber.compactJob;
+    if (!compactJob?.stageOnSend) return {};
+    return {
+      stage: ({ event, foldState }) => ({
+        event: {
+          id: event.id,
+          aggregateId: event.aggregateId,
+          aggregateType: event.aggregateType,
+          tenantId: event.tenantId,
+          createdAt: event.createdAt,
+          occurredAt: event.occurredAt,
+          type: event.type,
+        },
+        job: compactJob.stage(event, this.buildSubscriberDispatchContext({ event, foldState })),
+      }),
+    };
+  }
+
   /**
    * Initialize queue processors for projection subscribers.
    * Each subscriber gets a SimpleQueue for async dispatch.
@@ -465,26 +510,9 @@ export class ProjectionRouter<
   initializeProjectionSubscriberQueues(): void {
     if (this.subscribersForFold.size === 0 && this.subscribersForMap.size === 0) return;
 
-    const subscriberDefs: Record<
-      string,
-      {
-        name: string;
-        parentProjection: string;
-        parentType: "fold" | "map";
-        handler: {
-          handle: (payload: { event: EventType; foldState: unknown }) => Promise<void>;
-        };
-        groupKeyFn?: (payload: { event: EventType; foldState: unknown }) => string;
-        options?: {
-          disabled?: boolean;
-          delay?: number;
-          deduplication?: DeduplicationStrategy<{
-            event: EventType;
-            foldState: unknown;
-          }>;
-        };
-      }
-    > = {};
+    const subscriberDefs: Parameters<
+      typeof this.queueManager.initializeProjectionSubscriberQueues
+    >[0] = {};
 
     for (const def of [
       ...this.subscriberQueueDefinitions({
