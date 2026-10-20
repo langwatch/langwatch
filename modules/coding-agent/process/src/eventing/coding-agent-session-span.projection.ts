@@ -279,7 +279,10 @@ export class CodingAgentSessionSpanProjection {
       after: {
         ...folded,
         costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
-        aiUnits: folded.aiUnits + this.stateProjection.number(span.attrs[AI_UNITS_SESSION_FACT]),
+        // A state cached before the AI units column has none: read as 0, the sum stays a number.
+        aiUnits:
+          this.stateProjection.number(folded.aiUnits) +
+          this.stateProjection.number(span.attrs[AI_UNITS_SESSION_FACT]),
       },
       context,
     });
