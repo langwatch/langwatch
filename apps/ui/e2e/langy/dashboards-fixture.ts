@@ -5,6 +5,7 @@
  */
 
 import { dashboardWidgetsPath, type WidgetQuery, type WidgetResource } from "./board-state";
+import { CodedError } from "./coded-error";
 import { APP_BASE, useApiKey, useProject } from "./config";
 import { lwPost } from "./langwatch-api";
 import { getCliApiKey } from "./local-control-fixture";
@@ -65,7 +66,12 @@ export function reportTargetOf(
   const apiKey = env.LANGY_REPORT_API_KEY;
   if (!apiKey) return null;
   const endpoint = env.LANGY_REPORT_ENDPOINT;
-  if (!endpoint) throw new Error("LANGY_REPORT_ENDPOINT is required with LANGY_REPORT_API_KEY");
+  if (!endpoint) {
+    throw new CodedError({
+      code: "report_endpoint_missing",
+      message: "LANGY_REPORT_ENDPOINT is required with LANGY_REPORT_API_KEY",
+    });
+  }
   return { apiKey, endpoint };
 }
 

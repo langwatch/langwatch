@@ -9,7 +9,7 @@ describe("reportTargetOf", () => {
 
   it("refuses a report key without an endpoint", () => {
     expect(() => reportTargetOf({ LANGY_REPORT_API_KEY: "sk-lw-x" })).toThrow(
-      "LANGY_REPORT_ENDPOINT is required with LANGY_REPORT_API_KEY",
+      expect.objectContaining({ code: "report_endpoint_missing" }),
     );
   });
 

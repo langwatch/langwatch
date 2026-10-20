@@ -423,7 +423,7 @@ the saved board and the numbers with code first, then the reply with a judge.
   `runScenarioAndLog` and the transcript gets one `**Cost:**` line.
 - `dashboards-fixture.ts`: `seedDashboardsProject({ label })` signs a fresh
   account up and points the whole process at a new organization and project
-  (`seed-organization.ts`, shared with the guided fixture), including the key
+  (`seed-organization.ts` and `seed-provider.ts`, shared with the guided fixture), including the key
   `langwatch-api.ts` sends (`useApiKey`). One project per file. `createBoard`
   and `addWidget` go through `POST /api/dashboards` and the widget routes. It
   attaches no model provider; `setupWorld` below does.
@@ -1137,7 +1137,7 @@ all address the new project without being told. See
   it and send the kickoff first. The scenario library reports every
   simulation to the platform, and the folder fixture's demo application
   needs a key too — both take the same user key bound to this project.
-- **`attachProvider`** (in `seed-organization.ts`; it forwards `OPENAI_BASE_URL` only when a caller passes `openaiBaseUrl`, which `dashboards-world.ts` does): the provider the takeover connects — its row at
+- **`attachProvider`** (in `seed-provider.ts`; it forwards `OPENAI_BASE_URL` only when a caller passes `openaiBaseUrl`, which `dashboards-world.ts` does): the provider the takeover connects — its row at
   organization scope with the checkout's own credentials, then the Langy
   role pointed at it, then the organization's guided state told about it
   (`useGuidedProviderConnect`). Everything that is not Langy runs on the

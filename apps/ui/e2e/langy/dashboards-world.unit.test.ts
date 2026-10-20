@@ -65,7 +65,7 @@ describe("assertTracesPerDay", () => {
 
   it.each([0, 12, 25, -24])("refuses %i", (count) => {
     expect(() => assertTracesPerDay(count)).toThrow(
-      `tracesPerDay must be a positive multiple of 24, got ${count}`,
+      expect.objectContaining({ code: "traces_per_day_invalid" }),
     );
   });
 });

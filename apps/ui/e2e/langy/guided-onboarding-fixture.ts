@@ -32,15 +32,8 @@ import {
   getCliApiKey,
   toolOutputText,
 } from "./local-control-fixture";
-import {
-  attachProvider,
-  azureBaseUrl,
-  createOrganizationWithProject,
-  MODEL,
-  PROVIDER,
-  requiredEnv,
-  signUpAndUseAccount,
-} from "./seed-organization";
+import { createOrganizationWithProject, signUpAndUseAccount } from "./seed-organization";
+import { attachProvider, azureBaseUrl, MODEL, PROVIDER, requiredEnv } from "./seed-provider";
 import { getSessionCookie, trpcMutate, trpcQuery } from "./trpc";
 
 // ---------------------------------------------------------------------------

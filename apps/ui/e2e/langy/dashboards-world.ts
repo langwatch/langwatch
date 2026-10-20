@@ -17,10 +17,12 @@ import {
   readBoard,
   runBoardQueries,
 } from "./board-state";
+import { CodedError } from "./coded-error";
 import { addWidget, type Board, createBoard, seedDashboardsProject } from "./dashboards-fixture";
 import { seedTraffic } from "./langwatch-api";
 import type { LangyAdapter } from "./langy-agent";
-import { attachProvider, type SeededProject } from "./seed-organization";
+import type { SeededProject } from "./seed-organization";
+import { attachProvider } from "./seed-provider";
 import { dailyWindows, type TimeWindow } from "./traffic-pattern";
 import { getSessionCookie } from "./trpc";
 
@@ -86,7 +88,10 @@ const DECOY_WIDGET = {
 /** Hours share the day evenly only when the count is a positive multiple of 24. */
 export function assertTracesPerDay(tracesPerDay: number): void {
   if (tracesPerDay % 24 !== 0 || tracesPerDay < 24) {
-    throw new Error(`tracesPerDay must be a positive multiple of 24, got ${tracesPerDay}`);
+    throw new CodedError({
+      code: "traces_per_day_invalid",
+      message: `tracesPerDay must be a positive multiple of 24, got ${tracesPerDay}`,
+    });
   }
 }
 
