@@ -111,7 +111,8 @@ Rule: The session context links a Copilot session to its pull request
   Scenario: A repository switch during a Copilot session follows the Claude Code rule
     Given a Copilot session that reports one repository and then another
     When both session context records are folded
-    Then the row follows the same switch rule as a Claude Code session
+    Then the row shows the repository host, owner and name from the later record
+    And the result matches the same records folded for a Claude Code session
 
 Rule: Pull-request cost keeps AI units apart from dollars
 
