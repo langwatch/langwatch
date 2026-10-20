@@ -47,6 +47,12 @@ export function allocatePorts(base: number = PORT_BASE_DEFAULT): PortAllocation 
   };
 }
 
+/** The port base the install's .env was last written for: its PORT, else the default. */
+export function installedPortBase({ env }: { env: Record<string, string | undefined> }): number {
+  const port = env.PORT ?? "";
+  return /^\d+$/.test(port) ? Number.parseInt(port, 10) : PORT_BASE_DEFAULT;
+}
+
 export function portsToCheck(alloc: PortAllocation): { port: number; label: string }[] {
   return [
     { port: alloc.langwatch, label: "langwatch" },

@@ -36,7 +36,7 @@ import { captureUserEnv } from "./shared/env.ts";
 import { resolveLogSettings } from "./shared/log-level.ts";
 import { paths } from "./shared/paths.ts";
 import { assertSupportedHost } from "./shared/platform.ts";
-import { allocatePorts, PORT_BASE_DEFAULT } from "./shared/ports.ts";
+import { allocatePorts, installedPortBase, PORT_BASE_DEFAULT } from "./shared/ports.ts";
 import {
   exitCause,
   type RuntimeApi,
@@ -373,14 +373,15 @@ async function portConflicts({
 program
   .command("doctor")
   .description("check which predeps and services are installed; do not change anything")
-  .option("--port-base <n>", "report the resolved ports for this base", String(PORT_BASE_DEFAULT))
+  .option("--port-base <n>", "report the resolved ports for this base (default: the install's)")
   .action(async (opts) => {
     assertSupportedHost();
     printBanner(VERSION);
     const orchestrator = resolveLocalOrchestratorConfig(process.env);
-    const base = Number.parseInt(opts.portBase, 10);
-    const ports = allocatePorts(base);
     const env = readEnvFile(paths.envFile);
+    const base =
+      opts.portBase === undefined ? installedPortBase({ env }) : Number.parseInt(opts.portBase, 10);
+    const ports = allocatePorts(base);
     const own = ownDatabases({ env, ports });
     const rows = await inspectPredeps({
       version: VERSION,
@@ -406,14 +407,15 @@ program
     assertSupportedHost();
     printBanner(VERSION);
     const orchestrator = resolveLocalOrchestratorConfig(process.env);
-    const base = PORT_BASE_DEFAULT;
-    const ports = allocatePorts(base);
+    const env = readEnvFile(paths.envFile);
+    // The ports the .env was last written for, so its bundled databases read as bundled.
+    const ports = allocatePorts(installedPortBase({ env }));
     const run = await runPredeps({
       config: orchestrator,
       yes: opts.yes,
       version: VERSION,
       // A database the .env already points elsewhere is not downloaded.
-      skip: ownDatabases({ env: readEnvFile(paths.envFile), ports }),
+      skip: ownDatabases({ env, ports }),
     });
     // Nothing has started yet, so an abort can end here.
     if (run.outcome === "aborted") process.exit(run.exitCode);
@@ -431,9 +433,9 @@ program
       logLevel: logs.level,
     };
     // No conflict resolution has run for this port table (unlike "start",
-    // which calls resolvePortConflicts first): base is just
-    // PORT_BASE_DEFAULT. Reconciling now would rewrite a real install's
-    // .env to that guess; leave existing port-bound URLs alone.
+    // which calls resolvePortConflicts first): base is the .env's own.
+    // Reconciling now could rewrite a real install's .env to a guess;
+    // leave existing port-bound URLs alone.
     await ensureEnvFile(runtime, ctx, { shouldReconcilePorts: false });
     const shown = streamEventsToTTY(runtime.events(ctx), {
       showsServiceOutput: logs.showsServiceOutput,

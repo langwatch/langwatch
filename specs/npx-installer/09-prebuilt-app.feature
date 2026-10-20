@@ -249,3 +249,9 @@ Feature: `npx @langwatch/server` runs a prebuilt app
     Then the public port serves the app's hashed assets, cached for good
     And the boot page fetches the app's entry scripts and styles
     But the app's index page stays the api's, which adds each visitor's settings
+
+  @unit
+  Scenario: The boot page serves no file outside the app's assets
+    Given the app is unpacked and the backend is not healthy yet
+    When a request names a path that climbs out of "/assets", or one that cannot be read
+    Then no file is served for it and the public port keeps answering

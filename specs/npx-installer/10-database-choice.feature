@@ -90,3 +90,10 @@ Feature: First run asks whether to use bundled databases or your own
     When they run "npx @langwatch/server doctor"
     Then the upgrade status is read from their Postgres URL
     And the port table leaves out the bundled Postgres port
+
+  @unit
+  Scenario: Install and doctor read the databases at the install's own ports
+    Given an install whose bundled databases moved to a shifted port base
+    When they run "npx @langwatch/server install" or "npx @langwatch/server doctor"
+    Then Postgres, Redis and ClickHouse count as bundled
+    And the bundled ones are installed and checked as usual

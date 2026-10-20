@@ -1,6 +1,7 @@
 import { createReadStream, existsSync, readFileSync, statSync } from "node:fs";
 import type http from "node:http";
 import { extname, join, normalize, sep } from "node:path";
+import { pipeline } from "node:stream";
 
 /** The browser bundle's content-hashed assets, as the api serves them (browser-bundle.ts). */
 export const ASSET_PREFIX = "/assets/";
@@ -41,12 +42,21 @@ export function serveHashedAsset({
   const assetsDir = join(clientDir, "assets");
   const file = normalize(join(clientDir, pathname));
   if (!file.startsWith(assetsDir + sep)) return false;
-  const stats = statSync(file, { throwIfNoEntry: false });
-  if (!stats?.isFile()) return false;
+  if (!isFile(file)) return false;
   res.writeHead(200, {
     "Content-Type": MIME_TYPES[extname(file)] ?? "application/octet-stream",
     "Cache-Control": IMMUTABLE_CACHE,
   });
-  createReadStream(file).pipe(res);
+  // A read that fails mid-way ends this response, never the process holding the public port.
+  pipeline(createReadStream(file), res, () => undefined);
   return true;
+}
+
+/** Whether `file` is a file; a stat failure (ENOTDIR, EACCES) reads as no. */
+function isFile(file: string): boolean {
+  try {
+    return statSync(file, { throwIfNoEntry: false })?.isFile() === true;
+  } catch {
+    return false;
+  }
 }

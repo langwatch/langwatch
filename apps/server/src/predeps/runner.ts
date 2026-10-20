@@ -33,11 +33,7 @@ export type PredepOptions = {
   onSkipped?: (ids: readonly PredepId[]) => void;
 };
 
-/**
- * Fills `predeps` as `runPredeps` reports each one, and lets a service wait on the ones it
- * needs (RuntimeContext.predepsReady). A skipped predep settles as absent: `present` answers
- * false, `ready` fails. Once the run finishes, a wait on a missing one fails.
- */
+/** One service waiting on the predeps it needs. */
 type PredepWait = {
   ids: readonly PredepId[];
   resolve: (isPresent: boolean) => void;
@@ -67,6 +63,11 @@ function settleWait({
   return true;
 }
 
+/**
+ * Fills `predeps` as `runPredeps` reports each one, and lets a service wait on the ones it
+ * needs (RuntimeContext.predepsReady). A skipped predep settles as absent: `present` answers
+ * false, `ready` fails. Once the run finishes, a wait on a missing one fails.
+ */
 export function predepGate({ predeps }: { predeps: PredepResult }) {
   const waits = new Set<PredepWait>();
   const skipped = new Set<PredepId>();

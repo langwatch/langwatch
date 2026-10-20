@@ -124,13 +124,16 @@ describe("connecting to a database the person brings", () => {
   });
 
   describe("when it is ClickHouse", () => {
+    const SELECT_ONE = "/?query=SELECT%201";
     /** @scenario "A database they bring is connected before it is saved" */
-    it("asks /ping and refuses a server that does not answer Ok.", async () => {
+    it("runs SELECT 1 and refuses a server that does not answer 1", async () => {
       const server = http.createServer((req, res) => {
-        res.end(req.url === "/ping" ? "Ok.\n" : "no");
+        res.end(req.url === SELECT_ONE ? "1\n" : "no");
       });
       const port = await listen(server);
-      const refusing = http.createServer((_req, res) => res.end("Not ClickHouse"));
+      const refusing = http.createServer((_req, res) => {
+        res.writeHead(516).end("Authentication failed");
+      });
       const refusingPort = await listen(refusing);
 
       expect(
@@ -138,7 +141,7 @@ describe("connecting to a database the person brings", () => {
       ).toEqual({ ok: true });
       expect(
         await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${refusingPort}/x` }),
-      ).toEqual({ ok: false, reason: "/ping answered Not ClickHouse" });
+      ).toEqual({ ok: false, reason: "SELECT 1 answered 516: Authentication failed" });
     });
 
     /** @scenario "A database password is never shown" */
@@ -146,7 +149,7 @@ describe("connecting to a database the person brings", () => {
       const seen: { url?: string; authorization?: string }[] = [];
       const server = http.createServer((req, res) => {
         seen.push({ url: req.url, authorization: req.headers.authorization });
-        res.end("Ok.\n");
+        res.end("1\n");
       });
       const port = await listen(server);
 
@@ -157,7 +160,7 @@ describe("connecting to a database the person brings", () => {
 
       expect(result).toEqual({ ok: true });
       expect(seen).toEqual([
-        { url: "/ping", authorization: `Basic ${Buffer.from("me:s@cret").toString("base64")}` },
+        { url: SELECT_ONE, authorization: `Basic ${Buffer.from("me:s@cret").toString("base64")}` },
       ]);
     });
   });

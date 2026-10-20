@@ -29,7 +29,13 @@
 # Configure at npmjs.com → @langwatch/server → settings → Trusted Publishers,
 # add provider `GitHub Actions` with:
 #   Repository:        langwatch/langwatch
-#   Workflow filename: npx-server-publish
+#   Workflow filename: npx-server-publish.yml
+#   Environment:       (leave empty: we do not use job environments)
+# Once configured, the NPM_API_TOKEN secret can be deleted; the
+# `id-token: write` permission below is sufficient for npm to mint a
+# short-lived publish token from the OIDC token.
+
+name: npx-server-publish
 
 on:
   release:
@@ -264,7 +270,8 @@ jobs:
 
   notify:
     needs: [release, app-archive, publish]
-    if: always() && github.event_name == 'release'
+    # Only a release this workflow published from: other tags skip `release` and report nothing.
+    if: always() && github.event_name == 'release' && needs.release.result == 'success'
     runs-on: ubuntu-latest
     steps:
       - name: Notify Slack

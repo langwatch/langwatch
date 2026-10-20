@@ -65,7 +65,7 @@ describe("given a pending evaluation that failed 2 attempts", () => {
 describe("given an evaluation that ended in error after 3 attempts", () => {
   describe("when the Evals accordion is expanded", () => {
     /** @scenario A failed run that was attempted more than once says how many attempts it took */
-    it("says how many attempts it took beside the error", () => {
+    it("says how many attempts it took, the one that ended it included, beside the error", () => {
       renderWithDesignSystem(
         <EvalCard
           eval_={{
@@ -75,7 +75,8 @@ describe("given an evaluation that ended in error after 3 attempts", () => {
             status: "error",
             evaluationId: "eval-2",
             errorMessage: "evaluator unavailable",
-            attempts: 3,
+            // Two attempts failed and were retried; the third ended the run.
+            attempts: 2,
           }}
         />,
       );

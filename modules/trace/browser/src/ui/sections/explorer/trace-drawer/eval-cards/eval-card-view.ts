@@ -53,10 +53,11 @@ function errorViewOf(eval_: EvalEntry) {
   // For skipped and errored runs the reasoning is the message; without it the
   // error message stands in, and the worker always writes one or the other.
   const message = eval_.reasoning ?? (isError ? eval_.errorMessage : undefined);
-  const attempts = eval_.attempts ?? 0;
+  // `attempts` counts the attempts that failed and were retried; the one that ended it is one more.
+  const failedAttempts = eval_.attempts ?? 0;
   const primaryStatusText =
-    isError && message && attempts > 0
-      ? `${message} · after ${attempts} attempt${attempts === 1 ? "" : "s"}`
+    isError && message && failedAttempts > 0
+      ? `${message} · after ${failedAttempts + 1} attempts`
       : message;
   const showErrorPanel =
     isError && !!eval_.errorMessage && !!eval_.reasoning && eval_.errorMessage !== eval_.reasoning;

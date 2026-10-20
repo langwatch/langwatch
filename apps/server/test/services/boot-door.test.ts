@@ -193,3 +193,49 @@ describe("the app's assets on the boot page", () => {
     });
   });
 });
+
+/** A GET with its path sent as written: fetch would resolve the `..` before it left. */
+function rawGet({ door, path }: { door: BootDoor; path: string }) {
+  return new Promise<{ status: number; body: string }>((resolve, reject) => {
+    const req = http.get({ host: "127.0.0.1", port: door.port, path }, (res) => {
+      let body = "";
+      res.setEncoding("utf8");
+      res.on("data", (chunk: string) => (body += chunk));
+      res.on("end", () => resolve({ status: res.statusCode ?? 0, body }));
+    });
+    req.on("error", reject);
+  });
+}
+
+describe("a request for a path outside the app's assets", () => {
+  describe("when the path climbs out of the assets directory", () => {
+    /** @scenario "The boot page serves no file outside the app's assets" */
+    it("serves no file for it", async () => {
+      const door = await openDoor();
+      const clientDir = builtClient();
+      writeFileSync(join(clientDir, "secret.txt"), "not for the network");
+      door.offerAssets({ clientDir });
+
+      for (const path of ["/assets/../secret.txt", "/assets/../../../etc/passwd"]) {
+        const answer = await rawGet({ door, path });
+
+        expect(answer.status).toBe(503);
+        expect(answer.body).toBe("LangWatch is starting");
+      }
+    });
+  });
+
+  describe("when the path cannot be read as a file", () => {
+    /** @scenario "The boot page serves no file outside the app's assets" */
+    it("answers as for any other path and keeps the port up", async () => {
+      const door = await openDoor();
+      door.offerAssets({ clientDir: builtClient() });
+
+      const underAFile = await rawGet({ door, path: "/assets/core-abc.js/inside" });
+      const asset = await fetch(urlOf(door, "/assets/core-abc.js"));
+
+      expect(underAFile.status).toBe(503);
+      expect(asset.status).toBe(200);
+    });
+  });
+});
