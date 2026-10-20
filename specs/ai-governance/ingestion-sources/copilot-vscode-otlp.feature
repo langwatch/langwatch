@@ -53,12 +53,12 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
       When the receiver applies key provenance
       Then the foreign scopes are dropped and only Copilot's own scopes are recorded
 
-    @unit @unimplemented
+    @unit
     Scenario: Copilot Chat's copilot-chat scope counts as Copilot's own on a copilot_vscode key
       Given a copilot_vscode ingest key receives spans under the copilot-chat scope
       When the receiver applies key provenance
       Then the spans are recorded
-      And a copilot_cli or copilot_app key still drops the copilot-chat scope
+      And a copilot_cli or copilot_app key applies no scope filter
 
     @integration @unimplemented
     Scenario: The source is stamped at the receiver, not taken from the payload
