@@ -23,10 +23,18 @@ const jobRoutingSchema = z.object({
 /** Where a job goes and how it folds, decided from the typed value before it is queued. */
 export type JobRouting = z.infer<typeof jobRoutingSchema>;
 
+/** Routing parsed once per job envelope: the queue asks for it several times per job. */
+const parsedRoutings = new WeakMap<object, JobRouting | undefined>();
+
 /** The routing a queued envelope carries; absent on a job queued before routing moved to send. */
 export function readJobRouting(envelope: Record<string, unknown>): JobRouting | undefined {
-  const parsed = jobRoutingSchema.safeParse(envelope[JOB_ROUTING_FIELD]);
-  return parsed.success ? parsed.data : undefined;
+  const routing = envelope[JOB_ROUTING_FIELD];
+  if (typeof routing !== "object" || routing === null) return undefined;
+  if (parsedRoutings.has(routing)) return parsedRoutings.get(routing);
+  const parsed = jobRoutingSchema.safeParse(routing);
+  const result = parsed.success ? parsed.data : undefined;
+  parsedRoutings.set(routing, result);
+  return result;
 }
 
 /** One lane of the shared queue, typed over the payload it parses at the queue boundary. */
