@@ -8602,6 +8602,9 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
+      '@opentelemetry/semantic-conventions':
+        specifier: 'catalog:'
+        version: 1.43.0
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -15492,6 +15495,9 @@ importers:
       '@langwatch/span-normalisation':
         specifier: workspace:*
         version: link:../../../packages/span-normalisation
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

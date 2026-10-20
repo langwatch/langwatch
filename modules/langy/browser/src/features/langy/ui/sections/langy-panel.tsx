@@ -686,6 +686,11 @@ function LangyPanel({
                                 organizationId: organizationId ?? null,
                               }
                             : null,
+                        tourRunning: guidedTourRunning,
+                        onPutOffModelPrompt: () => {
+                          useLangyStore.getState().consumePendingKickoff();
+                          closePanel();
+                        },
                         empty: {
                           panelWidth: placement.floatingPanelWidth,
                           suggestions: emptySuggestions,
