@@ -775,6 +775,35 @@ describe("NurturingDeliveryService", () => {
     });
   });
 
+  describe("when a batch's first finished runs are delivered", () => {
+    /** @scenario "A backed-up project's finished runs are counted in one step" */
+    it("identifies the admin with the organization's run count the batch reached", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "simulation_run_finished:run-2",
+        signal: {
+          kind: "simulation_run_finished",
+          sourceEventId: "run-2",
+          ...source,
+          userId: "admin-1",
+          projectId: "project-1",
+          organizationRunCount: 2,
+          first: true,
+        },
+      });
+      await settle();
+
+      expect(cio.sent[0]).toEqual({
+        path: "/v1/identify",
+        body: expect.objectContaining({
+          userId: "admin-1",
+          traits: expect.objectContaining({ has_simulations: true, simulation_count: 2 }),
+        }),
+      });
+    });
+  });
+
   describe("given Customer.io fails while a rule's decision is sent", () => {
     /** @scenario "Activity tracking failure does not break the login flow" */
     it("session_started: returns normally and reports the failure", async () => {

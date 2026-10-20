@@ -26,11 +26,8 @@ function nurturingRecordingDeliveries() {
     projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
-    evaluationsCompleted: async (evaluations) => {
-      counted.push([...evaluations]);
-      return [];
-    },
-    simulationRunsFinished: async () => [],
+    evaluationsCompleted: async ({ evaluations }) => void counted.push([...evaluations]),
+    simulationRunsFinished: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

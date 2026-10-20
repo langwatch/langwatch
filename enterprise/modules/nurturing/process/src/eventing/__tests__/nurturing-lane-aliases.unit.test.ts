@@ -24,8 +24,8 @@ function laneAliases() {
     projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
-    evaluationsCompleted: async () => [],
-    simulationRunsFinished: async () => [],
+    evaluationsCompleted: async () => undefined,
+    simulationRunsFinished: async () => undefined,
   }).laneAliases;
 }
 

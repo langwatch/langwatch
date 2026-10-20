@@ -20,6 +20,9 @@ import {
 /** How long a counted evaluation or run is remembered against a redelivered event. */
 const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
+/** Sends one signal on; the batch's lane hands delivery in. */
+type Deliver = (signal: NurturingSignal) => Promise<void>;
+
 /** A finished run as its peer lane hands it over: the run's data, its aggregate and tenant. */
 type FinishedRun = Readonly<{
   data: SimulationRunFinishedEventData;
@@ -87,66 +90,108 @@ export class NurturingMilestonesService {
   }
 
   /**
-   * Counts a batch of settled evaluations, each once, and answers one signal per project. Every
-   * claim comes first, so a redelivered evaluation never counts twice; a count that then fails is
-   * lost rather than doubled. Keyed by project and evaluation, as before batching, so a claim
-   * taken by an earlier release still holds.
+   * Counts a batch of settled evaluations, each once, and delivers one signal per project and
+   * organization. Keyed by project and evaluation, as before batching, so a claim taken by an
+   * earlier release still holds.
    */
-  async evaluationsCompleted(
-    evaluations: readonly EvaluationLifecycleCompletedEventData[],
-  ): Promise<NurturingSignal[]> {
-    const counted = await claimedOnly({
+  evaluationsCompleted({
+    evaluations,
+    deliver,
+  }: Readonly<{
+    evaluations: readonly EvaluationLifecycleCompletedEventData[];
+    deliver: Deliver;
+  }>): Promise<void> {
+    return this.countByProject({
       items: evaluations,
-      keyOf: (data) => `nurturing:evaluation-counted:${data.projectId}:${data.evaluationId}`,
-      claims: this.dependencies.claims,
-    });
-    const signals: NurturingSignal[] = [];
-    for (const project of groupedBy(counted, (data) => data.projectId)) {
-      const latest = latestOf(project, (data) => data.occurredAt);
-      const organizations = await this.countFor({
-        projectId: latest.projectId,
-        count: ({ organizationId }) =>
-          this.dependencies.milestones.countEvaluation({ organizationId, by: project.length }),
-      });
-      for (const organization of organizations) {
-        signals.push(
-          ...evaluationCompletedSignal({
+      claimKeyOf: (data) => `nurturing:evaluation-counted:${data.projectId}:${data.evaluationId}`,
+      projectOf: (data) => data.projectId,
+      deliver,
+      signalsFor: async (project) => {
+        const latest = latestOf(project, (data) => data.occurredAt);
+        const organizations = await this.countFor({
+          projectId: latest.projectId,
+          count: ({ organizationId }) =>
+            this.dependencies.milestones.countEvaluation({ organizationId, by: project.length }),
+        });
+        return organizations.flatMap((organization) =>
+          evaluationCompletedSignal({
             latest,
             count: project.length,
             organization: { ...organization, seeded: seededAtRead(organization) },
           }),
         );
-      }
-    }
-    return signals;
+      },
+    });
   }
 
-  /** Counts a batch of finished runs, each once by its run, and answers one signal per project. */
-  async simulationRunsFinished(runs: readonly FinishedRun[]): Promise<NurturingSignal[]> {
-    const counted = await claimedOnly({
+  /** Counts a batch of finished runs, each once by its run, and delivers one signal per project. */
+  simulationRunsFinished({
+    runs,
+    deliver,
+  }: Readonly<{ runs: readonly FinishedRun[]; deliver: Deliver }>): Promise<void> {
+    return this.countByProject({
       items: runs,
-      keyOf: (run) => `nurturing:simulation-counted:${run.aggregateId}`,
-      claims: this.dependencies.claims,
-    });
-    const signals: NurturingSignal[] = [];
-    for (const project of groupedBy(counted, (run) => run.tenantId)) {
-      const latest = latestOf(project, (run) => run.data.occurredAt ?? 0);
-      const organizations = await this.countFor({
-        projectId: latest.tenantId,
-        count: ({ organizationId }) =>
-          this.dependencies.milestones.countSimulationRun({ organizationId, by: project.length }),
-      });
-      for (const organization of organizations) {
-        signals.push(
-          ...simulationRunFinishedSignal({
+      claimKeyOf: (run) => `nurturing:simulation-counted:${run.aggregateId}`,
+      projectOf: (run) => run.tenantId,
+      deliver,
+      signalsFor: async (project) => {
+        const latest = latestOf(project, (run) => run.data.occurredAt ?? 0);
+        const organizations = await this.countFor({
+          projectId: latest.tenantId,
+          count: ({ organizationId }) =>
+            this.dependencies.milestones.countSimulationRun({ organizationId, by: project.length }),
+        });
+        return organizations.flatMap((organization) =>
+          simulationRunFinishedSignal({
             ...latest,
-            counted: project.length,
+            count: project.length,
             organization: { ...organization, seeded: seededAtRead(organization) },
           }),
         );
+      },
+    });
+  }
+
+  /**
+   * Claims each item, then counts and delivers project by project. A project whose count fails
+   * gives its claims back, so the queue's retry of the batch counts it; the projects already
+   * counted keep theirs and are skipped. The batch throws once every project has been tried.
+   */
+  private async countByProject<Item>({
+    items,
+    claimKeyOf,
+    projectOf,
+    deliver,
+    signalsFor,
+  }: Readonly<{
+    items: readonly Item[];
+    claimKeyOf: (item: Item) => string;
+    projectOf: (item: Item) => string;
+    deliver: Deliver;
+    signalsFor: (project: readonly Item[]) => Promise<NurturingSignal[]>;
+  }>): Promise<void> {
+    const claimed = await claimedOnly({
+      items,
+      keyOf: claimKeyOf,
+      claims: this.dependencies.claims,
+    });
+    const failures: unknown[] = [];
+    for (const project of groupedBy(claimed, projectOf)) {
+      let signals: NurturingSignal[];
+      try {
+        signals = await signalsFor(project);
+      } catch (error) {
+        await Promise.all(
+          project.map((item) => this.dependencies.claims.release(claimKeyOf(item))),
+        );
+        failures.push(error);
+        continue;
       }
+      for (const signal of signals) await deliver(signal);
     }
-    return signals;
+    if (failures.length > 0) {
+      throw new AggregateError(failures, "nurturing could not count every project in the batch");
+    }
   }
 
   /** Empty when the owners hold no such project or nurturing never learned its organization. */

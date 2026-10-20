@@ -440,11 +440,11 @@ export function simulationRunFinishedSignal({
   data,
   aggregateId,
   tenantId,
-  counted = 1,
+  count,
   organization,
 }: TenantEvent<SimulationRunFinishedEventData> & {
   /** The project's runs counted together with this one, the latest of them. */
-  counted?: number;
+  count: number;
   organization: CountedRunOrganization;
 }): NurturingSignal[] {
   const { adminUserId, seeded, simulationRunCount } = organization;
@@ -459,7 +459,7 @@ export function simulationRunFinishedSignal({
       userId: adminUserId,
       projectId: tenantId,
       organizationRunCount: simulationRunCount,
-      first: !seeded && simulationRunCount === counted,
+      first: !seeded && simulationRunCount === count,
     },
   ];
 }

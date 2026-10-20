@@ -217,19 +217,23 @@ export function buildNurturingPipeline(deps: {
     data: UsageReportReceivedEventData;
     eventId: string;
   }) => Promise<void>;
-  /** Counts a project's batch of settled evaluations; one signal per organization. */
-  evaluationsCompleted: (
-    evaluations: readonly EvaluationLifecycleCompletedEventData[],
-  ) => Promise<NurturingSignal[]>;
-  /** Counts a project's batch of finished runs; one signal per organization. */
-  simulationRunsFinished: (
+  /** Counts a project's batch of settled evaluations and delivers one signal per organization. */
+  evaluationsCompleted: (input: {
+    evaluations: readonly EvaluationLifecycleCompletedEventData[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
+  /** Counts a project's batch of finished runs and delivers one signal per organization. */
+  simulationRunsFinished: (input: {
     runs: readonly {
       data: SimulationRunFinishedEventData;
       aggregateId: string;
       tenantId: string;
-    }[],
-  ) => Promise<NurturingSignal[]>;
+    }[];
+    deliver: (signal: NurturingSignal) => Promise<void>;
+  }) => Promise<void>;
 }): NurturingPipeline {
+  const deliverSignal = (signal: NurturingSignal) =>
+    deps.deliver({ key: nurturingSignalKey(signal), signal });
   /** Each signal once, in order: a batch can raise the same day's signal many times over. */
   const deliverEach = async (signals: readonly NurturingSignal[]) => {
     const byKey = new Map(signals.map((signal) => [nurturingSignalKey(signal), signal]));
@@ -306,8 +310,11 @@ export function buildNurturingPipeline(deps: {
         nurturingBatchLane({
           eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
           data: evaluationLifecycleCompletedEventDataSchema,
-          handleBatch: async (items) =>
-            deliverEach(await deps.evaluationsCompleted(items.map(({ data }) => data))),
+          handleBatch: (items) =>
+            deps.evaluationsCompleted({
+              evaluations: items.map(({ data }) => data),
+              deliver: deliverSignal,
+            }),
         }),
       )
       .withPeerSubscriber("projectCreated", {
@@ -454,16 +461,15 @@ export function buildNurturingPipeline(deps: {
         nurturingBatchLane({
           eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
           data: simulationRunFinishedEventDataSchema,
-          handleBatch: async (items) =>
-            deliverEach(
-              await deps.simulationRunsFinished(
-                items.map(({ data, context }) => ({
-                  data,
-                  aggregateId: context.aggregateId,
-                  tenantId: context.tenantId,
-                })),
-              ),
-            ),
+          handleBatch: (items) =>
+            deps.simulationRunsFinished({
+              runs: items.map(({ data, context }) => ({
+                data,
+                aggregateId: context.aggregateId,
+                tenantId: context.tenantId,
+              })),
+              deliver: deliverSignal,
+            }),
         }),
       )
       .withPeerSubscriber("firstTraceRecorded", {
