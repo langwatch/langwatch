@@ -3,11 +3,11 @@ package app
 import (
 	"errors"
 	"net/http"
-	"strings"
 
 	"github.com/tidwall/gjson"
 	"github.com/tidwall/sjson"
 
+	"github.com/langwatch/langwatch/pkg/providererr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -31,7 +31,7 @@ const accountExhaustionMessage = "Your organization's AI gateway access is exhau
 // exhaustion: a transient rate-limit 429, a 5xx, or a user's own bad request
 // all pass through unchanged.
 func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response, error) {
-	if resp != nil && isAccountExhaustion(resp.StatusCode, resp.Body) {
+	if resp != nil && providererr.AccountExhausted(resp.StatusCode, resp.Body) {
 		resp.Body = rewriteErrorMessage(resp.Body, accountExhaustionMessage)
 		return resp, err
 	}
@@ -44,40 +44,18 @@ func applyGovernanceMessage(resp *domain.Response, err error) (*domain.Response,
 }
 
 // isAccountExhaustionError is the UpstreamError-shaped twin of
-// isAccountExhaustion. Translated lanes carry the provider's error
+// providererr.AccountExhausted. Translated lanes carry the provider's error
 // discriminants on the error itself rather than in a captured body, so the
 // parsed type/code must count too or a quota error's original billing
 // message would reach governed users on those lanes.
 func isAccountExhaustionError(ue *domain.UpstreamError) bool {
+	if ue.StatusCode >= http.StatusInternalServerError {
+		return false
+	}
 	if ue.ErrorType == "insufficient_quota" || ue.ErrorCode == "insufficient_quota" {
 		return true
 	}
-	return isAccountExhaustion(ue.StatusCode, ue.Body)
-}
-
-// isAccountExhaustion reports whether a provider error is a terminal
-// account-level exhaustion (credit / quota / billing) that a governed end user
-// cannot resolve themselves — as opposed to a transient rate limit or a 5xx,
-// which must stay verbatim and retryable. Keyed on the terminal error code,
-// never on bare status: an OpenAI rate_limit 429 is retryable and excluded,
-// while a 429 carrying code/type=insufficient_quota is terminal and included.
-func isAccountExhaustion(status int, body []byte) bool {
-	if gjson.GetBytes(body, "error.code").String() == "insufficient_quota" ||
-		gjson.GetBytes(body, "error.type").String() == "insufficient_quota" {
-		return true
-	}
-	switch status {
-	case http.StatusPaymentRequired: // 402 — generic billing / account block
-		return true
-	case http.StatusBadRequest:
-		// Anthropic surfaces credit exhaustion as a 400 invalid_request_error
-		// whose message names the credit balance.
-		return strings.Contains(
-			strings.ToLower(gjson.GetBytes(body, "error.message").String()),
-			"credit balance",
-		)
-	}
-	return false
+	return providererr.AccountExhausted(ue.StatusCode, ue.Body)
 }
 
 // rewriteErrorMessage replaces only the error.message field of a provider

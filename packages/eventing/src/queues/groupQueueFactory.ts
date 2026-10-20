@@ -10,14 +10,23 @@ import {
   type GroupQueueDependencies,
   type RunningGroupQueueConsumer,
 } from "@langwatch/group-queue";
+import { createLogger, type Logger } from "@langwatch/observability";
 
+import { incrementEsJobsProjectGone } from "../metrics.ts";
 import {
   classifyClickHouseError,
   ErrorCategory,
+  isProjectGone,
   UndeclaredQueuedEventTypeError,
   UnroutableQueuedJobError,
 } from "../services/errorHandling.ts";
-import type { EventSourcedQueueDefinition, EventSourcedQueueProcessor } from "./queue.types.ts";
+import type {
+  EventSourcedQueueDefinition,
+  EventSourcedQueueProcessor,
+  JobDelivery,
+} from "./queue.types.ts";
+
+const logger = createLogger("langwatch:event-sourcing:group-queue");
 
 export interface EventingGroupQueueFactoryOptions {
   dependencies: GroupQueueDependencies<Record<string, unknown>>;
@@ -57,6 +66,45 @@ export async function handBackUnroutable<T>({ run }: { run: () => Promise<T> }):
       error instanceof UnroutableQueuedJobError || error instanceof UndeclaredQueuedEventTypeError;
     if (!unhandled) throw error;
     throw new HandBackGroupQueueError(error.message, { cause: error });
+  }
+}
+
+/**
+ * A job whose project was deleted after it was queued can never succeed, whatever its kind
+ * (command, fold, map, subscriber, process manager): it completes as a logged no-op instead of
+ * retrying into a blocked group (specs/eventing/deleted-project-jobs.feature).
+ */
+export async function completeWhenProjectGone({
+  queueName,
+  payloads,
+  run,
+  log = logger,
+}: {
+  queueName: string;
+  payloads: readonly Record<string, unknown>[];
+  run: () => Promise<void>;
+  log?: Logger;
+}): Promise<void> {
+  try {
+    await run();
+  } catch (error) {
+    if (!isProjectGone(error)) throw error;
+    const first = payloads[0];
+    incrementEsJobsProjectGone({
+      queue: queueName,
+      jobType: typeof first?.__jobType === "string" ? first.__jobType : "unknown",
+      count: payloads.length,
+    });
+    log.warn(
+      {
+        tenantId: first?.tenantId ?? null,
+        queueName,
+        jobType: first?.__jobType ?? null,
+        jobName: first?.__jobName ?? null,
+        jobs: payloads.length,
+      },
+      "Job's project no longer exists; completing it as a no-op",
+    );
   }
 }
 
@@ -163,18 +211,31 @@ export function createEventingGroupQueueFactory({
       consumerDependencies: GroupQueueDependencies<Record<string, unknown>>,
     ): RunningGroupQueueConsumer<Record<string, unknown>> => {
       const configuredConsumer = new GroupQueueConsumer(queueDefinition, consumerDependencies);
+      const one = (payload: Record<string, unknown>, context: JobDelivery | undefined) =>
+        refuse(() =>
+          completeWhenProjectGone({
+            queueName: eventingDefinition.name,
+            payloads: [payload],
+            run: () => eventingDefinition.process(payload, context),
+          }),
+        );
       return eventingDefinition.processBatch
         ? configuredConsumer.handleBatch({
-            each: (payload, context) => refuse(() => eventingDefinition.process(payload, context)),
+            each: one,
             batch: (payloads, context) =>
               backOffWhenOverloaded({
                 queueName: eventingDefinition.name,
-                run: () => refuse(() => eventingDefinition.processBatch!(payloads, context)),
+                run: () =>
+                  refuse(() =>
+                    completeWhenProjectGone({
+                      queueName: eventingDefinition.name,
+                      payloads,
+                      run: () => eventingDefinition.processBatch!(payloads, context),
+                    }),
+                  ),
               }),
           })
-        : configuredConsumer.handle((payload, context) =>
-            refuse(() => eventingDefinition.process(payload, context)),
-          );
+        : configuredConsumer.handle(one);
     };
 
     return {

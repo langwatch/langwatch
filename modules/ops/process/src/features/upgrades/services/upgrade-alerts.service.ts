@@ -14,9 +14,11 @@ function installationOf(upgradesUrl: string): string {
 function toUpgradeAlertMail({
   alerts,
   upgradesUrl,
+  audience,
 }: {
   alerts: UpgradeAlert[];
   upgradesUrl: string;
+  audience: UpgradeAlertEmailProps["audience"];
 }): UpgradeAlertEmailProps {
   const failedSteps = alerts.flatMap((alert) =>
     alert.kind === "step-failed"
@@ -37,6 +39,7 @@ function toUpgradeAlertMail({
   return {
     installation: installationOf(upgradesUrl),
     upgradesUrl,
+    audience,
     failedSteps,
     runnerStopped: runner ? { owner: runner.owner, host: runner.host } : null,
   };
@@ -54,6 +57,8 @@ export class UpgradeAlertsService {
     mail: Pick<NotificationApi, "sendEmail">;
     renderer: Pick<MailRender, "renderUpgradeAlert">;
     upgradesUrl: string;
+    /** LangWatch staff read ids and errors on Cloud; a self-hosted operator reads plain words. */
+    audience: UpgradeAlertEmailProps["audience"];
   }): UpgradeAlertsService {
     return new UpgradeAlertsService(input);
   }
@@ -61,7 +66,7 @@ export class UpgradeAlertsService {
   private constructor(private readonly deps: Parameters<typeof UpgradeAlertsService.create>[0]) {}
 
   async check({ since, until }: { since: number; until: number }): Promise<UpgradeAlert[]> {
-    const { ledger, operators, mail, renderer, upgradesUrl } = this.deps;
+    const { ledger, operators, mail, renderer, upgradesUrl, audience } = this.deps;
     // ponytail: first page of failed steps only; page through if a release ever fails more at once.
     const [status, failed] = await Promise.all([
       ledger.findStatus(),
@@ -71,7 +76,7 @@ export class UpgradeAlertsService {
     if (alerts.length === 0) return alerts;
 
     const { subject, html } = await renderer.renderUpgradeAlert(
-      toUpgradeAlertMail({ alerts, upgradesUrl }),
+      toUpgradeAlertMail({ alerts, upgradesUrl, audience }),
     );
     const recipients = (await operators.list()).flatMap(({ email }) => (email ? [email] : []));
     await Promise.all(

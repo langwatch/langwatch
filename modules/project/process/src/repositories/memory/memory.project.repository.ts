@@ -39,7 +39,7 @@ import {
 import { fromDate, nowInstant, toDate, type Instant } from "@langwatch/time";
 
 import type {
-  ProjectBackfillRow,
+  ProjectBackfillEntry,
   ProjectRepository,
   ProjectWithOrgAdmin,
   TouchCodingAgentActivityInput,
@@ -244,29 +244,30 @@ export class MemoryProjectRepository implements ProjectRepository {
   }: {
     afterId: string | null;
     limit: number;
-  }): Promise<ProjectBackfillRow[]> {
-    return this.#database
+  }): Promise<ProjectBackfillEntry[]> {
+    const page = this.#database
       .projects()
       .filter((project) => afterId === null || project.id > afterId)
       .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .flatMap((project) => {
-        const organization = this.#database.findOrganizationOf(project);
-        if (!organization) return [];
-        return [
-          {
-            id: project.id,
-            createdAt: fromDate(project.createdAt),
-            organizationId: organization.id,
-            teamId: project.teamId,
-            isPersonal: project.isPersonal,
-            departmentId: project.departmentId,
-            presenceEnabled: project.presenceEnabled,
-            isArchived: project.archivedAt !== null,
-            adminUserId: organization.adminUserIds[0] ?? null,
-          },
-        ];
-      })
       .slice(0, limit);
+    return page.map((project): ProjectBackfillEntry => {
+      const organization = this.#database.findOrganizationOf(project);
+      if (!organization) return { kind: "orphan", id: project.id };
+      return {
+        kind: "whole",
+        project: {
+          id: project.id,
+          createdAt: fromDate(project.createdAt),
+          organizationId: organization.id,
+          teamId: project.teamId,
+          isPersonal: project.isPersonal,
+          departmentId: project.departmentId,
+          presenceEnabled: project.presenceEnabled,
+          isArchived: project.archivedAt !== null,
+          adminUserId: organization.adminUserIds[0] ?? null,
+        },
+      };
+    });
   }
 
   async findTraceSharingConfig(id: string): Promise<TraceSharingConfig | null> {
@@ -418,17 +419,21 @@ export class MemoryProjectRepository implements ProjectRepository {
     after,
     limit,
   }: ProjectIdPageInput = {}): Promise<ProjectOrganizationPage> {
-    const projects = this.#database
+    const rows = this.#database
       .projects()
       .filter((project) => after === undefined || project.id > after)
-      .toSorted((left, right) => (left.id < right.id ? -1 : 1))
-      .flatMap((project) => {
-        const organizationId = this.#database.findTeam(project.teamId)?.organizationId;
-        return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
-      });
-    if (limit === undefined || projects.length <= limit) return { projects, next: null };
-    const page = projects.slice(0, limit);
-    return { projects: page, next: page[page.length - 1]?.id ?? null };
+      .toSorted((left, right) => (left.id < right.id ? -1 : 1));
+    const more = limit !== undefined && rows.length > limit;
+    const page = more ? rows.slice(0, limit) : rows;
+    const organizationOf = (teamId: string) => this.#database.findTeam(teamId)?.organizationId;
+    const projects = page.flatMap((project) => {
+      const organizationId = organizationOf(project.teamId);
+      return organizationId === undefined ? [] : [{ id: project.id, organizationId }];
+    });
+    const orphanIds = page
+      .filter((project) => organizationOf(project.teamId) === undefined)
+      .map((project) => project.id);
+    return { projects, orphanIds, next: more ? (page.at(-1)?.id ?? null) : null };
   }
 
   async listAllWithPrivateS3({

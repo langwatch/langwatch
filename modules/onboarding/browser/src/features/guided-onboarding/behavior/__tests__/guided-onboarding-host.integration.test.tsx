@@ -251,6 +251,59 @@ describe("GuidedOnboardingHost", () => {
     expect(invalidateGuidedState).toHaveBeenCalledWith({ organizationId: "org_1" });
   });
 
+  /** @scenario "a skipped provider still runs the tour" */
+  it("runs the tour for a skipped provider and queues the kickoff with the tour's status", () => {
+    guidedView = {
+      guided: true,
+      state: guidedState({ currentPath: "llmops", providerSkippedAt: "2026-10-18T09:00:00.000Z" }),
+      organizationId: "org_1",
+    };
+    const host = new TestOnboardingHost({
+      pathname: "/project/p1/traces",
+      organizationId: "org_1",
+    });
+    mount(host);
+
+    expect(useGuidedTourStore.getState().running).toBe(true);
+    expect(useGuidedTourStore.getState().path).toBe("llmops");
+    expect(host.langyQueueKickoff).not.toHaveBeenCalled();
+
+    useGuidedTourStore.getState().end("completed");
+
+    expect(recordTourMutate).toHaveBeenCalledWith({ organizationId: "org_1", status: "completed" });
+    expect(host.langyQueueKickoff).toHaveBeenCalledWith(
+      expect.objectContaining({
+        parts: [
+          expect.objectContaining({ path: "llmops", tourStatus: "completed" }),
+          expect.objectContaining({ type: "text" }),
+        ],
+      }),
+    );
+  });
+
+  /** @scenario "a landing after the model prompt was put off does nothing" */
+  it("leaves the panel alone once the model prompt was put off", () => {
+    guidedView = {
+      guided: true,
+      state: guidedState({
+        currentPath: "llmops",
+        providerSkippedAt: "2026-10-18T09:00:00.000Z",
+        tourCompletedAt: "2026-10-18T09:02:00.000Z",
+        providerPromptDismissedAt: "2026-10-18T09:05:00.000Z",
+      }),
+      organizationId: "org_1",
+    };
+    const host = new TestOnboardingHost({
+      pathname: "/project/p1/traces",
+      organizationId: "org_1",
+    });
+    mount(host);
+
+    expect(useGuidedTourStore.getState().running).toBe(false);
+    expect(host.langyDock).not.toHaveBeenCalled();
+    expect(host.langyQueueKickoff).not.toHaveBeenCalled();
+  });
+
   /** @scenario "the coding path queues the kickoff with no tour" */
   it("queues the kickoff straight away for a path with no tour", () => {
     guidedView = {
