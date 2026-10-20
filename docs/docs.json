@@ -1487,12 +1487,12 @@
               "api-reference/projects/create-project",
               "api-reference/projects/get-project",
               "api-reference/projects/get-api-key",
-              "api-reference/projects/update-project",
-              "api-reference/projects/regenerate-api-key",
-              "api-reference/projects/archive-project",
               "api-reference/projects/list-dashboards-boards",
               "api-reference/projects/get-a-dashboards-board",
+              "api-reference/projects/update-project",
+              "api-reference/projects/regenerate-api-key",
               "api-reference/projects/create-a-dashboards-board",
+              "api-reference/projects/archive-project",
               "api-reference/projects/delete-a-dashboards-board"
             ]
           },

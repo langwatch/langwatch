@@ -219,7 +219,7 @@ export class PrismaDashboardWidgetRepository
   /**
    * Adds a widget to a dashboard at the next free row; row computation and
    * write share one transaction so concurrent assignments can't overlap.
-   * @throws {DashboardNotFoundError} when the dashboard isn't this project's Dashboards board (IDOR).
+   * @throws {DashboardNotFoundError} when the dashboard isn't this project's board (IDOR).
    * @throws {DashboardWidgetNotFoundError} when the widget isn't in this project (IDOR).
    */
   async assignToDashboard({
