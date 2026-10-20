@@ -7,7 +7,7 @@
 -- in epoch ms and the longest retention, so a fold or a replay reads only the
 -- weeks an aggregate's events span. Rows with no occurred time (0) stay out:
 -- every bounded read keeps them through its `EventOccurredAt = 0` arm.
--- Unpartitioned and never tiered cold; an index row expires seven days after
+-- Unpartitioned, on the data disk, with no TTL move to cold; an index row expires seven days after
 -- the latest event it points at, the time clamped because producers supply it.
 -- A view fills it inside every insert; rows older than the view come from the
 -- background step ops:fill-event-log-id-index.
@@ -25,7 +25,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.event_log_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, AggregateType, AggregateId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(least(intDiv(ToAt, 1000), 4294967295)) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(least(intDiv(ToAt, 1000), 4294967295)) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin

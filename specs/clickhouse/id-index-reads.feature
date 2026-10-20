@@ -88,6 +88,12 @@ Feature: A lookup by id reads only the partitions its id index names
     Then no id index table declares a PARTITION BY
     And each is ordered by tenant then id
 
+  @unit
+  Scenario: the index table lives on the data disk, beside its source
+    When the id index migrations are read
+    Then each id index table takes the same storage policy as every other table
+    And none moves to cold storage by TTL
+
   @integration
   Scenario: the backfill fills existing records and can run twice
     Given records stored before the index existed

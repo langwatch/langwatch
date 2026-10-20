@@ -7,7 +7,7 @@
 -- partitions its runs live in. experiment_runs is ordered by (TenantId, RunId,
 -- ExperimentId), so the first index cannot serve it. Shaped as 00114: per
 -- (TenantId, ExperimentId) the earliest and latest StartedAt and the longest
--- retention; unpartitioned, never tiered cold, expiring seven days after the
+-- retention; unpartitioned, on the data disk, no TTL move to cold, expiring seven days after the
 -- latest row it points at. A view fills it inside every insert; older rows come
 -- from the owner's background step (experiment:fill-id-indexes).
 -- ============================================================================
@@ -23,7 +23,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.experiment_runs_by_experiment_
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, ExperimentId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin

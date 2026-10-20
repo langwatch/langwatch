@@ -66,7 +66,14 @@ describe("id index migrations", () => {
         expect(table.definition, table.name).toContain("AggregatingMergeTree");
         expect(table.definition, table.name).toMatch(/FromAt SimpleAggregateFunction\(min,/);
         expect(table.definition, table.name).toMatch(/ToAt SimpleAggregateFunction\(max,/);
-        expect(table.definition, table.name).not.toMatch(/storage_policy|TO VOLUME/i);
+      }
+    });
+
+    /** @scenario "the index table lives on the data disk, beside its source" */
+    it("puts each index on the shared storage policy and never moves it cold", () => {
+      for (const table of indexTables()) {
+        expect(table.definition, table.name).toContain("${CLICKHOUSE_STORAGE_POLICY_SETTING}");
+        expect(table.definition, table.name).not.toMatch(/TO VOLUME/i);
       }
     });
 

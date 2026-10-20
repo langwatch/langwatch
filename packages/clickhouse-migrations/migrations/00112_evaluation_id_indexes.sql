@@ -12,9 +12,9 @@
 -- (ttl.reconciler.ts), so the index also carries RetainAt = max(UpdatedAt) and
 -- its TTL runs off that, never before the source rows. Retention is copied with
 -- "keep forever" (0) written as 65535, so `max` keeps it sticky; the index
--- expires 7 days after its source rows and is never tiered cold (no
--- storage_policy, absent from TABLE_TTL_CONFIG). Retention changes reach it
--- raise-only through RETENTION_ID_INDEX_TABLES.
+-- expires 7 days after its source rows and has no TTL move to cold (absent
+-- from TABLE_TTL_CONFIG); it sits on the data disk (local_primary) like its
+-- source. Retention changes reach it raise-only through RETENTION_ID_INDEX_TABLES.
 --
 -- Rows older than the view are filled by the background step
 -- `evaluation:fill-id-indexes`, which then writes the index's ready marker
@@ -34,7 +34,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.evaluation_runs_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, EvaluationId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(RetainAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(RetainAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin

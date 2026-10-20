@@ -5,7 +5,7 @@
 -- Coding agent's id indexes (dev/docs/plans/id-index-2026-10-10.md): per
 -- (TenantId, id), the earliest and latest source time and the longest
 -- retention, so a lookup by id alone reads only the partitions the id lives in.
--- Unpartitioned and never tiered cold; each index expires seven days after the
+-- Unpartitioned, on the data disk, with no TTL move to cold; each index expires seven days after the
 -- latest row it points at. A view fills it inside every insert; rows older than
 -- the view come from the owner's background step (coding-agent:fill-id-indexes).
 -- ============================================================================
@@ -21,7 +21,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_sessions_id_index
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, SessionId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -45,7 +46,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_session_events_id
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, SessionId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
@@ -69,7 +71,8 @@ CREATE TABLE IF NOT EXISTS ${CLICKHOUSE_DATABASE}.coding_agent_trace_sessions_id
 )
 ENGINE = ${CLICKHOUSE_ENGINE_AGGREGATING:-AggregatingMergeTree()}
 ORDER BY (TenantId, TraceId)
-TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE;
+TTL IF(_retention_days BETWEEN 1 AND 65534, toDateTime(ToAt) + toIntervalDay(_retention_days + 7), toDateTime('2106-01-01')) DELETE
+SETTINGS index_granularity = 8192${CLICKHOUSE_STORAGE_POLICY_SETTING};
 -- +goose StatementEnd
 
 -- +goose StatementBegin
