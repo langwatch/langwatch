@@ -7,7 +7,7 @@ import * as path from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import type { LangyToolEvent } from "./langy-agent";
+import { type LangyToolEvent, toolEventOf } from "./langy-agent";
 import {
   answerOfTurn,
   deleteOrderFailure,
@@ -433,6 +433,23 @@ describe("pendingWaitDispatches", () => {
     });
   });
 
+  describe("when the platform raised the card after the turn ended", () => {
+    it("finds a question with no tool call, so it is answered between turns", () => {
+      const dispatches = pendingWaitDispatches({
+        waits: [
+          wait({
+            waitId: "wait_server",
+            kind: "question",
+            questions: [{ question: 'Delete evaluator "X"?' }],
+          }),
+        ],
+        answered: new Set<string>(),
+      });
+      expect(dispatches.map((dispatch) => dispatch.kind)).toEqual(["question"]);
+      expect(dispatches[0]?.entry.toolCallId).toBeUndefined();
+    });
+  });
+
   describe("when a card needs nothing", () => {
     it("leaves an answered card alone, so one answer is sent once", () => {
       expect(
@@ -567,6 +584,57 @@ describe("deleteOrderFailure", () => {
     });
   });
 
+  describe("when the platform refused the delete for want of a click", () => {
+    const REFUSAL = '{"code":"langy_confirmation_required","status":409}';
+    let calls = 0;
+    const refusal = (turnId: string, command: string, output: string): LangyToolEvent[] => {
+      const id = `call_${calls++}`;
+      return [
+        { ...frame(turnId, command), id },
+        { ...frame(turnId, command), id, phase: "end", output },
+      ];
+    };
+
+    it("does not take the refused attempt for a delete, so the card may be answered after it", () => {
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+            ...refusal(YES, "langwatch evaluator delete x", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 2 }],
+        }),
+      ).toBeNull();
+    });
+
+    it("fails a delete that succeeded before the card was answered", () => {
+      expect(
+        check({
+          toolEvents: [
+            ...refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+            ...refusal(REQUEST, "langwatch evaluator delete x", "deleted"),
+          ],
+          questions: [{ toolEventsBeforeAnswer: 4 }],
+        }),
+      ).toMatch(/tool frame 2\).*answered after the delete/);
+    });
+
+    it("fails closed when only refusals were recorded yet the target is gone", () => {
+      expect(
+        check({ toolEvents: refusal(REQUEST, "langwatch evaluator delete x", REFUSAL) }),
+      ).toMatch(/none of the 2 recorded tool frames is a delete/);
+    });
+
+    it("passes when only refusals were recorded and the target is still there", () => {
+      expect(
+        check({
+          toolEvents: refusal(REQUEST, "langwatch evaluator delete x", REFUSAL),
+          deleted: false,
+        }),
+      ).toBeNull();
+    });
+  });
+
   describe("when the target is gone but no delete frame was recorded", () => {
     it("fails closed rather than reading the missing frame as a pass", () => {
       expect(check({ toolEvents: [frame(YES, "langwatch evaluator list")] })).toMatch(
@@ -627,5 +695,15 @@ describe("isDeleteCommand", () => {
     ["rm delete", false],
   ])("%s -> %s", (command, expected) => {
     expect(isDeleteCommand(command)).toBe(expected);
+  });
+});
+
+describe("toolEventOf", () => {
+  it("keeps what an end frame printed, so a refused delete can be told from a done one", () => {
+    const event = toolEventOf({
+      entry: { type: "tool", phase: "end", id: "t1", output: "langy_confirmation_required" },
+      turnId: "turn_1",
+    });
+    expect(event?.output).toBe("langy_confirmation_required");
   });
 });

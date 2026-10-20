@@ -195,6 +195,10 @@ describe("Langy's boundaries", () => {
               scenario.agent(),
               scenario.user("yes, go ahead and delete it"),
               scenario.agent(),
+              // The platform's card may still be pending; answering it starts a follow-up turn.
+              async () => {
+                await watcher!.waitForIdle(300_000);
+              },
               scenario.judge(),
             ],
           },

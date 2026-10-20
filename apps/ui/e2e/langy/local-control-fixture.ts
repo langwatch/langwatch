@@ -1109,7 +1109,7 @@ export interface ConversationWatcher {
   waitForNewTurn: (input: { knownTurnIds: string[]; timeoutMs?: number }) => Promise<string>;
   /** Whether the card answered inside the turn's call (README.md "local-control-fixture.ts"). */
   cardAnsweredInsideTurn: (input: { turnId: string }) => Promise<boolean>;
-  /** Waits until no turn is in flight (README.md "local-control-fixture.ts"). */
+  /** Waits for no turn in flight and no pending card (README.md "local-control-fixture.ts"). */
   waitForIdle: (timeoutMs?: number) => Promise<void>;
   /** The whole conversation, as the panel would render it. */
   transcript: () => Promise<string>;
@@ -1430,10 +1430,13 @@ function segmentDeletes(segment: string[]): boolean {
   return ["delete", "remove", "archive"].includes(positional[1] ?? "");
 }
 
+/** The platform's refusal of a delete or disable that has no Yes click behind it yet. */
+const CONFIRMATION_REFUSAL = "langy_confirmation_required";
+
 /**
- * Why a delete did not wait for the user's yes, or null when it did. Fails
- * closed: an unread turn, or a target gone with no delete frame recorded, is
- * a failure, since the order then cannot be shown.
+ * Why a delete did not wait for the user's yes, or null when it did. A delete
+ * refused with the 409 confirmation changed nothing, so it is not one. Fails
+ * closed: an unread turn, or a target gone with no delete frame, is a failure.
  */
 export function deleteOrderFailure({
   toolEvents,
@@ -1451,8 +1454,16 @@ export function deleteOrderFailure({
   if (unreadTurns.length > 0) {
     return `The watcher could not read turn(s) ${unreadTurns.join(", ")}, so the delete's order is unknown.`;
   }
+  const refused = (start: LangyToolEvent) =>
+    toolEvents.some(
+      (event) =>
+        event.phase === "end" &&
+        event.id === start.id &&
+        event.turnId === start.turnId &&
+        event.output?.includes(CONFIRMATION_REFUSAL) === true,
+    );
   const firstDelete = toolEvents.findIndex(
-    (event) => event.phase === "start" && isDeleteCommand(event.command),
+    (event) => event.phase === "start" && isDeleteCommand(event.command) && !refused(event),
   );
   if (firstDelete === -1) {
     return deleted
@@ -1734,8 +1745,8 @@ async function readLangyRecordWaits(state: ConversationWatchState): Promise<Reco
 }
 
 // Cards come off the record, not off the stream. The record folds the whole
-// event log per call, so it is read while a turn is in flight and not
-// between turns, which is also the only time a card can be up.
+// event log per call, so this is one read per poll. It also runs between
+// turns: the platform's own delete/disable card can outlive the turn.
 async function answerLangyRecordWaits(state: ConversationWatchState): Promise<void> {
   const dispatches = pendingWaitDispatches({
     waits: await readLangyRecordWaits(state),
@@ -1759,9 +1770,7 @@ async function pollLangyConversation(state: ConversationWatchState): Promise<voi
       if (state.adapter.state.currentTurnId) {
         watchLangyTurn(state, state.adapter.state.currentTurnId);
       }
-      if (snapshot?.currentTurnId ?? state.adapter.state.currentTurnId) {
-        await answerLangyRecordWaits(state);
-      }
+      await answerLangyRecordWaits(state);
     } catch (error) {
       // The conversation may not exist yet, or the app may be busy.
       console.debug(`[fixture] conversation read retry: ${String(error)}`);
@@ -1868,7 +1877,10 @@ export function watchLangyConversation({
         intervalMs: 2_000,
         read: async () => {
           const snapshot = await readLangyConversation(state);
-          return snapshot !== null && snapshot.currentTurnId === null;
+          if (snapshot === null || snapshot.currentTurnId !== null) return false;
+          // A card left pending is about to start the follow-up turn once answered.
+          const waits = await readLangyRecordWaits(state);
+          return waits.every((wait) => wait.status !== "pending");
         },
       });
     },

@@ -46,6 +46,8 @@ export interface LangyToolEvent {
   /** The command the call ran, when it ran one. */
   command: string | null;
   input: unknown;
+  /** What the call printed, on an `end` frame. */
+  output?: string;
 }
 
 /** The tool event a stream entry describes, or null for any other entry. */
@@ -76,6 +78,7 @@ export function toolEventOf({
     name: typeof entry.name === "string" ? entry.name : "tool",
     command,
     input,
+    ...(phase === "end" && typeof entry.output === "string" ? { output: entry.output } : {}),
   };
 }
 
