@@ -18,10 +18,9 @@ import {
   runBoardQueries,
 } from "./board-state";
 import { addWidget, type Board, createBoard, seedDashboardsProject } from "./dashboards-fixture";
-import { attachProvider } from "./guided-onboarding-fixture";
 import { seedTraffic } from "./langwatch-api";
 import type { LangyAdapter } from "./langy-agent";
-import type { SeededProject } from "./seed-organization";
+import { attachProvider, type SeededProject } from "./seed-organization";
 import { dailyWindows, type TimeWindow } from "./traffic-pattern";
 import { getSessionCookie } from "./trpc";
 
@@ -84,6 +83,13 @@ const DECOY_WIDGET = {
   ],
 };
 
+/** Hours share the day evenly only when the count is a positive multiple of 24. */
+export function assertTracesPerDay(tracesPerDay: number): void {
+  if (tracesPerDay % 24 !== 0 || tracesPerDay < 24) {
+    throw new Error(`tracesPerDay must be a positive multiple of 24, got ${tracesPerDay}`);
+  }
+}
+
 /**
  * A fresh project with Langy's model attached, `tracesPerDay` traces on each
  * seeded day, the board under test, and a decoy board carrying one widget.
@@ -95,14 +101,13 @@ export async function setupWorld({
   label: string;
   params: WorldParams;
 }): Promise<World> {
-  if (params.tracesPerDay % 24 !== 0 || params.tracesPerDay < 24) {
-    throw new Error(`tracesPerDay must be a positive multiple of 24, got ${params.tracesPerDay}`);
-  }
+  assertTracesPerDay(params.tracesPerDay);
   const project = await seedDashboardsProject({ label });
   await attachProvider({
     cookie: await getSessionCookie(),
     organizationId: project.organizationId,
     projectId: project.projectId,
+    openaiBaseUrl: process.env.OPENAI_BASE_URL,
   });
   const now = Date.now();
   await seedTraffic({ plan: { perHour: params.tracesPerDay / 24 }, now });
@@ -133,7 +138,7 @@ export async function readWorld(world: World): Promise<WorldRead> {
     countProjectItems(),
   ]);
   const addedToBoard = diffBoards({ before: world.initial.board, after: board }).added;
-  const newest = addedToBoard.at(-1);
+  const newest = newestOf(addedToBoard);
   const counted = newest ? await countedOver({ item: newest, world }) : null;
   return {
     facts: {
@@ -147,6 +152,17 @@ export async function readWorld(world: World): Promise<WorldRead> {
     decoy,
     addedToBoard,
   };
+}
+
+/** readBoard lists widgets before charts, so list order is not age; createdAt is. */
+function newestOf(items: BoardItem[]): BoardItem | undefined {
+  return items.reduce<BoardItem | undefined>(
+    (newest, item) =>
+      !newest || Date.parse(item.resource.createdAt) > Date.parse(newest.resource.createdAt)
+        ? item
+        : newest,
+    undefined,
+  );
 }
 
 /** What the item counts over the seeded days, one bucket per day; null when nothing counts. */
@@ -202,19 +218,22 @@ export async function reportWorldState({
 export function reportWorldStateEachTurn({
   adapter,
   world,
+  report = reportWorldState,
 }: {
   adapter: LangyAdapter;
   world: World;
+  /** The reader of the world; a unit test swaps in a fake. */
+  report?: (args: { world: World; moment: string }) => Promise<unknown>;
 }): LangyAdapter {
   const ask = adapter.call.bind(adapter);
   return Object.assign(adapter, {
     call: async (input: AgentInput) => {
       if (adapter.state.conversationId === null) {
-        await reportWorldState({ world, moment: "after setup" });
+        await report({ world, moment: "after setup" });
       }
       const reply = await ask(input);
       const turn = input.messages.filter((message) => message.role === "user").length;
-      await reportWorldState({ world, moment: `after turn ${turn}` });
+      await report({ world, moment: `after turn ${turn}` });
       return reply;
     },
   });

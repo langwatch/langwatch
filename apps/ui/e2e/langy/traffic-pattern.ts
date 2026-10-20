@@ -14,8 +14,8 @@ export interface TimeWindow {
 }
 
 /**
- * The last full UTC day before `now` and the day before it, as
- * `dailyRunWindows` in modules/insight computes them for a run at `now`.
+ * The last full UTC day before `now` and the day before it. UTC midnight only:
+ * this matches `dailyRunWindows` in modules/insight only while that fixes UTC too.
  */
 export function dailyWindows(now: number): { day: TimeWindow; previous: TimeWindow } {
   const today = Math.floor(now / DAY_MS) * DAY_MS;

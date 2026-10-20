@@ -3,6 +3,8 @@
 // project API key, so a passing call here proves the entity actually
 // landed in the backend regardless of what Langy claimed.
 
+import { randomUUID } from "node:crypto";
+
 import { API_CREDENTIALS, LW_BASE_URL } from "./config";
 import { type PlannedTrace, planTraffic, type TrafficPlan } from "./traffic-pattern";
 
@@ -338,7 +340,11 @@ export async function seedTraffic({
   plan: TrafficPlan;
   now?: number;
 }): Promise<PlannedTrace[]> {
-  const traces = planTraffic({ now, plan, runId: now.toString(36) });
+  const traces = planTraffic({
+    now,
+    plan,
+    runId: `${now.toString(36)}${randomUUID().slice(0, 8)}`,
+  });
   await inBatches(traces, (trace) =>
     lwPost({
       path: "/api/collector",

@@ -428,8 +428,8 @@ the saved board and the numbers with code first, then the reply with a judge.
   and `addWidget` go through `POST /api/dashboards` and the widget routes. It
   attaches no model provider; `setupWorld` below does.
 - `traffic-pattern.ts` plans now-relative traffic in the last full UTC day and
-  the day before, the windows the daily insights run reads
-  (`dailyRunWindows` in `modules/insight`): a flat baseline per hour, an
+  the day before, UTC midnight to midnight, the windows the daily insights run
+  reads (`dailyRunWindows` in `modules/insight`) only while it also uses UTC: a flat baseline per hour, an
   optional spike hour, optional injected text on the last day.
   `expectedTotals(plan)` is what a correct chart or finding reports.
   `seedTraffic({ plan })` in `langwatch-api.ts` sends it and waits until every
@@ -1137,7 +1137,7 @@ all address the new project without being told. See
   it and send the kickoff first. The scenario library reports every
   simulation to the platform, and the folder fixture's demo application
   needs a key too — both take the same user key bound to this project.
-- **`attachProvider`**: the provider the takeover connects — its row at
+- **`attachProvider`** (in `seed-organization.ts`; it forwards `OPENAI_BASE_URL` only when a caller passes `openaiBaseUrl`, which `dashboards-world.ts` does): the provider the takeover connects — its row at
   organization scope with the checkout's own credentials, then the Langy
   role pointed at it, then the organization's guided state told about it
   (`useGuidedProviderConnect`). Everything that is not Langy runs on the

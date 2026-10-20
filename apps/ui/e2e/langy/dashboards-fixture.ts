@@ -52,12 +52,21 @@ export async function seedDashboardsProject({ label }: { label: string }): Promi
  * "Dashboards and Insights helpers").
  */
 function reportResultsToStableProject(): void {
-  const apiKey = process.env.LANGY_REPORT_API_KEY;
-  if (!apiKey) return;
-  const endpoint = process.env.LANGY_REPORT_ENDPOINT;
+  const target = reportTargetOf(process.env);
+  if (!target) return;
+  process.env.LANGWATCH_API_KEY = target.apiKey;
+  process.env.LANGWATCH_ENDPOINT = target.endpoint;
+}
+
+/** Where results go instead, or null when no stable project is named; a key alone is refused. */
+export function reportTargetOf(
+  env: Record<string, string | undefined>,
+): { apiKey: string; endpoint: string } | null {
+  const apiKey = env.LANGY_REPORT_API_KEY;
+  if (!apiKey) return null;
+  const endpoint = env.LANGY_REPORT_ENDPOINT;
   if (!endpoint) throw new Error("LANGY_REPORT_ENDPOINT is required with LANGY_REPORT_API_KEY");
-  process.env.LANGWATCH_API_KEY = apiKey;
-  process.env.LANGWATCH_ENDPOINT = endpoint;
+  return { apiKey, endpoint };
 }
 
 /** A dashboard as `POST /api/dashboards` answers it. */

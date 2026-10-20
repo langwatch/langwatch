@@ -19,11 +19,13 @@ import {
 } from "./dashboards-world";
 import { makeLangyAdapter } from "./langy-agent";
 import { runScenarioAndLog } from "./scenario-logger";
+import { expectedTotals } from "./traffic-pattern";
 
 const SET_ID = "langy-dashboards-insights";
 
 const meter = createCostMeter();
-const model = meter.wrap(openai("gpt-5-mini"), "judge");
+const judgeModel = meter.wrap(openai("gpt-5-mini"), "judge");
+const simulatorModel = meter.wrap(openai("gpt-5-mini"), "simulator");
 
 const params: WorldParams = {
   role: "admin",
@@ -32,7 +34,8 @@ const params: WorldParams = {
   board: "Checkout health",
   decoy: "Weekly review",
 };
-const seededTotal = params.tracesPerDay * params.days;
+const totals = expectedTotals({ perHour: params.tracesPerDay / 24 });
+const seededTotal = totals.previousDay + totals.day;
 
 let world: World;
 
@@ -42,6 +45,7 @@ describe("Langy builds a dashboard chart on the board the user attached", () => 
     meter.watchLangy({ organizationId: world.project.organizationId });
   }, 300_000);
 
+  /** @scenario Chart from a question */
   it("adds one trace volume chart to the attached board and leaves the decoy alone", async () => {
     const langy = reportWorldStateEachTurn({
       adapter: makeLangyAdapter({
@@ -61,9 +65,9 @@ describe("Langy builds a dashboard chart on the board the user attached", () => 
         agents: [
           langy,
           // The script sends the user's one message, so the simulator is never asked to write one.
-          scenario.userSimulatorAgent({ model }),
+          scenario.userSimulatorAgent({ model: simulatorModel }),
           scenario.judgeAgent({
-            model,
+            model: judgeModel,
             // Langy's tool output makes the trace large; under the default threshold the judge
             // sees span names alone and never reads the "world state" facts.
             tokenThreshold: 60_000,
