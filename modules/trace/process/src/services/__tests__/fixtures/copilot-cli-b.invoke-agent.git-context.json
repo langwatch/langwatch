@@ -13,7 +13,7 @@
 		"gen_ai.request.model": "auto",
 		"gen_ai.agent.id": "github.copilot.default",
 		"gen_ai.agent.version": "1.0.79-2",
-		"enduser.pseudo.id": "2bee93967305808e11093872671cc8be",
+		"enduser.pseudo.id": "00000000000000000000000000000001",
 		"github.copilot.git.repository": "example-org/repo-a",
 		"github.copilot.github.org": "example-org",
 		"github.copilot.git.branch": "feature/repo-a-work",

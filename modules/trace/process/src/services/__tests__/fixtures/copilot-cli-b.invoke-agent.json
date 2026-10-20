@@ -10,7 +10,7 @@
 		"gen_ai.operation.name": "invoke_agent",
 		"gen_ai.provider.name": "github",
 		"gen_ai.conversation.id": "00000000-0000-4000-8000-000000000001",
-		"enduser.pseudo.id": "2bee93967305808e11093872671cc8be",
+		"enduser.pseudo.id": "00000000000000000000000000000001",
 		"github.copilot.context.mcp_server_names": "[\"044b1506a3324f1f6e3b3a2c3a00b4ff8cd8ea489ccbc1c11dacf6043161ea42\"]",
 		"github.copilot.agent.type": "builtin",
 		"gen_ai.response.finish_reasons": [
