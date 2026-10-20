@@ -23,9 +23,9 @@ Dashboards and the graphs and saved workbench charts on them.
 | Postgres table | `DashboardFavourite`        | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
 | Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
 | Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.board.repository.ts:72`            |
-| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
-| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
-| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:58` |
+| Postgres table | `DashboardWidget`           | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
+| Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
+| Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard-widget.repository.ts:59` |
 | Postgres table | `Dashboard`                 | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
 | Postgres table | `CustomGraph`               | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
 | Postgres table | `DashboardsV2`              | `process/src/repositories/prisma/prisma.dashboard.repository.ts:122`       |
