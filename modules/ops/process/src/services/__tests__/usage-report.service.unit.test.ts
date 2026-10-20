@@ -50,6 +50,7 @@ class InstallStandIn implements UsageReportInstall {
         createdAt: "2026-08-01T00:00:00.000Z",
         optionalMetricsOptOut: false,
         hostnameOptOut: false,
+        upgradeDiagnosticsOptOut: false,
       };
     }
     return this.identity.instanceId;
@@ -66,6 +67,7 @@ class InstallStandIn implements UsageReportInstall {
   async setUsageReportSwitches(input: {
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
+    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<void> {
     await this.getInstanceId();
     if (this.identity) this.identity = { ...this.identity, ...input };
@@ -327,10 +329,29 @@ describe("the usage report preview", () => {
 
       const preview = await service().setSwitches({ optionalMetricsOptOut: true });
 
-      expect(preview.switches).toEqual({ optional: false, hostname: true });
+      expect(preview.switches).toEqual({
+        optional: false,
+        hostname: true,
+        upgradeDiagnostics: true,
+      });
       expect(preview.payload.user_email_domains).toBeUndefined();
       expect(preview.payload.totalTraces).toBeUndefined();
       expect(preview.payload.ops_health).toBeUndefined();
+    });
+  });
+
+  describe("when the identity row has opted out of upgrade diagnostics", () => {
+    it("carries upgradeDiagnostics false in the preview's switches", async () => {
+      await install.getInstanceId();
+      await install.setUsageReportSwitches({ upgradeDiagnosticsOptOut: true });
+
+      const preview = await service().preview();
+
+      expect(preview.switches).toEqual({
+        optional: true,
+        hostname: true,
+        upgradeDiagnostics: false,
+      });
     });
   });
 

@@ -176,7 +176,7 @@ describe("given a worker installing governance", () => {
       const { runtime, step } = await bootOver({ refusePage: 2 });
       const saves: Record<string, unknown>[] = [];
       try {
-        const run = step(STEP_ID).run({
+        const run = step(STEP_ID).run({ log: { info: () => undefined, warn: () => undefined },
           checkpoint: { resumeFrom: null, save: async ({ report }) => void saves.push(report) },
           dryRun: false,
           signal: new AbortController().signal,

@@ -12,6 +12,11 @@ import {
   type MigrationStepRun,
 } from "../../step/migration-step.ts";
 import {
+  LEDGER_TEXT_MAX_CHARS,
+  type LedgerTextRedactor,
+  ledgerRedactor,
+} from "../../step/step-log.ts";
+import {
   type BackgroundStepsLedger,
   type BackgroundStepsLog,
   type BackgroundStepsQueue,
@@ -194,7 +199,9 @@ describe("BackgroundStepsService", () => {
 });
 
 const STEP = "identity:reopen-unproven-accounts";
-type Row = Pick<UpgradeStep, "id" | "status" | "report" | "lastError">;
+type Row = Pick<UpgradeStep, "id" | "status" | "report" | "lastError"> & {
+  logTail?: readonly string[];
+};
 
 /** The step table and one lease in memory, as the two upgrade repositories keep them. */
 class MemoryBackgroundLedger implements BackgroundStepsLedger {
@@ -222,12 +229,18 @@ class MemoryBackgroundLedger implements BackgroundStepsLedger {
   markRunning = async () => {
     this.row = { ...this.row, status: "running" };
   };
-  setStatus: BackgroundStepsLedger["setStatus"] = async ({ status, lastError, report }) => {
+  setStatus: BackgroundStepsLedger["setStatus"] = async ({
+    status,
+    lastError,
+    report,
+    logTail,
+  }) => {
     this.row = {
       ...this.row,
       status,
       lastError: lastError ?? null,
       report: report ?? this.row.report,
+      logTail: logTail ?? this.row.logTail,
     };
   };
   saveReport = async ({ report }: { report: Record<string, unknown> }) => {
@@ -247,6 +260,7 @@ function serviceOver({
   clock = { now: 0 },
   queue,
   queueWaitMs,
+  redact,
 }: {
   ledger: MemoryBackgroundLedger;
   run: MigrationStepRun;
@@ -254,6 +268,7 @@ function serviceOver({
   clock?: { now: number };
   queue?: BackgroundStepsQueue;
   queueWaitMs?: number;
+  redact?: LedgerTextRedactor;
 }) {
   return BackgroundStepsService.create({
     ledger,
@@ -275,6 +290,7 @@ function serviceOver({
     retry: { attempts: 3, firstBackoffMs: 60_000, maxBackoffMs: 600_000 },
     now: () => clock.now,
     ...(queue === undefined ? {} : { queue }),
+    ...(redact === undefined ? {} : { redact }),
   });
 }
 
@@ -953,6 +969,87 @@ describe("BackgroundStepsService side by side", () => {
       expect(sweep.ran).toEqual(ids);
       expect(sweep.waiting).toEqual(["a:six"]);
       expect(leases.toSorted()).toEqual(ids.map((id) => `background:${id}`).toSorted());
+    });
+  });
+});
+
+describe("BackgroundStepsService diagnostics", () => {
+  const failing = (message: string) => async () => {
+    throw new Error(message);
+  };
+
+  describe("given a step whose error names a database URL with its password", () => {
+    /** @scenario "A step's error is redacted before the ledger stores it" */
+    it("stores the error with the password masked and the user and host kept", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const service = serviceOver({
+        ledger,
+        run: failing("connect to postgres://langwatch:hunter2secret@db.internal:5432/app failed"),
+      });
+
+      await sweepOnce(service);
+
+      expect(ledger.row.lastError).toContain("postgres://langwatch:***@db.internal:5432/app");
+      expect(ledger.row.lastError).not.toContain("hunter2secret");
+    });
+  });
+
+  describe("given a worker that holds a ClickHouse URL as a secret", () => {
+    /** @scenario "A step's error naming a secret the process holds is redacted before it is stored" */
+    it("stores the error without the URL, even where no pattern would match it", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const secret = "clickhouse-host.internal:8123/?user=default&k=9f8e7d6c5b4a";
+      const service = serviceOver({
+        ledger,
+        redact: ledgerRedactor({ secretValues: [secret] }),
+        run: failing(`ClickHouse refused ${secret} after 3 tries`),
+      });
+
+      await sweepOnce(service);
+
+      expect(ledger.row.lastError).toBe("ClickHouse refused *** after 3 tries");
+    });
+  });
+
+  describe("given a step that fails with a 20 KB error", () => {
+    /** @scenario "A very long step error is cut before it is stored" */
+    it("stores at most 4 KB and marks the cut", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const service = serviceOver({ ledger, run: failing("x".repeat(20_000)) });
+
+      await sweepOnce(service);
+
+      expect(ledger.row.lastError?.length).toBeLessThanOrEqual(LEDGER_TEXT_MAX_CHARS);
+      expect(ledger.row.lastError?.endsWith("[cut]")).toBe(true);
+    });
+  });
+
+  describe("given a step that logs two lines and then fails", () => {
+    /** @scenario "A background step's log lines are kept with its attempt" */
+    it("keeps the start line, both lines and the failure line, redacted, and forwards them", async () => {
+      const ledger = new MemoryBackgroundLedger();
+      const forwarded: string[] = [];
+      const service = serviceOver({
+        ledger,
+        log: (_level, message, fields) => void forwarded.push(`${message} ${String(fields.step)}`),
+        run: async ({ log }) => {
+          log.info("read page", { afterId: "project_1" });
+          log.warn("skipped an agent", { token: "x", note: "password=opensesame" });
+          throw new Error("boom");
+        },
+      });
+
+      await sweepOnce(service);
+
+      const tail = ledger.row.logTail ?? [];
+      expect(tail.map((line) => line.split(" ").slice(1, 3).join(" "))).toEqual([
+        "info background",
+        "info read",
+        "warn skipped",
+        "warn background",
+      ]);
+      expect(tail.join("\n")).not.toContain("opensesame");
+      expect(forwarded).toContain(`read page ${STEP}`);
     });
   });
 });

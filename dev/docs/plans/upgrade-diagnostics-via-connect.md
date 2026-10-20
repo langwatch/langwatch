@@ -1,6 +1,6 @@
-# Upgrade diagnostics via LangWatch Connect (design, not built)
+# Upgrade diagnostics via LangWatch Connect
 
-Status: decided 2026-10-19, not built. Decisions below under "Decided". The upgrade-alert email
+Status: decided 2026-10-19, built on `feat/upgrade-diagnostics` (2026-10-20). Decisions below under "Decided". The upgrade-alert email
 (`packages/mail/src/templates/upgrade-alert-email.tsx`) is already worded for it.
 
 ## Problem
@@ -149,3 +149,29 @@ step and release; later attempts thread under it.
 1. Redact on write, per-step log tail, Copy / Download diagnostics (no Cloud dependency).
 2. Hosted route, S3 storage with the 30-day rule, Slack signal.
 3. Send to LangWatch, the auto-send default and opt-out, docs, Checkup, email copy.
+
+## Corrections from building it (2026-10-20)
+
+- A background step has no run row (`run_id` is `background:<owner>`), so the log tail lives in
+  its own step column, `log_tail`, written at the end of each attempt; `report` is the checkpoint
+  and is replaced on every save. Steps receive a `log` in their run arguments.
+- Secret values cannot be read back from `@langwatch/secrets`; the serving gate passes the store
+  URLs it already resolved into the background runner's redactor.
+- Storage follows ADR-172, not stored-object: expiring bytes get no `stored_objects` row. Licensing
+  writes `upgrade-diagnostics/<instanceId>/<reportId>.json` through the object-storage member on
+  the platform tenant, and the 30-day expiry is a lifecycle row in `charts/langwatch/values.yaml`
+  (Cloud's bucket rule is set outside this repo). Download is the member's `signDownload`, 5 minutes.
+- The REST rate limit counts per organisation; the per-instance limit is licensing's own limiter,
+  as license sync does.
+- Slack: the self-hosted signal path was never composed. A webhook cannot thread, so one message
+  is posted per instance, step and release; later reports of that step are listed in Cloud admin
+  only. Threading needs a bot token and a stored `ts`; left for a human decision.
+- Cloud admin's instance drawer is opened from page state; it now also opens from `?instance=`,
+  which is the link Slack carries.
+- The bundle schema is ops' (`modules/ops/contract/src/features/migrations/ops-upgrade-diagnostics.ts`):
+  no core contract depends on an enterprise one. Licensing's contract imports it for the submission.
+- The automatic-send opt-out is a third switch beside the usage-report ones (stored on the
+  instance identity row), plus `DISABLE_UPGRADE_DIAGNOSTICS_AUTO_SEND`. The step page shows the
+  bundle as it stands, not a stored copy of what an automatic send sent.
+- The alert email picks its closing line from what happened: details already sent, sendable from
+  the step page, or downloadable to email to support.

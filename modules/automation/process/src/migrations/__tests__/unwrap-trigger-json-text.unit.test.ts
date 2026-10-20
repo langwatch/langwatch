@@ -106,7 +106,7 @@ afterEach(async () => {
 async function runStep({ dryRun }: { dryRun: boolean }) {
   running = await bootWorker();
   const saves: MigrationStepReport[] = [];
-  const report = await running.step(STEP).run({
+  const report = await running.step(STEP).run({ log: { info: () => undefined, warn: () => undefined },
     checkpoint: { resumeFrom: null, save: async ({ report: saved }) => void saves.push(saved) },
     dryRun,
     signal: new AbortController().signal,

@@ -249,6 +249,9 @@ import {
   type OpsUpgradeRunPage,
   type OpsUpgradeStatus,
   type OpsUpgradeStepDetail,
+  type OpsUpgradeDiagnosticsAvailability,
+  type OpsUpgradeDiagnosticsReceipt,
+  type UpgradeDiagnosticsBundle,
   type OpsUpgradeStepPage,
   type OpsUpgradeTenantPage,
   type OpsUpgradeTargetSummary,
@@ -283,6 +286,7 @@ import { UserApi, type UserApi as UserApiContract } from "@langwatch/user-contra
 import { WorkflowApi } from "@langwatch/workflow-contract";
 
 import { UpgradeAlertsService } from "#features/upgrades/services/upgrade-alerts.service";
+import { UpgradeDiagnosticsService } from "#features/upgrades/services/upgrade-diagnostics.service";
 import { OpsExplainClickHouseRepository } from "#repositories/clickhouse/clickhouse.ops-explain.repository";
 import type { OpsExplainClients } from "#repositories/ops-explain.repository";
 import type { OpsRepositories } from "#repositories/ops.repositories";
@@ -735,6 +739,8 @@ type OpsRuntimeDependencies = Readonly<{
   upgrades: OpsUpgradeService;
   /** The check `ops_upgrade_alerts` runs hourly; absent where a composition built none. */
   upgradeAlerts: UpgradeAlertsService | undefined;
+  /** A failed step's redacted bundle, and sending it over Connect; absent where none was built. */
+  upgradeDiagnostics: UpgradeDiagnosticsService | undefined;
   operatorSeed: PlatformOperatorSeedSettings | undefined;
   findOpsApiKey(): string | null;
   findProductAnalyticsTargets(): ProductAnalyticsTarget[];
@@ -901,6 +907,17 @@ export class OpsModule implements OpsApi {
       logger,
     });
 
+    const isCloud = config.isSaas || cloudOps;
+    const upgradeDiagnostics = UpgradeDiagnosticsService.create({
+      ledger: repositories.upgradeLedger,
+      licensing: dependencies.licensing,
+      deployment: {
+        imageRelease: releaseVersionOf(config),
+        chartVersion: config.usageStats.chartVersion ?? null,
+        installMethod: config.usageStats.installMethod ?? "self-hosted",
+      },
+      automaticDisabled: config.upgradeDiagnosticsAutoSendDisabled,
+    });
     const platformOperators = PlatformOperatorsService.create({
       authz: dependencies.authz,
       users: dependencies.users,
@@ -928,8 +945,10 @@ export class OpsModule implements OpsApi {
         mail: dependencies.notifications,
         renderer: ReactEmailMailRenderer.create(),
         upgradesUrl: `${(config.publicBaseUrl ?? "").replace(/\/$/, "")}/ops/upgrades`,
-        audience: config.isSaas || cloudOps ? "langwatch-cloud" : "self-hosted",
+        audience: isCloud ? "langwatch-cloud" : "self-hosted",
+        ...(isCloud ? {} : { diagnostics: upgradeDiagnostics }),
       }),
+      upgradeDiagnostics,
     });
     return app;
   }
@@ -948,6 +967,7 @@ export class OpsModule implements OpsApi {
     signUpHealth?: SignUpHealthService;
     platformOperators?: PlatformOperatorsService;
     upgradeAlerts?: UpgradeAlertsService;
+    upgradeDiagnostics?: UpgradeDiagnosticsService;
   }): OpsModule {
     const { infrastructure: members, dependencies, repositories } = setup;
 
@@ -1001,6 +1021,7 @@ export class OpsModule implements OpsApi {
       signUpHealth: setup.signUpHealth,
       platformOperators: setup.platformOperators,
       upgradeAlerts: setup.upgradeAlerts,
+      upgradeDiagnostics: setup.upgradeDiagnostics,
       operatorSeed: members.operatorSeed,
       findOpsApiKey: () => members.findOpsApiKey(),
       findProductAnalyticsTargets: () => members.findProductAnalyticsTargets(),
@@ -1976,6 +1997,7 @@ export class OpsModule implements OpsApi {
     operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
+    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<UsageReportAnswer> {
     const checkup = this.#checkup;
     if (checkup.isSaas) return { deployment: "saas" };
@@ -2019,6 +2041,18 @@ export class OpsModule implements OpsApi {
 
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail> {
     return this.#dependencies.upgrades.retryStep(input);
+  }
+
+  getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle> {
+    return this.#upgradeDiagnostics.getBundle(input);
+  }
+
+  getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability> {
+    return this.#upgradeDiagnostics.getAvailability();
+  }
+
+  sendUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<OpsUpgradeDiagnosticsReceipt> {
+    return this.#upgradeDiagnostics.send({ id: input.id, trigger: "operator" });
   }
 
   async getProjectCheckup({ projectId }: { projectId: string }): Promise<ProjectCheckupReport> {
@@ -2163,6 +2197,12 @@ export class OpsModule implements OpsApi {
   ): Promise<OpsQueueReapedStrandedGroups> {
     const audited = input.requestedBy !== GROUP_QUEUE_REAPER_PIPELINE_NAME;
     return this.#dependencies.groupQueueReaper.reap({ ...input, audited });
+  }
+
+  get #upgradeDiagnostics(): UpgradeDiagnosticsService {
+    const { upgradeDiagnostics } = this.#dependencies;
+    if (!upgradeDiagnostics) throw new OpsCapabilityUnavailableError("upgrade diagnostics");
+    return upgradeDiagnostics;
   }
 
   get #signUpHealth(): SignUpHealthService {

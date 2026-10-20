@@ -66,6 +66,11 @@ import type {
   OpsMigrationTargetedRunResult,
 } from "./features/migrations/ops-system-migration.ts";
 import type {
+  OpsUpgradeDiagnosticsAvailability,
+  OpsUpgradeDiagnosticsReceipt,
+  UpgradeDiagnosticsBundle,
+} from "./features/migrations/ops-upgrade-diagnostics.ts";
+import type {
   OpsUpgradeAttentionNotice,
   OpsUpgradeIdInput,
   OpsUpgradeListRunsInput,
@@ -694,6 +699,7 @@ export interface OpsApi {
     operator: OpsOperator | null;
     optionalMetricsOptOut?: boolean;
     hostnameOptOut?: boolean;
+    upgradeDiagnosticsOptOut?: boolean;
   }): Promise<UsageReportAnswer>;
   /** What `langwatch doctor` reads over a project key, which is never an install admin. */
   getProjectCheckup(input: { projectId: string }): Promise<ProjectCheckupReport>;
@@ -713,6 +719,11 @@ export interface OpsApi {
   listUpgradeTargets(): Promise<OpsUpgradeTargetSummary[]>;
   /** Reopens a failed step for the worker; refuses a step not failed or not in the ledger. */
   retryUpgradeStep(input: OpsUpgradeIdInput): Promise<OpsUpgradeStepDetail>;
+  /** The step's redacted diagnostics; refuses with `upgrade_not_found` like `getUpgradeStep`. */
+  getUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<UpgradeDiagnosticsBundle>;
+  getUpgradeDiagnosticsAvailability(): Promise<OpsUpgradeDiagnosticsAvailability>;
+  /** Sends the step's bundle to LangWatch over Connect, as the operator who asked. */
+  sendUpgradeStepDiagnostics(input: OpsUpgradeIdInput): Promise<OpsUpgradeDiagnosticsReceipt>;
 }
 
 export const OpsApi = moduleApi<OpsApi>()("ops");

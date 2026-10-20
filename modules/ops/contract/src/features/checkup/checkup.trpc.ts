@@ -54,6 +54,7 @@ export const checkupTrpc = defineTrpcContract("checkup")
       ...organizationInput.shape,
       optionalMetricsOptOut: z.boolean().optional(),
       hostnameOptOut: z.boolean().optional(),
+      upgradeDiagnosticsOptOut: z.boolean().optional(),
     }),
   )
   .withOutput(usageReportAnswer)

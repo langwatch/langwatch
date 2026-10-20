@@ -12,6 +12,8 @@ const usageReportSwitchesSchemaDefinition = z.object({
   optional: z.boolean(),
   /** Hostname, which names the customer's own network. */
   hostname: z.boolean(),
+  /** A failed upgrade step's diagnostics, sent by the hourly check (not part of the report). */
+  upgradeDiagnostics: z.boolean().optional(),
 });
 export interface UsageReportSwitchesSchema extends Named<
   typeof usageReportSwitchesSchemaDefinition

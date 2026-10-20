@@ -3496,6 +3496,9 @@ importers:
       '@langwatch/module':
         specifier: workspace:*
         version: link:../../../../packages/module
+      '@langwatch/ops-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/ops/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans

@@ -236,7 +236,7 @@ describe("given a worker installing SCIM over an empty connection view and ident
     const scim = runtime.service(ScimApi);
     const saved: MigrationStepReport[] = [];
     const pass = (resumeFrom: MigrationStepReport | null) =>
-      step?.run({
+      step?.run({ log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom, save: async ({ report }) => void saved.push(report) },
         dryRun: false,
         signal: new AbortController().signal,
@@ -273,7 +273,7 @@ describe("given a worker installing SCIM over identity's connection log", () => 
     const step = runtime.migrationSteps(isMigrationStep).find(({ id }) => id === STEP_ID);
 
     try {
-      await step?.run({
+      await step?.run({ log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
         dryRun: false,
         signal: new AbortController().signal,
@@ -325,7 +325,7 @@ describe("given identity's log holds registrations written before the arrival po
     const step = runtime.migrationSteps(isMigrationStep).find(({ id }) => id === STEP_ID);
 
     try {
-      const report = await step?.run({
+      const report = await step?.run({ log: { info: () => undefined, warn: () => undefined },
         checkpoint: { resumeFrom: null, save: async () => undefined },
         dryRun: false,
         signal: new AbortController().signal,

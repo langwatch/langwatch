@@ -14,6 +14,7 @@ const DOCS_URL = "https://docs.langwatch.ai/self-hosting/data-and-telemetry";
 export type UsageReportSwitchChange = {
   optionalMetricsOptOut?: boolean;
   hostnameOptOut?: boolean;
+  upgradeDiagnosticsOptOut?: boolean;
 };
 
 /**
@@ -85,7 +86,7 @@ export function UsageReportSection({
   );
 }
 
-/** The two opt-outs, shown to an organization or install admin, who reads the whole report. */
+/** The opt-outs, shown to an organization or install admin, who reads the whole report. */
 function UsageReportSwitchRows({
   switches,
   canManage,
@@ -132,6 +133,24 @@ function UsageReportSwitchRows({
             aria-label="Send hostname"
             inputProps={{ "data-testid": "checkup-switch-hostname-input" }}
             onCheckedChange={(event) => onSwitch({ hostnameOptOut: !event.checked })}
+          />
+        </HStack>
+      </CheckupSectionRow>
+      <CheckupSectionRow testId="checkup-switch-upgrade-diagnostics">
+        <HStack width="full" justify="space-between" align="start" gap={4}>
+          <VStack align="start" gap={0}>
+            <Text fontWeight="medium">Upgrade diagnostics</Text>
+            <Text fontSize="sm" color="fg.muted">
+              When an upgrade step fails, send its details to the LangWatch team so we can fix it.
+              Secrets are masked and no names are sent. Off, you can still send them from the step.
+            </Text>
+          </VStack>
+          <Switch
+            checked={switches.upgradeDiagnostics ?? true}
+            disabled={!canManage || isSaving}
+            aria-label="Always send upgrade diagnostics to LangWatch"
+            inputProps={{ "data-testid": "checkup-switch-upgrade-diagnostics-input" }}
+            onCheckedChange={(event) => onSwitch({ upgradeDiagnosticsOptOut: !event.checked })}
           />
         </HStack>
       </CheckupSectionRow>

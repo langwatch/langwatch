@@ -130,7 +130,7 @@ describe("suite app installation", () => {
         .find(({ id }) => id === "suite:replay-scenario-facts-for-open-runs");
       const saved: MigrationStepReport[] = [];
       const pass = () =>
-        step?.run({
+        step?.run({ log: { info: () => undefined, warn: () => undefined },
           checkpoint: { resumeFrom: null, save: async ({ report }) => void saved.push(report) },
           dryRun: false,
           signal: new AbortController().signal,

@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 The operator views over enterprise subjects (ARCHITECTURE.md section 3): each op admits Cloud admin staff through OpsApi, then forwards to the owner's Api.
 
-Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:25`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/enterprise-ops.api.ts:27`; nothing else in this package is public.
 
 #### `listIssuedLicenses`
 
@@ -112,6 +112,22 @@ getSelfHostedInstance(input: { id: string; operator: OpsOperator | null; }): Pro
 summarizeSelfHostedInstances(input: { operator: OpsOperator | null; }): Promise<SelfHostedInstanceSummary>;
 ```
 
+#### `findUpgradeDiagnostics`
+
+The upgrade diagnostics one install sent, newest first.
+
+```typescript
+findUpgradeDiagnostics(input: { instanceRowId: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsReport[]>;
+```
+
+#### `getUpgradeDiagnosticsDownload`
+
+A five-minute link to one bundle: the sensitive read, so it asks `ops:manage`.
+
+```typescript
+getUpgradeDiagnosticsDownload(input: { id: string; operator: OpsOperator | null; }): Promise<UpgradeDiagnosticsDownload>;
+```
+
 ## REST transport
 
 None: this module declares no REST family.
@@ -120,7 +136,7 @@ None: this module declares no REST family.
 
 ### `licenseRegistry`
 
-Contract `../contract/src/license-registry.trpc.ts:36`, router `src/transport/license-registry.trpc.ts:23`.
+Contract `../contract/src/license-registry.trpc.ts:40`, router `src/transport/license-registry.trpc.ts:23`.
 
 | Procedure                              | Kind     | Gate                             | Input                                  | Output                       |
 | -------------------------------------- | -------- | -------------------------------- | -------------------------------------- | ---------------------------- |
@@ -256,13 +272,15 @@ type Output = z.infer<typeof activationCodeViewSchema>; // ../../licensing/contr
 
 ### `selfHostedInstances`
 
-Contract `../contract/src/license-registry.trpc.ts:93`, router `src/transport/self-hosted-instance.trpc.ts:14`.
+Contract `../contract/src/license-registry.trpc.ts:97`, router `src/transport/self-hosted-instance.trpc.ts:14`.
 
-| Procedure                     | Kind  | Gate                           | Input                                | Output                            |
-| ----------------------------- | ----- | ------------------------------ | ------------------------------------ | --------------------------------- |
-| `selfHostedInstances.getAll`  | query | Platform permission `ops:view` | `listSelfHostedInstancesInputSchema` | `selfHostedInstancePageSchema`    |
-| `selfHostedInstances.getById` | query | Platform permission `ops:view` | `selfHostedInstanceIdInputSchema`    | `selfHostedInstanceDetailSchema`  |
-| `selfHostedInstances.summary` | query | Platform permission `ops:view` | inline                               | `selfHostedInstanceSummarySchema` |
+| Procedure                                    | Kind     | Gate                             | Input                                | Output                             |
+| -------------------------------------------- | -------- | -------------------------------- | ------------------------------------ | ---------------------------------- |
+| `selfHostedInstances.getAll`                 | query    | Platform permission `ops:view`   | `listSelfHostedInstancesInputSchema` | `selfHostedInstancePageSchema`     |
+| `selfHostedInstances.getById`                | query    | Platform permission `ops:view`   | `selfHostedInstanceIdInputSchema`    | `selfHostedInstanceDetailSchema`   |
+| `selfHostedInstances.summary`                | query    | Platform permission `ops:view`   | inline                               | `selfHostedInstanceSummarySchema`  |
+| `selfHostedInstances.findDiagnostics`        | query    | Platform permission `ops:view`   | `findUpgradeDiagnosticsInputSchema`  | inline                             |
+| `selfHostedInstances.getDiagnosticsDownload` | mutation | Platform permission `ops:manage` | `upgradeDiagnosticsIdInputSchema`    | `upgradeDiagnosticsDownloadSchema` |
 
 ```typescript
 // selfHostedInstances.getAll
@@ -277,9 +295,39 @@ interface Input {
 type Output = z.infer<typeof selfHostedInstanceDetailSchema>; // ../../licensing/contract/src/self-hosted-instance.ts:136
 
 // selfHostedInstances.summary
-// Input: inline, ../contract/src/license-registry.trpc.ts:103
+// Input: inline, ../contract/src/license-registry.trpc.ts:107
 type Input = unknown;
 type Output = z.infer<typeof selfHostedInstanceSummarySchema>; // ../../licensing/contract/src/self-hosted-instance.ts:162
+
+// selfHostedInstances.findDiagnostics
+// Input: findUpgradeDiagnosticsInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:55
+interface Input {
+  instanceRowId: string;
+}
+// Output: inline, ../contract/src/license-registry.trpc.ts:112
+type Output = {
+  id: string;
+  instanceId: string;
+  stepId: string;
+  stepDescription: string | null;
+  release: string | null;
+  attempt: number;
+  trigger: "operator" | "automatic";
+  byteLength: number;
+  receivedAt: string;
+  expiresAt: string;
+}[];
+
+// selfHostedInstances.getDiagnosticsDownload
+// Input: upgradeDiagnosticsIdInputSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:58
+interface Input {
+  id: string;
+}
+// Output: upgradeDiagnosticsDownloadSchema, ../../licensing/contract/src/upgrade-diagnostics.ts:41
+interface Output {
+  url: string;
+  expiresAt: string;
+}
 ```
 
 ## Sockets

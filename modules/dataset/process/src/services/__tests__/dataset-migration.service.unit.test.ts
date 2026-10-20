@@ -184,7 +184,7 @@ describe("DatasetMigrationService as an upgrade step", () => {
       const { migration, reports, checkpoint } = step({ failOnceProject: "project_c" });
 
       await expect(
-        migration.runStep({
+        migration.runStep({ log: { info: () => undefined, warn: () => undefined },
           checkpoint: checkpoint(null),
           dryRun: false,
           signal: new AbortController().signal,
@@ -198,12 +198,12 @@ describe("DatasetMigrationService as an upgrade step", () => {
       const { migration, commit, reports, checkpoint } = step({ failOnceProject: "project_c" });
       const signal = new AbortController().signal;
       await expect(
-        migration.runStep({ checkpoint: checkpoint(null), dryRun: false, signal }),
+        migration.runStep({ log: { info: () => undefined, warn: () => undefined }, checkpoint: checkpoint(null), dryRun: false, signal }),
       ).rejects.toThrow("1 datasets failed");
       commit.mockClear();
 
       await expect(
-        migration.runStep({
+        migration.runStep({ log: { info: () => undefined, warn: () => undefined },
           checkpoint: checkpoint(reports.at(-1) ?? null),
           dryRun: false,
           signal,

@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useDebounce } from "use-debounce";
 
 import { api } from "../../../../behavior/ops-api.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import type { SelfHostedInstanceFilters } from "../../model/self-hosted-instance.ts";
 import { InstancesSummary } from "../blocks/instances-summary.tsx";
 import { InstancesTable } from "../blocks/instances-table.tsx";
@@ -13,13 +14,20 @@ import { InstanceDetailDrawer } from "./instance-detail-drawer.tsx";
 const PAGE_SIZE = 25;
 
 /** Every self-hosted install that has reported (ADR-156 §10), with what they add up to on top.
- * Read only: an install reported every number here. */
+ * Read only. The open drawer is `?instance=<row id>`, the link a diagnostics Slack message carries. */
 export default function SelfHostedInstancesView() {
   const [search, setSearch] = useState("");
   const [debouncedSearch] = useDebounce(search, 300);
   const [page, setPage] = useState(1);
   const [filters, setFilters] = useState<SelfHostedInstanceFilters>({ sort: "last_report" });
-  const [openId, setOpenId] = useState<string | null>(null);
+  const router = useRouter();
+  const openId = typeof router.query.instance === "string" ? router.query.instance : null;
+  const setOpenId = (instanceRowId: string | null) => {
+    const query = { ...router.query } as Record<string, unknown>;
+    if (instanceRowId) query.instance = instanceRowId;
+    else delete query.instance;
+    router.replace({ query }, { shallow: true });
+  };
 
   const summary = api.selfHostedInstances.summary.useQuery();
   const list = api.selfHostedInstances.getAll.useQuery({

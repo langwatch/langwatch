@@ -101,6 +101,7 @@ function stepOf(step: UpgradeStepView): OpsUpgradeStep {
     attempt: step.attempt,
     lastError: step.lastError,
     report: step.report,
+    logTail: [...step.logTail],
     progress: step.progress,
     waitingOn: step.waitingOn.map((writer) => ({ ...writer })),
     runId: step.runId,

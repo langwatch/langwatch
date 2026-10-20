@@ -66,6 +66,7 @@ function checkupService(): OpsCheckupService {
       clickhouseOpsUrl: undefined,
       usageStats: { disabled: false, installMethod: undefined, chartVersion: undefined },
       collectClickHouseBackupMetrics: true,
+      upgradeDiagnosticsAutoSendDisabled: false,
       productAnalytics: { key: undefined, host: undefined },
       grafana: { baseUrl: undefined, tempoDatasourceUid: undefined, lokiDatasourceUid: undefined },
       bugReportSlackChannel: undefined,

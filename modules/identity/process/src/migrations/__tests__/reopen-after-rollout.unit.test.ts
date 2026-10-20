@@ -90,8 +90,8 @@ describe("identity's after-rollout reopen step", () => {
       signal: new AbortController().signal,
     };
     try {
-      expect(await step.run({ ...context, dryRun: false })).toEqual({ reopened: 0 });
-      expect(await step.run({ ...context, dryRun: true })).toEqual({ wouldReopen: 0 });
+      expect(await step.run({ log: { info: () => undefined, warn: () => undefined }, ...context, dryRun: false })).toEqual({ reopened: 0 });
+      expect(await step.run({ log: { info: () => undefined, warn: () => undefined }, ...context, dryRun: true })).toEqual({ wouldReopen: 0 });
     } finally {
       await runtime.stop();
     }

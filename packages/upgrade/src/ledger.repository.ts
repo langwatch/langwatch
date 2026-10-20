@@ -25,6 +25,8 @@ import {
   upcastStepStatus,
 } from "./ledger.ts";
 import type { UpgradePostgres } from "./ports.ts";
+import { redactSecrets } from "./runner/run-log.ts";
+import { ledgerText } from "./step/step-log.ts";
 
 // The columns are TIMESTAMP(3) holding UTC, as Prisma writes them; read back as instants.
 const NOW_UTC = `(now() AT TIME ZONE 'UTC')`;
@@ -268,7 +270,13 @@ export class UpgradeLedgerRepository {
               "last_error" = EXCLUDED."last_error",
               "updated_at" = EXCLUDED."updated_at"
        RETURNING ${TARGET_COLUMNS}`,
-      [stepId, target, status, version, lastError],
+      [
+        stepId,
+        target,
+        status,
+        version,
+        lastError === null ? null : ledgerText({ text: lastError, redact: redactSecrets }),
+      ],
     );
     return upgradeTargetSchema.parse(rows[0]);
   }

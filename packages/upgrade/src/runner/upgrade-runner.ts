@@ -17,6 +17,7 @@ import type { UpgradeStatus } from "../reader/reader.schema.ts";
 import { createUpgradeReader } from "../reader/reader.service.ts";
 import { prismaSteps, readPrismaMigrations } from "../seed-sources.ts";
 import type { MigrationStep } from "../step/migration-step.ts";
+import { StepLogTail } from "../step/step-log.ts";
 import { type DifferingIndex, differingPrebuiltIndexes } from "../stepping/prebuilt-indexes.ts";
 import {
   findHandAppliedSql,
@@ -1037,6 +1038,10 @@ export class UpgradeRunnerService {
     const minutes = BLOCKING_STEP_DEADLINE_MS / 60_000;
     const reason = `blocking step ${id} passed its ${minutes}-minute deadline`;
     const deadline = stepDeadline({ signal, deadlineMs: BLOCKING_STEP_DEADLINE_MS, reason });
+    const stepLog = StepLogTail.create({
+      redact: redactSecrets,
+      forward: (level, message, fields) => this.narrate[level](message, { step: id, ...fields }),
+    });
     try {
       const report = await deadline.race(
         step.run({
@@ -1046,17 +1051,25 @@ export class UpgradeRunnerService {
           },
           dryRun: false,
           signal: deadline.signal,
+          log: stepLog,
         }),
       );
       // A run that returns aborted stopped early: it stays running with its checkpoint (F-2).
       signal.throwIfAborted();
-      await this.runner.setStatus({ ids: [id], status: "done", runId, report });
+      const logTail = stepLog.tail();
+      await this.runner.setStatus({ ids: [id], status: "done", runId, report, logTail });
       this.narrate.stepEnded({ id, error: null });
     } catch (error) {
       if (signal.aborted) throw error;
       const lastError = describeError(error);
       this.narrate.stepEnded({ id, error: lastError });
-      await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError });
+      stepLog.keepOnly({
+        level: "warn",
+        message: "blocking step failed",
+        fields: { error: lastError },
+      });
+      const logTail = stepLog.tail();
+      await this.runner.setStatus({ ids: [id], status: "failed", runId, lastError, logTail });
       throw new UpgradeRunFailure("step_failed", `blocking step ${id} failed: ${lastError}`, {
         step: id,
       });

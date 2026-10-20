@@ -28,6 +28,11 @@ import {
   opsRunSystemMigrationForOrganizationInputSchema,
   opsSearchMigrationOrganizationsInputSchema,
 } from "./ops-system-migration.ts";
+import {
+  opsUpgradeDiagnosticsAvailabilitySchema,
+  opsUpgradeDiagnosticsReceiptSchema,
+  upgradeDiagnosticsBundleSchema,
+} from "./ops-upgrade-diagnostics.ts";
 
 const isoInstant = z.string();
 const countsSchema = z.record(z.string(), z.number().int());
@@ -184,6 +189,8 @@ const opsUpgradeStepSchemaDefinition = z.object({
   attempt: z.number().int(),
   lastError: z.string().nullable(),
   report: reportSchema,
+  /** The last attempt's log lines, redacted when written. */
+  logTail: z.array(z.string()),
   progress: opsUpgradeStepProgressSchema.nullable(),
   waitingOn: z.array(opsUpgradeWaitingWriterSchema),
   runId: z.string().nullable(),
@@ -387,6 +394,20 @@ export const opsUpgradeTrpc = defineTrpcContract("ops.upgrade")
   .mutation("retryStep")
   .withInput(opsUpgradeIdInputSchema)
   .withOutput(opsUpgradeStepDetailSchema)
+
+  /** The step's redacted diagnostics bundle, as Copy, Download and Send to LangWatch use it. */
+  .query("getDiagnostics")
+  .withInput(opsUpgradeIdInputSchema)
+  .withOutput(upgradeDiagnosticsBundleSchema)
+
+  .query("diagnosticsAvailability")
+  .withInput(z.void())
+  .withOutput(opsUpgradeDiagnosticsAvailabilitySchema)
+
+  /** Sends the step's bundle over Connect; refused by name where Connect is unavailable. */
+  .mutation("sendDiagnostics")
+  .withInput(opsUpgradeIdInputSchema)
+  .withOutput(opsUpgradeDiagnosticsReceiptSchema)
 
   /**
    * The in-place system migrations, per migration: the status rollup plus the
