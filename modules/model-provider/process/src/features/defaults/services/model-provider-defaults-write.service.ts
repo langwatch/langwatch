@@ -65,6 +65,7 @@ export class ModelProviderDefaultsWriteService {
 
     const config = this.options.catalog.sanitizeDefaultConfig(
       parsed.config ?? existing?.config ?? {},
+      existing?.config,
     );
     if (Object.keys(config).length === 0) {
       if (existing) {

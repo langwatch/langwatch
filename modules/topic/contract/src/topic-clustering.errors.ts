@@ -11,6 +11,12 @@ export const CLUSTERING_ERROR_CODES = {
    */
   MODEL_NOT_CONFIGURED: "model_not_configured",
   /**
+   * A model IS configured but the resolver had to skip it: a terms-restricted
+   * codex model cannot run topic clustering. The fix is another model, so this
+   * is distinct from MODEL_NOT_CONFIGURED.
+   */
+  MODEL_RESTRICTED: "model_restricted",
+  /**
    * Model provider auth rejection. Defined for backwards compatibility but
    * not set until langevals returns structured provider errors.
    */
@@ -42,6 +48,7 @@ export interface ClassifiedClusteringError {
  */
 const USER_ACTIONABLE_CODES = new Set<ClusteringErrorCode>([
   CLUSTERING_ERROR_CODES.MODEL_NOT_CONFIGURED,
+  CLUSTERING_ERROR_CODES.MODEL_RESTRICTED,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_AUTH,
   CLUSTERING_ERROR_CODES.MODEL_PROVIDER_QUOTA,
 ]);

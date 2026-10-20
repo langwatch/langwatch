@@ -105,7 +105,15 @@ export abstract class ModelProviderCatalog {
   staticCostRates(): readonly ModelCostRate[] {
     return getStaticModelCostRates();
   }
-  sanitizeDefaultConfig(input: Record<string, unknown>): Record<string, string> {
+  /**
+   * Rejects restricted (codex) models loudly. Only keys being WRITTEN are
+   * checked: a value equal to the `stored` one may predate the restriction, and
+   * resolution already skips it at runtime; rejecting it would lock the config.
+   */
+  sanitizeDefaultConfig(
+    input: Record<string, unknown>,
+    stored: Record<string, unknown> = {},
+  ): Record<string, string> {
     const valid = new Set<string>([
       "DEFAULT",
       "FAST",
@@ -119,12 +127,14 @@ export abstract class ModelProviderCatalog {
         continue;
       }
 
-      const allowed = isModelRole(key)
-        ? isModelAllowedAsRoleDefault(value, key)
-        : Boolean(
-            findFeatureByKey(key)[0] &&
-            isModelAllowedForFeature({ modelId: value, featureKey: key }),
-          );
+      const allowed =
+        stored[key] === value ||
+        (isModelRole(key)
+          ? isModelAllowedAsRoleDefault(value, key)
+          : Boolean(
+              findFeatureByKey(key)[0] &&
+              isModelAllowedForFeature({ modelId: value, featureKey: key }),
+            ));
       if (!allowed) {
         throw new ModelDefaultValidationError(
           `"${value}" ${CODING_ASSISTANT_SURFACES_ONLY_NEEDLE} and cannot be set for "${key}".`,
