@@ -4,6 +4,7 @@
  */
 
 import {
+  isRunNotScored,
   SimulationRunStatus as ScenarioRunStatus,
   type SimulationRunData as ScenarioRunData,
 } from "@langwatch/scenario-contract";
@@ -124,6 +125,8 @@ export type RunGroupSummary = {
   failedCount: number;
   stalledCount: number;
   cancelledCount: number;
+  /** Runs whose setup failed or timed out: no verdict, left out of the pass rate (ADR-180). */
+  notScoredCount: number;
   /** Runs with an actual verdict: passed + failed (SUCCESS + FAILED + ERROR). */
   completedCount: number;
   totalCount: number;
@@ -383,10 +386,15 @@ export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSum
   let failedCount = 0;
   let stalledCount = 0;
   let cancelledCount = 0;
+  let notScoredCount = 0;
   let inProgressCount = 0;
   let queuedCount = 0;
 
   for (const run of group.scenarioRuns) {
+    if (isRunNotScored(run.metadata?.langwatch?.hooks)) {
+      notScoredCount++;
+      continue;
+    }
     switch (categorizeRunStatus(run.status)) {
       case "success":
         passedCount++;
@@ -412,6 +420,7 @@ export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSum
   const completedCount = passedCount + failedCount;
   const settledCount = passedCount + failedCount + stalledCount + cancelledCount;
   const totalCount = group.scenarioRuns.length;
+  // A batch of only not-scored runs has settled nothing scored, so its pass rate is null, not 0.
   const passRate = computePassRate({ passedCount, settledCount, totalCount });
 
   const { totalCost, totalDurationMs, allAgentLatencies, allAgentCosts } = sumRunTotals(
@@ -427,6 +436,7 @@ export function computeGroupSummary({ group }: { group: RunGroup }): RunGroupSum
     failedCount,
     stalledCount,
     cancelledCount,
+    notScoredCount,
     completedCount,
     totalCount,
     inProgressCount,

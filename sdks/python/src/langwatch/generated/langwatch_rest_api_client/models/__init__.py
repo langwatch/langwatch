@@ -20,14 +20,17 @@ from .archive_run_plan_response_404 import ArchiveRunPlanResponse404
 from .archive_test_suite_response_200 import ArchiveTestSuiteResponse200
 from .archive_test_suite_response_404 import ArchiveTestSuiteResponse404
 from .call_connected_agent_body import CallConnectedAgentBody
+from .call_connected_agent_body_kind import CallConnectedAgentBodyKind
 from .call_connected_agent_body_messages_item import CallConnectedAgentBodyMessagesItem
 from .call_connected_agent_body_new_messages_item import CallConnectedAgentBodyNewMessagesItem
 from .call_connected_agent_body_params import CallConnectedAgentBodyParams
 from .call_connected_agent_body_run import CallConnectedAgentBodyRun
+from .call_connected_agent_body_state_type_0 import CallConnectedAgentBodyStateType0
 from .call_connected_agent_response_200 import CallConnectedAgentResponse200
 from .call_connected_agent_response_200_instance import CallConnectedAgentResponse200Instance
 from .call_connected_agent_response_200_output_type_1 import CallConnectedAgentResponse200OutputType1
 from .call_connected_agent_response_200_output_type_2_item import CallConnectedAgentResponse200OutputType2Item
+from .call_connected_agent_response_200_state_type_0 import CallConnectedAgentResponse200StateType0
 from .cancel_instant_eval_run_response_200 import CancelInstantEvalRunResponse200
 from .cancel_instant_eval_run_response_200_matched_by_question import CancelInstantEvalRunResponse200MatchedByQuestion
 from .cancel_instant_eval_run_response_200_parameters import CancelInstantEvalRunResponse200Parameters
@@ -3587,6 +3590,9 @@ from .poll_connected_agent_instance_response_200 import PollConnectedAgentInstan
 from .poll_connected_agent_instance_response_200_frames_item_type_0 import (
     PollConnectedAgentInstanceResponse200FramesItemType0,
 )
+from .poll_connected_agent_instance_response_200_frames_item_type_0_kind import (
+    PollConnectedAgentInstanceResponse200FramesItemType0Kind,
+)
 from .poll_connected_agent_instance_response_200_frames_item_type_0_messages_item import (
     PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem,
 )
@@ -3598,6 +3604,9 @@ from .poll_connected_agent_instance_response_200_frames_item_type_0_params impor
 )
 from .poll_connected_agent_instance_response_200_frames_item_type_0_run import (
     PollConnectedAgentInstanceResponse200FramesItemType0Run,
+)
+from .poll_connected_agent_instance_response_200_frames_item_type_0_state_type_0 import (
+    PollConnectedAgentInstanceResponse200FramesItemType0StateType0,
 )
 from .poll_connected_agent_instance_response_200_frames_item_type_1 import (
     PollConnectedAgentInstanceResponse200FramesItemType1,
@@ -7366,6 +7375,9 @@ from .post_connected_agent_frames_body_frames_item_type_1_output_type_1 import (
 from .post_connected_agent_frames_body_frames_item_type_1_output_type_2_item import (
     PostConnectedAgentFramesBodyFramesItemType1OutputType2Item,
 )
+from .post_connected_agent_frames_body_frames_item_type_1_state_type_0 import (
+    PostConnectedAgentFramesBodyFramesItemType1StateType0,
+)
 from .post_connected_agent_frames_body_frames_item_type_2 import PostConnectedAgentFramesBodyFramesItemType2
 from .post_connected_agent_frames_response_200 import PostConnectedAgentFramesResponse200
 from .post_langy_control_frames_body import PostLangyControlFramesBody
@@ -7778,6 +7790,7 @@ from .receive_stripe_webhook_response_200 import ReceiveStripeWebhookResponse200
 from .regenerate_project_api_key_response_200 import RegenerateProjectApiKeyResponse200
 from .register_connected_agent_instance_body import RegisterConnectedAgentInstanceBody
 from .register_connected_agent_instance_body_agents_item import RegisterConnectedAgentInstanceBodyAgentsItem
+from .register_connected_agent_instance_body_agents_item_hooks import RegisterConnectedAgentInstanceBodyAgentsItemHooks
 from .register_connected_agent_instance_body_agents_item_parameters import (
     RegisterConnectedAgentInstanceBodyAgentsItemParameters,
 )
@@ -8520,14 +8533,17 @@ __all__ = (
     "ArchiveTestSuiteResponse200",
     "ArchiveTestSuiteResponse404",
     "CallConnectedAgentBody",
+    "CallConnectedAgentBodyKind",
     "CallConnectedAgentBodyMessagesItem",
     "CallConnectedAgentBodyNewMessagesItem",
     "CallConnectedAgentBodyParams",
     "CallConnectedAgentBodyRun",
+    "CallConnectedAgentBodyStateType0",
     "CallConnectedAgentResponse200",
     "CallConnectedAgentResponse200Instance",
     "CallConnectedAgentResponse200OutputType1",
     "CallConnectedAgentResponse200OutputType2Item",
+    "CallConnectedAgentResponse200StateType0",
     "CancelInstantEvalRunResponse200",
     "CancelInstantEvalRunResponse200MatchedByQuestion",
     "CancelInstantEvalRunResponse200Parameters",
@@ -10581,10 +10597,12 @@ __all__ = (
     "PatchApiWorkflowsByIdResponse200",
     "PollConnectedAgentInstanceResponse200",
     "PollConnectedAgentInstanceResponse200FramesItemType0",
+    "PollConnectedAgentInstanceResponse200FramesItemType0Kind",
     "PollConnectedAgentInstanceResponse200FramesItemType0MessagesItem",
     "PollConnectedAgentInstanceResponse200FramesItemType0NewMessagesItem",
     "PollConnectedAgentInstanceResponse200FramesItemType0Params",
     "PollConnectedAgentInstanceResponse200FramesItemType0Run",
+    "PollConnectedAgentInstanceResponse200FramesItemType0StateType0",
     "PollConnectedAgentInstanceResponse200FramesItemType1",
     "PollLangyControlSessionResponse200",
     "PollLangyControlSessionResponse200FramesItemType0",
@@ -12336,6 +12354,7 @@ __all__ = (
     "PostConnectedAgentFramesBodyFramesItemType1Error",
     "PostConnectedAgentFramesBodyFramesItemType1OutputType1",
     "PostConnectedAgentFramesBodyFramesItemType1OutputType2Item",
+    "PostConnectedAgentFramesBodyFramesItemType1StateType0",
     "PostConnectedAgentFramesBodyFramesItemType2",
     "PostConnectedAgentFramesResponse200",
     "PostLangyControlFramesBody",
@@ -12620,6 +12639,7 @@ __all__ = (
     "RegenerateProjectApiKeyResponse200",
     "RegisterConnectedAgentInstanceBody",
     "RegisterConnectedAgentInstanceBodyAgentsItem",
+    "RegisterConnectedAgentInstanceBodyAgentsItemHooks",
     "RegisterConnectedAgentInstanceBodyAgentsItemParameters",
     "RegisterConnectedAgentInstanceBodyInstance",
     "RegisterConnectedAgentInstanceBodySdk",
