@@ -167,7 +167,6 @@ function processConfigOf(options: {
       defaultRetentionDays: config.defaultRetentionDays,
       queueDrainTimeoutMs: config.shutdownDrainTimeoutMs,
       queueConcurrency: config.queueConcurrency,
-      queueConcurrencyCeiling: config.queueConcurrencyCeiling,
       queueTenantCap: config.queueTenantCap,
       queueGlobalBudget: config.queueGlobalBudget,
     }),

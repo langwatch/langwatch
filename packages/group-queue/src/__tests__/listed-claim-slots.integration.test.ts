@@ -91,7 +91,6 @@ describe("GroupQueueProcessor - claims from several listed runs", () => {
       {
         consumerEnabled: consumer !== "none",
         context: new TestQueueContext(),
-        policy: { adaptiveSlotsCeiling: SLOTS },
         ...(consumer === "listed" ? { dispatchListed: true } : {}),
       },
     );

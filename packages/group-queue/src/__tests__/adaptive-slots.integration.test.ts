@@ -1,18 +1,34 @@
 /**
- * A consumer's slots stay at its configured concurrency unless the policy raises the ceiling; then
- * they grow while jobs wait on IO and the dispatcher claims against the grown count, on real
- * Redis. Spec: specs/adaptive-slots.feature.
+ * A consumer's slots follow the throughput its jobs reach, on real Redis: with every job sharing a
+ * store that serves four at a time, the slots settle near four instead of climbing to the cap.
+ * Spec: specs/adaptive-slots.feature.
  */
 import IORedis, { type Redis } from "ioredis";
-import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, beforeEach, describe, expect, it } from "vitest";
 
 import { GroupQueueProcessor } from "../groupQueue.ts";
 
 type TestPayload = { id: string; groupId: string };
 
 const CONFIGURED = 2;
-const CEILING = 4;
-const WAITS_MS = 1_000;
+const STORE_SERVES = 4;
+const STORE_MS = 40;
+const BACKLOG = 3_500;
+const RUN_MS = 22_000;
+
+/** A store that serves a fixed number of jobs at once and queues the rest. */
+function storeServing({ atOnce }: { atOnce: number }) {
+  let serving = 0;
+  const waiting: (() => void)[] = [];
+  return async function serve({ ms }: { ms: number }): Promise<void> {
+    if (serving >= atOnce) await new Promise<void>((resolve) => waiting.push(resolve));
+    else serving += 1;
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    const next = waiting.shift();
+    if (next) next();
+    else serving -= 1;
+  };
+}
 
 describe("GroupQueueProcessor - adaptive slots", () => {
   let redis: Redis;
@@ -41,57 +57,46 @@ describe("GroupQueueProcessor - adaptive slots", () => {
     await redis.quit();
   });
 
-  /** Runs a backlog of jobs that each wait on IO; answers the most that ran at once. */
-  async function peakOfBacklog({
-    jobs,
-    adaptiveSlotsCeiling,
-  }: {
-    jobs: number;
-    adaptiveSlotsCeiling?: number;
-  }): Promise<number> {
-    let running = 0;
-    let peak = 0;
-    const done = new Set<string>();
-    const queue = new GroupQueueProcessor<TestPayload>(
-      {
-        name: queueName,
-        process: async (payload) => {
-          running += 1;
-          peak = Math.max(peak, running);
-          await new Promise((resolve) => setTimeout(resolve, WAITS_MS));
-          running -= 1;
-          done.add(payload.id);
+  describe("given a backlog of jobs that share a store serving four at a time", () => {
+    /** @scenario "Slots settle near what a saturated store absorbs instead of climbing" */
+    it("grows past its configured two and never runs more than four times what the store serves", async () => {
+      const serve = storeServing({ atOnce: STORE_SERVES });
+      let running = 0;
+      let peak = 0;
+      let finished = 0;
+      const queue = new GroupQueueProcessor<TestPayload>(
+        {
+          name: queueName,
+          process: async () => {
+            running += 1;
+            peak = Math.max(peak, running);
+            await serve({ ms: STORE_MS });
+            running -= 1;
+            finished += 1;
+          },
+          groupKey: (payload) => payload.groupId,
+          identify: (payload) => payload.id,
+          score: () => Date.now(),
+          options: { globalConcurrency: CONFIGURED },
         },
-        groupKey: (payload) => payload.groupId,
-        identify: (payload) => payload.id,
-        score: () => Date.now(),
-        options: { globalConcurrency: CONFIGURED },
-      },
-      redis,
-      adaptiveSlotsCeiling === undefined ? {} : { policy: { adaptiveSlotsCeiling } },
-    );
-    queues.push(queue);
-    await queue.waitUntilReady();
+        redis,
+      );
+      queues.push(queue);
+      await queue.waitUntilReady();
 
-    const ids = Array.from({ length: jobs }, (_, index) => `tenant-1/group-${index}`);
-    for (const id of ids) await queue.send({ id, groupId: id });
+      const ids = Array.from({ length: BACKLOG }, (_, index) => `tenant-1/group-${index}`);
+      for (let start = 0; start < ids.length; start += 250) {
+        await Promise.all(
+          ids.slice(start, start + 250).map((id) => queue.send({ id, groupId: id })),
+        );
+      }
+      await new Promise((resolve) => setTimeout(resolve, RUN_MS));
 
-    await vi.waitFor(() => expect(done.size).toBe(ids.length), { timeout: 20_000 });
-    return peak;
-  }
-
-  describe("given a backlog of jobs that each wait on IO and no ceiling raised", () => {
-    /** @scenario "By default a consumer's slots stay at its configured concurrency" */
-    it("never runs more than its configured concurrency at once", async () => {
-      // Six one-second jobs on two slots span three of the once-a-second load checks.
-      expect(await peakOfBacklog({ jobs: 6 })).toBe(CONFIGURED);
-    }, 30_000);
-  });
-
-  describe("given a backlog of jobs that each wait on IO and a raised ceiling", () => {
-    /** @scenario "A consumer whose jobs wait on IO grows its slots up to a raised ceiling" */
-    it("comes to run its ceiling of jobs at once, and never more", async () => {
-      expect(await peakOfBacklog({ jobs: 16, adaptiveSlotsCeiling: CEILING })).toBe(CEILING);
-    }, 30_000);
+      // Queue round trips sit outside the store, so throughput still rises a little past four
+      // slots: local runs settled between four and nine, against a cap of 1000.
+      expect(finished).toBeLessThan(BACKLOG);
+      expect(peak).toBeGreaterThan(CONFIGURED);
+      expect(peak).toBeLessThanOrEqual(STORE_SERVES * 4);
+    }, 40_000);
   });
 });

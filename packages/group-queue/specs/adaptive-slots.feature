@@ -1,56 +1,52 @@
-Feature: A consumer's slots follow its load
+Feature: A consumer's slots follow the throughput the system absorbs
   As the queue every fold and command runs through
-  I want the number of jobs a consumer runs at once to grow while they wait on IO and shrink under pressure
-  So that a small pod's idle CPU is used and a loaded pod backs off before it stalls
+  I want the number of jobs a consumer runs at once to grow only while that gets more work done
+  So that a big install uses its headroom and a small one stops before it overloads its stores
 
   The configured concurrency (GLOBAL_QUEUE_CONCURRENCY, 100 by default) is the floor: a consumer
-  starts there and never runs fewer. Slots adapt only up to a ceiling the deployment raises
-  with GLOBAL_QUEUE_CONCURRENCY_CEILING (the queue policy's adaptiveSlotsCeiling); by default the
-  ceiling is the configured concurrency, so the count stays fixed (Alex, 2026-10-20). A ceiling
-  that is not a whole number at least the configured concurrency is refused at boot by name.
-  With a raised ceiling, once a second
-  the consumer looks at its own process: with every slot taken and the event loop under 85% busy,
-  the jobs are waiting on ClickHouse and Redis, so the count grows by a quarter up to the ceiling.
-  Above 95% loop or 80% of the heap limit it shrinks by a fifth.
+  starts there and never runs fewer. Once a second it measures the jobs that finished: completed
+  jobs per second, their median duration and the share that failed, waiting for 50 finished jobs
+  or ten seconds, and how many slots were taken as each finished. With nine in ten slots taken
+  on average and the event loop under 85% busy it grows by a quarter,
+  discards the measurement that straddles the change, and keeps the step only if completed jobs
+  per second rose by 5% or more. A step that adds less is undone, and the count holds for 30
+  measurements before it probes again. It shrinks by a fifth when the event loop is over 95%
+  busy, the heap over 80% of its limit, the median duration doubles against its recent baseline
+  without throughput rising, or failures reach a tenth of finished jobs and twice their baseline.
+  It never runs more than 1000 jobs at once. No setting changes this (Alex, 2026-10-20).
 
   @integration
-  Scenario: By default a consumer's slots stay at its configured concurrency
-    Given a consumer configured for two jobs at once with no ceiling raised
-    And a backlog of jobs that each wait on IO
-    When every slot stays taken while the event loop is idle
-    Then it never runs more than two jobs at once
-
-  @integration
-  Scenario: A consumer whose jobs wait on IO grows its slots up to a raised ceiling
-    Given a consumer configured for two jobs at once with a ceiling raised to four
-    And a backlog of jobs that each wait on IO
-    When every slot stays taken while the event loop is idle
-    Then the consumer comes to run four jobs at once
-    And it never runs more than four
+  Scenario: Slots settle near what a saturated store absorbs instead of climbing
+    Given a consumer configured for two jobs at once
+    And a backlog of jobs that share a store which serves only four at a time
+    When the consumer runs the backlog for several measurements
+    Then it grows past the two jobs at once it was configured for
+    And it never runs more than four times the four the store serves
 
   @unit
-  Scenario: With GLOBAL_QUEUE_CONCURRENCY_CEILING unset the worker keeps its configured concurrency
-    Given a worker whose environment sets GLOBAL_QUEUE_CONCURRENCY and no ceiling
-    When its queue policy is built
-    Then the policy names no ceiling, so slots stay at the configured concurrency
-
-  @unit
-  Scenario: GLOBAL_QUEUE_CONCURRENCY_CEILING raises the ceiling slots adapt up to
-    Given a worker whose environment sets GLOBAL_QUEUE_CONCURRENCY_CEILING to 1000
-    When its queue policy is built
-    Then the policy's ceiling is 1000
-
-  @unit
-  Scenario: An invalid GLOBAL_QUEUE_CONCURRENCY_CEILING is refused by name
-    Given a ceiling that is not a whole number, or is below the configured concurrency
-    When the worker's queue policy is built
-    Then boot is refused with an error naming GLOBAL_QUEUE_CONCURRENCY_CEILING
-
-  @unit
-  Scenario: Slots grow by a quarter while every slot is taken and the event loop is idle
+  Scenario: Slots grow by a quarter while each step raises completed jobs per second
     Given a consumer with every slot taken and an idle event loop
-    When it looks at its load
-    Then its slots grow by a quarter each time, never past the ceiling
+    When each growth step raises completed jobs per second by more than 5%
+    Then its slots grow by a quarter after each judged step
+
+  @unit
+  Scenario: A growth step that adds no throughput is undone and the count holds
+    Given a consumer that has just grown by a quarter
+    When completed jobs per second rose by less than 5%
+    Then its slots step back to the count before the step
+    And they hold for 30 measurements before growing again
+
+  @unit
+  Scenario: Job duration doubling without more throughput gives slots back
+    Given a consumer that has grown past its configured concurrency
+    When the median job duration doubles against its recent baseline and throughput does not rise
+    Then its slots shrink by a fifth
+
+  @unit
+  Scenario: Rising job failures give slots back
+    Given a consumer that has grown past its configured concurrency
+    When a tenth of its finished jobs fail, twice the share before
+    Then its slots shrink by a fifth
 
   @unit
   Scenario: A busy event loop gives slots back down to the configured concurrency
@@ -65,13 +61,26 @@ Feature: A consumer's slots follow its load
     Then its slots shrink by a fifth each time, never below the configured concurrency
 
   @unit
-  Scenario: Slots sitting free keep the count
-    Given a consumer with most of its slots free
-    When it looks at its load
+  Scenario: An event loop without room keeps the count
+    Given a consumer with every slot taken whose event loop is over 85% busy
+    When completed jobs per second keep rising
     Then its slots stay as they are
 
   @unit
-  Scenario: A ceiling at or below the configured concurrency keeps the count fixed
-    Given a consumer whose ceiling is its configured concurrency
-    When every slot is taken and the event loop is idle
-    Then its slots stay at the configured concurrency
+  Scenario: Slots sitting free keep the count
+    Given a consumer with most of its slots free
+    When it measures its work
+    Then its slots stay as they are
+
+  @unit
+  Scenario: Slots never grow past 1000
+    Given a consumer configured near 1000 jobs at once
+    When every growth step raises throughput
+    Then its slots stop at 1000
+
+  @unit
+  Scenario: Throughput is measured from the jobs that finished
+    Given a consumer whose jobs report their duration and failures
+    When fewer than 50 have finished within ten seconds
+    Then it takes no measurement yet
+    And once enough have finished it measures completed jobs per second, their median duration, the failed share and the slots taken

@@ -1,4 +1,3 @@
-import { ConfigParseError } from "@langwatch/config";
 import type { EventLogRetentionClassifier } from "@langwatch/eventing/server";
 import { type GroupQueuePolicy, resolveGroupQueuePolicyFromEnv } from "@langwatch/group-queue";
 
@@ -13,8 +12,6 @@ export interface PipelineSettings {
   readonly queueDrainTimeoutMs?: number | undefined;
   /** GLOBAL_QUEUE_CONCURRENCY as written; absent or invalid keeps the queue's 100. */
   readonly queueConcurrency?: string | undefined;
-  /** GLOBAL_QUEUE_CONCURRENCY_CEILING as written; absent keeps slots at the configured count. */
-  readonly queueConcurrencyCeiling?: string | undefined;
   /** LANGWATCH_DISPATCH_TENANT_CAP as written; absent keeps 50, "0" turns it off. */
   readonly queueTenantCap?: string | undefined;
   /** LANGWATCH_DISPATCH_GLOBAL_BUDGET as written; absent or "0" keeps the fixed cap. */
@@ -25,25 +22,13 @@ export interface PipelineSettings {
 function queuePolicyOf(settings: PipelineSettings): GroupQueuePolicy {
   const resolved = resolveGroupQueuePolicyFromEnv({
     globalConcurrency: settings.queueConcurrency,
-    adaptiveSlotsCeiling: settings.queueConcurrencyCeiling,
     tenantConcurrencyCap: settings.queueTenantCap,
     globalConcurrencyBudget: settings.queueGlobalBudget,
   });
-  if (
-    settings.queueConcurrencyCeiling !== undefined &&
-    resolved.adaptiveSlotsCeiling === undefined
-  ) {
-    throw new ConfigParseError([
-      `stores.queueConcurrencyCeiling ← GLOBAL_QUEUE_CONCURRENCY_CEILING: must be a whole number at least the configured concurrency (GLOBAL_QUEUE_CONCURRENCY), got "${settings.queueConcurrencyCeiling}"`,
-    ]);
-  }
   return {
     ...(resolved.globalConcurrency === undefined
       ? {}
       : { globalConcurrency: resolved.globalConcurrency }),
-    ...(resolved.adaptiveSlotsCeiling === undefined
-      ? {}
-      : { adaptiveSlotsCeiling: resolved.adaptiveSlotsCeiling }),
     ...(resolved.tenantConcurrencyCap === undefined
       ? {}
       : { tenantConcurrencyCap: resolved.tenantConcurrencyCap }),
