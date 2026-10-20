@@ -51,25 +51,31 @@ describe("given the PostgreSQL reader role statements", () => {
         reader: readerRole({ approvedViews: ["lwql_traces"] }),
       });
 
-      expect(statements, "schema-level revoke does not reach relation grants").toContain(
-        `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "ChReader"`,
-      );
+      expect(
+        statements.some((statement) =>
+          statement.includes(
+            `REVOKE ALL PRIVILEGES ON ALL TABLES IN SCHEMA "public" FROM "ChReader";`,
+          ),
+        ),
+        "schema-level revoke does not reach relation grants",
+      ).toBe(true);
     });
 
-    it("revokes before it grants, so the revoke cannot undo the new grants", () => {
+    /** @scenario "The PostgreSQL reader's grants change in one transaction" */
+    it("revokes and grants in one statement, revoking first, so no read sees a gap", () => {
       const statements = postgresMapping.readerRoleStatements({
-        reader: readerRole({ approvedViews: ["lwql_traces"] }),
+        reader: readerRole({ approvedViews: ["lwql_traces", "lwql_topics"] }),
       });
-      const revokeAt = statements.findIndex((statement) =>
-        statement.includes("REVOKE ALL PRIVILEGES ON ALL TABLES"),
-      );
-      const grantAt = statements.findIndex((statement) =>
-        statement.includes(`GRANT SELECT ON "public"."lwql_traces"`),
-      );
+      const touching = statements.filter((statement) => /\b(REVOKE|GRANT)\b/.test(statement));
 
+      expect(touching).toHaveLength(1);
+      const [grants = ""] = touching;
+      expect(grants).toMatch(/^DO \$lwql_grants\$\nBEGIN\n[\s\S]*\nEND\n\$lwql_grants\$$/);
+      const revokeAt = grants.indexOf("REVOKE ALL PRIVILEGES ON ALL TABLES");
       expect(revokeAt).toBeGreaterThan(-1);
-      expect(grantAt).toBeGreaterThan(-1);
-      expect(revokeAt).toBeLessThan(grantAt);
+      for (const view of ["lwql_traces", "lwql_topics"]) {
+        expect(grants.indexOf(`GRANT SELECT ON "public"."${view}"`)).toBeGreaterThan(revokeAt);
+      }
     });
   });
 

@@ -4,10 +4,15 @@ import type { AuditLogApi } from "@langwatch/audit-log-contract";
 import type {
   LicensingApi,
   SelfHostedInstanceDetail,
+  SelfHostedInstanceFilters,
   SelfHostedInstancePage,
+  SelfHostedInstanceSummary,
 } from "@langwatch/enterprise-licensing-contract";
 
-type Instances = Pick<LicensingApi, "listSelfHostedInstances" | "getSelfHostedInstance">;
+type Instances = Pick<
+  LicensingApi,
+  "listSelfHostedInstances" | "getSelfHostedInstance" | "summarizeSelfHostedInstances"
+>;
 
 export class SelfHostedInstanceAuditService {
   static create(deps: {
@@ -22,20 +27,40 @@ export class SelfHostedInstanceAuditService {
     private readonly auditLog: Pick<AuditLogApi, "record">,
   ) {}
 
-  async list(input: {
-    operatorId: string;
-    page: number;
-    pageSize: number;
-    search?: string;
-  }): Promise<SelfHostedInstancePage> {
+  async list(
+    input: {
+      operatorId: string;
+      page: number;
+      pageSize: number;
+      search?: string;
+    } & SelfHostedInstanceFilters,
+  ): Promise<SelfHostedInstancePage> {
     const { operatorId, ...query } = input;
     await this.auditLog.record({
       userId: operatorId,
       action: "selfHostedInstances.getAll",
-      args: { page: query.page, pageSize: query.pageSize, hasSearch: Boolean(query.search) },
+      args: {
+        page: query.page,
+        pageSize: query.pageSize,
+        hasSearch: Boolean(query.search),
+        sort: query.sort ?? "last_report",
+        license: query.license ?? null,
+        activity: query.activity ?? null,
+        signal: query.signal ?? null,
+      },
       targetKind: "selfHostedInstance",
     });
     return this.instances.listSelfHostedInstances(query);
+  }
+
+  async summarize(input: { operatorId: string }): Promise<SelfHostedInstanceSummary> {
+    await this.auditLog.record({
+      userId: input.operatorId,
+      action: "selfHostedInstances.summary",
+      args: {},
+      targetKind: "selfHostedInstance",
+    });
+    return this.instances.summarizeSelfHostedInstances();
   }
 
   async getById(input: { operatorId: string; id: string }): Promise<SelfHostedInstanceDetail> {

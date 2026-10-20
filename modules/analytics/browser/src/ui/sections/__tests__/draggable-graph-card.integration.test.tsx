@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
- * The alert bell is deliberately excluded from both surfaces (neither has a
- * `series` to threshold) — this test pins that exclusion staying in place.
+ * The alert bell is deliberately excluded from a workbench chart (it has no
+ * `series` to threshold); this test pins that exclusion staying in place.
  */
 
 import type { LangWatchQLGranularityStep } from "@langwatch/analytics-contract";
@@ -29,53 +29,7 @@ vi.mock("../../../features/dashboard-widget/ui/sections/langwatch-ql-dashboard-w
   ),
 }));
 
-// The card and its menu read tRPC hooks at render (rename/save, "Add to
-// dashboard"), and the dashboard's period comes from the page's selector.
-// None of these scenarios exercise them, so both are stubbed rather than
-// provided — the claim here is which body a card draws.
-vi.mock("../../../behavior/analytics-api.ts", () => ({
-  analyticsApi: {
-    useUtils: () => ({
-      dashboardWidgets: { list: { invalidate: vi.fn() } },
-      graphs: { getAll: { invalidate: vi.fn() } },
-    }),
-    dashboards: {
-      getOrCreateFirst: { useQuery: () => ({ data: undefined }) },
-    },
-    dashboardWidgets: {
-      assignDashboard: {
-        useMutation: () => ({ mutate: vi.fn(), isPending: false }),
-      },
-      update: {
-        useMutation: () => ({ mutateAsync: vi.fn(), isPending: false }),
-      },
-    },
-  },
-}));
-
-vi.mock("../../../behavior/use-analytics-period.ts", () => ({
-  useAnalyticsPeriod: () => ({
-    period: { startDate: new Date(0), endDate: new Date(1) },
-  }),
-}));
-
-vi.mock(
-  "../../../features/dashboard-widget/ui/sections/dashboard-widget-in-place-editor.tsx",
-  () => ({
-    DashboardWidgetInPlaceEditor: () => null,
-  }),
-);
-
-vi.mock("../../../features/dashboard-widget/ui/sections/dashboard-widget-frame.tsx", () => ({
-  DashboardWidgetFrame: ({ id, graph }: { id: string; graph: unknown }) => (
-    <div data-testid="dashboard-widget" data-id={id} data-graph={JSON.stringify(graph)} />
-  ),
-}));
-
-import {
-  DASHBOARD_SRCDOC_CHART_KIND,
-  WORKBENCH_SQL_CHART_KIND,
-} from "../../../model/chart-kinds.ts";
+import { WORKBENCH_SQL_CHART_KIND } from "../../../model/chart-kinds.ts";
 import { AnalyticsTestHarness, StubAnalyticsHost } from "../../../testing.tsx";
 import { DraggableGraphCard } from "../draggable-graph-card.tsx";
 
@@ -202,75 +156,6 @@ describe("a dashboard grid card", () => {
       });
 
       expect(screen.getByTestId("workbench-widget")).toHaveAttribute("data-granularity", "unset");
-    });
-  });
-
-  describe("given a dashboard widget", () => {
-    const DASHBOARD_WIDGET_PAYLOAD = {
-      version: 1,
-      code: "export default function Widget() { return null; }",
-      queries: [{ name: "main", sql: "SELECT 1" }],
-    };
-
-    /** @scenario "A dashboard widget card draws the sandboxed widget, not the builder" */
-    it("draws the sandboxed dashboard widget frame rather than the builder renderer", () => {
-      render(
-        <DraggableGraphCard
-          graph={{
-            id: "graph_1",
-            name: "Error rate",
-            graph: DASHBOARD_WIDGET_PAYLOAD,
-            filters: {},
-            gridColumn: 0,
-            gridRow: 0,
-            colSpan: 1,
-            rowSpan: 1,
-            kind: DASHBOARD_SRCDOC_CHART_KIND,
-            trigger: null,
-          }}
-          projectSlug="proj"
-          projectId="project_1"
-          onDelete={vi.fn()}
-          isDeleting={false}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      const widget = screen.getByTestId("dashboard-widget");
-      expect(widget).toBeInTheDocument();
-      expect(widget).toHaveAttribute("data-id", "graph_1");
-      expect(JSON.parse(widget.getAttribute("data-graph") ?? "null")).toEqual(
-        DASHBOARD_WIDGET_PAYLOAD,
-      );
-      expect(screen.queryByTestId("builder-graph")).not.toBeInTheDocument();
-      expect(screen.queryByTestId("workbench-widget")).not.toBeInTheDocument();
-    });
-
-    /** @scenario "A dashboard widget card is not offered an alert it cannot evaluate" */
-    it("offers no alert bell", () => {
-      render(
-        <DraggableGraphCard
-          graph={{
-            id: "graph_1",
-            name: "Error rate",
-            graph: DASHBOARD_WIDGET_PAYLOAD,
-            filters: {},
-            gridColumn: 0,
-            gridRow: 0,
-            colSpan: 1,
-            rowSpan: 1,
-            kind: DASHBOARD_SRCDOC_CHART_KIND,
-            trigger: null,
-          }}
-          projectSlug="proj"
-          projectId="project_1"
-          onDelete={vi.fn()}
-          isDeleting={false}
-        />,
-        { wrapper: Wrapper },
-      );
-
-      expect(screen.queryByRole("button", { name: /Add automation/ })).not.toBeInTheDocument();
     });
   });
 });

@@ -574,10 +574,11 @@ export async function createDemoRepo({
 }
 
 /** Folders a scenario can share that are NOT a demo app (README.md "local-control-fixture.ts"). */
-export type FixtureFolderName = "acme-notes";
+export type FixtureFolderName = "acme-notes" | "acme-pocket";
 
 const FIXTURE_FOLDER: Record<FixtureFolderName, string> = {
   "acme-notes": path.join(REPO_ROOT, "dev", "dogfood", "acme-notes", "python"),
+  "acme-pocket": path.join(REPO_ROOT, "dev", "dogfood", "acme-pocket"),
 };
 
 /** A shared folder that is not a demo repository, and what a test reads of it. */
@@ -1399,6 +1400,7 @@ async function readTurnEntries({
   const input = encodeURIComponent(
     JSON.stringify({ projectId: CONFIG.PROJECT_ID, conversationId, turnId }),
   );
+  // The live channel opens only from the app's own origin (BrowserOriginGuard).
   const response = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
     headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     signal,

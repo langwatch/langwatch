@@ -4810,9 +4810,6 @@ importers:
       '@langwatch/evaluator-contract':
         specifier: workspace:*
         version: link:../../evaluator/contract
-      '@langwatch/feature-flag-client':
-        specifier: workspace:*
-        version: link:../../feature-flag/client
       '@langwatch/feature-flag-contract':
         specifier: workspace:*
         version: link:../../feature-flag/contract
@@ -6213,9 +6210,6 @@ importers:
       hono:
         specifier: 'catalog:'
         version: 4.13.1
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -6553,6 +6547,9 @@ importers:
       '@langwatch/authorization':
         specifier: workspace:*
         version: link:../../../packages/authorization
+      '@langwatch/group-queue':
+        specifier: workspace:*
+        version: link:../../../packages/group-queue
       '@langwatch/process-stores':
         specifier: workspace:*
         version: link:../../../packages/process-stores
@@ -6715,6 +6712,9 @@ importers:
       '@langwatch/clickhouse-client':
         specifier: workspace:*
         version: link:../../../packages/clickhouse-client
+      '@langwatch/clickhouse-markers':
+        specifier: workspace:*
+        version: link:../../../packages/clickhouse-markers
       '@langwatch/coding-agent-contract':
         specifier: workspace:*
         version: link:../contract
@@ -8605,6 +8605,9 @@ importers:
       '@opentelemetry/api':
         specifier: 'catalog:'
         version: 1.9.1
+      '@opentelemetry/semantic-conventions':
+        specifier: 'catalog:'
+        version: 1.43.0
       '@trpc/server':
         specifier: 'catalog:'
         version: 11.18.0(typescript@7.0.2(patch_hash=77bf107cb8ced773782c5f307fc64d325e908a2fdce03f9a6267afa0d219070e))
@@ -9599,9 +9602,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       samlify:
         specifier: 2.13.1
         version: 2.13.1
@@ -10472,9 +10472,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       ws:
         specifier: 'catalog:'
         version: 8.21.3(bufferutil@4.1.0)
@@ -12115,6 +12112,9 @@ importers:
       '@langwatch/langy-contract':
         specifier: workspace:*
         version: link:../../langy/contract
+      '@langwatch/mail':
+        specifier: workspace:*
+        version: link:../../../packages/mail
       '@langwatch/model-provider-contract':
         specifier: workspace:*
         version: link:../../model-provider/contract
@@ -14766,9 +14766,6 @@ importers:
       langwatch:
         specifier: workspace:*
         version: link:../../../sdks/typescript
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -15498,6 +15495,9 @@ importers:
       '@langwatch/span-normalisation':
         specifier: workspace:*
         version: link:../../../packages/span-normalisation
+      '@langwatch/stored-object-contract':
+        specifier: workspace:*
+        version: link:../../stored-object/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -17329,9 +17329,6 @@ importers:
       nanoid:
         specifier: 'catalog:'
         version: 6.0.0
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
       zod:
         specifier: 'catalog:'
         version: 4.6.5
@@ -17384,9 +17381,6 @@ importers:
       msgpackr:
         specifier: ^2.0.4
         version: 2.0.4
-      prom-client:
-        specifier: 'catalog:'
-        version: 15.1.3
     devDependencies:
       '@langwatch/test-harness':
         specifier: workspace:*

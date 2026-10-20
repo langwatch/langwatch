@@ -430,3 +430,45 @@ async function waitUntilQueryable({
       "data scenarios would have graded an empty index as a wrong answer.",
   );
 }
+
+/**
+ * Seeds traces carrying `label` whose `started_at` is `ageMs` in the past, so a
+ * time-bounded question over a recent window finds nothing while the data
+ * exists. Resolves once every trace is queryable.
+ */
+export async function seedStaleTraces({
+  label,
+  ageMs,
+  count = 3,
+}: {
+  label: string;
+  ageMs: number;
+  count?: number;
+}): Promise<void> {
+  const now = Date.now();
+  const traceIds = Array.from({ length: count }, (_, i) => `trace_e2e_stale_${label}_${i}`);
+  await Promise.all(
+    traceIds.map((traceId, i) => {
+      const startedAt = now - ageMs - i * 60_000;
+      return lwPost({
+        path: "/api/collector",
+        body: {
+          spans: [
+            {
+              trace_id: traceId,
+              span_id: `span_e2e_stale_${label}_${i}`,
+              type: "llm",
+              model: "gpt-5-mini",
+              input: { type: "text", value: `stale question #${i}` },
+              output: { type: "text", value: `stale answer #${i}` },
+              timestamps: { started_at: startedAt, finished_at: startedAt + 800 },
+            },
+          ],
+          metadata: { labels: [label] },
+        },
+      });
+    }),
+  );
+
+  await waitUntilQueryable({ traceIds, timeoutMs: INGESTION_VISIBILITY_TIMEOUT_MS });
+}

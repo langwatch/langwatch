@@ -352,6 +352,14 @@ Each file's header links here rather than repeating its narrative.
   and options, the commands that ran before it, and, after "Create a
   repository for me", the repository the answer made and the branch the
   path carried on with.
+- **llmops-no-agent**: the shared folder is the ACME pocket device (a
+  SwiftUI app and ESP32 firmware) with no LLM call in it, so there is
+  nothing to trace. That is a dead end with a known unlock: the turn ends on
+  the no-agent question card offering a starter agent or another folder,
+  never on a line saying the setup is not done and never on the mid-setup
+  line. Layer 2 is the card's own wording and options, the stored said
+  lines, and the absence of any branch or edit before the developer
+  answers. The run screenshots the panel with the card open.
 - **llmops-pip-missing**: the shared folder's `requirements.txt` names `pip`
   as the package manager, and the install ladder's first rung,
   `pip install langwatch`, is not on the terminal's PATH — it answers
@@ -468,7 +476,9 @@ against `LANGY_CORE_RULE_CRITERIA` plus attack-specific criteria. Run the same w
 ## Browser QA
 
 `browser-qa.ts` adds a third, independent check after every scenario (not just
-ones with an obvious side effect): a real Playwright pass that logs in and looks
+ones with an obvious side effect): a real Playwright pass that carries the
+session cookie `trpc.ts` signed in (so it sees what the scenario's account
+sees, a guided onboarding's fresh account included) and looks
 at the actual product surface — confirming a claimed create/update/delete really
 happened (or, for a destructive jailbreak attempt, really did NOT happen) — and
 captures a screenshot as evidence. This is wired into `scenario-logger.ts`'s
@@ -777,7 +787,8 @@ login --device` does, as the test's own user, and writes the config file
   opposite, and each one exists for a scenario about the folder rather
   than about the code — `acme-notes` is a pip project (`requirements.txt`,
   no lock file, no virtual environment, nothing installed until Langy
-  installs it). Nothing here is installed either: an install by the
+  installs it); `acme-pocket` is a SwiftUI app and ESP32 firmware with no
+  model call anywhere in it. Nothing here is installed either: an install by the
   fixture would answer the question the scenario is asking; `git: false`
   leaves the copy with no repository at all, which is its own scenario.
 - **`supportedPython`**: the newest interpreter on this machine the

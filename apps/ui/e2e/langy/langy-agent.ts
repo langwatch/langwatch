@@ -399,6 +399,7 @@ async function streamTurnText({
   onUiAction?: (entry: UiActionEntry) => void;
 }): Promise<TurnText> {
   const input = encodeURIComponent(JSON.stringify(params));
+  // The live channel opens only from the app's own origin (BrowserOriginGuard).
   const res = await fetch(`${APP_BASE}/api/sse/langy.onTurnStream?input=${input}`, {
     headers: { Cookie: cookie, Accept: "text/event-stream", Origin: APP_BASE },
     // How long a single turn may take (README.md "langy-agent.ts").

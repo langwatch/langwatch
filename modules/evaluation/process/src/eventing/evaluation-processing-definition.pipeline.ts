@@ -229,6 +229,9 @@ export class EvaluationProcessingPipelineAdapter {
                     occurredAt: context.occurredAt,
                     spanAttributes: data.span.attributes,
                   },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceOriginEvaluationTrigger", {
@@ -240,6 +243,9 @@ export class EvaluationProcessingPipelineAdapter {
                   tenantId: String(context.tenantId),
                   traceId: String(context.aggregateId),
                   event: { type: ORIGIN_RESOLVED_EVENT_TYPE, occurredAt: context.occurredAt },
+                  ...(context.deliveryAttempt !== undefined && {
+                    deliveryAttempt: context.deliveryAttempt,
+                  }),
                 }),
             })
             .withPeerSubscriber("traceCustomEvaluationSync", {

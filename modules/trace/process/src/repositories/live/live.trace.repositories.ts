@@ -1,11 +1,12 @@
 import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import type { EventReadSeat } from "@langwatch/eventing";
-import type { RateLimiter } from "@langwatch/process-stores";
+import type { ObjectStorage, RateLimiter } from "@langwatch/process-stores";
 import type { RedisConnection } from "@langwatch/redis-client";
 import type { TraceServerConfig } from "@langwatch/trace-contract";
 
 import { ClickHouseTraceClientsRepository } from "../clickhouse/clickhouse.trace-member-client.repository.ts";
 import { EventingTraceEventPayloadRepository } from "../eventing/eventing.trace-event-payload.repository.ts";
+import { ObjectStorageTraceSpoolObjectsRepository } from "../object-storage/object-storage.trace-spool-objects.repository.ts";
 import { PostgresTraceRepositories } from "../prisma/prisma.trace.repositories.ts";
 import { RedisTraceAnalyticsFoldCacheRepository } from "../redis/redis.trace-analytics-fold-cache.repository.ts";
 import { RedisTraceExportSlotRepository } from "../redis/redis.trace-export-slot.repository.ts";
@@ -16,7 +17,7 @@ import type { TraceRepositories } from "../trace.repositories.ts";
 
 /**
  * Trace's live stores: corrections in Prisma, rows in ClickHouse, claims and windows in Redis,
- * offloaded fields through eventing's one-event read seat.
+ * offloaded fields through eventing's one-event read seat, the transient spool in object storage.
  */
 export class LiveTraceRepositories {
   static readonly requires = [
@@ -25,6 +26,7 @@ export class LiveTraceRepositories {
     "redis",
     "rateLimiter",
     "eventReadSeat",
+    "objectStorage",
   ] as const;
 
   static create({
@@ -33,6 +35,7 @@ export class LiveTraceRepositories {
     redis,
     rateLimiter,
     eventReadSeat,
+    objectStorage,
     config,
   }: Readonly<{
     prisma: Parameters<typeof PostgresTraceRepositories.create>[0]["prisma"];
@@ -40,6 +43,7 @@ export class LiveTraceRepositories {
     redis: RedisConnection;
     rateLimiter: RateLimiter;
     eventReadSeat: EventReadSeat;
+    objectStorage: ObjectStorage;
     config: Pick<TraceServerConfig, "foldCacheTtlSeconds">;
   }>): TraceRepositories {
     return {
@@ -57,6 +61,7 @@ export class LiveTraceRepositories {
       rateLimits: RedisTraceRateLimitRepository.create(rateLimiter),
       clickhouseClients: ClickHouseTraceClientsRepository.create(clickhouse),
       eventPayloads: EventingTraceEventPayloadRepository.create({ eventReadSeat }),
+      spoolObjects: ObjectStorageTraceSpoolObjectsRepository.create({ objectStorage }),
     };
   }
 }

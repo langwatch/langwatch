@@ -101,6 +101,34 @@ describe("LangevalsClusteringService", () => {
       expect(langevals.posts[0]?.url).toBe(`${ENDPOINT}/topics/incremental_clustering`);
     });
 
+    /** @scenario "A langevals clustering refusal keeps its status and failure code" */
+    it("carries the HTTP status and the detail's failure code on the refusal", async () => {
+      const { langevals, service } = setup(ENDPOINT);
+      langevals.answerWith(
+        Response.json(
+          {
+            detail: {
+              code: "model_provider_auth_failed",
+              message: "The model provider rejected the credentials.",
+            },
+          },
+          { status: 422, statusText: "Unprocessable Entity" },
+        ),
+      );
+
+      const refusal = service.request({
+        projectId: "project-1",
+        signal: new AbortController().signal,
+        mode: "batch",
+        params: BATCH,
+      });
+
+      await expect(refusal).rejects.toMatchObject({
+        status: 422,
+        failureCode: "model_provider_auth_failed",
+      });
+    });
+
     /** @scenario "A clustering call aborted by its caller does not reach langevals" */
     it("rejects with the caller's abort and posts nothing", async () => {
       const { langevals, service } = setup(ENDPOINT);
