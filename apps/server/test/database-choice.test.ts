@@ -122,10 +122,30 @@ describe("the database question", () => {
       const validate = asked[2]?.validate as (value: string) => Promise<true | string>;
 
       expect(await validate("postgresql://nobody@nowhere:1/x")).toBe(
-        "Could not connect to Postgres: connection refused",
+        "Could not connect to Postgres at postgresql://nobody@nowhere:1/x: connection refused",
       );
       expect(await validate(OWN_POSTGRES)).toBe(true);
       expect(probe).toHaveBeenCalledWith({ id: "postgres", url: OWN_POSTGRES });
+    });
+
+    /** @scenario "A database password is never shown" */
+    it("masks the URL while it is typed and names it without its password when refused", async () => {
+      const { ask, asked } = scriptedAsk([
+        { mode: "own" },
+        { source: "own" },
+        { url: OWN_POSTGRES },
+        { source: "bundled" },
+        { source: "bundled" },
+      ]);
+      const probe = vi.fn<Probe>(async () => ({ ok: false, reason: "connection refused" }));
+      await chooseDatabases({ isInteractive: true, ask, probe });
+      const validate = asked[2]?.validate as (value: string) => Promise<true | string>;
+
+      expect(asked[2]?.type).toBe("password");
+      const refusal = await validate("postgresql://me:s3cret@db.internal:5432/langwatch");
+      expect(refusal).toBe(
+        "Could not connect to Postgres at postgresql://me:***@db.internal:5432/langwatch: connection refused",
+      );
     });
   });
 

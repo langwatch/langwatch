@@ -206,7 +206,7 @@ export async function openBootDoor({
     port: door.address.port,
     feed: board.feed,
     openApp: async () => {
-      await door.proxyTo({ port: backendPort });
+      await door.proxyTo({ port: backendPort, proxiesLiveness: true });
       board.ready();
     },
     offerAssets: (app) => {

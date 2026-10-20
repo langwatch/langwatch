@@ -1,5 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
+import { predepGate } from "../../src/predeps/runner.ts";
+import type { PredepId } from "../../src/predeps/types.ts";
 import type { SupervisedHandle } from "../../src/services/spawn.ts";
 import type { RuntimeContext, RuntimeEvent } from "../../src/shared/runtime-contract.ts";
 
@@ -499,6 +501,55 @@ describe("services/runtime while the predeps are still arriving", () => {
       expect(started).toContain("postgres");
       for (const service of started) expect(callLog).toContain(`stop:${service}`);
     });
+  });
+});
+
+/** The CLI's own gate: arrive, or skip as the person does after an install failed. */
+function skippableCtx() {
+  const ctx = fakeCtx();
+  const gate = predepGate({ predeps: ctx.predeps });
+  ctx.predepsReady = gate.ready;
+  ctx.predepsPresent = gate.present;
+  const arrive = (...ids: PredepId[]) => {
+    for (const id of ids) {
+      gate.add({ id, resolved: { version: "1", resolvedPath: `/bin/${id}`, preInstalled: true } });
+    }
+  };
+  return { ctx, gate, arrive };
+}
+
+describe("services/runtime when the person skips an optional predep", () => {
+  beforeEach(() => {
+    langyBinarySupported = true;
+    callLog.length = 0;
+  });
+
+  /** @scenario "Skipping an optional predep starts LangWatch without what needs it" */
+  it("starts the backend without the assistant when its runtime was skipped", async () => {
+    const { ctx, gate, arrive } = skippableCtx();
+    const booting = runtime.startAll(ctx);
+
+    arrive("postgres", "redis", "clickhouse", "aigateway", "pnpm", "app", "uv");
+    gate.skip(["opencode"]);
+    gate.finish();
+    const handles = await booting;
+
+    expect(handles.map((handle) => handle.name)).toContain("langwatch");
+    expect(callLog).not.toContain("start:langyagent");
+  });
+
+  /** @scenario "Skipping an optional predep starts LangWatch without what needs it" */
+  it("starts the backend without LangEvals when uv was skipped", async () => {
+    const { ctx, gate, arrive } = skippableCtx();
+    const booting = runtime.startAll(ctx);
+
+    arrive("postgres", "redis", "clickhouse", "aigateway", "pnpm", "app", "opencode");
+    gate.skip(["uv"]);
+    gate.finish();
+    const handles = await booting;
+
+    expect(handles.map((handle) => handle.name)).toContain("langwatch");
+    expect(callLog).not.toContain("start:langevals");
   });
 });
 

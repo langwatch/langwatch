@@ -1,6 +1,7 @@
 // julia's lane: orchestrator that implements RuntimeApi.
 // Wired up by the CLI through its static import of `runtime`.
 
+import type { PredepId } from "../predeps/types.ts";
 import { ownDatabases, type DatabaseId } from "../shared/databases.ts";
 import { scaffoldEnvFile } from "../shared/env.ts";
 import { featureEnv, resolveEffectiveFeatures } from "../shared/features.ts";
@@ -73,6 +74,8 @@ const runtimeImpl: RuntimeApi = {
     const own = ownDatabases({ env: envFromFile, ports: ctx.ports });
     const features = resolveEffectiveFeatures(ctx.envFile);
     const predepsReady = ctx.predepsReady ?? (async () => undefined);
+    const predepsPresent =
+      ctx.predepsPresent ?? ((ids: readonly PredepId[]) => predepsReady(ids).then(() => true));
     const handles: SupervisedHandle[] = [];
     let isAbandoned = false;
     // Records what a step started; a step that finishes after another failed stops what it made.
@@ -115,9 +118,14 @@ const runtimeImpl: RuntimeApi = {
     const isLangyUp = Promise.all([
       infra,
       isLangyRunnable,
-      predepsReady(["pnpm", "opencode"]),
-    ]).then(async ([, runnable]) => {
+      predepsReady(["pnpm"]),
+      predepsPresent(["opencode"]),
+    ]).then(async ([, runnable, , hasOpencode]) => {
       if (!runnable) return false;
+      if (!hasOpencode) {
+        notice({ bus, service: "langyagent", line: SKIPPED_LINE.langy });
+        return false;
+      }
       await ensureLangyCli(ctx, bus);
       return startLangy({ ctx, bus, env: userEnv, keep });
     });
@@ -125,11 +133,16 @@ const runtimeImpl: RuntimeApi = {
       keep(async () => [await startLangwatch(ctx, bus, envFor(langyUp))]),
     );
     // LangEvals reads none of the assistant's settings, so it does not wait on that decision.
-    const langevals = predepsReady(["app", "uv"])
-      .then(() => syncVenvs(ctx, bus))
-      .then(() =>
-        keep(async () => [await startLangevals(ctx, bus, envFor(features.isLangyEnabled))]),
-      );
+    const langevals = Promise.all([predepsReady(["app"]), predepsPresent(["uv"])]).then(
+      async ([, hasUv]) => {
+        if (!hasUv) {
+          notice({ bus, service: "langevals", line: SKIPPED_LINE.langevals });
+          return [];
+        }
+        await syncVenvs(ctx, bus);
+        return keep(async () => [await startLangevals(ctx, bus, envFor(features.isLangyEnabled))]);
+      },
+    );
     // A checkout fills its tokenizer cache here (the prebuilt app ships it); nothing waits on it.
     const tokenizers = predepsReady(["app"]).then(() =>
       ensureTiktokenEncodings({ paths: ctx.paths, bus, appRootDir: appRoot() }),
@@ -170,6 +183,18 @@ async function stopHandles(handles: { stop(): Promise<void> }[]): Promise<void> 
       // Swallow — we still want to stop the rest.
     }
   }
+}
+
+/** What the terminal says when a predep the person skipped leaves a service off. */
+const SKIPPED_LINE = {
+  langy:
+    "langy assistant disabled: its runtime was skipped after its install failed. Everything else continues without it.",
+  langevals:
+    "langevals not started: uv was skipped after its install failed. Evaluators that need it stay unavailable; everything else continues.",
+};
+
+function notice({ bus, service, line }: { bus: EventBus; service: string; line: string }): void {
+  bus.emit({ type: "log", service, stream: "stderr", isNotice: true, line });
 }
 
 /** Whether the assistant can run: it is enabled and the installed ai-gateway binary carries it. */

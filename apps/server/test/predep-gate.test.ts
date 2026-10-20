@@ -38,4 +38,19 @@ describe("waiting on predeps while the rest install", () => {
       await expect(waiting).rejects.toThrow("uv did not install");
     });
   });
+
+  describe("when the person skips a predep whose install failed", () => {
+    /** @scenario "Skipping an optional predep starts LangWatch without what needs it" */
+    it("settles it as absent: present answers false and ready names the skip", async () => {
+      const gate = predepGate({ predeps: {} });
+      const present = gate.present(["opencode"]);
+      const ready = gate.ready(["opencode"]);
+
+      gate.skip(["opencode"]);
+      gate.finish();
+
+      await expect(present).resolves.toBe(false);
+      await expect(ready).rejects.toThrow("opencode was skipped");
+    });
+  });
 });

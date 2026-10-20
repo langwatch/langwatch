@@ -49,6 +49,15 @@ export function ownDatabases({
   }).map(({ id }) => id);
 }
 
+/** The URL as it may be shown: its password replaced by `***`. */
+export function redactUrl(url: string): string {
+  if (!URL.canParse(url)) return url;
+  const parsed = new URL(url);
+  if (parsed.password === "") return url;
+  parsed.password = "***";
+  return parsed.toString();
+}
+
 /** The ports this install holds itself: every allocated one but a brought database's. */
 export function portsInUse({
   ports,

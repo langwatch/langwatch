@@ -1,5 +1,6 @@
 import { nowInstant } from "@langwatch/time";
 
+import { recordAppInUse } from "../shared/app-in-use.ts";
 import { DEFAULT_LOG_LEVEL } from "../shared/log-level.ts";
 import type { RuntimeContext } from "../shared/runtime-contract.ts";
 import { appRoot } from "./app-dir.ts";
@@ -30,6 +31,7 @@ export async function startLangwatch(
 
   const sp = servicePaths(ctx.paths);
   const pnpm = await resolvePnpm(ctx.paths);
+  const releaseApp = markAppInUse(ctx);
   const handle = supervise({
     spec: {
       name: "langwatch",
@@ -73,6 +75,7 @@ export async function startLangwatch(
   });
   if (!ready.ok) {
     await handle.stop();
+    releaseApp();
     throw new Error(`langwatch did not become healthy: ${ready.reason}`);
   }
   bus.emit({
@@ -81,4 +84,19 @@ export async function startLangwatch(
     durationMs: nowInstant().epochMilliseconds - start,
   });
   return handle;
+}
+
+/**
+ * While this CLI serves the prebuilt app, a newer install elsewhere keeps app/<version> (the app
+ * predep's cleanup). Removed when the CLI exits; a crash leaves a record its dead pid voids.
+ */
+function markAppInUse(ctx: RuntimeContext): () => void {
+  const version = ctx.predeps.app?.version;
+  if (version === undefined || version === "checkout") return () => undefined;
+  const remove = recordAppInUse({ root: ctx.paths.root, version });
+  process.once("exit", remove);
+  return () => {
+    process.off("exit", remove);
+    remove();
+  };
 }

@@ -126,6 +126,7 @@ program
       userEnv: captureUserEnv(),
       orchestrator,
       predepsReady: gate.ready,
+      predepsPresent: gate.present,
       logLevel: logs.level,
     };
 
@@ -150,13 +151,21 @@ program
     }
 
     // Services start as their predeps arrive (RuntimeContext.predepsReady), not after all of them.
+    // An abort ends through `shutdown`, so the stores already started are stopped too.
     const predepsDone = runPredeps({
       config: orchestrator,
       yes: opts.yes,
       version: VERSION,
       skip: ownStores,
       onReady: (ready) => predepArrived({ ready, gate, door }),
-    }).finally(() => gate.finish());
+      onSkipped: gate.skip,
+    })
+      .then((run) => {
+        if (run.outcome === "aborted") {
+          void shutdown({ exitCode: run.exitCode, reason: run.reason });
+        }
+      })
+      .finally(() => gate.finish());
     const write = heldOutput({ until: predepsDone });
 
     let handles: ServiceHandle[] = [];
@@ -399,13 +408,16 @@ program
     const orchestrator = resolveLocalOrchestratorConfig(process.env);
     const base = PORT_BASE_DEFAULT;
     const ports = allocatePorts(base);
-    const predeps = await runPredeps({
+    const run = await runPredeps({
       config: orchestrator,
       yes: opts.yes,
       version: VERSION,
       // A database the .env already points elsewhere is not downloaded.
       skip: ownDatabases({ env: readEnvFile(paths.envFile), ports }),
     });
+    // Nothing has started yet, so an abort can end here.
+    if (run.outcome === "aborted") process.exit(run.exitCode);
+    const { predeps } = run;
     const runtime: RuntimeApi = serviceRuntime;
     const logs = resolveLogSettings({ env: process.env, isVerbose: opts.verbose === true });
     const ctx: RuntimeContext = {

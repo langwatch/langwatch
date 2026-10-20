@@ -3,7 +3,7 @@ import tls from "node:tls";
 
 import pg from "pg";
 
-import type { DatabaseId } from "../shared/databases.ts";
+import { redactUrl, type DatabaseId } from "../shared/databases.ts";
 
 const PROBE_TIMEOUT_MS = 5_000;
 
@@ -98,10 +98,24 @@ async function probeRedis(url: string): Promise<ProbeResult> {
   }
 }
 
-/** ClickHouse: its HTTP /ping, answered "Ok.". */
+/** The URL with user and password taken out, and them as a Basic auth header when present. */
+function withoutCredentials(url: string): { target: URL; headers: Record<string, string> } {
+  const target = new URL(url);
+  const user = decodeURIComponent(target.username);
+  const password = decodeURIComponent(target.password);
+  target.username = "";
+  target.password = "";
+  if (user === "" && password === "") return { target, headers: {} };
+  const token = Buffer.from(`${user}:${password}`).toString("base64");
+  return { target, headers: { Authorization: `Basic ${token}` } };
+}
+
+/** ClickHouse: its HTTP /ping, answered "Ok."; fetch refuses a URL carrying credentials. */
 async function probeClickhouse(url: string): Promise<ProbeResult> {
   try {
-    const response = await fetch(new URL("/ping", url), {
+    const { target, headers } = withoutCredentials(url);
+    const response = await fetch(new URL("/ping", target), {
+      headers,
       signal: AbortSignal.timeout(PROBE_TIMEOUT_MS),
     });
     const body = (await response.text()).trim();
@@ -111,8 +125,7 @@ async function probeClickhouse(url: string): Promise<ProbeResult> {
   }
 }
 
-/** Connects to a database the person brings, before its URL is saved. */
-export function probeDatabase({ id, url }: { id: DatabaseId; url: string }): Promise<ProbeResult> {
+function probeOne({ id, url }: { id: DatabaseId; url: string }): Promise<ProbeResult> {
   switch (id) {
     case "postgres":
       return probePostgres(url);
@@ -121,4 +134,28 @@ export function probeDatabase({ id, url }: { id: DatabaseId; url: string }): Pro
     case "clickhouse":
       return probeClickhouse(url);
   }
+}
+
+/** A reason with the URL's password taken out wherever a driver repeated it. */
+function redactReason({ reason, url }: { reason: string; url: string }): string {
+  if (!URL.canParse(url)) return reason;
+  const { password } = new URL(url);
+  if (password === "") return reason;
+  const withoutUrl = reason.split(url).join(redactUrl(url));
+  return [password, decodeURIComponent(password)].reduce(
+    (text, secret) => text.split(secret).join("***"),
+    withoutUrl,
+  );
+}
+
+/** Connects to a database the person brings, before it is saved; no reason shows its password. */
+export async function probeDatabase({
+  id,
+  url,
+}: {
+  id: DatabaseId;
+  url: string;
+}): Promise<ProbeResult> {
+  const result = await probeOne({ id, url });
+  return result.ok ? result : { ok: false, reason: redactReason({ reason: result.reason, url }) };
 }

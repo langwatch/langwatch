@@ -3,6 +3,7 @@ import type { PromptObject } from "prompts";
 import {
   DATABASES,
   databaseEnvValues,
+  redactUrl,
   type DatabaseChoice,
   type DatabaseId,
 } from "../shared/databases.ts";
@@ -86,13 +87,17 @@ async function chooseOne({
     initial: 0,
   });
   if (source !== "own") return { kind: "bundled" };
+  // Masked while typed: the URL usually carries the password.
   const { url } = await ask({
-    type: "text",
+    type: "password",
     name: "url",
     message: `${label} URL`,
     validate: async (value: string) => {
-      const result = await probe({ id, url: value.trim() });
-      return result.ok ? true : `Could not connect to ${label}: ${result.reason}`;
+      const typed = value.trim();
+      const result = await probe({ id, url: typed });
+      return result.ok
+        ? true
+        : `Could not connect to ${label} at ${redactUrl(typed)}: ${result.reason}`;
     },
   });
   return { kind: "own", url: String(url).trim() };

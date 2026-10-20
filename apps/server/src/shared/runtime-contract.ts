@@ -24,6 +24,11 @@ export type RuntimeContext = {
    * service starts while the others still download. Absent: every predep is already there.
    */
   predepsReady?: (ids: readonly PredepId[]) => Promise<void>;
+  /**
+   * Like predepsReady, for a predep a service can do without: false once one was skipped after
+   * its install failed. Absent: the answer follows predepsReady.
+   */
+  predepsPresent?: (ids: readonly PredepId[]) => Promise<boolean>;
   /** The level every service starts at (shared/log-level.ts). Absent: warn. */
   logLevel?: string;
 };

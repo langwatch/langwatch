@@ -15,6 +15,11 @@ export type PredepResult = Record<string, ResolvedPredep>;
 /** One predep the moment it is there, found or installed. */
 export type ArrivedPredep = { id: PredepId; resolved: ResolvedPredep };
 
+/** How the predeps phase ended: everything there (or skipped), or the person or CI aborted. */
+export type PredepRun =
+  | { outcome: "done"; predeps: PredepResult }
+  | { outcome: "aborted"; exitCode: number; reason: string };
+
 export type PredepOptions = {
   config: LocalOrchestratorConfig;
   yes?: boolean;
@@ -24,33 +29,71 @@ export type PredepOptions = {
   skip?: readonly PredepId[];
   /** Told about each predep the moment it is there, found or installed, before the rest finish. */
   onReady?: (predep: ArrivedPredep) => void;
+  /** Told which predeps the person chose to go on without after their install failed. */
+  onSkipped?: (ids: readonly PredepId[]) => void;
 };
 
 /**
  * Fills `predeps` as `runPredeps` reports each one, and lets a service wait on the ones it
- * needs (RuntimeContext.predepsReady). Once the run finishes, a wait on a missing one fails.
+ * needs (RuntimeContext.predepsReady). A skipped predep settles as absent: `present` answers
+ * false, `ready` fails. Once the run finishes, a wait on a missing one fails.
  */
+type PredepWait = {
+  ids: readonly PredepId[];
+  resolve: (isPresent: boolean) => void;
+  reject: (error: Error) => void;
+};
+
+/** Answers one wait if it can be: present, skipped (absent), or failed once all have run. */
+function settleWait({
+  wait,
+  predeps,
+  skipped,
+  isFinished,
+}: {
+  wait: PredepWait;
+  predeps: PredepResult;
+  skipped: ReadonlySet<PredepId>;
+  isFinished: boolean;
+}): boolean {
+  const missing = wait.ids.filter((id) => !(id in predeps));
+  if (missing.some((id) => skipped.has(id))) {
+    wait.resolve(false);
+    return true;
+  }
+  if (missing.length > 0 && !isFinished) return false;
+  if (missing.length === 0) wait.resolve(true);
+  else wait.reject(new Error(`${missing.join(", ")} did not install`));
+  return true;
+}
+
 export function predepGate({ predeps }: { predeps: PredepResult }) {
-  type Wait = { ids: readonly PredepId[]; resolve: () => void; reject: (error: Error) => void };
-  const waits = new Set<Wait>();
+  const waits = new Set<PredepWait>();
+  const skipped = new Set<PredepId>();
   let isFinished = false;
   const settle = () => {
     for (const wait of waits) {
-      const missing = wait.ids.filter((id) => !(id in predeps));
-      if (missing.length > 0 && !isFinished) continue;
-      waits.delete(wait);
-      if (missing.length === 0) wait.resolve();
-      else wait.reject(new Error(`${missing.join(", ")} did not install`));
+      if (settleWait({ wait, predeps, skipped, isFinished })) waits.delete(wait);
     }
   };
+  const present = (ids: readonly PredepId[]) =>
+    new Promise<boolean>((resolve, reject) => {
+      waits.add({ ids, resolve, reject });
+      settle();
+    });
   return {
-    ready: (ids: readonly PredepId[]) =>
-      new Promise<void>((resolve, reject) => {
-        waits.add({ ids, resolve, reject });
-        settle();
-      }),
+    present,
+    ready: async (ids: readonly PredepId[]): Promise<void> => {
+      if (await present(ids)) return;
+      const absent = ids.filter((id) => skipped.has(id));
+      throw new Error(`${absent.join(", ")} was skipped`);
+    },
     add: ({ id, resolved }: ArrivedPredep) => {
       predeps[id] = resolved;
+      settle();
+    },
+    skip: (ids: readonly PredepId[]) => {
+      for (const id of ids) skipped.add(id);
       settle();
     },
     finish: () => {
@@ -62,6 +105,7 @@ export function predepGate({ predeps }: { predeps: PredepResult }) {
 
 export type PredepGate = ReturnType<typeof predepGate>;
 
+/** Never exits the process: an abort is returned so the caller stops what already started. */
 export async function runPredeps({
   config,
   yes = false,
@@ -69,7 +113,8 @@ export async function runPredeps({
   version,
   skip = [],
   onReady,
-}: PredepOptions): Promise<PredepResult> {
+  onSkipped,
+}: PredepOptions): Promise<PredepRun> {
   const platform = detectPlatform();
   mkdirSync(paths.bin, { recursive: true });
   mkdirSync(paths.data, { recursive: true });
@@ -88,28 +133,35 @@ export async function runPredeps({
   const missing = predeps.filter((p) => !detection[p.id]?.installed);
 
   if (missing.length === 0) {
-    return collectResult(predeps, detection, {});
+    return { outcome: "done", predeps: collectResult(predeps, detection, {}) };
   }
 
   // Only `uv` warrants a confirmation: it installs into the user's home
   // (`~/.local/bin/uv`) rather than `~/.langwatch/bin`, where every other
   // predep lives and `rm -rf ~/.langwatch` fully cleans up.
   if (!skipConfirm && !yes && missing.some((p) => p.id === "uv")) {
-    await confirmUvInstallPrompt();
+    const refusal = await confirmUvInstallPrompt();
+    if (refusal) return refusal;
   }
 
   const installResults: Record<string, { version: string; resolvedPath: string }> = {};
-  await runListr({
+  const aborted = await runListr({
     predeps: missing,
     platform,
     installResults,
     continuousIntegration: config.browser.continuousIntegration,
     onInstalled: ({ id, result }) =>
       onReady?.({ id, resolved: { ...result, preInstalled: false } }),
+    onSkipped: (ids) => onSkipped?.(ids),
   });
+  if (aborted) return aborted;
 
-  return collectResult(predeps, detection, installResults);
+  return { outcome: "done", predeps: collectResult(predeps, detection, installResults) };
 }
+
+type Aborted = Extract<PredepRun, { outcome: "aborted" }>;
+
+const CANCELLED: Aborted = { outcome: "aborted", exitCode: 130, reason: "cancelled" };
 
 async function detectAll(predeps: Predep[]) {
   const out: Record<string, Awaited<ReturnType<Predep["detect"]>>> = {};
@@ -121,7 +173,8 @@ async function detectAll(predeps: Predep[]) {
   return out;
 }
 
-async function confirmUvInstallPrompt(): Promise<void> {
+async function confirmUvInstallPrompt(): Promise<Aborted | null> {
+  let isCancelled = false;
   const { ok } = await prompts(
     {
       type: "confirm",
@@ -129,20 +182,26 @@ async function confirmUvInstallPrompt(): Promise<void> {
       message: "LangWatch needs to install `uv` (Astral's Python package manager) — proceed?",
       initial: true,
     },
-    { onCancel: () => process.exit(130) },
+    {
+      onCancel: () => {
+        isCancelled = true;
+      },
+    },
   );
-  if (!ok) {
-    console.error(chalk.red("Aborted — `uv` is required to run langevals."));
-    process.exit(1);
-  }
+  if (isCancelled) return CANCELLED;
+  if (ok) return null;
+  console.error(chalk.red("Aborted — `uv` is required to run langevals."));
+  return { outcome: "aborted", exitCode: 1, reason: "`uv` is required to run langevals" };
 }
 
+/** Installs until each predep is in or skipped; an abort is returned, never exited on. */
 async function runListr({
   predeps,
   platform,
   installResults,
   continuousIntegration,
   onInstalled,
+  onSkipped,
 }: {
   predeps: Predep[];
   platform: SupportedPlatform;
@@ -152,7 +211,8 @@ async function runListr({
     id: PredepId;
     result: { version: string; resolvedPath: string };
   }) => void;
-}): Promise<void> {
+  onSkipped: (ids: readonly PredepId[]) => void;
+}): Promise<Aborted | null> {
   const remaining = [...predeps];
   // Loop until every predep either installs or the user explicitly skips it.
   // Each pass runs the still-unfinished predeps concurrently in a fresh
@@ -186,12 +246,14 @@ async function runListr({
       // the per-predep error in the task wrapper above.
     });
 
-    if (failed.length === 0) return;
+    if (failed.length === 0) return null;
 
     const action = await promptOnFailure(failed, continuousIntegration);
+    if (action === "cancelled") return CANCELLED;
     if (action === "abort") {
       console.error(chalk.red(`✗ aborting — ${failed.length} predep(s) did not install.`));
-      process.exit(1);
+      const labels = failed.map((f) => f.predep.label).join(", ");
+      return { outcome: "aborted", exitCode: 1, reason: `${labels} did not install` };
     }
     if (action === "skip") {
       console.warn(
@@ -199,24 +261,27 @@ async function runListr({
           `⚠ skipping ${failed.length} predep(s) — services that depend on them will fail to start.`,
         ),
       );
-      return;
+      onSkipped(failed.map((f) => f.predep.id));
+      return null;
     }
     // retry: keep only the failed ones in `remaining` and loop.
     remaining.length = 0;
     remaining.push(...failed.map((f) => f.predep));
   }
+  return null;
 }
 
 async function promptOnFailure(
   failed: { predep: Predep; error: Error }[],
   continuousIntegration: boolean,
-): Promise<"retry" | "skip" | "abort"> {
+): Promise<"retry" | "skip" | "abort" | "cancelled"> {
   console.error("");
   console.error(chalk.red.bold(`✗ ${failed.length} predep(s) failed:`));
   for (const f of failed) {
     console.error(`  ${chalk.red("✗")} ${f.predep.label}: ${f.error.message}`);
   }
   if (continuousIntegration) return "abort";
+  let isCancelled = false;
   const { action } = await prompts(
     {
       type: "select",
@@ -229,11 +294,15 @@ async function promptOnFailure(
       ],
       initial: 0,
     },
-    { onCancel: () => process.exit(130) },
+    {
+      onCancel: () => {
+        isCancelled = true;
+      },
+    },
   );
+  if (isCancelled) return "cancelled";
   return action ?? "abort";
 }
-
 function collectResult(
   predeps: Predep[],
   detection: Record<string, Awaited<ReturnType<Predep["detect"]>>>,

@@ -21,7 +21,7 @@ const installServices = vi.hoisted(() => vi.fn(async (_ctx: RuntimeContext) => {
 
 vi.mock("../src/predeps/runner.ts", async (importOriginal) => ({
   ...(await importOriginal<typeof PredepRunner>()),
-  runPredeps: vi.fn(async () => resolved.predeps),
+  runPredeps: vi.fn(async () => ({ outcome: "done", predeps: resolved.predeps })),
 }));
 vi.mock("../src/services/runtime.ts", () => ({
   runtime: {

@@ -4,7 +4,9 @@ import { join } from "node:path";
 import { execa } from "execa";
 
 import type { LocalOrchestratorDevelopmentConfig } from "../platform/config/local-orchestrator.config.ts";
+import { appVersionsInUse } from "../shared/app-in-use.ts";
 import { APP_COMPLETE_MARKER, checkoutRoot, installedAppDir } from "../shared/app-location.ts";
+import { withExclusiveLock } from "../shared/exclusive-lock.ts";
 import type { LangwatchPaths } from "../shared/paths.ts";
 import { downloadWithProgress, releaseAssetSlug, sha256OfFile } from "./_download.ts";
 import type { DetectionResult, Predep, PredepTask } from "./types.ts";
@@ -79,8 +81,8 @@ export function makeAppPredep({
 
 /**
  * Fetches the archive, verifies it against its `.sha256` file, extracts it beside the target and
- * renames it into place; then removes every other version and an older CLI's flat tree. Nothing
- * outside `paths.app` is touched, so the data under `paths.data` survives every upgrade.
+ * renames it into place; then removes every other version no running LangWatch serves, and an
+ * older CLI's flat tree. One run at a time holds the lock; nothing outside `paths.app` is touched.
  */
 async function installApp({
   paths,
@@ -88,16 +90,44 @@ async function installApp({
   source,
   task,
 }: {
-  paths: Pick<LangwatchPaths, "app">;
+  paths: Pick<LangwatchPaths, "app" | "root" | "lockFile">;
   version: string;
   source: string;
   task: PredepTask;
 }): Promise<string> {
   mkdirSync(paths.app, { recursive: true });
   const target = installedAppDir({ appsDir: paths.app, version });
-  const staging = join(paths.app, `.extracting-${version}`);
-  const download = join(paths.app, `.download-${version}.tar.gz`);
+  return withExclusiveLock({
+    lockFile: paths.lockFile,
+    onWait: (holder) => {
+      task.output = `waiting for another LangWatch (pid ${holder}) to finish installing the app`;
+    },
+    run: async () => {
+      // Another run may have installed this version while this one waited for the lock.
+      if (!existsSync(join(target, APP_COMPLETE_MARKER))) {
+        await unpackApp({ appsDir: paths.app, version, source, task, target });
+      }
+      removeOtherVersions({ paths, version });
+      return target;
+    },
+  });
+}
 
+async function unpackApp({
+  appsDir,
+  version,
+  source,
+  task,
+  target,
+}: {
+  appsDir: string;
+  version: string;
+  source: string;
+  task: PredepTask;
+  target: string;
+}): Promise<void> {
+  const staging = join(appsDir, `.extracting-${version}-${process.pid}`);
+  const download = join(appsDir, `.download-${version}-${process.pid}.tar.gz`);
   const archive = isUrl(source) ? download : source;
   try {
     if (isUrl(source)) {
@@ -125,11 +155,21 @@ async function installApp({
     rmSync(staging, { recursive: true, force: true });
     rmSync(download, { force: true });
   }
+}
 
+/** Every entry but this version and the ones a running LangWatch serves (shared/app-in-use.ts). */
+function removeOtherVersions({
+  paths,
+  version,
+}: {
+  paths: Pick<LangwatchPaths, "app" | "root">;
+  version: string;
+}): void {
+  const inUse = appVersionsInUse({ root: paths.root });
   for (const entry of readdirSync(paths.app)) {
-    if (entry !== version) rmSync(join(paths.app, entry), { recursive: true, force: true });
+    if (entry === version || inUse.has(entry)) continue;
+    rmSync(join(paths.app, entry), { recursive: true, force: true });
   }
-  return target;
 }
 
 /** The archive against the `<source>.sha256` file published beside it. */

@@ -35,6 +35,14 @@ Feature: First run asks whether to use bundled databases or your own
     And a URL it cannot reach is refused with the reason, and asked for again
 
   @unit
+  Scenario: A database password is never shown
+    Given they chose their own ClickHouse
+    When they enter a URL that carries a user and password
+    Then the URL is masked while they type it
+    And the CLI connects with the user and password as credentials, not inside the URL
+    And a refusal names the URL with its password replaced by "***"
+
+  @unit
   Scenario: A database they bring is neither downloaded nor started
     Given they chose their own Postgres and the bundled Redis and ClickHouse
     When LangWatch starts
@@ -68,6 +76,13 @@ Feature: First run asks whether to use bundled databases or your own
     Given the .env names the bundled Redis as "localhost", "127.0.0.1" or "::1" on its bundled port
     Then Redis counts as bundled
     And a URL naming another host, or another port, counts as their own
+
+  @unit
+  Scenario: A database they bring on this machine stays theirs on the next start
+    Given they chose their own Redis at "redis://localhost:6379/0"
+    When a later start lands on different ports
+    Then the .env still names their Redis at "redis://localhost:6379/0"
+    And only a database URL on the previous bundled port moves to the new one
 
   @unit
   Scenario: Doctor checks the databases the install uses

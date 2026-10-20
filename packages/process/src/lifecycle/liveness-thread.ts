@@ -144,6 +144,7 @@ const stalledMs = () => {
   return Date.now() - lastBeatSeenAt;
 };
 const target = { host: "127.0.0.1", port: workerData.proxyPort };
+let proxiesLiveness = false;
 let consoleHold = null;
 const sessions = [];
 let wrongTokensAt = [];
@@ -241,7 +242,7 @@ const unavailable = (res, body) => {
   res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
 };
 const server = http.createServer((req, res) => {
-  if (req.url === workerData.livenessPath) {
+  if (req.url === workerData.livenessPath && !proxiesLiveness) {
     const stalled = stalledMs();
     if (stalled > workerData.stallBudgetMs) {
       unavailable(res, "main loop stalled " + Math.round(stalled / 1000) + "s");
@@ -335,6 +336,7 @@ server.on("error", (error) => {
 parentPort.on("message", (message) => {
   if (message.type === "proxyTo") {
     target.port = message.port;
+    proxiesLiveness = message.proxiesLiveness === true;
     parentPort.postMessage({ type: "proxying" });
     return;
   }
@@ -410,8 +412,11 @@ export type LivenessThread = Readonly<{
   liftConsole: () => Promise<void>;
   /** Shows the failure console; true once a console session pressed Retry, false if it ended. */
   holdConsole: (upgradeConsole: UpgradeConsole) => Promise<boolean>;
-  /** Sends every later request to `port` on loopback instead (the npx CLI's boot hand-over). */
-  proxyTo: (target: { port: number }) => Promise<void>;
+  /**
+   * Sends every later request to `port` on loopback instead (the npx CLI's boot hand-over);
+   * with `proxiesLiveness`, /healthz is answered by the target too.
+   */
+  proxyTo: (target: { port: number; proxiesLiveness?: boolean }) => Promise<void>;
 }>;
 
 /** Starts the thread and resolves once it is listening; rejects when it cannot bind or start. */
@@ -476,9 +481,9 @@ export async function startLivenessThread({
   });
   return {
     address,
-    proxyTo: async ({ port: proxyPort }) => {
+    proxyTo: async ({ port: proxyPort, proxiesLiveness }) => {
       const proxying = nextMessage({ thread, type: "proxying" });
-      thread.postMessage({ type: "proxyTo", port: proxyPort });
+      thread.postMessage({ type: "proxyTo", port: proxyPort, proxiesLiveness });
       await Promise.race([proxying, exited]);
     },
     liftConsole: async () => {

@@ -140,5 +140,38 @@ describe("connecting to a database the person brings", () => {
         await probeDatabase({ id: "clickhouse", url: `http://127.0.0.1:${refusingPort}/x` }),
       ).toEqual({ ok: false, reason: "/ping answered Not ClickHouse" });
     });
+
+    /** @scenario "A database password is never shown" */
+    it("sends the URL's user and password as Basic auth, not in the URL", async () => {
+      const seen: { url?: string; authorization?: string }[] = [];
+      const server = http.createServer((req, res) => {
+        seen.push({ url: req.url, authorization: req.headers.authorization });
+        res.end("Ok.\n");
+      });
+      const port = await listen(server);
+
+      const result = await probeDatabase({
+        id: "clickhouse",
+        url: `http://me:s%40cret@127.0.0.1:${port}/langwatch`,
+      });
+
+      expect(result).toEqual({ ok: true });
+      expect(seen).toEqual([
+        { url: "/ping", authorization: `Basic ${Buffer.from("me:s@cret").toString("base64")}` },
+      ]);
+    });
+  });
+
+  describe("when a driver's reason repeats the URL or its password", () => {
+    /** @scenario "A database password is never shown" */
+    it("shows the reason with the password replaced", async () => {
+      const url = "postgresql://me:s3cret@db.internal:5432/langwatch";
+      pgFailure = new Error(`could not reach ${url} (password s3cret)`);
+
+      expect(await probeDatabase({ id: "postgres", url })).toEqual({
+        ok: false,
+        reason: "could not reach postgresql://me:***@db.internal:5432/langwatch (password ***)",
+      });
+    });
   });
 });

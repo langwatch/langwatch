@@ -91,6 +91,26 @@ Feature: `npx @langwatch/server` runs a prebuilt app
     And the data under "~/.langwatch/data" is unchanged
 
   @unit
+  Scenario: Two first runs at once install the app once
+    Given two "npx @langwatch/server" runs start at the same time on a machine without the app
+    When both reach the app predep
+    Then one downloads and extracts the app while the other waits for it
+    And the other uses the app the first installed, without downloading it again
+
+  @unit
+  Scenario: A lock left by a run that ended does not hold up the next
+    Given a run that was installing the app ended without releasing its lock
+    When the next run reaches the app predep
+    Then it takes the lock over and installs the app
+
+  @unit
+  Scenario: A new version keeps the app a running LangWatch serves
+    Given a running LangWatch serves the app for "3.20.1"
+    When another run installs "3.21.0"
+    Then "app/3.20.1" stays in place
+    And a version no running LangWatch serves is removed
+
+  @unit
   Scenario: An install made by an older CLI is replaced
     Given "~/.langwatch/app" holds the source tree an older CLI installed
     When they run the new CLI
@@ -174,6 +194,20 @@ Feature: `npx @langwatch/server` runs a prebuilt app
     And LangEvals starts once its environment is ready, on its own
 
   @unit
+  Scenario: Aborting the install stops the services already started
+    Given the stores started while the other predeps were still installing
+    When an install fails and they abort, or CI aborts for them, or they press Ctrl+C at the prompt
+    Then every service already started is stopped
+    And the CLI exits with 1 for an abort and 130 for Ctrl+C
+
+  @unit
+  Scenario: Skipping an optional predep starts LangWatch without what needs it
+    Given the install of the assistant's runtime or of uv failed
+    When they choose to skip it and continue
+    Then the backend starts without the assistant, or without LangEvals
+    And the terminal says which service stays off and why
+
+  @unit
   Scenario: LangEvals failing its first boot still takes the stack down
     Given the backend is starting
     When LangEvals never becomes healthy
@@ -196,6 +230,12 @@ Feature: `npx @langwatch/server` runs a prebuilt app
     When the backend answers its health route
     Then the public port forwards to the backend, keeping the browser's Host
     And the boot page reloads into the app
+
+  @unit
+  Scenario: The health check on the public port reports the backend once it is up
+    Given the boot page answers "/healthz" while the backend starts
+    When the public port switches to the backend
+    Then "/healthz" is answered by the backend, so it fails when the backend does
 
   @unit
   Scenario: A failed first boot shows on the boot page with the log path

@@ -112,6 +112,18 @@ describe("the boot page on the public port", () => {
       const response = await fetch(urlOf(door, "/settings"), { headers: { Accept: "text/html" } });
       expect(await response.text()).toBe(`backend saw 127.0.0.1:${door.port}`);
     });
+
+    /** @scenario "The health check on the public port reports the backend once it is up" */
+    it("answers /healthz itself while booting and from the backend after the switch", async () => {
+      const door = await openDoor();
+      const booting = await fetch(urlOf(door, "/healthz"));
+
+      await door.openApp();
+      const open = await fetch(urlOf(door, "/healthz"));
+
+      expect(await booting.text()).toBe("ok");
+      expect(await open.text()).toBe(`backend saw 127.0.0.1:${door.port}`);
+    });
   });
 
   describe("when the backend fails its first boot", () => {

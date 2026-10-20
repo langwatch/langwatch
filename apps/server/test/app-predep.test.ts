@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import {
   existsSync,
@@ -17,6 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { resolveLocalOrchestratorConfig } from "../src/platform/config/local-orchestrator.config.ts";
 import { makeAppPredep } from "../src/predeps/app.ts";
 import type { PredepTask } from "../src/predeps/types.ts";
+import { recordAppInUse } from "../src/shared/app-in-use.ts";
 import { APP_COMPLETE_MARKER } from "../src/shared/app-location.ts";
 import type { LangwatchPaths } from "../src/shared/paths.ts";
 
@@ -85,6 +87,11 @@ function serveRelease({ archive, sha }: { archive: string; sha: string }) {
 
 function task(): PredepTask {
   return { output: undefined };
+}
+
+/** The pid of a process that has already ended. */
+function endedPid(): number {
+  return spawnSync(process.execPath, ["-e", ""]).pid;
 }
 
 function predep({ version, appArchive }: { version: string; appArchive?: string }) {
@@ -191,6 +198,86 @@ describe("the app predep", () => {
 
       expect(readdirSync(paths.app)).toEqual(["3.21.0"]);
       expect(readFileSync(join(paths.postgresData, "PG_VERSION"), "utf8")).toBe("18\n");
+    });
+  });
+
+  describe("when two first runs install the app at once", () => {
+    /** @scenario "Two first runs at once install the app once" */
+    it("downloads it once: the second waits for the lock and finds it installed", async () => {
+      const fetch = serveRelease(await buildArchive({ version: "3.21.0" }));
+      const app = predep({ version: "3.21.0" });
+
+      const [first, second] = await Promise.all([
+        app.install({ platform: "darwin-arm64", paths, task: task() }),
+        app.install({ platform: "darwin-arm64", paths, task: task() }),
+      ]);
+
+      expect(first.resolvedPath).toBe(join(paths.app, "3.21.0"));
+      expect(second.resolvedPath).toBe(first.resolvedPath);
+      expect(fetch).toHaveBeenCalledTimes(2);
+      expect(readdirSync(paths.app)).toEqual(["3.21.0"]);
+      expect(existsSync(paths.lockFile)).toBe(false);
+    });
+
+    /** @scenario "Two first runs at once install the app once" */
+    it("waits while another running LangWatch holds the lock", async () => {
+      serveRelease(await buildArchive({ version: "3.21.0" }));
+      write({ path: paths.lockFile, content: String(process.ppid) });
+      const progress = task();
+      setTimeout(() => rmSync(paths.lockFile, { force: true }), 700);
+
+      await predep({ version: "3.21.0" }).install({
+        platform: "darwin-arm64",
+        paths,
+        task: progress,
+      });
+
+      expect(progress.output).not.toBeUndefined();
+      expect(existsSync(join(paths.app, "3.21.0", APP_COMPLETE_MARKER))).toBe(true);
+    });
+
+    /** @scenario "A lock left by a run that ended does not hold up the next" */
+    it("takes over a lock whose process is no longer running", async () => {
+      serveRelease(await buildArchive({ version: "3.21.0" }));
+      write({ path: paths.lockFile, content: String(endedPid()) });
+
+      await predep({ version: "3.21.0" }).install({
+        platform: "darwin-arm64",
+        paths,
+        task: task(),
+      });
+
+      expect(existsSync(join(paths.app, "3.21.0", APP_COMPLETE_MARKER))).toBe(true);
+      expect(existsSync(paths.lockFile)).toBe(false);
+    });
+  });
+
+  describe("when a running LangWatch serves an older version", () => {
+    /** @scenario "A new version keeps the app a running LangWatch serves" */
+    it("keeps that version's tree and removes one whose LangWatch has ended", async () => {
+      const served = await buildArchive({ version: "3.20.1" });
+      const ended = await buildArchive({ version: "3.19.0" });
+      const newer = await buildArchive({ version: "3.21.0" });
+      const runs = [
+        { version: "3.20.1", archive: served.archive, pid: process.pid },
+        { version: "3.19.0", archive: ended.archive, pid: endedPid() },
+      ];
+      for (const { version, archive, pid } of runs) {
+        await predep({ version, appArchive: archive }).install({
+          platform: "darwin-arm64",
+          paths,
+          task: task(),
+        });
+        recordAppInUse({ root: paths.root, version, pid });
+      }
+
+      await predep({ version: "3.21.0", appArchive: newer.archive }).install({
+        platform: "darwin-arm64",
+        paths,
+        task: task(),
+      });
+
+      expect(readdirSync(paths.app).toSorted()).toEqual(["3.20.1", "3.21.0"]);
     });
   });
 
