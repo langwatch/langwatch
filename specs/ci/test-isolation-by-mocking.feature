@@ -46,10 +46,23 @@ Feature: Only the test files that mock modules pay for isolation
     Then the isolated project selects exactly that file
 
   @unit
-  Scenario: A suite where every file mocks, or none does, is left as it is
-    Given every test file in the suite mocks, or none does
+  Scenario: A suite where every file mocks is left as it is
+    Given every test file in the suite mocks
     When the suite's config is resolved
     Then the config is returned unchanged
+
+  @unit
+  Scenario: A suite where no file mocks runs with isolation off
+    Given no test file in the suite mocks, or reaches a file that does
+    When the suite's config is resolved
+    Then every file shares modules, with no isolated project
+
+  @unit
+  Scenario: A suite that asks for isolation in its test block is split too
+    Given a suite that sets isolation in the test block it passes through
+    And some of its files mock modules
+    When the suite's config is resolved
+    Then the mocking files run isolated and the rest share modules
 
   @unit
   Scenario: A suite that keeps isolation off is left as it is
