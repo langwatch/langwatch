@@ -7,7 +7,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { TenantScopedReader } from "../authorized-reads.ts";
 import { ClickHouseQueryClient } from "../client.ts";
-import { defineIdIndex, type IdIndexDeclaration, idIndexName } from "../idIndexFill.ts";
+import { defineIdIndex, type IdIndexDeclaration, idIndexName } from "../idIndexFlags.ts";
 import { ID_INDEX_WIDEN_MS } from "../indexedRead.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
 import { TenantGuard } from "../tenantGuard.ts";

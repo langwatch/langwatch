@@ -6,15 +6,14 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ClickHouseQueryClient } from "../client.ts";
 import {
-  defineIdIndex,
   fillIdIndexes,
   fillOwnerIdIndexes,
   fillStatement,
-  type IdIndexDeclaration,
   type IdIndexFillReport,
   idIndexFillTargets,
   planBatches,
 } from "../idIndexFill.ts";
+import { defineIdIndex, type IdIndexDeclaration } from "../idIndexFlags.ts";
 import type { QueryDriver, QueryRequest } from "../query.ts";
 import { TenantGuard } from "../tenantGuard.ts";
 

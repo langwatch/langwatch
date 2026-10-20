@@ -225,7 +225,8 @@ export type {
   IdIndexReader,
   IdIndexTimeFormat,
 } from "./idIndexFlags.ts";
-export { SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+export type { IdIndexDeclaration } from "./idIndexFlags.ts";
+export { defineIdIndex, idIndexName, SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
 export type { IdIndexMarkerStatements, IdIndexMarkerTable } from "./idIndexReadiness.ts";
 export {
   hasIdIndexMarker,
@@ -257,7 +258,6 @@ export {
 } from "./idIndexRetention.ts";
 export type {
   FillIdIndexesOptions,
-  IdIndexDeclaration,
   IdIndexFillCheckpoint,
   IdIndexFillCursor,
   IdIndexFillReport,
@@ -270,14 +270,12 @@ export type {
 export type { IdIndexKeyRange, IdIndexTenantSplit } from "./idIndexFill.ts";
 export {
   DEFAULT_ID_INDEX_BATCH_ROWS,
-  defineIdIndex,
   fillIdIndexes,
   fillOwnerIdIndexes,
   fillReportOf,
   fillStatement,
   IdIndexFillIncompleteError,
   idIndexFillTargets,
-  idIndexName,
   sortKeyLeadsWith,
 } from "./idIndexFill.ts";
 export type { ClickHouseClientResolver, ReadResource } from "./authorized-reads.ts";

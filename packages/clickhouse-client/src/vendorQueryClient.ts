@@ -4,7 +4,7 @@
  * as not filled and each read takes today's path, as `idIndexedClientDouble` does.
  */
 import { ClickHouseQueryClient } from "./client.ts";
-import type { IdIndexDeclaration } from "./idIndexFill.ts";
+import type { IdIndexDeclaration } from "./idIndexFlags.ts";
 import { isIdIndexReadinessStatement } from "./idIndexReadiness.ts";
 import type { QueryDriver, QueryResult } from "./query.ts";
 import { TenantGuard } from "./tenantGuard.ts";

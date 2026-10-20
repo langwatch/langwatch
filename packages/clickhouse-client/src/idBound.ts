@@ -3,8 +3,12 @@
  * key column and id parameter, and the reader adds the time bound its id index names. The
  * declarations and their readiness live here, one record per index per ClickHouse target.
  */
-import type { IdIndexDeclaration } from "./idIndexFill.ts";
-import type { IdIndexBounds, IdIndexKey, IdIndexLookup } from "./idIndexFlags.ts";
+import type {
+  IdIndexBounds,
+  IdIndexDeclaration,
+  IdIndexKey,
+  IdIndexLookup,
+} from "./idIndexFlags.ts";
 import {
   type IdIndexMarkerStatements,
   IdIndexReadiness,

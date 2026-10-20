@@ -102,3 +102,82 @@ export function idIndexBoundsOf({ rows }: { rows: readonly unknown[] }): IdIndex
   };
   return { n: field("n"), fromMs: field("fromMs"), toMs: field("toMs") };
 }
+
+/**
+ * One index an owner fills, as its migration declares it. `retentionAnchor` is the column the
+ * source expires on; when it is not `time`, the index carries it as `RetainAt`. `retention` is
+ * `"copied"` from `_retention_days` (0 kept as 65535), or `"none"` for a source without it.
+ */
+export type IdIndexDeclaration = Readonly<{
+  source: string;
+  index: string;
+  key: readonly string[];
+  time: string;
+  retentionAnchor: string;
+  retention: "copied" | "none";
+  filter?: string | undefined;
+  /** How the source's `time` and the index's `FromAt`/`ToAt` are stored; `DateTime64` default. */
+  timeFormat?: IdIndexTimeFormat | undefined;
+}>;
+
+/** `ExperimentId` as `experiment_id`: a key column as an index name spells it. */
+function snakeCaseOf({ column }: { column: string }): string {
+  return column
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z])([A-Z][a-z])/g, "$1_$2")
+    .toLowerCase();
+}
+
+/**
+ * An id index's table name: `<source>_id_index` for a source's first, and `<source>_by_<key>_index`
+ * for a second on other key columns (`experiment_runs_by_experiment_id_index`).
+ */
+export function idIndexName({
+  source,
+  key,
+  by = false,
+}: {
+  source: string;
+  key: readonly string[];
+  by?: boolean | undefined;
+}): string {
+  if (!by) return `${source}_id_index`;
+  return `${source}_by_${key.map((column) => snakeCaseOf({ column })).join("_")}_index`;
+}
+
+/**
+ * Declares one id index the way its goose file creates it: named by `idIndexName`, expiring on
+ * `time` and copying the source's `_retention_days` unless told otherwise.
+ */
+export function defineIdIndex({
+  source,
+  key,
+  time,
+  by,
+  retentionAnchor = time,
+  retention = "copied",
+  filter,
+  timeFormat,
+}: {
+  source: string;
+  key: readonly string[];
+  time: string;
+  /** A source's second index, on other key columns: named `<source>_by_<key>_index`. */
+  by?: true | undefined;
+  retentionAnchor?: string | undefined;
+  retention?: "copied" | "none" | undefined;
+  filter?: string | undefined;
+  timeFormat?: IdIndexTimeFormat | undefined;
+}): IdIndexDeclaration {
+  if (key.length === 0) throw new Error(`The id index over ${source} names no key column.`);
+  return {
+    source: assertIdentifier({ name: source }),
+    index: idIndexName({ source, key, by }),
+    key: key.map((column) => assertIdentifier({ name: column })),
+    time: assertIdentifier({ name: time }),
+    retentionAnchor: assertIdentifier({ name: retentionAnchor }),
+    retention,
+    ...(filter === undefined ? {} : { filter }),
+    ...(timeFormat === undefined ? {} : { timeFormat }),
+  };
+}

@@ -5,9 +5,9 @@
  */
 
 import { hasIdBound, type IdBound, idBoundOf, IdIndexRegistry, readIdBound } from "./idBound.ts";
-import type { IdIndexDeclaration } from "./idIndexFill.ts";
 import {
   type IdIndexBounds,
+  type IdIndexDeclaration,
   idIndexBoundsOf,
   idIndexBoundsStatement,
   type IdIndexLookup,

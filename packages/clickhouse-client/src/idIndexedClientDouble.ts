@@ -4,8 +4,7 @@
  * statements never reach the script; every index reads as not filled, or filled once marked.
  */
 import { ClickHouseQueryClient } from "./client.ts";
-import type { IdIndexDeclaration } from "./idIndexFill.ts";
-import { SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
+import { type IdIndexDeclaration, SHARED_CLICKHOUSE_TARGET } from "./idIndexFlags.ts";
 import { isIdIndexReadinessStatement } from "./idIndexReadiness.ts";
 import type { InsertRequest, QueryDriver, QueryRequest, QueryResult } from "./query.ts";
 import { TenantGuard } from "./tenantGuard.ts";
