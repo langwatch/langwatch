@@ -4,7 +4,8 @@ import { dirname, join } from "node:path";
 
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
-import { splitIsolationByMocking } from "../vitest-config.ts";
+import { splitIsolationByMocking } from "../split-isolation-by-mocking.ts";
+import { defineModuleVitestConfig } from "../vitest-config.ts";
 
 const MOCKING = 'import { vi } from "vitest";\nvi.mock("../store.ts");\n';
 const PLAIN = 'import { it } from "vitest";\nit("works", () => {});\n';
@@ -57,6 +58,7 @@ describe("splitIsolationByMocking", () => {
           test: {
             name: "shared-modules",
             isolate: false,
+            include: ["**/*.{test,spec}.?(c|m)[jt]s?(x)"],
             exclude: ["**/node_modules/**", "src/a.test.ts", "src/c.test.ts"],
           },
         },
@@ -122,6 +124,51 @@ describe("splitIsolationByMocking", () => {
       expect(split.projects?.[1]).toMatchObject({ test: { include: ["src/b.test.ts"] } });
     });
 
+    /** @scenario "The isolated project collects only the files that need isolation" */
+    it("keeps the suite's include off the root, so projects do not inherit it", () => {
+      write({ "src/b.test.ts": MOCKING, "src/c.test.ts": PLAIN });
+
+      const split = splitIsolationByMocking({
+        test: { isolate: true, include: ["src/**/*.test.ts"] },
+        root,
+      });
+
+      expect("include" in split).toBe(false);
+      expect(split.projects?.[0]).toMatchObject({ test: { include: ["src/**/*.test.ts"] } });
+      expect(split.projects?.[1]).toMatchObject({ test: { include: ["src/b.test.ts"] } });
+    });
+
+    /** @scenario "A file that imports a helper which mocks modules runs isolated" */
+    it("follows a .js specifier to the TypeScript file it means", () => {
+      write({
+        "src/a.test.ts": 'import { harness } from "./harness.js";\n',
+        "src/harness.ts": MOCKING,
+        "src/b.test.ts": PLAIN,
+      });
+
+      const split = splitIsolationByMocking({ test: { isolate: true }, root });
+
+      expect(split.projects?.[1]).toMatchObject({ test: { include: ["src/a.test.ts"] } });
+    });
+
+    /** @scenario "A file that imports a helper which mocks modules runs isolated" */
+    it("isolates every file reaching a mock through an import cycle", () => {
+      write({
+        "src/a.test.ts": 'import "./cycle-a.ts";\n',
+        "src/b.test.ts": 'import "./cycle-b.ts";\n',
+        "src/cycle-a.ts": 'import "./cycle-b.ts";\nimport "./harness.ts";\n',
+        "src/cycle-b.ts": 'import "./cycle-a.ts";\n',
+        "src/harness.ts": MOCKING,
+        "src/c.test.ts": PLAIN,
+      });
+
+      const split = splitIsolationByMocking({ test: { isolate: true }, root });
+
+      expect(split.projects?.[1]).toMatchObject({
+        test: { include: ["src/a.test.ts", "src/b.test.ts"] },
+      });
+    });
+
     /** @scenario "A file name with glob characters is matched literally" */
     it("escapes glob characters in file names", () => {
       write({ "src/[id]/a.test.ts": MOCKING, "src/b.test.ts": PLAIN });
@@ -129,6 +176,15 @@ describe("splitIsolationByMocking", () => {
       const split = splitIsolationByMocking({ test: { isolate: true }, root });
 
       expect(split.projects?.[1]).toMatchObject({ test: { include: ["src/\\[id\\]/a.test.ts"] } });
+    });
+
+    /** @scenario "A file name with glob characters is matched literally" */
+    it("escapes a backslash in a file name", () => {
+      write({ "src/a\\b.test.ts": MOCKING, "src/b.test.ts": PLAIN });
+
+      const split = splitIsolationByMocking({ test: { isolate: true }, root });
+
+      expect(split.projects?.[1]).toMatchObject({ test: { include: ["src/a\\\\b.test.ts"] } });
     });
   });
 
@@ -143,6 +199,16 @@ describe("splitIsolationByMocking", () => {
       write({ "src/b.test.ts": PLAIN });
       const noneMock = { isolate: true };
       expect(splitIsolationByMocking({ test: noneMock, root })).toBe(noneMock);
+    });
+  });
+
+  describe("given a suite that asks for whole-suite isolation", () => {
+    /** @scenario "A suite that isolates every file is left whole" */
+    it("isolates every file and builds no projects", () => {
+      const { test } = defineModuleVitestConfig({ kind: "node", isolate: "all" });
+
+      expect(test?.isolate).toBe(true);
+      expect(test?.projects).toBeUndefined();
     });
   });
 });

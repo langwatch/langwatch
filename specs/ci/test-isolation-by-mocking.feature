@@ -56,3 +56,18 @@ Feature: Only the test files that mock modules pay for isolation
     Given a suite that does not ask for isolation
     When the suite's config is resolved
     Then the config is returned unchanged
+
+  @unit
+  Scenario: The isolated project collects only the files that need isolation
+    Given a suite that names its own include patterns
+    And some of its files mock modules
+    When the suite's config is resolved
+    Then the isolated project selects only the mocking files
+    And no file runs in both projects
+
+  @unit
+  Scenario: A suite that isolates every file is left whole
+    Given a suite whose files leak state other than through mocks
+    And its config asks for every file to be isolated
+    When the suite's config is resolved
+    Then every file runs isolated in a single project

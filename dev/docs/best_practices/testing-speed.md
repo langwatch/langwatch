@@ -150,7 +150,14 @@ behind); say why next to it. The split happens in fast mode only, and only for
 configs built with `defineModuleVitestConfig`.
 
 Two vitest projects mean two labels in the output, `shared-modules` and
-`isolated`, and `--project <name>` runs one of them.
+`isolated`, and `--project <name>` runs one of them. A project with
+`extends: true` concatenates array options with the root config, so the
+suite's `include` moves onto `shared-modules` instead of staying on the
+root; left there, `isolated` would collect every file as well as its own.
+
+`apps/ui` and `packages/browser` use `isolate: "all"`: their files share
+module-level singletons (the capability host, the feedback host, the posthog
+client), which no mock scan can see.
 
 ## Reading `vitest doctor`
 
