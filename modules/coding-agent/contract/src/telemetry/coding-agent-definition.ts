@@ -177,7 +177,7 @@ export interface CodingAgentDefinition {
   /** Per-model-call attributes carrying the agent's AI units in nano units; first present wins. */
   nanoAiUnitAttributes?: readonly string[];
 
-  /** The row's entrypoint (its surface) per ingestion source type the receiver stamps. */
+  /** The row's entrypoint (its surface) per source type the ingest-key receiver stamps. */
   surfaceBySourceType?: Readonly<Record<string, string>>;
 }
 
