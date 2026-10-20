@@ -236,20 +236,11 @@ RUN if echo "$LANGWATCH_BUILD_COMMIT" | grep -Eq '^[0-9a-f]{7,40}$'; then \
       && grep -q "^export const buildCommit: string | null = \"$SHORT_COMMIT\";\$" packages/upgrade/src/reader/build-commit.ts; \
     fi
 
-# `build:types` first: the module contracts' declarations now come from one
-# `tsc -b` over every contract's build config rather than a compiler process per
-# package, so the filtered application builds below find their dependencies'
-# .d.ts already on disk instead of emitting them 38 processes at a time.
-# The same preparation the CI build runs: generated files (modules, Prisma client,
-# langy skills) and the four dist-resolving packages (SDK, mcp-server, ksuid, mail)
-# before the declaration build, which reads their declarations. The root
-# `start:prepare:files`, `ensure:built` and `build:types` scripts go through nx,
-# and this stage copies neither nx.json nor the dev/nx plugins (here nx stopped at
-# "Failed to process project graph"), so each step runs its package script directly.
-# Keep this list in step with those three root scripts.
-# The application build's `!` filters exclude the 28 projects the first build already
-# built (the four dist-resolving packages and their dependencies); the `...` filters
-# reach them too, and rebuilding them cost 11s of every image build.
+# The generated files and the four dist-resolving packages build first, since
+# `build:types` reads their declarations. Each step calls its package script:
+# this stage has no nx.json, so the root nx scripts cannot run here. Keep it in
+# step with the root start:prepare:files, ensure:built and build:types. The last
+# build's `!` filters skip the projects the first build already built.
 RUN pnpm run ensure:ai-gateway-secrets && pnpm run generate:modules \
  && pnpm --filter @langwatch/prisma-client run prisma:generate \
  && pnpm --filter @langwatch/evaluator-contract run generate:evaluators \
