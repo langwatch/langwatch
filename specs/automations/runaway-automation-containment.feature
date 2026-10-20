@@ -150,7 +150,7 @@ Feature: Runaway automations are contained without punishing the customer
       And no error is logged
 
     # Every match past the ceiling raises a breach, so logging each one floods
-    # the logs (thousands an hour from one trigger).
+    # the logs for as long as the trigger keeps matching.
     @unit
     Scenario: Repeated breaches within the containment window are logged once
       Given a selective trigger that has reached its daily ceiling
