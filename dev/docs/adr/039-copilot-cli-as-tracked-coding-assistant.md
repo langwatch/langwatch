@@ -289,12 +289,12 @@ genAiOperations: { session: "invoke_agent", modelCall: "chat", toolRun: "execute
 
 - **Admission:** a span is admitted when the first word of its name is a declared operation **and** the agent detected from its scope is the agent that declared it. A Gemini or OpenCode `chat` span stays out.
 - **Fold:** the projection reads the role and applies the generic fold for it. There is no `copilot` branch in the projection.
-- **One model-call predicate** serves stamping, the fold and the trace browser, read from the declarations.
+- **One model-call predicate** serves stamping and the fold, read from the declarations. The trace browser's GenAI rule already reads `chat …` as a model call.
 
 ### S2. Every number comes from the model call
 
 - **Model call (`chat`):** tokens, model and AI units, once per call. CLI 1.0.100 puts `github.copilot.nano_aiu` on every `chat` span; VS Code puts `copilot_chat.copilot_usage_nano_aiu` there.
-- **Session root (`invoke_agent`):** start, end and duration only. Its tokens are the rollup of its calls (v7), so they are never counted.
+- **Session root (`invoke_agent`):** identity and start only. Its tokens and AI units are the rollup of its calls (v7), so they are never counted. The row's end is its last event, as for every agent.
 - **Tool run (`execute_tool`):** one run per span, named by `gen_ai.tool.name`.
 
 ### S3. The session key is `gen_ai.conversation.id`

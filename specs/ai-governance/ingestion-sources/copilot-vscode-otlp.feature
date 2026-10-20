@@ -108,7 +108,7 @@ Feature: VS Code Copilot Chat OTLP spans canonicalize on the unified substrate
 
   Rule: v1 is tokens-only — no fabricated dollar cost
 
-    @unit @unimplemented
+    @unit
     Scenario: A VS Code turn is recorded without a fabricated dollar cost
       Given a copilot-chat span carrying copilot_usage_nano_aiu under an obfuscated model codename
       When the span is ingested with the copilot_vscode ingest key

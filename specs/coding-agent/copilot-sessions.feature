@@ -28,13 +28,13 @@ Rule: Only Copilot's declared operations join a Copilot session
     When the session span gate decides on each
     Then none is admitted
 
-  @unit @unimplemented
+  @unit
   Scenario: Copilot's model call, session root and tool run spans are admitted
     Given the captured chat, invoke_agent and execute_tool spans from the Copilot CLI and from VS Code
     When the session span gate decides on each
     Then each is admitted
 
-  @unit @unimplemented
+  @unit
   Scenario: A Copilot span of an undeclared operation is not admitted
     Given a captured execute_hook span from VS Code Copilot Chat
     When the session span gate decides on it
@@ -42,52 +42,52 @@ Rule: Only Copilot's declared operations join a Copilot session
 
 Rule: One row per conversation, every number from the model calls
 
-  @unit @unimplemented
+  @unit
   Scenario: A Copilot CLI session becomes one row with model, tokens and AI units
     Given the captured spans of one Copilot CLI conversation
     When they are folded
     Then exactly one session row exists, keyed by the conversation id
     And it shows the model, the input and output tokens and the AI units
 
-  @unit @unimplemented
+  @unit
   Scenario: Tokens and AI units are counted from model calls, never again from the session root
     Given a session root whose usage is the rollup of its two model calls
     When the session is folded
     Then the row's tokens and AI units equal the sum of the two model calls
 
-  @unit @unimplemented
-  Scenario: The session root sets the row's start, end and duration
+  @unit
+  Scenario: The session root sets the row's start
     Given a session root span and the model calls inside it
     When the session is folded
-    Then the row starts and ends with the session root
+    Then the row starts when the session root started
 
-  @unit @unimplemented
+  @unit
   Scenario: Tool runs are counted with their names
     Given a Copilot session with three execute_tool spans
     When the session is folded
     Then the row shows three tool runs, each with its tool name
     And the number of rows does not change
 
-  @unit @unimplemented
+  @unit
   Scenario: A Copilot span without a conversation id mints no row
     Given a captured VS Code title model call, which carries no conversation id
     When it is folded
     Then no session row is created for it
 
-  @unit @unimplemented
+  @unit
   Scenario: Copilot model calls are model calls everywhere
     Given a captured Copilot chat span
     When the span is stamped, folded and shown in the trace browser
     Then all three treat it as a model call
 
-  @unit @unimplemented
+  @unit
   Scenario: The row shows the surface it ran in
     Given one Copilot session from the CLI and one from VS Code
     When the rows are listed
     Then both rows have the agent "copilot"
     And one shows the CLI surface and the other the VS Code surface
 
-  @unit @unimplemented
+  @unit
   Scenario: Claude Code and Codex rows are unchanged by the Copilot declarations
     Given Claude Code and Codex sessions folded before the Copilot declarations
     When the same sessions are folded after them

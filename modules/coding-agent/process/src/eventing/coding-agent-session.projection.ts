@@ -332,6 +332,8 @@ export interface CodingAgentSessionRow {
   cacheCreationTokens: number;
   costUsd: number;
   agentReportedCostUsd: number;
+  /** AI units summed over model calls (migration 00110); 0 for agents that report none. */
+  aiUnits: number;
   /**
    * What the session spent under each declared working context (migration 00099), first seen first.
    * The counters above are the amount; this says where it went. Empty on a row folded before the

@@ -10,6 +10,7 @@ export type {
   CodingAgentEvent,
   CodingAgentMetric,
   CodingAgentSignal,
+  GenAiOperationRole,
   TokenType,
 } from "./coding-agent-definition.ts";
 export { codingAgentSchema } from "./coding-agent-definition.ts";

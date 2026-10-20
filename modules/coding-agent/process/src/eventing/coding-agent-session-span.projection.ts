@@ -1,5 +1,8 @@
 import {
+  AI_UNITS_SESSION_FACT,
   EVENTS_FOLD_TOOL_RUNS_AGENT_IDS,
+  genAiOperationRoleOf,
+  type GenAiOperationRole,
   LOGS_ONLY_AGENT_IDS,
   type SessionWorkingContext,
 } from "@langwatch/coding-agent-contract";
@@ -24,12 +27,17 @@ const CLAUDE = {
 const CODEX = {
   // `HELPER_REQUEST` is a codex helper thread's request span: its one fact is the auxiliary mark.
   SPAN: { TURN: "session_task.turn", HELPER_REQUEST: "turn/start" },
+} as const;
+/** The GenAI semconv keys a codex turn and a declared model call both carry, canonicalised. */
+const GEN_AI = {
   ATTR: {
     INPUT_TOKENS: "gen_ai.usage.input_tokens",
     OUTPUT_TOKENS: "gen_ai.usage.output_tokens",
     CACHE_READ_TOKENS: "gen_ai.usage.cache_read.input_tokens",
     CACHE_CREATION_TOKENS: "gen_ai.usage.cache_creation.input_tokens",
+    REQUEST_MODEL: "gen_ai.request.model",
     RESPONSE_MODEL: "gen_ai.response.model",
+    TOOL_NAME: "gen_ai.tool.name",
   },
 } as const;
 /**
@@ -37,10 +45,15 @@ const CODEX = {
  * contribute service stamps exactly these with the session's declared working context, so the fold
  * can charge their tokens to it; every other span charges nothing anywhere and rides unstamped.
  */
-export const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
+const MODEL_CALL_SPAN_NAMES: ReadonlySet<string> = new Set([
   CLAUDE.SPAN.LLM_REQUEST,
   CODEX.SPAN.TURN,
 ]);
+
+/** Whether the fold counts this span as a model call: a listed name, or a declared GenAI chat. */
+export function isFoldedModelCall({ name, agent }: { name: string; agent: string }): boolean {
+  return MODEL_CALL_SPAN_NAMES.has(name) || genAiOperationRoleOf({ agent, name }) === "modelCall";
+}
 
 interface SpanFactsView {
   name: string;
@@ -110,6 +123,12 @@ export class CodingAgentSessionSpanProjection {
     const attrs = span.attrs;
     const durationMs = Math.max(0, span.endTimeUnixMs - span.startTimeUnixMs);
     const isLogsOnly = agent !== undefined && LOGS_ONLY_AGENT_IDS.has(agent);
+
+    const role =
+      agent !== undefined ? genAiOperationRoleOf({ agent, name: span.name }) : "undeclared";
+    if (role !== "undeclared") {
+      return this.applyGenAiOperation({ state, span, role, durationMs, context });
+    }
 
     if (span.name === CLAUDE.SPAN.LLM_REQUEST) {
       return this.applyClaudeLlmRequest({ state, attrs, durationMs, isLogsOnly, context });
@@ -208,7 +227,7 @@ export class CodingAgentSessionSpanProjection {
     // declined foreign spans reusing this bare name, and one that still
     // arrives labeled as another agent contributes identity only.
     if (agent !== "codex" || isLogsOnly) return this.stateProjection.withIdentity(state, attrs);
-    const facts = this.codexTurnTokenFacts(attrs);
+    const facts = this.genAiTokenFacts(attrs);
     // Fallback duration 0, not the span's: the turn's wall time includes the
     // tools that ran inside it, and zero reads honestly as "not measured".
     const before = this.stateProjection.withIdentity(state, attrs);
@@ -218,6 +237,49 @@ export class CodingAgentSessionSpanProjection {
       after: {
         ...folded,
         costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
+      },
+      context,
+    });
+  }
+
+  /**
+   * One span of an agent that declares its GenAI operations: the root gives identity and start
+   * only, since its usage is the rollup of its model calls; each call and tool run counts once.
+   */
+  private applyGenAiOperation({
+    state,
+    span,
+    role,
+    durationMs,
+    context,
+  }: {
+    state: CodingAgentSessionData;
+    span: SpanFactsView;
+    role: GenAiOperationRole;
+    durationMs: number;
+    context: NonNullable<CodingAgentSessionSpanProjectionInput["context"]> | null;
+  }): CodingAgentSessionData {
+    const before = this.stateProjection.withIdentity(state, span.attrs);
+    if (role === "session") return before;
+
+    if (role === "toolRun") {
+      return this.stateProjection.foldToolInvocation(before, {
+        attrs: { ...span.attrs, tool_name: span.attrs[GEN_AI.ATTR.TOOL_NAME] },
+        failed: span.statusCode === SPAN_STATUS_ERROR,
+        toolMs: durationMs,
+        startedAtMs: span.startTimeUnixMs,
+      });
+    }
+
+    const facts = this.genAiTokenFacts(span.attrs);
+    // A chat span wraps one request and no tools, so its wall time is the call's latency.
+    const folded = this.stateProjection.foldModelCall(before, facts, durationMs);
+    return this.stateProjection.chargeContextUsage({
+      before,
+      after: {
+        ...folded,
+        costUsd: folded.costUsd + this.pricedFromTokens(facts, this.modelProviders),
+        aiUnits: folded.aiUnits + this.stateProjection.number(span.attrs[AI_UNITS_SESSION_FACT]),
       },
       context,
     });
@@ -256,16 +318,17 @@ export class CodingAgentSessionSpanProjection {
     };
   }
 
-  private codexTurnTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
+  /** The fold's token facts off GenAI semconv keys, whose input the canonicaliser made disjoint. */
+  private genAiTokenFacts(attrs: Record<string, unknown>): Record<string, unknown> {
     return {
       ...attrs,
-      input_tokens: this.stateProjection.number(attrs[CODEX.ATTR.INPUT_TOKENS]),
-      output_tokens: this.stateProjection.number(attrs[CODEX.ATTR.OUTPUT_TOKENS]),
-      cache_read_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_READ_TOKENS]),
-      cache_creation_tokens: this.stateProjection.number(attrs[CODEX.ATTR.CACHE_CREATION_TOKENS]),
+      input_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.INPUT_TOKENS]),
+      output_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.OUTPUT_TOKENS]),
+      cache_read_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.CACHE_READ_TOKENS]),
+      cache_creation_tokens: this.stateProjection.number(attrs[GEN_AI.ATTR.CACHE_CREATION_TOKENS]),
       model:
-        this.stateProjection.coerceString(attrs["gen_ai.request.model"]) ??
-        this.stateProjection.coerceString(attrs[CODEX.ATTR.RESPONSE_MODEL]),
+        this.stateProjection.coerceString(attrs[GEN_AI.ATTR.REQUEST_MODEL]) ??
+        this.stateProjection.coerceString(attrs[GEN_AI.ATTR.RESPONSE_MODEL]),
     };
   }
 }

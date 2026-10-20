@@ -93,6 +93,7 @@ export function codingAgentSessionStateFromRow(
     cacheCreationTokens: row.cacheCreationTokens,
     costUsd: row.costUsd,
     agentReportedCostUsd: row.agentReportedCostUsd,
+    aiUnits: row.aiUnits,
     usageByContext: Object.fromEntries(
       row.usageByContext.map((usage) => [contextUsageKey(usage), usage]),
     ),
