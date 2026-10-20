@@ -898,18 +898,16 @@ export class AnalyticsModule
     const reading = readLegacyTimeseriesBody(input.raw);
     if (!reading.accepted) return { status: 400, body: reading.refusal };
 
-    return {
-      status: 200,
-      body: await this.getTimeseries(
-        {
-          ...reading.body,
-          projectId: input.projectId,
-          startDate: toEpochMs(reading.body.startDate),
-          endDate: toEpochMs(reading.body.endDate),
-        },
-        { authorization: input.authorization },
-      ),
-    };
+    const series = await this.getTimeseries(
+      {
+        ...reading.body,
+        projectId: input.projectId,
+        startDate: toEpochMs(reading.body.startDate),
+        endDate: toEpochMs(reading.body.endDate),
+      },
+      { authorization: input.authorization },
+    );
+    return { status: 200, body: series };
   }
 
   /** Whether this project's rollout admits it to the Workbench at all. */

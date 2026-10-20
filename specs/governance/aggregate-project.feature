@@ -541,6 +541,14 @@ Feature: An aggregate project reads its member projects
     Then the member's spans inside the window are counted
     And the member's spans before the window and the non-member's spans are not
 
+  @integration
+  Scenario: The aggregate's slim analytics counts members inside their windows
+    Given an aggregate project with one member shared for a window of time
+    And another project in the organisation that is not a member and holds traces
+    When the aggregate's trace cost is read from the slim trace analytics table under its proof
+    Then the member's traces inside the window are counted
+    And the member's traces outside the window and the non-member's traces are not
+
   # Unimplemented: the rollup and slim analytics tables read members through the
   # proof, but trace_summaries and evaluation_runs still read the aggregate's own
   # tenant, and the page stays hidden until they are fenced too.
