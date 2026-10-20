@@ -31,6 +31,12 @@ import { createRestRuntime } from "../runtime.ts";
 
 const VERSION = "2026-10-05";
 
+class EvaluatorInUseError extends HandledError {
+  constructor() {
+    super("evaluator_in_use", "in use", { httpStatus: 409 });
+  }
+}
+
 interface RecordsApi {
   remove(input: unknown): Promise<unknown>;
   removeMany(input: unknown): Promise<unknown>;
@@ -533,7 +539,7 @@ describe("when the route fails after the click was spent", () => {
   });
 
   it("keeps the click spent for a refusal the caller caused", async () => {
-    failWith = new HandledError("evaluator_in_use", "in use", { httpStatus: 409 });
+    failWith = new EvaluatorInUseError();
 
     const answer = await call({
       gate: gateFor(["ev-1"]),
