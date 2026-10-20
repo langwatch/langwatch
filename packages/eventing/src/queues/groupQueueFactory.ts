@@ -255,9 +255,15 @@ export function createEventingGroupQueueFactory({
           ...consumers.map((each) => each.waitUntilReady()),
         ]);
       },
+      // Consumers first: a job still draining sends its fan-out through THIS producer, and a
+      // producer's gate shuts the moment its own close ends, which for a processor with nothing
+      // in flight is at once. Spec: specs/background/queue-drain-send-gate.feature
       async close() {
-        await producer.close();
-        await Promise.all(consumers.map((each) => each.close()));
+        try {
+          await Promise.all(consumers.map((each) => each.close()));
+        } finally {
+          await producer.close();
+        }
       },
     };
   };
