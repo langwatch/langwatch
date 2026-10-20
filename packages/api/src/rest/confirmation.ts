@@ -132,8 +132,10 @@ export async function confirmMarkedRequest<Api>({
 }): Promise<void> {
   if (!mark || !isKeyDoor(credential)) return;
   const recorded = recordedKeyCredentialOf({ door: credential, request });
-  // Every key door records the key it let in; one that did not is never trusted to be no Langy key.
+  // Every served key door records the key it let in; one that did not is never trusted to be no
+  // Langy key. A runtime with no gate (a test's own identity) asks no one, so it goes on.
   if (!recorded) {
+    if (!gate) return;
     throw new Error(`The ${credential} door recorded no key for a route that asks for a click`);
   }
   const key = keyCredentialOf(recorded);

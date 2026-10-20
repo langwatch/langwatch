@@ -438,6 +438,17 @@ describe("a route marked as removing something", () => {
       expect(answer.status).toBe(500);
       expect(ran).toEqual([]);
     });
+
+    it("goes on in a runtime with no gate, as a test's own identity is", async () => {
+      const answer = await call({
+        gate: undefined,
+        token: "silent",
+        method: "POST",
+        path: "/vk-1/revoke",
+      });
+
+      expect(answer.status).toBe(200);
+    });
   });
 
   describe("when a Langy key comes in through the organization door", () => {
