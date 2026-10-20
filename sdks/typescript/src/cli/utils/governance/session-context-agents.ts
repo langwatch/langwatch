@@ -24,12 +24,14 @@ export interface HooksTarget {
 
 /**
  * How an agent runs our hook, which decides how it is installed and removed:
- * entries merged into a hook file the user shares with us, or a plugin module
- * opencode loads.
+ * entries merged into a hook file the user shares with us, a plugin module
+ * opencode loads, or a whole file only LangWatch writes in a folder the agent
+ * loads every file of.
  */
 export type HookTarget =
   | { kind: "entries"; resolve: () => HooksTarget }
-  | { kind: "plugin"; resolve: () => HooksTarget };
+  | { kind: "plugin"; resolve: () => HooksTarget }
+  | { kind: "owned-file"; resolve: () => HooksTarget };
 
 export interface SessionContextAgent {
   /** The tool argument `langwatch ingest hook` is called with. */
@@ -42,7 +44,7 @@ export interface SessionContextAgent {
   keySourceType: (env: NodeJS.ProcessEnv) => string;
   /**
    * The variable carrying the session id when the payload has none. The
-   * payload's own `session_id` always wins.
+   * payload's own `session_id` (or `sessionId`) always wins.
    */
   sessionIdVar?: string;
   /**
@@ -55,6 +57,26 @@ export interface SessionContextAgent {
 
 /** The single key source type of an agent with one surface. */
 const only = (sourceType: string) => () => sourceType;
+
+/**
+ * The Copilot hook folder: `$COPILOT_HOME/hooks` when the user relocated it,
+ * `~/.copilot/hooks` otherwise. Both the CLI and VS Code load every `*.json`
+ * there, so this file is ours alone and no user file is ever edited.
+ */
+function copilotHookFile(): HooksTarget {
+  const home = process.env.COPILOT_HOME?.trim();
+  if (home) {
+    const file = path.join(home, "hooks", COPILOT_HOOK_FILE_NAME);
+    return { path: file, displayPath: file };
+  }
+  return {
+    path: path.join(os.homedir(), ".copilot", "hooks", COPILOT_HOOK_FILE_NAME),
+    displayPath: `~/.copilot/hooks/${COPILOT_HOOK_FILE_NAME}`,
+  };
+}
+
+/** The name of LangWatch's own file in the Copilot hook folder. */
+export const COPILOT_HOOK_FILE_NAME = "langwatch.json";
 
 export const SESSION_CONTEXT_AGENTS = {
   claude_code: {
@@ -100,6 +122,18 @@ export const SESSION_CONTEXT_AGENTS = {
     keySourceTypes: ["opencode"],
     keySourceType: only("opencode"),
     hookTarget: { kind: "plugin", resolve: () => opencodePluginTarget() },
+  },
+  copilot: {
+    hookArgument: "copilot",
+    agent: "copilot",
+    // One agent, two surfaces, two keys: the CLI and VS Code are minted and
+    // cached apart so each surface's telemetry stays separable (ADR-039 S4).
+    keySourceTypes: ["copilot_cli", "copilot_vscode"],
+    // The CLI marks every hook it runs with COPILOT_CLI; VS Code sets nothing.
+    keySourceType: (env) => (env.COPILOT_CLI?.trim() ? "copilot_cli" : "copilot_vscode"),
+    // The CLI pins this to where it was launched; VS Code sends none.
+    projectDirVar: "COPILOT_PROJECT_DIR",
+    hookTarget: { kind: "owned-file", resolve: copilotHookFile },
   },
 } as const satisfies Record<string, SessionContextAgent>;
 

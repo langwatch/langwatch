@@ -46,8 +46,8 @@ const POST_TIMEOUT_MS = 3_000;
 
 export interface HookCommandOptions {
   /**
-   * The agent the hook is running for: `claude-code`, `codex` or `opencode`,
-   * one row of the session context agent table.
+   * The agent the hook is running for: `claude-code`, `codex`, `opencode` or
+   * `copilot`, one row of the session context agent table.
    */
   tool: string;
   env?: NodeJS.ProcessEnv;
@@ -324,8 +324,8 @@ const SIGNED_OUT_NOTICE =
 const HEAL_THROTTLE_MS = 10 * 60 * 1000;
 
 /**
- * One heal window per cached key. For every agent so far the source type is
- * its agent id, so the window's file is named as it always was.
+ * One heal window per cached key, so the two Copilot surfaces each repair
+ * their own; for every single-surface agent the source type is its agent id.
  */
 function healStateFile({ stateDir, sourceType }: { stateDir: string; sourceType: string }): string {
   return path.join(stateDir, `heal-${sourceType}.json`);

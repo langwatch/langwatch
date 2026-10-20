@@ -573,40 +573,40 @@ Rule: Copilot reports through one hook file LangWatch owns
     When each payload is read
     Then it yields the session id, the directory and Claude Code's event name
 
-  @unit @unimplemented
+  @unit
   Scenario: A Copilot CLI hook payload yields its session id and directory
     Given the hook payloads captured from the Copilot CLI, which spell the session id sessionId
     When each payload is read
     Then it yields the session id and the directory
 
-  @unit @unimplemented
+  @unit
   Scenario: Installing copilot writes LangWatch's own hook file
     Given a Copilot hooks folder without the LangWatch file
     When the copilot ingestion install runs twice
     Then exactly one LangWatch hook file is present
     And it runs the hook command for copilot on sessionStart and agentStop
 
-  @unit @unimplemented
+  @unit
   Scenario: The Copilot hook file follows COPILOT_HOME
     Given COPILOT_HOME points at another folder
     When the copilot ingestion install runs
     Then the LangWatch hook file is written under that folder's hooks directory
 
-  @unit @unimplemented
+  @unit
   Scenario: The user's own Copilot hook files are never touched
     Given a Copilot hooks folder holding a hook file the user wrote
     When the copilot ingestion install runs and logout then removes the telemetry targets
     Then the user's hook file is unchanged throughout
     And the LangWatch hook file is gone after logout
 
-  @unit @unimplemented
+  @unit
   Scenario: The copilot record declares the copilot agent and the span session id
     Given a Copilot hook invocation inside a git repository
     When the hook runs
     Then one record is posted declaring the agent "copilot"
     And it carries the session id from the payload, which is the conversation id on Copilot's spans
 
-  @unit @unimplemented
+  @unit
   Scenario: A Copilot hook posts with the personal key of the surface that ran it
     Given personal ingest keys for copilot_cli and copilot_vscode
     When the hook runs from the Copilot CLI, which sets COPILOT_CLI
@@ -614,7 +614,7 @@ Rule: Copilot reports through one hook file LangWatch owns
     Then the first posts with the copilot_cli key
     And the second posts with the copilot_vscode key
 
-  @unit @unimplemented
+  @unit
   Scenario: Every agent's hook wiring comes from one per-agent table
     Given the per-agent table that names each agent's tool slug, server agent id, key source types, session id source and hook target
     When the hooks are installed and run for Claude Code, Codex and opencode
