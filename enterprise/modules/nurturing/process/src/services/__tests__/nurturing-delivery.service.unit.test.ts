@@ -664,7 +664,7 @@ describe("NurturingDeliveryService", () => {
   });
 
   describe("when a tenant's trace update is delivered twice within five minutes", () => {
-    /** @scenario "Trace, simulation and evaluation updates to Customer.io are debounced per tenant" */
+    /** @scenario "Trace and simulation updates to Customer.io are debounced per tenant" */
     it("sends Customer.io the update once", async () => {
       const cio = customerIo();
       const delivery = NurturingDeliveryService.create({
@@ -686,6 +686,86 @@ describe("NurturingDeliveryService", () => {
       await settle();
 
       expect(cio.sent.filter((call) => call.path === "/v1/identify")).toHaveLength(1);
+    });
+  });
+
+  describe("when a batch's evaluation count is delivered", () => {
+    function counted(sourceEventId: string, overrides: Partial<NurturingSignalOf<"evaluation_completed">> = {}): NurturingSignal {
+      return {
+        kind: "evaluation_completed",
+        sourceEventId,
+        ...source,
+        userId: "admin-1",
+        projectId: "project-1",
+        evaluationId: "eval-3",
+        score: 1,
+        passed: true,
+        evaluationsCounted: 3,
+        organizationEvaluationCount: 7,
+        first: false,
+        ...overrides,
+      };
+    }
+
+    /** @scenario "A backed-up project's settled evaluations are counted in one step and send one update" */
+    it("tells Customer.io the new count once and PostHog how many the batch counted", async () => {
+      const { posthog, cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({ key: "evaluation_completed:project-1:eval-3", signal: counted("project-1:eval-3") });
+      await settle();
+
+      expect(cio.sent).toEqual([
+        {
+          path: "/v1/identify",
+          body: expect.objectContaining({
+            userId: "admin-1",
+            traits: expect.objectContaining({ evaluation_count: 7 }),
+          }),
+        },
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({
+            event: "evaluation_ran",
+            properties: { evaluation_id: "eval-3", score: 1, passed: true, count: 3 },
+          }),
+        },
+      ]);
+      expect(posthog.tracked).toEqual([
+        {
+          userId: "admin-1",
+          event: "evaluations_completed",
+          properties: { count: 3, projectId: "project-1" },
+        },
+      ]);
+    });
+
+    /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
+    it("sends first_evaluation_created with the count the batch reached", async () => {
+      const { cio, delivery } = deliveryOverBothSinks();
+
+      await delivery.deliver({
+        key: "evaluation_completed:project-1:eval-2",
+        signal: counted("project-1:eval-2", {
+          evaluationId: "eval-2",
+          evaluationsCounted: 2,
+          organizationEvaluationCount: 2,
+          first: true,
+        }),
+      });
+      await settle();
+
+      expect(cio.sent.slice(0, 2)).toEqual([
+        {
+          path: "/v1/identify",
+          body: expect.objectContaining({
+            traits: expect.objectContaining({ has_evaluations: true, evaluation_count: 2 }),
+          }),
+        },
+        {
+          path: "/v1/track",
+          body: expect.objectContaining({ userId: "admin-1", event: "first_evaluation_created" }),
+        },
+      ]);
     });
   });
 

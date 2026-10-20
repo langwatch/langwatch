@@ -126,6 +126,7 @@ import {
   userRegisteredSignal,
   workflowCreatedSignal,
 } from "../rules/nurturing-owner-signals.rules.ts";
+import { nurturingBatchLane } from "./nurturing-batch-lane.ts";
 import { nurturingSignalKey, RecordNurturingSignalCommand } from "./nurturing-signal.commands.ts";
 import {
   NURTURING_PIPELINE_NAME,
@@ -151,7 +152,7 @@ const mainEvaluationEventSchema = z.object({
   occurredAt: z.number().int().nonnegative(),
 });
 
-/** Main's job as the settled-evaluation fact evaluation records now, keyed by its project. */
+/** Main's job as the settled-evaluation fact evaluation records now, keyed by the evaluation. */
 export function mainEvaluationSyncAsLifecycleCompleted(stored: unknown): Record<string, unknown> {
   const { event, foldState } = mainEvaluationSyncJobSchema.parse(stored);
   const { tenantId, occurredAt } = mainEvaluationEventSchema.parse(event);
@@ -164,7 +165,7 @@ export function mainEvaluationSyncAsLifecycleCompleted(stored: unknown): Record<
   return {
     ...event,
     aggregateType: EVALUATION_LIFECYCLE_AGGREGATE_TYPE,
-    aggregateId: tenantId,
+    aggregateId: foldState.evaluationId,
     type: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
     data,
   };
@@ -216,29 +217,36 @@ export function buildNurturingPipeline(deps: {
     data: UsageReportReceivedEventData;
     eventId: string;
   }) => Promise<void>;
-  evaluationCompleted: (input: {
-    data: EvaluationLifecycleCompletedEventData;
-    aggregateId: string;
-  }) => Promise<NurturingSignal[]>;
-  simulationRunFinished: (input: {
-    data: SimulationRunFinishedEventData;
-    aggregateId: string;
-    tenantId: string;
-  }) => Promise<NurturingSignal[]>;
+  /** Counts a project's batch of settled evaluations; one signal per organization. */
+  evaluationsCompleted: (
+    evaluations: readonly EvaluationLifecycleCompletedEventData[],
+  ) => Promise<NurturingSignal[]>;
+  /** Counts a project's batch of finished runs; one signal per organization. */
+  simulationRunsFinished: (
+    runs: readonly {
+      data: SimulationRunFinishedEventData;
+      aggregateId: string;
+      tenantId: string;
+    }[],
+  ) => Promise<NurturingSignal[]>;
 }): NurturingPipeline {
+  /** Each signal once, in order: a batch can raise the same day's signal many times over. */
+  const deliverEach = async (signals: readonly NurturingSignal[]) => {
+    const byKey = new Map(signals.map((signal) => [nurturingSignalKey(signal), signal]));
+    for (const [key, signal] of byKey) await deps.deliver({ key, signal });
+  };
   /** The project's first application signal of the UTC day; delivery's claim drops the rest. */
-  const deliverActiveDay = ({
+  const activeDaySignal = ({
     onboardingVariant,
     ...input
   }: Omit<Parameters<typeof projectActiveDaySignal>[0], "onboardingVariant"> & {
     onboardingVariant?: string | null;
   }) => {
     const parsed = onboardingVariantSchema.safeParse(onboardingVariant);
-    const signal = projectActiveDaySignal({
+    return projectActiveDaySignal({
       ...input,
       onboardingVariant: parsed.success ? parsed.data : null,
     });
-    return deps.deliver({ key: nurturingSignalKey(signal), signal });
   };
   return (
     definePipeline({
@@ -280,28 +288,28 @@ export function buildNurturingPipeline(deps: {
       .withPeerSubscriber("experimentRan", {
         eventType: EXPERIMENT_RAN_EVENT_TYPE,
         data: experimentRanEventDataSchema,
-        handle: (data, { aggregateId }) => {
-          const signal = experimentRanSignal({ data, aggregateId });
+        handle: (data) => {
+          const signal = experimentRanSignal({ data });
           return deps.deliver({ key: nurturingSignalKey(signal), signal });
         },
       })
       .withPeerSubscriber("evaluationRan", {
         eventType: EVALUATION_RAN_EVENT_TYPE,
         data: evaluationRanEventDataSchema,
-        handle: (data, { aggregateId }) => {
-          const signal = evaluationRanSignal({ data, aggregateId });
+        handle: (data) => {
+          const signal = evaluationRanSignal({ data });
           return deps.deliver({ key: nurturingSignalKey(signal), signal });
         },
       })
-      .withPeerSubscriber("evaluationCompleted", {
-        eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
-        data: evaluationLifecycleCompletedEventDataSchema,
-        handle: async (data, { aggregateId }) => {
-          for (const signal of await deps.evaluationCompleted({ data, aggregateId })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          }
-        },
-      })
+      .withPeerSubscriber(
+        "evaluationCompleted",
+        nurturingBatchLane({
+          eventType: EVALUATION_LIFECYCLE_COMPLETED_EVENT_TYPE,
+          data: evaluationLifecycleCompletedEventDataSchema,
+          handleBatch: async (items) =>
+            deliverEach(await deps.evaluationsCompleted(items.map(({ data }) => data))),
+        }),
+      )
       .withPeerSubscriber("projectCreated", {
         eventType: PROJECT_CREATED_EVENT_TYPE,
         data: projectCreatedEventDataSchema,
@@ -441,33 +449,49 @@ export function buildNurturingPipeline(deps: {
           }
         },
       })
-      .withPeerSubscriber("simulationRunFinished", {
-        eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
-        data: simulationRunFinishedEventDataSchema,
-        handle: async (data, context) => {
-          for (const signal of await deps.simulationRunFinished({ data, ...context })) {
-            await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          }
-        },
-      })
+      .withPeerSubscriber(
+        "simulationRunFinished",
+        nurturingBatchLane({
+          eventType: SIMULATION_RUN_EVENT_TYPES.FINISHED,
+          data: simulationRunFinishedEventDataSchema,
+          handleBatch: async (items) =>
+            deliverEach(
+              await deps.simulationRunsFinished(
+                items.map(({ data, context }) => ({
+                  data,
+                  aggregateId: context.aggregateId,
+                  tenantId: context.tenantId,
+                })),
+              ),
+            ),
+        }),
+      )
       .withPeerSubscriber("firstTraceRecorded", {
         eventType: FIRST_TRACE_RECORDED_EVENT_TYPE,
         data: firstTraceRecordedEventDataSchema,
         handle: async (data, { aggregateId }) => {
           const signal = firstTraceRecordedSignal({ data, aggregateId });
           await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          await deliverActiveDay({ source: "trace", ...data });
+          const activeDay = activeDaySignal({ source: "trace", ...data });
+          await deps.deliver({ key: nurturingSignalKey(activeDay), signal: activeDay });
         },
       })
-      .withPeerSubscriber("traceReceived", {
-        eventType: TRACE_RECEIVED_EVENT_TYPE,
-        data: traceReceivedEventDataSchema,
-        handle: async (data, { aggregateId }) => {
-          const signal = traceReceivedSignal({ data, aggregateId });
-          await deps.deliver({ key: nurturingSignalKey(signal), signal });
-          await deliverActiveDay({ source: "trace", ...data });
-        },
-      })
+      // One trace_received per batch, the latest: Customer.io debounces it per tenant anyway.
+      .withPeerSubscriber(
+        "traceReceived",
+        nurturingBatchLane({
+          eventType: TRACE_RECEIVED_EVENT_TYPE,
+          data: traceReceivedEventDataSchema,
+          handleBatch: async (items) => {
+            const datas = items.map(({ data }) => data);
+            const latest = datas.reduce((a, b) => (b.occurredAt > a.occurredAt ? b : a));
+            await deliverEach([
+              traceReceivedSignal({ data: latest }),
+              ...datas.map((data) => activeDaySignal({ source: "trace", ...data })),
+            ]);
+          },
+        }),
+      )
       .withCommand("recordSignal", RecordNurturingSignalCommand)
       .withLaneAliases(MAIN_NURTURING_LANE_ALIASES)
       .build()

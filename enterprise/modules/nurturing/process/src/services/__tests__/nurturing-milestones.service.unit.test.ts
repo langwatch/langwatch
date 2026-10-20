@@ -9,6 +9,7 @@ import { describe, expect, it } from "vitest";
 
 import { MemoryNurturingMilestonesRepository } from "../../repositories/memory/memory.nurturing-milestones.repository.ts";
 import { MemoryNurturingProjectDirectoryRepository } from "../../repositories/memory/memory.nurturing-project-directory.repository.ts";
+import type { NurturingMilestonesRepository } from "../../repositories/nurturing-milestones.repository.ts";
 import { NURTURING_CUTOVER_AT } from "../../rules/nurturing-owner-signals.rules.ts";
 import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 
@@ -16,10 +17,15 @@ import { NurturingMilestonesService } from "../nurturing-milestones.service.ts";
 function serviceOver({
   placed = new Map([["project-1", "org-1"]]),
   created,
-}: { placed?: ReadonlyMap<string, string>; created?: ReadonlyMap<string, number> } = {}) {
+  milestones = MemoryNurturingMilestonesRepository.create(),
+}: {
+  placed?: ReadonlyMap<string, string>;
+  created?: ReadonlyMap<string, number>;
+  milestones?: NurturingMilestonesRepository;
+} = {}) {
   const claimed = new Set<string>();
   return NurturingMilestonesService.create({
-    milestones: MemoryNurturingMilestonesRepository.create(),
+    milestones,
     projects: MemoryNurturingProjectDirectoryRepository.create({ placed, created }),
     claims: {
       claim: async (key) => {
@@ -44,14 +50,25 @@ function projectCreatedFact(
   };
 }
 
-function settled(evaluationId: string): {
-  data: EvaluationLifecycleCompletedEventData;
-  aggregateId: string;
-} {
+function settled(
+  evaluationId: string,
+  overrides: Partial<EvaluationLifecycleCompletedEventData> = {},
+): EvaluationLifecycleCompletedEventData {
   return {
-    aggregateId: `project-1:${evaluationId}`,
-    data: { tenantId: "project-1", occurredAt: 2, projectId: "project-1", evaluationId },
+    tenantId: "project-1",
+    occurredAt: 2,
+    projectId: "project-1",
+    evaluationId,
+    ...overrides,
   };
+}
+
+/** One batch of settled evaluations, as a backed-up project's lane hands it over. */
+function settleAndCount(
+  service: NurturingMilestonesService,
+  ...evaluations: EvaluationLifecycleCompletedEventData[]
+) {
+  return service.evaluationsCompleted(evaluations);
 }
 
 describe("NurturingMilestonesService", () => {
@@ -60,8 +77,8 @@ describe("NurturingMilestonesService", () => {
     const service = serviceOver();
     await service.projectCreated(projectCreatedFact());
 
-    const first = await service.evaluationCompleted(settled("eval-1"));
-    const second = await service.evaluationCompleted(settled("eval-2"));
+    const first = await settleAndCount(service, settled("eval-1"));
+    const second = await settleAndCount(service, settled("eval-2"));
 
     expect(first).toMatchObject([
       { userId: "admin-1", first: true, organizationEvaluationCount: 1 },
@@ -74,7 +91,7 @@ describe("NurturingMilestonesService", () => {
     const service = serviceOver();
     await service.projectCreated(projectCreatedFact({ backfilled: true }));
 
-    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
+    expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([
       { first: false, organizationEvaluationCount: 1 },
     ]);
   });
@@ -86,19 +103,8 @@ describe("NurturingMilestonesService", () => {
     await service.projectCreated(projectCreatedFact({ backfilled: true }));
     await service.projectCreated(projectCreatedFact({ backfilled: true }));
 
-    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
+    expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([
       { first: true, organizationEvaluationCount: 1 },
-    ]);
-  });
-
-  it("counts a redelivered completion once", async () => {
-    const service = serviceOver();
-    await service.projectCreated(projectCreatedFact());
-    await service.evaluationCompleted(settled("eval-1"));
-
-    expect(await service.evaluationCompleted(settled("eval-1"))).toEqual([]);
-    expect(await service.evaluationCompleted(settled("eval-2"))).toMatchObject([
-      { organizationEvaluationCount: 2 },
     ]);
   });
 
@@ -106,12 +112,12 @@ describe("NurturingMilestonesService", () => {
     const service = serviceOver({ placed: new Map() });
     await service.projectCreated(projectCreatedFact());
 
-    expect(await service.evaluationCompleted(settled("eval-1"))).toEqual([]);
+    expect(await settleAndCount(service, settled("eval-1"))).toEqual([]);
   });
 
   /** @scenario "An evaluation in an organization nurturing never learned raises nothing" */
   it("raises nothing for a placed project whose organization it never learned", async () => {
-    expect(await serviceOver().evaluationCompleted(settled("eval-1"))).toEqual([]);
+    expect(await settleAndCount(serviceOver(), settled("eval-1"))).toEqual([]);
   });
 
   /** @scenario "An evaluation in a project nurturing never saw created counts toward its organization" */
@@ -124,17 +130,122 @@ describe("NurturingMilestonesService", () => {
     });
     await service.projectCreated(projectCreatedFact());
 
-    const counted = await service.evaluationCompleted({
-      aggregateId: "project-old:eval-1",
-      data: {
-        tenantId: "project-old",
-        occurredAt: 2,
-        projectId: "project-old",
-        evaluationId: "eval-1",
-      },
-    });
+    const counted = await settleAndCount(
+      service,
+      settled("eval-1", { tenantId: "project-old", projectId: "project-old" }),
+    );
 
     expect(counted).toMatchObject([{ userId: "admin-1", organizationEvaluationCount: 1 }]);
+  });
+
+  describe("when a backed-up project's settled evaluations arrive as one batch", () => {
+    /** @scenario "A backed-up project's settled evaluations are counted in one step and send one update" */
+    it("counts the project's three evaluations in one step and raises one signal", async () => {
+      const service = serviceOver();
+      await service.projectCreated(projectCreatedFact({ backfilled: true }));
+
+      const signals = await settleAndCount(
+        service,
+        settled("eval-1", { occurredAt: 10 }),
+        settled("eval-2", { occurredAt: 30, score: 0.5 }),
+        settled("eval-3", { occurredAt: 20 }),
+      );
+
+      expect(signals).toEqual([
+        {
+          kind: "evaluation_completed",
+          sourceEventId: "project-1:eval-2",
+          tenantId: "project-1",
+          occurredAt: 30,
+          userId: "admin-1",
+          projectId: "project-1",
+          evaluationId: "eval-2",
+          evaluatorType: undefined,
+          score: 0.5,
+          passed: undefined,
+          evaluationsCounted: 3,
+          organizationEvaluationCount: 3,
+          first: false,
+        },
+      ]);
+    });
+
+    /** @scenario "The batch that counts an organization's first evaluations sends its milestone once" */
+    it("marks the batch that counts an organization's first evaluations as its first, once", async () => {
+      const service = serviceOver();
+      await service.projectCreated(projectCreatedFact());
+
+      const firstBatch = await settleAndCount(service, settled("eval-1"), settled("eval-2"));
+      const nextBatch = await settleAndCount(service, settled("eval-3"));
+
+      expect(firstBatch).toMatchObject([
+        { userId: "admin-1", first: true, evaluationsCounted: 2, organizationEvaluationCount: 2 },
+      ]);
+      expect(nextBatch).toMatchObject([{ first: false, organizationEvaluationCount: 3 }]);
+    });
+
+    /** @scenario "A redelivered settled evaluation is counted once" */
+    it("counts an evaluation redelivered inside a batch or in a later one once", async () => {
+      const service = serviceOver();
+      await service.projectCreated(projectCreatedFact());
+
+      expect(
+        await settleAndCount(service, settled("eval-1"), settled("eval-1"), settled("eval-2")),
+      ).toMatchObject([{ evaluationsCounted: 2, organizationEvaluationCount: 2 }]);
+      expect(await settleAndCount(service, settled("eval-2"))).toEqual([]);
+    });
+
+    it("raises one signal per project when a batch spans projects", async () => {
+      const service = serviceOver({
+        placed: new Map([
+          ["project-1", "org-1"],
+          ["project-2", "org-2"],
+        ]),
+      });
+      await service.projectCreated(projectCreatedFact());
+      await service.projectCreated(
+        projectCreatedFact({ projectId: "project-2", organizationId: "org-2", adminUserId: "admin-2" }),
+      );
+
+      expect(
+        await settleAndCount(
+          service,
+          settled("eval-1"),
+          settled("eval-2", { tenantId: "project-2", projectId: "project-2" }),
+          settled("eval-3"),
+        ),
+      ).toMatchObject([
+        { projectId: "project-1", evaluationsCounted: 2 },
+        { projectId: "project-2", userId: "admin-2", evaluationsCounted: 1 },
+      ]);
+    });
+  });
+
+  describe("when counting a batch fails", () => {
+    /** @scenario "A batch that fails counting is retried without counting twice" */
+    it("throws, and the retried batch never counts its evaluations a second time", async () => {
+      const memory = MemoryNurturingMilestonesRepository.create();
+      let failuresLeft = 1;
+      const milestones: NurturingMilestonesRepository = {
+        recordOrganization: (input) => memory.recordOrganization(input),
+        countSimulationRun: (input) => memory.countSimulationRun(input),
+        countEvaluation: async (input) => {
+          if (failuresLeft > 0) {
+            failuresLeft -= 1;
+            throw new Error("database unavailable");
+          }
+          return memory.countEvaluation(input);
+        },
+      };
+      const service = serviceOver({ milestones });
+      await service.projectCreated(projectCreatedFact());
+
+      await expect(settleAndCount(service, settled("eval-1"))).rejects.toThrow();
+      expect(await settleAndCount(service, settled("eval-1"))).toEqual([]);
+      expect(await settleAndCount(service, settled("eval-2"))).toMatchObject([
+        { organizationEvaluationCount: 1 },
+      ]);
+    });
   });
 });
 
@@ -153,15 +264,17 @@ describe("given an organization that held a project before nurturing's cutover",
     const service = serviceOver({ placed, created });
     await service.projectCreated(projectCreatedFact({ backfilled: false }));
 
-    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([
+    expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([
       { first: false, organizationEvaluationCount: 1 },
     ]);
     expect(
-      await service.simulationRunFinished({
-        aggregateId: "run-1",
-        tenantId: "project-1",
-        data: { scenarioRunId: "run-1", occurredAt: 3 },
-      }),
+      await service.simulationRunsFinished([
+        {
+          aggregateId: "run-1",
+          tenantId: "project-1",
+          data: { scenarioRunId: "run-1", occurredAt: 3 },
+        },
+      ]),
     ).toMatchObject([{ first: false, organizationRunCount: 1 }]);
   });
 
@@ -176,18 +289,18 @@ describe("given an organization that held a project before nurturing's cutover",
     });
     await service.projectCreated(projectCreatedFact());
 
-    expect(await service.evaluationCompleted(settled("eval-1"))).toMatchObject([{ first: true }]);
-    expect(await service.evaluationCompleted(settled("eval-2"))).toMatchObject([{ first: false }]);
+    expect(await settleAndCount(service, settled("eval-1"))).toMatchObject([{ first: true }]);
+    expect(await settleAndCount(service, settled("eval-2"))).toMatchObject([{ first: false }]);
   });
 });
 
 /** @see modules/scenario/specs/simulation-run-finished-nurturing-signal.feature */
-describe("NurturingMilestonesService.simulationRunFinished", () => {
-  function finished(runId: string) {
+describe("NurturingMilestonesService.simulationRunsFinished", () => {
+  function finished(runId: string, occurredAt = 3) {
     return {
       aggregateId: runId,
       tenantId: "project-1",
-      data: { scenarioRunId: runId, occurredAt: 3 },
+      data: { scenarioRunId: runId, occurredAt },
     };
   }
 
@@ -196,7 +309,7 @@ describe("NurturingMilestonesService.simulationRunFinished", () => {
     const service = serviceOver();
     await service.projectCreated(projectCreatedFact());
 
-    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([
+    expect(await service.simulationRunsFinished([finished("run-1")])).toEqual([
       {
         kind: "simulation_run_finished",
         sourceEventId: "run-1",
@@ -208,7 +321,7 @@ describe("NurturingMilestonesService.simulationRunFinished", () => {
         first: true,
       },
     ]);
-    expect(await service.simulationRunFinished(finished("run-2"))).toMatchObject([
+    expect(await service.simulationRunsFinished([finished("run-2")])).toMatchObject([
       { organizationRunCount: 2, first: false },
     ]);
   });
@@ -218,17 +331,31 @@ describe("NurturingMilestonesService.simulationRunFinished", () => {
     const service = serviceOver();
     await service.projectCreated(projectCreatedFact({ adminUserId: null }));
 
-    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);
+    expect(await service.simulationRunsFinished([finished("run-1")])).toEqual([]);
   });
 
   it("counts a redelivered run once and never fires the first for a backfilled organization", async () => {
     const service = serviceOver();
     await service.projectCreated(projectCreatedFact({ backfilled: true }));
-    await service.simulationRunFinished(finished("run-1"));
+    await service.simulationRunsFinished([finished("run-1")]);
 
-    expect(await service.simulationRunFinished(finished("run-1"))).toEqual([]);
-    expect(await service.simulationRunFinished(finished("run-2"))).toMatchObject([
+    expect(await service.simulationRunsFinished([finished("run-1")])).toEqual([]);
+    expect(await service.simulationRunsFinished([finished("run-2")])).toMatchObject([
       { organizationRunCount: 2, first: false },
     ]);
+  });
+
+  /** @scenario "A backed-up project's finished runs are counted in one step" */
+  it("counts a batch of runs in one step under the latest run, each run once", async () => {
+    const service = serviceOver();
+    await service.projectCreated(projectCreatedFact());
+
+    expect(
+      await service.simulationRunsFinished([
+        finished("run-1", 3),
+        finished("run-2", 9),
+        finished("run-1", 3),
+      ]),
+    ).toMatchObject([{ sourceEventId: "run-2", organizationRunCount: 2, first: true }]);
   });
 });

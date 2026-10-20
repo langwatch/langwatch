@@ -354,6 +354,14 @@ export class ProjectionRouter<
         { subscriberName: subscriber.name },
       );
     }
+    const coalesceMaxBatch = subscriber.options?.coalesceMaxBatch ?? 1;
+    if (!subscriber.handleBatch && coalesceMaxBatch > 1) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Event subscriber "${subscriber.name}" coalesces up to ${coalesceMaxBatch} events but declares no handleBatch`,
+        { subscriberName: subscriber.name, coalesceMaxBatch },
+      );
+    }
     this.eventSubscribers.set(subscriber.name, subscriber);
   }
 
@@ -371,6 +379,7 @@ export class ProjectionRouter<
           delay?: number;
           deduplication?: DeduplicationStrategy<EventType>;
           groupKeyFn?: (event: EventType) => string;
+          coalesceMaxBatch?: number;
           spanAttributes: (event: EventType) => Record<string, string | number | boolean>;
         };
       }
@@ -387,6 +396,7 @@ export class ProjectionRouter<
           delay: subscriber.options?.delay,
           deduplication: subscriber.options?.deduplication,
           groupKeyFn: subscriber.options?.groupKeyFn,
+          coalesceMaxBatch: subscriber.options?.coalesceMaxBatch,
           spanAttributes: (event) => ({
             "subscriber.name": name,
             "event.type": event.type,
@@ -401,17 +411,34 @@ export class ProjectionRouter<
     this.queueManager.initializeSubscriberQueues(
       subscriberDefs,
       async (subscriberName, event, context) => {
-        const subscriber = this.eventSubscribers.get(subscriberName);
-        if (!subscriber) {
+        const subscriber = this.registeredEventSubscriber(subscriberName);
+        await this.handleSubscriber(subscriber, event, deliveryAttemptOf(context));
+      },
+      async (subscriberName, events, context) => {
+        const subscriber = this.registeredEventSubscriber(subscriberName);
+        const handleBatch = subscriber.handleBatch;
+        if (!handleBatch) {
           throw new ConfigurationError(
             "ProjectionRouter",
-            `Event subscriber "${subscriberName}" not found`,
+            `Event subscriber "${subscriberName}" was handed a batch but declares no handleBatch`,
             { subscriberName },
           );
         }
-        await this.handleSubscriber(subscriber, event, deliveryAttemptOf(context));
+        await this.handleSubscriberBatch({ subscriber, handleBatch, events, context });
       },
     );
+  }
+
+  private registeredEventSubscriber(subscriberName: string): EventSubscriberDefinition<EventType> {
+    const subscriber = this.eventSubscribers.get(subscriberName);
+    if (!subscriber) {
+      throw new ConfigurationError(
+        "ProjectionRouter",
+        `Event subscriber "${subscriberName}" not found`,
+        { subscriberName },
+      );
+    }
+    return subscriber;
   }
 
   private subscriberQueueDefinitions({
@@ -1502,27 +1529,77 @@ export class ProjectionRouter<
     event: EventType,
     delivery: { deliveryAttempt?: number } = {},
   ): Promise<void> {
+    await this.runSubscriber({
+      subscriber,
+      spanName: "EventSubscriber.handle",
+      attributes: {
+        "event.id": event.id,
+        "event.type": event.type,
+        "event.aggregate_id": String(event.aggregateId),
+        "tenant.id": String(event.tenantId),
+      },
+      fn: () =>
+        subscriber.handle(event, {
+          tenantId: String(event.tenantId),
+          aggregateId: String(event.aggregateId),
+          ...delivery,
+        }),
+    });
+  }
+
+  /** A coalesced batch (ADR-066), one `handleBatch` call; each event keeps its own context. */
+  private async handleSubscriberBatch({
+    subscriber,
+    handleBatch,
+    events,
+    context,
+  }: {
+    subscriber: EventSubscriberDefinition<EventType>;
+    handleBatch: NonNullable<EventSubscriberDefinition<EventType>["handleBatch"]>;
+    events: EventType[];
+    context: { tenantId: string; deliveryAttempt?: number };
+  }): Promise<void> {
+    await this.runSubscriber({
+      subscriber,
+      spanName: "EventSubscriber.handleBatch",
+      attributes: { "batch.size": events.length, "tenant.id": String(context.tenantId) },
+      fn: () =>
+        handleBatch(
+          events,
+          events.map((event) => ({
+            tenantId: String(event.tenantId),
+            aggregateId: String(event.aggregateId),
+            ...deliveryAttemptOf(context),
+          })),
+        ),
+    });
+  }
+
+  /** Runs one subscriber call under its span, counting and timing it, warning when slow. */
+  private async runSubscriber({
+    subscriber,
+    spanName,
+    attributes,
+    fn,
+  }: {
+    subscriber: EventSubscriberDefinition<EventType>;
+    spanName: string;
+    attributes: Record<string, string | number>;
+    fn: () => Promise<void>;
+  }): Promise<void> {
     await this.tracer.withActiveSpan(
-      "EventSubscriber.handle",
+      spanName,
       {
         kind: SpanKind.INTERNAL,
         attributes: {
           "subscriber.name": subscriber.name,
           "pipeline.name": this.pipelineName,
-          "event.id": event.id,
-          "event.type": event.type,
-          "event.aggregate_id": String(event.aggregateId),
-          "tenant.id": String(event.tenantId),
+          ...attributes,
         },
       },
       async () => {
         await withMetrics({
-          fn: () =>
-            subscriber.handle(event, {
-              tenantId: String(event.tenantId),
-              aggregateId: String(event.aggregateId),
-              ...delivery,
-            }),
+          fn,
           onComplete: (ms) => {
             incrementEsSubscriberTotal({
               pipelineName: this.pipelineName,

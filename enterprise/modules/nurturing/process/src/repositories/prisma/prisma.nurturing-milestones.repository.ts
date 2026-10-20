@@ -42,14 +42,16 @@ export class PrismaNurturingMilestonesRepository
 
   countEvaluation({
     organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
-    return this.count({ organizationId, data: { evaluationCount: { increment: 1 } } });
+    by,
+  }: Readonly<{ organizationId: string; by: number }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { evaluationCount: { increment: by } } });
   }
 
   countSimulationRun({
     organizationId,
-  }: Readonly<{ organizationId: string }>): Promise<NurturingOrganizationCounts[]> {
-    return this.count({ organizationId, data: { simulationRunCount: { increment: 1 } } });
+    by,
+  }: Readonly<{ organizationId: string; by: number }>): Promise<NurturingOrganizationCounts[]> {
+    return this.count({ organizationId, data: { simulationRunCount: { increment: by } } });
   }
 
   /** Empty when nurturing never learned the organization. */
@@ -58,7 +60,7 @@ export class PrismaNurturingMilestonesRepository
     data,
   }: {
     organizationId: string;
-    data: { evaluationCount: { increment: 1 } } | { simulationRunCount: { increment: 1 } };
+    data: { evaluationCount: { increment: number } } | { simulationRunCount: { increment: number } };
   }): Promise<NurturingOrganizationCounts[]> {
     const { count } = await this.prisma.nurturingOrganization.updateMany({
       where: { organizationId },

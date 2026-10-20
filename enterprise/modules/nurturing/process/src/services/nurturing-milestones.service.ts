@@ -20,15 +20,55 @@ import {
 /** How long a counted evaluation or run is remembered against a redelivered event. */
 const COUNTED_WINDOW_SECONDS = 7 * 24 * 60 * 60;
 
+/** A finished run as its peer lane hands it over: the run's data, its aggregate and tenant. */
+type FinishedRun = Readonly<{
+  data: SimulationRunFinishedEventData;
+  aggregateId: string;
+  tenantId: string;
+}>;
+
 type MilestonesDependencies = Readonly<{
   milestones: NurturingMilestonesRepository;
   projects: NurturingProjectDirectoryRepository;
   claims: NurturingClaimRepository;
 }>;
 
+/** The items whose key the claim repository had not seen inside the window, in order. */
+async function claimedOnly<Item>({
+  items,
+  keyOf,
+  claims,
+}: Readonly<{
+  items: readonly Item[];
+  keyOf: (item: Item) => string;
+  claims: NurturingClaimRepository;
+}>): Promise<Item[]> {
+  const claimed = await Promise.all(
+    items.map((item) => claims.claim(keyOf(item), COUNTED_WINDOW_SECONDS)),
+  );
+  return items.filter((_, index) => claimed[index]);
+}
+
+/** Items grouped by a key, the groups in order of their first item. */
+function groupedBy<Item>(items: readonly Item[], keyOf: (item: Item) => string): Item[][] {
+  const groups = new Map<string, Item[]>();
+  for (const item of items) {
+    const key = keyOf(item);
+    groups.set(key, [...(groups.get(key) ?? []), item]);
+  }
+  return [...groups.values()];
+}
+
+/** The item that happened last; the earliest in order wins a tie. */
+function latestOf<Item>(items: readonly Item[], instantOf: (item: Item) => number): Item {
+  return items.reduce((latest, item) => (instantOf(item) > instantOf(latest) ? item : latest));
+}
+
 /**
  * Nurturing's own read model: which organization a project belongs to and its admin, from
- * project's created event, and each organization's evaluation count, from evaluation's (§9).
+ * project's created event, and each organization's evaluation and run counts, from evaluation's
+ * and scenario's (§9). Counts come in batches: a backed-up project's settled evaluations or
+ * finished runs are counted in one step and raise one signal, however many the batch holds.
  */
 export class NurturingMilestonesService {
   static create(dependencies: MilestonesDependencies): NurturingMilestonesService {
@@ -47,55 +87,66 @@ export class NurturingMilestonesService {
   }
 
   /**
-   * Counts a settled evaluation once and answers the signal it raises. The claim comes first, so a
-   * redelivery never counts twice; a count that then fails is lost rather than doubled.
+   * Counts a batch of settled evaluations, each once, and answers one signal per project. Every
+   * claim comes first, so a redelivered evaluation never counts twice; a count that then fails is
+   * lost rather than doubled. Keyed by project and evaluation, as before batching, so a claim
+   * taken by an earlier release still holds.
    */
-  async evaluationCompleted({
-    data,
-    aggregateId,
-  }: Readonly<{
-    data: EvaluationLifecycleCompletedEventData;
-    aggregateId: string;
-  }>): Promise<NurturingSignal[]> {
-    const key = `nurturing:evaluation-counted:${aggregateId}:${data.evaluationId}`;
-    if (!(await this.dependencies.claims.claim(key, COUNTED_WINDOW_SECONDS))) return [];
-    const organizations = await this.countFor({
-      projectId: data.projectId,
-      count: (input) => this.dependencies.milestones.countEvaluation(input),
+  async evaluationsCompleted(
+    evaluations: readonly EvaluationLifecycleCompletedEventData[],
+  ): Promise<NurturingSignal[]> {
+    const counted = await claimedOnly({
+      items: evaluations,
+      keyOf: (data) => `nurturing:evaluation-counted:${data.projectId}:${data.evaluationId}`,
+      claims: this.dependencies.claims,
     });
-    return organizations.flatMap((organization) =>
-      evaluationCompletedSignal({
-        data,
-        aggregateId,
-        organization: { ...organization, seeded: seededAtRead(organization) },
-      }),
-    );
+    const signals: NurturingSignal[] = [];
+    for (const project of groupedBy(counted, (data) => data.projectId)) {
+      const latest = latestOf(project, (data) => data.occurredAt);
+      const organizations = await this.countFor({
+        projectId: latest.projectId,
+        count: ({ organizationId }) =>
+          this.dependencies.milestones.countEvaluation({ organizationId, by: project.length }),
+      });
+      for (const organization of organizations) {
+        signals.push(
+          ...evaluationCompletedSignal({
+            latest,
+            count: project.length,
+            organization: { ...organization, seeded: seededAtRead(organization) },
+          }),
+        );
+      }
+    }
+    return signals;
   }
 
-  /** Counts a finished simulation run once, keyed by the run, and answers the signal it raises. */
-  async simulationRunFinished({
-    data,
-    aggregateId,
-    tenantId,
-  }: Readonly<{
-    data: SimulationRunFinishedEventData;
-    aggregateId: string;
-    tenantId: string;
-  }>): Promise<NurturingSignal[]> {
-    const key = `nurturing:simulation-counted:${aggregateId}`;
-    if (!(await this.dependencies.claims.claim(key, COUNTED_WINDOW_SECONDS))) return [];
-    const organizations = await this.countFor({
-      projectId: tenantId,
-      count: (input) => this.dependencies.milestones.countSimulationRun(input),
+  /** Counts a batch of finished runs, each once by its run, and answers one signal per project. */
+  async simulationRunsFinished(runs: readonly FinishedRun[]): Promise<NurturingSignal[]> {
+    const counted = await claimedOnly({
+      items: runs,
+      keyOf: (run) => `nurturing:simulation-counted:${run.aggregateId}`,
+      claims: this.dependencies.claims,
     });
-    return organizations.flatMap((organization) =>
-      simulationRunFinishedSignal({
-        data,
-        aggregateId,
-        tenantId,
-        organization: { ...organization, seeded: seededAtRead(organization) },
-      }),
-    );
+    const signals: NurturingSignal[] = [];
+    for (const project of groupedBy(counted, (run) => run.tenantId)) {
+      const latest = latestOf(project, (run) => run.data.occurredAt ?? 0);
+      const organizations = await this.countFor({
+        projectId: latest.tenantId,
+        count: ({ organizationId }) =>
+          this.dependencies.milestones.countSimulationRun({ organizationId, by: project.length }),
+      });
+      for (const organization of organizations) {
+        signals.push(
+          ...simulationRunFinishedSignal({
+            ...latest,
+            counted: project.length,
+            organization: { ...organization, seeded: seededAtRead(organization) },
+          }),
+        );
+      }
+    }
+    return signals;
   }
 
   /** Empty when the owners hold no such project or nurturing never learned its organization. */

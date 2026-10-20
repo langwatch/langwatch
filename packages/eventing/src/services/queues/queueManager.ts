@@ -431,10 +431,16 @@ export class QueueManager<EventType extends Event = Event> {
       event: EventType,
       context: EventStoreReadContext<EventType>,
     ) => Promise<void>,
+    onEventBatch?: (
+      subscriberName: string,
+      events: EventType[],
+      context: EventStoreReadContext<EventType>,
+    ) => Promise<void>,
   ): void {
     this.initializeEventConsumerQueues({
       definitions: subscribers,
       onEvent,
+      onEventBatch,
       jobType: "subscriber",
       jobPath: "subscriber",
       incrementCount: () => this.subscriberCount++,
@@ -501,9 +507,12 @@ export class QueueManager<EventType extends Event = Event> {
           onEventBatch &&
           handlerDef.options.coalesceMaxBatch &&
           handlerDef.options.coalesceMaxBatch > 1
-            ? (events: EventType[]) =>
+            ? (events: EventType[], delivery?: JobDelivery) =>
                 withBatchTenant(events, (tenantId) =>
-                  onEventBatch(handlerName, events, { tenantId }),
+                  onEventBatch(handlerName, events, {
+                    tenantId,
+                    deliveryAttempt: delivery?.attempt,
+                  }),
                 )
             : undefined,
         coalesceMaxBatch: handlerDef.options.coalesceMaxBatch,
