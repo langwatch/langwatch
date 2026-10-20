@@ -20,6 +20,7 @@ const MAX_SERIALIZATION_ATTEMPTS = 4;
 const COMMITTED_ABANDON_MS = 10 * 60 * 1000;
 
 function isRetryableTransactionError(error: unknown): boolean {
+  // A P2002 clash means a racing claim created the receipt first; the retry re-reads it.
   return (
     isSerializationConflict(error) ||
     (error instanceof Error && "code" in error && error.code === "P2002")
