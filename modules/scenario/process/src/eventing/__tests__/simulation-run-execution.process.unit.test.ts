@@ -290,6 +290,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "queued event carries no execution target",
+            outcomeAtMs: 10_000,
           },
         },
       ]);
@@ -350,6 +351,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             scenarioRunId: RUN_ID,
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.CANCELLED,
+            outcomeAtMs: 10_000,
           },
         },
       ]);
@@ -646,6 +648,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             scenarioRunId: RUN_ID,
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.CANCELLED,
+            outcomeAtMs: 15_000,
           },
         },
       ]);
@@ -714,6 +717,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
           scenarioRunId: RUN_ID,
           projectId: PROJECT_ID,
           status: ScenarioRunStatus.CANCELLED,
+          outcomeAtMs: 15_000 + CANCEL_GRACE_MS,
         },
       });
     });
@@ -776,6 +780,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
               projectId: PROJECT_ID,
               status: ScenarioRunStatus.ERROR,
               error: "stalled",
+              outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
             },
           },
         ]);
@@ -795,6 +800,24 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
         expect(evolution.nextWakeAt).toBe(10_000 + STALL_THRESHOLD_MS);
       },
     );
+
+    /** @scenario "A run caught up long after it stalled is finished at its stall time" */
+    it("dates the stalled finish at the stall deadline when the wake runs months late", () => {
+      const state = queuedState({ phase: "running", lastActivityAtMs: 10_000 });
+      const ninetyDaysLate = 10_000 + STALL_THRESHOLD_MS + 90 * 24 * 60 * 60 * 1000;
+
+      const evolution = evolveWake(state, ninetyDaysLate, ninetyDaysLate);
+
+      expect(evolution.intents).toEqual([
+        expect.objectContaining({
+          intentType: "finish",
+          payload: expect.objectContaining({
+            error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
+          }),
+        }),
+      ]);
+    });
 
     /** @scenario "A queued run whose execute intent never lands is finished as stalled" */
     it("finishes a run that never left queued, so a lost execute cannot pin it", () => {
@@ -821,6 +844,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
           },
         },
       ]);
@@ -864,6 +888,7 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
             projectId: PROJECT_ID,
             status: ScenarioRunStatus.ERROR,
             error: "stalled",
+            outcomeAtMs: 10_000 + STALL_THRESHOLD_MS,
           },
         },
       ]);
