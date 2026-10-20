@@ -29,7 +29,7 @@ export type BlobSweepOutcome = (typeof BLOB_SWEEP_OUTCOMES)[number];
  * RECLAIM deletes bytes only when TTL proves blob was unreferenced past safety margin.
  * Atomic cluster eval; ARGV[1]="1" to dry-run, which reports the verdict and writes nothing.
  */
-export const BLOB_SWEEP_LUA = `
+export const BLOB_SWEEP_LUA = `#!lua flags=allow-oom
 local dryRun = ARGV[1] == "1"
 
 local now = redis.call("TIME")
