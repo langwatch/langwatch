@@ -23,6 +23,13 @@ Feature: Projects page by cursor with their organisation
     Then the third arrives and the next cursor is null
 
   @unit
+  Scenario: A project whose team is gone is named as an orphan instead of paged with an organisation
+    Given an install with a project whose team was deleted, between two projects that have one
+    When a peer reads the projects with their organisation with a limit of two
+    Then the page holds the first project with its organisation and names the orphan by id
+    And the next cursor is the orphan's id, so the following page starts after it
+
+  @unit
   Scenario: An install with no projects yields an empty page of projects
     Given an install with no projects
     When a peer reads the projects with their organisation

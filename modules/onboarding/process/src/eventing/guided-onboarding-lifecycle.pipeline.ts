@@ -12,17 +12,26 @@ import {
 } from "@langwatch/onboarding-contract";
 
 import type { OnboardingModule } from "../app/onboarding.app.ts";
-import { RecordGuidedOnboardingCommand } from "./guided-onboarding-lifecycle.commands.ts";
+import {
+  RecordGuidedOnboardingCommand,
+  RecordOnboardingVariantAssignedCommand,
+} from "./guided-onboarding-lifecycle.commands.ts";
 import {
   guidedOnboardingRecordedEventSchema,
+  onboardingVariantAssignedEventSchema,
   type GuidedOnboardingLifecycleEvent,
   type RecordGuidedOnboardingCommandData,
+  type RecordOnboardingVariantAssignedCommandData,
 } from "./guided-onboarding-lifecycle.events.ts";
 
 export type GuidedOnboardingLifecyclePipeline = StaticPipelineDefinition<
   GuidedOnboardingLifecycleEvent,
   Record<string, Projection>,
-  { name: "recordGuidedOnboarding"; payload: RecordGuidedOnboardingCommandData }
+  | { name: "recordGuidedOnboarding"; payload: RecordGuidedOnboardingCommandData }
+  | {
+      name: "recordOnboardingVariantAssigned";
+      payload: RecordOnboardingVariantAssignedCommandData;
+    }
 >;
 
 /** guided_onboarding_lifecycle: onboarding records its facts; peers react from their side (§9). */
@@ -31,8 +40,9 @@ export function buildGuidedOnboardingLifecyclePipeline(): GuidedOnboardingLifecy
     name: GUIDED_ONBOARDING_LIFECYCLE_PIPELINE_NAME,
     aggregate: defineAggregate({ type: GUIDED_ONBOARDING_AGGREGATE_TYPE }),
   })
-    .withEvents([guidedOnboardingRecordedEventSchema])
+    .withEvents([guidedOnboardingRecordedEventSchema, onboardingVariantAssignedEventSchema])
     .withCommand("recordGuidedOnboarding", RecordGuidedOnboardingCommand)
+    .withCommand("recordOnboardingVariantAssigned", RecordOnboardingVariantAssignedCommand)
     .build();
 }
 
