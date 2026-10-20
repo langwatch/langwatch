@@ -47,7 +47,7 @@ export class TriggerSettlementEmailService {
   }): Promise<{ didSend: boolean; dropReason?: string }> {
     const parsed = emailActionParamsSchema.safeParse(input.trigger.actionParams);
     if (!parsed.success) {
-      throw storedActionParamsRefusal(input.trigger);
+      throw storedActionParamsRefusal({ triggerName: input.trigger.name, action: "SEND_EMAIL" });
     }
 
     const digest = this.dispatchDigest(input.triggerData);

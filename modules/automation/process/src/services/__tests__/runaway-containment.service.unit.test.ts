@@ -78,7 +78,6 @@ class TestRunawaySignals
   onCeilingBreach(): void {}
   onAutoPaused(): void {}
   onContainmentFailed(): void {}
-  /** Every logged line, by level, in the order the policy logged it. */
   readonly logged: { level: "error" | "warn" | "info"; message: string }[] = [];
   error(_fields: Record<string, unknown>, message: string): void {
     this.logged.push({ level: "error", message });

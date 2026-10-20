@@ -64,10 +64,6 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       projectId: input.projectId,
     });
     if (!dataset) {
-      this.logger.warn(
-        { triggerId: input.triggerId, datasetId: input.datasetId },
-        "ADD_TO_DATASET dataset is gone or archived; the match was dropped",
-      );
       throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "it is gone or archived",
@@ -121,6 +117,7 @@ export class PersistActionWriterService extends AutomationPersistActionRepositor
       throw new AutomationDatasetUnavailableError({
         datasetId: input.datasetId,
         reason: "it is gone or archived",
+        cause: error instanceof Error ? error : undefined,
       });
     }
   }

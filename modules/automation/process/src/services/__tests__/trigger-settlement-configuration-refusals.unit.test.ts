@@ -1,8 +1,5 @@
-import type { AnnotationApi } from "@langwatch/annotation-contract";
 import { AutomationDatasetUnavailableError } from "@langwatch/automation-contract";
-import type { DatasetApi } from "@langwatch/dataset-contract";
-import { refusesRetry } from "@langwatch/group-queue";
-import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import { HandledError } from "@langwatch/handled-error";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
@@ -10,7 +7,6 @@ import {
   settlementContext,
   settlementTrigger,
 } from "../../__tests__/fixtures/settlement.fixtures.ts";
-import { PersistActionWriterService } from "../../features/runaway/services/persist-action-writer.service.ts";
 
 const loggerWarn = vi.hoisted(() => vi.fn());
 const loggerError = vi.hoisted(() => vi.fn());
@@ -23,6 +19,12 @@ vi.mock("@langwatch/observability", () => ({
     error: loggerError,
   }),
 }));
+
+class RateLimitedRefusal extends HandledError {
+  constructor() {
+    super("rate_limited", "Too many requests", { httpStatus: 429, fault: "customer" });
+  }
+}
 
 const digest = { triggerId: "trigger-1", traceIds: ["trace-1"], boundary: 1_000 };
 
@@ -96,32 +98,6 @@ describe("settlement refusals caused by the automation's saved configuration", (
     });
   });
 
-  describe("given a dataset automation whose dataset is gone or archived", () => {
-    describe("when the match is written", () => {
-      /** @scenario "A dataset automation whose dataset is gone is refused as the customer's to fix" */
-      it("refuses with a customer-fault code that the queue does not redeliver", async () => {
-        const writer = PersistActionWriterService.create({
-          datasets: createApiFixture<DatasetApi>({ findBySlugOrId: async () => null }),
-          annotations: createApiFixture<AnnotationApi>(),
-        });
-
-        const refusal = await refusalOf(
-          writer.addToDataset({
-            datasetId: "dataset-1",
-            projectId: "project-1",
-            triggerId: "trigger-1",
-            datasetRecords: [{ id: "trigger-1-trace-1-0", question: "why" }],
-          }),
-        );
-
-        expect(refusal).toEqual(
-          expect.objectContaining({ code: "automation_dataset_unavailable", fault: "customer" }),
-        );
-        expect(refusesRetry(refusal)).toBe(true);
-      });
-    });
-  });
-
   describe("given a persist action refused as the customer's to fix", () => {
     describe("when the persist page settles", () => {
       /** @scenario "A persist refusal the customer must fix is warned once and not retried" */
@@ -162,6 +138,34 @@ describe("settlement refusals caused by the automation's saved configuration", (
         ]);
         expect(loggerError).not.toHaveBeenCalled();
         expect(fixture.observability.captures).toEqual([]);
+      });
+    });
+  });
+
+  describe("given a persist action refused with a rate limit", () => {
+    describe("when the persist page settles", () => {
+      /** @scenario "A rate-limited refusal is retried rather than treated as the customer's to fix" */
+      it("rethrows the refusal for a retry and logs no configuration refusal", async () => {
+        const fixture = createSettlementFixture(
+          settlementTrigger("ADD_TO_DATASET", {
+            actionParams: {
+              datasetId: "dataset-1",
+              datasetMapping: { mapping: {}, expansions: [] },
+            },
+          }),
+        );
+        const rateLimited = new RateLimitedRefusal();
+        fixture.writer.errors.set("trace-1", rateLimited);
+
+        const thrown = await refusalOf(
+          fixture.service.persistMatch(
+            { triggerId: "trigger-1", traceIds: ["trace-1"] },
+            settlementContext("persist:page-1"),
+          ),
+        );
+
+        expect(thrown).toBe(rateLimited);
+        expect(refusalWarnings()).toEqual([]);
       });
     });
   });

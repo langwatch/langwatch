@@ -355,7 +355,7 @@ export class TriggerSettlementNotificationService {
     try {
       params = this.composition.webhooks.parseStored(input.trigger.actionParams);
     } catch {
-      throw storedActionParamsRefusal(input.trigger);
+      throw storedActionParamsRefusal({ triggerName: input.trigger.name, action: "SEND_WEBHOOK" });
     }
 
     // A JSON content type is checked and falls back to the default envelope; any other is sent

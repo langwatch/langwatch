@@ -4,7 +4,8 @@ Feature: A settlement refused by the automation's own saved configuration
   dispatches cannot succeed however often they run, because the automation's
   saved configuration is the cause: an email action whose stored recipients
   no longer validate, a webhook action whose stored settings no longer parse,
-  or a dataset action whose dataset is gone. Those are the customer's to fix,
+  or a dataset action whose dataset is gone (its refusal is specified in
+  dataset-action-stale-columns.feature). Those are the customer's to fix,
   so the refusal names a stable code with customer fault, ends the dispatch
   instead of retrying it, and is logged once as a warning rather than paging
   as an error. A failure we cannot name is still reported, once.
@@ -28,18 +29,18 @@ Feature: A settlement refused by the automation's own saved configuration
     And the dispatch completes instead of retrying
 
   @unit
-  Scenario: A dataset automation whose dataset is gone is refused as the customer's to fix
-    Given the automation adds matches to a dataset that is gone or archived
-    When the match is written
-    Then the refusal carries the code "automation_dataset_unavailable" with customer fault
-    And it is not redelivered
-
-  @unit
   Scenario: A persist refusal the customer must fix is warned once and not retried
     Given the automation's persist action is refused as the customer's to fix
     When the persist page settles
     Then the page completes instead of retrying
     And one warning is logged and no error is reported
+
+  @unit
+  Scenario: A rate-limited refusal is retried rather than treated as the customer's to fix
+    Given the automation's persist action is refused with a rate limit
+    When the persist page settles
+    Then the page is retried
+    And no configuration refusal is logged
 
   @unit
   Scenario: A dispatch failure we cannot name is reported once and retried

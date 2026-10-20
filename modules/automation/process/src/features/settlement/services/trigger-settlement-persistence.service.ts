@@ -1,7 +1,8 @@
 import { setTimeout as sleep } from "node:timers/promises";
 
 import type { TriggerSummary } from "@langwatch/automation-contract";
-import { DispatchError, isDispatchError, pMapLimited } from "@langwatch/eventing";
+import { DispatchError, pMapLimited } from "@langwatch/eventing";
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationSettlementLedgerRepository } from "../../../repositories/automation-settlement-ledger.repository.ts";
@@ -239,7 +240,8 @@ export class TriggerSettlementPersistenceService {
   }
 
   private recordTraceFailure(page: PersistPage, traceId: string, error: unknown): void {
-    if (isCustomerConfigurationRefusal(error)) {
+    const retryable = !refusesRetry(error);
+    if (!retryable && isCustomerConfigurationRefusal(error)) {
       logger.warn(
         {
           projectId: page.projectId,
@@ -255,7 +257,7 @@ export class TriggerSettlementPersistenceService {
       return;
     }
 
-    if (isRetryableSettlementFailure(error)) {
+    if (retryable) {
       page.retryableFailures.push(error);
 
       return;
@@ -309,10 +311,4 @@ export class TriggerSettlementPersistenceService {
     const handled = error instanceof Error ? error : new Error(String(error));
     this.composition.observability.capture(handled, context);
   }
-}
-
-/** A dispatch error says whether to retry; a customer configuration refusal never is; anything else is. */
-export function isRetryableSettlementFailure(error: unknown): boolean {
-  if (isDispatchError(error)) return error.retryable;
-  return !isCustomerConfigurationRefusal(error);
 }

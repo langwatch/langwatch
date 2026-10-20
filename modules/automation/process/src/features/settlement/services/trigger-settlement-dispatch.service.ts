@@ -1,4 +1,5 @@
 import type { IntentContext } from "@langwatch/eventing";
+import { refusesRetry } from "@langwatch/group-queue";
 import { createLogger } from "@langwatch/observability";
 
 import type { AutomationNotificationDelivery } from "../../../channels/automation-notification-delivery.channel.ts";
@@ -21,10 +22,7 @@ import type { SlackDestinationService } from "../../slack/services/slack-destina
 import type { AutomationSettlementMatchConfirmation } from "./automation-settlement-match-confirmation.service.ts";
 import type { AutomationSettlementObservability } from "./automation-settlement-observability.service.ts";
 import { TriggerSettlementNotificationService } from "./trigger-settlement-notification.service.ts";
-import {
-  isRetryableSettlementFailure,
-  TriggerSettlementPersistenceService,
-} from "./trigger-settlement-persistence.service.ts";
+import { TriggerSettlementPersistenceService } from "./trigger-settlement-persistence.service.ts";
 
 const logger = createLogger("langwatch:automation:settlement-dispatch");
 
@@ -118,7 +116,8 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
    * process's error capture, and rethrown when another attempt could succeed.
    */
   private rethrowIfRetryable(error: unknown, context: Record<string, unknown>): void {
-    if (isCustomerConfigurationRefusal(error)) {
+    const retryable = !refusesRetry(error);
+    if (!retryable && isCustomerConfigurationRefusal(error)) {
       logger.warn(
         { ...context, code: error.code, fault: error.fault, error: error.message },
         "Settlement dispatch refused by the automation's saved configuration; not retrying",
@@ -126,7 +125,6 @@ export class AutomationSettlementDispatchService extends AutomationSettlementExe
       return;
     }
 
-    const retryable = isRetryableSettlementFailure(error);
     const handled = error instanceof Error ? error : new Error(String(error));
     this.composition.observability.capture(handled, { ...context, retryable });
     if (retryable) {
