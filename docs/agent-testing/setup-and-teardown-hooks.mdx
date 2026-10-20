@@ -1,0 +1,186 @@
+---
+title: Setup and Teardown Hooks
+sidebarTitle: Setup and teardown hooks
+keywords: langwatch, agent simulations, scenario hooks, setup, teardown, fixtures, test data, connected agent, connectAgent, connect_agent, run parameters, cleanup
+description: Create the test data a scenario needs before its first turn and remove it after its last, with setup and teardown hooks on a connected agent.
+---
+
+## What are hooks
+
+A connected agent can declare two optional hooks. **Setup** runs before the first turn of a scenario run and makes the test data the scenario needs, such as a customer with a loyalty tier or an order to refund. **Teardown** runs after the last turn and removes that data, so nothing leaks into your project.
+
+Both hooks run inside your own process, the one that already runs the agent. They reach your database, your secrets and your internal APIs the same way the agent does. LangWatch calls them over the connection the SDK already holds open, as it does for each turn.
+
+A run goes in this order: setup, then the turns, then teardown.
+
+<Note>
+  Hooks work on connected agents only. An agent that declares no hooks runs as before, and its run shows "No hooks". HTTP agents and code agents never call hooks. Hooks run for scenario runs: experiments, the Test button and `langwatch agent run` do not call them.
+</Note>
+
+## Declare the hooks
+
+Declare the hooks on the agent that `connectAgent` (TypeScript) or `@langwatch.connect_agent` (Python) returns. See [Connect your agent](/agent-testing/connect-your-agent) for the connect function itself.
+
+<CodeGroup>
+
+```typescript TypeScript
+import { connectAgent } from "langwatch/agent";
+
+const shopAssistant = connectAgent(
+  {
+    name: "shop-assistant",
+    parameters: {
+      loyalty_tier: { default: "none" },
+    },
+  },
+  async ({ messages, state }) => {
+    // `state` is what setup returned
+    return await runShopAssistant({ messages, customerId: state?.customerId });
+  },
+);
+
+shopAssistant.scenario.setup(async (run, params) => {
+  const customer = await createTestCustomer({
+    tier: params.loyalty_tier,
+    label: run.scenarioRunId,
+  });
+  return { customerId: customer.id };
+});
+
+shopAssistant.scenario.teardown(async (run, state, params) => {
+  if (!state) return;
+  await deleteTestCustomer(state.customerId as string);
+  return { deletedCustomer: state.customerId };
+});
+```
+
+```python Python
+import langwatch
+
+
+@langwatch.connect_agent(name="shop-assistant")
+async def shop_assistant(messages: list[dict], state: dict | None = None) -> str:
+    # `state` is what setup returned
+    return await run_shop_assistant(messages, customer_id=(state or {}).get("customerId"))
+
+
+@shop_assistant.scenario.setup
+async def setup(run, loyalty_tier: str = "none") -> dict:
+    customer = await create_test_customer(tier=loyalty_tier, label=run["scenarioRunId"])
+    return {"customerId": customer.id}
+
+
+@shop_assistant.scenario.teardown
+async def teardown(run, state, loyalty_tier: str = "none") -> dict | None:
+    if not state:
+        return None
+    await delete_test_customer(state["customerId"])
+    return {"deletedCustomer": state["customerId"]}
+```
+
+</CodeGroup>
+
+What each part is:
+
+- **`run`** identifies the run: `scenarioRunId`, `scenarioName` and `batchRunId`.
+- **`state`** is a JSON object. Setup returns it. Every turn receives the latest `state`, and so does teardown. A turn may return an update, and the platform keeps the newest one.
+- **`params`** are the [run parameters](/agent-testing/run-parameters) of the run. A hook reads the same value for a name that the agent and the scenario read. In Python, declare the parameters you use as keyword arguments, as in `loyalty_tier` above.
+- **Teardown's return value** is optional. If it returns an object, the run shows it.
+
+A hook parameter joins the agent's single run-parameter schema. If a name is declared twice, the types must agree, or the agent is refused at registration with `parameters_invalid`.
+
+<Note>
+  In the Python SDK, `state` is a reserved turn field. Do not name a run parameter `state`: the argument receives the scenario state, and the name is not registered as a parameter.
+</Note>
+
+## What the simulated user and the judge see
+
+The simulated user and the judge see the current `state` on every turn. That helps them grade against the real data. It also means the state is part of their prompts: it costs tokens, and the data reaches your model provider.
+
+## When hooks run, and how they fail
+
+| Situation | What happens |
+| --- | --- |
+| Setup succeeds | The turns run with the state setup returned. |
+| Setup fails, times out, or the agent is offline | No turn runs. The run ends in `ERROR` with no verdict, is shown as "Not scored", and is left out of the pass rate. Teardown is still attempted. |
+| The turns pass or fail | Teardown runs either way. |
+| Teardown fails or times out | The score does not change. The run shows the error, the state teardown was given, and "Test data may be left behind." |
+| A hook is called on an instance that did not declare it | The call fails with `hook_not_declared`. The agent function does not run. |
+| The state or teardown's returned object is over 64 KiB | The call fails with `agent_payload_too_large`. |
+
+Each hook has a **60 second** timeout. The agent's own per-turn timeout does not apply to hooks. The timeout is not configurable per scenario.
+
+Setup failures leave the pass rate for a reason: an infrastructure fault in your fixtures should not read as the agent failing. Teardown never changes the score for the opposite reason: the score is about the agent.
+
+Each run records, per hook, its status (`ok`, `failed`, `timed_out`, `skipped` or `not_run`), duration, trace, state or returned object, and error. The record keeps the first 1,000 characters of an error. Open the run in **Agent Testing** to see it.
+
+### Rerun and keep data
+
+The **Rerun and keep data** action on a run skips teardown for that one rerun, so you can inspect the data. The run shows "Teardown skipped". "Teardown not run" means teardown did not happen by accident, for example because the agent was offline.
+
+### Limits to know
+
+- If the process that runs the scenario is killed, teardown can be missed. Plan for that: see the practice on unique names below.
+- A run cancelled during its turns does not run teardown yet.
+
+## Example: a Dashboards board per run
+
+The LangWatch assistant is tested this way. Its setup creates a Dashboards board for the run, and its teardown deletes it. Both use the project REST API: [Create a Dashboards board](/api-reference/projects/create-a-dashboards-board) and [Delete a Dashboards board](/api-reference/projects/delete-a-dashboards-board).
+
+```typescript
+const base = `${process.env.LANGWATCH_ENDPOINT}/api/v1/projects/${process.env.LANGWATCH_PROJECT_ID}/analytics/boards`;
+const headers = {
+  "X-Auth-Token": process.env.LANGWATCH_API_KEY!,
+  "Content-Type": "application/json",
+};
+
+assistant.scenario.setup(async (run) => {
+  // The run id in the name makes the board unique to this run
+  const response = await fetch(base, {
+    method: "POST",
+    headers,
+    body: JSON.stringify({ name: `e2e-${run.scenarioRunId}` }),
+  });
+  if (!response.ok) throw new Error(`Board create failed: ${response.status}`);
+  const board = await response.json();
+  return { boardId: board.id, boardUrl: board.platformUrl };
+});
+
+assistant.scenario.teardown(async (_run, state) => {
+  if (!state?.boardId) return;
+  const response = await fetch(`${base}/${state.boardId}`, { method: "DELETE", headers });
+  // A 404 means the board is already gone, which is the goal
+  return { deletedBoard: response.ok, status: response.status };
+});
+```
+
+The create route takes a board `name` and returns the board with its `id`. The delete route takes the `boardId` and answers 404 for a board that is not in the project. Deleting a board leaves its widgets saved but unplaced, so a scenario that adds widgets must remove them in teardown too.
+
+## Best practices
+
+**Create fixtures in setup and remove them in teardown.** That is what the pair is for. Test data made anywhere else, such as inside a turn, is not tracked by the run and no teardown knows about it.
+
+**Return references, not data.** Put ids and URLs in the state, not whole records, and never secrets. The state goes into every call, into the prompts of the simulated user and the judge, and into the run record. It is capped at 64 KiB.
+
+**Name every fixture with the run id.** Use `run.scenarioRunId` in the name or a tag, as in the example. Runs of a suite can overlap, and a unique name keeps one run's data and counts apart from another's. It also lets you find leftovers by name if a teardown is missed.
+
+**Make teardown safe to run twice, and safe on partial state.** Teardown runs after a failed setup, and the state it receives can be missing or incomplete. Check that each id exists before deleting it, and treat "already gone" as success. Remove everything you can and report what you could not.
+
+**Return what teardown did.** The returned object is shown on the run. Return what you deleted and what you left behind, so a person can tell whether cleanup is needed. If a delete route does not exist for something setup made, say so in the object.
+
+**Keep hooks fast.** Each hook has 60 seconds, and a hook that runs out of time counts as failed. Do slow seeding once, ahead of time, and have setup pick the fixture instead of building it.
+
+**Fail loudly in setup.** If the data cannot be made, throw. The run is then marked "Not scored" and stays out of the pass rate. A setup that swallows the error and returns an empty state would let the agent be graded on data that is not there.
+
+**Keep secrets out of the hook's state and output.** Read credentials from the environment of your own process, as the example does. The state and the returned object are stored on the run and sent to the model provider.
+
+**Let the parameters pick the world.** One scenario can cover several fixtures when setup reads a run parameter, such as `loyalty_tier` above, and the scenario text reads the same value as `{{ params.loyalty_tier }}`. See [Run parameters](/agent-testing/run-parameters).
+
+**Expect hooks on scenario runs only.** Do not rely on them for experiments, the Test button or `langwatch agent run`.
+
+## Related
+
+- [Connect your agent](/agent-testing/connect-your-agent)
+- [Run parameters](/agent-testing/run-parameters)
+- [Scenarios](/agent-testing/scenarios)
+- [Results](/agent-testing/results)
